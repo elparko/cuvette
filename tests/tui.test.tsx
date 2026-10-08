@@ -248,6 +248,41 @@ describe("keys and commands", () => {
   });
 });
 
+describe("API key", () => {
+  test("the key card opens at start for Claude with no key, checks the format, and Esc closes it", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const old = process.env.GA_HOME;
+    process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-tui-key-"));
+    try {
+      const h = makeHarness();
+      const s = new FakeSession({ delayMs: 0 });
+      s.model = { ...s.model, provider: "claude", model: "claude-opus-5-5" };
+      const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} });
+      live = { h, s, done };
+      await until(() => h.all().includes("Claude API key"));
+      expect(h.all()).toContain("No Claude API key is set");
+      await submit(h, "abc");
+      await until(() => h.all().includes("A Claude API key starts with sk-ant-."));
+      expect(h.all()).not.toContain("abc");
+      await type(h, "\x1b");
+      await until(() => h.last().includes("Ask for an analysis step"));
+    } finally {
+      if (old === undefined) delete process.env.GA_HOME;
+      else process.env.GA_HOME = old;
+    }
+  });
+
+  test("/key opens the card and /key status reports no key", async () => {
+    const { h } = start();
+    await submit(h, "/key status");
+    await until(() => h.all().includes("No Claude API key is set") || h.all().includes("comes from"));
+    await submit(h, "/key");
+    await until(() => h.all().includes("Paste your key"));
+  });
+});
+
 describe("pieces", () => {
   test("settingsLine keeps scalars only", () => {
     expect(settingsLine({ tolerance_ppm: 5, min_auc: 0.7, nested: { a: 1 }, none: null })).toBe("tolerance ppm 5 · min auc 0.7");

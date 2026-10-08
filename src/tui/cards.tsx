@@ -9,7 +9,8 @@ export type Card =
   | { t: "permission"; rid: string; tool: string; args: Record<string, unknown>; code?: string; touches: string }
   | { t: "question"; q: Question }
   | { t: "instruction"; step: number; tool: string; text: string }
-  | { t: "findings"; list: Finding[] };
+  | { t: "findings"; list: Finding[] }
+  | { t: "key"; reason?: string };
 
 export function show(v: unknown): string {
   if (v === undefined || v === null || v === "") return "not set";
@@ -380,6 +381,25 @@ export function SetupCard(props: {
       })}
       {error ? <Text color="red">{error}</Text> : null}
       <Text dimColor>Arrows move. Enter edits a field. Esc closes the card.</Text>
+    </Frame>
+  );
+}
+
+export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string; onSubmit: (key: string) => void; onCancel: () => void }) {
+  const [v, setV] = useState("");
+  useInput((_, key) => {
+    if (key.escape) props.onCancel();
+  });
+  return (
+    <Frame title="Claude API key" color="cyan">
+      {props.card.reason ? <Text>{props.card.reason}</Text> : null}
+      <Text>Paste your key from console.anthropic.com. The screen shows it masked.</Text>
+      <Text dimColor>The harness checks it with the API, then saves it to {props.path}. Only your user can read that file.</Text>
+      <Box marginTop={1}>
+        <Text>Key: </Text>
+        <TextInput value={v} onChange={setV} onSubmit={(k) => props.onSubmit(k.trim())} mask="*" />
+      </Box>
+      <Text dimColor>Enter saves · Esc cancels</Text>
     </Frame>
   );
 }

@@ -21,10 +21,16 @@ node bin/ga.js adapters
 ### With Claude
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...        # or: ant auth login
-node bin/ga.js --adapter imagej --model claude
+node bin/ga.js --adapter imagej --model claude   # asks for the key at start if none is set
+node bin/ga.js key                               # or save the key from the shell
+node bin/ga.js key status                        # shows which key is used (masked)
 node bin/ga.js --adapter imagej --model claude:claude-sonnet-5-5 --referee claude:claude-haiku-5-5
 ```
+
+The harness checks the key with the API and saves it to `~/.guided-analysis/credentials.json`.
+Only your user can read that file. Inside the app, type `/key` to change it, `/key status` to see
+it masked, and `/key remove` to delete it. `ANTHROPIC_API_KEY` in the shell wins over the saved
+key. `ant auth login` also works.
 
 ### With a small local model (Ollama)
 

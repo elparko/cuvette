@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Box, Static, Text, render, useApp, useInput, useStdout } from "ink";
 import TextInput from "ink-text-input";
 import type { BusEvent, Mode } from "../core/types.ts";
-import { FindingsCard, InstructionCard, PermissionCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
+import { FindingsCard, InstructionCard, KeyCard, PermissionCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
+import { claudeKey, credentialsPath, keyProblem, maskKey, saveClaudeKey } from "../core/credentials.ts";
+import { checkClaudeKey } from "../providers/claude.ts";
 import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from "./commands.ts";
 import { imageProtocol, inlineImage } from "./image.ts";
 import { Mapper, type Item } from "./items.ts";
@@ -48,6 +50,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
       setCards((x) => {
         if (c.t === "question" && x.some((y) => y.t === "question" && y.q.qid === c.q.qid)) return x;
         if (c.t === "setup" && x.some((y) => y.t === "setup")) return x;
+        if (c.t === "key") return x.some((y) => y.t === "key") ? x : [c, ...x];
         return [...x, c];
       }),
     [],
@@ -75,7 +78,29 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     if (opts.autoSetup !== false && session.decisions.fields().some((f) => f.essential && !f.set)) {
       void openSetup({ openCard: addCard } as CommandCtx);
     }
+    if (session.model.provider === "claude" && claudeKey(env).from === "none") {
+      addCard({ t: "key", reason: "No Claude API key is set. Add one now, or press Esc if you use `ant auth login`." });
+    }
   }, []);
+
+  const submitKey = useCallback(
+    async (key: string) => {
+      const problem = keyProblem(key);
+      if (problem) return line("✗", problem, "red");
+      popCard();
+      line("·", `Checking the key ${maskKey(key)} with the Claude API…`, undefined, true);
+      const r = await checkClaudeKey(key, session.model.provider === "claude" ? session.model.model : undefined);
+      if (!r.ok) {
+        line("✗", r.text, "red");
+        addCard({ t: "key", reason: r.text });
+        return;
+      }
+      const path = saveClaudeKey(key);
+      line("✓", `${r.text} Saved to ${path}.`, "green");
+      if (env.ANTHROPIC_API_KEY) line("!", "ANTHROPIC_API_KEY is also set in this shell. The harness uses that one first.", "yellow");
+    },
+    [session, env],
+  );
 
   useEffect(() => {
     return session.bus.on((e: BusEvent) => {
@@ -310,6 +335,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         />
       ) : null}
       {card?.t === "findings" ? <FindingsCard key="findings" card={card} session={session} onClose={popCard} /> : null}
+      {card?.t === "key" ? <KeyCard key="key" card={card} path={credentialsPath()} onSubmit={(k) => void submitKey(k)} onCancel={popCard} /> : null}
       <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
         <Text color="cyan">{"> "}</Text>
         {card ? (

@@ -15,6 +15,7 @@ Usage
   ga adapter approve <name|dir> --by <name>
   ga onboard <program> --model <model> [--docs <url>] [--kind cli]
   ga models                            list the models
+  ga key [status|remove]               save, show or remove your Claude API key
   ga sessions                          list the sessions
   ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow
   ga replay <flow.json> [--input name=path ...] [--session <id>]
@@ -159,6 +160,23 @@ async function main() {
       await runTui(s as never, { firstMessage: plan.firstMessage });
       return s.close();
     }
+    case "key": {
+      const cred = await import("./core/credentials.ts");
+      if (a1 === "status") {
+        const k = cred.claudeKey();
+        return console.log(k.from === "none" ? "No Claude API key is set." : `${cred.maskKey(k.key!)} from ${k.from === "env" ? "ANTHROPIC_API_KEY" : cred.credentialsPath()}`);
+      }
+      if (a1 === "remove") return console.log(cred.removeClaudeKey() ? `Removed the key from ${cred.credentialsPath()}.` : "No key was saved.");
+      if (a1) return fail("usage: ga key [status|remove]");
+      const key = (await readSecret("Claude API key: ")).trim();
+      const problem = cred.keyProblem(key);
+      if (problem) return fail(problem);
+      const { checkClaudeKey } = await import("./providers/claude.ts");
+      const r = await checkClaudeKey(key);
+      if (!r.ok) return fail(r.text);
+      console.log(`${r.text} Saved to ${cred.saveClaudeKey(key)}.`);
+      return;
+    }
     case "models": {
       const { listModels } = await import("./providers/index.ts");
       for (const m of await listModels()) console.log(`${m.spec.padEnd(32)} ${m.local ? "local" : "cloud"} tools:${m.tools ? "yes" : "no"} context:${m.contextWindow}  ${m.label}`);
@@ -220,3 +238,36 @@ async function main() {
 }
 
 main().catch((e) => fail(`ga: ${(e as Error).message}`));
+
+async function readSecret(prompt: string): Promise<string> {
+  const input = process.stdin;
+  if (!input.isTTY) {
+    let all = "";
+    for await (const c of input) all += c;
+    return all;
+  }
+  process.stderr.write(prompt);
+  input.setRawMode(true);
+  input.resume();
+  input.setEncoding("utf8");
+  return new Promise((resolve) => {
+    let v = "";
+    const done = (out: string) => {
+      input.setRawMode(false);
+      input.pause();
+      input.off("data", on);
+      process.stderr.write("\n");
+      resolve(out);
+    };
+    const on = (chunk: string) => {
+      for (const ch of chunk) {
+        if (ch === "\r" || ch === "\n") return done(v);
+        if (ch === "\u0003") return done("");
+        if (ch === "\u007f" || ch === "\b") {
+          if (v.length) (v = v.slice(0, -1)), process.stderr.write("\b \b");
+        } else if (ch >= " ") (v += ch), process.stderr.write("*");
+      }
+    };
+    input.on("data", on);
+  });
+}

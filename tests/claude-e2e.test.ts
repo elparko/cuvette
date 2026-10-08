@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
-import { ClaudeProvider } from "../src/providers/claude.ts";
+import { saveClaudeKey } from "../src/core/credentials.ts";
+import { checkClaudeKey, ClaudeProvider } from "../src/providers/claude.ts";
 
 type Block =
   | { type: "thinking"; thinking: string; signature: string }
@@ -264,9 +265,30 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     );
   }
 
+  test("the saved key is used when the shell has none, and a new key takes effect at once", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    saveClaudeKey("sk-ant-saved-one-0000");
+    const p = new ClaudeProvider("claude-opus-5-5");
+    const ask = () => p.step({ system: "s", messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }], tools: [] });
+    replies = [{ blocks: [{ type: "text", text: "a" }] }, { blocks: [{ type: "text", text: "b" }] }];
+    await ask();
+    saveClaudeKey("sk-ant-saved-two-1111");
+    await ask();
+    expect(captured.map((c) => c.headers["x-api-key"])).toEqual(["sk-ant-saved-one-0000", "sk-ant-saved-two-1111"]);
+  });
+
+  test("checkClaudeKey accepts a working key and rejects a 401", async () => {
+    replies = [{}];
+    expect(await checkClaudeKey("sk-ant-good")).toMatchObject({ ok: true, text: "The key works. It can use claude-opus-5-5." });
+    expect(captured[0]!.url).toBe("/v1/models/claude-opus-5-5");
+    expect(captured[0]!.headers["x-api-key"]).toBe("sk-ant-good");
+    replies = [{ status: 401, error: { type: "authentication_error", message: "invalid x-api-key" } }];
+    expect(await checkClaudeKey("sk-ant-bad")).toMatchObject({ ok: false });
+  });
+
   test("401 gives the credentials message", async () => {
     const msg = await stepError({ status: 401, error: { type: "authentication_error", message: "invalid x-api-key" } });
-    expect(msg).toBe("No valid Claude credentials. Set ANTHROPIC_API_KEY or run `ant auth login`.");
+    expect(msg).toBe("No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`.");
   });
 
   test("401 inside a session ends the turn with that message", async () => {
@@ -274,7 +296,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     const s = await labSession();
     await s.send("hi");
     const errors = s.record.entries(["error"]).map((e) => String(e.data.message));
-    expect(errors).toEqual(["No valid Claude credentials. Set ANTHROPIC_API_KEY or run `ant auth login`."]);
+    expect(errors).toEqual(["No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`."]);
   });
 
   test("429, 500, 529 and 403 are reported in plain words", async () => {

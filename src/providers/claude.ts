@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
 import { ProviderError } from "../core/types.ts";
+import { claudeKey, keyVersion } from "../core/credentials.ts";
 import { ImageBudget } from "./images.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
 const MAX_TOKENS = 64000;
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
-const NO_CREDENTIALS = "No valid Claude credentials. Set ANTHROPIC_API_KEY or run `ant auth login`.";
+const NO_CREDENTIALS = "No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`.";
 
 export interface ClaudeOpts {
   apiKey?: string;
@@ -39,14 +40,26 @@ function toolResultContent(text: string, images: { media: string; data: string }
 
 export class ClaudeProvider implements Provider {
   info: ModelInfo;
-  private client: any;
+  private fixedClient: any;
+  private apiKey?: string;
+  private made?: { client: any; version: number };
   private effort: string;
   private fallbacks = true;
 
   constructor(readonly model: string, opts: ClaudeOpts = {}) {
     this.info = { provider: "claude", model, contextWindow: 1_000_000, vision: true, small: false };
     this.effort = opts.effort || (model === "claude-haiku-5-5" ? "medium" : "high");
-    this.client = opts.client ?? (opts.apiKey ? new Anthropic({ apiKey: opts.apiKey }) : new Anthropic());
+    this.fixedClient = opts.client;
+    this.apiKey = opts.apiKey;
+  }
+
+  private get client(): any {
+    if (this.fixedClient) return this.fixedClient;
+    if (!this.made || this.made.version !== keyVersion()) {
+      const key = this.apiKey ?? claudeKey().key;
+      this.made = { client: key ? new Anthropic({ apiKey: key }) : new Anthropic(), version: keyVersion() };
+    }
+    return this.made.client;
   }
 
   toNative(messages: Message[]): unknown[] {
@@ -193,5 +206,17 @@ export class ClaudeProvider implements Provider {
     } catch (e) {
       throw mapError(e, this.model);
     }
+  }
+}
+
+export async function checkClaudeKey(key: string, model = DEFAULT_CLAUDE_MODEL): Promise<{ ok: boolean; text: string }> {
+  try {
+    await new Anthropic({ apiKey: key }).models.retrieve(model);
+    return { ok: true, text: `The key works. It can use ${model}.` };
+  } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) return { ok: false, text: "The API rejected this key (HTTP 401). Check it and try again." };
+    if (e instanceof Anthropic.NotFoundError || e instanceof Anthropic.PermissionDeniedError) return { ok: true, text: `The key works, but it cannot use ${model}.` };
+    if (e instanceof Anthropic.APIConnectionError) return { ok: true, text: "Cannot reach the Claude API to check the key. It is saved; the first request will test it." };
+    return { ok: true, text: `Cannot check the key: ${(e as Error).message}. It is saved; the first request will test it.` };
   }
 }
