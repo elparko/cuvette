@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { Session } from "../src/core/session.ts";
+import { Session, announcesStep, endsWithPromise } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
 let session: Session | undefined;
@@ -263,4 +263,15 @@ test("an answer that still ends with a promise after three nudges is marked unfi
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   await session.send("Count");
   expect(session.findings.list().some((f) => f.check === "answer_unfinished")).toBe(true);
+});
+
+test("a promise survives a file name with a dot and verbs such as analyze", () => {
+  expect(endsWithPromise("Done with the trajectory.\n\nNext, I will analyze the closed structure (1AKE.pdb) to see how different it is from chain A.")).toBe(true);
+  expect(endsWithPromise("The RMSD is 6.8 A. We need to run the filter next.")).toBe(true);
+  expect(endsWithPromise("The RMSD is 6.8 A. The structures differ by 7.1 A.")).toBe(false);
+});
+
+test("an answer that says it needs to run a tool is an announced step", () => {
+  expect(announcesStep("3. To keep the variants, we need to run the `filter_variants` tool. This will give the count.")).toBe(true);
+  expect(announcesStep("The count is 328. We checked the filter.")).toBe(false);
 });

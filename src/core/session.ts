@@ -102,9 +102,18 @@ function abortable<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
   });
 }
 
+const ACTION = "use|call|run|compute|count|measure|perform|fit|check|merge|filter|align|infer|analy[sz]e|calculate|load|inspect|compare|plot|apply|test|examine|determine|fetch|read";
+
 export function endsWithPromise(text: string): boolean {
+  const last = text.trim().slice(-400).split(/(?<=[.!?:])\s+/).at(-1) ?? "";
+  const intent = /\b(I will|I'll|we will|we'll|Let me|Let's|(?:Next|Now),? (?:I|we)|I am going to|I'm going to|we are going to|we're going to)\b/i;
+  const need = new RegExp(`\\b(?:I|we) (?:need|have|must) to (?:${ACTION})\\b|\\bthe next step is to\\b`, "i");
+  return intent.test(last) || need.test(last);
+}
+
+export function announcesStep(text: string): boolean {
   const tail = text.trim().slice(-400);
-  return /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I need to|I have to|the next step is to)\s+(use|call|run|compute|count|measure|perform|fit|check|merge|filter|align|infer)\b[^.?!]*[.:]?\s*$/i.test(tail);
+  return new RegExp(`\\b(?:I will|I'll|we will|we'll) (?:now )?(?:${ACTION})\\b|\\b(?:I|we) (?:need|have|must) to (?:${ACTION})\\b|\\bthe next step is to\\b`, "i").test(tail);
 }
 
 export class Session {
@@ -361,7 +370,7 @@ export class Session {
         }
         if (!calls.length && nudges < 3) {
           const tail = said.slice(-400);
-          const promise = /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I will|I'll) (now )?(use|call|run|compute|count|measure|perform|fit|check)\b/i.test(tail) || /\b(I need to|I have to|I must|the next step is to|next, I need to)\s+(use|call|run|compute|count|measure|perform|fit|check|merge|filter|align|infer)\b/i.test(tail);
+          const promise = endsWithPromise(said) || announcesStep(said);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
           const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
