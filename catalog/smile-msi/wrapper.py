@@ -174,6 +174,8 @@ def _summary(name, args, out, m):
         return f"Opened {out['ref']}: {out['n_pixels']} pixels, {len(out['regions'])} regions."
     if name == "annotate":
         return f"Matched {m.get('n_matched', 0)} of {m.get('n_rows', 0)} features to a lipid ({args['mode']} mode)."
+    if name == "run_script":
+        return f"Script: {out['summary']}."
     if name == "apply_settings":
         return "Changed: " + (", ".join(out["changed"]) or "nothing") + "."
     if name == "state":
@@ -208,6 +210,8 @@ def _decorate(name, args, out):
         route = _route(name, args)
     except Exception:
         route = NO_ROUTE
+    if isinstance(out.get("summary"), str):
+        out["engine_summary"] = out["summary"]
     out.update(metrics=m, outputs=outputs, manual_route=route, summary=_summary(name, args, out, m))
     return out
 

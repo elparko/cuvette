@@ -47,11 +47,18 @@ def stage1_call(tool, args):
     return getattr(mcpserver, tool)(**args)
 
 
+def records(t):
+    if "preview" in t:
+        return t["preview"]
+    return [dict(zip(t["columns"], row)) for row in t["rows"]]
+
+
 def digest(tool, args, out):
     d = {}
     t = out.get("table")
+    rec = records(t) if t else []
     if tool == "open_slide":
-        d = {"n_pixels": out.get("n_pixels"), "groups": out.get("groups") or out.get("resolved_groups")}
+        d = {"n_pixels": out.get("n_pixels"), "groups": out.get("resolved_groups") or out.get("groups")}
     elif tool == "apply_settings":
         d = {"changed": sorted(out.get("changed") or out.get("changes", {}))}
     elif tool == "run_script":
@@ -60,12 +67,12 @@ def digest(tool, args, out):
         d = {k: out[k] for k in ("n_features", "n_detected")}
         d["first_mz"] = out["mz"][:5]
     elif tool in ("run_analysis", "annotate"):
-        d = {"n_rows": t["n_rows"], "first_mz": [r["mz"] for r in t["preview"][:3]]}
+        d = {"n_rows": t["n_rows"], "first_mz": [r["mz"] for r in rec[:3]]}
         if tool == "run_analysis":
-            d["engine_summary"] = out["summary"]
-            d["top_auc"] = [r.get("AUC") for r in t["preview"][:3]]
+            d["engine_summary"] = out.get("engine_summary", out["summary"])
+            d["top_auc"] = [r.get("AUC") for r in rec[:3]]
         else:
-            d["lipids"] = [r["lipid"] for r in t["preview"]]
+            d["lipids"] = [r["lipid"] for r in rec]
         d["csv_sha256"] = hashlib.sha256(open(t["path"] if "path" in t else t["csv"], "rb").read()).hexdigest()[:12]
     return d
 

@@ -5,6 +5,7 @@ import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { makeProvider } from "../providers/index.ts";
 import { coreTools } from "../tools/core.ts";
+import { taskTool } from "../tools/task.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer } from "./claims.ts";
 import { compact, needsCompaction, summaryMessage } from "./compaction.ts";
@@ -135,6 +136,7 @@ export class Session {
   private callCount = 0;
   private lastAnswer = "";
   private waitedQids = new Set<string>();
+  private timer?: ReturnType<typeof setInterval>;
 
   private constructor(id: string, cwd: string, settings: Settings) {
     this.id = id;
@@ -225,6 +227,7 @@ export class Session {
         log: (kind, data) => this.record.append(kind, data),
       }),
     );
+    if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.pipeline(t, a, id, sig) }));
     for (const t of extra) if (!this.tools.has(t.name)) this.tools.set(t.name, t);
     this.chooseActiveTools();
 
@@ -252,6 +255,15 @@ export class Session {
       });
     }
     await this.hooks.event("SessionStart", { session: this.id });
+    this.timer = setInterval(() => this.expireQuestions(), 30_000);
+    this.timer.unref?.();
+  }
+
+  expireQuestions(now = Date.now()) {
+    for (const q of this.questions.expire(now)) {
+      if (q.status === "defaulted" && q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by: "human", reason: `default after the time limit of ${q.qid}` });
+      this.notes.push(q.status === "defaulted" ? `Question ${q.qid} reached its time limit. The default ${String(q.answer)} applies.` : `Question ${q.qid} reached its time limit with no answer. That branch stays stopped.`);
+    }
   }
 
   private chooseActiveTools() {
@@ -829,6 +841,7 @@ export class Session {
   }
 
   async close(): Promise<void> {
+    if (this.timer) clearInterval(this.timer);
     this.interrupt();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
   }

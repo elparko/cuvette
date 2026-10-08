@@ -17,6 +17,9 @@ proof of concept. The general harness is in this repo.
 | 2026-10-07 | **Model choice belongs to the user.** |
 | 2026-10-07 | **Two ways to get adapters:** a hosted catalog of adapters that we build and test, and a published adapter spec, so that people can use a model to build their own. |
 | 2026-10-07 | **First adapter:** SMILE MSI. |
+| 2026-10-08 | **TypeScript, not Python.** The harness is a Node terminal agent built on the principles of Claude Code and OpenCode (see `docs/harness-survey.md` and `docs/architecture.md`). The stack table below is the earlier proposal; `docs/architecture.md` replaces it. Adapters can still wrap Python programs. |
+| 2026-10-08 | **Terminal first.** The window is a later graph view over the same session. |
+| 2026-10-08 | **Second adapter:** ImageJ, through its macro language. |
 | Open | **Product name.** Parker wants a proprietary name. |
 
 ## Design rules

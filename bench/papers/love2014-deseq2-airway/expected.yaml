@@ -1,0 +1,28 @@
+tool: DESeq2 (R) or pydeseq2 (Python)
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/love2014-deseq2-airway/airway_counts.csv
+  - /Volumes/T7/guided-analysis/data/love2014-deseq2-airway/airway_coldata.csv
+decisions:
+  design: "~ cell + dex"
+  reference_level: untrt
+  replication_unit: "cell line (4 pairs)"
+  low_count_filter: "counts >= 10 in at least 4 samples"
+  fdr_cutoff: 0.1
+  fold_change_cutoff: "none (lfcThreshold 1 as optional stricter test)"
+  exclusions: none
+expected:
+  - {description: "genes after pre-filter, workflow", value: 16637, tolerance: 600, source: "rnaseqGene workflow, section 4.1"}
+  - {description: "genes with padj < 0.1, workflow", value: 4381, tolerance: 400, source: "rnaseqGene workflow, results section"}
+  - {description: "up-regulated at padj < 0.1, workflow", value: 2362, tolerance: 250, source: "rnaseqGene workflow, summary(res)"}
+  - {description: "down-regulated at padj < 0.1, workflow", value: 2019, tolerance: 250, source: "rnaseqGene workflow, summary(res)"}
+  - {description: "genes with padj < 0.05, workflow", value: 3602, tolerance: 400, source: "rnaseqGene workflow, results(alpha=0.05)"}
+  - {description: "genes with padj < 0.1 on this CSV, pydeseq2 0.5.4", value: 4643, tolerance: 100, source: "computed"}
+  - {description: "genes with padj < 0.05 on this CSV, pydeseq2 0.5.4", value: 3872, tolerance: 100, source: "computed"}
+notes: |
+  R is not installed. Use pydeseq2 or give the R script as text only.
+  The workflow numbers come from a newer gene annotation than the airway package CSV; a close match to the workflow needs tolerance of several hundred genes.
+  The DESeq2 2014 paper does not report airway counts. Numbers come from the rnaseqGene workflow.
+  Trap: leaving out the cell term in the design changes the result. The scientist owns this choice.
+  Trap: pydeseq2 needs samples as rows, so transpose the CSV.
+  I did not verify the gene symbol of the top Ensembl id.

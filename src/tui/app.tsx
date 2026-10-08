@@ -262,6 +262,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           card={card}
           onAllow={() => (session.respondPermission(card.rid, true), popCard())}
           onAlways={() => (session.respondPermission(card.rid, true, "", true), popCard())}
+          onInterrupt={() => (session.interrupt(), popCard())}
           onDeny={(note) => (session.respondPermission(card.rid, false, note), popCard())}
         />
       ) : null}
@@ -282,6 +283,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           card={card}
           program={program}
           onDone={() => (popCard(), void session.followDone(card.step))}
+          onInterrupt={() => (session.interrupt(), popCard())}
           onAgent={() => (popCard(), void session.followDone(card.step, "", true))}
         />
       ) : null}

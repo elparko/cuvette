@@ -1,0 +1,23 @@
+tool: RDKit
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/delaney2004-esol/delaney-processed.csv
+decisions:
+  logp_method: "RDKit Crippen MolLogP"
+  hbd_hba_definition: "rdkit.Chem.Lipinski NumHDonors / NumHAcceptors"
+  rule_of_five_cutoffs: "MW > 500, logP > 5, HBD > 5, HBA > 10"
+  allowed_violations: 1
+  esol_equation: "0.16 - 0.63*logP - 0.0062*MW + 0.066*RB - 0.74*AP"
+expected:
+  - {description: "molecules parsed", value: 1128, tolerance: 0, source: "computed"}
+  - {description: "molecules with zero rule-of-five violations", value: 1018, tolerance: 5, source: "computed, RDKit 2026.03.6"}
+  - {description: "molecules with 2 or more violations", value: 12, tolerance: 3, source: "computed, RDKit 2026.03.6"}
+  - {description: "molecules with logP > 5", value: 97, tolerance: 5, source: "computed, RDKit 2026.03.6"}
+  - {description: "R2 of ESOL equation (Crippen logP) vs measured", value: 0.752, tolerance: 0.03, source: "computed"}
+  - {description: "RMSE of ESOL equation vs measured, log units", value: 1.10, tolerance: 0.1, source: "computed"}
+  - {description: "R2 reported by Delaney", value: 0.74, tolerance: 0.05, source: "Walters 2018 blog (secondary); not read in the paper"}
+notes: |
+  The 2004 paper does not report rule-of-five counts. Those values are computed.
+  The Delaney R2 0.74 comes from a blog post, not from the ACS text. Mark as unverified.
+  Counts shift by a few molecules between RDKit versions because the Crippen and acceptor definitions change.
+  Trap: SMILES in the CSV have a trailing space; strip it.

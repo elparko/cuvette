@@ -1,0 +1,22 @@
+tool: samtools
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/li2009-samtools/ex1.fa
+  - /Volumes/T7/guided-analysis/data/li2009-samtools/ex1.sam.gz
+decisions:
+  reference_supplied_for_header: ex1.fa
+  min_mapq_for_count: "none for flagstat; 30 for the MAPQ count"
+  region: "seq2:100-200"
+expected:
+  - {description: "total reads", value: 3307, tolerance: 0, source: "computed, samtools flagstat 1.24"}
+  - {description: "mapped reads", value: 3271, tolerance: 0, source: "computed, samtools flagstat 1.24"}
+  - {description: "properly paired reads", value: 3144, tolerance: 0, source: "computed, samtools flagstat 1.24"}
+  - {description: "singletons", value: 127, tolerance: 0, source: "computed, samtools flagstat 1.24"}
+  - {description: "reads mapped to seq1", value: 1482, tolerance: 0, source: "computed, samtools idxstats"}
+  - {description: "reads mapped to seq2", value: 1789, tolerance: 0, source: "computed, samtools idxstats"}
+  - {description: "reads with MAPQ >= 30", value: 3210, tolerance: 0, source: "computed, samtools view -c -q 30"}
+  - {description: "reads in seq2:100-200", value: 79, tolerance: 0, source: "computed, samtools view -c"}
+notes: |
+  The paper has no numeric results for this data. All values are computed.
+  Trap: the SAM has no header. `samtools view -b` fails with "no SQ lines present" unless the agent passes -T ex1.fa (or runs faidx and -t).
+  samtools is not installed here; install samtools or use pysam.

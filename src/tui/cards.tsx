@@ -46,14 +46,16 @@ export function PermissionCard(props: {
   onAllow: () => void;
   onAlways: () => void;
   onDeny: (note?: string) => void;
+  onInterrupt: () => void;
 }) {
   const { card } = props;
   const [asking, setAsking] = useState(false);
   useInput(
-    (input) => {
+    (input, key) => {
       if (input === "y") props.onAllow();
       else if (input === "a") props.onAlways();
       else if (input === "n") setAsking(true);
+      else if (key.escape) props.onInterrupt();
     },
     { isActive: !asking },
   );
@@ -149,10 +151,12 @@ export function InstructionCard(props: {
   program: string;
   onDone: () => void;
   onAgent: () => void;
+  onInterrupt: () => void;
 }) {
   useInput((input, key) => {
     if (key.return) props.onDone();
     else if (input === "s") props.onAgent();
+    else if (key.escape) props.onInterrupt();
   });
   const { card } = props;
   return (
@@ -160,7 +164,7 @@ export function InstructionCard(props: {
       <Text>{card.text}</Text>
       <Box marginTop={1}>
         <Text>
-          Do this step in {props.program}, then press <Text bold>Enter</Text>. Press <Text bold>s</Text> to let the agent do it.
+          Do this step in {props.program}, then press <Text bold>Enter</Text>. Press <Text bold>s</Text> to let the agent do it. Esc stops the agent.
         </Text>
       </Box>
     </Frame>

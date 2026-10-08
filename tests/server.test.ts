@@ -1,0 +1,140 @@
+import { afterEach, describe, expect, test } from "vitest";
+import { FakeSession } from "../src/tui/fake-session.ts";
+import { ntfyNotifier, setWindowUrl } from "../src/server/notify.ts";
+import { startWindow } from "../src/server/window.ts";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+
+const closers: (() => void)[] = [];
+afterEach(() => {
+  while (closers.length) closers.pop()!();
+});
+
+async function open() {
+  const s = new FakeSession({ delayMs: 0 });
+  const w = await startWindow(s, { port: 0 });
+  closers.push(w.close);
+  const u = new URL(w.url);
+  return { s, w, base: u.origin, token: u.searchParams.get("t")! };
+}
+
+async function runToQuestion(s: FakeSession) {
+  const run = s.send("go");
+  await new Promise<void>((resolve) => {
+    const off = s.bus.on((e) => {
+      if (e.type === "permission") {
+        off();
+        s.respondPermission(e.rid, true);
+        resolve();
+      }
+    });
+  });
+  while (s.questions.open().length === 0) await new Promise((r) => setTimeout(r, 10));
+  return run;
+}
+
+describe("window server", () => {
+  test("serves one self-contained page with the token", async () => {
+    const { w, base, token } = await open();
+    expect(w.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/\?t=.{20,}$/);
+    const res = await fetch(w.url);
+    const html = await res.text();
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(html).toContain(JSON.stringify(token));
+    expect(html).toContain("prefers-color-scheme: dark");
+    expect(html).not.toMatch(/(src|href)="https?:/);
+    expect((await fetch(base + "/")).status).toBe(401);
+    expect((await fetch(base + "/api/state?t=wrong")).status).toBe(401);
+  });
+
+  test("rejects a foreign Host header", async () => {
+    const { base, token } = await open();
+    const res = await fetch(`${base}/api/state?t=${token}`, { headers: { host: "evil.example" } }).catch(() => undefined);
+    expect(res === undefined || res.status === 403).toBe(true);
+  });
+
+  test("state holds nodes, edges, stale marks, trail, questions and decisions", async () => {
+    const { s, base, token } = await open();
+    const run = runToQuestion(s);
+    await run.catch(() => {});
+    const q = s.questions.open()[0]!;
+    const state = await (await fetch(`${base}/api/state?t=${token}`)).json();
+    expect(state.nodes.map((n: { id: string }) => n.id)).toEqual(["n1", "n2"]);
+    expect(state.edges).toEqual([["n1", "n2"]]);
+    expect(state.questions[0].qid).toBe(q.qid);
+    expect(state.decisions.map((d: { key: string }) => d.key)).toContain("tolerance_ppm");
+    expect(state.trail.length).toBeGreaterThan(0);
+    s.setDecision("normalization", "RMS");
+    const after = await (await fetch(`${base}/api/state?t=${token}`)).json();
+    expect(after.stale).toContain("n2");
+  });
+
+  test("POST /api/answer answers an open question", async () => {
+    const { s, base, token } = await open();
+    void runToQuestion(s);
+    while (s.questions.open().length === 0) await new Promise((r) => setTimeout(r, 10));
+    const q = s.questions.open()[0]!;
+    const bad = await fetch(`${base}/api/answer?t=${token}`, { method: "POST", body: JSON.stringify({ qid: "zz", value: 1 }) });
+    expect(bad.status).toBe(404);
+    const ok = await fetch(`${base}/api/answer?t=${token}`, { method: "POST", body: JSON.stringify({ qid: q.qid, value: 0.8 }) });
+    expect(ok.status).toBe(200);
+    expect(s.record.entries(["answer"])[0]!.data.value).toBe(0.8);
+    const noToken = await fetch(`${base}/api/answer`, { method: "POST", body: "{}" });
+    expect(noToken.status).toBe(401);
+  });
+
+  test("serves blobs by hash and nothing else", async () => {
+    const { s, base, token } = await open();
+    const sha = s.record.putBlob(Buffer.from("png-bytes"), ".png");
+    const res = await fetch(`${base}/api/blob/${sha}?t=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(await res.text()).toBe("png-bytes");
+    expect((await fetch(`${base}/api/blob/..%2F..%2Fetc%2Fpasswd?t=${token}`)).status).toBe(404);
+    expect((await fetch(`${base}/api/blob/${"0".repeat(64)}?t=${token}`)).status).toBe(404);
+  });
+
+  test("streams bus events over SSE", async () => {
+    const { s, base, token } = await open();
+    const res = await fetch(`${base}/events?t=${token}`);
+    expect(res.headers.get("content-type")).toBe("text/event-stream");
+    const reader = res.body!.getReader();
+    await reader.read();
+    s.record.append("note", { text: "hello window" });
+    const chunk = new TextDecoder().decode((await reader.read()).value);
+    expect(chunk).toContain('"type":"entry"');
+    expect(chunk).toContain("hello window");
+    await reader.cancel();
+  });
+});
+
+describe("ntfy notifier", () => {
+  test("posts the question title and the window URL", async () => {
+    const got: { body: string; title?: string; click?: string }[] = [];
+    const srv = createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        got.push({ body, title: req.headers.title as string, click: req.headers.click as string });
+        res.end("ok");
+      });
+    });
+    await new Promise<void>((r) => srv.listen(0, "127.0.0.1", r));
+    closers.push(() => srv.close());
+    const topic = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/my-topic`;
+    const q = { qid: "q1", title: "Which cutoff?", text: "Pick one." } as never;
+    setWindowUrl(undefined);
+    await ntfyNotifier(topic)(q);
+    expect(got[0]!.body).toBe("Which cutoff?\nPick one.");
+    expect(got[0]!.click).toBeUndefined();
+    setWindowUrl("http://127.0.0.1:9/?t=abc");
+    await ntfyNotifier(topic)(q);
+    expect(got[1]!.body).toContain("http://127.0.0.1:9/?t=abc");
+    expect(got[1]!.click).toBe("http://127.0.0.1:9/?t=abc");
+    setWindowUrl(undefined);
+  });
+
+  test("does not throw when the topic is unreachable", async () => {
+    await expect(ntfyNotifier("http://127.0.0.1:1/x")({ title: "t", text: "" } as never)).resolves.toBeUndefined();
+  });
+});

@@ -60,7 +60,7 @@ describe("transcript", () => {
     expect(text).toContain("⚠ Deviation: tolerance ppm 10 (setup says 5)");
     expect(text).toContain("● Step 3  Found 14 features different between endo and epi");
     expect(text).toContain("▸ Analyze > Discriminating features · group a endo");
-    expect(text).toMatch(/image: .*\.png \(open with \/open 1\)/);
+    expect(text).toMatch(/image: [\s\S]*\.png[\s\S]*\(open with \/open 1\)/);
     expect(text).toContain("✗ Step 4  Folder is read-only");
     expect(text).toContain("◇ code only: no manual route");
     expect(text).toMatch(/\d+(\.\d)?k? in \/ \d+ out/);
@@ -137,6 +137,7 @@ describe("cards", () => {
     await type(h, "\x1b[B");
     h.type("\r");
     await sleep(40);
+    await type(h, "\x7f");
     await type(h, "12");
     h.type("\r");
     await sleep(40);
@@ -144,7 +145,7 @@ describe("cards", () => {
     h.type("\r");
     await until(() => s.record.entries(["setup"]).length === 1);
     expect(s.decisions.value("question")).toBe("Does X differ?");
-    expect(s.decisions.value("tolerance_ppm")).toBe(512);
+    expect(s.decisions.value("tolerance_ppm")).toBe(12);
   });
 });
 
