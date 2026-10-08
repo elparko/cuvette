@@ -1,0 +1,32 @@
+tool: flowkit
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/white2021-flowkit/src/data/8_color_data_set/fcs_files/101_DEN084Y5_15_E01_008_clean.fcs
+  - /Volumes/T7/guided-analysis/data/white2021-flowkit/src/data/8_color_data_set/8_color_ICS.wsp
+decisions:
+  gating_file: /Volumes/T7/guided-analysis/data/white2021-flowkit/src/data/8_color_data_set/8_color_ICS.wsp
+  compensation: gating_file
+  free_compensation: none
+  compensation_matrix: ""
+  control_sample: ""
+  transform: logicle
+expected:
+  - {description: "events in the file", value: 290172, tolerance: 0, source: "workspace SampleNode count; FCS event count read by FlowKit"}
+  - {description: "CD3+ events, FlowKit, matrix of the workspace", value: 133670, tolerance: 0, source: "FlowKit test test_get_gate_events asserts 133670; computed 133670 with FlowKit 1.3.2"}
+  - {description: "CD3+ events, FlowJo count stored in the workspace", value: 133860, tolerance: 0, source: "8_color_ICS.wsp, Count attribute"}
+  - {description: "CD4+ events, FlowKit", value: 82484, tolerance: 0, source: "computed with FlowKit 1.3.2"}
+  - {description: "CD4+ events, FlowJo", value: 82636, tolerance: 0, source: "8_color_ICS.wsp"}
+  - {description: "CD8+ events, FlowKit", value: 47165, tolerance: 0, source: "computed with FlowKit 1.3.2"}
+  - {description: "CD8+ events, FlowJo", value: 47241, tolerance: 0, source: "8_color_ICS.wsp"}
+  - {description: "largest difference FlowKit minus FlowJo, percent of FlowJo count, gates CD3+, CD4+, CD8+", value: -0.184, tolerance: 0.02, source: "computed: -0.142, -0.184, -0.161 percent"}
+  - {description: "CD3+ events, compensation none", value: 135381, tolerance: 0, source: "computed with FlowKit 1.3.2"}
+  - {description: "CD4+ events, compensation none", value: 85369, tolerance: 0, source: "computed with FlowKit 1.3.2"}
+  - {description: "CD8+ events, compensation none", value: 47694, tolerance: 0, source: "computed with FlowKit 1.3.2"}
+  - {description: "CD8+ IFNg+ events, compensation none (2 with the matrix)", value: 672, tolerance: 0, source: "computed with FlowKit 1.3.2"}
+  - {description: "gate that changes most without compensation (IFNg+ under CD8+, relative)", value: "IFNg+ under CD8+", tolerance: 0, source: "computed: 2 to 672 events"}
+notes: |
+  The paper prints no counts. FlowKit counts for the gates above Singlets differ from the FlowJo counts by up to 0.3 percent of events. A good answer reports both numbers and says that they differ.
+  The matrix in the workspace changes CD3+ by 1711 events (1.3 percent) and IFNg+ in CD8+ from 2 to 672 events.
+  Trap: the gate name CD107a+ exists under CD4+ and under CD8+. An answer that gives one CD107a+ count without the parent is incomplete.
+  Trap: compensation none makes the answer look far from FlowJo. Gates were drawn on compensated data.
+  Gating-ML reference check (in the adapter tests, not in the run): gml_all_gates.xml on data1.fcs gives the reference counts of the Gating-ML 2.0 compliance suite for all 49 gates, for example Rectangle1 252, Polygon1 1582, Ellipse1 203.

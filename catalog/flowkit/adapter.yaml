@@ -1,0 +1,778 @@
+adapter:
+  name: flowkit
+  title: FlowKit (flow cytometry)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Reads FCS files and counts events per gate with FlowKit. The scientist chooses the
+    compensation matrix, the transform and its parameters, the gating file or FlowJo workspace,
+    and the control sample. Each tool is one FlowKit call that the scientist can repeat in Python.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: FlowKit
+  version: ""
+  tested_versions: ["1.3.2"]
+  homepage: https://github.com/whitews/FlowKit
+  docs:
+    - https://flowkit.readthedocs.io/
+    - https://github.com/whitews/FlowKit/tree/master/docs/notebooks
+    - https://pubmed.ncbi.nlm.nih.gov/34248832/
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: GA_FLOWKIT_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/flowkit/bin/python
+    - ~/.guided-analysis/envs/flowkit/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import flowkit; print(flowkit.__version__)"]
+  version_pattern: '(\d+\.\d+\.\d+)'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees counts, tables and PNG previews. It never sees the event data. Patient samples are personal data.
+
+decisions:
+  - key: gating_file
+    label: Gating file or FlowJo workspace
+    kind: text
+    default: ""
+    group: Gates
+    help: >
+      Path of a GatingML 2.0 file (.xml) or a FlowJo workspace (.wsp). The gates in it decide every
+      count. A workspace also holds the compensation matrix and the transforms that FlowJo used.
+      Write the path. Leave empty if you will draw one rectangle gate by hand.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: list_gates, arg: gating_file }
+      - { tool: count_gates, arg: gating_file }
+      - { tool: plot_gate, arg: gating_file }
+
+  - key: compensation
+    label: Compensation for gating
+    kind: choice
+    choices: [gating_file, fcs, csv, none]
+    default: gating_file
+    group: Compensation
+    help: >
+      gating_file uses the matrix that each gate names in the GatingML file or that the workspace
+      holds. fcs uses the spill matrix that the cytometer wrote into the FCS file. csv uses the
+      matrix file below. none uses the raw values. A different matrix moves events across gates.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: count_gates, arg: compensation }
+      - { tool: plot_gate, arg: compensation }
+    sensitivity:
+      options: [gating_file, none]
+      tool: count_gates
+      compare: [metrics.count_CD3, metrics.count_CD4, metrics.max_abs_diff_vs_flowjo]
+      max_runs: 2
+
+  - key: free_compensation
+    label: Compensation for the other tools
+    kind: choice
+    choices: [fcs, csv, none]
+    default: none
+    group: Compensation
+    help: >
+      The matrix for the compensation table, the transform histograms and the rectangle gate. fcs
+      uses the spill matrix in the FCS file. csv uses the matrix file below. none uses raw values.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: apply_compensation, arg: compensation }
+      - { tool: transform_channels, arg: compensation }
+      - { tool: count_rectangle, arg: compensation }
+
+  - key: compensation_matrix
+    label: Compensation matrix file
+    kind: text
+    default: ""
+    group: Compensation
+    help: >
+      Path of a CSV file with the matrix. The first row holds the detector names. Each row after it
+      holds the spillover of one fluorochrome. Used only if a compensation choice is csv.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_gates, arg: matrix_path }
+      - { tool: plot_gate, arg: matrix_path }
+      - { tool: apply_compensation, arg: matrix_path }
+      - { tool: transform_channels, arg: matrix_path }
+      - { tool: count_rectangle, arg: matrix_path }
+
+  - key: transform
+    label: Transform
+    kind: choice
+    choices: [none, logicle, asinh, hyperlog]
+    default: logicle
+    group: Transform
+    help: >
+      The display scale for fluorescence. logicle and hyperlog are linear near zero and logarithmic
+      above. asinh has no linear width. The scale moves the gate limits that you write for a hand
+      gate. Gates in a GatingML file or workspace carry their own transforms.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: transform_channels, arg: transform }
+      - { tool: count_rectangle, arg: transform }
+    sensitivity:
+      options: [logicle, asinh]
+      tool: transform_channels
+      compare: [metrics.min_after, metrics.max_after]
+      max_runs: 2
+
+  - key: transform_t
+    label: Transform top of scale (T)
+    kind: float
+    default: 262144
+    lo: 1
+    hi: 100000000
+    group: Transform
+    help: The data value that maps to 1. The FlowKit tutorial uses 262144, the top of a 18 bit instrument. Use the range of your instrument.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: transform_channels, arg: transform_t }
+      - { tool: count_rectangle, arg: transform_t }
+
+  - key: transform_w
+    label: Transform linear width (W)
+    kind: float
+    default: 0.5
+    lo: 0
+    hi: 5
+    group: Transform
+    help: Decades of the linear region near zero. A larger value spreads the events near zero. Not used by asinh.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: transform_channels, arg: transform_w }
+      - { tool: count_rectangle, arg: transform_w }
+
+  - key: transform_m
+    label: Transform decades (M)
+    kind: float
+    default: 4.5
+    lo: 0.5
+    hi: 10
+    group: Transform
+    help: Decades of the logarithmic scale at the high end. The FlowKit tutorial uses 4.5 for logicle and 4.0 for asinh.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: transform_channels, arg: transform_m }
+      - { tool: count_rectangle, arg: transform_m }
+
+  - key: transform_a
+    label: Transform extra negative decades (A)
+    kind: float
+    default: 0
+    lo: 0
+    hi: 5
+    group: Transform
+    help: Extra decades for negative values. Use a value above 0 if compensation gives many large negative events.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: transform_channels, arg: transform_a }
+      - { tool: count_rectangle, arg: transform_a }
+
+  - key: control_sample
+    label: Control sample
+    kind: text
+    default: ""
+    group: Samples
+    help: >
+      Path of the FCS file that is the control, for example an unstained or a no-stimulation
+      sample. The gate counts of the control are shown next to the sample. Leave empty to use no
+      control. Name the control in the report.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_gates, arg: control_path }
+
+  - key: rect_x_channel
+    label: Rectangle gate, first channel
+    kind: text
+    group: Rectangle gate
+    help: Name of the channel (PnN) for the first axis, for example CD3 or FL1-H. Run inspect_fcs to see the names.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_rectangle, arg: x_channel }
+
+  - key: rect_x_min
+    label: Rectangle gate, first channel minimum
+    kind: float
+    group: Rectangle gate
+    help: Lower limit on the first axis, in the units after compensation and transform. Events at or above it are inside.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_rectangle, arg: x_min }
+
+  - key: rect_x_max
+    label: Rectangle gate, first channel maximum
+    kind: float
+    group: Rectangle gate
+    help: Upper limit on the first axis, in the units after compensation and transform.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_rectangle, arg: x_max }
+
+  - key: rect_y_channel
+    label: Rectangle gate, second channel
+    kind: text
+    default: ""
+    group: Rectangle gate
+    help: Name of the channel for the second axis. Leave empty for a gate on one channel.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_rectangle, arg: y_channel }
+
+  - key: rect_y_min
+    label: Rectangle gate, second channel minimum
+    kind: float
+    group: Rectangle gate
+    help: Lower limit on the second axis, in the units after compensation and transform.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_rectangle, arg: y_min }
+
+  - key: rect_y_max
+    label: Rectangle gate, second channel maximum
+    kind: float
+    group: Rectangle gate
+    help: Upper limit on the second axis, in the units after compensation and transform.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_rectangle, arg: y_max }
+
+tools:
+  - name: inspect_fcs
+    title: Inspect an FCS file
+    description: >
+      Read an FCS file. Show the event count, each channel with its marker name and range, the
+      number of negative values, and whether the file holds a spill matrix. Changes nothing.
+    read_only: true
+    function: "ga_flowkit:inspect_fcs"
+    params:
+      path: { type: string, minLength: 1, description: Path of the FCS file. }
+      ignore_offset_error: { type: boolean, default: false, description: Read a file whose data offset is off by one byte. }
+    required: [path]
+    outputs:
+      channels: { kind: table, ext: csv, description: One row for each channel. }
+
+  - name: apply_compensation
+    title: Show the effect of compensation
+    description: >
+      Apply a compensation matrix to the events of one FCS file. Show the mean, the median and the
+      number of negative values of each fluorescence channel before and after. Write the matrix to a
+      CSV file. Changes no file. Use compensation gating_file only with a FlowJo workspace.
+    read_only: true
+    function: "ga_flowkit:apply_compensation"
+    params:
+      path: { type: string, minLength: 1, description: Path of the FCS file. }
+      compensation: { type: string, enum: [fcs, csv, none, gating_file], default: none, description: "fcs: spill matrix in the file. csv: matrix_path. none: raw. gating_file: the matrix in a FlowJo workspace." }
+      matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
+      gating_file: { type: string, description: Path of the FlowJo workspace. Needed for gating_file. }
+      sample_id: { type: string, description: Sample name in the workspace. The default is the file name. }
+      ignore_offset_error: { type: boolean, default: false }
+    required: [path]
+    outputs:
+      effect: { kind: table, ext: csv, description: Channel statistics before and after. }
+      matrix: { kind: table, ext: csv, description: The matrix that was applied. }
+
+  - name: transform_channels
+    title: Transform channels
+    description: >
+      Transform fluorescence channels with logicle, asinh or hyperlog and the parameters T, W, M and
+      A. Show the range of each channel after the transform and draw one histogram for each channel.
+      Compensation is applied first if requested. Changes no file.
+    read_only: true
+    function: "ga_flowkit:transform_channels"
+    params:
+      path: { type: string, minLength: 1, description: Path of the FCS file. }
+      transform: { type: string, enum: [none, logicle, asinh, hyperlog], default: logicle }
+      transform_t: { type: number, exclusiveMinimum: 0, default: 262144, description: Top of scale. }
+      transform_w: { type: number, minimum: 0, default: 0.5, description: Linear width in decades. }
+      transform_m: { type: number, exclusiveMinimum: 0, default: 4.5, description: Decades at the high end. }
+      transform_a: { type: number, minimum: 0, default: 0, description: Extra negative decades. }
+      compensation: { type: string, enum: [fcs, csv, none], default: none }
+      matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
+      channels: { type: string, description: Channel names separated by commas. The default is every fluorescence channel. }
+      include_scatter: { type: boolean, default: false, description: Also transform the scatter channels. }
+      ignore_offset_error: { type: boolean, default: false }
+    required: [path]
+    outputs:
+      effect: { kind: table, ext: csv, description: Range of each channel before and after. }
+      histograms: { kind: image, ext: png, description: One histogram for each channel. }
+
+  - name: list_gates
+    title: List the gates
+    description: >
+      Read a GatingML file or a FlowJo workspace. Show each gate with its type, its parent, and the
+      compensation and transform of each dimension. Show the gate tree. A workspace also lists its
+      samples. Changes nothing.
+    read_only: true
+    function: "ga_flowkit:list_gates"
+    params:
+      gating_file: { type: string, minLength: 1, description: Path of the .xml or .wsp file. }
+      sample_id: { type: string, description: Sample name in a workspace. The default is the first sample. }
+    required: [gating_file]
+    outputs:
+      gates: { kind: table, ext: csv, description: One row for each gate. }
+
+  - name: count_gates
+    title: Count events in each gate
+    description: >
+      Run the gates of a GatingML file or a FlowJo workspace on one FCS file. Show the event count
+      of each gate, the percent of all events and the percent of the parent gate. For a workspace,
+      also show the count that FlowJo stored. With control_path, show the counts of the control
+      sample next to the sample. The compensation can be overridden for every gate.
+    function: "ga_flowkit:count_gates"
+    params:
+      path: { type: string, minLength: 1, description: Path of the FCS file. }
+      gating_file: { type: string, minLength: 1, description: Path of the .xml or .wsp file. }
+      sample_id: { type: string, description: Sample name. For a workspace the default is the file name. }
+      compensation: { type: string, enum: [gating_file, fcs, csv, none], default: gating_file, description: "gating_file: as the file defines. fcs: spill matrix in the FCS file. csv: matrix_path. none: raw values." }
+      matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
+      control_path: { type: string, description: Path of the control FCS file. }
+      ignore_offset_error: { type: boolean, default: false }
+    required: [path, gating_file]
+    outputs:
+      counts: { kind: table, ext: csv, description: Counts for each gate. }
+
+  - name: compare_compensation
+    title: Compare counts under two compensation choices
+    description: >
+      Run the gates of a GatingML file or a FlowJo workspace on one FCS file once for each listed
+      compensation choice. Show the count of each gate for each choice, the change in events and the
+      change in percent. Use it to answer what happens if the data are not compensated. The main
+      counts still use the compensation that the scientist chose.
+    read_only: true
+    function: "ga_flowkit:compare_compensation"
+    params:
+      path: { type: string, minLength: 1, description: Path of the FCS file. }
+      gating_file: { type: string, minLength: 1, description: Path of the .xml or .wsp file. }
+      sample_id: { type: string, description: Sample name. For a workspace the default is the file name. }
+      modes: { type: string, default: "gating_file,none", description: "Compensation choices separated by commas, from gating_file, fcs, csv, none. The change is the last minus the first." }
+      matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
+      ignore_offset_error: { type: boolean, default: false }
+    required: [path, gating_file]
+    outputs:
+      comparison: { kind: table, ext: csv, description: Counts for each gate and each choice. }
+
+  - name: plot_gate
+    title: Draw a gate
+    description: >
+      Draw a dot plot of the parent events of one gate with the gate outline. Events inside the
+      gate are purple. The plot is a PNG file. A gate name that exists twice needs gate_path.
+    read_only: true
+    function: "ga_flowkit:plot_gate"
+    params:
+      path: { type: string, minLength: 1, description: Path of the FCS file. }
+      gating_file: { type: string, minLength: 1, description: Path of the .xml or .wsp file. }
+      gate_name: { type: string, minLength: 1, description: Name of the gate. }
+      gate_path: { type: string, description: "Parent names from the top, separated by /, for example Time/Singlets/aAmine-/CD3+/CD4+." }
+      sample_id: { type: string }
+      compensation: { type: string, enum: [gating_file, fcs, csv, none], default: gating_file }
+      matrix_path: { type: string }
+      ignore_offset_error: { type: boolean, default: false }
+    required: [path, gating_file, gate_name]
+    outputs:
+      plot: { kind: image, ext: png, description: Dot plot with the gate. }
+
+  - name: count_rectangle
+    title: Count events in a rectangle gate
+    description: >
+      Count the events inside one rectangle gate that the scientist defines on one or two channels.
+      The limits are in the units after compensation and transform. Draw the dot plot with the
+      gate. Changes no file.
+    read_only: true
+    function: "ga_flowkit:count_rectangle"
+    params:
+      path: { type: string, minLength: 1, description: Path of the FCS file. }
+      x_channel: { type: string, minLength: 1, description: Channel name for the first axis. }
+      x_min: { type: number }
+      x_max: { type: number }
+      y_channel: { type: string, description: Channel name for the second axis. }
+      y_min: { type: number }
+      y_max: { type: number }
+      compensation: { type: string, enum: [fcs, csv, none], default: none }
+      matrix_path: { type: string }
+      transform: { type: string, enum: [none, logicle, asinh, hyperlog], default: none }
+      transform_t: { type: number, exclusiveMinimum: 0, default: 262144 }
+      transform_w: { type: number, minimum: 0, default: 0.5 }
+      transform_m: { type: number, exclusiveMinimum: 0, default: 4.5 }
+      transform_a: { type: number, minimum: 0, default: 0 }
+      ignore_offset_error: { type: boolean, default: false }
+    required: [path, x_channel]
+    outputs:
+      plot: { kind: image, ext: png, description: Dot plot with the gate. }
+
+map:
+  - tool: inspect_fcs
+    route: |
+      s = fk.Sample(path)
+      s.event_count, s.pnn_labels, s.pns_labels
+    params:
+      - { arg: path, label: fcs_path_or_data }
+      - { arg: ignore_offset_error, label: ignore_offset_error, ui_default: false }
+    fidelity: exact
+    evidence: { source: docs, test: inspect-data1, note: "The event count equals the $TOT keyword of the file." }
+
+  - tool: apply_compensation
+    route: |
+      s = fk.Sample(path)
+      s.apply_compensation(matrix_csv)   # or s.metadata["spill"]
+      s.get_events(source="comp")
+    params:
+      - { arg: path, label: fcs_path_or_data }
+      - { arg: matrix_path, label: compensation }
+      - { arg: compensation, label: source of the matrix, ui_default: none }
+    fidelity: exact
+    evidence: { source: docs, test: comp-example-numpy, note: "The mean and the negative count after compensation match a second calculation with numpy (events times the inverse of the matrix)." }
+
+  - tool: transform_channels
+    route: |
+      xform = fk.transforms.LogicleTransform(param_t=262144, param_w=0.5, param_m=4.5, param_a=0)
+      s.apply_transform(xform)
+      s.get_events(source="xform")
+    params:
+      - { arg: transform, label: transform class }
+      - { arg: transform_t, label: param_t, ui_default: 262144 }
+      - { arg: transform_w, label: param_w, ui_default: 0.5 }
+      - { arg: transform_m, label: param_m, ui_default: 4.5 }
+      - { arg: transform_a, label: param_a, ui_default: 0 }
+      - { arg: include_scatter, label: include_scatter, ui_default: false }
+    fidelity: exact
+    evidence: { source: docs, test: synthetic-transform, note: "The tutorial transform parameters. The asinh formula in the GatingML 2.0 text maps the value T to 1 and the value 0 to 0, which the test shows." }
+
+  - tool: list_gates
+    route: |
+      sess = fk.Session("gates.xml")          # GatingML
+      wsp = fk.Workspace("flowjo.wsp")        # FlowJo workspace
+      print(sess.get_gate_hierarchy())
+    params:
+      - { arg: gating_file, label: gating_strategy or wsp_file_path }
+    fidelity: exact
+    evidence: { source: docs, test: gatingml-list }
+
+  - tool: count_gates
+    match: { compensation: gating_file }
+    route: |
+      sess = fk.Session("gates.xml", fcs_samples="sample.fcs")
+      sess.analyze_samples(use_mp=False)
+      sess.get_gating_results(sample_id).report
+      # FlowJo workspace: fk.Workspace("flowjo.wsp", fcs_samples="sample.fcs"), then wsp.analyze_samples() and wsp.get_analysis_report()
+    params:
+      - { arg: path, label: fcs_samples }
+      - { arg: gating_file, label: gating_strategy or wsp_file_path }
+      - { arg: sample_id, label: sample_id }
+    fidelity: close
+    difference: >
+      For a GatingML file the counts equal the Gating-ML 2.0 reference counts. For a FlowJo
+      workspace FlowKit counts differ from the counts that FlowJo stored (up to 0.3 percent of
+      events in the 8 color example). The tool shows both. The control columns come from a second
+      run of the same call on the control file.
+    evidence: { source: docs, test: gatingml-truth, note: "49 of 49 gates of gml_all_gates.xml equal the reference results of the Gating-ML 2.0 compliance suite. The FlowJo comparison is in bench/papers/white2021-flowkit." }
+
+  - tool: count_gates
+    match: { compensation: none }
+    route: |
+      gs = sess.gating_strategy
+      for node in gs._gate_tree.descendants:
+          for dim in node.gate.dimensions:
+              dim.compensation_ref = "uncompensated"
+      gs.gate_sample(sample)
+    params:
+      - { arg: path, label: fcs_samples }
+      - { arg: gating_file, label: gating_strategy or wsp_file_path }
+    fidelity: close
+    difference: FlowKit has no public setting to switch off compensation. The tool sets the compensation reference of every gate dimension to uncompensated, and maps a gate that names a fluorochrome to its detector. The route in the call line uses a private attribute of the gating strategy.
+    evidence: { source: code, test: gatingml-comp-none }
+
+  - tool: count_gates
+    match: { compensation: fcs }
+    route: |
+      # set dim.compensation_ref = "FCS" for every gate dimension, then gs.gate_sample(sample)
+    params:
+      - { arg: path, label: fcs_samples }
+      - { arg: gating_file, label: gating_strategy or wsp_file_path }
+    fidelity: close
+    difference: The tool sets the compensation reference of every gate dimension to FCS, which FlowKit reads as the spill matrix in the file. This is a private attribute of the gating strategy. Route not tested by hand.
+    evidence: { source: code }
+
+  - tool: count_gates
+    match: { compensation: csv }
+    route: |
+      gs.add_comp_matrix("ga_matrix", fk.Matrix(csv_path, detectors, fluorochromes))
+      # set dim.compensation_ref = "ga_matrix" for every gate dimension, then gs.gate_sample(sample)
+    params:
+      - { arg: path, label: fcs_samples }
+      - { arg: gating_file, label: gating_strategy or wsp_file_path }
+      - { arg: matrix_path, label: compensation }
+    fidelity: close
+    difference: The tool sets the compensation reference of every gate dimension to the new matrix. This is a private attribute of the gating strategy. Route not tested by hand.
+    evidence: { source: code }
+
+  - tool: compare_compensation
+    route: |
+      # run count_gates once for each compensation choice, then subtract the counts
+    params:
+      - { arg: modes, label: compensation choices }
+    fidelity: close
+    difference: One tool call makes several runs of the count_gates route with different compensation settings. Each run has the same difference as count_gates.
+    evidence: { source: code, test: compare-compensation }
+
+  - tool: plot_gate
+    route: |
+      p = sess.plot_gate(sample_id, gate_name)   # a Bokeh figure
+      bokeh.io.show(p)
+    params:
+      - { arg: gate_name, label: gate_name }
+      - { arg: gate_path, label: gate_path }
+    fidelity: close
+    difference: FlowKit draws an interactive Bokeh plot with density color. The tool draws a Matplotlib PNG from the same events and the same gate limits, and shows only rectangle and polygon outlines.
+    evidence: { source: docs, test: plot-gate-rectangle }
+
+  - tool: count_rectangle
+    route: |
+      dim_x = fk.Dimension("FL1-A", compensation_ref="uncompensated", transformation_ref="xf", range_min=500)
+      gs = fk.GatingStrategy()
+      gs.add_transform("xf", fk.transforms.AsinhTransform(param_t=1000, param_m=4, param_a=0))
+      gs.add_gate(fk.gates.RectangleGate("rectangle", [dim_x]), ("root",))
+      gs.gate_sample(sample).get_gate_count("rectangle")
+    params:
+      - { arg: x_channel, label: dimension_id }
+      - { arg: x_min, label: range_min }
+      - { arg: x_max, label: range_max }
+      - { arg: compensation, label: compensation_ref, ui_default: uncompensated }
+      - { arg: transform, label: transformation_ref }
+    fidelity: exact
+    evidence: { source: docs, test: synthetic-rectangle, note: "Counts by construction of the synthetic file: 60 events without compensation, 20 with it." }
+
+checks:
+  - id: compensation_not_reported
+    severity: warning
+    description: The answer gives gate counts without saying which compensation matrix was used.
+    text: >
+      If the answer gives gate counts or percentages, it must say where the compensation matrix came
+      from (the gating file, the FCS file, a CSV file or none) and name the file. Flag the answer if
+      it does not.
+  - id: counts_without_compensation
+    severity: warning
+    description: Gates were run on raw values.
+    rule: { tool: count_gates, arg: compensation, op: "==", value: none, message: "The gates ran with no compensation. Gates in a file or a workspace were usually drawn on compensated data. Say so in the report, and show the count with the file matrix." }
+  - id: control_not_named
+    severity: warning
+    description: A comparison with a control does not name the control sample.
+    text: >
+      If the answer compares a sample with a control, it must name the control file and say why it is
+      the control. Flag the answer if it does not, or if it calls a difference real with only one
+      control sample and no replicate.
+  - id: flowjo_difference_hidden
+    severity: warning
+    description: FlowKit counts are reported as if they were the FlowJo counts.
+    text: >
+      If the answer uses a FlowJo workspace, it must report both the FlowKit count and the FlowJo count
+      of the workspace, and say that they can differ. Flag the answer if it calls them identical or
+      gives only one of them.
+  - id: transform_limits_not_reported
+    severity: warning
+    description: A hand gate is given without the transform and its parameters.
+    text: >
+      If the answer gives a count from count_rectangle, it must give the channel names, the limits,
+      the compensation, the transform and T, W, M and A. Flag the answer if one is missing.
+
+tests:
+  - id: inspect-data1
+    description: The Gating-ML 2.0 compliance file has 13367 events and 5 fluorescence channels. The $TOT keyword of the file gives the count.
+    data: [data/data1.fcs]
+    calls:
+      - { tool: inspect_fcs, args: { path: "{adapter_dir}/data/data1.fcs" } }
+    expect:
+      - { path: metrics.n_events, equals: 13367 }
+      - { path: metrics.n_channels, equals: 8 }
+      - { path: metrics.n_fluoro, equals: 5 }
+      - { path: metrics.has_spill, equals: 0 }
+
+  - id: gatingml-list
+    description: The Gating-ML 2.0 compliance file gml_all_gates.xml holds 51 gates and 1 compensation matrix.
+    data: [data/gml_all_gates.xml]
+    calls:
+      - { tool: list_gates, args: { gating_file: "{adapter_dir}/data/gml_all_gates.xml" } }
+    expect:
+      - { path: metrics.n_gates, equals: 51 }
+      - { path: metrics.n_matrices, equals: 1 }
+
+  - id: gatingml-truth
+    description: >
+      Event counts of gates in gml_all_gates.xml on data1.fcs. The expected counts are the reference
+      results of the Gating-ML 2.0 compliance suite (data/truth_counts.json, one 0 or 1 for each
+      event and gate). The gates cover rectangle, polygon, ellipse, range, boolean, asinh, logicle,
+      hyperlog and matrix compensation. FlowKit matches all 49 gates that the file holds.
+    data: [data/data1.fcs, data/gml_all_gates.xml, data/truth_counts.json]
+    calls:
+      - { tool: count_gates, args: { path: "{adapter_dir}/data/data1.fcs", gating_file: "{adapter_dir}/data/gml_all_gates.xml" } }
+    expect:
+      - { path: metrics.n_events, equals: 13367 }
+      - { path: metrics.n_gates, equals: 49 }
+      - { path: metrics.count_Rectangle1, equals: 252 }
+      - { path: metrics.count_Polygon1, equals: 1582 }
+      - { path: metrics.count_Ellipse1, equals: 203 }
+      - { path: metrics.count_Range1, equals: 440 }
+      - { path: metrics.count_And1, equals: 561 }
+      - { path: metrics.count_Not1, equals: 13164 }
+      - { path: metrics.count_Or1, equals: 1983 }
+      - { path: metrics.count_RatRange1, equals: 7679 }
+      - { path: metrics.count_ScaleRange1, equals: 8425 }
+      - { path: metrics.count_ScaleRange4, equals: 2509 }
+      - { path: metrics.count_ScaleRange1c, equals: 6916 }
+      - { path: metrics.count_ScaleRange8c, equals: 6263 }
+      - { path: metrics.count_FL2P_FL4P, equals: 620 }
+
+  - id: gatingml-comp-none
+    description: >
+      Gates ScaleRange1 and ScaleRange1c in gml_all_gates.xml are the same asinh range gate, the
+      second one on compensated data. With compensation none, both gates must give the same count,
+      the reference count of ScaleRange1 (8425). With the matrix in the file, ScaleRange1c gives 6916.
+    data: [data/data1.fcs, data/gml_all_gates.xml]
+    calls:
+      - { tool: count_gates, args: { path: "{adapter_dir}/data/data1.fcs", gating_file: "{adapter_dir}/data/gml_all_gates.xml" }, save_as: a }
+      - { tool: count_gates, args: { path: "{adapter_dir}/data/data1.fcs", gating_file: "{adapter_dir}/data/gml_all_gates.xml", compensation: none } }
+    expect:
+      - { path: saved.a.metrics.count_ScaleRange1c, equals: 6916 }
+      - { path: metrics.count_ScaleRange1c, equals: 8425 }
+      - { path: metrics.count_ScaleRange1, equals: 8425 }
+
+  - id: compare-compensation
+    description: >
+      On data1.fcs, gate ScaleRange1c (asinh range on compensated data) has 6916 events with the matrix in
+      the file and 8425 with no compensation. 8425 is the reference count of the same gate without a matrix,
+      ScaleRange1. Gate ScaleRange1 does not change.
+    data: [data/data1.fcs, data/gml_all_gates.xml]
+    calls:
+      - { tool: compare_compensation, args: { path: "{adapter_dir}/data/data1.fcs", gating_file: "{adapter_dir}/data/gml_all_gates.xml", modes: "gating_file,none" } }
+    expect:
+      - { path: metrics.count_ScaleRange1c_gating_file, equals: 6916 }
+      - { path: metrics.count_ScaleRange1c_none, equals: 8425 }
+      - { path: metrics.count_ScaleRange1_gating_file, equals: 8425 }
+      - { path: metrics.count_ScaleRange1_none, equals: 8425 }
+
+  - id: synthetic-compensation
+    description: >
+      A synthetic file made by data/make_synthetic.py. 100 events: 40 with CD3 1000 and CD4 0, 30 with
+      CD3 0 and CD4 1000, 20 with both 1000, 10 with neither, before spillover. CD3 spills 10 percent
+      into CD4 (matrix 1, 0.1 / 0, 1). The raw CD4 mean is (40*100+30*1000+20*1100)/100 = 560 by
+      construction. After compensation the CD4 mean is 500 and no event is negative.
+    data: [data/synthetic_comp.fcs, data/synthetic_comp_matrix.csv]
+    calls:
+      - { tool: apply_compensation, args: { path: "{adapter_dir}/data/synthetic_comp.fcs", compensation: fcs }, save_as: f }
+      - { tool: apply_compensation, args: { path: "{adapter_dir}/data/synthetic_comp.fcs", compensation: csv, matrix_path: "{adapter_dir}/data/synthetic_comp_matrix.csv" } }
+    expect:
+      - { path: saved.f.metrics.mean_raw_FL2_A, approx: 560, abs: 0.001 }
+      - { path: saved.f.metrics.mean_comp_FL2_A, approx: 500, abs: 0.001 }
+      - { path: saved.f.metrics.mean_comp_FL1_A, approx: 600, abs: 0.001 }
+      - { path: saved.f.metrics.n_negative_comp, equals: 0 }
+      - { path: metrics.mean_comp_FL2_A, approx: 500, abs: 0.001 }
+      - { path: metrics.max_offdiag, approx: 0.1, abs: 1.0e-9 }
+
+  - id: synthetic-rectangle
+    description: >
+      Rectangle gate CD3 at least 500 and CD4 at least 50 on the synthetic file. Raw values:
+      the 40 CD3 single positive events have a CD4 value of 100 from spillover, so 60 events are inside.
+      After compensation with the matrix in the file or in the CSV file only the 20 double positive events stay.
+    data: [data/synthetic_comp.fcs, data/synthetic_comp_matrix.csv]
+    calls:
+      - { tool: count_rectangle, args: { path: "{adapter_dir}/data/synthetic_comp.fcs", x_channel: FL1-A, x_min: 500, y_channel: FL2-A, y_min: 50, compensation: none }, save_as: n }
+      - { tool: count_rectangle, args: { path: "{adapter_dir}/data/synthetic_comp.fcs", x_channel: FL1-A, x_min: 500, y_channel: FL2-A, y_min: 50, compensation: csv, matrix_path: "{adapter_dir}/data/synthetic_comp_matrix.csv" }, save_as: c }
+      - { tool: count_rectangle, args: { path: "{adapter_dir}/data/synthetic_comp.fcs", x_channel: FL1-A, x_min: 500, y_channel: FL2-A, y_min: 50, compensation: fcs } }
+    expect:
+      - { path: saved.n.metrics.count, equals: 60 }
+      - { path: saved.c.metrics.count, equals: 20 }
+      - { path: metrics.count, equals: 20 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: synthetic-transform
+    description: >
+      The asinh transform of GatingML 2.0 maps the value T to 1 and the value 0 to 0 when A is 0.
+      The synthetic file holds the values 0 and 1000 for CD3. With T 1000 and M 4 the range after the
+      transform is 0 to 1 by construction. A rectangle gate at 0.9 or above on the transformed CD3
+      holds the 60 events with value 1000.
+    data: [data/synthetic_comp.fcs]
+    calls:
+      - { tool: transform_channels, args: { path: "{adapter_dir}/data/synthetic_comp.fcs", transform: asinh, transform_t: 1000, transform_m: 4, transform_a: 0, channels: "FL1-A" }, save_as: t }
+      - { tool: count_rectangle, args: { path: "{adapter_dir}/data/synthetic_comp.fcs", x_channel: FL1-A, x_min: 0.9, transform: asinh, transform_t: 1000, transform_m: 4, transform_a: 0 } }
+    expect:
+      - { path: saved.t.metrics.max_after_FL1_A, approx: 1.0, abs: 1.0e-6 }
+      - { path: saved.t.metrics.min_after, approx: 0.0, abs: 1.0e-9 }
+      - { path: metrics.count, equals: 60 }
+
+  - id: comp-example-numpy
+    description: >
+      The FlowKit test file test_comp_example.fcs with the matrix comp_complete_example.csv (14 channels).
+      The expected values come from a second method: events times the inverse of the matrix in numpy.
+      Mean of PE-A after compensation 997.52686, mean of PerCP-Cy55-A 441.47836, negative values over the
+      14 channels 15451 before and 20908 after.
+    data: [data/test_comp_example.fcs, data/comp_complete_example.csv]
+    calls:
+      - { tool: apply_compensation, args: { path: "{adapter_dir}/data/test_comp_example.fcs", compensation: csv, matrix_path: "{adapter_dir}/data/comp_complete_example.csv", ignore_offset_error: true } }
+    expect:
+      - { path: metrics.n_events, equals: 10703 }
+      - { path: metrics.n_fluoro, equals: 14 }
+      - { path: metrics.mean_comp_PE_A, approx: 997.52686, abs: 0.01 }
+      - { path: metrics.mean_comp_PerCP_Cy55_A, approx: 441.47836, abs: 0.01 }
+      - { path: metrics.n_negative_raw, equals: 15451 }
+      - { path: metrics.n_negative_comp, equals: 20908 }
+
+  - id: flowjo-ellipse
+    description: >
+      The FlowKit test workspace single_ellipse_51_events.wsp holds one ellipse gate on 100 events.
+      FlowJo stored the count 51 for it. FlowKit gives the same count.
+    data: [data/data_set_simple_line_100.fcs, data/single_ellipse_51_events.wsp]
+    calls:
+      - { tool: count_gates, args: { path: "{adapter_dir}/data/data_set_simple_line_100.fcs", gating_file: "{adapter_dir}/data/single_ellipse_51_events.wsp" } }
+    expect:
+      - { path: metrics.n_events, equals: 100 }
+      - { path: metrics.count_ellipse1, equals: 51 }
+      - { path: metrics.max_abs_diff_vs_flowjo, equals: 0 }
+
+  - id: control-same-file
+    description: A file used as its own control gives a difference of 0 percent in every gate by construction. This shows the control columns, not a biological result.
+    data: [data/data1.fcs, data/gml_all_gates.xml]
+    calls:
+      - { tool: count_gates, args: { path: "{adapter_dir}/data/data1.fcs", gating_file: "{adapter_dir}/data/gml_all_gates.xml", control_path: "{adapter_dir}/data/data1.fcs" } }
+    expect:
+      - { path: metrics.max_abs_percent_vs_control, approx: 0, abs: 1.0e-9 }
+      - { path: metrics.count_Rectangle1, equals: 252 }
+
+  - id: plot-gate-rectangle
+    description: The plot of Rectangle1 shows 252 of 13367 events inside, the reference count.
+    data: [data/data1.fcs, data/gml_all_gates.xml]
+    calls:
+      - { tool: plot_gate, args: { path: "{adapter_dir}/data/data1.fcs", gating_file: "{adapter_dir}/data/gml_all_gates.xml", gate_name: Rectangle1 } }
+    expect:
+      - { path: metrics.count, equals: 252 }
+      - { path: metrics.parent_count, equals: 13367 }
+      - { path: "outputs[0].path", contains: ".png" }
