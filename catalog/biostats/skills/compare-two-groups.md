@@ -15,4 +15,4 @@ The scientist chooses the test. Help the scientist to see the design.
 6. To check the result without a normal distribution, run the call again with test set to wilcoxon. Report both p-values and say that the rank test answers a different question about the center.
 7. Report the direction (second group minus first group), the mean difference, the confidence interval, the p-value, the test name, the sidedness and alpha.
 
-The sleep data (R dataset sleep) show why the pairing matters. The paired t-test gives p = 0.0028. The unpaired Welch test gives p = 0.079. The same numbers give two conclusions at alpha 0.05.
+Pairing matters. With paired data, the paired t-test and the unpaired Welch test can fall on the two sides of alpha 0.05. The same numbers then give two conclusions.

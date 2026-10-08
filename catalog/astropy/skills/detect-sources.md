@@ -11,6 +11,6 @@ description: How to find sources in a FITS image and report the count with its t
 4. Report the count with all settings, and the background method.
 5. Run the sensitivity table for detect_nsigma if the scientist asks how the count changes.
 
-On the photutils 100-source image, 100 sources are injected. At 3 sigma, 10 pixels and smoothing FWHM 3, the global background finds 82 sources. Background2D finds 83, and 85 if touching sources are split. The faint injected sources have a peak of 4 to 10 counts on a noise of 2. They do not reach the threshold. At 5 sigma the count falls to 50.
+On a simulated image with a known number of injected sources, the detected count is lower than the injected count. Faint sources with a peak of two to five times the noise do not reach the threshold. A higher threshold (5 sigma instead of 3) removes many more of them. Splitting touching sources adds a few.
 
-The count is not a completeness. Do not say that 82 of 100 sources are found without saying why 18 are missed.
+The count is not a completeness. Do not report the detected fraction of injected sources without saying why the rest are missed.

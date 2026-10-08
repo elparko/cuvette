@@ -14,4 +14,4 @@ Use this when each subject has more than one row, for example one reaction time 
 5. Run fit_mixed_model again with the other random effects choice. Report both. The fixed effect is the same. The standard error of the slope is not.
 6. Report the formula, the random effects, REML or ML, the number of groups, the fixed effects with standard errors and the variance of each random effect.
 
-Do not run fit_ols on these rows to get a p-value. In the sleepstudy data, OLS gives a standard error of 1.24 for Days. The mixed model with a random slope gives 1.55. OLS treats 180 rows as 180 independent subjects. There are 18.
+Do not run fit_ols on these rows to get a p-value. OLS treats each row as an independent subject. Its standard error for a slope is then too small compared with a mixed model with a random slope.

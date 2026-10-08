@@ -1,10 +1,10 @@
 tool: METASPACE (metaspace2020 python client)
 adapter_kind: python
 data:
-  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_10h14m23s_HMDB_fdr10.csv
-  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_10h14m23s_LipidMaps_fdr10.csv
-  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_12h31m33s_HMDB_fdr10.csv
-  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_12h31m33s_LipidMaps_fdr10.csv
+  - /Volumes/T7/guided-analysis/reference/alexandrov2019-metaspace/2022-08-16_10h14m23s_HMDB_fdr10.csv
+  - /Volumes/T7/guided-analysis/reference/alexandrov2019-metaspace/2022-08-16_10h14m23s_LipidMaps_fdr10.csv
+  - /Volumes/T7/guided-analysis/reference/alexandrov2019-metaspace/2022-08-16_12h31m33s_HMDB_fdr10.csv
+  - /Volumes/T7/guided-analysis/reference/alexandrov2019-metaspace/2022-08-16_12h31m33s_LipidMaps_fdr10.csv
   - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_10h14m23s_meta.json
   - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_12h31m33s_meta.json
 decisions:

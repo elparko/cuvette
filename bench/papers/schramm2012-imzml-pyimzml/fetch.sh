@@ -2,13 +2,14 @@
 set -euo pipefail
 D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/schramm2012-imzml-pyimzml"
 U=https://raw.githubusercontent.com/alexandrovteam/pyimzML/master
-mkdir -p "$D"
+R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/schramm2012-imzml-pyimzml"
+mkdir -p "$D" "$R"
 cd "$D"
 for f in Example_Continuous.ibd Example_Continuous.imzML Example_Processed.ibd Example_Processed.imzML; do
   curl -L -C - -o "$f" "$U/tests/data/$f"
 done
 curl -L -C - -o pyimzML_LICENSE "$U/LICENSE"
-curl -L -C - -o test_basic.py "$U/tests/test_basic.py"
+curl -L -C - -o "$R/test_basic.py" "$U/tests/test_basic.py"
 cat > SHA256SUMS <<'S'
 e8f2fefb1a0b6947b9ad78c773d20c1381f7728e060010c8d2f174ac414ff099  Example_Continuous.ibd
 04237b10d61db093d2c5529f380d676d400383e8cbe55b3fe0e09bb97ae2ea8e  Example_Continuous.imzML

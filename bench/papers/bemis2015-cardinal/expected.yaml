@@ -1,7 +1,7 @@
 tool: Cardinal (R, Bioconductor)
 adapter_kind: script
 data:
-  - /Volumes/T7/guided-analysis/data/bemis2015-cardinal/CardinalWorkflows_1.44.0.tar.gz
+  - /Volumes/T7/guided-analysis/reference/bemis2015-cardinal/CardinalWorkflows_1.44.0.tar.gz
 decisions:
   dataset: "pig206 (single DESI section)"
   normalization: "TIC"

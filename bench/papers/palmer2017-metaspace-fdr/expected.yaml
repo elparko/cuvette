@@ -4,7 +4,7 @@ data:
   - /Volumes/T7/guided-analysis/data/palmer2017-metaspace-fdr/MBa2s1.zip
   - /Volumes/T7/guided-analysis/data/palmer2017-metaspace-fdr/MBa2s2.zip
   - /Volumes/T7/guided-analysis/data/palmer2017-metaspace-fdr/MBa2s3.zip
-  - /Volumes/T7/guided-analysis/data/palmer2017-metaspace-fdr/MTBLS313_m_MTBLS313_imagingms_metabolite_profiling_mass_spectrometry_v2_maf.tsv
+  - /Volumes/T7/guided-analysis/reference/palmer2017-metaspace-fdr/MTBLS313_m_MTBLS313_imagingms_metabolite_profiling_mass_spectrometry_v2_maf.tsv
   - /Volumes/T7/guided-analysis/data/palmer2017-metaspace-fdr/sim001_twosquares.zip
 decisions:
   database: "HMDB (version 2.5 in the paper)"

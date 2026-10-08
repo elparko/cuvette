@@ -14,7 +14,6 @@ data:
   - palmer2017-metaspace-fdr/MBa2s1.zip
   - palmer2017-metaspace-fdr/MBa2s2.zip
   - palmer2017-metaspace-fdr/MBa2s3.zip
-  - palmer2017-metaspace-fdr/MTBLS313_m_MTBLS313_imagingms_metabolite_profiling_mass_spectrometry_v2_maf.tsv
 items:
   - {key: formulas_in_all_three_sections, description: "Sum formulas annotated in all three serial sections of animal a2.", value: 51, tolerance: 8, reference: true, tool: overlap_annotations}
   - {key: unique_formulas_three_sections, description: "Unique formulas in sections a2s1, a2s2 and a2s3, computed from the MAF table.", value: 66, exact: true, in_answer: false, reference: true}

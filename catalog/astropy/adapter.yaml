@@ -497,9 +497,8 @@ checks:
     description: The background was estimated with bright sources inside it.
     text: >
       If the answer reports a background level or a noise level from an image that holds sources, it must say
-      whether bright sources were masked (mask_sources). Sources raise the sigma-clipped median. On the
-      photutils 100-source test image the unmasked median is 5.15 and the masked median is 5.03 for a
-      true value of 5. Flag the answer if it does not say.
+      whether bright sources were masked (mask_sources). Sources raise the sigma-clipped median above the
+      true background. Flag the answer if it does not say.
   - id: threshold_not_reported
     severity: warning
     description: A source count is given with no threshold.

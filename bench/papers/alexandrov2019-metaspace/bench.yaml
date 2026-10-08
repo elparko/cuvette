@@ -11,10 +11,8 @@ answers:
 allow: all
 timeout_s: 900
 data:
-  - alexandrov2019-metaspace/2022-08-16_10h14m23s_LipidMaps_fdr10.csv
-  - alexandrov2019-metaspace/2022-08-16_10h14m23s_HMDB_fdr10.csv
-  - alexandrov2019-metaspace/2022-08-16_12h31m33s_LipidMaps_fdr10.csv
-  - alexandrov2019-metaspace/2022-08-16_12h31m33s_HMDB_fdr10.csv
+  - alexandrov2019-metaspace/2022-08-16_10h14m23s_meta.json
+  - alexandrov2019-metaspace/2022-08-16_12h31m33s_meta.json
 items:
   - {key: d1_lipidmaps_fdr10, description: "Dataset 10h14m23s, LipidMaps annotations at FDR 10%.", value: 414, exact: true}
   - {key: d1_hmdb_fdr10, description: "Dataset 10h14m23s, HMDB annotations at FDR 10%.", value: 263, exact: true, from_comparison: true}

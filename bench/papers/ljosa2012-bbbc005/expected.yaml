@@ -5,7 +5,7 @@ data:
   - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/sub/BBBC005_v1_images
   - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/sub_w1/BBBC005_v1_images
   - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/synthetic_2_ground_truth
-  - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/BBBC005_results_bray.csv
+  - /Volumes/T7/guided-analysis/reference/ljosa2012-bbbc005/BBBC005_results_bray.csv
 decisions:
   segmentation_channel: w1 (round separate nuclei; the BBBC page calls w2 the nuclei stain, the images show w2 as cell bodies)
   truth_source: C value in file name
