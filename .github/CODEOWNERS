@@ -1,0 +1,4 @@
+# The owner reviews every change. The last matching line wins.
+*          @elparko
+/catalog/  @elparko
+/src/      @elparko

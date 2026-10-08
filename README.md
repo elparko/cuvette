@@ -150,3 +150,13 @@ npx tsc --noEmit
 - [docs/harness-survey.md](docs/harness-survey.md): how Claude Code and OpenCode work, and what
   this harness takes from them.
 - [docs/adapter-spec.md](docs/adapter-spec.md) and [docs/onboarding-guide.md](docs/onboarding-guide.md).
+
+## License
+
+SPDX-License-Identifier: AGPL-3.0-only
+
+The core is under the GNU Affero General Public License, version 3 only. See [LICENSE](LICENSE).
+Each adapter author can choose any license that the Open Source Initiative (OSI) approves for
+their own adapter folder. An adapter in `catalog/` that names no license is under
+AGPL-3.0-only. Contributions to the core need the [Contributor License Agreement](CLA.md). See
+[CONTRIBUTING.md](CONTRIBUTING.md).

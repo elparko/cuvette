@@ -1,0 +1,89 @@
+name: pull request checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pandoc
+        run: sudo apt-get install -y pandoc
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+        env:
+          CI: "false"
+
+  adapter-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Find changed adapter folders
+        id: changed
+        run: |
+          # The checkout is the merge commit. Its first parent is the base branch.
+          names=$(git diff --name-only HEAD^1 HEAD -- catalog/ | cut -d/ -f2 | sort -u | tr '\n' ' ')
+          echo "names=$names" >> "$GITHUB_OUTPUT"
+          echo "Changed adapter folders: ${names:-none}"
+      - uses: actions/setup-node@v4
+        if: steps.changed.outputs.names != ''
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        if: steps.changed.outputs.names != ''
+        with:
+          python-version: "3"
+      - if: steps.changed.outputs.names != ''
+        run: npm ci
+      - name: Check each changed adapter
+        if: steps.changed.outputs.names != ''
+        env:
+          NAMES: ${{ steps.changed.outputs.names }}
+          CI: "false"
+        run: |
+          # The runner has Node.js and Python only. It has no science programs.
+          # The known-answer tests (--run-tests) run only for an adapter that needs no
+          # external program: its locate block is empty and its connection starts with {node}.
+          # Every other adapter gets the manifest check only. The owner runs its tests by hand.
+          status=0
+          for name in $NAMES; do
+            dir="catalog/$name"
+            if [ ! -f "$dir/adapter.yaml" ]; then
+              echo "::notice::$dir has no adapter.yaml. Skipped."
+              continue
+            fi
+            self_contained=$(node --input-type=module -e '
+              import { readFileSync } from "node:fs";
+              import { parse } from "yaml";
+              const m = parse(readFileSync(process.argv[1], "utf8")) ?? {};
+              const loc = m.locate ?? {};
+              const c = m.connection ?? {};
+              const external = Boolean(loc.env) || (loc.paths ?? []).length > 0 || (loc.which ?? []).length > 0;
+              const start = (c.command ?? c.interpreter ?? [])[0];
+              process.stdout.write(!external && start === "{node}" ? "yes" : "no");
+            ' "$dir/adapter.yaml")
+            if [ "$self_contained" = "yes" ]; then
+              echo "::group::$name: manifest check and known-answer tests"
+              node bin/ga.js adapter check "$dir" --run-tests || status=1
+            else
+              echo "::group::$name: manifest check only (the adapter needs an external program)"
+              node bin/ga.js adapter check "$dir" || status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $status
