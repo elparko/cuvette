@@ -103,6 +103,14 @@ test("a promise of an action with no tool call gets one nudge", async () => {
   expect(provider.requests.length).toBe(3);
 });
 
+test("a nudge that leads to a tool call does not use up the nudges for later steps", async () => {
+  const steps = [0, 1, 2, 3].flatMap((i) => [{ text: `Step ${i} done. Next, I will run the next step.` }, { calls: [{ name: "state", args: { i } }] }]);
+  const provider = new FakeProvider([...steps, { text: "All four steps are done." }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false, headless: true } });
+  expect(await session.send("go")).toBe("All four steps are done.");
+  expect(provider.requests.length).toBe(9);
+});
+
 test("generic file tools stay inside the folders of the analysis", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "ga-cwd-"));
   const provider = new FakeProvider([{ calls: [{ name: "list_dir", args: { path: "/" } }, { name: "list_dir", args: { path: cwd } }] }, { text: "ok" }]);

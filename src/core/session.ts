@@ -420,6 +420,7 @@ export class Session {
           return out.text;
         }
         if (said) this.record.append("assistant", { text: said, final: false });
+        nudges = 0;
         const results: Part[] = [];
         for (const call of calls) {
           if (signal.aborted) {
