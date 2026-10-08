@@ -1,7 +1,7 @@
 adapter:
   name: astropy
   title: Astropy and photutils
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Reads a FITS image, measures the background, finds sources and measures aperture fluxes with
@@ -358,6 +358,8 @@ tools:
     description: >
       Sum the pixels in a circle around each position. Subtract the sky from a ring if asked.
       Positions come from a CSV file or from x and y lists. Pixel positions are 0-based.
+      To measure the positions that the scientist names, give x and y. A CSV file measures every row,
+      and the result table then has one row for each row of the file, not for the named positions.
     function: "ga_astropy:measure_apertures"
     params:
       path: { type: string, minLength: 1, description: Absolute path of the FITS file. }
