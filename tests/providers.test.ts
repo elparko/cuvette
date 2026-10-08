@@ -273,6 +273,7 @@ describe("ollama", () => {
     const chat = seen.find((s) => s.url.endsWith("/api/chat"))!.body;
     expect(chat.stream).toBe(true);
     expect(chat.options.num_ctx).toBe(32768);
+    expect(chat.options.num_predict).toBe(8192);
     expect(chat.think).toBe(false);
     expect(chat.messages[0]).toEqual({ role: "system", content: "SYS" });
     expect(chat.tools[0]).toEqual({ type: "function", function: { name: "add", description: "Add two numbers", parameters: tools[0].inputSchema } });

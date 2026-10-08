@@ -5,6 +5,7 @@ import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText }
 
 const TIMEOUT_MS = 600_000;
 const DEFAULT_NUM_CTX = 32768;
+const MAX_OUTPUT_TOKENS = 8192;
 
 export interface OllamaOpts {
   numCtx?: number;
@@ -165,7 +166,7 @@ export class OllamaProvider implements Provider {
       model: this.model,
       messages: this.toNative(this.promptedTools && req.tools.length ? `${req.system}\n\n${promptedToolsText(req.tools)}` : req.system, req.messages),
       stream: true,
-      options: { num_ctx: this.numCtx },
+      options: { num_ctx: this.numCtx, num_predict: MAX_OUTPUT_TOKENS },
     };
     if (req.tools.length && !this.promptedTools)
       body.tools = req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
