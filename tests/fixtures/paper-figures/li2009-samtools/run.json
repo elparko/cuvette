@@ -1,0 +1,111 @@
+{
+ "paper": "li2009-samtools",
+ "model": "mock",
+ "status": "answer",
+ "items": [
+  {
+   "key": "k0",
+   "description": "total reads",
+   "expected": 3307,
+   "computed": {
+    "pass": true,
+    "value": 3307
+   },
+   "reported": {
+    "pass": true,
+    "value": 3307
+   }
+  },
+  {
+   "key": "k1",
+   "description": "mapped reads",
+   "expected": 3271,
+   "computed": {
+    "pass": false,
+    "value": 3271
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k2",
+   "description": "properly paired reads",
+   "expected": 3144,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": true,
+    "value": 3144
+   }
+  },
+  {
+   "key": "k3",
+   "description": "singletons",
+   "expected": 127,
+   "computed": {
+    "pass": true,
+    "value": 127
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k4",
+   "description": "reads mapped to seq1",
+   "expected": 1482,
+   "computed": {
+    "pass": false,
+    "value": 1482
+   },
+   "reported": {
+    "pass": true,
+    "value": 1482
+   }
+  },
+  {
+   "key": "k5",
+   "description": "reads mapped to seq2",
+   "expected": 1789,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k6",
+   "description": "reads with MAPQ >= 30",
+   "expected": 3210,
+   "computed": {
+    "pass": true,
+    "value": 3210
+   },
+   "reported": {
+    "pass": true,
+    "value": 3210
+   }
+  },
+  {
+   "key": "k7",
+   "description": "reads in seq2:100-200",
+   "expected": 79,
+   "computed": {
+    "pass": false,
+    "value": 79
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  }
+ ]
+}

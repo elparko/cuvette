@@ -1,0 +1,98 @@
+{
+ "paper": "minh2020-iqtree2",
+ "model": "mock",
+ "status": "answer",
+ "items": [
+  {
+   "key": "k0",
+   "description": "best model by BIC",
+   "expected": "TIM2+F+I+G4",
+   "computed": {
+    "pass": true,
+    "value": "TIM2+F+I+G4"
+   },
+   "reported": {
+    "pass": true,
+    "value": "TIM2+F+I+G4"
+   }
+  },
+  {
+   "key": "k1",
+   "description": "log-likelihood of the ML tree",
+   "expected": -21152.54,
+   "computed": {
+    "pass": false,
+    "value": -21152.54
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k2",
+   "description": "sequences in example.phy",
+   "expected": 17,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": true,
+    "value": 17
+   }
+  },
+  {
+   "key": "k3",
+   "description": "sites in example.phy",
+   "expected": 1998,
+   "computed": {
+    "pass": true,
+    "value": 1998
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k4",
+   "description": "constant sites",
+   "expected": 686,
+   "computed": {
+    "pass": false,
+    "value": 686
+   },
+   "reported": {
+    "pass": true,
+    "value": 686
+   }
+  },
+  {
+   "key": "k5",
+   "description": "sequences in the MAFFT alignment",
+   "expected": 6,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k6",
+   "description": "MAFFT alignment length",
+   "expected": 240,
+   "computed": {
+    "pass": true,
+    "value": 240
+   },
+   "reported": {
+    "pass": true,
+    "value": 240
+   }
+  }
+ ]
+}

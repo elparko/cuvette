@@ -1,0 +1,85 @@
+{
+ "paper": "wolf2018-scanpy",
+ "model": "mock",
+ "status": "answer",
+ "items": [
+  {
+   "key": "k0",
+   "description": "cells at load",
+   "expected": 2700,
+   "computed": {
+    "pass": true,
+    "value": 2700
+   },
+   "reported": {
+    "pass": true,
+    "value": 2700
+   }
+  },
+  {
+   "key": "k1",
+   "description": "genes at load",
+   "expected": 32738,
+   "computed": {
+    "pass": false,
+    "value": 32738
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k2",
+   "description": "genes after min_cells=3",
+   "expected": 13714,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": true,
+    "value": 13714
+   }
+  },
+  {
+   "key": "k3",
+   "description": "cells after QC",
+   "expected": 2638,
+   "computed": {
+    "pass": true,
+    "value": 2638
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k4",
+   "description": "highly variable genes, default flavor",
+   "expected": 1838,
+   "computed": {
+    "pass": false,
+    "value": 1838
+   },
+   "reported": {
+    "pass": true,
+    "value": 1838
+   }
+  },
+  {
+   "key": "k5",
+   "description": "Leiden cluster count at resolution 0.7",
+   "expected": 7,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  }
+ ]
+}

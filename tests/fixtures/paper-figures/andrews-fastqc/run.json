@@ -1,0 +1,208 @@
+{
+ "paper": "andrews-fastqc",
+ "model": "ollama:qwen3:8b",
+ "run": 1,
+ "status": "answer",
+ "durationS": 184.567,
+ "session": "20261008-140830-3c93",
+ "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/andrews-fastqc/run1/home/sessions/20261008-140830-3c93",
+ "answer": "",
+ "items": [
+  {
+   "key": "good_total_sequences",
+   "description": "Good file total sequences",
+   "expected": 250000,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 250000,
+    "diff": 0,
+    "node": "n1",
+    "path": "metrics.total_sequences",
+    "entry": 8
+   },
+   "reported": {
+    "pass": true,
+    "value": 250000,
+    "diff": 0,
+    "via": "tolerance",
+    "node": "n1",
+    "claimEntry": 56,
+    "text": "- **Total Reads:** 250,000"
+   }
+  },
+  {
+   "key": "bad_total_sequences",
+   "description": "Bad file total sequences",
+   "expected": 395288,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 395288,
+    "diff": 0,
+    "node": "n2",
+    "path": "metrics.total_sequences",
+    "entry": 14
+   },
+   "reported": {
+    "pass": true,
+    "value": 395288,
+    "diff": 0,
+    "via": "tolerance",
+    "node": "n2",
+    "claimEntry": 56,
+    "text": "- **Total Reads:** 395,288"
+   }
+  },
+  {
+   "key": "sequence_length",
+   "description": "Sequence length, both files",
+   "expected": 40,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 40,
+    "diff": 0,
+    "node": "n1",
+    "path": "metrics.sequence_length",
+    "entry": 8
+   },
+   "reported": {
+    "pass": true,
+    "value": 40,
+    "diff": 0,
+    "via": "tolerance",
+    "node": "n2",
+    "claimEntry": 56,
+    "text": "- **Read Length:** 40"
+   }
+  },
+  {
+   "key": "good_gc_percent",
+   "description": "Good file %GC",
+   "expected": 45,
+   "tolerance": 1,
+   "abs": false,
+   "inAnswer": false,
+   "computed": {
+    "pass": true,
+    "value": 45,
+    "diff": 0,
+    "node": "n1",
+    "path": "metrics.gc_percent",
+    "entry": 8
+   },
+   "reported": {
+    "pass": null,
+    "value": null,
+    "diff": null,
+    "via": null,
+    "node": null,
+    "claimEntry": 56,
+    "text": null
+   }
+  },
+  {
+   "key": "bad_gc_percent",
+   "description": "Bad file %GC",
+   "expected": 47,
+   "tolerance": 1,
+   "abs": false,
+   "inAnswer": false,
+   "computed": {
+    "pass": true,
+    "value": 47,
+    "diff": 0,
+    "node": "n2",
+    "path": "metrics.gc_percent",
+    "entry": 14
+   },
+   "reported": {
+    "pass": null,
+    "value": null,
+    "diff": null,
+    "via": null,
+    "node": null,
+    "claimEntry": 56,
+    "text": null
+   }
+  },
+  {
+   "key": "good_modules_not_pass",
+   "description": "Good file modules not PASS",
+   "expected": 0,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": false,
+   "computed": {
+    "pass": true,
+    "value": 0,
+    "diff": 0,
+    "node": "n1",
+    "path": "metrics.n_warn",
+    "entry": 8
+   },
+   "reported": {
+    "pass": null,
+    "value": null,
+    "diff": null,
+    "via": null,
+    "node": null,
+    "claimEntry": 56,
+    "text": null
+   }
+  },
+  {
+   "key": "bad_modules_warning",
+   "description": "Bad file modules with WARNING",
+   "expected": 4,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": false,
+   "computed": {
+    "pass": true,
+    "value": 4,
+    "diff": 0,
+    "node": "n2",
+    "path": "metrics.n_warn",
+    "entry": 14
+   },
+   "reported": {
+    "pass": null,
+    "value": null,
+    "diff": null,
+    "via": null,
+    "node": null,
+    "claimEntry": 56,
+    "text": null
+   }
+  }
+ ],
+ "metrics": {
+  "requests": 11,
+  "inputTokens": 76197,
+  "outputTokens": 1955,
+  "cacheRead": 0,
+  "cacheWrite": 0,
+  "toolCalls": 6,
+  "failedToolCalls": 4,
+  "nudges": 3,
+  "planReminders": 0,
+  "revisions": 1,
+  "findings": {
+   "info": 2,
+   "warning": 6,
+   "error": 2
+  },
+  "unsourced": 0,
+  "deviations": 0,
+  "overwritten": 0,
+  "nodes": 2
+ }
+}

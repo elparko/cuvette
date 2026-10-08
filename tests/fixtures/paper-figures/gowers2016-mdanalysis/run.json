@@ -1,0 +1,111 @@
+{
+ "paper": "gowers2016-mdanalysis",
+ "model": "mock",
+ "status": "answer",
+ "items": [
+  {
+   "key": "k0",
+   "description": "atoms in the AdK system",
+   "expected": 3341,
+   "computed": {
+    "pass": true,
+    "value": 3341
+   },
+   "reported": {
+    "pass": true,
+    "value": 3341
+   }
+  },
+  {
+   "key": "k1",
+   "description": "frames in the AdK trajectory",
+   "expected": 98,
+   "computed": {
+    "pass": false,
+    "value": 98
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k2",
+   "description": "backbone RMSD of the last frame against frame 0, fit on the backbone (angstrom)",
+   "expected": 6.8203,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": true,
+    "value": 6.8203
+   }
+  },
+  {
+   "key": "k3",
+   "description": "radius of gyration of the protein, last frame (angstrom)",
+   "expected": 19.592,
+   "computed": {
+    "pass": true,
+    "value": 19.592
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k4",
+   "description": "residues in chain A of 4AKE",
+   "expected": 214,
+   "computed": {
+    "pass": false,
+    "value": 214
+   },
+   "reported": {
+    "pass": true,
+    "value": 214
+   }
+  },
+  {
+   "key": "k5",
+   "description": "residues in chain B of 4AKE",
+   "expected": 214,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k6",
+   "description": "CA RMSD after fitting 4AKE chain A on 1AKE chain A (angstrom)",
+   "expected": 7.131,
+   "computed": {
+    "pass": true,
+    "value": 7.131
+   },
+   "reported": {
+    "pass": true,
+    "value": 7.131
+   }
+  },
+  {
+   "key": "k7",
+   "description": "distance CA(1) to CA(214), chain A of 4AKE (angstrom)",
+   "expected": 10.101,
+   "computed": {
+    "pass": false,
+    "value": 10.101
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  }
+ ]
+}

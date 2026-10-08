@@ -1,0 +1,72 @@
+{
+ "paper": "quinlan2010-bedtools",
+ "model": "mock",
+ "status": "answer",
+ "items": [
+  {
+   "key": "k0",
+   "description": "exons with an overlap (-u)",
+   "expected": 126,
+   "computed": {
+    "pass": true,
+    "value": 126
+   },
+   "reported": {
+    "pass": true,
+    "value": 126
+   }
+  },
+  {
+   "key": "k1",
+   "description": "overlapping pairs",
+   "expected": 129,
+   "computed": {
+    "pass": false,
+    "value": 129
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k2",
+   "description": "overlap bases, any overlap",
+   "expected": 33713,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": true,
+    "value": 33713
+   }
+  },
+  {
+   "key": "k3",
+   "description": "pairs with fraction of exon >= 0.5",
+   "expected": 9,
+   "computed": {
+    "pass": true,
+    "value": 9
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k4",
+   "description": "AluY intervals after merge, distance 100",
+   "expected": 11270,
+   "computed": {
+    "pass": false,
+    "value": 11270
+   },
+   "reported": {
+    "pass": true,
+    "value": 11270
+   }
+  }
+ ]
+}

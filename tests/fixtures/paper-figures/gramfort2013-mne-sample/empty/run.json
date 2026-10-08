@@ -1,0 +1,215 @@
+{
+ "paper": "gramfort2013-mne-sample",
+ "model": "ollama:qwen3:8b",
+ "status": "answer",
+ "items": [
+  {
+   "key": "k0",
+   "description": "events found on STI 014",
+   "expected": 319,
+   "computed": {
+    "pass": true,
+    "value": 319
+   },
+   "reported": {
+    "pass": true,
+    "value": 319
+   }
+  },
+  {
+   "key": "k1",
+   "description": "events with id 1 (auditory/left)",
+   "expected": 72,
+   "computed": {
+    "pass": false,
+    "value": 72
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k2",
+   "description": "events with id 2 (auditory/right)",
+   "expected": 73,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": true,
+    "value": 73
+   }
+  },
+  {
+   "key": "k3",
+   "description": "events with id 3 (visual/left)",
+   "expected": 73,
+   "computed": {
+    "pass": true,
+    "value": 73
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k4",
+   "description": "events with id 4 (visual/right)",
+   "expected": 70,
+   "computed": {
+    "pass": false,
+    "value": 70
+   },
+   "reported": {
+    "pass": true,
+    "value": 70
+   }
+  },
+  {
+   "key": "k5",
+   "description": "events with id 5 (smiley)",
+   "expected": 15,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k6",
+   "description": "events with id 32 (buttonpress)",
+   "expected": 16,
+   "computed": {
+    "pass": true,
+    "value": 16
+   },
+   "reported": {
+    "pass": true,
+    "value": 16
+   }
+  },
+  {
+   "key": "k7",
+   "description": "epochs dropped by the limits, all six ids",
+   "expected": 10,
+   "computed": {
+    "pass": false,
+    "value": 10
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k8",
+   "description": "epochs kept, all six ids",
+   "expected": 309,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": true,
+    "value": 309
+   }
+  },
+  {
+   "key": "k9",
+   "description": "auditory/left epochs kept",
+   "expected": 68,
+   "computed": {
+    "pass": true,
+    "value": 68
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k10",
+   "description": "N100 latency, global field power of good gradiometers, auditory/left",
+   "expected": 0.0932,
+   "computed": {
+    "pass": false,
+    "value": 0.0932
+   },
+   "reported": {
+    "pass": true,
+    "value": 0.0932
+   }
+  },
+  {
+   "key": "k11",
+   "description": "N100 global field power amplitude, gradiometers (fT/cm)",
+   "expected": 42.1,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k12",
+   "description": "strongest gradiometer channel latency (s)",
+   "expected": 0.0866,
+   "computed": {
+    "pass": true,
+    "value": 0.0866
+   },
+   "reported": {
+    "pass": true,
+    "value": 0.0866
+   }
+  },
+  {
+   "key": "k13",
+   "description": "strongest gradiometer amplitude (fT/cm, absolute)",
+   "expected": 199,
+   "computed": {
+    "pass": false,
+    "value": 199
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k14",
+   "description": "N100 latency, EEG negative peak (s)",
+   "expected": 0.0999,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": true,
+    "value": 0.0999
+   }
+  },
+  {
+   "key": "k15",
+   "description": "N100 amplitude, EEG negative peak (uV)",
+   "expected": -6.0,
+   "computed": {
+    "pass": true,
+    "value": -6.0
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  }
+ ]
+}

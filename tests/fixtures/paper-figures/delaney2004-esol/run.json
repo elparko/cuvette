@@ -1,0 +1,183 @@
+{
+ "paper": "delaney2004-esol",
+ "model": "ollama:qwen3:8b",
+ "run": 1,
+ "status": "answer",
+ "durationS": 119.651,
+ "session": "20261008-144814-0e07",
+ "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/delaney2004-esol/run1/home/sessions/20261008-144814-0e07",
+ "answer": "",
+ "items": [
+  {
+   "key": "molecules_parsed",
+   "description": "Molecules parsed.",
+   "expected": 1128,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": false,
+   "computed": {
+    "pass": true,
+    "value": 1128,
+    "diff": 0,
+    "node": "n1",
+    "path": "metrics.n_read",
+    "entry": 13
+   },
+   "reported": {
+    "pass": null,
+    "value": null,
+    "diff": null,
+    "via": null,
+    "node": null,
+    "claimEntry": 49,
+    "text": null
+   }
+  },
+  {
+   "key": "zero_violations",
+   "description": "Molecules with zero rule-of-five violations.",
+   "expected": 1018,
+   "tolerance": 5,
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 1018,
+    "diff": 0,
+    "node": "n3",
+    "path": "metrics.n_zero_violations",
+    "entry": 32
+   },
+   "reported": {
+    "pass": true,
+    "value": 1018,
+    "diff": 0,
+    "via": "tolerance",
+    "node": "n3",
+    "claimEntry": 49,
+    "text": "- **Molecules with zero violations:** 1018"
+   }
+  },
+  {
+   "key": "two_or_more_violations",
+   "description": "Molecules with two or more violations.",
+   "expected": 12,
+   "tolerance": 3,
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 12,
+    "diff": 0,
+    "node": "n2",
+    "path": "table.rows[0][6]",
+    "entry": 19
+   },
+   "reported": {
+    "pass": true,
+    "value": 12,
+    "diff": 0,
+    "via": "tolerance",
+    "node": "n3",
+    "claimEntry": 49,
+    "text": "- **Molecules with two or more violations:** 12"
+   }
+  },
+  {
+   "key": "logp_above_5",
+   "description": "Molecules with logP above 5.",
+   "expected": 97,
+   "tolerance": 5,
+   "abs": false,
+   "inAnswer": false,
+   "computed": {
+    "pass": true,
+    "value": 97,
+    "diff": 0,
+    "node": "n3",
+    "path": "metrics.n_logp_over_5",
+    "entry": 32
+   },
+   "reported": {
+    "pass": null,
+    "value": null,
+    "diff": null,
+    "via": null,
+    "node": null,
+    "claimEntry": 49,
+    "text": null
+   }
+  },
+  {
+   "key": "esol_r2",
+   "description": "R squared of the ESOL equation (Crippen logP) against measured values.",
+   "expected": 0.752,
+   "tolerance": 0.03,
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 0.7333,
+    "diff": 0.01870000000000005,
+    "node": "n2",
+    "path": "table.rows[1][8]",
+    "entry": 19
+   },
+   "reported": {
+    "pass": false,
+    "value": 0.9894,
+    "diff": 0.23739999999999994,
+    "via": null,
+    "node": "n3",
+    "claimEntry": 49,
+    "text": "- **Fraction of molecules passing the rule of five:** 98.94%"
+   }
+  },
+  {
+   "key": "esol_rmse",
+   "description": "RMSE of the ESOL equation against measured values, in log units.",
+   "expected": 1.1,
+   "tolerance": 0.1,
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 1,
+    "diff": 0.10000000000000009,
+    "node": "n2",
+    "path": "table.rows[1][5]",
+    "entry": 19
+   },
+   "reported": {
+    "pass": false,
+    "value": 0.9894,
+    "diff": 0.11060000000000014,
+    "via": null,
+    "node": "n3",
+    "claimEntry": 49,
+    "text": "- **Fraction of molecules passing the rule of five:** 98.94%"
+   }
+  }
+ ],
+ "metrics": {
+  "requests": 8,
+  "inputTokens": 40421,
+  "outputTokens": 1669,
+  "cacheRead": 0,
+  "cacheWrite": 0,
+  "toolCalls": 4,
+  "failedToolCalls": 1,
+  "nudges": 3,
+  "planReminders": 0,
+  "revisions": 0,
+  "findings": {
+   "info": 10,
+   "warning": 1,
+   "error": 0
+  },
+  "unsourced": 0,
+  "deviations": 0,
+  "overwritten": 0,
+  "nodes": 3
+ }
+}

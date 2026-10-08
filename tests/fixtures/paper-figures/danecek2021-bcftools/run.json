@@ -1,0 +1,183 @@
+{
+ "paper": "danecek2021-bcftools",
+ "model": "ollama:qwen3:8b",
+ "run": 1,
+ "status": "answer",
+ "durationS": 53.159,
+ "session": "20261008-144721-eb8c",
+ "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/danecek2021-bcftools/run1/home/sessions/20261008-144721-eb8c",
+ "answer": "",
+ "items": [
+  {
+   "key": "snp_records",
+   "description": "SNP records",
+   "expected": 1955,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 1955,
+    "diff": 0,
+    "node": "n1",
+    "path": "metrics.n_snps",
+    "entry": 8
+   },
+   "reported": {
+    "pass": true,
+    "value": 1955,
+    "diff": 0,
+    "via": "tolerance",
+    "node": "n1",
+    "claimEntry": 24,
+    "text": "There are **1955 single-base changes (SNPs)** and **248 insertions or deletions (indels)** in the 100 kb stretch of chromosome 20."
+   }
+  },
+  {
+   "key": "indel_records",
+   "description": "Indel records",
+   "expected": 248,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 248,
+    "diff": 0,
+    "node": "n1",
+    "path": "metrics.n_indels",
+    "entry": 8
+   },
+   "reported": {
+    "pass": true,
+    "value": 248,
+    "diff": 0,
+    "via": "tolerance",
+    "node": "n1",
+    "claimEntry": 24,
+    "text": "There are **1955 single-base changes (SNPs)** and **248 insertions or deletions (indels)** in the 100 kb stretch of chromosome 20."
+   }
+  },
+  {
+   "key": "total_records",
+   "description": "Total records",
+   "expected": 2210,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": false,
+   "computed": {
+    "pass": true,
+    "value": 2210,
+    "diff": 0,
+    "node": "n1",
+    "path": "metrics.n_records",
+    "entry": 8
+   },
+   "reported": {
+    "pass": null,
+    "value": null,
+    "diff": null,
+    "via": null,
+    "node": null,
+    "claimEntry": 24,
+    "text": null
+   }
+  },
+  {
+   "key": "ts_tv_ratio",
+   "description": "Ts/Tv ratio of the SNPs",
+   "expected": 2.2,
+   "tolerance": 0.01,
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 2.2,
+    "diff": 0,
+    "node": "n1",
+    "path": "metrics.ts_tv",
+    "entry": 8
+   },
+   "reported": {
+    "pass": true,
+    "value": 2.2,
+    "diff": 0,
+    "via": "tolerance",
+    "node": "n1",
+    "claimEntry": 24,
+    "text": "The transition to transversion (Ts/Tv) ratio of the single-base changes is **2.2**."
+   }
+  },
+  {
+   "key": "records_in_region",
+   "description": "Records in chr20:1000000-1050000",
+   "expected": 1137,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": true,
+    "value": 1137,
+    "diff": 0,
+    "node": "n2",
+    "path": "metrics.n_records",
+    "entry": 19
+   },
+   "reported": {
+    "pass": true,
+    "value": 1137,
+    "diff": 0,
+    "via": "tolerance",
+    "node": "n2",
+    "claimEntry": 24,
+    "text": "The number of variants between positions 1,000,000 and 1,050,000 is **1137**."
+   }
+  },
+  {
+   "key": "records_af_5pct",
+   "description": "Records with INFO/AF at least 0.05",
+   "expected": 328,
+   "tolerance": "exact",
+   "abs": false,
+   "inAnswer": true,
+   "computed": {
+    "pass": false,
+    "value": 312,
+    "diff": 16,
+    "node": "n2",
+    "path": "metrics.tv",
+    "entry": 19
+   },
+   "reported": {
+    "pass": false,
+    "value": 248,
+    "diff": 80,
+    "via": null,
+    "node": "n1",
+    "claimEntry": 24,
+    "text": "There are **1955 single-base changes (SNPs)** and **248 insertions or deletions (indels)** in the 100 kb stretch of chromosome 20."
+   }
+  }
+ ],
+ "metrics": {
+  "requests": 4,
+  "inputTokens": 14664,
+  "outputTokens": 624,
+  "cacheRead": 0,
+  "cacheWrite": 0,
+  "toolCalls": 2,
+  "failedToolCalls": 0,
+  "nudges": 0,
+  "planReminders": 0,
+  "revisions": 1,
+  "findings": {
+   "info": 1,
+   "warning": 0,
+   "error": 1
+  },
+  "unsourced": 1,
+  "deviations": 0,
+  "overwritten": 0,
+  "nodes": 2
+ }
+}

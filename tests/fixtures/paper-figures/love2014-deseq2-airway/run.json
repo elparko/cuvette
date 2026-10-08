@@ -1,0 +1,98 @@
+{
+ "paper": "love2014-deseq2-airway",
+ "model": "mock",
+ "status": "answer",
+ "items": [
+  {
+   "key": "k0",
+   "description": "genes after pre-filter, workflow",
+   "expected": 16637,
+   "computed": {
+    "pass": true,
+    "value": 16637
+   },
+   "reported": {
+    "pass": true,
+    "value": 16637
+   }
+  },
+  {
+   "key": "k1",
+   "description": "genes with padj < 0.1, workflow",
+   "expected": 4381,
+   "computed": {
+    "pass": false,
+    "value": 4381
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k2",
+   "description": "up-regulated at padj < 0.1, workflow",
+   "expected": 2362,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": true,
+    "value": 2362
+   }
+  },
+  {
+   "key": "k3",
+   "description": "down-regulated at padj < 0.1, workflow",
+   "expected": 2019,
+   "computed": {
+    "pass": true,
+    "value": 2019
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k4",
+   "description": "genes with padj < 0.05, workflow",
+   "expected": 3602,
+   "computed": {
+    "pass": false,
+    "value": 3602
+   },
+   "reported": {
+    "pass": true,
+    "value": 3602
+   }
+  },
+  {
+   "key": "k5",
+   "description": "genes with padj < 0.1 on this CSV, pydeseq2 0.5.4",
+   "expected": 4643,
+   "computed": {
+    "pass": null,
+    "value": null
+   },
+   "reported": {
+    "pass": null,
+    "value": null
+   }
+  },
+  {
+   "key": "k6",
+   "description": "genes with padj < 0.05 on this CSV, pydeseq2 0.5.4",
+   "expected": 3872,
+   "computed": {
+    "pass": true,
+    "value": 3872
+   },
+   "reported": {
+    "pass": true,
+    "value": 3872
+   }
+  }
+ ]
+}
