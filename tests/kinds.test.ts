@@ -430,3 +430,11 @@ test("samePath joins the two names of one file", async () => {
   expect(samePath(join(d, "a.png"))).toBe(samePath(join(d, ".", "a.png")));
   if (process.platform === "darwin" && d.startsWith("/var/")) expect(samePath(join("/private", d, "a.png"))).toBe(samePath(join(d, "a.png")));
 });
+
+test("fmtNumber keeps integers exact and rounds fractions to 6 significant digits", async () => {
+  const { fmtNumber } = await import("../src/adapters/kinds/common.ts");
+  expect(fmtNumber(3258788)).toBe("3258788");
+  expect(fmtNumber(0.123456789)).toBe("0.123457");
+  expect(fmtNumber(384.478123)).toBe("384.478");
+  expect(fmtNumber(1234567.891)).toBe("1234567.9");
+});

@@ -74,6 +74,12 @@ describe("checkAnswer", () => {
     expect(claims.map((c) => c.value)).toEqual([0.81]);
   });
 
+  test("ignores file names and PDB codes", () => {
+    const { record } = fake(nums);
+    const claims = checkAnswer("I compared 4AKE.pdb with 1AKE and read data_set_100.fcs and run2.csv; AUC 0.81.", record);
+    expect(claims.map((c) => c.value)).toEqual([0.81]);
+  });
+
   test("ignores version numbers", () => {
     const { record } = fake(nums);
     const claims = checkAnswer("I used vegan 2.7.6 and lmerTest v3.2.1 for AUC 0.81.", record);

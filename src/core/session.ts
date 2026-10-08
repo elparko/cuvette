@@ -7,7 +7,7 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { taskTool } from "../tools/task.ts";
 import { Bus } from "./bus.ts";
-import { annotate, checkAnswer } from "./claims.ts";
+import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
 import { compact, needsCompaction, summaryMessage } from "./compaction.ts";
 import { loadSettings, type Settings } from "./config.ts";
 import { decisionHook, DecisionRecord } from "./decisions.ts";
@@ -100,6 +100,11 @@ function abortable<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
       (e) => (signal.removeEventListener("abort", onAbort), reject(e)),
     );
   });
+}
+
+export function endsWithPromise(text: string): boolean {
+  const tail = text.trim().slice(-400);
+  return /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I need to|I have to|the next step is to)\s+(use|call|run|compute|count|measure|perform|fit|check|merge|filter|align|infer)\b[^.?!]*[.:]?\s*$/i.test(tail);
 }
 
 export class Session {
@@ -354,7 +359,7 @@ export class Session {
           this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
           continue;
         }
-        if (!calls.length && nudges < 2) {
+        if (!calls.length && nudges < 3) {
           const tail = said.slice(-400);
           const promise = /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I will|I'll) (now )?(use|call|run|compute|count|measure|perform|fit|check)\b/i.test(tail) || /\b(I need to|I have to|I must|the next step is to|next, I need to)\s+(use|call|run|compute|count|measure|perform|fit|check|merge|filter|align|infer)\b/i.test(tail);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
@@ -460,6 +465,8 @@ export class Session {
     for (const m of res.kept) this.record.append("message", { message: m as unknown as Record<string, unknown> });
   }
 
+  private draft?: { answer: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number };
+
   private async finishAnswer(text: string, revised: boolean, signal: AbortSignal): Promise<{ text: string; revise?: string }> {
     if (!this.settings.guidance) {
       this.record.append("assistant", { text, final: true });
@@ -469,6 +476,9 @@ export class Session {
     const pre = await this.hooks.preAnswer({ event: "PreAnswer", session: this.id, answer: text });
     const answer = pre.answer ?? text;
     const claims = checkAnswer(answer, this.record);
+    let kept: string | undefined;
+    let keptClaims: typeof claims | undefined;
+    let keptFound: { f: FindingIn; source: Finding["source"] }[] | undefined;
     const ctx = { record: this.record, decisions: this.decisions, adapters: this.adapters, answer, claims };
     const found: { f: FindingIn; source: Finding["source"] }[] = [...(pre.findings ?? []).map((f) => ({ f, source: "hook" as const }))];
     for (const f of await runChecks(ctx)) found.push({ f, source: "rule" });
@@ -479,21 +489,52 @@ export class Session {
         this.record.append("notice", { text: `The referee did not run: ${(e as Error).message}` });
       }
     }
-    const errors = found.filter((x) => x.f.severity === "error");
+    let errors = found.filter((x) => x.f.severity === "error");
+    const measured = (cs: typeof claims) => cs.filter((c) => c.label === "measured").length;
+    if (revised && this.draft && errors.length >= this.draft.errors && measured(claims) < this.draft.measured) {
+      this.record.append("notice", { text: "The revision lost results and fixed no problem, so the harness kept the first answer." });
+      ({ answer: kept, found: keptFound } = this.draft);
+      keptClaims = checkAnswer(kept, this.record);
+      errors = keptFound.filter((x) => x.f.severity === "error");
+    }
+    this.draft = undefined;
     if (errors.length && !revised && this.settings.reviseOnFindings) {
+      this.draft = { answer, claims, found, errors: errors.length, measured: measured(claims) };
       this.record.append("notice", { text: `Review found ${errors.length} problem(s). The agent revises the answer before you see it.` });
       return {
         text: "",
         revise: "[Review before the answer reaches the scientist]\n" + errors.map((x) => `- ${x.f.message}`).join("\n") + "\nFix these problems. Then give the answer again.",
       };
     }
-    const fids = found.map(({ f, source }) => this.findings.add(f, source).fid);
+    const finalAnswer = kept ?? answer;
+    const finalClaims = keptClaims ?? claims;
+    const finalFound = keptFound ?? found;
+    if (endsWithPromise(finalAnswer)) finalFound.push({ f: { check: "answer_unfinished", severity: "warning", message: "The answer ends with a plan for more steps, not with a result. The agent stopped before it finished." }, source: "rule" });
+    const fids = finalFound.map(({ f, source }) => this.findings.add(f, source).fid);
+    const missing = this.resultsNotIn(finalAnswer);
     const settings = this.settingsUsed();
-    const shown = settings ? `${answer}\n\n${settings}` : answer;
-    const annotated = annotate(answer, claims) + (settings ? `\n\n${settings}` : "");
-    this.record.append("assistant", { text: shown, annotated, final: true, findings: fids, settings });
-    this.lastAnswer = answer;
+    const tail = [missing, settings].filter(Boolean).join("\n\n");
+    const shown = tail ? `${finalAnswer}\n\n${tail}` : finalAnswer;
+    const annotated = annotate(finalAnswer, finalClaims) + (tail ? `\n\n${tail}` : "");
+    this.record.append("assistant", { text: shown, annotated, final: true, findings: fids, settings, results: missing || undefined });
+    this.lastAnswer = finalAnswer;
     return { text: annotated };
+  }
+
+  private resultsNotIn(answer: string): string {
+    const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
+    const stale = this.record.stale();
+    const said = extractNumbers(answer).map((f) => f.value);
+    const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(1e-9, Math.abs(b) * 0.005);
+    const lines: string[] = [];
+    for (const n of this.record.nodes()) {
+      if (n.entry <= turnStart || n.sensitivityOf || stale.has(n.id) || n.tool === "calculate") continue;
+      const nums = extractNumbers(n.summary ?? "").map((f) => f.value);
+      if (!nums.length || nums.some((v) => said.some((x) => close(x, v)))) continue;
+      lines.push(`- ${n.id} ${n.tool}: ${n.summary}`);
+    }
+    if (!lines.length) return "";
+    return `Step results that the answer does not mention, from the record:\n${lines.slice(-12).join("\n")}`;
   }
 
   private settingsUsed(): string {

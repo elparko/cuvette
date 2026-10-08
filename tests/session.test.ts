@@ -227,3 +227,39 @@ test("an answer while plan steps are open gets one reminder to finish them", asy
   expect(notes.length).toBeGreaterThan(0);
   expect(answer).toMatch(/Done\./);
 });
+
+test("a revision that loses results and fixes nothing is replaced by the first answer", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "count", args: { input: "/data/a.tif" } }] },
+    { text: "There are 64 particles. Also 999 cells." },
+    { text: "There are 999 cells." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  const answer = await session.send("Count");
+  expect(answer).toMatch(/There are 64 particles/);
+  expect(session.record.entries(["notice"]).some((e) => /kept the first answer/.test(String(e.data.text)))).toBe(true);
+});
+
+test("the answer gets a list of step results that it does not mention", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "count", args: { input: "/data/a.tif" } }] },
+    { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+    { text: "I counted the particles and blurred the image." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count and blur");
+  const last = session.record.entries(["assistant"]).at(-1)!.data as { text: string; results?: string };
+  expect(last.results).toMatch(/Step results that the answer does not mention/);
+  expect(last.results).toMatch(/n1 count: Counted 64 particles/);
+  expect(last.text).toContain(last.results!);
+});
+
+test("an answer that still ends with a promise after three nudges is marked unfinished", async () => {
+  const provider = new FakeProvider(() => ({ text: "I will now run the count." }));
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count");
+  expect(session.findings.list().some((f) => f.check === "answer_unfinished")).toBe(true);
+});

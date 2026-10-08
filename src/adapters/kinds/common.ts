@@ -464,7 +464,8 @@ export function readFields(obj: unknown, opts: { inferMetrics?: boolean; scanPat
 }
 
 export function fmtNumber(n: number): string {
-  return String(Number(n.toPrecision(6)));
+  if (Number.isInteger(n)) return String(n);
+  return String(Number(n.toPrecision(Math.max(6, Math.floor(Math.log10(Math.abs(n))) + 2))));
 }
 
 export function makeSummary(entry: MapEntry | undefined, title: string, args: Args, extra: { metrics?: Record<string, number>; data?: unknown; table?: TablePreview; summary?: string }): string {

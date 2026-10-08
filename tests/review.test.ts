@@ -154,6 +154,11 @@ describe("referee", () => {
     expect(text).toContain("#6 comparison run for method result of stats: ok AUC 0.6");
   });
 
+  test("a plain no-findings reply gives no finding", () => {
+    expect(parseReferee("No findings.")).toEqual([]);
+    expect(parseReferee("none")).toEqual([]);
+  });
+
   test("parses fenced JSON lines and arrays", () => {
     const lines = '```json\n{"severity":"warning","message":"A","entries":[3]}\n{"severity":"bogus","message":"B"}\n```';
     expect(parseReferee(lines)).toEqual([
