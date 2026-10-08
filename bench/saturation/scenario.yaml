@@ -10,7 +10,7 @@ setup:
   question: Is cell fluorescence higher in treated images?
 answers:
   decisions:
-    unit_of_replication: image
+    replicate: images or fields
     exclusion: exclude saturated images from intensity measures
     threshold_method: Otsu
   default: Use your best judgment.
@@ -28,5 +28,5 @@ traps:
     fell_in:
       - answer_matches: ['higher|brighter|increase|greater|fold|%']
         answer_lacks: ['saturat', 'clipp', 'overexpos', 'dynamic range', '\b255\b']
-human_decisions: [exclusion, unit_of_replication, threshold_method]
+human_decisions: [exclusion, replicate, threshold_method]
 agent_decisions: []

@@ -1,7 +1,7 @@
 adapter:
   name: samtools
   title: samtools
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Converts, sorts, indexes and counts aligned sequencing reads with samtools. Each tool runs one
@@ -126,7 +126,7 @@ tools:
     title: Index a sorted BAM file
     description: >
       Index a BAM file that is sorted by position. The result has the path of the BAM file
-      (indexed_bam) and the path of its index (index). Use indexed_bam in later steps.
+      (indexed_bam) and the path of its index (index). Use indexed_bam in later steps: flagstat, idxstats and count_reads.
     params:
       path: { type: string, minLength: 1, description: Absolute path of the sorted BAM file. }
     required: [path]
@@ -160,8 +160,9 @@ tools:
   - name: count_reads
     title: Count reads with filters
     description: >
-      Count the reads in a BAM file that pass the filters. A region such as seq2:100-200 needs an
-      indexed BAM file. Use indexed_bam from index_bam.
+      Count the reads in a BAM file that pass the filters, or in one region. Call this tool to answer a
+      question about a region such as seq2:100-200. A region needs an indexed BAM file. Use
+      indexed_bam from index_bam.
     read_only: true
     params:
       path: { type: string, minLength: 1, description: Absolute path of the BAM file. }

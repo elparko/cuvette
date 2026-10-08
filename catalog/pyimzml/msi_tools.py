@@ -228,7 +228,9 @@ def _ion_image(p, mz, ppm, norm, reduce):
     return raw, nrm, npts, lo_mz, hi_mz
 
 
-def get_ion_image(path, mz, ppm, normalization="none", reduce="sum", name="ion_image"):
+def get_ion_image(path, mz, ppm=None, normalization="none", reduce="sum", name="ion_image"):
+    if ppm is None:
+        raise ValueError("ppm is not set. The decision ion_ppm sets it.")
     _check_norm(normalization)
     if reduce not in REDUCERS:
         raise ValueError("reduce must be one of %s" % ", ".join(REDUCERS))
@@ -377,7 +379,9 @@ def get_mean_spectrum(path, normalization="none", bin_width=0.0, max_pixels=500,
     }
 
 
-def find_top_peaks(path, snr=3.0, n_peaks=20, normalization="none", bin_width=0.0, max_pixels=500, name="top_peaks"):
+def find_top_peaks(path, snr=None, n_peaks=20, normalization="none", bin_width=0.0, max_pixels=500, name="top_peaks"):
+    if snr is None:
+        raise ValueError("snr is not set. The decision snr sets it.")
     _check_norm(normalization)
     p = _parser(path)
     mz, y, used, outside = _mean_spectrum(p, normalization, float(bin_width), int(max_pixels))

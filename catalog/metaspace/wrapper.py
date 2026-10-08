@@ -169,7 +169,7 @@ def _results(ds, database, version, fdr):
     return df
 
 
-def list_annotations(dataset_id, database="HMDB", database_version="v4", fdr=0.1, exclude_off_sample=False, adduct=""):
+def list_annotations(dataset_id, database="HMDB", database_version="v4", fdr=0.1, exclude_off_sample=False, adduct="all"):
     try:
         _check_fdr(fdr)
         ds = _dataset(dataset_id)
@@ -179,7 +179,7 @@ def list_annotations(dataset_id, database="HMDB", database_version="v4", fdr=0.1
     df = df.reset_index()
     n_all = len(df)
     n_off = int(df["offSample"].fillna(False).sum()) if n_all else 0
-    if adduct:
+    if adduct and adduct != "all":
         df = df[df["adduct"] == adduct]
     if exclude_off_sample:
         df = df[~df["offSample"].fillna(False).astype(bool)]

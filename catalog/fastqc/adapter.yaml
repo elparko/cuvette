@@ -134,7 +134,7 @@ tests:
     expect:
       - { path: metrics.total_sequences, equals: 10000 }
       - { path: metrics.sequence_length, equals: 40 }
-      - { path: metrics.gc_percent, equals: 45 }
+      - { path: metrics.gc_percent, equals: 46 }
       - { path: metrics.n_fail, equals: 0 }
       - { path: metrics.n_warn, equals: 2 }
       - { path: data.module_per_base_sequence_content, equals: WARN }

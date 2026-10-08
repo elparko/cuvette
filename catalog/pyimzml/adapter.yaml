@@ -1,0 +1,435 @@
+adapter:
+  name: pyimzml
+  title: pyimzML reader for imzML mass spectrometry imaging files
+  version: 0.1.0
+  description: Reads any imzML file with pyimzML. It gives file facts, the total ion current image, ion images at an m/z with a ppm window, the mean spectrum and the strongest peaks.
+program:
+  name: pyimzML
+  version: 1.5.5
+  homepage: https://github.com/alexandrovteam/pyimzML
+  docs:
+    - https://pyimzml.readthedocs.io/
+    - https://www.ms-imaging.org/imzml/
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 60
+  call_timeout_s: 3600
+locate:
+  env: PYIMZML_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/pyimzml/bin/python
+    - ~/.guided-analysis/envs/pyimzml/Scripts/python.exe
+  version_command:
+    - "{program_path}"
+    - -c
+    - "import importlib.metadata as m; print(m.version('pyimzml'))"
+module: ""
+decisions:
+  - key: ion_ppm
+    label: Ion image tolerance (ppm)
+    kind: float
+    default: 10
+    lo: 0.1
+    hi: 500
+    owner: human
+    group: Acquisition
+    essential: true
+    stage: setup
+    links:
+      - { tool: get_ion_image, arg: ppm }
+    help: The half-width of the m/z window of an ion image, in parts per million. pyimzML itself uses 0.1 Da and has no ppm default. The value 10 is the SMILE MSI default. Use a window that matches the mass accuracy of the instrument.
+    sensitivity:
+      tool: get_ion_image
+      options: [5, 10, 50]
+      compare: [mean_points_in_window, mean_intensity, frac_pixels_above_half_max]
+      max_runs: 3
+  - key: normalization
+    label: Normalization
+    kind: choice
+    choices: [none, tic, rms]
+    default: none
+    owner: human
+    group: Ion image
+    essential: true
+    stage: setup
+    links:
+      - { tool: get_ion_image, arg: normalization }
+      - { tool: get_mean_spectrum, arg: normalization }
+      - { tool: find_top_peaks, arg: normalization }
+    help: How each pixel is scaled before images and spectra are made. none keeps raw intensities, like pyimzML. tic divides by the sum of the pixel. rms divides by the root mean square of the pixel. This choice can create or remove a difference between regions.
+    sensitivity:
+      tool: get_ion_image
+      options: [none, tic, rms]
+      compare: [frac_pixels_above_half_max, peak_pixel_x, peak_pixel_y]
+      max_runs: 3
+  - key: reduce
+    label: Reduce (m/z window)
+    kind: choice
+    choices: [sum, max, mean]
+    default: sum
+    owner: agent
+    group: Ion image
+    stage: setup
+    links:
+      - { tool: get_ion_image, arg: reduce }
+    help: How the points inside the m/z window become one value. pyimzML sums them by default.
+  - key: snr
+    label: Peak picking S/N
+    kind: float
+    default: 3
+    lo: 1
+    hi: 50
+    owner: human
+    group: Peak picking
+    essential: true
+    stage: setup
+    links:
+      - { tool: find_top_peaks, arg: snr }
+    help: The signal-to-noise ratio that a local maximum of the mean spectrum must reach. pyimzML has no peak picker. The value 3 is the SMILE MSI default.
+    sensitivity:
+      tool: find_top_peaks
+      options: [3, 5, 10]
+      compare: [n_peaks_found]
+      max_runs: 3
+  - key: sample_pixels
+    label: Pixels used for the mean spectrum (0 = all)
+    kind: int
+    default: 500
+    lo: 0
+    hi: 100000
+    owner: agent
+    group: Peak picking
+    stage: setup
+    links:
+      - { tool: get_mean_spectrum, arg: max_pixels }
+      - { tool: find_top_peaks, arg: max_pixels }
+    help: The mean spectrum reads this number of evenly spaced pixels. 0 reads every pixel. A large file takes minutes with 0.
+  - key: polarity
+    label: Polarity
+    kind: choice
+    choices: [negative, positive]
+    default: negative
+    owner: human
+    group: Acquisition
+    essential: true
+    stage: setup
+    help: The ionization polarity of the run. The file states its own polarity. Call read_file_info and compare. Use this value to choose adducts when you name a peak.
+map:
+  - tool: read_file_info
+    route: "In Python: p = ImzMLParser(path); then p.polarity, p.spectrum_mode, p.imzmldict, len(p.coordinates), p.mzLengths"
+    steps:
+      - "Run p = pyimzml.ImzMLParser.ImzMLParser('file.imzML')."
+      - "Read len(p.coordinates) for the pixel count and p.imzmldict for the grid and the pixel size."
+      - "Read p.polarity and p.spectrum_mode. Read max(p.mzLengths) for the points per spectrum."
+      - "Read the m/z range from p.getspectrum(i)[0].min() and .max()."
+      - "In SMILE MSI: File > Open imzML..., then Data > Acquisition & matching... shows the settings."
+    params:
+      - { arg: max_scan, label: Spectra read for the m/z range, ui_default: 200 }
+    fidelity: exact
+    evidence:
+      source: code
+      test: file-info-continuous
+      note: The numbers equal the pyimzML repository test (9 spectra, 8399 points, profile, negative).
+    summary: "{metrics.n_pixels} pixels, m/z {metrics.mz_min} to {metrics.mz_max}."
+  - tool: get_ion_image
+    match: { normalization: none, reduce: sum }
+    route: "In Python: pyimzml.ImzMLParser.getionimage(p, mz, tol=mz * ppm * 1e-6)"
+    steps:
+      - "Convert the tolerance: tol = mz * ppm * 1e-6. pyimzML takes a tolerance in Da."
+      - "Run image = getionimage(p, mz, tol). Rows are y - 1 and columns are x - 1."
+      - "Save the plot with matplotlib imshow, or write the array with tifffile."
+      - "In SMILE MSI: open the file, set Extraction tolerance (ppm) in Data > Acquisition & matching..., set Normalization to none in the Display panel, then click the m/z on the Ion image tab."
+    params:
+      - { arg: mz, label: m/z }
+      - { arg: ppm, label: Extraction tolerance (ppm), ui_default: 10, note: "getionimage takes Da and defaults to 0.1 Da. Convert with mz * ppm * 1e-6." }
+      - { arg: normalization, label: Normalization, ui_default: tic, note: "getionimage does no normalization. The SMILE MSI Display panel shows tic first." }
+      - { arg: reduce, label: Reduce (m/z window), ui_default: sum }
+    fidelity: exact
+    evidence:
+      source: code
+      test: ion-image-matches-getionimage
+      note: The test pins the maximum and the mean that getionimage gives for the same window.
+    summary: "Ion image at m/z {mz}: max {metrics.max_intensity} at pixel ({metrics.peak_pixel_x}, {metrics.peak_pixel_y})."
+  - tool: get_ion_image
+    route: "In Python: getionimage(p, mz, tol=mz * ppm * 1e-6, reduce_func=max or mean), then divide each pixel by its TIC or RMS"
+    steps:
+      - "Run getionimage with reduce_func set to the reducer."
+      - "For tic: divide each pixel value by the sum of the intensities of that pixel, then multiply by the mean pixel TIC."
+      - "For rms: divide by the root mean square of the intensities of that pixel, then multiply by the mean pixel RMS."
+      - "In SMILE MSI: set Reduce (m/z window) and Normalization (tic, rms or none) in the Display panel."
+    params:
+      - { arg: ppm, label: Extraction tolerance (ppm), ui_default: 10 }
+      - { arg: normalization, label: Normalization, ui_default: tic }
+      - { arg: reduce, label: Reduce (m/z window), ui_default: sum }
+    fidelity: close
+    difference: getionimage has no normalization. The tool rescales each pixel by mean pixel norm / pixel norm. SMILE MSI also caps the TIC amplification (3 times by default). The tool has no cap, so faint pixels can show bright false hot spots.
+    evidence:
+      source: code
+      test: ion-image-tic-hand-calculation
+      note: The test pins a value that was worked out by hand from the file. The SMILE MSI route was not run.
+    summary: "Ion image at m/z {mz}, {normalization} normalization: max {metrics.max_intensity}."
+  - tool: get_tic_image
+    route: "In Python: sum(p.getspectrum(i)[1]) for each pixel i, placed at (y - 1, x - 1)"
+    steps:
+      - "For each index i in range(len(p.coordinates)), compute sum(p.getspectrum(i)[1])."
+      - "Place the value at row y - 1 and column x - 1 of an array of shape (grid y, grid x)."
+      - "In SMILE MSI: the TIC image in the Display panel."
+    fidelity: exact
+    evidence:
+      source: code
+      test: tic-image-continuous
+      note: The mean and maximum equal the values computed from the pyimzML spectra.
+    summary: "TIC mean {metrics.tic_mean}, max {metrics.tic_max} at pixel ({metrics.tic_max_x}, {metrics.tic_max_y})."
+  - tool: get_mean_spectrum
+    route: "In Python: average p.getspectrum(i)[1] over the pixels on the shared m/z axis"
+    steps:
+      - "For a continuous file, all spectra share one m/z axis: mz = p.getspectrum(0)[0]."
+      - "Average the intensity arrays: np.mean([p.getspectrum(i)[1] for i in indices], axis=0)."
+      - "For a processed file, bin the m/z values first. The tool bins at 0.01 by default."
+      - "In SMILE MSI: the spectrum plot on the Ion image tab."
+    params:
+      - { arg: bin_width, label: Bin width (m/z), ui_default: 0, note: "0 uses the file axis for a continuous file and 0.01 for a processed file." }
+      - { arg: max_pixels, label: Pixels used, ui_default: 0, note: "The tool samples 500 evenly spaced pixels by default. 0 reads all." }
+    fidelity: close
+    difference: The tool reads evenly spaced pixels, not all of them, unless max_pixels is 0. A processed file is binned, and the reported m/z of a bin is the intensity-weighted mean m/z inside the bin.
+    evidence:
+      source: code
+      test: mean-spectrum-synthetic
+      note: The test pins numbers worked out by hand from the synthetic file.
+    summary: "Mean spectrum of {metrics.n_pixels_used} of {metrics.n_pixels_total} pixels, strongest at m/z {metrics.mz_at_max}."
+  - tool: find_top_peaks
+    route: "In Python: local maxima of the mean spectrum above median + snr * 1.4826 * MAD"
+    steps:
+      - "Make the mean spectrum as in get_mean_spectrum."
+      - "Find the points that are higher than both neighbors."
+      - "Keep the points where (intensity - median) / (1.4826 * MAD) is at least snr. The median and MAD use the non-zero points."
+      - "For a sparse spectrum, the noise unit is the median of the non-zero points."
+      - "In SMILE MSI: Analyze > This slide > Peaks > Find peaks, with Signal-to-noise set to the same value."
+    params:
+      - { arg: snr, label: Signal-to-noise, ui_default: 3 }
+      - { arg: n_peaks, label: Peaks returned }
+    fidelity: close
+    difference: This is the adapter's own simple picker. SMILE MSI uses another noise model, a prominence rule and Min rel. intensity. The two peak lists can differ.
+    evidence:
+      source: code
+      test: top-peaks-synthetic
+      note: The SMILE MSI route was not run.
+    summary: "{metrics.n_peaks_found} peaks at S/N {snr} or more; strongest at m/z {metrics.top_mz}."
+  - tool: compare_files
+    route: "In Python: compare p1.getspectrum(i) with p2.getspectrum(i) for every i with numpy.array_equal"
+    steps:
+      - "Open both files with ImzMLParser."
+      - "For each pixel index i, compare the m/z arrays and the intensity arrays."
+    fidelity: exact
+    evidence:
+      source: code
+      test: compare-continuous-processed
+      note: A continuous and a processed file with the same spectra give no difference.
+    summary: "{metrics.n_pixels_different} of {metrics.n_pixels_compared} pixels differ."
+checks:
+  - id: ppm_too_wide
+    severity: warning
+    description: The ion image window is wider than the mass accuracy of a high-resolution instrument.
+    rule:
+      tool: get_ion_image
+      arg: ppm
+      op: ">"
+      value: 50
+      message: A window wider than 50 ppm can merge neighbor ions on an Orbitrap or FTICR (Fourier transform ion cyclotron resonance) instrument. Use it only for a time-of-flight instrument, and say so.
+  - id: normalization_not_stated
+    severity: warning
+    description: An ion image or a comparison is reported with no normalization named.
+    text: The report must say which normalization (none, TIC or RMS) each ion image or spectrum used. If it compares regions or files, it must say that the same normalization was used for both.
+  - id: sampled_spectrum_as_whole
+    severity: warning
+    description: A mean spectrum or peak list from a sample of pixels is described as the whole file.
+    text: If n_pixels_used is smaller than n_pixels_total, the report must say that the mean spectrum or the peak list comes from a sample of pixels.
+  - id: identity_from_mz_alone
+    severity: warning
+    description: A peak is named as a lipid from the m/z alone.
+    text: The report must call a lipid name from an m/z putative, give the adduct, the polarity and the mass error in ppm, and say that MS/MS (tandem mass spectrometry) is needed to confirm it.
+tests:
+  - id: file-info-continuous
+    description: The pyimzML example file has 9 pixels in a 3 by 3 grid, 8399 points per spectrum, profile mode, negative polarity, m/z 100.083336 to 799.9167 and a pixel size of 100 um. These numbers come from the pyimzML repository test and the file.
+    data: [data/Example_Continuous.imzML, data/Example_Continuous.ibd]
+    calls:
+      - { tool: read_file_info, args: { path: "{adapter_dir}/data/Example_Continuous.imzML" } }
+    expect:
+      - { path: metrics.n_pixels, equals: 9 }
+      - { path: metrics.grid_x, equals: 3 }
+      - { path: metrics.grid_y, equals: 3 }
+      - { path: metrics.points_per_spectrum_max, equals: 8399 }
+      - { path: metrics.mz_min, approx: 100.083336, abs: 0.0001 }
+      - { path: metrics.mz_max, approx: 799.9167, abs: 0.0001 }
+      - { path: metrics.pixel_size_x_um, equals: 100 }
+      - { path: metrics.ibd_bytes, equals: 335976 }
+      - { path: data.polarity, equals: negative }
+      - { path: data.spectrum_mode, equals: profile }
+      - { path: data.storage_mode, equals: continuous }
+  - id: tic-image-continuous
+    description: The mean pixel TIC (sum of intensities) is 161.1444 and the largest is 243.5395 at pixel (3, 3). The numbers were computed from the spectra with numpy. They are not from a paper.
+    data: [data/Example_Continuous.imzML, data/Example_Continuous.ibd]
+    calls:
+      - { tool: get_tic_image, args: { path: "{adapter_dir}/data/Example_Continuous.imzML" } }
+    expect:
+      - { path: metrics.tic_mean, approx: 161.1444, abs: 0.001 }
+      - { path: metrics.tic_max, approx: 243.5395, abs: 0.001 }
+      - { path: metrics.tic_max_x, equals: 3 }
+      - { path: metrics.tic_max_y, equals: 3 }
+      - { path: "outputs[0].path", contains: ".png" }
+  - id: ion-image-matches-getionimage
+    description: Ion image at m/z 153.0833 with a 10 ppm window. pyimzML getionimage with tol = 153.0833 * 10e-6 gives the maximum 9.244604 at pixel (3, 3) and the mean 3.080003. The numbers come from the manual route.
+    data: [data/Example_Continuous.imzML, data/Example_Continuous.ibd]
+    manual_route_checked: true
+    calls:
+      - tool: get_ion_image
+        args: { path: "{adapter_dir}/data/Example_Continuous.imzML", mz: 153.0833, ppm: 10, normalization: none, reduce: sum }
+    expect:
+      - { path: metrics.max_intensity, approx: 9.244604, abs: 0.000001 }
+      - { path: metrics.mean_intensity, approx: 3.080003, abs: 0.000001 }
+      - { path: metrics.peak_pixel_x, equals: 3 }
+      - { path: metrics.peak_pixel_y, equals: 3 }
+      - { path: "outputs[1].path", contains: ".tif" }
+  - id: ion-image-tolerance-synthetic
+    description: "Synthetic file lipids_tiny.imzML, made with the pyimzML writer. Pixels with x of 1 or 2 have a peak of 100 at m/z 760.5851 and a neighbor of 20 at 760.5901 (6.6 ppm away). Pixels with x of 3 or 4 have 10 and 20. A 5 ppm window gets 100 at pixel (1, 1). A 10 ppm window adds the neighbor and gets 120. Worked out by hand."
+    data: [data/lipids_tiny.imzML, data/lipids_tiny.ibd]
+    calls:
+      - { tool: get_ion_image, args: { path: "{adapter_dir}/data/lipids_tiny.imzML", mz: 760.5851, ppm: 5, normalization: none, reduce: sum } }
+    expect:
+      - { path: metrics.max_intensity, approx: 100, abs: 0.0001 }
+      - { path: metrics.mean_intensity, approx: 55, abs: 0.0001 }
+      - { path: metrics.peak_pixel_x, equals: 1 }
+      - { path: metrics.peak_pixel_y, equals: 1 }
+  - id: ion-image-wide-window-synthetic
+    description: The same synthetic file with a 10 ppm window. The neighbor at 6.6 ppm falls inside the window. The maximum is 120 and the mean is 75. Worked out by hand.
+    data: [data/lipids_tiny.imzML, data/lipids_tiny.ibd]
+    calls:
+      - { tool: get_ion_image, args: { path: "{adapter_dir}/data/lipids_tiny.imzML", mz: 760.5851, ppm: 10, normalization: none, reduce: sum } }
+    expect:
+      - { path: metrics.max_intensity, approx: 120, abs: 0.0001 }
+      - { path: metrics.mean_intensity, approx: 75, abs: 0.0001 }
+      - { path: metrics.mean_points_in_window, equals: 2 }
+  - id: ion-image-tic-hand-calculation
+    description: In the synthetic file the TIC is 175 for x of 1 or 2 and 85 for x of 3 or 4. The mean TIC is 130. TIC normalization gives 100 / 175 * 130 = 74.2857 for the first pixels. Worked out by hand.
+    data: [data/lipids_tiny.imzML, data/lipids_tiny.ibd]
+    calls:
+      - { tool: get_ion_image, args: { path: "{adapter_dir}/data/lipids_tiny.imzML", mz: 760.5851, ppm: 5, normalization: tic, reduce: sum } }
+    expect:
+      - { path: metrics.max_intensity, approx: 74.285714, abs: 0.0001 }
+      - { path: metrics.peak_pixel_x, equals: 1 }
+  - id: mean-spectrum-synthetic
+    description: The mean of the 12 synthetic pixels is 55 at m/z 760.5851, 50 at 786.6007, 20 at 760.5901 and 5 at 700.5. The sum is 130. Worked out by hand.
+    data: [data/lipids_tiny.imzML, data/lipids_tiny.ibd]
+    calls:
+      - { tool: get_mean_spectrum, args: { path: "{adapter_dir}/data/lipids_tiny.imzML", normalization: none, max_pixels: 0 } }
+    expect:
+      - { path: metrics.max_mean_intensity, approx: 55, abs: 0.0001 }
+      - { path: metrics.mz_at_max, approx: 760.5851, abs: 0.00001 }
+      - { path: metrics.sum_mean_intensity, approx: 130, abs: 0.0001 }
+      - { path: metrics.n_pixels_used, equals: 12 }
+  - id: top-peaks-synthetic
+    description: At S/N 1 the synthetic mean spectrum has two peaks, 760.5851 and 786.6007. The noise unit is the median of the four non-zero points, 35. Worked out by hand.
+    data: [data/lipids_tiny.imzML, data/lipids_tiny.ibd]
+    calls:
+      - { tool: find_top_peaks, args: { path: "{adapter_dir}/data/lipids_tiny.imzML", snr: 1, max_pixels: 0 } }
+    expect:
+      - { path: metrics.n_peaks_found, equals: 2 }
+      - { path: metrics.noise_sigma, approx: 35, abs: 0.0001 }
+      - { path: metrics.top_mz, approx: 760.5851, abs: 0.00001 }
+      - { path: "table.rows[1][0]", approx: 786.6007, abs: 0.00001 }
+  - id: compare-continuous-processed
+    description: A processed and a continuous file written from the same 12 spectra hold the same data. The ibd files have 592 and 240 bytes.
+    data: [data/lipids_tiny.imzML, data/lipids_tiny.ibd, data/lipids_tiny_continuous.imzML, data/lipids_tiny_continuous.ibd]
+    calls:
+      - { tool: compare_files, args: { path_a: "{adapter_dir}/data/lipids_tiny.imzML", path_b: "{adapter_dir}/data/lipids_tiny_continuous.imzML" } }
+    expect:
+      - { path: metrics.identical, equals: 1 }
+      - { path: metrics.n_pixels_different, equals: 0 }
+      - { path: metrics.ibd_bytes_a, equals: 592 }
+      - { path: metrics.ibd_bytes_b, equals: 240 }
+      - { path: data.storage_a, equals: processed }
+      - { path: data.storage_b, equals: continuous }
+data_rules:
+  cloud_visibility: all
+  note: The tools return summaries and tables of at most 10 rows. Full images and tables stay in the work folder.
+tools:
+  - name: read_file_info
+    title: Read imzML file information
+    description: "Read an imzML file and report the pixel count, the pixel grid, the pixel size, the m/z range, profile or centroid mode, polarity, continuous or processed storage, points per spectrum and the file sizes. Use it first on any imzML file."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the .imzML file. The .ibd file must sit next to it. }
+      max_scan: { type: integer, minimum: 1, maximum: 100000, description: "Number of evenly spaced spectra read for the m/z range of a processed file. A continuous file needs one." }
+    required: [path]
+    function: "msi_tools:read_file_info"
+  - name: get_ion_image
+    title: Make an ion image
+    description: "Make the ion image of one m/z. The window is the m/z plus or minus ppm. The tool writes a PNG, a TIFF (32-bit float) and a CSV of the 10 brightest pixels."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the .imzML file. }
+      mz: { type: number, exclusiveMinimum: 0, description: Center m/z of the window. }
+      ppm: { type: number, minimum: 0.1, maximum: 500, description: Half-width of the window in ppm. The decision ion_ppm sets it. }
+      normalization: { type: string, enum: [none, tic, rms], description: Pixel normalization. The decision normalization sets it. }
+      reduce: { type: string, enum: [sum, max, mean], description: How the points in the window become one value. The decision reduce sets it. }
+      name: { type: string, description: File name stem of the outputs. }
+    required: [path, mz]
+    function: "msi_tools:get_ion_image"
+    outputs:
+      image: { kind: image, ext: png, description: Ion image in the viridis color scale. Pixels without a spectrum are dark gray. }
+      raster: { kind: file, ext: tif, description: 32-bit float values of the image. }
+      pixels: { kind: table, ext: csv, description: The 10 brightest pixels. }
+  - name: get_tic_image
+    title: Make the total ion current image
+    description: "Sum the intensities of each pixel and make the image. It reports the mean, the maximum and the pixel with the strongest total signal. It reads every pixel, so a large file takes minutes."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the .imzML file. }
+      name: { type: string, description: File name stem of the outputs. }
+    required: [path]
+    function: "msi_tools:get_tic_image"
+    outputs:
+      image: { kind: image, ext: png }
+      raster: { kind: file, ext: tif }
+      pixels: { kind: table, ext: csv }
+  - name: get_mean_spectrum
+    title: Make the mean spectrum
+    description: "Average the spectra of evenly spaced pixels. A continuous file keeps its m/z axis. A processed file is binned. The tool writes the spectrum as CSV."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the .imzML file. }
+      normalization: { type: string, enum: [none, tic, rms], description: Pixel normalization. The decision normalization sets it. }
+      bin_width: { type: number, minimum: 0, description: "Bin width in m/z. 0 uses the file axis of a continuous file, and 0.01 for a processed file." }
+      max_pixels: { type: integer, minimum: 0, description: "Pixels read, evenly spaced. 0 reads all. The decision sample_pixels sets it." }
+      name: { type: string, description: File name stem of the output. }
+    required: [path]
+    function: "msi_tools:get_mean_spectrum"
+    outputs:
+      spectrum: { kind: table, ext: csv }
+  - name: find_top_peaks
+    title: Find the strongest peaks
+    description: "Find local maxima of the mean spectrum that reach the signal-to-noise cutoff. It lists the strongest peaks with m/z, intensity and S/N."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the .imzML file. }
+      snr: { type: number, minimum: 1, maximum: 50, description: Signal-to-noise cutoff. The decision snr sets it. }
+      n_peaks: { type: integer, minimum: 1, maximum: 1000, description: Number of peaks returned. }
+      normalization: { type: string, enum: [none, tic, rms], description: Pixel normalization. The decision normalization sets it. }
+      bin_width: { type: number, minimum: 0, description: Bin width in m/z. 0 uses the default of get_mean_spectrum. }
+      max_pixels: { type: integer, minimum: 0, description: "Pixels read, evenly spaced. 0 reads all. The decision sample_pixels sets it." }
+      name: { type: string, description: File name stem of the output. }
+    required: [path]
+    function: "msi_tools:find_top_peaks"
+    outputs:
+      peaks: { kind: table, ext: csv }
+  - name: compare_files
+    title: Compare the spectra of two imzML files
+    description: "Compare the m/z and intensity arrays of two imzML files pixel by pixel. Use it to check that a continuous and a processed file hold the same spectra."
+    read_only: true
+    params:
+      path_a: { type: string, minLength: 1, description: Absolute path of the first .imzML file. }
+      path_b: { type: string, minLength: 1, description: Absolute path of the second .imzML file. }
+      max_pixels: { type: integer, minimum: 0, description: "Pixels compared, evenly spaced. 0 compares all." }
+    required: [path_a, path_b]
+    function: "msi_tools:compare_files"

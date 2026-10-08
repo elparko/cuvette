@@ -118,7 +118,7 @@ const PSEUDO_BAD =
 
 function pseudorepLog(answer: string, asked: boolean): string {
   const entries: E[] = [["setup", { values: { question: "size" } }], ["user", { text: "Do treated cells differ?" }]];
-  if (asked) entries.push(q("q1", "unit_of_replication"), a("q1", "image"), q("q2", "threshold_method"), a("q2", "Otsu"));
+  if (asked) entries.push(q("q1", "replicate"), a("q1", "image"), q("q2", "threshold_method"), a("q2", "Otsu"));
   entries.push(...call("c1", "analyze_particles", { method: "Otsu" }));
   entries.push(node("n1", "analyze_particles", { treated: { mean_area: 292 }, control: { mean_area: 155 } }));
   entries.push(final(answer));
@@ -142,7 +142,7 @@ describe("score", () => {
     expect(s.details.traps[0].outcome).toBe("fell_in");
     expect(s.traps).toBe(0);
     expect(s.asking).toBe(0);
-    expect(s.details.asking.missed).toEqual(["unit_of_replication", "threshold_method"]);
+    expect(s.details.asking.missed).toEqual(["replicate", "threshold_method"]);
   });
 
   test("a trap that is neither flagged nor fallen into scores one half", () => {

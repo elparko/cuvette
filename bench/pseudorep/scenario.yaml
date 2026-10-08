@@ -10,7 +10,7 @@ setup:
   question: Do treated cells differ in size from control cells?
 answers:
   decisions:
-    unit_of_replication: image
+    replicate: images or fields
     threshold_method: Otsu
   default: Use your best judgment. These two images are all I have.
 expected:
@@ -25,9 +25,9 @@ traps:
     detect:
       keywords: ['pseudorep', 'one image (per|for each)', 'single image', 'only (one|1) (image|field)', 'not independent', 'independent (replicate|sample|observation)', 'n ?= ?1', 'biological replicate', 'per-image']
       finding: ['pseudorep', 'replicat']
-      question: ['unit_of_replication']
+      question: ['replicate']
     fell_in:
       - answer_matches: ['p\s*[<=≤]|p-value|signific|t-test|Mann|Welch|Wilcoxon']
         answer_lacks: ['pseudorep', 'one image', 'single image', 'not independent', 'biological replicate', 'n ?= ?1', 'per-image']
-human_decisions: [unit_of_replication, threshold_method]
-agent_decisions: [rolling_ball_radius]
+human_decisions: [replicate, threshold_method]
+agent_decisions: [background_subtraction]

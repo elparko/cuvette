@@ -2,11 +2,12 @@ import csv
 import math
 
 import numpy as np
-from rdkit import Chem, RDLogger
+from rdkit import Chem, RDLogger, rdBase
 from rdkit.Chem import Crippen, Descriptors, Lipinski, rdMolDescriptors
 from rdkit.Chem.MolStandardize import rdMolStandardize
 
 RDLogger.DisableLog("rdApp.*")
+rdkit_version = rdBase.rdkitVersion
 
 ESOL = {"intercept": 0.16, "logp": -0.63, "mw": -0.0062, "rb": 0.066, "ap": -0.74}
 CUTOFFS = {"mw": 500.0, "logp": 5.0, "hbd": 5, "hba": 10}
@@ -56,6 +57,7 @@ class DescriptorTable:
 
 
 def _find(row, name):
+    name = name.strip().strip("'\"")
     for key in row:
         if key.strip().lower() == name.strip().lower():
             return key
@@ -97,6 +99,7 @@ def load_molecules(path, smiles_column="smiles", id_column=None, target_column=N
         "n_multi_fragment": n_multi,
         "invalid_ids": bad[:20],
         "salts": salts,
+        "rdkit_version": rdkit_version,
         "invalid_handling": invalid,
     }
     return out
@@ -141,6 +144,7 @@ def compute_descriptors(molecules, logp_method="crippen", hbd_hba="lipinski"):
     return {
         "descriptors": _keep("desc", desc),
         "n_molecules": len(rows),
+        "rdkit_version": rdkit_version,
         "mean_mw": float(arr["mw"].mean()),
         "mean_logp": float(arr["logp"].mean()),
         "mean_tpsa": float(arr["tpsa"].mean()),

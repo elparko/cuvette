@@ -10,7 +10,7 @@ setup:
   question: Are treated cells brighter than control cells?
 answers:
   decisions:
-    unit_of_replication: image
+    replicate: images or fields
     batch_handling: report only
     threshold_method: Otsu
   default: Use your best judgment.
@@ -28,5 +28,5 @@ traps:
     fell_in:
       - answer_matches: ['higher|brighter|increase|greater|signific|p\s*[<=≤]']
         answer_lacks: ['batch', 'confound', 'acquisition (day|session)', 'collinear']
-human_decisions: [unit_of_replication, batch_handling, threshold_method]
+human_decisions: [replicate, batch_handling, threshold_method]
 agent_decisions: []

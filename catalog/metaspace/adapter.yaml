@@ -1,0 +1,385 @@
+adapter:
+  name: metaspace
+  title: METASPACE public annotations
+  version: 0.1.0
+  spec: "1"
+  description: Searches public METASPACE datasets, reads their metadata, lists annotations at an FDR level and database, counts annotations at FDR 5, 10 and 20 percent, and saves one ion image as a PNG file. Read only. No upload and no private data.
+  authors: [onboarding agent]
+  status: draft
+
+program:
+  name: METASPACE
+  version: "2.0.9"
+  homepage: https://metaspace2020.org
+  docs:
+    - https://metaspace2020.org/help
+    - https://metaspace2.readthedocs.io/en/latest/content/examples/fetch-dataset-annotations.html
+    - https://github.com/metaspace2020/metaspace/tree/master/metaspace/python-client
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  call_timeout_s: 180
+
+locate:
+  env: GA_METASPACE_PYTHON
+  paths: ["~/.guided-analysis/envs/metaspace/bin/python"]
+  version_command: ["{program_path}", "-c", "import importlib.metadata as m; print(m.version('metaspace2020'))"]
+  version_pattern: "(\\S+)"
+
+data_rules:
+  cloud_visibility: all
+  note: All data are public METASPACE datasets. METASPACE policy for public datasets is CC BY 4.0. Check the license of one dataset before you redistribute its tables.
+
+decisions:
+  - key: fdr
+    label: FDR level
+    kind: choice
+    choices: [0.05, 0.1, 0.2, 0.5]
+    default: 0.1
+    owner: human
+    group: Annotation
+    stage: when_needed
+    essential: true
+    changes_conclusion: true
+    help: An annotation is kept if its false discovery rate is at or below this value. METASPACE offers 5, 10, 20 and 50 percent. The website shows 10 percent first. The count changes a lot between levels.
+    links:
+      - { tool: list_annotations, arg: fdr }
+    sensitivity:
+      options: [0.05, 0.1, 0.2]
+      tool: list_annotations
+      compare: [metrics.n_annotations]
+      max_runs: 3
+
+  - key: database
+    label: Molecular database
+    kind: choice
+    choices: [HMDB, LipidMaps, SwissLipids, ChEBI, LIPID_MAPS]
+    default: HMDB
+    owner: human
+    group: Annotation
+    stage: when_needed
+    essential: true
+    help: The engine scores only the molecular formulas that are in this database. A lipid database gives a different count than HMDB. Use list_databases to see the others.
+    links:
+      - { tool: list_annotations, arg: database }
+      - { tool: compare_fdr_counts, arg: database }
+
+  - key: database_version
+    label: Molecular database version
+    kind: text
+    default: v4
+    owner: human
+    group: Annotation
+    stage: when_needed
+    help: The version of the database, such as v4 for HMDB or 2017-12-12 for LipidMaps. The dataset must have been processed with this version. Use get_dataset_info to see the versions of a dataset.
+    links:
+      - { tool: list_annotations, arg: database_version }
+      - { tool: compare_fdr_counts, arg: database_version }
+
+  - key: adducts
+    label: Adduct to count
+    kind: choice
+    choices: [all, "+H", "+Na", "+K", "-H", "+Cl"]
+    default: all
+    owner: human
+    group: Annotation
+    stage: when_needed
+    help: The adducts were set when the owner of the dataset ran the engine. This choice only filters the list. Use all to count every adduct that the dataset has.
+    links:
+      - { tool: list_annotations, arg: adduct }
+
+  - key: exclude_off_sample
+    label: Remove off-sample annotations
+    kind: bool
+    default: false
+    owner: human
+    group: Annotation
+    stage: when_needed
+    essential: true
+    help: METASPACE flags an annotation as off-sample if its ion image looks like it comes from outside the tissue, for example from matrix. The website shows them unless you hide them. Yes removes them from the count.
+    links:
+      - { tool: list_annotations, arg: exclude_off_sample }
+      - { tool: compare_fdr_counts, arg: exclude_off_sample }
+
+tools:
+  - name: search_datasets
+    title: Search public datasets
+    description: Search public METASPACE datasets. All filters are optional. The result lists id, name, organism, polarity, matrix, analyzer, resolving power, submitter and group. The newest datasets come first.
+    read_only: true
+    function: "wrapper:search_datasets"
+    params:
+      name: { type: string, description: Part of the dataset name. }
+      organism: { type: string, description: "Organism as METASPACE writes it, such as Mouse or Human." }
+      polarity: { type: string, enum: [Positive, Negative] }
+      submitter: { type: string, description: Part of the name of the submitter. The tool checks only the newest 1500 datasets that fit the other filters. Add group or organism to narrow the search. }
+      group: { type: string, description: Part of the name of the lab group. }
+      maldi_matrix: { type: string }
+      analyzer_type: { type: string, description: "Analyzer such as Orbitrap, FTICR or TOF." }
+      ionisation_source: { type: string, description: "Such as MALDI or DESI." }
+      limit: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  - name: get_dataset_info
+    title: Read dataset information
+    description: Read the metadata of one public dataset - organism, polarity, ionisation source, analyzer, resolving power, matrix, pixel size, and the databases, adducts and ppm tolerance that the engine used.
+    read_only: true
+    function: "wrapper:get_dataset_info"
+    params:
+      dataset_id: { type: string, description: "METASPACE dataset id, such as 2022-08-16_10h14m23s." }
+    required: [dataset_id]
+
+  - name: list_databases
+    title: List molecular databases
+    description: List the public molecular databases of METASPACE with their ids and versions.
+    read_only: true
+    function: "wrapper:list_databases"
+
+  - name: list_annotations
+    title: List annotations
+    description: List the annotations of one dataset at a maximum FDR for one database. Each row has formula, adduct, m/z, MSM, FDR, the off-sample flag and molecule names. The full list is saved as a CSV file. An annotation is a putative sum formula, not an identification.
+    read_only: true
+    function: "wrapper:list_annotations"
+    outputs:
+      annotations: { kind: table, ext: csv, description: All annotation rows. }
+    params:
+      dataset_id: { type: string }
+      database: { type: string, description: "Database name, such as HMDB or LipidMaps.", default: HMDB }
+      database_version: { type: string, description: "Database version, such as v4 or 2017-12-12.", default: v4 }
+      fdr: { type: number, enum: [0.05, 0.1, 0.2, 0.5], default: 0.1 }
+      exclude_off_sample: { type: boolean, default: false }
+      adduct: { type: string, description: "An adduct such as +H, or all.", default: all }
+    required: [dataset_id]
+
+  - name: compare_fdr_counts
+    title: Compare annotation counts at FDR 5, 10 and 20 percent
+    description: Count the annotations of one dataset and one database at FDR 5, 10 and 20 percent. Also count the off-sample annotations at each level.
+    read_only: true
+    function: "wrapper:compare_fdr_counts"
+    params:
+      dataset_id: { type: string }
+      database: { type: string, default: HMDB }
+      database_version: { type: string, default: v4 }
+      exclude_off_sample: { type: boolean, default: false }
+    required: [dataset_id]
+
+  - name: get_ion_image
+    title: Save an ion image
+    description: Save the ion image of one annotation as a PNG file. The image is the first isotope peak, scaled to its own maximum, in the viridis color scale.
+    read_only: true
+    function: "wrapper:get_ion_image"
+    params:
+      dataset_id: { type: string }
+      formula: { type: string, description: "Neutral sum formula, such as C39H78NO8P." }
+      adduct: { type: string, description: "Adduct such as +H." }
+      hotspot_clipping: { type: boolean, default: true, description: "Clip the brightest pixels as the website does." }
+    required: [dataset_id, formula, adduct]
+
+map:
+  - tool: search_datasets
+    route: "Datasets page > Add filter > Select organism / Select polarity / Select group / Select submitter / Select MALDI matrix / Select analyzer / Select ionisation source > pick a value; or type in Enter keywords"
+    steps:
+      - "Open https://metaspace2020.org/datasets"
+      - "Click Add filter and choose a filter, such as Select polarity"
+      - "Pick the value, such as Negative"
+      - "Read the id of each dataset on its Dataset overview page, or in the address after ds="
+    params:
+      - { arg: name, label: Enter keywords }
+      - { arg: organism, label: Select organism }
+      - { arg: polarity, label: Select polarity }
+      - { arg: submitter, label: Select submitter }
+      - { arg: group, label: Select group }
+      - { arg: maldi_matrix, label: Select MALDI matrix }
+      - { arg: analyzer_type, label: Select analyzer }
+      - { arg: ionisation_source, label: Select ionisation source }
+    fidelity: close
+    difference: "The website lists Processing, Queued and Finished datasets; the tool lists Finished ones. The website needs a pick from a list for submitter; the tool matches part of the name in the newest 1500 datasets. Keyword search on the website is not the same as the name filter of the tool. The route was not run side by side."
+    evidence: { source: docs, test: search-group, note: "Filter names were read from the Add filter list on the website on 2026-10-08. The tool search was run through the GraphQL API." }
+    summary: "{metrics.n_found} datasets found"
+
+  - tool: get_dataset_info
+    route: "Datasets page > filter on the dataset > Show full metadata; or Dataset overview"
+    steps:
+      - "Open https://metaspace2020.org/dataset/{dataset_id}"
+      - "Read Sample information, Sample preparation, MS analysis and the processing settings"
+    params:
+      - { arg: dataset_id, label: Dataset }
+    fidelity: exact
+    evidence: { source: docs, test: info-pinned, note: "The website dataset card for this dataset shows Mouse, brain, MALDI + qTOF, positive mode, RP 60k @ 700. The tool shows the same values." }
+    summary: "{data.name}: {data.organism}, {data.polarity}, {data.analyzer}"
+
+  - tool: list_databases
+    route: "Upload page > Molecular databases list; or Annotations page > Add filter > Database"
+    steps:
+      - "Open https://metaspace2020.org/annotations"
+      - "Open the Database filter and read the list"
+    fidelity: close
+    difference: "The Annotations page lists only the databases of the datasets that match the current filters. The tool lists every public database. The route was not run side by side."
+    evidence: { source: docs, test: databases-list }
+    summary: "{metrics.n_databases} public databases"
+
+  - tool: list_annotations
+    route: "Datasets page > open the dataset > Browse annotations > Annotations page > set filters Database and FDR > Export to CSV"
+    steps:
+      - "Open https://metaspace2020.org/annotations?ds={dataset_id}"
+      - "Set the filter Database to {database} - {database_version}"
+      - "Set the filter FDR to the value of fdr, such as 10%"
+      - "Add filter > Show/hide off-sample annotations, to hide off-sample annotations if you choose that"
+      - "Add filter > Select adduct, if you filter on one adduct"
+      - "Read the number in the line 'matching records' under the table"
+      - "Click Export to CSV to save the table"
+    params:
+      - { arg: dataset_id, label: Dataset }
+      - { arg: database, label: Database }
+      - { arg: database_version, label: Database, note: "The website shows name and version together, such as LipidMaps - 2017-12-12." }
+      - { arg: fdr, label: FDR, ui_default: 0.1 }
+      - { arg: exclude_off_sample, label: Show/hide off-sample annotations, ui_default: false }
+      - { arg: adduct, label: Select adduct, ui_default: all }
+    fidelity: exact
+    evidence: { source: docs, test: annotations-lipidmaps-fdr10, note: "The website shows 414 matching records for LipidMaps - 2017-12-12 at FDR 10% for dataset 2022-08-16_10h14m23s. The tool gives 414. Checked by the onboarding agent on 2026-10-08, not by the scientist." }
+    summary: "{metrics.n_annotations} annotations at FDR {fdr}"
+
+  - tool: compare_fdr_counts
+    route: "Annotations page > set Database > set FDR to 5%, then 10%, then 20% > read 'matching records' each time"
+    steps:
+      - "Open https://metaspace2020.org/annotations?ds={dataset_id}"
+      - "Set the filter Database"
+      - "Set the filter FDR to 5% and read the number of matching records"
+      - "Set FDR to 10% and read the number"
+      - "Set FDR to 20% and read the number"
+    params:
+      - { arg: dataset_id, label: Dataset }
+      - { arg: database, label: Database }
+      - { arg: database_version, label: Database }
+      - { arg: exclude_off_sample, label: Show/hide off-sample annotations, ui_default: false }
+    fidelity: exact
+    evidence: { source: docs, test: fdr-counts-lipidmaps, note: "The 10 percent count was read on the website (414). The 5 and 20 percent counts come from the same API data and from the paper table of the benchmark folder, not from a second look at the website." }
+    summary: "FDR 5/10/20 percent: {metrics.n_fdr_05} / {metrics.n_fdr_10} / {metrics.n_fdr_20} annotations"
+
+  - tool: get_ion_image
+    route: "Annotations page > click the annotation row > Image viewer > Export image"
+    steps:
+      - "Open https://metaspace2020.org/annotations?ds={dataset_id}"
+      - "Click the row of {formula}{adduct}"
+      - "In the Image viewer, click Export image"
+    params:
+      - { arg: dataset_id, label: Dataset }
+      - { arg: formula, label: Annotation }
+      - { arg: adduct, label: Annotation }
+      - { arg: hotspot_clipping, label: "Ion image controls > scale (Linear / Linear without hot-spot removal)", ui_default: true }
+    fidelity: close
+    difference: "The website draws the image in its own color scale with its own scale bar and exports with that. The tool uses viridis, scaled to the maximum. The pixel data and the size are the same. Route not compared pixel by pixel."
+    evidence: { source: docs, test: ion-image-pinned }
+    summary: "Saved the ion image of {ion}: {metrics.width} by {metrics.height} pixels"
+
+checks:
+  - id: fdr_stated
+    description: Each annotation count must come with its FDR level.
+    severity: error
+    text: "The answer must state the FDR level for every annotation count, and must say that the level is a maximum (for example, at most 10 percent). An answer that gives a count with no FDR level fails."
+  - id: database_stated
+    description: Each annotation count must name the molecular database and its version.
+    severity: warning
+    text: "The answer must name the molecular database and its version for every annotation count. The count depends on the database."
+  - id: not_identification
+    description: Annotations are putative sum formulas, not identifications.
+    severity: error
+    text: "The answer must not call METASPACE annotations identified, confirmed or validated molecules. They are putative annotations at the level of the sum formula and the adduct. A formula can match many isomers. An answer that says lipids were identified, with no MS/MS, fails."
+  - id: off_sample_kept
+    description: The list or count keeps off-sample annotations.
+    severity: warning
+    rule:
+      tool: list_annotations
+      arg: exclude_off_sample
+      op: "=="
+      value: false
+      message: "Off-sample annotations are in this list. METASPACE flags them as signal from outside the tissue. Say how many there are, or remove them."
+  - id: high_fdr
+    description: An FDR above 10 percent gives more false annotations.
+    severity: warning
+    rule:
+      tool: list_annotations
+      arg: fdr
+      op: ">"
+      value: 0.1
+      message: "FDR above 10 percent keeps annotations that are more likely false. Do not use this list as a result without a reason."
+
+tests:
+  - id: search-group
+    description: "Network test. The two Michael et al. 2022 mouse brain datasets of the Ellis group are in the search result. The number comes from the benchmark folder alexandrov2019-metaspace."
+    calls:
+      - { tool: search_datasets, args: { group: Ellis, submitter: Jesse, polarity: Positive, limit: 10 } }
+    expect:
+      - { path: metrics.n_found, min: 2 }
+      - { path: "table.rows[0][0]", contains: "2022-08-16_" }
+
+  - id: info-pinned
+    description: "Network test. Metadata of 2022-08-16_10h14m23s, a dataset of the published project Michael et al. 2022. The values match the website dataset card read on 2026-10-08."
+    calls:
+      - { tool: get_dataset_info, args: { dataset_id: "2022-08-16_10h14m23s" } }
+    expect:
+      - { path: data.name, equals: MouseBrain_PlasmaPI_Pos20um }
+      - { path: data.organism, equals: Mouse }
+      - { path: data.polarity, equals: Positive }
+      - { path: data.analyzer, equals: qTOF }
+      - { path: metrics.resolving_power, equals: 60000 }
+      - { path: metrics.ppm, equals: 6 }
+      - { path: "data.adducts[0]", equals: "+H" }
+
+  - id: databases-list
+    description: "Network test. The public database list has HMDB v4 and LipidMaps 2017-12-12."
+    calls:
+      - { tool: list_databases }
+    expect:
+      - { path: metrics.n_databases, min: 10 }
+
+  - id: annotations-lipidmaps-fdr10
+    description: "Network test. 414 annotations at FDR 10 percent in LipidMaps 2017-12-12 for 2022-08-16_10h14m23s; 26 are off-sample. The 414 was read on the website on 2026-10-08."
+    calls:
+      - { tool: list_annotations, args: { dataset_id: "2022-08-16_10h14m23s", database: LipidMaps, database_version: "2017-12-12", fdr: 0.1, exclude_off_sample: false, adduct: all } }
+    expect:
+      - { path: metrics.n_annotations, equals: 414 }
+      - { path: metrics.n_off_sample_in_fdr_set, equals: 26 }
+      - { path: table.n_rows, equals: 414 }
+
+  - id: annotations-off-sample-removed
+    description: "Network test. Removing the 26 off-sample annotations leaves 388. The number is derived from the two known numbers above (414 minus 26)."
+    calls:
+      - { tool: list_annotations, args: { dataset_id: "2022-08-16_10h14m23s", database: LipidMaps, database_version: "2017-12-12", fdr: 0.1, exclude_off_sample: true, adduct: all } }
+    expect:
+      - { path: metrics.n_annotations, equals: 388 }
+
+  - id: fdr-counts-lipidmaps
+    description: "Network test. LipidMaps 2017-12-12 counts at FDR 5, 10 and 20 percent: 144, 414, 903. Source - benchmark folder alexandrov2019-metaspace, computed on 2026-10-07. The 10 percent count was also read on the website."
+    calls:
+      - { tool: compare_fdr_counts, args: { dataset_id: "2022-08-16_10h14m23s", database: LipidMaps, database_version: "2017-12-12", exclude_off_sample: false } }
+    expect:
+      - { path: metrics.n_fdr_05, equals: 144 }
+      - { path: metrics.n_fdr_10, equals: 414 }
+      - { path: metrics.n_fdr_20, equals: 903 }
+
+  - id: fdr-counts-hmdb
+    description: "Network test. HMDB v4 counts at FDR 5, 10 and 20 percent: 14, 263, 819. Source - benchmark folder alexandrov2019-metaspace, computed on 2026-10-07."
+    calls:
+      - { tool: compare_fdr_counts, args: { dataset_id: "2022-08-16_10h14m23s", database: HMDB, database_version: v4, exclude_off_sample: false } }
+    expect:
+      - { path: metrics.n_fdr_05, equals: 14 }
+      - { path: metrics.n_fdr_10, equals: 263 }
+      - { path: metrics.n_fdr_20, equals: 819 }
+
+  - id: ion-image-pinned
+    description: "Network test. The ion image of C39H78NO8P+H (a PC 32:0 sum formula) has 350 by 489 pixels. The size is the image size of the dataset. This number is stable, not independent; it comes from a run of the tool."
+    calls:
+      - { tool: get_ion_image, args: { dataset_id: "2022-08-16_10h14m23s", formula: C39H78NO8P, adduct: "+H" } }
+    expect:
+      - { path: metrics.width, equals: 350 }
+      - { path: metrics.height, equals: 489 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: fdr-then-list
+    description: "Network test with two tools in order. The count at FDR 10 percent from compare_fdr_counts equals the count from list_annotations."
+    calls:
+      - { tool: compare_fdr_counts, args: { dataset_id: "2022-08-16_12h31m33s", database: LipidMaps, database_version: "2017-12-12" }, save_as: counts }
+      - { tool: list_annotations, args: { dataset_id: "2022-08-16_12h31m33s", database: LipidMaps, database_version: "2017-12-12", fdr: 0.1 } }
+    expect:
+      - { path: metrics.n_annotations, equals: 191 }
+      - { path: saved.counts.metrics.n_fdr_10, equals: 191 }

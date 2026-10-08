@@ -1,7 +1,7 @@
 adapter:
   name: rdkit
   title: RDKit descriptors, rule of five and solubility model
-  version: 0.1.0
+  version: 0.1.2
   description: Reads SMILES from a CSV file, computes descriptors, counts rule of five violations and fits or scores an ESOL solubility equation.
   authors: [onboarding agent]
   status: draft
@@ -141,7 +141,7 @@ tools:
     required: [path]
   - name: compute_descriptors
     title: Compute descriptors
-    description: "Compute molecular weight, logP, topological polar surface area, donors, acceptors, rotatable bonds and aromatic proportion for each molecule. Writes descriptors.csv. Pass the text in descriptors (such as desc2) to the next tools."
+    description: "Compute molecular weight, logP, topological polar surface area, donors, acceptors, rotatable bonds and aromatic proportion for each molecule. Writes descriptors.csv. Pass the text in descriptors (such as desc2) to rule_of_five and fit_solubility_model. A solubility question needs a call to fit_solubility_model. Do not state R squared or RMSE without that call."
     read_only: true
     function: "ga_rdkit.py:compute_descriptors"
     params:

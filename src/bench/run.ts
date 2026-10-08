@@ -1,3 +1,4 @@
+import { fitAnswer } from "../core/answers.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BENCH_DIR, ensureData } from "./datasets.ts";
@@ -40,9 +41,13 @@ export async function runScenario(id: string, opts: RunOptions): Promise<RunResu
     });
     session.bus.on((e) => {
       if (e.type !== "question") return;
-      void session.answer(e.question.qid, answerFor(sc, e.question), "simulated scientist").catch(() => {});
+      const v = fitAnswer(e.question, answerFor(sc, e.question));
+      setTimeout(() => void session.answer(e.question.qid, v ?? "", "simulated scientist").catch(() => {}), 0);
     });
-    session.decisions.applySetup(sc.setup, { how: "bench" });
+    const setupKeys = new Set(session.decisions.fields().filter((f) => f.stage === "setup").map((f) => f.key));
+    const fromAnswers = Object.fromEntries(Object.entries(sc.answers.decisions).filter(([k]) => setupKeys.has(k)));
+    session.settings.autoResume = false;
+    session.decisions.applySetup({ ...fromAnswers, ...sc.setup }, { how: "bench (simulated scientist)" });
     const timer = setTimeout(() => session.interrupt(), (opts.timeoutS ?? 900) * 1000);
     try {
       await session.send(prompt);

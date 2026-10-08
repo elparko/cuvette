@@ -12,3 +12,5 @@ data=$(ls "$dir"/report/*_fastqc/fastqc_data.txt 2>/dev/null | head -1)
 echo "data_file=$data"
 echo "html_report=$(ls "$dir"/report/*_fastqc.html | head -1)"
 sh "$here/summary.sh" "$data"
+note=$(sort -u "$dir/fastqc.log" | head -1)
+if [ -n "$note" ]; then echo "log_note=$note"; fi

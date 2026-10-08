@@ -1,0 +1,781 @@
+adapter:
+  name: scanpy
+  title: Scanpy
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Clusters single-cell RNA data with scanpy. Each tool does one scanpy step on a cell-by-gene
+    object (AnnData), saves an .h5ad checkpoint, and returns a handle for the next step. The
+    scientist can repeat each step with the scanpy call line in the map.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: scanpy
+  version: ""
+  tested_versions: ["1.12.4"]
+  homepage: https://scanpy.readthedocs.io
+  docs:
+    - https://scanpy.readthedocs.io/en/stable/tutorials/basics/clustering-2017.html
+    - https://scanpy.readthedocs.io/en/stable/api/preprocessing.html
+    - https://scanpy.readthedocs.io/en/stable/api/tools.html
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: GA_SCANPY_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/scanpy/bin/python
+    - ~/.guided-analysis/envs/scanpy/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import scanpy; print(scanpy.__version__)"]
+  version_pattern: '(\d+\.\d+\.\d+)'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and small PNG previews. It never sees the cell-by-gene matrix.
+
+decisions:
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - cells in one sample (descriptive only)
+      - samples, donors or animals
+    default: samples, donors or animals
+    group: Design
+    help: >
+      Cells from one sample are not independent replicates. Use samples, donors or animals for a
+      test between conditions. Use cells only to describe one sample.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: min_genes_per_cell
+    label: Minimum genes per cell
+    kind: int
+    lo: 0
+    hi: 20000
+    group: Quality control
+    help: Cells with fewer detected genes are empty droplets or debris. The right value depends on the sample and the chemistry.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_cells, arg: min_genes }
+
+  - key: max_genes_per_cell
+    label: Maximum genes per cell
+    kind: int
+    lo: 1
+    hi: 100000
+    group: Quality control
+    help: Cells with more detected genes are often doublets (two cells in one droplet). Look at the QC violin plot before you choose.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_cells, arg: max_genes }
+
+  - key: max_pct_mito
+    label: Maximum percent mitochondrial counts
+    kind: float
+    lo: 0
+    hi: 100
+    group: Quality control
+    help: Cells with a high share of mitochondrial counts are often dying cells. The right value depends on the tissue.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_cells, arg: max_pct_mito }
+
+  - key: min_cells_per_gene
+    label: Minimum cells per gene
+    kind: int
+    lo: 0
+    hi: 10000
+    group: Quality control
+    help: Genes that are detected in fewer cells are removed.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_genes, arg: min_cells }
+
+  - key: target_sum
+    label: Counts per cell after normalization
+    kind: float
+    lo: 1
+    hi: 1000000
+    group: Normalization
+    help: Each cell is scaled to this total, then log1p is applied. Scanpy scales to the median total if you give none. Common choice is 10000.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: normalize_log, arg: target_sum }
+
+  - key: n_top_genes
+    label: Number of top highly variable genes (0 = use the mean and dispersion cutoffs)
+    kind: int
+    default: 0
+    lo: 0
+    hi: 20000
+    group: Feature selection
+    help: Give a number to keep that many genes. Give 0 to keep genes that pass min_mean 0.0125, max_mean 3 and min_disp 0.5.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_variable_genes, arg: n_top_genes }
+
+  - key: regress_out
+    label: Variables to regress out
+    kind: choice
+    choices: [none, "total_counts,pct_counts_mt"]
+    default: none
+    group: Feature selection
+    help: Regression removes the effect of the counts per cell and the mitochondrial share on each gene before PCA.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: scale_data, arg: regress_out }
+
+  - key: n_pcs
+    label: Number of principal components for the neighbor graph
+    kind: int
+    default: 50
+    lo: 2
+    hi: 200
+    group: Clustering
+    help: More components keep more detail and more noise. Look at the PCA variance plot.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: build_neighbors, arg: n_pcs }
+
+  - key: n_neighbors
+    label: Number of neighbors
+    kind: int
+    default: 15
+    lo: 2
+    hi: 200
+    group: Clustering
+    help: A small number gives finer local structure. A large number gives a smoother graph.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: build_neighbors, arg: n_neighbors }
+
+  - key: leiden_resolution
+    label: Leiden resolution
+    kind: float
+    default: 1.0
+    lo: 0.01
+    hi: 5
+    group: Clustering
+    help: A higher value gives more and smaller clusters. The number of clusters depends on this value.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: cluster_leiden, arg: resolution }
+    sensitivity:
+      options: [0.3, 0.7, 1.0, 1.5]
+      tool: cluster_leiden
+      compare: [metrics.n_clusters, metrics.smallest_cluster, metrics.largest_cluster]
+      max_runs: 4
+
+  - key: random_seed
+    label: Random seed
+    kind: int
+    default: 0
+    lo: 0
+    hi: 2147483647
+    group: Clustering
+    help: PCA, the neighbor graph, UMAP and Leiden use random numbers. Report the seed so that others can repeat the result.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_pca, arg: random_state }
+      - { tool: build_neighbors, arg: random_state }
+      - { tool: run_umap, arg: random_state }
+      - { tool: cluster_leiden, arg: random_state }
+    sensitivity:
+      options: [0, 1, 2]
+      tool: cluster_leiden
+      compare: [metrics.n_clusters, metrics.smallest_cluster, metrics.largest_cluster]
+      max_runs: 3
+
+  - key: marker_method
+    label: Marker gene test
+    kind: choice
+    choices: [t-test, t-test_overestim_var, wilcoxon, logreg]
+    default: t-test
+    group: Markers
+    help: >
+      Test that ranks the genes of each cluster against the other cells. Scanpy uses the t-test
+      if you give none. The tutorial uses wilcoxon (Wilcoxon rank-sum test).
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_markers, arg: method }
+
+tools:
+  - name: inspect_data
+    title: Inspect the data
+    description: Show the number of cells and genes, the stored columns and layers, and whether X holds raw counts. Takes a handle or an .h5ad path.
+    read_only: true
+    function: "ga_scanpy:inspect_data"
+    params:
+      adata: { type: [object, string], description: 'A handle such as {"handle": "h3"}, or the path of an .h5ad file.' }
+    required: [adata]
+
+  - name: load_data
+    title: Load 10x or h5ad data
+    description: >
+      Read a 10x matrix folder (matrix.mtx, genes.tsv or features.tsv, barcodes.tsv), a 10x .h5 file,
+      or an .h5ad file. Returns a handle and saves loaded.h5ad.
+    function: "ga_scanpy:load_data"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the 10x folder, the .h5 file or the .h5ad file. }
+      var_names: { type: string, enum: [gene_symbols, gene_ids], default: gene_symbols, description: Use gene symbols or gene ids as gene names. }
+    required: [path]
+    outputs:
+      checkpoint: { kind: file, ext: h5ad, description: The loaded counts. }
+
+  - name: calculate_qc
+    title: Calculate QC metrics
+    description: >
+      Mark mitochondrial genes by name prefix. Calculate genes per cell, counts per cell and percent
+      mitochondrial counts. Draw a violin plot and save a table for each cell. Run this on raw counts.
+    function: "ga_scanpy:calculate_qc"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      mito_prefix: { type: string, default: "MT-", description: Gene names that start with this text count as mitochondrial. Use MT- for human and mt- for mouse. }
+    required: [adata]
+    outputs:
+      plot: { kind: image, ext: png, description: Violin plots of the QC metrics. }
+      cells: { kind: table, ext: csv, description: QC metrics for each cell. }
+
+  - name: filter_genes
+    title: Filter genes
+    description: Remove genes that are detected in fewer than min_cells cells. Run this on raw counts.
+    function: "ga_scanpy:filter_genes"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      min_cells: { type: integer, minimum: 0, description: Minimum number of cells that must express the gene. }
+    required: [adata]
+
+  - name: filter_cells
+    title: Filter cells
+    description: >
+      Remove cells with fewer than min_genes genes, max_genes genes or more, or max_pct_mito percent
+      mitochondrial counts or more. Computes the QC metrics if they are missing. Run this on raw counts.
+    function: "ga_scanpy:filter_cells"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      min_genes: { type: integer, minimum: 0, description: Minimum genes per cell. }
+      max_genes: { type: integer, minimum: 1, description: Cells with this many genes or more are removed. }
+      max_pct_mito: { type: number, minimum: 0, maximum: 100, description: Cells with this percent mitochondrial counts or more are removed. }
+      mito_prefix: { type: string, default: "MT-" }
+    required: [adata]
+
+  - name: normalize_log
+    title: Normalize and log-transform
+    description: >
+      Scale each cell to target_sum total counts, then apply log1p. Keeps the raw counts in
+      layers['counts'] and the log values of all genes in .raw. Refuses data that are not raw counts.
+    function: "ga_scanpy:normalize_log"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      target_sum: { type: number, minimum: 1, description: Counts per cell after scaling. }
+    required: [adata]
+
+  - name: find_variable_genes
+    title: Find highly variable genes
+    description: >
+      Mark highly variable genes on log-normalized data. Give n_top_genes above 0 to keep that many
+      genes. Give 0 to use the mean and dispersion cutoffs.
+    function: "ga_scanpy:find_variable_genes"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      n_top_genes: { type: integer, minimum: 0, description: Number of genes to keep. 0 means use the cutoffs. }
+      min_mean: { type: number, default: 0.0125 }
+      max_mean: { type: number, default: 3 }
+      min_disp: { type: number, default: 0.5 }
+      flavor: { type: string, enum: [seurat, cell_ranger], default: seurat }
+    required: [adata]
+    outputs:
+      plot: { kind: image, ext: png, description: Mean against normalized dispersion. }
+      genes: { kind: table, ext: csv, description: The highly variable genes. }
+
+  - name: scale_data
+    title: Regress out and scale
+    description: >
+      Keep only the highly variable genes. Optionally regress out variables. Scale each gene to unit
+      variance and clip at max_value. Run find_variable_genes first.
+    function: "ga_scanpy:scale_data"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      regress_out: { type: string, description: 'Comma-separated obs columns such as "total_counts,pct_counts_mt", or "none".' }
+      max_value: { type: number, default: 10, description: Clip scaled values at this value. }
+      subset_to_hvg: { type: boolean, default: true }
+    required: [adata]
+
+  - name: run_pca
+    title: Principal component analysis
+    description: Compute principal components with the arpack solver. Draw the variance plot.
+    function: "ga_scanpy:run_pca"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      n_comps: { type: integer, minimum: 2, default: 50, description: Number of components to compute. }
+      random_state: { type: integer, minimum: 0 }
+    required: [adata]
+    outputs:
+      plot: { kind: image, ext: png, description: Log variance ratio for each component. }
+      variance: { kind: table, ext: csv, description: Variance ratio for each component. }
+
+  - name: build_neighbors
+    title: Build the neighbor graph
+    description: Build the k-nearest-neighbor graph from the first n_pcs principal components.
+    function: "ga_scanpy:build_neighbors"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      n_neighbors: { type: integer, minimum: 2, description: Number of neighbors. }
+      n_pcs: { type: integer, minimum: 2, description: Number of principal components to use. }
+      random_state: { type: integer, minimum: 0 }
+    required: [adata]
+
+  - name: run_umap
+    title: UMAP embedding
+    description: Compute the UMAP embedding from the neighbor graph and draw it as a PNG.
+    function: "ga_scanpy:run_umap"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      color: { type: [string, array], default: leiden, description: An obs column or a gene name, or a list of them. Columns that do not exist are skipped. }
+      random_state: { type: integer, minimum: 0 }
+      min_dist: { type: number, default: 0.5 }
+    required: [adata]
+    outputs:
+      plot: { kind: image, ext: png, description: The UMAP plot. }
+
+  - name: cluster_leiden
+    title: Leiden clustering
+    description: >
+      Cluster the cells with the Leiden algorithm on the neighbor graph. Returns the number of
+      clusters and their sizes. The number of clusters depends on the resolution.
+    function: "ga_scanpy:cluster_leiden"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      resolution: { type: number, minimum: 0.01, description: Higher values give more clusters. }
+      random_state: { type: integer, minimum: 0 }
+    required: [adata]
+    outputs:
+      sizes: { kind: table, ext: csv, description: Cells in each cluster. }
+      plot: { kind: image, ext: png, description: UMAP colored by cluster, if a UMAP exists. }
+
+  - name: find_markers
+    title: Marker genes for each group
+    description: >
+      Rank the genes of each group against all other cells with rank_genes_groups. Uses the
+      log-normalized values of all genes. Saves the top 25 genes of each group.
+    function: "ga_scanpy:find_markers"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      groupby: { type: string, default: leiden, description: The obs column that holds the groups. }
+      method: { type: string, enum: [t-test, t-test_overestim_var, wilcoxon, logreg], description: The test. }
+      n_genes: { type: integer, minimum: 1, default: 25 }
+      n_top: { type: integer, minimum: 1, default: 3, description: Genes of each group to show in the table preview. }
+    required: [adata]
+    outputs:
+      markers: { kind: table, ext: csv, description: Ranked genes with scores, log fold changes and adjusted p-values. }
+      plot: { kind: image, ext: png, description: Top genes of each group. }
+
+  - name: plot_genes
+    title: Plot genes
+    description: Draw genes on the UMAP, as a dot plot or as violin plots. Without genes, a dot plot shows the top 3 markers of each group.
+    read_only: true
+    function: "ga_scanpy:plot_genes"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      genes: { type: [array, string], description: Gene names. }
+      kind: { type: string, enum: [umap, dotplot, violin], default: umap }
+      groupby: { type: string, default: leiden }
+    required: [adata]
+    outputs:
+      plot: { kind: image, ext: png, description: The plot. }
+
+map:
+  - tool: inspect_data
+    route: "print(adata)"
+    params:
+      - { arg: adata, label: AnnData object }
+    fidelity: close
+    difference: The tool also tests whether X holds raw counts. Scanpy has no such call.
+    evidence: { source: docs, test: small-load }
+
+  - tool: load_data
+    route: 'adata = sc.read_10x_mtx(path, var_names="gene_symbols")   # 10x folder. For an .h5ad file: sc.read_h5ad(path)'
+    params:
+      - { arg: path, label: path }
+      - { arg: var_names, label: var_names, ui_default: gene_symbols }
+    fidelity: exact
+    evidence: { source: docs, test: small-load, note: The scanpy tutorial reads the 10x folder with this call. The full PBMC 3k folder gives 2700 cells and 32738 genes. }
+
+  - tool: calculate_qc
+    route: |
+      adata.var["mt"] = adata.var_names.str.startswith("MT-")
+      sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True)
+    params:
+      - { arg: mito_prefix, label: str.startswith argument, ui_default: "MT-" }
+    fidelity: exact
+    evidence: { source: docs, test: small-qc, note: "The cell counts are checked against a numpy calculation that does not use scanpy." }
+
+  - tool: filter_genes
+    route: "sc.pp.filter_genes(adata, min_cells=3)"
+    params:
+      - { arg: min_cells, label: min_cells, ui_default: null, note: Scanpy has no default. The tutorial uses 3. }
+    fidelity: exact
+    evidence: { source: docs, test: small-filter-genes }
+
+  - tool: filter_cells
+    route: |
+      sc.pp.filter_cells(adata, min_genes=200)
+      adata = adata[adata.obs.n_genes_by_counts < 2500, :]
+      adata = adata[adata.obs.pct_counts_mt < 5, :].copy()
+    params:
+      - { arg: min_genes, label: min_genes, ui_default: null, note: Scanpy has no default. The tutorial uses 200. }
+      - { arg: max_genes, label: n_genes_by_counts limit, ui_default: null, note: The tutorial uses 2500. }
+      - { arg: max_pct_mito, label: pct_counts_mt limit, ui_default: null, note: The tutorial uses 5. }
+    fidelity: exact
+    evidence: { source: docs, test: small-filter-cells, note: "The kept cells are checked against a numpy calculation that does not use scanpy." }
+
+  - tool: normalize_log
+    route: |
+      adata.layers["counts"] = adata.X.copy()
+      sc.pp.normalize_total(adata, target_sum=1e4)
+      sc.pp.log1p(adata)
+      adata.raw = adata
+    params:
+      - { arg: target_sum, label: target_sum, ui_default: null, note: Scanpy scales to the median total if you give none. The tutorial uses 1e4. }
+    fidelity: exact
+    evidence: { source: docs, test: small-pipeline }
+
+  - tool: find_variable_genes
+    route: "sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)   # or n_top_genes=2000"
+    params:
+      - { arg: n_top_genes, label: n_top_genes, ui_default: null }
+      - { arg: min_mean, label: min_mean, ui_default: 0.0125 }
+      - { arg: max_mean, label: max_mean, ui_default: 3 }
+      - { arg: min_disp, label: min_disp, ui_default: 0.5 }
+      - { arg: flavor, label: flavor, ui_default: seurat }
+    fidelity: exact
+    evidence: { source: docs, test: small-pipeline, note: The full PBMC 3k data give 1838 genes with the default flavor, as in the scanpy tutorial run. }
+
+  - tool: scale_data
+    route: |
+      adata = adata[:, adata.var.highly_variable].copy()
+      sc.pp.regress_out(adata, ["total_counts", "pct_counts_mt"])
+      sc.pp.scale(adata, max_value=10)
+    params:
+      - { arg: regress_out, label: keys of regress_out, ui_default: none }
+      - { arg: max_value, label: max_value, ui_default: null, note: "Scanpy does not clip if you give none. The tool default is 10, as in the tutorial." }
+      - { arg: subset_to_hvg, label: subset to highly_variable, ui_default: false, note: The tutorial subsets before it scales. }
+    fidelity: exact
+    evidence: { source: docs, test: small-pipeline }
+
+  - tool: run_pca
+    route: 'sc.pp.pca(adata, n_comps=50, svd_solver="arpack", random_state=0)'
+    params:
+      - { arg: n_comps, label: n_comps, ui_default: null, note: Scanpy uses 50 if you give none. }
+      - { arg: random_state, label: random_state, ui_default: 0 }
+    fidelity: exact
+    evidence: { source: docs, test: small-pipeline, note: The tool sets svd_solver to arpack, as the tutorial does. }
+
+  - tool: build_neighbors
+    route: "sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40, random_state=0)"
+    params:
+      - { arg: n_neighbors, label: n_neighbors, ui_default: 15 }
+      - { arg: n_pcs, label: n_pcs, ui_default: null, note: Scanpy uses all computed components if you give none. }
+      - { arg: random_state, label: random_state, ui_default: 0 }
+    fidelity: exact
+    evidence: { source: docs, test: small-pipeline }
+
+  - tool: run_umap
+    route: |
+      sc.tl.umap(adata, random_state=0)
+      sc.pl.umap(adata, color="leiden")
+    params:
+      - { arg: color, label: color, ui_default: null }
+      - { arg: random_state, label: random_state, ui_default: 0 }
+      - { arg: min_dist, label: min_dist, ui_default: 0.5 }
+    fidelity: exact
+    evidence: { source: docs, test: small-pipeline }
+
+  - tool: cluster_leiden
+    route: 'sc.tl.leiden(adata, resolution=0.7, random_state=0, flavor="igraph", n_iterations=2, directed=False)'
+    params:
+      - { arg: resolution, label: resolution, ui_default: 1 }
+      - { arg: random_state, label: random_state, ui_default: 0 }
+    fidelity: exact
+    evidence: { source: docs, test: small-pipeline, note: "The tool sets flavor, n_iterations and directed as the tutorial does. The full PBMC 3k data give 7 clusters of 1174, 486, 438, 341, 150, 36 and 13 cells at resolution 0.7." }
+
+  - tool: find_markers
+    route: |
+      sc.tl.rank_genes_groups(adata, "leiden", method="wilcoxon", n_genes=25, use_raw=True)
+      sc.get.rank_genes_groups_df(adata, group=None)
+    params:
+      - { arg: groupby, label: groupby, ui_default: null }
+      - { arg: method, label: method, ui_default: t-test }
+      - { arg: n_genes, label: n_genes, ui_default: null, note: Scanpy ranks all genes if you give none. }
+    fidelity: exact
+    evidence: { source: docs, test: small-markers }
+
+  - tool: plot_genes
+    route: |
+      sc.pl.umap(adata, color=["CD3D", "LYZ"])
+      sc.pl.dotplot(adata, ["CD3D", "LYZ"], groupby="leiden")
+    params:
+      - { arg: genes, label: color or var_names }
+      - { arg: kind, label: plot function }
+      - { arg: groupby, label: groupby, ui_default: null }
+    fidelity: close
+    difference: The tool saves the figure at 100 dpi with a tight border. The numbers in the plot are the same.
+    evidence: { source: docs, test: small-pipeline }
+
+checks:
+  - id: seed_not_fixed
+    severity: warning
+    description: The report does not give the random seed, or the clusters came from a run with no fixed seed.
+    text: >
+      The report must state the random seed used for PCA, the neighbor graph, UMAP and Leiden
+      clustering. Compare the tool calls: random_state must be set in each of run_pca,
+      build_neighbors, run_umap and cluster_leiden. Flag the answer if the seed is missing from
+      the calls or from the text, or if different calls used different seeds without a reason.
+  - id: resolution_not_reported
+    severity: warning
+    description: The answer gives a number of clusters but not the Leiden resolution.
+    text: >
+      If the answer gives a number of clusters, it must also give the Leiden resolution, the
+      number of neighbors and the number of principal components that made them. Flag the answer
+      if it does not. Also flag it if it treats the cluster count as a fixed property of the
+      tissue and does not say that the count changes with the resolution.
+  - id: marker_test_not_named
+    severity: warning
+    description: Marker genes are reported without the test, or the t-test is used without the answer saying so.
+    text: >
+      If the answer lists marker genes, it must name the test that find_markers used (the method
+      argument; the tool default is the t-test). Flag the answer if it names no test, or names a
+      different test than the one in the tool call. Flag it too if it gives p-values for markers of
+      clusters that were defined from the same data, without saying that these p-values are
+      descriptive.
+  - id: pseudoreplication
+    severity: error
+    description: Cells are used as replicates to compare conditions or samples, and p-values are reported.
+    text: >
+      If the answer compares conditions, donors or samples, and reports p-values or significance
+      from tests where each cell is one observation (for example find_markers with groupby set to a
+      condition or sample column), flag it as an error. Cells from one sample are not independent
+      replicates. The answer must use one value for each sample (a pseudobulk sum or mean) and
+      count samples as n. This check does not apply to markers between clusters of one sample if
+      the answer calls the p-values descriptive.
+  - id: qc_cutoffs_not_reported
+    severity: warning
+    description: The answer gives the cell count after quality control without the cutoffs.
+    text: >
+      If the answer gives the number of cells that passed quality control, it must also give the
+      minimum genes per cell, the maximum genes per cell, the maximum percent mitochondrial counts
+      and the number of cells removed. Flag the answer if one is missing, or if the numbers differ
+      from the filter_cells result.
+
+tests:
+  - id: small-load
+    description: >
+      The small file holds 300 cells and 1000 genes by construction (a random subsample of the
+      scanpy PBMC 3k data, made by data/make_pbmc_small.py). A numpy sum of the counts gives 564149.
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: load_data
+        args: { path: "{adapter_dir}/data/pbmc3k_small.h5ad" }
+        save_as: a
+      - tool: inspect_data
+        args: { adata: { handle: "{saved.a.data.adata.handle}" } }
+    expect:
+      - { path: metrics.n_cells, equals: 300 }
+      - { path: metrics.n_genes, equals: 1000 }
+      - { path: metrics.x_is_counts, equals: 1 }
+      - { path: data.has_raw, equals: false }
+
+  - id: small-qc
+    description: >
+      Numpy check, no scanpy: 13 genes start with MT-, and the median genes per cell is 413.5. The
+      median percent mitochondrial counts is a number from a run of this tool.
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: calculate_qc
+        args: { adata: "{adapter_dir}/data/pbmc3k_small.h5ad" }
+    expect:
+      - { path: metrics.n_mito_genes, equals: 13 }
+      - { path: metrics.median_genes_per_cell, approx: 413.5, abs: 1.0e-9 }
+      - { path: metrics.max_genes_per_cell, equals: 716 }
+      - { path: metrics.median_pct_mito, approx: 2.5015, abs: 0.001 }
+      - { path: outputs[0].name, contains: qc }
+
+  - id: small-filter-genes
+    description: "Numpy check, no scanpy: 938 genes are detected in at least 50 of the 300 cells."
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: filter_genes
+        args: { adata: "{adapter_dir}/data/pbmc3k_small.h5ad", min_cells: 50 }
+    expect:
+      - { path: metrics.n_genes_after, equals: 938 }
+      - { path: metrics.n_genes_removed, equals: 62 }
+      - { path: metrics.n_cells, equals: 300 }
+
+  - id: small-filter-cells
+    description: >
+      Numpy check, no scanpy: 284 cells have under 5 percent mitochondrial counts, and 119 of them
+      have 100 to 399 genes.
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: filter_cells
+        args: { adata: "{adapter_dir}/data/pbmc3k_small.h5ad", min_genes: 100, max_genes: 400, max_pct_mito: 5 }
+        save_as: kept
+    expect:
+      - { path: metrics.n_cells_before, equals: 300 }
+      - { path: metrics.n_cells_after, equals: 119 }
+      - { path: metrics.n_high_mito, equals: 16 }
+      - { path: metrics.n_low_genes, equals: 0 }
+
+  - id: small-pipeline
+    description: >
+      Runs every step on the small file with the tutorial settings (200 genes is too high for 1000
+      genes, so min_genes is 100). The cell count 284 and the 938 genes come from the numpy checks.
+      The numbers for highly variable genes, variance and clusters are from a run of this tool with
+      scanpy 1.12.4. They show that the result is stable. They are not published numbers. The same
+      tool calls on the full PBMC 3k data give the tutorial numbers (2638 cells, 13714 genes, 1838
+      highly variable genes, 7 clusters of 1174, 486, 438, 341, 150, 36 and 13 cells).
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: load_data
+        args: { path: "{adapter_dir}/data/pbmc3k_small.h5ad" }
+        save_as: a
+      - tool: calculate_qc
+        args: { adata: { handle: "{saved.a.data.adata.handle}" } }
+        save_as: b
+      - tool: filter_cells
+        args: { adata: { handle: "{saved.b.data.adata.handle}" }, min_genes: 100, max_genes: 1500, max_pct_mito: 5 }
+        save_as: c
+      - tool: normalize_log
+        args: { adata: { handle: "{saved.c.data.adata.handle}" }, target_sum: 10000 }
+        save_as: d
+      - tool: find_variable_genes
+        args: { adata: { handle: "{saved.d.data.adata.handle}" } }
+        save_as: e
+      - tool: scale_data
+        args: { adata: { handle: "{saved.e.data.adata.handle}" }, regress_out: "total_counts,pct_counts_mt", max_value: 10 }
+        save_as: f
+      - tool: run_pca
+        args: { adata: { handle: "{saved.f.data.adata.handle}" }, n_comps: 20, random_state: 0 }
+        save_as: g
+      - tool: build_neighbors
+        args: { adata: { handle: "{saved.g.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0 }
+        save_as: h
+      - tool: run_umap
+        args: { adata: { handle: "{saved.h.data.adata.handle}" }, random_state: 0 }
+        save_as: u
+      - tool: cluster_leiden
+        args: { adata: { handle: "{saved.u.data.adata.handle}" }, resolution: 0.7, random_state: 0 }
+        save_as: l
+    expect:
+      - { path: saved.c.metrics.n_cells_after, equals: 284 }
+      - { path: saved.d.metrics.x_max, approx: 7.644143, abs: 0.0001 }
+      - { path: saved.e.metrics.n_highly_variable, equals: 202 }
+      - { path: saved.f.metrics.n_genes, equals: 202 }
+      - { path: saved.g.metrics.variance_first10, approx: 0.274304, abs: 0.0001 }
+      - { path: saved.h.metrics.n_pcs, equals: 10 }
+      - { path: saved.u.outputs[1].name, contains: umap }
+      - { path: metrics.n_clusters, equals: 5 }
+      - { path: metrics.largest_cluster, equals: 125 }
+      - { path: metrics.smallest_cluster, equals: 27 }
+      - { path: data.cluster_sizes.0, equals: 125 }
+      - { path: checkpoint_sha256, contains: "" }
+
+  - id: small-resolution
+    description: >
+      The cluster count moves with the resolution. The numbers are from a run of this tool with
+      scanpy 1.12.4 and seed 0 (stability test, not published numbers).
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: load_data
+        args: { path: "{adapter_dir}/data/pbmc3k_small.h5ad" }
+        save_as: a
+      - tool: filter_cells
+        args: { adata: { handle: "{saved.a.data.adata.handle}" }, min_genes: 100, max_genes: 1500, max_pct_mito: 5 }
+        save_as: c
+      - tool: normalize_log
+        args: { adata: { handle: "{saved.c.data.adata.handle}" }, target_sum: 10000 }
+        save_as: d
+      - tool: find_variable_genes
+        args: { adata: { handle: "{saved.d.data.adata.handle}" } }
+        save_as: e
+      - tool: scale_data
+        args: { adata: { handle: "{saved.e.data.adata.handle}" }, regress_out: "total_counts,pct_counts_mt", max_value: 10 }
+        save_as: f
+      - tool: run_pca
+        args: { adata: { handle: "{saved.f.data.adata.handle}" }, n_comps: 20, random_state: 0 }
+        save_as: g
+      - tool: build_neighbors
+        args: { adata: { handle: "{saved.g.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0 }
+        save_as: h
+      - tool: cluster_leiden
+        args: { adata: { handle: "{saved.h.data.adata.handle}" }, resolution: 0.3, random_state: 0 }
+        save_as: low
+      - tool: cluster_leiden
+        args: { adata: { handle: "{saved.h.data.adata.handle}" }, resolution: 1.5, random_state: 0 }
+    expect:
+      - { path: saved.low.metrics.n_clusters, equals: 4 }
+      - { path: metrics.n_clusters, equals: 8 }
+
+  - id: small-markers
+    description: >
+      Marker genes of the clusters at resolution 0.7. The top gene of the NK and T cell cluster is
+      NKG7 and the top gene of the monocyte cluster is S100A8. These are known cell type markers.
+      The cluster numbers and scores are from a run of this tool (stability test).
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: load_data
+        args: { path: "{adapter_dir}/data/pbmc3k_small.h5ad" }
+        save_as: a
+      - tool: filter_cells
+        args: { adata: { handle: "{saved.a.data.adata.handle}" }, min_genes: 100, max_genes: 1500, max_pct_mito: 5 }
+        save_as: c
+      - tool: normalize_log
+        args: { adata: { handle: "{saved.c.data.adata.handle}" }, target_sum: 10000 }
+        save_as: d
+      - tool: find_variable_genes
+        args: { adata: { handle: "{saved.d.data.adata.handle}" } }
+        save_as: e
+      - tool: scale_data
+        args: { adata: { handle: "{saved.e.data.adata.handle}" }, regress_out: "total_counts,pct_counts_mt", max_value: 10 }
+        save_as: f
+      - tool: run_pca
+        args: { adata: { handle: "{saved.f.data.adata.handle}" }, n_comps: 20, random_state: 0 }
+        save_as: g
+      - tool: build_neighbors
+        args: { adata: { handle: "{saved.g.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0 }
+        save_as: h
+      - tool: cluster_leiden
+        args: { adata: { handle: "{saved.h.data.adata.handle}" }, resolution: 0.7, random_state: 0 }
+        save_as: l
+      - tool: find_markers
+        args: { adata: { handle: "{saved.l.data.adata.handle}" }, method: wilcoxon }
+    expect:
+      - { path: metrics.n_groups, equals: 5 }
+      - { path: data.method, equals: wilcoxon }
+      - { path: "table.rows[0][1]", equals: NKG7 }
+      - { path: summary, contains: S100A8 }

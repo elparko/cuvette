@@ -363,7 +363,7 @@ def plot_genes(adata, genes=None, kind="umap", groupby="leiden"):
     else:
         return _fail("kind must be umap, dotplot or violin")
     plot = _png("genes_" + kind)
-    summary = "Drew a %s plot%s." % (kind, " of " + ", ".join(names) if names else "") + (" Genes not found: %s." % ", ".join(missing) if missing else "")
+    summary = "Drew the %s plot%s." % (kind, " of " + ", ".join(names) if names else "") + (" Genes not found: %s." % ", ".join(missing) if missing else "")
     return {
         "ok": True,
         "summary": summary,
