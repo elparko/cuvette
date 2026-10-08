@@ -74,7 +74,11 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
   for (const e of m.map) {
     const what = `map entry for "${e.tool}"`;
     if (!need(what, e.tool)) continue;
-    for (const p of e.params) argOk(`${what}, param "${p.arg}"`, e.tool, p.arg);
+    for (const p of e.params) {
+      const info = tools.get(e.tool);
+      if (info?.args && !info.args.has(firstSegment(p.arg)))
+        warnings.push(`${what}, param "${p.arg}": the tool has no such argument. This is fine for a dialog field that the tool fixes; say the value in "difference" or the param note`);
+    }
     for (const k of Object.keys(e.match)) argOk(`${what}, match "${k}"`, e.tool, k);
     if (e.fidelity === "close" && !e.difference) warnings.push(`${what}: fidelity is "close" but "difference" is empty`);
     if (e.fidelity !== "code_only" && !e.route) errors.push(`${what}: the route is empty`);
@@ -205,7 +209,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   const adapter = loadAdapter(dir);
   const m = adapter.manifest;
   const tools = new Map<string, ToolInfo>();
-  for (const t of m.tools) tools.set(t.name, { args: new Set(Object.keys(t.params)) });
+  for (const t of m.tools) tools.set(t.name, { args: m.connection.kind === "mcp" && !Object.keys(t.params).length ? undefined : new Set(Object.keys(t.params)) });
   for (const t of m.tools) {
     for (const r of t.required) if (!(r in t.params)) errors.push(`tool "${t.name}": required argument "${r}" is not in "params"`);
   }
@@ -217,7 +221,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   }
 
   let tests: TestOutcome[] | undefined;
-  let toolsKnown = tools.size > 0 || m.connection.kind === "files";
+  let toolsKnown = (tools.size > 0 && m.connection.kind !== "mcp") || m.connection.kind === "files";
   if (opts.runTests) {
     const work = mkdtempSync(join(tmpdir(), "ga-check-"));
     let runtime: Awaited<ReturnType<typeof import("../adapters/runtime.ts").startAdapter>> | undefined;

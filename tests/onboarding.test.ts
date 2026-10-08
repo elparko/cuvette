@@ -62,9 +62,9 @@ describe("checker", () => {
     expect(r.errors.join("\n")).toMatch(/tool "summarize" has no map entry/);
   });
 
-  test("a map param that names no argument", async () => {
+  test("a map param that names no argument is a warning (a dialog field the tool fixes)", async () => {
     const dir = broken("badparam", (y) => y.replace("{ arg: column, label: Column }", "{ arg: colum, label: Column }"));
-    expect((await checkAdapter(dir)).errors.join("\n")).toMatch(/param "colum": tool "summarize" has no argument "colum"/);
+    expect((await checkAdapter(dir)).warnings.join("\n")).toMatch(/param "colum": the tool has no such argument/);
   });
 
   test("a check without rule, text or module function", async () => {
