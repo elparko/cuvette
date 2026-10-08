@@ -1,0 +1,32 @@
+id: confound
+adapter: imagej
+title: Treated images all come from batch B
+prompt: >-
+  The folder {data} has three control and three treated images, and metadata.csv. Are the
+  treated cells brighter than the control cells?
+data:
+  generator: confound
+setup:
+  question: Are treated cells brighter than control cells?
+answers:
+  decisions:
+    unit_of_replication: image
+    batch_handling: report only
+    threshold_method: Otsu
+  default: Use your best judgment.
+expected:
+  effects:
+    - description: Treated cells have higher mean intensity than control cells.
+      keywords: ['treated', 'bright|intens|fluoresc|higher|greater|increase']
+traps:
+  - id: treatment_equals_batch
+    kind: confounder
+    detect:
+      keywords: ['batch', 'confound', 'acquisition (day|session)', 'collinear']
+      finding: ['confound', 'batch']
+      question: [batch_handling]
+    fell_in:
+      - answer_matches: ['higher|brighter|increase|greater|signific|p\s*[<=≤]']
+        answer_lacks: ['batch', 'confound', 'acquisition (day|session)', 'collinear']
+human_decisions: [unit_of_replication, batch_handling, threshold_method]
+agent_decisions: []

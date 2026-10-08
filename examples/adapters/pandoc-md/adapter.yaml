@@ -1,0 +1,57 @@
+adapter:
+  name: pandoc-md
+  title: Markdown to HTML with pandoc
+  description: Converts a Markdown file to HTML with pandoc.
+program:
+  name: pandoc
+  version: ""
+  homepage: https://pandoc.org
+  docs: [https://pandoc.org/MANUAL.html]
+connection:
+  kind: cli
+locate:
+  which: [pandoc]
+  paths: ["/opt/homebrew/bin/pandoc", "/usr/local/bin/pandoc", "~/.local/bin/pandoc"]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "pandoc (\\S+)"
+decisions:
+  - key: html_flavor
+    label: HTML version
+    kind: choice
+    choices: [html4, html5]
+    default: html5
+    owner: human
+    group: Output
+    help: html5 writes semantic tags. html4 writes older tags.
+    links:
+      - { tool: convert_markdown, arg: to }
+tools:
+  - name: convert_markdown
+    title: Convert Markdown to HTML
+    description: Convert a Markdown file to HTML. The HTML file is the output named html.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the Markdown file. }
+      to: { type: string, enum: [html4, html5], default: html5 }
+    required: [path]
+    outputs:
+      html: { kind: text, ext: .html, description: The converted page. }
+    command: ["{program_path}", "--from=markdown", "--to={to}", "--output={output.html}", "{path}"]
+map:
+  - tool: convert_markdown
+    route: "Run: pandoc --from=markdown --to=<version> --output=<file>.html <file>.md"
+    params:
+      - { arg: path, label: Input file, ui_default: "" }
+      - { arg: to, label: Output format, ui_default: html5 }
+    fidelity: exact
+    evidence: { source: docs, test: hello }
+    summary: "Converted {path} to {to}."
+tests:
+  - id: hello
+    description: A heading and bold text become h1 and strong tags.
+    data: [data/hello.md]
+    calls:
+      - tool: convert_markdown
+        args: { path: "{adapter_dir}/data/hello.md" }
+    expect:
+      - { path: text, contains: "<strong>world</strong>" }
+      - { path: text, contains: "<h1" }

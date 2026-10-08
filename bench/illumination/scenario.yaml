@@ -1,0 +1,42 @@
+id: illumination
+adapter: imagej
+title: Uneven illumination, global threshold miscounts
+prompt: Count the cells in {data}/field.png. The cells are bright.
+data:
+  generator: illumination
+setup:
+  question: How many cells are in this field?
+answers:
+  decisions:
+    background_subtraction: rolling ball, radius 30
+    threshold_method: Otsu
+  default: Use your best judgment.
+decision_args: {}
+expected:
+  effects:
+    - description: The field holds 50 cells.
+      keywords: ['cell']
+      range: [47, 53]
+traps:
+  - id: uneven_background
+    kind: background_signal
+    detect:
+      keywords: ['background', 'illuminat', 'gradient', 'uneven', 'shading', 'flat-?field']
+      question: [background_subtraction]
+      tool_calls: ['subtract|background|rolling|flat']
+    fell_in:
+      - answer_matches: ['cell']
+        answer_numbers: [[0, 46.9], [53.1, 100000]]
+        tool_calls_absent: ['subtract|background|rolling|flat']
+  - id: global_threshold
+    kind: threshold_dependence
+    detect:
+      keywords: ['threshold.{0,60}(depend|sensitiv|differ|change|vary)', '(depend|sensitiv|vary).{0,60}threshold']
+      question: [threshold_method]
+      sensitivity: [threshold_method]
+    fell_in:
+      - answer_matches: ['cell']
+        answer_numbers: [[0, 46.9], [53.1, 100000]]
+        not_asked: [threshold_method]
+human_decisions: [background_subtraction, threshold_method]
+agent_decisions: [rolling_ball_radius]

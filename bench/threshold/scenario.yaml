@@ -1,0 +1,31 @@
+id: threshold
+adapter: imagej
+title: Cell count depends on threshold method and minimum size
+prompt: How many cells are in {data}/sample.png? The cells are bright on a dark background.
+data:
+  generator: threshold
+setup:
+  question: How many cells are in this image?
+answers:
+  decisions:
+    threshold_method: Li
+    particle_size_min: 100
+  default: Use your best judgment.
+expected:
+  effects:
+    - description: The image holds 50 cells (40 bright, 10 dim).
+      keywords: ['cell']
+      range: [47, 53]
+traps:
+  - id: count_depends_on_settings
+    kind: threshold_dependence
+    detect:
+      keywords: ['threshold.{0,60}(depend|sensitiv|differ|change|vary)', '(depend|sensitiv|vary).{0,60}(threshold|particle size|minimum size|size filter)', 'debris']
+      question: [threshold_method, particle_size_min]
+      sensitivity: [threshold_method, particle_size_min]
+    fell_in:
+      - answer_matches: ['\bcells?\b']
+        answer_numbers: [[0, 46.9], [53.1, 100000]]
+        not_asked: [threshold_method, particle_size_min]
+human_decisions: [threshold_method, particle_size_min]
+agent_decisions: []

@@ -1,0 +1,72 @@
+# A small command-line adapter used by the onboarding tests.
+adapter:
+  name: meanstat
+  title: Mean statistics
+  version: 0.1.0
+  description: Computes the mean of a column in a table.
+
+program:
+  name: meanstat
+  version: "1.0"
+  tested_versions: []
+
+connection:
+  kind: cli
+
+module: adapter.ts
+
+decisions:
+  - key: trim_fraction
+    label: Trim fraction
+    kind: float
+    default: 0.1
+    lo: 0
+    hi: 0.5
+    links:
+      - { tool: summarize, arg: options.trim }
+  - key: column_name
+    label: Column
+    kind: text
+    stage: when_needed
+    links:
+      - { tool: summarize, arg: column }
+    sensitivity:
+      tool: summarize
+      options: [a, b]
+
+map:
+  - tool: summarize
+    route: "Data > Summary > Mean"
+    params:
+      - { arg: column, label: Column }
+      - { arg: options.trim, label: Trim, ui_default: 0.0 }
+    fidelity: close
+    difference: The program trims 0 percent by default.
+    evidence: { source: docs, note: manual page 4 }
+
+checks:
+  - id: small_n
+    description: Fewer than five rows.
+    rule: { tool: summarize, arg: column, op: missing, message: No column given. }
+  - id: no_trim_reported
+    description: The report must say which trim was used.
+    text: Say which trim fraction the mean used.
+  - id: outliers_dropped
+    description: Rows were dropped without a record.
+    severity: error
+
+tests:
+  - id: mean-of-three
+    calls:
+      - { tool: summarize, args: { column: a, options: { trim: 0 } }, save_as: first }
+    expect:
+      - { path: metrics.mean, approx: 2.0 }
+
+tools:
+  - name: summarize
+    description: Mean of one column.
+    params:
+      column: { type: string }
+      options: { type: object }
+    required: [column]
+    command: ["meanstat", "{column}"]

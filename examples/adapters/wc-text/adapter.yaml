@@ -1,0 +1,61 @@
+adapter:
+  name: wc-text
+  title: Count lines and words
+  description: Counts the lines and words in a text file with the wc program.
+program:
+  name: wc
+  version: ""
+  homepage: https://www.gnu.org/software/coreutils/manual/html_node/wc-invocation.html
+connection:
+  kind: cli
+  env:
+    WC: "{program_path}"
+locate:
+  paths: ["/usr/bin/wc"]
+  which: ["wc"]
+decisions:
+  - key: text_file
+    label: Text file to count
+    kind: text
+    owner: human
+    group: Data
+    help: The file whose lines and words the tool counts.
+    essential: true
+    links:
+      - { tool: count_text, arg: path }
+tools:
+  - name: count_text
+    title: Count lines and words
+    description: Count the lines and the words in a text file.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the text file. }
+    required: [path]
+    command:
+      - /bin/sh
+      - -c
+      - 'printf "lines=%s\nwords=%s\n" $("$WC" -l < "$1") $("$WC" -w < "$1")'
+      - sh
+      - "{path}"
+    parse: keyvalue
+map:
+  - tool: count_text
+    route: "Run: wc -l -w <file>"
+    params:
+      - { arg: path, label: File, ui_default: "", note: wc reads the file you name. }
+    fidelity: exact
+    evidence:
+      source: docs
+      test: three-lines
+      note: The adapter runs wc twice and prints the two counts as key=value lines.
+    summary: "{path} has {metrics.lines} lines and {metrics.words} words."
+tests:
+  - id: three-lines
+    description: A file with three lines and nine words.
+    data: [data/three-lines.txt]
+    calls:
+      - tool: count_text
+        args: { path: "{adapter_dir}/data/three-lines.txt" }
+    expect:
+      - { path: metrics.lines, equals: 3 }
+      - { path: metrics.words, equals: 9 }

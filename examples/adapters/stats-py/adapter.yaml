@@ -1,0 +1,87 @@
+adapter:
+  name: stats-py
+  title: Small statistics module
+  description: Loads a CSV column and computes summary statistics with a Python module.
+program:
+  name: stats.py
+  version: "1.0"
+connection:
+  kind: python
+decisions:
+  - key: score_cutoff
+    label: Score cutoff
+    kind: float
+    default: 4.5
+    lo: 0
+    hi: 100
+    owner: human
+    group: Method
+    help: A score above the cutoff counts as high.
+    essential: true
+    links:
+      - { tool: threshold, arg: cutoff }
+tools:
+  - name: load_csv_column
+    title: Load a CSV column
+    description: "Read one numeric column of a CSV file. The result is a handle. Pass the handle to the other tools as {\"handle\": \"h1\"}."
+    read_only: true
+    function: "stats.py:load_csv_column"
+    params:
+      path: { type: string, minLength: 1 }
+      column: { type: string, minLength: 1 }
+    required: [path, column]
+  - name: describe
+    title: Describe values
+    description: Count, mean, median, standard deviation, minimum and maximum of the values.
+    read_only: true
+    function: "stats:describe"
+    params:
+      values: { type: [object, array], description: A handle from load_csv_column, or a list of numbers. }
+    required: [values]
+  - name: threshold
+    title: Count values above a cutoff
+    description: Count the values that are above the cutoff.
+    read_only: true
+    function: "stats:threshold"
+    params:
+      values: { type: [object, array] }
+      cutoff: { type: number }
+    required: [values, cutoff]
+map:
+  - tool: load_csv_column
+    route: "In Python: stats.load_csv_column(path, column)"
+    params:
+      - { arg: path, label: CSV file, ui_default: "" }
+      - { arg: column, label: Column name, ui_default: "" }
+    fidelity: exact
+    evidence: { source: code, test: scores }
+    summary: "Loaded column {column}."
+  - tool: describe
+    route: "In Python: stats.describe(values)"
+    params:
+      - { arg: values, label: Values, ui_default: "" }
+    fidelity: exact
+    evidence: { source: code, test: scores }
+    summary: "n={metrics.n}, mean={metrics.mean}, sd={metrics.sd}."
+  - tool: threshold
+    route: "In Python: stats.threshold(values, cutoff)"
+    params:
+      - { arg: cutoff, label: Cutoff, ui_default: 0, note: "The tool default comes from the score_cutoff decision." }
+    fidelity: exact
+    evidence: { source: code, test: scores }
+    summary: "{metrics.n_above} values are above {cutoff}."
+tests:
+  - id: scores
+    description: Eight scores with mean 5 and median 4.5.
+    data: [data/scores.csv]
+    calls:
+      - tool: load_csv_column
+        args: { path: "{adapter_dir}/data/scores.csv", column: score }
+        save_as: col
+      - tool: describe
+        args: { values: "{col.data}" }
+    expect:
+      - { path: metrics.n, equals: 8 }
+      - { path: metrics.mean, approx: 5, abs: 1.0e-9 }
+      - { path: metrics.median, approx: 4.5, abs: 1.0e-9 }
+      - { path: metrics.sd, approx: 2.138089935, abs: 1.0e-6 }

@@ -1,0 +1,38 @@
+adapter: { name: lab, title: Lab counter, version: "0.2.0" }
+program: { name: Lab counter, version: "1.0" }
+connection:
+  kind: mcp
+  command: ["{node}", "{tsx}", "{adapter_dir}/server.ts"]
+  state_tool: state
+decisions:
+  - key: method
+    label: Threshold method
+    kind: choice
+    choices: [Default, Otsu, Triangle]
+    owner: human
+    stage: when_needed
+    links: [{ tool: count, arg: method }]
+    sensitivity: { tool: count, compare: [metrics.count] }
+  - key: min_size
+    label: Smallest particle
+    kind: int
+    default: 5
+    owner: human
+    links: [{ tool: count, arg: min_size }]
+  - key: sigma
+    label: Blur
+    kind: float
+    owner: agent
+    stage: when_needed
+    links: [{ tool: blur, arg: sigma }]
+map:
+  - tool: count
+    route: Analyze > Count
+    steps: ["Method: {method}", "Click OK"]
+    params: [{ arg: min_size, label: Minimum size, ui_default: 0 }]
+    fidelity: exact
+    summary: "Counted {metrics.count} particles with {method}."
+  - tool: blur
+    route: Process > Blur
+    fidelity: exact
+    summary: "Blurred with sigma {sigma}."

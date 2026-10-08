@@ -1,0 +1,7 @@
+image,condition,batch
+control_1.png,control,A
+control_2.png,control,A
+control_3.png,control,A
+treated_1.png,treated,B
+treated_2.png,treated,B
+treated_3.png,treated,B

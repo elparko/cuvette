@@ -1,0 +1,131 @@
+import { readFileSync } from "node:fs";
+import type { LoadedAdapter } from "../adapters/manifest.ts";
+import type { Args, Tool, ToolOutput } from "../core/types.ts";
+
+export interface CoreDeps {
+  adapters: LoadedAdapter[];
+  allTools: () => Tool[];
+  activate: (names: string[]) => void;
+  ask: (spec: { question: string; options: string[]; recommendation?: string; reason?: string; wait: boolean }) => Promise<ToolOutput>;
+  proposeLab: (adapter: string, kind: string, payload: Record<string, unknown>, reason: string) => ToolOutput;
+  log: (kind: "note", data: Record<string, unknown>) => void;
+}
+
+function tool(name: string, description: string, properties: Record<string, unknown>, required: string[], execute: (a: Args) => Promise<ToolOutput> | ToolOutput): Tool {
+  return {
+    name,
+    description,
+    inputSchema: { type: "object", properties, required },
+    source: "harness",
+    readOnly: true,
+    permission: "allow",
+    execute: async (a) => execute(a),
+  };
+}
+
+function words(s: string): string[] {
+  return s.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+}
+
+export function searchTools(tools: Tool[], query: string, k = 6): Tool[] {
+  const q = words(query);
+  return tools
+    .map((t) => {
+      const hay = `${t.name.replace(/_/g, " ")} ${t.title ?? ""} ${t.description}`.toLowerCase();
+      return { t, score: q.reduce((n, w) => n + (hay.includes(w) ? (t.name.includes(w) ? 3 : 1) : 0), 0) };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k)
+    .map((x) => x.t);
+}
+
+export function coreTools(d: CoreDeps): Tool[] {
+  const skillIndex = () => d.adapters.flatMap((a) => a.skills().map((s) => ({ ...s, adapter: a.name })));
+  return [
+    tool(
+      "find_tools",
+      "Search the program tools that are not in your list yet. The matching tools become available on your next step.",
+      { query: { type: "string", description: "What you want to do, in a few words." } },
+      ["query"],
+      ({ query }) => {
+        const hits = searchTools(d.allTools(), String(query));
+        d.activate(hits.map((t) => t.name));
+        return {
+          ok: true,
+          summary: hits.length ? `Found ${hits.length} tools.` : "No tool matches.",
+          data: hits.map((t) => ({ name: t.name, description: t.description.split("\n")[0] })),
+        };
+      },
+    ),
+    tool(
+      "load_skill",
+      "Read a skill: a procedure for this program, written by the adapter author or the lab.",
+      { name: { type: "string" } },
+      ["name"],
+      ({ name }) => {
+        const s = skillIndex().find((x) => x.name === name);
+        if (!s) return { ok: false, error: `No skill named ${name}. Skills: ${skillIndex().map((x) => x.name).join(", ") || "none"}` };
+        return { ok: true, summary: `Loaded the skill ${s.name}.`, text: readFileSync(s.path, "utf8") };
+      },
+    ),
+    tool(
+      "ask_scientist",
+      "Ask the scientist a question when a choice can change the conclusion. Give options, your recommendation and the reason. With wait false, the question waits in the queue and you can continue other work.",
+      {
+        question: { type: "string" },
+        options: { type: "array", items: { type: "string" } },
+        recommendation: { type: "string" },
+        reason: { type: "string" },
+        wait: { type: "boolean", default: true },
+      },
+      ["question"],
+      (a) =>
+        d.ask({
+          question: String(a.question),
+          options: Array.isArray(a.options) ? a.options.map(String) : [],
+          recommendation: a.recommendation ? String(a.recommendation) : undefined,
+          reason: a.reason ? String(a.reason) : undefined,
+          wait: a.wait !== false,
+        }),
+    ),
+    tool(
+      "plan",
+      "Write or update the analysis plan: a short list of steps. The scientist sees it in the trail.",
+      {
+        steps: {
+          type: "array",
+          items: { type: "object", properties: { step: { type: "string" }, status: { type: "string", enum: ["todo", "doing", "done", "waiting"] } }, required: ["step"] },
+        },
+      },
+      ["steps"],
+      ({ steps }) => {
+        const list = Array.isArray(steps) ? steps.map((s: any) => ({ step: String(s.step ?? s), status: String(s.status ?? "todo") })) : [];
+        d.log("note", { text: "Plan:\n" + list.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`).join("\n"), plan: list, by: "agent" });
+        return { ok: true, summary: `Plan with ${list.length} steps.` };
+      },
+    ),
+    tool(
+      "note",
+      "Write an observation in the trail, for example a quality problem that you see in an image.",
+      { text: { type: "string" } },
+      ["text"],
+      ({ text }) => {
+        d.log("note", { text: String(text), by: "agent" });
+        return { ok: true, summary: "Note saved." };
+      },
+    ),
+    tool(
+      "propose_lab_rule",
+      "Propose a permanent lab rule after the scientist corrects you: a new default, a review check, a standards line or a known-answer test. The scientist must approve it.",
+      {
+        adapter: { type: "string" },
+        kind: { type: "string", enum: ["default", "check", "standard", "test"] },
+        payload: { type: "object" },
+        reason: { type: "string" },
+      },
+      ["adapter", "kind", "payload", "reason"],
+      (a) => d.proposeLab(String(a.adapter), String(a.kind), (a.payload ?? {}) as Record<string, unknown>, String(a.reason)),
+    ),
+  ];
+}

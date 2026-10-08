@@ -1,0 +1,24 @@
+adapter:
+  name: fake-mcp
+  title: Fake MCP server
+  description: A test server that has one tool for each result shape.
+program:
+  name: fake-mcp
+  version: "1.0"
+connection:
+  kind: mcp
+  command: ["{node}", "{tsx}", "{adapter_dir}/server.ts"]
+  call_timeout_s: 20
+  startup_timeout_s: 30
+tools:
+  - name: add
+    description: Add two numbers.
+    approval: true
+map:
+  - tool: add
+    route: Calculator > Add
+    fidelity: exact
+    summary: "Added {a} and {b}."
+  - tool: echo
+    route: Calculator > Echo
+    summary: "Echoed text."

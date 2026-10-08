@@ -1,0 +1,162 @@
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeAll, expect, test } from "vitest";
+import type { Tool, ToolContext } from "../src/core/types.ts";
+import { loadAdapter, Manifest } from "../src/adapters/manifest.ts";
+import { locate } from "../src/adapters/locate.ts";
+import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
+
+const root = mkdtempSync(join(tmpdir(), "ga-runtime-"));
+const dirs = { workDir: join(root, "work"), sessionDir: join(root, "session") };
+
+export function ctx(signal: AbortSignal = new AbortController().signal): ToolContext {
+  return { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal, log: () => { throw new Error("no log"); }, callTool: async () => ({ ok: true }) };
+}
+
+let rt: AdapterRuntime;
+let tools: Record<string, Tool>;
+const run = (name: string, args: Record<string, unknown> = {}, signal?: AbortSignal) => tools[name].execute(args, ctx(signal));
+
+beforeAll(async () => {
+  rt = await startAdapter(loadAdapter("tests/fixtures/fake-mcp"), dirs);
+  tools = Object.fromEntries((await rt.tools()).map((t) => [t.name, t]));
+}, 60000);
+
+afterAll(async () => {
+  await rt?.close();
+});
+
+test("tools carry the adapter fields", () => {
+  expect(Object.keys(tools).sort()).toEqual(["add", "crash", "echo", "fail", "image_content", "make_image", "reject", "slow", "spin", "structured", "table"]);
+  expect(tools.echo).toMatchObject({ source: "adapter", adapter: "fake-mcp", remoteName: "echo", readOnly: true, title: "Echo" });
+  expect(tools.echo.permission).toBeUndefined();
+  expect(tools.add.permission).toBe("ask");
+  expect(tools.add.readOnly).toBeUndefined();
+  expect((tools.add.inputSchema as { properties: object }).properties).toHaveProperty("a");
+  expect(rt.running).toBe(true);
+  expect(rt.instructions).toBe("Use echo to repeat text.");
+  expect(existsSync(join(dirs.sessionDir, "adapter-fake-mcp.log"))).toBe(true);
+});
+
+test("plain text result uses the map summary", async () => {
+  const r = await run("echo", { text: "hi" });
+  expect(r).toMatchObject({ ok: true, text: "echo: hi", summary: "Echoed text." });
+});
+
+test("JSON text result fills ok, summary, metrics, route and fidelity", async () => {
+  const r = await run("add", { a: 3, b: 4 });
+  expect(r).toMatchObject({ ok: true, summary: "3 + 4 = 7", metrics: { sum: 7 }, manualRoute: "Calculator: 3 + 4", fidelity: "exact" });
+});
+
+test("structured content wins and keeps only numeric metrics", async () => {
+  const r = await run("structured", { n: 4 });
+  expect(r.data).toMatchObject({ value: 8 });
+  expect(r.metrics).toEqual({ doubled: 8 });
+});
+
+test("table and manualRoute are read", async () => {
+  const r = await run("table");
+  expect(r.table).toEqual({ columns: ["x", "y"], rows: [[1, 2], [3, 4]], n_rows: 2, path: undefined });
+  expect(r).toMatchObject({ manualRoute: "Open the table", fidelity: "close" });
+});
+
+test("ok false in the JSON and isError both fail", async () => {
+  expect(await run("reject")).toMatchObject({ ok: false, error: "the data is empty" });
+  expect(await run("fail")).toMatchObject({ ok: false, error: "it failed on purpose" });
+});
+
+test("a path in the JSON becomes an image output", async () => {
+  const r = await run("make_image", { width: 5, height: 3 });
+  const path = join(dirs.workDir, "fake-5x3.png");
+  expect(r.outputs).toEqual([{ path, kind: "image", name: "fake-5x3.png" }]);
+});
+
+test("image content is saved as a PNG file", async () => {
+  const r = await run("image_content");
+  expect(r.images).toHaveLength(1);
+  expect(readFileSync(r.images![0]).subarray(1, 4).toString()).toBe("PNG");
+  expect(r.outputs?.[0].kind).toBe("image");
+  expect(r.text).toBe("an image");
+});
+
+test("cancel stops a call that obeys cancel and keeps the process", async () => {
+  const p = run("slow", { seconds: 30 });
+  await new Promise((r) => setTimeout(r, 500));
+  const t0 = Date.now();
+  await rt.cancel();
+  const r = await p;
+  expect(r.ok).toBe(false);
+  expect(r.error).toMatch(/cancelled/);
+  expect(Date.now() - t0).toBeLessThan(4000);
+  expect(rt.running).toBe(true);
+  expect((await run("echo", { text: "again" })).ok).toBe(true);
+});
+
+test("an abort signal cancels the call", async () => {
+  const ac = new AbortController();
+  const p = run("slow", { seconds: 30 }, ac.signal);
+  await new Promise((r) => setTimeout(r, 300));
+  ac.abort();
+  expect(await p).toMatchObject({ ok: false, error: "the call was cancelled" });
+});
+
+test("cancel kills a process that does not answer, and the next call restarts it", async () => {
+  const p = run("spin", { seconds: 60 });
+  await new Promise((r) => setTimeout(r, 500));
+  const t0 = Date.now();
+  await rt.cancel();
+  expect(Date.now() - t0).toBeLessThan(6000);
+  expect((await p).ok).toBe(false);
+  expect(rt.running).toBe(false);
+  expect((await run("echo", { text: "back" })).text).toBe("echo: back");
+  expect(rt.running).toBe(true);
+}, 30000);
+
+test("a crash gives a readable error and the next call restarts", async () => {
+  const r = await run("crash");
+  expect(r.ok).toBe(false);
+  expect(r.error).toMatch(/^the adapter process stopped: /);
+  expect(r.error).toMatch(/crashing on purpose|exit code 1/);
+  expect((await run("echo", { text: "up" })).ok).toBe(true);
+}, 30000);
+
+test("close ends the process", async () => {
+  const other = await startAdapter(loadAdapter("tests/fixtures/fake-mcp"), { workDir: join(root, "w2"), sessionDir: join(root, "s2") });
+  expect(other.running).toBe(true);
+  await other.close();
+  expect(other.running).toBe(false);
+});
+
+function manifest(locateSection: Record<string, unknown>, version = ""): Manifest {
+  return Manifest.parse({ adapter: { name: "x" }, program: { name: "x", version }, connection: { kind: "cli" }, locate: locateSection });
+}
+
+test("locate: env var, paths with ~ and globs, then which", async () => {
+  const bin = join(root, "bin");
+  mkdirSync(join(bin, "tool-1.2"), { recursive: true });
+  mkdirSync(join(bin, "tool-1.10"), { recursive: true });
+  const exe = join(bin, "tool-1.10", "prog");
+  writeFileSync(exe, "#!/bin/sh\necho 'prog version 1.10.3'\n");
+  chmodSync(exe, 0o755);
+  writeFileSync(join(bin, "tool-1.2", "prog"), "x");
+  process.env.GA_TEST_PROG = exe;
+  process.env.GA_TEST_ROOT = bin;
+
+  const a = await locate(manifest({ env: "GA_TEST_PROG", paths: ["/nonexistent"], version_command: ["{program_path}"], version_pattern: "version ([\\d.]+)" }, "0"));
+  expect(a).toMatchObject({ path: exe, version: "1.10.3" });
+  expect(a.how).toContain("GA_TEST_PROG");
+
+  const b = await locate(manifest({ env: "GA_UNSET_VAR", paths: ["/nonexistent/x", "{env:GA_TEST_ROOT}/tool-*/prog"] }, "9.9"));
+  expect(b).toMatchObject({ path: exe, version: "9.9" });
+
+  const home = await locate(manifest({ paths: ["~/definitely-not-here-*"] }));
+  expect(home.path).toBeUndefined();
+
+  const c = await locate(manifest({ which: ["nope-not-a-program", "sh"] }, "2"));
+  expect(c.path).toMatch(/sh$/);
+  expect(c.version).toBe("2");
+
+  const d = await locate(manifest({ which: ["nope-not-a-program"], version_command: ["{program_path}", "-v"] }, "fallback"));
+  expect(d).toMatchObject({ path: undefined, version: "fallback" });
+});

@@ -1,0 +1,389 @@
+import { spawn } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import type { Mode, Owner, Question } from "../core/types.ts";
+import { gaHome } from "../adapters/manifest.ts";
+import type { Card } from "./cards.tsx";
+import { show } from "./cards.tsx";
+import type { OutputRef } from "./items.ts";
+import type { SessionLike } from "./types.ts";
+
+export interface CommandCtx {
+  session: SessionLike;
+  print(text: string, title?: string): void;
+  notice(text: string): void;
+  error(text: string): void;
+  openCard(card: Card): void;
+  hasQuestionCard(qid: string): boolean;
+  refresh(): void;
+  clear(): void;
+  quit(): void;
+  outputs(): OutputRef[];
+  startWindow(): Promise<string>;
+}
+
+export interface Command {
+  name: string;
+  args?: string;
+  help: string;
+  run(args: string[], ctx: CommandCtx): Promise<void> | void;
+}
+
+const MODES: Mode[] = ["watch", "follow", "teach", "plan"];
+const OWNERS: Owner[] = ["human", "agent", "fixed"];
+const FORMATS = ["html", "md", "jsonl", "pdf", "protocol", "script", "notebook", "flow"];
+
+async function lazy<T = any>(spec: string): Promise<T | undefined> {
+  try {
+    return (await import(spec)) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+const unavailable = (ctx: CommandCtx) => ctx.notice("Not available yet.");
+
+export function table(headers: string[], rows: string[][]): string {
+  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
+  const fmt = (r: string[]) => r.map((c, i) => c.padEnd(widths[i]!)).join("  ").trimEnd();
+  return [fmt(headers), fmt(widths.map((w) => "-".repeat(w))), ...rows.map(fmt)].join("\n");
+}
+
+function clip(s: string, n = 48): string {
+  const one = s.replace(/\s+/g, " ");
+  return one.length > n ? one.slice(0, n - 1) + "…" : one;
+}
+
+export function decisionRows(session: SessionLike): string[][] {
+  const by: Record<string, string> = {};
+  for (const e of session.record.entries(["setup", "decision"])) {
+    if (e.kind === "setup") {
+      const defaults = new Set((e.data.defaultsAccepted as string[] | undefined) ?? []);
+      for (const k of Object.keys((e.data.values as object) ?? {})) by[k] = defaults.has(k) ? "default" : "you (setup)";
+    } else by[String(e.data.key)] = String(e.data.by ?? "human");
+  }
+  return session.decisions
+    .fields()
+    .map((f) => [f.key, clip(show(f.value)), session.decisions.owner(f.key), f.set ? (by[f.key] ?? "setup") : "not set"]);
+}
+
+function questionLine(q: Question): string {
+  const opts = q.options.map((o, i) => `${i + 1}=${o.label}`).join("  ");
+  return `${q.qid}  ${q.title}${opts ? `\n    ${opts}` : ""}`;
+}
+
+export function matchOption(q: Question, raw: string): { ok: true; value: unknown } | { ok: false } {
+  const n = Number(raw);
+  if (Number.isInteger(n) && n >= 1 && n <= q.options.length) return { ok: true, value: q.options[n - 1]!.value };
+  const hit = q.options.find((o) => String(o.value) === raw || o.label.toLowerCase() === raw.toLowerCase());
+  if (hit) return { ok: true, value: hit.value };
+  return { ok: false };
+}
+
+const TRAIL_ICON: Record<string, string> = {
+  setup: "⚙",
+  step: "●",
+  decision: "✎",
+  question: "?",
+  deviation: "⚠",
+  finding: "⚠",
+  note: "▸",
+};
+
+export function renderTrail(lines: any[], level: number): string {
+  const out: string[] = [];
+  for (const l of lines) {
+    out.push(`${String(l.n).padStart(2)}. ${TRAIL_ICON[l.icon] ?? "▸"} ${l.line}${l.stale ? "  [out of date]" : ""}`);
+    if (level >= 2 && l.details) for (const [k, v] of Object.entries(l.details)) out.push(`      ${k}: ${clip(show(v), 100)}`);
+    if (level >= 3 && l.technical) for (const [k, v] of Object.entries(l.technical)) out.push(`      · ${k}: ${clip(show(v), 100)}`);
+  }
+  return out.join("\n") || "The trail is empty.";
+}
+
+export function renderGraph(session: SessionLike): string {
+  const nodes = session.record.nodes();
+  if (!nodes.length) return "No steps yet.";
+  const stale = session.record.stale();
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const kids = new Map<string, string[]>();
+  const placed = new Set<string>();
+  const roots: string[] = [];
+  for (const n of nodes) {
+    const parents = n.parents.filter((p) => byId.has(p));
+    if (!parents.length) roots.push(n.id);
+    else kids.set(parents[0]!, [...(kids.get(parents[0]!) ?? []), n.id]);
+  }
+  const out: string[] = [];
+  const label = (id: string) => {
+    const n = byId.get(id)!;
+    const extra = n.parents.length > 1 ? ` (also from ${n.parents.slice(1).join(", ")})` : "";
+    return `${id} ${clip(n.summary || n.tool, 60)}${extra}${stale.has(id) ? "  [out of date]" : ""}`;
+  };
+  const walk = (id: string, prefix: string, last: boolean, top: boolean) => {
+    if (placed.has(id)) return;
+    placed.add(id);
+    out.push(top ? label(id) : `${prefix}${last ? "└─ " : "├─ "}${label(id)}`);
+    const next = top ? "" : prefix + (last ? "   " : "│  ");
+    const c = kids.get(id) ?? [];
+    c.forEach((k, i) => walk(k, next, i === c.length - 1, false));
+  };
+  roots.forEach((r) => walk(r, "", true, true));
+  return out.join("\n");
+}
+
+export function openWithOs(path: string): void {
+  const [cmd, args] =
+    process.platform === "darwin"
+      ? ["open", [path]]
+      : process.platform === "win32"
+        ? ["cmd", ["/c", "start", "", path]]
+        : ["xdg-open", [path]];
+  const child = spawn(cmd!, args as string[], { stdio: "ignore", detached: true });
+  child.on("error", () => {});
+  child.unref();
+}
+
+async function loadProfiles(): Promise<{ name: string; version: number }[]> {
+  const mod = await lazy("../core/decisions.ts");
+  try {
+    return mod?.DecisionRecord?.listProfiles?.() ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function openSetup(ctx: CommandCtx): Promise<void> {
+  ctx.openCard({ t: "setup", profiles: await loadProfiles() });
+}
+
+async function allOpen(): Promise<Question[] | undefined> {
+  for (const f of ["../core/questions.ts", "../core/decisions.ts"]) {
+    const mod = await lazy(f);
+    if (mod?.allOpenQuestions) return mod.allOpenQuestions();
+  }
+  return undefined;
+}
+
+function listSessions(): string[] {
+  const dir = join(gaHome(), "sessions");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((d) => existsSync(join(dir, d, "log.jsonl")))
+    .sort()
+    .reverse()
+    .slice(0, 10);
+}
+
+export const commands: Command[] = [
+  {
+    name: "help",
+    help: "Show this list.",
+    run(_, ctx) {
+      const rows = commands.map((c) => [`/${c.name}${c.args ? " " + c.args : ""}`, c.help]);
+      const keys = "Keys: Esc stops the agent. Shift+Tab changes the mode. Ctrl+C twice quits. Up and Down show past input.";
+      ctx.print(table(["Command", "What it does"], rows) + "\n\n" + keys, "Commands");
+    },
+  },
+  { name: "setup", help: "Open the setup card for your choices.", run: (_, ctx) => openSetup(ctx) },
+  {
+    name: "decisions",
+    help: "Show every decision, its owner and who set it.",
+    run(_, ctx) {
+      ctx.print(table(["Key", "Value", "Owner", "Set by"], decisionRows(ctx.session)), "Decisions");
+    },
+  },
+  {
+    name: "owner",
+    args: "<key> <human|agent|fixed>",
+    help: "Change who owns a decision.",
+    run([key, owner], ctx) {
+      if (!key || !OWNERS.includes(owner as Owner)) return ctx.error("Use: /owner <key> <human|agent|fixed>");
+      if (!ctx.session.decisions.fields().some((f) => f.key === key)) return ctx.error(`No decision named ${key}. See /decisions.`);
+      ctx.session.setOwner(key, owner as Owner);
+      ctx.notice(`Owner of ${key} is now ${owner}.`);
+    },
+  },
+  {
+    name: "mode",
+    args: "<watch|follow|teach|plan>",
+    help: "Change the mode.",
+    run([m], ctx) {
+      if (!MODES.includes(m as Mode)) return ctx.error("Use: /mode <watch|follow|teach|plan>");
+      ctx.session.setMode(m as Mode);
+      ctx.refresh();
+    },
+  },
+  {
+    name: "questions",
+    help: "List open questions in this session and in all sessions.",
+    async run(_, ctx) {
+      const mine = ctx.session.questions.open();
+      const all = await allOpen();
+      const others = (all ?? []).filter((q) => q.session !== ctx.session.id);
+      const parts = [`This session (${mine.length}):`, ...(mine.length ? mine.map(questionLine) : ["  none"])];
+      if (all) parts.push("", `Other sessions (${others.length}):`, ...(others.length ? others.map((q) => `${questionLine(q)}\n    session ${q.session}`) : ["  none"]));
+      if (mine.length) parts.push("", "Answer with /answer <id> <value>, or use the cards below.");
+      ctx.print(parts.join("\n"), "Open questions");
+      for (const q of mine) if (!ctx.hasQuestionCard(q.qid)) ctx.openCard({ t: "question", q });
+    },
+  },
+  {
+    name: "answer",
+    args: "<qid> <value>",
+    help: "Answer an open question by its id.",
+    async run([qid, ...rest], ctx) {
+      const raw = rest.join(" ").trim();
+      if (!qid || !raw) return ctx.error("Use: /answer <qid> <value>");
+      const q = ctx.session.questions.open().find((x) => x.qid === qid);
+      if (!q) {
+        const other = (await allOpen())?.find((x) => x.qid === qid);
+        return ctx.error(other ? `${qid} belongs to session ${other.session}. Run: ga --resume ${other.session}` : `No open question ${qid}.`);
+      }
+      const hit = matchOption(q, raw);
+      await ctx.session.answer(qid, hit.ok ? hit.value : raw);
+      ctx.notice(`Answered ${qid}.`);
+    },
+  },
+  {
+    name: "trail",
+    args: "[1|2|3]",
+    help: "Show the audit trail. 1 is short, 3 is the technical record.",
+    async run([lv], ctx) {
+      const level = lv === "2" ? 2 : lv === "3" ? 3 : 1;
+      const mod = await lazy("../core/trail.ts");
+      if (!mod?.trail) return unavailable(ctx);
+      ctx.print(renderTrail(mod.trail(ctx.session.record, level), level), `Audit trail, level ${level}`);
+    },
+  },
+  {
+    name: "graph",
+    help: "Show the steps as a tree. Out-of-date steps are marked.",
+    run(_, ctx) {
+      ctx.print(renderGraph(ctx.session), "Analysis graph");
+    },
+  },
+  {
+    name: "review",
+    help: "Check the analysis now and list what the checks found.",
+    async run(_, ctx) {
+      ctx.notice("Reviewing the analysis.");
+      const list = await ctx.session.review();
+      if (!list.length) return ctx.notice("The review found nothing.");
+      ctx.openCard({ t: "findings", list });
+    },
+  },
+  {
+    name: "findings",
+    help: "Accept, reject or mark fixed each open finding.",
+    run(_, ctx) {
+      const list = ctx.session.findings.list("open");
+      if (!list.length) return ctx.notice("No open findings.");
+      ctx.openCard({ t: "findings", list });
+    },
+  },
+  {
+    name: "export",
+    args: `<${FORMATS.join("|")}>`,
+    help: "Write the record in a file format.",
+    async run([fmt], ctx) {
+      if (!FORMATS.includes(fmt ?? "")) return ctx.error(`Use: /export <${FORMATS.join("|")}>`);
+      try {
+        ctx.notice(`Exported: ${await ctx.session.exportAs(fmt)}`);
+      } catch (e) {
+        ctx.error(`Export failed: ${(e as Error).message}`);
+      }
+    },
+  },
+  {
+    name: "open",
+    args: "<n>",
+    help: "Open output number n with the system viewer.",
+    run([n], ctx) {
+      const outs = ctx.outputs();
+      const ref = outs[Number(n) - 1];
+      if (!ref) return ctx.error(outs.length ? `Use a number from 1 to ${outs.length}.` : "No outputs yet.");
+      openWithOs(ref.path);
+      ctx.notice(`Opening ${ref.path}`);
+    },
+  },
+  {
+    name: "model",
+    help: "Show the model.",
+    run(_, ctx) {
+      const m = ctx.session.model;
+      ctx.print(`${m.provider}:${m.model}\ncontext window ${m.contextWindow} tokens · vision ${m.vision ? "yes" : "no"} · ${m.small ? "small model" : "full model"}`, "Model");
+    },
+  },
+  {
+    name: "adapters",
+    help: "List the programs this session controls.",
+    run(_, ctx) {
+      const rows = ctx.session.adapterInfo.map((a) => [a.name, a.title, a.version, a.programVersion]);
+      ctx.print(rows.length ? table(["Adapter", "Program", "Adapter version", "Program version"], rows) : "No adapters.", "Adapters");
+    },
+  },
+  {
+    name: "skills",
+    help: "List the skills the adapters offer.",
+    async run(_, ctx) {
+      const mod = await lazy("../adapters/manifest.ts");
+      if (!mod?.findAdapter) return unavailable(ctx);
+      const rows: string[][] = [];
+      for (const a of ctx.session.adapterInfo) {
+        try {
+          for (const s of mod.findAdapter(a.name).skills()) rows.push([a.name, s.name, clip(s.description, 70)]);
+        } catch {}
+      }
+      ctx.print(rows.length ? table(["Adapter", "Skill", "Use"], rows) : "No skills.", "Skills");
+    },
+  },
+  {
+    name: "lab",
+    help: "List lab memory changes that wait for approval.",
+    async run(_, ctx) {
+      const mod = await lazy("../core/labmemory.ts");
+      if (!mod?.pending) return unavailable(ctx);
+      const list = mod.pending() as { pid: string; adapter: string; changeKind: string; reason?: string }[];
+      ctx.print(
+        list.length ? list.map((p) => `${p.pid}  ${p.adapter}  ${p.changeKind}  ${p.reason ?? ""}`).join("\n") : "Nothing waits for approval.",
+        "Lab memory",
+      );
+    },
+  },
+  {
+    name: "compact",
+    help: "Summarize old messages to free space.",
+    async run(_, ctx) {
+      await ctx.session.compact();
+      ctx.notice("Older messages are summarized.");
+    },
+  },
+  {
+    name: "resume",
+    help: "List past sessions.",
+    run(_, ctx) {
+      const ids = listSessions();
+      const text = ids.length ? ids.join("\n") : "No past sessions.";
+      ctx.print(`${text}\n\nTo continue one, quit and run: ga --resume <id>`, "Sessions");
+    },
+  },
+  {
+    name: "window",
+    help: "Open the graph window in your browser.",
+    async run(_, ctx) {
+      try {
+        ctx.notice(`Window: ${await ctx.startWindow()}`);
+      } catch (e) {
+        ctx.error(`The window did not start: ${(e as Error).message}`);
+      }
+    },
+  },
+  { name: "clear", help: "Clear the screen. The record stays.", run: (_, ctx) => ctx.clear() },
+  { name: "quit", help: "Leave the program.", run: (_, ctx) => ctx.quit() },
+];
+
+export function suggestions(input: string): Command[] {
+  if (!input.startsWith("/") || input.includes(" ")) return [];
+  const q = input.slice(1).toLowerCase();
+  return commands.filter((c) => c.name.startsWith(q));
+}

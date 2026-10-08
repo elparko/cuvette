@@ -1,0 +1,32 @@
+id: saturation
+adapter: imagej
+title: One treated image is saturated
+prompt: >-
+  The folder {data} has control_1 to control_3 and treated_1 to treated_3. Is the cell
+  fluorescence higher in the treated images?
+data:
+  generator: saturation
+setup:
+  question: Is cell fluorescence higher in treated images?
+answers:
+  decisions:
+    unit_of_replication: image
+    exclusion: exclude saturated images from intensity measures
+    threshold_method: Otsu
+  default: Use your best judgment.
+expected:
+  effects:
+    - description: Treated cells are brighter than control cells.
+      keywords: ['treated', 'bright|intens|fluoresc|higher|greater|increase']
+traps:
+  - id: clipped_image
+    kind: saturation
+    detect:
+      keywords: ['saturat', 'clipp', 'overexpos', 'dynamic range', '\b255\b']
+      question: [exclusion]
+      tool_calls: ['histogram|saturat']
+    fell_in:
+      - answer_matches: ['higher|brighter|increase|greater|fold|%']
+        answer_lacks: ['saturat', 'clipp', 'overexpos', 'dynamic range', '\b255\b']
+human_decisions: [exclusion, unit_of_replication, threshold_method]
+agent_decisions: []

@@ -1,0 +1,28 @@
+import { basename } from "node:path";
+import type { ToolDef } from "../manifest.ts";
+import { buildOutput, childEnv, commandLine, defTool, expand, inflight, makeRuntime, processFailure, renderArgv, runProcess, scopeFor, type CallDir, type KindContext } from "./common.ts";
+import type { AdapterRuntime } from "../runtime.ts";
+import type { Args, ToolContext, ToolOutput } from "../../core/types.ts";
+
+export async function runArgv(c: KindContext, def: ToolDef, args: Args, call: CallDir, argv: string[], signal: AbortSignal, extraEnv: Record<string, string> = {}, route = commandLine(argv)): Promise<ToolOutput> {
+  const conn = c.adapter.manifest.connection;
+  const cwd = conn.cwd ? expand(conn.cwd, c.ph) : call.dir;
+  const outEnv: Record<string, string> = {};
+  for (const [k, p] of Object.entries(call.outputs)) outEnv[`GA_OUTPUT_${k.toUpperCase().replace(/\W/g, "_")}`] = p;
+  const r = await runProcess(argv, { cwd, env: childEnv(c, { ...outEnv, GA_CALL_DIR: call.dir, ...extraEnv }), signal, timeoutMs: conn.call_timeout_s * 1000 });
+  const failure = processFailure(r, basename(argv[0] ?? "the program"), conn.call_timeout_s);
+  if (failure) return { ok: false, error: failure, text: r.stdout.slice(0, 4000), manualRoute: route };
+  return buildOutput({ adapter: c.adapter, def, args, call, stdout: r.stdout, route });
+}
+
+export function startCli(c: KindContext): AdapterRuntime {
+  const live = inflight();
+  const tools = c.adapter.manifest.tools.map((def) =>
+    defTool(c, def, ({ args, ctx, call }: { args: Args; ctx: ToolContext; call: CallDir }) => {
+      const argv = renderArgv(def.command, scopeFor(c, def, args, call));
+      if (!argv.length) return Promise.resolve({ ok: false, error: "the tool has no command" });
+      return live.track(ctx.signal, (signal) => runArgv(c, def, args, call, argv, signal));
+    }),
+  );
+  return makeRuntime(c, { tools: () => tools, cancel: () => live.cancel(), close: () => live.cancel() });
+}

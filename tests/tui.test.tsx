@@ -1,0 +1,263 @@
+import { afterEach, describe, expect, test } from "vitest";
+import { runTui } from "../src/tui/app.tsx";
+import { FakeSession } from "../src/tui/fake-session.ts";
+import { imageProtocol, inlineImage } from "../src/tui/image.ts";
+import { Mapper, settingsLine } from "../src/tui/items.ts";
+import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
+import { renderGraph, suggestions } from "../src/tui/commands.ts";
+
+let live: { h: Harness; s: FakeSession; done: Promise<void> } | undefined;
+
+function start(opts: { mode?: "watch" | "follow"; autoSetup?: boolean; env?: Record<string, string> } = {}) {
+  const h = makeHarness();
+  const s = new FakeSession({ delayMs: 0, mode: opts.mode });
+  const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: opts.autoSetup ?? false, env: opts.env ?? {} });
+  live = { h, s, done };
+  return { h, s, done };
+}
+
+async function type(h: Harness, text: string) {
+  h.type(text);
+  await sleep(40);
+}
+
+async function submit(h: Harness, text: string) {
+  await type(h, text);
+  await type(h, "\r");
+}
+
+afterEach(async () => {
+  if (!live) return;
+  live.h.type("\x03");
+  await sleep(20);
+  live.h.type("\x03");
+  await Promise.race([live.done, sleep(500)]);
+  live = undefined;
+});
+
+describe("transcript", () => {
+  test("shows the header once", async () => {
+    const { h } = start();
+    await until(() => h.all().includes("Type /help for commands."));
+    const text = h.all();
+    expect(text).toContain("smile-msi 0.1.0 (SMILE MSI 2.4.0)");
+    expect(text).toContain("Model: fake-model · Mode: watch · Session: 20261008-101500-ab12");
+  });
+
+  test("shows steps with route, settings, fidelity, deviation and failure", async () => {
+    const { h } = start();
+    await sleep(100);
+    await submit(h, "compare endo and epi");
+    await until(() => h.all().includes("Permission needed: run_script"));
+    await type(h, "y");
+    await until(() => h.all().includes("Which AUC cutoff do you want?"));
+    await type(h, "1");
+    await until(() => h.all().includes("14 features differ between endo and epi at AUC 0.7."));
+    const text = h.all();
+    expect(text).toContain("● Step 1  Loaded 2 samples with 4812 spectra");
+    expect(text).toContain("▸ File > Open > endo_epi.imzML · path endo_epi.imzML");
+    expect(text).toContain("◇ close match");
+    expect(text).toContain("⚠ Deviation: tolerance ppm 10 (setup says 5)");
+    expect(text).toContain("● Step 3  Found 14 features different between endo and epi");
+    expect(text).toContain("▸ Analyze > Discriminating features · group a endo");
+    expect(text).toMatch(/image: .*\.png \(open with \/open 1\)/);
+    expect(text).toContain("✗ Step 4  Folder is read-only");
+    expect(text).toContain("◇ code only: no manual route");
+    expect(text).toMatch(/\d+(\.\d)?k? in \/ \d+ out/);
+  });
+});
+
+describe("cards", () => {
+  test("permission: n asks for a note and denies", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    await submit(h, "go");
+    await until(() => h.all().includes("Permission needed: run_script"));
+    expect(h.all()).toContain("1 import numpy as np");
+    expect(h.all()).toContain("This will touch: a Python process");
+    await type(h, "n");
+    await until(() => h.all().includes("Reason for the agent"));
+    await type(h, "too risky");
+    h.type("\r");
+    await until(() => h.all().includes("I did not run the script"));
+    expect(s.record.entries(["permission"])[0]!.data).toMatchObject({ decision: "denied", note: "too risky" });
+  });
+
+  test("question: number key answers and the card closes", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    await submit(h, "go");
+    await until(() => h.all().includes("Permission needed"));
+    await type(h, "y");
+    await until(() => h.all().includes("0.8 (6 features)"));
+    expect(h.all()).toContain("Recommended: 0.7 is the cutoff in your lab profile.");
+    expect(h.all()).toContain("Cutoff  Features  Both normalizations");
+    await type(h, "2");
+    await until(() => s.questions.open().length === 0);
+    expect(s.record.entries(["answer"])[0]!.data.value).toBe(0.8);
+  });
+
+  test("question: o opens free text", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    await submit(h, "go");
+    await until(() => h.all().includes("Permission needed"));
+    await type(h, "y");
+    await until(() => h.all().includes("other: type your own answer"));
+    await type(h, "o");
+    await type(h, "0.75");
+    h.type("\r");
+    await until(() => s.questions.open().length === 0);
+    expect(s.record.entries(["answer"])[0]!.data.value).toBe("0.75");
+  });
+
+  test("follow instruction: Enter confirms, s lets the agent act", async () => {
+    const { h, s } = start({ mode: "follow" });
+    await sleep(100);
+    await submit(h, "go");
+    await until(() => h.all().includes("Permission needed"));
+    await type(h, "y");
+    await until(() => h.all().includes("Which AUC cutoff"));
+    await type(h, "1");
+    await until(() => h.all().includes("Do this step in SMILE MSI, then press Enter. Press s to let the agent do it."));
+    expect(h.all()).toContain("Analyze > Discriminating features. Group A = endo.");
+    await type(h, "s");
+    await until(() => s.record.entries(["follow_step"]).length === 1);
+    expect(s.record.entries(["follow_step"])[0]!.data.agentDoes).toBe(true);
+  });
+
+  test("setup card edits a field and saves", async () => {
+    const { h, s } = start({ autoSetup: true });
+    await until(() => h.all().includes("Setup: your choices for this analysis"));
+    h.type("\r");
+    await sleep(40);
+    await type(h, "Does X differ?");
+    h.type("\r");
+    await sleep(40);
+    await type(h, "\x1b[B");
+    h.type("\r");
+    await sleep(40);
+    await type(h, "12");
+    h.type("\r");
+    await sleep(40);
+    for (let i = 0; i < 6; i++) await type(h, "\x1b[B");
+    h.type("\r");
+    await until(() => s.record.entries(["setup"]).length === 1);
+    expect(s.decisions.value("question")).toBe("Does X differ?");
+    expect(s.decisions.value("tolerance_ppm")).toBe(512);
+  });
+});
+
+describe("keys and commands", () => {
+  test("Shift+Tab cycles the mode", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    await type(h, "\x1b[Z");
+    expect(s.mode).toBe("follow");
+    await type(h, "\x1b[Z");
+    expect(s.mode).toBe("teach");
+    await type(h, "\x1b[Z");
+    await type(h, "\x1b[Z");
+    expect(s.mode).toBe("watch");
+  });
+
+  test("Esc interrupts a running turn", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    await submit(h, "go");
+    await until(() => h.all().includes("Permission needed"));
+    await type(h, "\x1b");
+    await until(() => s.interrupts === 1 || false);
+  });
+
+  test("Ctrl+C twice quits", async () => {
+    const { h, done } = start();
+    await sleep(100);
+    await type(h, "\x03");
+    expect(h.all()).toContain("Press Ctrl+C again to quit.");
+    h.type("\x03");
+    await done;
+  });
+
+  test("a slash shows filtered suggestions", async () => {
+    const { h } = start();
+    await sleep(100);
+    await type(h, "/de");
+    expect(h.last()).toContain("/decisions");
+    expect(h.last()).not.toContain("/graph");
+    expect(suggestions("/q").map((c) => c.name)).toEqual(["questions", "quit"]);
+    expect(suggestions("/mode x")).toEqual([]);
+  });
+
+  test("/decisions prints the table; /owner changes the owner", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    await submit(h, "/owner seed fixed");
+    await until(() => s.decisions.owner("seed") === "fixed");
+    await submit(h, "/decisions");
+    await until(() => h.all().includes("Set by"));
+    expect(h.all()).toMatch(/tolerance_ppm\s+5\s+human\s+not set/);
+    expect(h.all()).toMatch(/seed\s+42\s+fixed/);
+  });
+
+  test("/mode, /trail and unknown commands", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    await submit(h, "/mode teach");
+    await until(() => s.mode === "teach");
+    await submit(h, "/nope");
+    await until(() => h.all().includes("Unknown command /nope"));
+    await submit(h, "/trail");
+    await until(() => /Audit trail|Not available yet/.test(h.all()));
+  });
+
+  test("/graph marks out-of-date steps; /findings resolves with keys", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    await submit(h, "go");
+    await until(() => h.all().includes("Permission needed"));
+    await type(h, "y");
+    await until(() => h.all().includes("Which AUC cutoff"));
+    await type(h, "1");
+    await until(() => h.all().includes("Step 4"));
+    s.setDecision("normalization", "RMS", "test");
+    const graph = renderGraph(s);
+    expect(graph).toContain("n1 Loaded 2 samples");
+    expect(graph).toMatch(/└─ n2 Normalized spectra with TIC {2}\[out of date\]/);
+    await submit(h, "/review");
+    await until(() => h.all().includes("Review finding 1 of 1"));
+    await type(h, "a");
+    await until(() => s.findings.list("accepted").length === 1);
+  });
+
+  test("/open without outputs, /clear and /quit", async () => {
+    const { h, done } = start();
+    await sleep(100);
+    await submit(h, "/open 1");
+    await until(() => h.all().includes("No outputs yet."));
+    await submit(h, "/quit");
+    await done;
+  });
+});
+
+describe("pieces", () => {
+  test("settingsLine keeps scalars only", () => {
+    expect(settingsLine({ tolerance_ppm: 5, min_auc: 0.7, nested: { a: 1 }, none: null })).toBe("tolerance ppm 5 · min auc 0.7");
+  });
+
+  test("image protocol follows the terminal", () => {
+    expect(imageProtocol({ TERM_PROGRAM: "iTerm.app" })).toBe("iterm");
+    expect(imageProtocol({ KITTY_WINDOW_ID: "3" })).toBe("kitty");
+    expect(imageProtocol({ TERM_PROGRAM: "Apple_Terminal" })).toBeUndefined();
+    expect(inlineImage("/missing.png", "iterm")).toBeUndefined();
+  });
+
+  test("mapper numbers adapter steps and tracks outputs", () => {
+    const s = new FakeSession({ delayMs: 0 });
+    const m = new Mapper(s);
+    const e = s.record.append("tool_result", { tool: "t", adapter: "a", ok: true, summary: "Did it", images: ["abc"], files: [], effectiveArgs: {}, manualRoute: "Menu > Item" });
+    const [item] = m.map(e);
+    expect(item).toMatchObject({ t: "step", n: 1, summary: "Did it", route: "Menu > Item" });
+    expect(m.outputs).toHaveLength(1);
+  });
+});

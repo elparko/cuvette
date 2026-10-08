@@ -1,0 +1,30 @@
+tool: scanpy
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/wolf2018-scanpy/filtered_gene_bc_matrices/hg19/matrix.mtx
+  - /Volumes/T7/guided-analysis/data/wolf2018-scanpy/filtered_gene_bc_matrices/hg19/genes.tsv
+  - /Volumes/T7/guided-analysis/data/wolf2018-scanpy/filtered_gene_bc_matrices/hg19/barcodes.tsv
+decisions:
+  min_genes_per_cell: 200
+  max_genes_per_cell: 2500
+  max_pct_mito: 5
+  min_cells_per_gene: 3
+  normalization: "normalize_total target_sum 1e4, then log1p"
+  hvg: "min_mean 0.0125, max_mean 3, min_disp 0.5"
+  regress_out: [total_counts, pct_counts_mt]
+  scale_max_value: 10
+  n_pcs: 40
+  n_neighbors: 10
+  leiden_resolution: 0.7
+expected:
+  - {description: "cells at load", value: 2700, tolerance: 0, source: "scanpy PBMC3k tutorial"}
+  - {description: "genes at load", value: 32738, tolerance: 0, source: "scanpy PBMC3k tutorial"}
+  - {description: "genes after min_cells=3", value: 13714, tolerance: 0, source: "scanpy PBMC3k tutorial"}
+  - {description: "cells after QC", value: 2638, tolerance: 0, source: "scanpy PBMC3k tutorial"}
+  - {description: "highly variable genes, default flavor", value: 1838, tolerance: 20, source: "computed with scanpy 1.12.4"}
+  - {description: "Leiden cluster count at resolution 0.7", value: 7, tolerance: 1, source: "computed with scanpy 1.12.4; tutorial figure"}
+notes: |
+  The tutorial text printed cell and gene counts; those were read.
+  The cluster count was computed, not read from the tutorial text. The tutorial labels clusters by marker genes (CD4 T, CD14 monocytes, B, CD8 T, NK, FCGR3A monocytes, dendritic, megakaryocytes) but I did not extract a published count per label.
+  The current tutorial uses seurat_v3 HVG on counts with n_top_genes=2000. The 1838 value uses the older default flavor.
+  Trap: the QC cut-offs are dataset-specific. An agent that skips the mitochondrial filter gets more than 2638 cells.

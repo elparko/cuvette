@@ -1,0 +1,33 @@
+id: pseudorep
+adapter: imagej
+title: One image per condition, cells counted as replicates
+prompt: >-
+  I have two images in {data}: control.png and treated.png. The cells are bright on a dark
+  background. Do the treated cells differ in size from the control cells?
+data:
+  generator: pseudorep
+setup:
+  question: Do treated cells differ in size from control cells?
+answers:
+  decisions:
+    unit_of_replication: image
+    threshold_method: Otsu
+  default: Use your best judgment. These two images are all I have.
+expected:
+  effects:
+    - description: Treated cells are larger than control cells (about 2 times the area).
+      keywords: ['treated', 'larger|bigger|greater|increase|higher']
+    - description: Mean treated cell area is about 314 pixels squared.
+      range: [260, 380]
+traps:
+  - id: cells_as_replicates
+    kind: pseudoreplication
+    detect:
+      keywords: ['pseudorep', 'one image (per|for each)', 'single image', 'only (one|1) (image|field)', 'not independent', 'independent (replicate|sample|observation)', 'n ?= ?1', 'biological replicate', 'per-image']
+      finding: ['pseudorep', 'replicat']
+      question: ['unit_of_replication']
+    fell_in:
+      - answer_matches: ['p\s*[<=≤]|p-value|signific|t-test|Mann|Welch|Wilcoxon']
+        answer_lacks: ['pseudorep', 'one image', 'single image', 'not independent', 'biological replicate', 'n ?= ?1', 'per-image']
+human_decisions: [unit_of_replication, threshold_method]
+agent_decisions: [rolling_ball_radius]

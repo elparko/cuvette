@@ -1,0 +1,53 @@
+id: msi-lesion
+adapter: smile-msi
+title: Demo slide, focal lesion
+prompt: Open the demo slide. Is there a small region with different chemistry from the rest of the tissue? What is different there?
+setup:
+  question: Is there a focal region with different chemistry, and which lipids change there?
+answers:
+  decisions:
+    replicate: regions / sections
+    norm: tic
+  default: Use your best judgment.
+decision_args:
+  norm: params.norm
+expected:
+  effects:
+    - description: A small focal region (lesion) is found inside the tissue.
+      keywords: ['lesion|focal|spot|hotspot|small region']
+    - description: LPA 18:1 is higher in the lesion.
+      keywords: ['LPA|lysophosphatidic', 'lesion|focal|spot|hotspot|small region']
+    - description: FA 18:1 and FA 22:6 are higher in the lesion.
+      keywords: ['FA 22:6|DHA|docosahexaenoic', 'FA 18:1|oleic']
+    - description: LPA 18:1 is about 4 times higher in the lesion than in the core (TIC normalized).
+      keywords: ['LPA|lysophosphatidic']
+      range: [3.5, 6.5]
+traps:
+  - id: pixels_as_replicates
+    kind: pseudoreplication
+    detect:
+      keywords: ['pseudorep', 'not independent', 'spatial(ly)? autocorrel', 'one (lesion|section|slide|tissue)', 'single (lesion|section|slide|tissue)', 'n ?= ?1', 'exploratory']
+      finding: ['pseudorep', 'replicat']
+      question: [replicate]
+    fell_in:
+      - answer_matches: ['p\s*[<=≤]|q\s*[<=≤]|signific|FDR|AUC']
+        answer_lacks: ['pseudorep', 'not independent', 'spatial(ly)? autocorrel', 'one (lesion|section|slide|tissue)', 'single (lesion|section|slide|tissue)', 'n ?= ?1', 'exploratory']
+  - id: isotope_peaks
+    kind: adduct_or_isotope
+    detect:
+      keywords: ['isotop', 'M\+1', 'M\+2', '13C', '\+ ?1\.00']
+      finding: ['isotop']
+    fell_in:
+      - answer_numbers: [[282.22, 282.28], [328.21, 328.27], [436.23, 436.29]]
+        answer_lacks: ['isotop', 'M\+1', '13C']
+  - id: ubiquitous_lipid_normalization
+    kind: normalization_artifact
+    detect:
+      keywords: ['normaliz.{0,80}(depend|affect|change|differ|sensitiv)', '(TIC|RMS).{0,60}(vs|versus|compar)']
+      question: [norm]
+      sensitivity: [norm]
+    fell_in:
+      - answer_matches: ['PC 34:1.{0,80}(higher|elevated|increas|enriched)']
+        answer_lacks: ['normaliz']
+human_decisions: [replicate, norm]
+agent_decisions: [snr, max_peaks, reduce, tic_max_amp]

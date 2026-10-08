@@ -1,0 +1,1327 @@
+adapter:
+  name: smile-msi
+  title: SMILE MSI
+  version: 0.1.0
+  description: MALDI mass spectrometry imaging of lipids. The agent uses the SMILE MSI engine through its MCP server. Each
+    step has a route in the SMILE MSI program.
+program:
+  name: SMILE MSI
+  version: 2.0.0
+  tested_versions:
+    - 2.0.0
+connection:
+  kind: mcp
+  transport: stdio
+  command:
+    - "{program_path}"
+    - "{adapter_dir}/wrapper.py"
+  state_tool: state
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+locate:
+  env: SMILE_MSI_PYTHON
+  paths:
+    - ~/Code/SMILE-MSI/.venv/bin/python
+    - ~/code/SMILE-MSI/.venv/bin/python
+    - ~/Code/SMILE-MSI/.venv/Scripts/python.exe
+  version_command:
+    - "{program_path}"
+    - -c
+    - import smile_msi; print(smile_msi.__version__)
+module: adapter.ts
+decisions:
+  - key: replicate
+    label: Unit of replication
+    kind: choice
+    default: pixels (exploratory)
+    choices: [ pixels (exploratory), regions / sections, animals / patients ]
+    owner: human
+    group: Study
+    essential: true
+    stage: setup
+    help: One independent observation. If you choose pixels, the p-values describe pixels and not biology. Treat the results
+      as exploratory.
+  - key: max_q
+    label: False-discovery threshold (q)
+    kind: float
+    default: 0.05
+    lo: 0.001
+    hi: 0.25
+    owner: human
+    group: Study
+    essential: true
+    stage: setup
+    links: [ { tool: run_analysis, arg: params.max_q } ]
+    help: The Benjamini-Hochberg q that a feature must pass to count as significant.
+  - key: min_auc
+    label: Minimum effect (AUC)
+    kind: float
+    default: 0.7
+    lo: 0.5
+    hi: 1
+    owner: human
+    group: Study
+    essential: true
+    stage: setup
+    links: [ { tool: run_analysis, arg: params.min_auc } ]
+    help: The smallest separation to report. 0.5 means no separation. 1 means perfect separation.
+  - key: mode
+    label: Polarity
+    kind: choice
+    default: negative
+    choices: [ negative, positive ]
+    group: Acquisition
+    owner: human
+    essential: true
+    stage: setup
+    links: [ { tool: annotate, arg: mode } ]
+    help: The ionization polarity of the instrument. It sets the adduct set for lipid identification.
+  - key: ppm
+    label: Extraction tolerance (ppm)
+    kind: float
+    default: 10
+    lo: 1
+    hi: 200
+    group: Acquisition
+    owner: human
+    essential: true
+    stage: setup
+    links: [ { tool: run_analysis, arg: params.tol_ppm }, { tool: open_slide, arg: ppm }, { tool: apply_settings, arg: ppm } ]
+    help: The m/z window that extracts ion images, the feature matrix and the spatial statistics.
+  - key: id_ppm
+    label: Identification tolerance (ppm)
+    kind: float
+    default: 5
+    lo: 1
+    hi: 30
+    group: Acquisition
+    owner: human
+    essential: true
+    stage: setup
+    links: [ { tool: annotate, arg: match_ppm } ]
+    help: The mass-accuracy window for lipid identification. Use a window that is tighter than the extraction window.
+  - key: norm
+    label: Normalization
+    kind: choice
+    default: tic
+    choices: [ tic, none, rms ]
+    group: Ion image
+    owner: human
+    essential: true
+    stage: setup
+    links: [ { tool: run_analysis, arg: params.norm }, { tool: open_slide, arg: norm }, { tool: apply_settings, arg: norm } ]
+    help: The per-pixel normalization for ion images and analyses. This choice can create or remove a difference between
+      groups.
+    sensitivity:
+      tool: run_analysis
+      args:
+        step_id: discriminating_features
+      options: [ tic, rms, none ]
+      compare: [ n_rows, n_q_pass, n_q_auc_pass ]
+      max_runs: 3
+  - key: reduce
+    label: Reduce (m/z window)
+    kind: choice
+    default: sum
+    choices: [ sum, max, mean ]
+    group: Ion image
+    owner: agent
+    essential: false
+    stage: setup
+    links: [ { tool: open_slide, arg: reduce }, { tool: apply_settings, arg: reduce } ]
+    help: How the intensities inside the m/z window become one value.
+  - key: tic_max_amp
+    label: TIC amplification cap (×)
+    kind: float
+    default: 3
+    lo: 1
+    hi: 50
+    group: Ion image
+    owner: agent
+    essential: false
+    stage: setup
+    links: [ { tool: open_slide, arg: tic_max_amp }, { tool: apply_settings, arg: tic_max_amp } ]
+    help: The limit on the per-pixel TIC amplification. It stops faint pixels from making false hotspots.
+  - key: snr
+    label: Min S/N
+    kind: float
+    default: 3
+    lo: 1
+    hi: 50
+    group: Peak picking
+    owner: agent
+    essential: true
+    stage: setup
+    links: [ { tool: find_peaks, arg: snr } ]
+    help: The signal-to-noise ratio that a peak must reach.
+  - key: prominence
+    label: Min prominence (S/N)
+    kind: float
+    default: 1
+    lo: 0
+    hi: 20
+    group: Peak picking
+    owner: agent
+    essential: false
+    stage: setup
+    help: The height that a peak must rise above the saddle next to it. 0 keeps every local maximum. The find_peaks tool
+      uses 1.0 and does not take this argument.
+  - key: max_peaks
+    label: Max peaks (0 = no limit)
+    kind: int
+    default: 0
+    lo: 0
+    hi: 200000
+    group: Peak picking
+    owner: agent
+    essential: false
+    stage: setup
+    links: [ { tool: find_peaks, arg: max_peaks } ]
+    help: The most peaks to keep, strongest first. 0 keeps all peaks. A cap makes two regions show the same count.
+  - key: segment_default_count
+    label: Default segment count
+    kind: int
+    default: 8
+    lo: 2
+    hi: 64
+    group: Segmentation
+    owner: agent
+    essential: false
+    stage: setup
+    changes_conclusion: false
+    help: The number of segments for the first segmentation of a slide.
+  - key: spatial_min_morans
+    label: Min Moran's I
+    kind: float
+    default: 0.05
+    lo: -1
+    hi: 1
+    group: Spatial finder
+    owner: agent
+    essential: false
+    stage: setup
+    links: [ { tool: find_peaks, arg: min_morans } ]
+    help: The Moran's I floor for the spatial feature finder. It removes spatially random noise.
+  - key: spatial_max_candidates
+    label: Max candidates (0 = no limit)
+    kind: int
+    default: 2000
+    lo: 0
+    hi: 200000
+    group: Spatial finder
+    owner: agent
+    essential: false
+    stage: setup
+    changes_conclusion: false
+    links: [ { tool: find_peaks, arg: max_candidates } ]
+    help: The number of peaks that enter the spatial gates, strongest first. Each peak costs one Moran's I run.
+map:
+  - tool: list_slides
+    route: File > Open analysis... shows the saved slides.
+    fidelity: code_only
+    difference: The tool only reads information. No result to repeat.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: Read-only tool.
+    summary: Listed {n_rows} slides.
+  - tool: slide_state
+    route: No step. The Analyses... tab (File menu) shows the runs on a slide.
+    fidelity: code_only
+    difference: The tool only reads information. No result to repeat.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: Read-only tool.
+  - tool: analysis_catalog
+    route: No step. The Analyze tab shows the same list of analyses.
+    fidelity: code_only
+    difference: The tool only reads information. No result to repeat.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: Read-only tool.
+  - tool: scripting_guide
+    route: No step. Data > Analysis script... shows the same reference.
+    fidelity: code_only
+    difference: The tool only reads information. No result to repeat.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: Read-only tool.
+  - tool: run_result
+    route: File > Analyses... > History > open the run.
+    fidelity: code_only
+    difference: The tool only reads information. No result to repeat.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: Read-only tool.
+  - tool: state
+    route: Read the right panel (Display, Regions, Features) and Data > Acquisition & matching...
+    fidelity: close
+    difference: The tool returns one summary. The program shows the same values in several places.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: Reads the same slide object that the program uses.
+    summary: Read the state of the open slide.
+  - tool: open_slide
+    match: { ref: demo }
+    route: File > Load demo dataset
+    steps:
+      - Open the File menu.
+      - Click Load demo dataset.
+    fidelity: exact
+    difference: The program also finds peaks at once after it loads the demo. The tool does not.
+    evidence:
+      source: program_definitions
+      test: demo-opens
+      note: headless.open_demo and the demo loader use demo.make_synthetic.
+    summary: "Opened the demo slide: {metrics.n_pixels} pixels."
+    params:
+      - {
+          arg: ppm,
+          label: Extraction tolerance (ppm),
+          ui_default: 10,
+          note: The demo session sets 20. Data > Acquisition & matching...
+        }
+      - { arg: norm, label: Normalization, ui_default: tic, note: Display panel. }
+      - { arg: reduce, label: Reduce (m/z window), ui_default: sum }
+  - tool: open_slide
+    route: File > Open imzML... and choose the file
+    steps:
+      - Open the File menu.
+      - Click Open imzML... and choose the file.
+      - Or click Open analysis... and choose a session file.
+    fidelity: close
+    difference: The tool restores the saved preprocessing and regions from the session, like the program does.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: Not tested with real data.
+    summary: "Opened {ref}: {metrics.n_pixels} pixels."
+    params:
+      - { arg: stride, label: Subsample, ui_default: 1 }
+  - tool: apply_settings
+    route: Data > Acquisition & matching... and the Display panel
+    steps:
+      - Open Data > Acquisition & matching... and set Extraction tolerance (ppm) and Reduce (m/z window).
+      - In the Display panel, set Normalization.
+      - "For the TIC amplification cap: Data > Analysis profiles..., edit TIC amplification cap (x), then press Apply to
+        current sample."
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: settings-apply
+      note: Ports setup.apply_to_slide. The program sets the same slide fields.
+    summary: "Changed settings: {data.changed}."
+    params:
+      - { arg: ppm, label: Extraction tolerance (ppm), ui_default: 10 }
+      - { arg: norm, label: Normalization, ui_default: tic }
+      - { arg: reduce, label: Reduce (m/z window), ui_default: sum }
+      - { arg: tic_max_amp, label: TIC amplification cap (x), ui_default: 3 }
+  - tool: find_peaks
+    match: { spatial: true }
+    route: Analyze > This slide > Peaks > Find spatial features
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Peaks, click Find spatial features.
+      - Open Settings and set the fields.
+      - Press Run.
+    fidelity: exact
+    difference: The tool sets Min rel. intensity and Min pixel frequency to 0. The dialog defaults are 0.002 and 0.01. Set
+      both fields to 0 to get the same peaks.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+    summary: Found {metrics.n_features} spatial features.
+    params:
+      - { arg: snr, label: Signal-to-noise, ui_default: 3 }
+      - { arg: min_rel_intensity, label: Min rel. intensity, ui_default: 0.002, note: Not a tool argument. The tool uses 0. }
+      - { arg: min_frequency, label: Min pixel frequency, ui_default: 0.01, note: Not a tool argument. The tool uses 0. }
+      - { arg: min_morans, label: Min Moran's I, ui_default: 0.05 }
+      - { arg: max_candidates, label: Max candidates (0 = no limit), ui_default: 2000 }
+  - tool: find_peaks
+    route: Analyze > This slide > Peaks > Find peaks
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Peaks, click Find peaks.
+      - Open Settings and set the fields.
+      - Press Run.
+    fidelity: exact
+    difference: The tool sets Min rel. intensity to 0. The dialog default is 0.002. Set the field to 0 to get the same peaks.
+    evidence:
+      source: program_definitions
+      test: demo-planted-lipids
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+    summary: Found {metrics.n_features} peaks.
+    params:
+      - { arg: snr, label: Signal-to-noise, ui_default: 3 }
+      - { arg: min_rel_intensity, label: Min rel. intensity, ui_default: 0.002, note: Not a tool argument. The tool uses 0. }
+      - { arg: prominence, label: Prominence, ui_default: 1, note: Not a tool argument. The tool uses 1.0. }
+      - { arg: max_peaks, label: Max peaks (0 = no limit), ui_default: 0 }
+  - tool: annotate
+    route: Analyze > This slide > Annotation > Annotate lipids
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Annotation, click Annotate lipids.
+      - Open Settings and set Adduct mode and Match tol (ppm).
+      - Press Run.
+    fidelity: exact
+    difference: The tool default for Match tol (ppm) is 5. The dialog default is 10.
+    evidence:
+      source: program_definitions
+      test: demo-planted-lipids
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+    summary: Matched {metrics.n_matched} of {metrics.n_rows} features to a lipid.
+    params:
+      - { arg: mode, label: Adduct mode, ui_default: negative }
+      - { arg: match_ppm, label: Match tol (ppm), ui_default: 10, note: The tool default is 5.0. }
+  - tool: run_script
+    route: Data > Analysis script...
+    steps:
+      - Open Data > Analysis script...
+      - Paste the code.
+      - Press Run.
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The tool and the console both call scripting.run_script.
+    summary: Ran a script.
+    params:
+      - { arg: code, label: Script editor }
+  - tool: send_regions
+    route: Draw each region in the Regions panel and set its group
+    fidelity: close
+    difference: The tool puts the regions in an inbox. The program adds them within a few seconds.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: regioninbox.post_regions.
+  - tool: ion_image
+    route: "Ion image tab: click the m/z in the peak table"
+    steps:
+      - Open the Ion image tab.
+      - Click the m/z in the peak table, or enter it.
+      - Set the colormap on the toolbar and Normalization in the Display panel.
+    fidelity: close
+    difference: The tool also saves a PNG and reports the statistics over all pixels, including the background.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: ""
+    summary: Made the ion image of m/z {mz}.
+  - tool: mean_spectrum
+    route: "Ion image tab: the spectrum plot"
+    fidelity: close
+    difference: The tool lists the strongest local maxima. The plot shows the whole spectrum.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: ""
+  - tool: export_feature_table
+    route: File > Export... (Export hub) > feature table
+    fidelity: close
+    difference: The tool joins the saved runs to the feature list by m/z.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: ""
+  - tool: close_slide
+    route: Open another slide
+    fidelity: code_only
+    difference: No result to repeat.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: Read-only tool.
+  - tool: list_user_tools
+    route: No manual route. User tools and flows exist only in the agent and the MCP interface.
+    fidelity: code_only
+    difference: The code of a user tool runs in Data > Analysis script... if you paste it.
+    evidence:
+      source: code
+      test: ""
+      note: ""
+  - tool: run_user_tool
+    route: No manual route. User tools and flows exist only in the agent and the MCP interface.
+    fidelity: code_only
+    difference: The code of a user tool runs in Data > Analysis script... if you paste it.
+    evidence:
+      source: code
+      test: ""
+      note: ""
+  - tool: get_tool_code
+    route: No manual route. User tools and flows exist only in the agent and the MCP interface.
+    fidelity: code_only
+    difference: The code of a user tool runs in Data > Analysis script... if you paste it.
+    evidence:
+      source: code
+      test: ""
+      note: ""
+  - tool: save_flow
+    route: No manual route. User tools and flows exist only in the agent and the MCP interface.
+    fidelity: code_only
+    difference: The code of a user tool runs in Data > Analysis script... if you paste it.
+    evidence:
+      source: code
+      test: ""
+      note: ""
+  - tool: list_flows
+    route: No manual route. User tools and flows exist only in the agent and the MCP interface.
+    fidelity: code_only
+    difference: The code of a user tool runs in Data > Analysis script... if you paste it.
+    evidence:
+      source: code
+      test: ""
+      note: ""
+  - tool: run_flow
+    route: No manual route. User tools and flows exist only in the agent and the MCP interface.
+    fidelity: code_only
+    difference: The code of a user tool runs in Data > Analysis script... if you paste it.
+    evidence:
+      source: code
+      test: ""
+      note: ""
+  - tool: create_tool
+    route: No manual route. User tools and flows exist only in the agent and the MCP interface.
+    fidelity: code_only
+    difference: The code of a user tool runs in Data > Analysis script... if you paste it.
+    evidence:
+      source: code
+      test: ""
+      note: ""
+  - tool: edit_tool
+    route: No manual route. User tools and flows exist only in the agent and the MCP interface.
+    fidelity: code_only
+    difference: The code of a user tool runs in Data > Analysis script... if you paste it.
+    evidence:
+      source: code
+      test: ""
+      note: ""
+  - tool: delete_tool
+    route: No manual route. User tools and flows exist only in the agent and the MCP interface.
+    fidelity: code_only
+    difference: The code of a user tool runs in Data > Analysis script... if you paste it.
+    evidence:
+      source: code
+      test: ""
+      note: ""
+  - tool: run_analysis
+    match: { step_id: find_peaks }
+    route: Analyze > This slide > Peaks > Find peaks
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Peaks, click Find peaks.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: mask, label: Run on ROIs..., note: Empty means the whole slide. }
+      - { arg: params.snr, label: Signal-to-noise, ui_default: 3 }
+      - { arg: params.min_rel_intensity, label: Min rel. intensity, ui_default: 0.002 }
+      - { arg: params.prominence, label: Prominence, ui_default: 1 }
+      - { arg: params.max_peaks, label: Max peaks (0 = no limit), ui_default: 0 }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: find_spatial_features }
+    route: Analyze > This slide > Peaks > Find spatial features
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Peaks, click Find spatial features.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: mask, label: Run on ROIs..., note: Empty means the whole slide. }
+      - { arg: params.snr, label: Signal-to-noise, ui_default: 3 }
+      - { arg: params.min_rel_intensity, label: Min rel. intensity, ui_default: 0.002 }
+      - { arg: params.min_frequency, label: Min pixel frequency, ui_default: 0.01 }
+      - { arg: params.min_morans, label: Min Moran's I, ui_default: 0.05 }
+      - { arg: params.max_candidates, label: Max candidates (0 = no limit), ui_default: 2000 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 10,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: roi_comparison }
+    route: Analyze > This slide > Statistics > Region comparison (A vs B)
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click Region comparison (A vs B).
+      - Set Compare A and vs B.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: a, label: Compare A, note: The default is the first group. }
+      - { arg: b, label: vs B, note: The default is the second group. }
+      - { arg: params.method, label: Statistical test, ui_default: mwu }
+      - { arg: params.save_lists, label: Save distinguishing ions as ★ lists, ui_default: true }
+      - { arg: params.max_q, label: Max q-value (for saved lists), ui_default: 0.05 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 10,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: demo-rim-vs-core
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+    summary: Found {metrics.n_q_pass} features different between {a} and {b}.
+  - tool: run_analysis
+    match: { step_id: region_comparison }
+    route: Analyze > This slide > Statistics > Region spectra (A vs B overlay)
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click Region spectra (A vs B overlay).
+      - Set Compare A and vs B.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: a, label: Compare A, note: The default is the first group. }
+      - { arg: b, label: vs B, note: The default is the second group. }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: discriminating_features }
+    route: Analyze > This slide > Statistics > Discriminating features (per group)
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click Discriminating features (per group).
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: groups, label: Choose groups..., note: The default is every group. }
+      - { arg: params.enriched_only, label: Enriched markers only, ui_default: true }
+      - { arg: params.min_auc, label: Min AUC, ui_default: 0.5 }
+      - { arg: params.max_q, label: Max q-value, ui_default: 0.05 }
+      - { arg: params.top_n, label: Candidates / group, ui_default: 50 }
+      - { arg: params.save_lists, label: Save per-group ★ marker lists, ui_default: false }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: demo-rim-vs-core
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+    summary: Kept {metrics.n_rows} marker features.
+  - tool: run_analysis
+    match: { step_id: multigroup_features }
+    route: Analyze > This slide > Statistics > Multi-group features
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click Multi-group features.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: groups, label: Choose groups..., note: The default is every group. }
+      - { arg: params.method, label: Statistical test, ui_default: kruskal }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: class_comparison }
+    route: Analyze > This slide > Statistics > Lipid class comparison (A vs B)
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click Lipid class comparison (A vs B).
+      - Set Compare A and vs B.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: a, label: Compare A, note: The default is the first group. }
+      - { arg: b, label: vs B, note: The default is the second group. }
+      - { arg: params.method, label: Statistical test, ui_default: mwu }
+      - { arg: params.mode, label: Adduct mode, ui_default: negative }
+      - { arg: params.id_ppm, label: Identification tol (ppm), ui_default: 5 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 10,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+    summary: "Compared lipid classes: {metrics.n_rows} classes."
+  - tool: run_analysis
+    match: { step_id: class_composition }
+    route: Analyze > This slide > Statistics > Lipid class composition (A vs B)
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click Lipid class composition (A vs B).
+      - Set Compare A and vs B.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: a, label: Compare A, note: The default is the first group. }
+      - { arg: b, label: vs B, note: The default is the second group. }
+      - { arg: params.mode, label: Adduct mode, ui_default: negative }
+      - { arg: params.id_ppm, label: Identification tol (ppm), ui_default: 5 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 10,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: marker_panel }
+    route: Analyze > This slide > Statistics > Region marker panel
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click Region marker panel.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: params.direction, label: Keep ions, ui_default: either side }
+      - { arg: params.threshold, label: AUC cutoff, ui_default: 0.6 }
+      - { arg: params.max_q, label: Max q-value, ui_default: 0.05 }
+      - { arg: params.subtract_a_from_b, label: Exclude A's pixels from B, ui_default: false }
+      - { arg: params.save_each, label: Also save each pair's own ★ list, ui_default: false }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 10,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: shrunken_centroids }
+    route: Analyze > This slide > Statistics > Markers (shrunken centroids)
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click Markers (shrunken centroids).
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: groups, label: Choose groups..., note: The default is every group. }
+      - { arg: params.shrink, label: Shrinkage, ui_default: 2 }
+      - { arg: params.top_n, label: Top markers / group, ui_default: 15 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: roi_localization }
+    route: Analyze > This slide > Statistics > ROI localization
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click ROI localization.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: groups, label: Choose groups..., note: The default is every group. }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: region_membership }
+    route: Analyze > This slide > Statistics > Distinct & shared ions (Venn)
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Statistics, click Distinct & shared ions (Venn).
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: groups, label: Choose groups..., note: The default is every group. }
+      - { arg: params.min_prevalence, label: Min prevalence, ui_default: 0.5 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: auto_segment }
+    route: "Segmentation tab: Segmentation"
+    steps:
+      - Open the Segmentation tab.
+      - Set the fields and run it.
+    params:
+      - { arg: mask, label: Run on ROIs..., note: Empty means the whole slide. }
+      - { arg: params.n_clusters, label: Clusters (0 = auto), ui_default: 0 }
+      - { arg: params.spatial, label: Spatially-aware, ui_default: true }
+      - { arg: params.spatial_sigma, label: Smoothing radius (px), ui_default: 1 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: close
+    difference: This step runs from its own tab, not from the generic dialog. The tab calls the same engine; the inputs were
+      not compared.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+    summary: Segmentation finished.
+  - tool: run_analysis
+    match: { step_id: colocalize }
+    route: Analyze > This slide > Co-localization > Co-localization with ion
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Co-localization, click Co-localization with ion.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: mask, label: Run on ROIs..., note: Empty means the whole slide. }
+      - { arg: params.target_mz, label: Target m/z, ui_default: null }
+      - { arg: params.method, label: Similarity, ui_default: pearson }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: coloc_modules }
+    route: Analyze > This slide > Co-localization > Co-localization modules
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Co-localization, click Co-localization modules.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: mask, label: Run on ROIs..., note: Empty means the whole slide. }
+      - { arg: params.n_modules, label: Modules (0 = auto), ui_default: 0 }
+      - { arg: params.threshold, label: Merge threshold, ui_default: 0.5 }
+      - { arg: params.method, label: Similarity, ui_default: pearson }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: region_correlation }
+    route: Analyze > This slide > Co-localization > Region correlation & match
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Co-localization, click Region correlation & match.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: params.method, label: Measure, ui_default: pearson }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: pca }
+    route: Analyze > This slide > Multivariate > PCA images
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Multivariate, click PCA images.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: mask, label: Run on ROIs..., note: Empty means the whole slide. }
+      - { arg: params.n_components, label: Components, ui_default: 5 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: nmf }
+    route: Analyze > This slide > Multivariate > NMF images
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Multivariate, click NMF images.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: mask, label: Run on ROIs..., note: Empty means the whole slide. }
+      - { arg: params.n_components, label: Components, ui_default: 5 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: plsda }
+    route: Analyze > This slide > Multivariate > PLS-DA / OPLS-DA
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Multivariate, click PLS-DA / OPLS-DA.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: groups, label: Choose groups..., note: The default is every group. }
+      - { arg: params.n_components, label: Latent components, ui_default: 2 }
+      - { arg: params.orthogonal, label: OPLS-DA (binary), ui_default: false }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: classify_cv }
+    route: Analyze > This slide > Multivariate > Classifier cross-validation
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Multivariate, click Classifier cross-validation.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: groups, label: Choose groups..., note: The default is every group. }
+      - { arg: params.n_components, label: Latent components, ui_default: 2 }
+      - { arg: params.orthogonal, label: OPLS-DA (binary), ui_default: false }
+      - { arg: params.n_folds, label: Folds (stratified fallback), ui_default: 5 }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: embedding }
+    route: Analyze > This slide > Multivariate > 2-D embedding (UMAP/t-SNE)
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Multivariate, click 2-D embedding (UMAP/t-SNE).
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: params.method, label: Method, ui_default: umap }
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          ui_default: 50,
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    match: { step_id: annotate }
+    route: Analyze > This slide > Annotation > Annotate lipids
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Under Annotation, click Annotate lipids.
+      - Open Settings and set the fields.
+      - Press Run.
+    params:
+      - { arg: params.mode, label: Adduct mode, ui_default: negative }
+      - { arg: params.match_ppm, label: Match tol (ppm), ui_default: 10 }
+      - { arg: params.image_ppm, label: Image tol (ppm), ui_default: 10 }
+      - { arg: params.database, label: Database, ui_default: lipids }
+      - { arg: params.species, label: Species (glycans), ui_default: human }
+      - { arg: params.derivatization, label: Sialic-acid chemistry, ui_default: native }
+      - { arg: params.reducing_end, label: Reducing end (glycans), ui_default: free }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          ui_default: tic,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+    fidelity: exact
+    difference: ""
+    evidence:
+      source: program_definitions
+      test: ""
+      note: The dialog and the tool both call StepDef.run. Not yet compared by running the dialog.
+  - tool: run_analysis
+    route: Analyze > This slide > the category of the step > the step
+    steps:
+      - Open the Analyze tab and choose This slide.
+      - Click the card of the step.
+      - Set Compare, Settings and Run on ROIs.
+      - Press Run.
+    fidelity: close
+    difference: No map entry for this step. Check the route in the Analyze tab.
+    evidence:
+      source: unverified
+      test: ""
+      note: Generic entry.
+    params:
+      - {
+          arg: params.tol_ppm,
+          label: Extraction tol (ppm),
+          note: The tool uses the ppm setting of the slide. The dialog starts at this value.
+        }
+      - {
+          arg: params.norm,
+          label: Normalization,
+          note: The tool uses the normalization setting of the slide. The dialog starts at this value.
+        }
+checks:
+  - id: pixel_replication
+    severity: error
+    description: A test over pixels is presented as a test over replicates.
+  - id: failed_result_ignored
+    severity: error
+    description: A tool failed and the text after it never mentions the failure.
+  - id: putative_identity_stated_as_fact
+    severity: warning
+    description: A lipid is named without the words putative, sum composition or MS/MS.
+  - id: p_value_without_effect_size
+    severity: warning
+    description: The text gives a p-value or q-value with no effect size next to it.
+  - id: artefacts_not_addressed
+    severity: warning
+    description: The results show isotopes or off-tissue background and the answer does not mention them.
+  - id: no_question
+    severity: info
+    description: The setup has no study question.
+tests:
+  - id: demo-opens
+    description: The demo slide opens with two groups of 792 pixels.
+    calls:
+      - tool: open_slide
+        args:
+          ref: demo
+    expect:
+      - { path: metrics.n_pixels, equals: 1584 }
+      - { path: data.groups.Group A, equals: 792 }
+      - { path: data.settings.ppm, approx: 20 }
+      - { path: summary, contains: Opened demo }
+  - id: settings-apply
+    description: apply_settings changes the slide and reports was and now.
+    calls:
+      - tool: open_slide
+        args:
+          ref: demo
+      - tool: apply_settings
+        args:
+          ppm: 10
+          norm: rms
+    expect:
+      - { path: data.was.ppm, approx: 20 }
+      - { path: data.now.ppm, approx: 10 }
+      - { path: data.now.norm, equals: rms }
+      - { path: data.changed, contains: norm }
+  - id: demo-planted-lipids
+    description: The picker finds the planted peaks. Annotation names the planted lipids.
+    calls:
+      - &a1
+        tool: open_slide
+        args:
+          ref: demo
+      - &a2
+        tool: run_script
+        args:
+          code: |
+            rows, cols = ds._pixel_rows_cols()
+            h, w = ds.height, ds.width
+            e = ((cols - w / 2) / (w * 0.45)) ** 2 + ((rows - h / 2) / (h * 0.45)) ** 2
+            add_region("core", e <= 0.405)
+            add_region("rim", (e <= 1.0) & (e > 0.495))
+      - &a3
+        tool: find_peaks
+        args:
+          max_peaks: 40
+        save_as: peaks
+      - tool: annotate
+        args:
+          mz:
+            - 766.5388
+            - 904.6187
+            - 744.5577
+            - 885.5488
+            - 834.5287
+            - 890.6388
+            - 281.2486
+            - 824.6593
+            - 905.6192
+            - 767.5395
+            - 886.5494
+            - 327.2322
+          match_ppm: 5
+    expect:
+      - { path: saved.peaks.metrics.n_features, equals: 40 }
+      - { path: saved.peaks.metrics.n_detected, equals: 11432 }
+      - { path: metrics.n_matched, equals: 9 }
+      - { path: table.rows, contains: PE 38:4 }
+      - { path: table.rows, contains: Sulfatide 42:2;O3 }
+      - { path: table.rows, contains: FA 22:6 }
+  - id: demo-rim-vs-core
+    description: The rim differs from the core for 30 of the 40 strongest peaks.
+    calls:
+      - *a1
+      - *a2
+      - *a3
+      - tool: run_analysis
+        args:
+          step_id: roi_comparison
+          a: rim
+          b: core
+          params:
+            norm: tic
+        save_as: cmp
+      - tool: run_analysis
+        args:
+          step_id: discriminating_features
+          groups:
+            - rim
+            - core
+          params:
+            norm: tic
+    expect:
+      - { path: saved.cmp.metrics.n_q_pass, equals: 30 }
+      - { path: saved.cmp.metrics.n_rows, equals: 40 }
+      - { path: saved.cmp.summary, contains: Found 30 features different between rim and core }
+      - { path: metrics.n_rows, equals: 30 }
+  - id: demo-norm-none
+    description: Without normalization 29 features pass. This is the check for the norm decision.
+    calls:
+      - *a1
+      - *a2
+      - *a3
+      - tool: run_analysis
+        args:
+          step_id: roi_comparison
+          a: rim
+          b: core
+          params:
+            norm: none
+    expect:
+      - { path: metrics.n_q_pass, equals: 29 }
+data_rules:
+  cloud_visibility: all
+  note: The tools return summaries and tables of at most 12 rows. Full tables stay in the work folder.

@@ -1,0 +1,53 @@
+id: msi-rim-vs-core
+adapter: smile-msi
+title: Demo slide, outer rim against inner core
+prompt: Open the demo slide. Which lipids differ between the outer rim of the tissue and the inner core?
+setup:
+  question: Which lipids differ between the tissue rim and the tissue core?
+answers:
+  decisions:
+    replicate: regions / sections
+    norm: tic
+  default: Use your best judgment.
+decision_args:
+  norm: params.norm
+expected:
+  effects:
+    - description: Sulfatide 42:2;O3 (m/z 904.62) is higher in the rim.
+      keywords: ['sulfatide', 'rim|outer|white']
+    - description: HexCer 42:2;O3 (m/z 824.66) is higher in the rim.
+      keywords: ['HexCer|hexosylceramide|galactosylceramide', 'rim|outer|white']
+    - description: PS 40:6, PE 38:4 or PI 38:4 is higher in the core.
+      keywords: ['PS 40:6|PE 38:4|PI 38:4', 'core|inner|gray|grey']
+    - description: Sulfatide 42:2;O3 is about 7 times higher in the rim (TIC normalized).
+      keywords: ['sulfatide']
+      range: [5, 9]
+traps:
+  - id: pixels_as_replicates
+    kind: pseudoreplication
+    detect:
+      keywords: ['pseudorep', 'not independent', 'spatial(ly)? autocorrel', 'one (section|slide|tissue)', 'single (section|slide|tissue)', 'n ?= ?1', 'exploratory']
+      finding: ['pseudorep', 'replicat']
+      question: [replicate]
+    fell_in:
+      - answer_matches: ['p\s*[<=≤]|q\s*[<=≤]|signific|FDR|AUC']
+        answer_lacks: ['pseudorep', 'not independent', 'spatial(ly)? autocorrel', 'one (section|slide|tissue)', 'single (section|slide|tissue)', 'n ?= ?1', 'exploratory']
+  - id: isotope_peaks
+    kind: adduct_or_isotope
+    detect:
+      keywords: ['isotop', 'M\+1', 'M\+2', '13C', '\+ ?1\.00']
+      finding: ['isotop']
+    fell_in:
+      - answer_numbers: [[905.59, 905.65], [891.61, 891.67], [825.63, 825.70], [767.51, 767.57], [835.50, 835.56], [886.52, 886.58]]
+        answer_lacks: ['isotop', 'M\+1', '13C']
+  - id: ubiquitous_lipid_normalization
+    kind: normalization_artifact
+    detect:
+      keywords: ['normaliz.{0,80}(depend|affect|change|differ|sensitiv)', '(TIC|RMS).{0,60}(vs|versus|compar)']
+      question: [norm]
+      sensitivity: [norm]
+    fell_in:
+      - answer_matches: ['PC 34:1.{0,80}(higher|lower|elevated|decreas|increas|enriched|depleted)']
+        answer_lacks: ['normaliz']
+human_decisions: [replicate, norm]
+agent_decisions: [snr, max_peaks, reduce, tic_max_amp]

@@ -1,0 +1,191 @@
+import type { AnalysisRecord } from "./record.ts";
+import type { Claim } from "./types.ts";
+
+interface Found {
+  start: number;
+  end: number;
+  value: number;
+  step: number;
+  percent: boolean;
+}
+
+interface Span {
+  start: number;
+  end: number;
+  text: string;
+}
+
+const NUMBER =
+  /(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)(?:\s?[eE]([-+−]?\d+)|\s?[x×]\s?10\^?([-+−]?\d+))?(\s?%)?/g;
+
+const MASKS: RegExp[] = [
+  /^[ \t]*(?:[-*•][ \t]+)?\d+[.)](?=\s)/gm,
+  /https?:\/\/\S+/g,
+  /10\.\d{4,9}\/\S+/g,
+  /\bPMID:?\s*\d+/gi,
+  /\bPMC\d+/g,
+  /\[\d+(?:\s*[,–-]\s*\d+)*\]/g,
+  /\b\d{4}-\d{2}-\d{2}\b/g,
+  /\bet al\.?,?\s*\(?(?:19|20)\d\d[a-z]?\)?/g,
+  /\([A-Z][A-Za-z'-]+(?:\s+et al\.?|\s+(?:and|&)\s+[A-Z][A-Za-z'-]+)?,?\s+(?:19|20)\d\d[a-z]?(?:[;,][^)]*)?\)/g,
+];
+
+const CITATION =
+  /10\.\d{4,9}\/\S+|\bPMID\b|\bPMC\d+|\bet al\b|\[\d+(?:\s*[,–-]\s*\d+)*\]|\([A-Z][A-Za-z'-]+,?\s+(?:19|20)\d\d[a-z]?\)/;
+
+const HEDGE =
+  /\b(?:suggest(?:s|ed|ing)?|likely|may|might|could|consistent with|indicat(?:es|ed|ing)|probabl[ye]|possibly|perhaps|appears?|seems?)\b/i;
+
+const LABEL_BEFORE =
+  /\b(?:steps?|figs?\.?|figures?|tables?|sections?|nodes?|panels?|rounds?|stages?|phases?|items?|no\.?|#)\s*$/i;
+
+const THRESHOLD_BEFORE =
+  /(?:\b[pq]\s*(?:<|≤|<=)|\b(?:alpha|threshold|cut-?off|FDR|significance level)\s*(?:of|at|=|<|≤)?|α\s*(?:=|<|≤)?)\s*$/i;
+
+function mask(text: string): string {
+  let out = text;
+  for (const re of MASKS) out = out.replace(re, (m) => " ".repeat(m.length));
+  return out;
+}
+
+export function extractNumbers(text: string): Found[] {
+  const masked = mask(text);
+  const hasCitation = (s: Span) => CITATION.test(s.text);
+  const spans = splitSentences(text);
+  const out: Found[] = [];
+  for (const m of masked.matchAll(NUMBER)) {
+    const start = m.index!;
+    let end = start + m[0].length;
+    const mantissa = m[1].replace(/,/g, "");
+    const dec = mantissa.includes(".") ? mantissa.length - mantissa.indexOf(".") - 1 : 0;
+    const exp = Number((m[2] ?? m[3] ?? "0").replace("−", "-"));
+    let value = Number(mantissa) * 10 ** exp;
+    const step = 10 ** (exp - dec);
+    const percent = Boolean(m[4]);
+    const before = masked.slice(0, start);
+    const sign = before.match(/(^|[\s(=<>≤≥])([-−+])$/);
+    let from = start;
+    if (sign) {
+      from = start - 1;
+      if (sign[2] !== "+") value = -value;
+    }
+    const plain = dec === 0 && m[2] === undefined && m[3] === undefined && !percent;
+    const attached = /^[A-Za-zµ°]/.test(masked.slice(end));
+    if (plain && Math.abs(value) <= 10 && !attached) continue;
+    if (LABEL_BEFORE.test(before)) continue;
+    if (THRESHOLD_BEFORE.test(before)) continue;
+    if (percent && /^\s*(?:confidence|CI\b)/i.test(masked.slice(end))) continue;
+    const sentence = spans.find((s) => start >= s.start && start < s.end);
+    if (plain && value >= 1900 && value <= 2100 && sentence && hasCitation(sentence)) continue;
+    if (percent) end = start + m[0].length;
+    out.push({ start: from, end, value, step, percent });
+  }
+  return out;
+}
+
+export function splitSentences(text: string): Span[] {
+  const out: Span[] = [];
+  const re = /[^\n]+?(?:[.!?](?=\s|$)(?<!\bet al\.)(?<!\bvs\.)(?<!\bFig\.)|(?=\n)|$)/g;
+  for (const m of text.matchAll(re)) {
+    const raw = m[0];
+    const lead = raw.length - raw.trimStart().length;
+    const t = raw.trim();
+    if (!t) continue;
+    out.push({ start: m.index! + lead, end: m.index! + lead + t.length, text: t });
+  }
+  return out;
+}
+
+function near(shown: number, step: number, logged: number): boolean {
+  return Math.abs(shown - logged) <= Math.max(0.005 * Math.abs(logged), step / 2) + 1e-12;
+}
+
+function variants(f: Found): { value: number; step: number }[] {
+  const base = [{ value: f.value, step: f.step }];
+  if (f.percent) base.push({ value: f.value / 100, step: f.step / 100 });
+  return base;
+}
+
+function matchesAny(f: Found, values: number[]): number | undefined {
+  let best: number | undefined;
+  let bestDiff = Infinity;
+  for (const v of variants(f)) {
+    values.forEach((logged, i) => {
+      if (!near(v.value, v.step, logged)) return;
+      const diff = Math.abs(v.value - logged) / (Math.abs(logged) || 1);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = i;
+      }
+    });
+  }
+  return best;
+}
+
+function leaves(x: unknown, out: number[]): void {
+  if (typeof x === "number" && Number.isFinite(x)) out.push(x);
+  else if (typeof x === "string") for (const f of extractNumbers(x)) out.push(f.value);
+  else if (Array.isArray(x)) for (const y of x) leaves(y, out);
+  else if (x && typeof x === "object") for (const y of Object.values(x)) leaves(y, out);
+}
+
+function inputValues(record: AnalysisRecord): number[] {
+  const out: number[] = [];
+  for (const e of record.entries(["user", "setup"])) {
+    if (e.kind === "user") leaves(String(e.data.text ?? ""), out);
+    else leaves(e.data.values, out);
+  }
+  return out;
+}
+
+export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
+  const logged = record.numbers();
+  const loggedValues = logged.map((n) => n.value);
+  const inputs = inputValues(record);
+  const found = extractNumbers(text);
+  const claims: Claim[] = [];
+  for (const s of splitSentences(text)) {
+    const cited = CITATION.test(s.text);
+    const hedged = HEDGE.test(s.text);
+    const own = found.filter((f) => f.start >= s.start && f.start < s.end);
+    const sentenceText = s.text.length > 300 ? s.text.slice(0, 297) + "..." : s.text;
+    const hits = own.map((f) => ({ f, i: matchesAny(f, loggedValues) }));
+    const anyMatched = hits.some((h) => h.i !== undefined);
+    const before = claims.length;
+    for (const { f, i } of hits) {
+      if (i !== undefined) {
+        claims.push({ text: sentenceText, value: f.value, label: "measured", node: logged[i].node });
+        continue;
+      }
+      if (matchesAny(f, inputs) !== undefined) continue;
+      const label = cited ? "literature" : hedged && !anyMatched ? "inferred" : "unsourced";
+      claims.push({ text: sentenceText, value: f.value, label });
+    }
+    if (claims.length === before && (cited || hedged)) {
+      claims.push({ text: sentenceText, value: null, label: cited ? "literature" : "inferred" });
+    }
+  }
+  const last = record.entries(["assistant"]).at(-1);
+  const answerEntry = last && last.data.text === text ? last.id : undefined;
+  const unsourced = claims.filter((c) => c.label === "unsourced").length;
+  record.append("claim_check", { answerEntry, claims, unsourced });
+  return claims;
+}
+
+export function annotate(text: string, claims: Claim[]): string {
+  const bad = claims.filter((c) => c.label === "unsourced" && c.value !== null);
+  if (!bad.length) return text;
+  const taken = new Set<number>();
+  const marks: number[] = [];
+  const found = extractNumbers(text);
+  for (const c of bad) {
+    const i = found.findIndex((f, k) => !taken.has(k) && f.value === c.value && c.text.includes(text.slice(f.start, f.end).trim()));
+    if (i < 0) continue;
+    taken.add(i);
+    marks.push(found[i].end);
+  }
+  let out = text;
+  for (const pos of marks.sort((a, b) => b - a)) out = out.slice(0, pos) + " [no source]" + out.slice(pos);
+  if (!marks.length) return text;
+  return `${out}\n\nNumbers marked [no source] do not match any logged tool result.`;
+}

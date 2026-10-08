@@ -1,0 +1,33 @@
+adapter:
+  name: onboarding
+  title: Onboarding a new program
+  version: 0.1.0
+  description: Finds a program, reads its help and docs, and writes an adapter folder for it.
+  status: draft
+
+program:
+  name: Onboarding tools
+  homepage: ""
+
+connection:
+  kind: mcp
+  transport: stdio
+  command: ["{node}", "{tsx}", "{adapter_dir}/server.ts"]
+  env:
+    GA_DRAFT_DIR: "{env:GA_DRAFT_DIR}"
+  startup_timeout_s: 30
+  call_timeout_s: 180
+
+map:
+  - { tool: probe_program, route: "Run the program name in a terminal with --version", fidelity: code_only }
+  - { tool: read_help, route: "Run the program in a terminal with --help", fidelity: code_only }
+  - { tool: python_api, route: "In Python: import the module and call help()", fidelity: code_only }
+  - { tool: fetch_url, route: "Open the address in a web browser", fidelity: code_only }
+  - { tool: list_files, route: "Open the folder in the file manager", fidelity: code_only }
+  - { tool: read_file, route: "Open the file in a text editor", fidelity: code_only }
+  - { tool: write_adapter_file, route: "Write the file in the draft folder with a text editor", fidelity: code_only }
+  - { tool: check_adapter, route: "Run: ga adapter check <name> --run-tests", fidelity: code_only }
+  - { tool: record_demonstration, route: "Save the scientist's notes as a text file in the draft folder", fidelity: code_only }
+
+data_rules:
+  cloud_visibility: all
