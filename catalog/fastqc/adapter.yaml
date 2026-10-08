@@ -1,7 +1,7 @@
 adapter:
   name: fastqc
   title: FastQC
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Checks the quality of a sequencing read file with FastQC. The tool runs FastQC on one file and
