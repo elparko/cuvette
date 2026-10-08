@@ -277,7 +277,7 @@ describe.skipIf(!live)("live ImageJ", () => {
     const jar = (await locate(adapter.manifest)).path!;
     const route = manualRoute("threshold_and_count", { method: "Default", dark_background: false, rolling_radius: 0, sigma: 0, watershed: false, min_size: 0, max_size: 0, min_circularity: 0, exclude_edges: false })!;
     const lines = route.split("\n").filter((l) => /^ {2}(run|setAutoThreshold)\(/.test(l)).map((l) => l.trim());
-    const macro = [`open("${join(ROOT, "data/blobs.gif")}");`, 'setOption("BlackBackground", false);', ...lines, 'print("manual_count=" + nResults);'].join("\n");
+    const macro = [`open("${join(ROOT, "data/blobs.gif").replace(/\\/g, "/")}");`, 'setOption("BlackBackground", false);', ...lines, 'print("manual_count=" + nResults);'].join("\n");
     const file = join(work, "manual.ijm");
     writeFileSync(file, macro);
     const r = await runProcess(["java", "-Dapple.awt.UIElement=true", "-jar", jar, "-batch", file], { timeoutMs: 60000 });
@@ -356,7 +356,7 @@ describe.skipIf(!live)("live teach review", () => {
     const work = mkdtempSync(join(tmpdir(), "ga-teach-live-"));
     process.env.GA_HOME = join(work, "home");
     const file = join(work, "recording.ijm");
-    const text = readFileSync(join(ROOT, "data/recording-blobs.ijm"), "utf8").replace("/Users/lab/data/blobs.gif", join(ROOT, "data/blobs.gif"));
+    const text = readFileSync(join(ROOT, "data/recording-blobs.ijm"), "utf8").replace("/Users/lab/data/blobs.gif", join(ROOT, "data/blobs.gif").replace(/\\/g, "/"));
     writeFileSync(file, text);
     const jar = (await locate(adapter.manifest)).path!;
     const ran = await runProcess(["java", "-Dapple.awt.UIElement=true", "-jar", jar, "-batch", file], { timeoutMs: 120000 });

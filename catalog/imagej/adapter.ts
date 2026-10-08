@@ -157,7 +157,7 @@ function recorderLines(tool: string, a: Args): string[] {
   switch (tool) {
     case "open_image":
     case "image_info":
-      return [`open("${a.path}");`];
+      return [`open("${String(a.path).replace(/\\/g, "/").replace(/"/g, '\\"')}");`];
     case "set_scale":
       return [`run("Set Scale...", "distance=${num(a.distance_px)} known=${num(a.known_distance)} pixel=1 unit=${a.unit ?? "um"}");`];
     case "subtract_background":

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import type { Hook, Tool } from "../core/types.ts";
@@ -294,7 +294,7 @@ export function loadAdapter(path: string): LoadedAdapter {
     },
     module() {
       if (!manifest.module) return Promise.resolve({});
-      mod ??= import(join(root, manifest.module)).then((m) => (m.default ?? m) as AdapterModule);
+      mod ??= import(pathToFileURL(join(root, manifest.module)).href).then((m) => (m.default ?? m) as AdapterModule);
       return mod;
     },
   };
