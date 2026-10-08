@@ -1,7 +1,7 @@
 adapter:
   name: mne
   title: MNE-Python
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Analyzes EEG and MEG recordings with MNE-Python. Each tool does one MNE step on a raw
@@ -764,6 +764,16 @@ tests:
       - { path: metrics.n_events, equals: 30 }
       - { path: metrics.count_1, equals: 20 }
       - { path: metrics.count_2, equals: 10 }
+
+  - id: synthetic-events-long-pulses-only
+    description: A minimum pulse length of 100 s removes every event. The summary names the count without the limit.
+    data: [data/synthetic_raw.fif]
+    calls:
+      - tool: count_events
+        args: { raw: "{adapter_dir}/data/synthetic_raw.fif", min_duration: 100 }
+    expect:
+      - { path: metrics.n_events, equals: 0 }
+      - { path: metrics.n_events_without_min_duration, equals: 30 }
 
   - id: synthetic-epochs
     description: >

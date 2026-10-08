@@ -184,6 +184,10 @@ def count_events(raw, stim_channel="STI 014", event_id=None, min_duration=0.0):
     metrics = {"n_events": len(events), "n_event_ids": len(ids)}
     metrics.update({"count_%d" % i: c for i, c in zip(ids, counts)})
     summary = "%d events on %s: %s." % (len(events), stim_channel, ", ".join("id %d: %d" % (i, c) for i, c in zip(ids, counts)))
+    if min_duration:
+        all_events = mne.find_events(r, stim_channel=stim_channel, min_duration=0.0, verbose=False)
+        metrics["n_events_without_min_duration"] = len(all_events)
+        summary = summary.replace(": .", ".") + " Only pulses of at least %g s count. Without that limit there are %d events. Use min_duration 0 to count every pulse." % (min_duration, len(all_events))
     return {"ok": True, "summary": summary, "metrics": {k: _num(v) for k, v in metrics.items()}, "table": _preview(frame, csv),
             "outputs": [{"path": csv, "kind": "table", "name": "event_counts.csv"}]}
 
