@@ -52,7 +52,11 @@ describe("transcript", () => {
     await type(h, "y");
     await until(() => h.all().includes("Which AUC cutoff do you want?"));
     await type(h, "1");
-    await until(() => h.all().includes("14 features differ between endo and epi at AUC 0.7.") && h.all().includes("✗ Step 4") && /open with\s+\/open 1/.test(h.all()));
+    try {
+      await until(() => h.all().includes("14 features differ between endo and epi at AUC 0.7.") && h.all().includes("✗ Step 4") && /open with\s+\/open 1/.test(h.all()));
+    } catch (e) {
+      throw new Error(`${(e as Error).message}\n--- last screen text ---\n${h.all().slice(-2500)}`);
+    }
     const text = h.all();
     expect(text).toContain("● Step 1  Loaded 2 samples with 4812 spectra");
     expect(text).toContain("▸ File > Open > endo_epi.imzML · path endo_epi.imzML");
