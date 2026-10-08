@@ -51,6 +51,46 @@ What went wrong:
 - The model repeated plan, list_dir and count_nuclei for about 85 minutes (20 count calls). It gave no final answer. I stopped the process, so there is no final answer text.
 - The tool is not the cause of the low ratio only. On three test images with 1, 5 and 10 cells the same settings give the exact counts (16 of 16). The images with up to 100 cells have many touching nuclei. The ratio falls with the density. A better pipeline (smoothing filter size, minimum distance between maxima, intensity declumping) must be chosen by the scientist and tested. I did not tune it.
 
+## Root cause found (runs 1 to 3)
+
+The runs counted the wrong stain. `paper.md`, `expected.yaml`, the prompt and the adapter skill said that w2 is the nuclei stain. The images show the opposite. The w2 files show large cell bodies that touch and overlap. The w1 files show separate round nuclei. The tool and the pipeline were not the cause.
+
+Evidence (CellProfiler 4.2.8, same 100-image sample, every sixth file, F1, 5,007 true cells, Otsu, no discard):
+
+| Stain | Settings | Objects | Ratio | Mean absolute error |
+| --- | --- | --- | --- | --- |
+| w2 | 30 to 120, Shape, lines Shape | 3037 | 0.607 | 19.7 |
+| w2 | 15 to 120, Shape, lines Shape | 3481 | 0.695 | 15.3 |
+| w1 | 15 to 60, Shape, lines Shape | 4984 | 0.995 | 0.33 |
+| w1 | 20 to 60, Shape, lines Shape | 4980 | 0.995 | 0.31 |
+| w1 | 15 to 60, Shape, lines Intensity (adapter default) | 4706 | 0.940 | 3.01 |
+
+- On w2 the ratio falls with density. By true count below 25, 25 to 49, 50 to 74, 75 and above: 1.00, 0.90, 0.74, 0.59. The mean object diameter is 67 pixels on w2 and 31 pixels on w1.
+- Two fields with 48 and 100 cells: w1 gives 48 and 100 (exact). w2 gives 32 and 46.
+- The published CSV ratio by the same bins (blur 1): 0.93, 0.97, 0.96, 0.90. This matches a count of separate nuclei.
+- No setting on w2 gave a ratio near 0.93. The intensity declumping on w2 and w1 splits cells into too many pieces (ratio 1.56 to 5.4).
+- The BBBC page text says w2 is the nuclei stain. I do not know why the images differ. A person must confirm the channel.
+
+Changes:
+
+- New decision `stain_pattern` (owner human). It sets the `pattern` argument of `count_nuclei` and `run_pipeline`. Help text: look at one image of each stain, nuclei are separate round blobs.
+- New check `stain_not_checked`. Skill texts corrected. Adapter version 0.1.1.
+- New known-answer tests `count_dense_nuclei_stain` (w1, 148 of 148) and `count_dense_cell_body_stain` (w2, ratio 0.527). Files in `catalog/cellprofiler/data/bbbc005_dense/`.
+- `paper.md`, `expected.yaml` and `fetch.sh` name w1 and add `sub_w1/` (the 600 F1 w1 files, extracted from the zip into `/Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/sub_w1/`).
+
+## Runs 4 and 5 (after the fix)
+
+Same command as run 1. The prompt names `sub_w1/BBBC005_v1_images` and the pattern `*_w1.TIF`. The answers file adds `stain_pattern` `*_w1.TIF` and sets diameter 15 to 60 (measured on w1, mean diameter 31 pixels). These values are mine. A person must confirm them. Adapter 0.1.1.
+
+| Run | Session | Best tool call | Final answer | Pass |
+| --- | --- | --- | --- | --- |
+| 4 | `20261008-113342-f041` | 4706 nuclei, ratio 0.940, error 3.01 (same settings as in the table above) | gives no ratio, error or R squared. It says the true counts are missing. It lists discard_border and discard_outside as True. | fail |
+| 5 | `20261008-113342-a90f` | 4696 nuclei, ratio 0.9379, error 3.11, R squared 0.9951 | ratio 0.9379, error 3.11, R squared 0.9951 | ratio pass, error fail |
+
+- Run 5: the ratio 0.9379 is within 0.02 of the published 0.934. The error 3.11 is 0.25 from the published 3.36 (tolerance 0.1), so that item fails. The model also says "the default settings for discarding ... were used". The decisions set both to false, so this statement is wrong.
+- Run 4: the tool result was correct. The model did not read it. The failure is in the model (qwen3:8b), not in the adapter.
+- Both runs ran many comparison calls (declump None, Intensity, threshold methods). Each took about 20 to 25 minutes.
+
 ## Harness notes (not fixed, per rules)
 
 - A linked tool argument that the model gives with another value is not replaced by the decision value. `deviation` is logged only. Small models pass all arguments. Reproduction: run command above with `--adapter catalog/cellprofiler`, then read `deviation` entries in `log.jsonl`.

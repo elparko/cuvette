@@ -3,10 +3,11 @@ adapter_kind: cli
 data:
   - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/BBBC005_v1_images.zip
   - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/sub/BBBC005_v1_images
+  - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/sub_w1/BBBC005_v1_images
   - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/synthetic_2_ground_truth
   - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/BBBC005_results_bray.csv
 decisions:
-  segmentation_channel: w2 (nuclei stain)
+  segmentation_channel: w1 (round separate nuclei; the BBBC page calls w2 the nuclei stain, the images show w2 as cell bodies)
   truth_source: C value in file name
   blur_levels: F1 to F48 for the trend; F1 only for the base accuracy
   threshold_method: not given in sources
@@ -35,7 +36,7 @@ expected:
     value: 3.36
     tolerance: 0.1
     source: computed from BBBC005_results_bray.csv
-  - description: sum of true cell counts over 100 sampled in-focus w2 images (every sixth sorted file name)
+  - description: sum of true cell counts over 100 sampled in-focus images (w1 or w2, same file names) (every sixth sorted file name)
     value: 5007
     tolerance: 0
     source: computed from file names

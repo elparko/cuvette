@@ -1,7 +1,7 @@
 adapter:
   name: cellprofiler
   title: CellProfiler
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Counts and measures nuclei in microscope images with CellProfiler. The adapter writes a
@@ -52,6 +52,22 @@ decisions:
     essential: true
     owner: human
     stage: setup
+
+  - key: stain_pattern
+    label: Which file names show the nuclei?
+    kind: text
+    group: Question
+    help: >
+      A file name pattern with * and ? such as "*_w1.TIF". Some image sets hold one file for each
+      stain. Open one image of each stain before you choose. Nuclei are separate round blobs. A
+      stain that shows large shapes that touch is a cell body or cytoplasm stain, not a nuclei
+      stain. In BBBC005 the w1 files show the nuclei and the w2 files show the cell bodies.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: count_nuclei, arg: pattern }
+      - { tool: run_pipeline, arg: pattern }
 
   - key: replicate
     label: What is the unit of replication?
@@ -300,6 +316,10 @@ checks:
       op: "=="
       value: true
       message: "Objects that touch the image border are discarded. The count is lower than the number of nuclei in the field. Say this, or run again with discard_border false when you compare with known counts."
+  - id: stain_not_checked
+    description: The report does not say which stain was counted or how the scientist knows it shows nuclei.
+    severity: warning
+    text: "The report must give the file name pattern and say how the stain was checked (a look at the image or the mean object diameter). Objects that are much larger than a nucleus, or a count far below the known count, can mean that the stain shows cell bodies."
   - id: diameter_range_fit
     description: The report does not say if the diameter range fits the nuclei.
     severity: warning
@@ -361,6 +381,55 @@ tests:
       - { path: "table.rows[2][1]", equals: 10 }
       - { path: metrics.mean_area, approx: 2705.4, rel: 0.01 }
 
+  - id: count_dense_nuclei_stain
+    description: >
+      Two BBBC005 fields with 48 and 100 cells (file names), nuclei stain w1. Declumping by shape
+      finds exactly the true counts. The true counts come from the C value in the file names.
+    data: [data/bbbc005_dense/SIMCEPImages_A12_C48_F1_s14_w1.TIF, data/bbbc005_dense/SIMCEPImages_A24_C100_F1_s02_w1.TIF]
+    calls:
+      - tool: count_nuclei
+        args:
+          folder: "{adapter_dir}/data/bbbc005_dense"
+          pattern: "*_w1.TIF"
+          truth_regex: "_C(\\d+)_F"
+          diameter_min: 15
+          diameter_max: 60
+          discard_outside: false
+          discard_border: false
+          declump_method: Shape
+          dividing_lines: Shape
+    expect:
+      - { path: metrics.n_images, equals: 2 }
+      - { path: metrics.true_total, equals: 148 }
+      - { path: metrics.n_objects_total, equals: 148 }
+      - { path: metrics.mean_abs_error, approx: 0, abs: 0.001 }
+      - { path: metrics.mean_diameter, approx: 31.2, rel: 0.05 }
+
+  - id: count_dense_cell_body_stain
+    description: >
+      The w2 files of the same two fields show cell bodies that touch and overlap. The same
+      settings find about half of the true counts and objects about twice the nucleus diameter.
+      This is why the scientist must choose the stain. The ratio is a stability number from one
+      run of this tool.
+    data: [data/bbbc005_dense/SIMCEPImages_A12_C48_F1_s14_w2.TIF, data/bbbc005_dense/SIMCEPImages_A24_C100_F1_s02_w2.TIF]
+    calls:
+      - tool: count_nuclei
+        args:
+          folder: "{adapter_dir}/data/bbbc005_dense"
+          pattern: "*_w2.TIF"
+          truth_regex: "_C(\\d+)_F"
+          diameter_min: 15
+          diameter_max: 60
+          discard_outside: false
+          discard_border: false
+          declump_method: Shape
+          dividing_lines: Shape
+    expect:
+      - { path: metrics.n_images, equals: 2 }
+      - { path: metrics.true_total, equals: 148 }
+      - { path: metrics.detected_to_true_ratio, approx: 0.527, abs: 0.05 }
+      - { path: metrics.mean_diameter, approx: 66.9, rel: 0.05 }
+
   - id: pipeline_then_run
     description: >
       Two tools in order. write_pipeline writes the file and run_pipeline runs it on the same
@@ -417,7 +486,7 @@ tools:
     params:
       pipeline: { type: string, description: Full path of the .cppipe file. }
       folder: { type: string, description: "Full path of the folder with the images." }
-      pattern: { type: string, default: "*", description: "File name pattern with * and ? wildcards, such as *_w2.TIF. Not case sensitive." }
+      pattern: { type: string, default: "*", description: "File name pattern with * and ? wildcards, such as *_w1.TIF. Not case sensitive." }
       every_nth: { type: integer, minimum: 1, default: 1, description: "Use every nth file of the sorted list. 1 uses all files." }
       max_images: { type: integer, minimum: 0, default: 0, description: "Use at most this many files. 0 means no limit." }
       truth_regex: { type: string, description: "Optional regular expression with one group that reads the known count from the file name, such as _C(\\d+)_F." }
@@ -437,7 +506,7 @@ tools:
       seconds for each image.
     params:
       folder: { type: string, description: "Full path of the folder with the images." }
-      pattern: { type: string, default: "*", description: "File name pattern with * and ? wildcards, such as *_w2.TIF. Not case sensitive." }
+      pattern: { type: string, default: "*", description: "File name pattern with * and ? wildcards, such as *_w1.TIF. Not case sensitive." }
       every_nth: { type: integer, minimum: 1, default: 1, description: "Use every nth file of the sorted list. 1 uses all files." }
       max_images: { type: integer, minimum: 0, default: 0, description: "Use at most this many files. 0 means no limit." }
       truth_regex: { type: string, description: "Optional regular expression with one group that reads the known count from the file name, such as _C(\\d+)_F." }

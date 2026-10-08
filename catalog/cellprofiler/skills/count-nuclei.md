@@ -7,9 +7,9 @@ description: Steps to count nuclei in a folder of images with CellProfiler and t
 
 Use these steps. Ask the scientist for each decision that the setup lists.
 
-1. Ask for the image folder, the file name pattern and the stain that shows the nuclei. A pattern such as *_w2.TIF picks one stain.
+1. Ask for the image folder and the file name pattern of the nuclei stain (the stain_pattern decision). A pattern such as *_w1.TIF picks one stain. Do not trust a channel name from a description. Open one image of each stain and look at it. Nuclei are separate round blobs.
 2. Start with a small sample. Use every_nth or max_images so that the run has 3 to 10 images. CellProfiler needs about one minute to start. Each image then needs a few seconds.
-3. Run count_nuclei with the default settings on the sample. Read metrics.mean_diameter and metrics.mean_area.
+3. Run count_nuclei with the default settings on the sample. Read metrics.mean_diameter and metrics.mean_area. Objects far larger than a nucleus, or a count far below the known count, can mean that you counted a cell body stain.
 4. Tell the scientist the mean diameter. The default range is 10 to 40 pixels. If the mean diameter is outside that range, ask for a new range. A range of 0.5 to 2 times the mean diameter is a start.
 5. Ask for the threshold method and the declumping method. Show the sensitivity table. Touching nuclei need declumping by Shape or by Intensity. None keeps a clump as one object.
 6. Ask if objects at the border and objects outside the range leave the count.
