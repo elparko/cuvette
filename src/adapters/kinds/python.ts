@@ -5,7 +5,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { Args, OutputFile, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
-import { expand, childEnv, collectOutputs, defTool, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, samePath, tail, type CallDir, type KindContext } from "./common.ts";
+import { expand, childEnv, collectOutputs, defTool, failSummary, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, samePath, tail, type CallDir, type KindContext } from "./common.ts";
 import type { ToolDef } from "../manifest.ts";
 import { blindArgv } from "../blind.ts";
 
@@ -177,7 +177,10 @@ export function startPython(c: KindContext): AdapterRuntime {
       fidelity: f.fidelity ?? entry?.fidelity ?? "exact",
     };
     if (f.error) out.error = f.error;
-    out.summary = entry?.summary || !f.summary ? makeSummary(entry, def.title || def.name, args, { metrics: out.metrics, data: reply.result, table: out.table }) : f.summary;
+    else if (!out.ok) out.error = f.summary ?? "the tool reported a failure";
+    out.summary = !out.ok
+      ? failSummary(def.title || def.name, out.error)
+      : entry?.summary || !f.summary ? makeSummary(entry, def.title || def.name, args, { metrics: out.metrics, data: reply.result, table: out.table }) : f.summary;
     return out;
   };
 

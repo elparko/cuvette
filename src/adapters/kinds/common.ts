@@ -469,6 +469,12 @@ export function fmtNumber(n: number): string {
   return String(Number(n.toPrecision(Math.max(6, Math.floor(Math.log10(Math.abs(n))) + 2))));
 }
 
+export function failSummary(title: string, error?: string): string {
+  const reason = (error ?? "").split("\n").map((l) => l.trim()).find(Boolean) ?? "the tool gave no reason";
+  const short = reason.length > 160 ? `${reason.slice(0, 157).trimEnd()}...` : reason.replace(/[.\s]+$/, "");
+  return `${title} failed: ${short}.`;
+}
+
 export function makeSummary(entry: MapEntry | undefined, title: string, args: Args, extra: { metrics?: Record<string, number>; data?: unknown; table?: TablePreview; summary?: string }): string {
   if (entry?.summary) {
     const scope = { ...args, metrics: extra.metrics ?? {}, data: extra.data, n_rows: extra.table?.n_rows, summary: extra.summary };
@@ -553,7 +559,10 @@ export function buildOutput(a: {
   if (metrics) out.metrics = metrics;
   if (table) out.table = table;
   if (outputs.size) out.outputs = [...outputs.values()];
-  out.summary = entry?.summary ? makeSummary(entry, a.def.title || a.def.name, a.args, { metrics, data: out.data, table, summary: f.summary }) : f.summary ?? makeSummary(entry, a.def.title || a.def.name, a.args, { metrics, data: out.data, table });
+  if (!out.ok && !out.error) out.error = f.summary ?? "the tool reported a failure";
+  out.summary = !out.ok
+    ? failSummary(a.def.title || a.def.name, out.error)
+    : entry?.summary ? makeSummary(entry, a.def.title || a.def.name, a.args, { metrics, data: out.data, table, summary: f.summary }) : f.summary ?? makeSummary(entry, a.def.title || a.def.name, a.args, { metrics, data: out.data, table });
   return out;
 }
 

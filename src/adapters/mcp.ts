@@ -5,7 +5,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import type { LoadedAdapter } from "./manifest.ts";
-import { cap, decorate, expand, inflight, makeRuntime, killWithChildren, makeSummary, outputFile, readFields, safeName, tail, uniqueFile, type KindContext } from "./kinds/common.ts";
+import { cap, decorate, expand, failSummary, inflight, makeRuntime, killWithChildren, makeSummary, outputFile, readFields, safeName, tail, uniqueFile, type KindContext } from "./kinds/common.ts";
 import type { AdapterRuntime } from "./runtime.ts";
 import { blindArgv } from "./blind.ts";
 
@@ -62,7 +62,7 @@ export function convertResult(res: McpResult, tool: string, args: Args, adapter:
   if (f.manualRoute) out.manualRoute = f.manualRoute;
   const fidelity = f.fidelity ?? entry?.fidelity;
   if (fidelity) out.fidelity = fidelity;
-  out.summary = f.summary ?? makeSummary(entry, tool, args, { metrics: f.metrics, data, table: f.table });
+  out.summary = !out.ok ? failSummary(tool, out.error) : f.summary ?? makeSummary(entry, tool, args, { metrics: f.metrics, data, table: f.table });
   return out;
 }
 

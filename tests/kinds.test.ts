@@ -438,3 +438,32 @@ test("fmtNumber keeps integers exact and rounds fractions to 6 significant digit
   expect(fmtNumber(384.478123)).toBe("384.478");
   expect(fmtNumber(1234567.891)).toBe("1234567.9");
 });
+
+test("a failed call gets a failure summary with the short reason, not 'finished'", async () => {
+  const { failSummary } = await import("../src/adapters/kinds/common.ts");
+  expect(failSummary("Compare two groups", "A paired test needs id_column.")).toBe("Compare two groups failed: A paired test needs id_column.");
+  expect(failSummary("T", "\n  first line\nsecond line")).toBe("T failed: first line.");
+  expect(failSummary("T", "x".repeat(300))).toMatch(/^T failed: x{157}\.\.\.\.$/);
+  expect(failSummary("T")).toBe("T failed: the tool gave no reason.");
+
+  const dir = adapter(
+    `${head("python")}tools:
+  - { name: refuse, title: Compare two groups, description: d, function: "m:refuse" }
+  - { name: quiet, description: d, function: "m:quiet" }
+  - { name: fine, title: Fine tool, description: d, function: "m:fine" }
+`,
+    {
+      "m.py": `def refuse(): return {"ok": False, "error": "A paired test needs id_column, the column that names the same subject in both groups."}
+def quiet(): return {"ok": False, "summary": "The fit did not converge"}
+def fine(): return {"ok": True, "metrics": {"n": 3}}
+`,
+    },
+  );
+  const { run } = await start(dir);
+  const r = await run("refuse");
+  expect(r.ok).toBe(false);
+  expect(r.summary).toBe("Compare two groups failed: A paired test needs id_column, the column that names the same subject in both groups.");
+  const q = await run("quiet");
+  expect(q).toMatchObject({ ok: false, error: "The fit did not converge", summary: "quiet failed: The fit did not converge." });
+  expect((await run("fine")).summary).toBe("Fine tool finished. n=3.");
+}, 60000);

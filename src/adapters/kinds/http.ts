@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Args, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
-import { cap, defTool, expand, inflight, lookup, makeRuntime, makeSummary, outputFile, readFields, renderString, scopeFor, type CallDir, type KindContext, type Scope } from "./common.ts";
+import { cap, defTool, expand, failSummary, inflight, lookup, makeRuntime, makeSummary, outputFile, readFields, renderString, scopeFor, type CallDir, type KindContext, type Scope } from "./common.ts";
 
 function renderDeep(v: unknown, s: Scope): unknown {
   if (typeof v === "string") {
@@ -86,7 +86,10 @@ export function startHttp(c: KindContext): AdapterRuntime {
       };
       if (!res.ok) out.error = `HTTP ${res.status}: ${cap(text, 1000)}`;
       else if (f.error) out.error = f.error;
-      out.summary = entry?.summary || !f.summary ? makeSummary(entry, def.title || def.name, args, { metrics: f.metrics, data, table: f.table }) : f.summary;
+      else if (!out.ok) out.error = f.summary ?? "the tool reported a failure";
+      out.summary = !out.ok
+        ? failSummary(def.title || def.name, out.error)
+        : entry?.summary || !f.summary ? makeSummary(entry, def.title || def.name, args, { metrics: f.metrics, data, table: f.table }) : f.summary;
       return out;
     }),
   );
