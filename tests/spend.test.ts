@@ -8,6 +8,7 @@ afterEach(() => {
 
 test("cost uses the model's prices", () => {
   expect(costUsd("claude-opus-5-5", { inputTokens: 1e6, outputTokens: 1e6, cacheRead: 1e6, cacheWrite: 1e6 })).toBeCloseTo(4 + 20 + 0.2 + 5, 6);
+  expect(costUsd("claude-haiku-5-5", { inputTokens: 1e6, outputTokens: 1e6 })).toBeCloseTo(0.6, 6);
   expect(costUsd("unknown-model", { inputTokens: 1e6, outputTokens: 0 })).toBe(10);
 });
 
