@@ -256,6 +256,11 @@ def fit_mixed_model(path, formula, groups, re_formula="1", reml=True, alpha=0.05
     if problem:
         return _fail(problem)
     spec = None if re_formula in ("1", "", None) else re_formula
+    used = [c for c in frame.columns if c != groups and re.search(r"(?<![\w.])%s(?!\w)" % re.escape(str(c)), formula + " " + (spec or ""))] + [groups]
+    missing = [c for c in used if frame[c].isna().any()]
+    before = len(frame)
+    frame = frame.dropna(subset=used)
+    dropped = before - len(frame)
     model = smf.mixedlm(formula, frame, groups=frame[groups], re_formula=spec)
     res = model.fit(reml=reml)
     fe = res.fe_params.index
@@ -263,7 +268,7 @@ def fit_mixed_model(path, formula, groups, re_formula="1", reml=True, alpha=0.05
     table = pd.DataFrame({"term": fe, "coef": res.fe_params.values, "se": res.bse_fe.values, "p": res.pvalues[fe].values,
                           "ci_lo": ci.loc[fe, 0].values, "ci_hi": ci.loc[fe, 1].values})
     cov = np.atleast_2d(res.cov_re)
-    metrics = {"n": res.nobs, "n_groups": len(res.model.group_labels), "residual_variance": res.scale,
+    metrics = {"n": res.nobs, "n_groups": len(res.model.group_labels), "n_dropped": dropped, "residual_variance": res.scale,
                "group_variance": cov[0, 0], "log_likelihood": res.llf, "converged": int(bool(res.converged))}
     if cov.shape[0] > 1:
         metrics["slope_variance"] = cov[1, 1]
@@ -276,7 +281,14 @@ def fit_mixed_model(path, formula, groups, re_formula="1", reml=True, alpha=0.05
     summary = "Mixed model %s, %s by %s, %s. n = %d, %d groups. %s. Group variance %.4g, residual variance %.4g." % (
         formula, random, groups, "REML" if reml else "ML", res.nobs, metrics["n_groups"],
         "; ".join("%s %.4g (se %.4g)" % (r.term, r.coef, r.se) for r in table.itertuples()), cov[0, 0], res.scale)
-    return {"ok": True, "summary": summary, "metrics": _metrics(metrics), "table": _table(table, "mixed_model")}
+    out = {"ok": True, "summary": summary, "metrics": _metrics(metrics), "table": _table(table, "mixed_model")}
+    if dropped:
+        out["summary"] += " Dropped %d of %d rows with a missing value in %s." % (dropped, before, ", ".join(missing))
+        out["manual_route"] = (
+            'df = pandas.read_csv(%r).dropna(subset=%r)  # drops %d rows with a missing value\n'
+            'statsmodels.formula.api.mixedlm(%r, df, groups=df[%r]%s).fit(reml=%s).summary()'
+            % (path, used, dropped, formula, groups, "" if spec is None else ", re_formula=%r" % spec, bool(reml)))
+    return out
 
 
 def _key(term):

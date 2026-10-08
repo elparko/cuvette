@@ -348,7 +348,8 @@ tools:
     title: Fit a linear mixed model
     description: >
       Fit a linear mixed model with random effects for each subject. Reports fixed effects with standard
-      errors and the variance of the random effects.
+      errors and the variance of the random effects. Rows with a missing value in a model column are
+      dropped. The result gives the number (n_dropped).
     function: "ga_biostats:fit_mixed_model"
     params:
       path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
