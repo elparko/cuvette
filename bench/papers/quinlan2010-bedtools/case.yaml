@@ -1,0 +1,76 @@
+kind: tool tutorial or test suite
+short: Quinlan 2010
+field: Genomics and transcriptomics
+program: bedtools (command line), through the bedtools adapter
+citation:
+  authors: Quinlan AR, Hall IM
+  title: "BEDTools: a flexible suite of utilities for comparing genomic features"
+  venue: Bioinformatics 26(6):841-842
+  year: 2010
+  doi: 10.1093/bioinformatics/btq033
+related:
+  - text: The data folder of the bedtools2 source repository. Source of the exon and AluY files.
+    url: https://github.com/arq5x/bedtools2/tree/master/data
+measured: >-
+  The paper describes bedtools, a set of programs that compare sets of genome intervals. The main
+  operations find overlaps between two sets and merge intervals that lie near each other. The paper is a
+  two-page application note and gives no numbers for these files. The benchmark uses two example files from
+  the bedtools repository. One file holds RefSeq exons and the other holds AluY repeats on human chromosome 1.
+instruction: >-
+  I have RefSeq exons and AluY repeats on human chromosome 1, both on genome build hg18. How many exons
+  overlap a repeat, and how many bases overlap in total? Then merge the repeats that lie within 100 bases of
+  each other. How many intervals remain?
+instruction_basis: >-
+  The intersect and merge operations that the paper describes. The question about exons and repeats is a
+  benchmark choice, because the paper has no worked example on these files.
+answers:
+  genome_build:
+    decision: Genome build
+    value: hg18
+    source: Not in the paper. The repository files use hg18 coordinates. Both files must use the same build.
+  min_fraction_a:
+    decision: Minimum overlap as a fraction of the exon
+    value: 0 (any overlap of one base or more)
+    source: Not in the paper. This is the bedtools intersect default.
+  min_fraction_b:
+    decision: Minimum overlap as a fraction of the repeat
+    value: 0 (any overlap of one base or more)
+    source: Not in the paper. This is the bedtools intersect default.
+  reciprocal:
+    decision: Require a reciprocal fraction
+    value: false
+    source: Not in the paper. This is the bedtools intersect default.
+  strand:
+    decision: Strand rule
+    value: any strand
+    source: Not in the paper. This is the bedtools intersect default. Both files have a strand column.
+  merge_distance:
+    decision: Merge distance
+    value: 100 bases
+    source: Not in the paper. The benchmark sets the distance. The bedtools merge default is 0.
+items:
+  exons_with_overlap:
+    source: computed
+    tool: bedtools 2.31.1 intersect -u
+    where: Not in the paper. The paper gives no numbers for these files.
+  overlapping_pairs:
+    source: computed
+    tool: bedtools 2.31.1 intersect -wo
+    where: >-
+      Not in the paper. There are 129 pairs but 126 exons, because one exon can overlap more than one
+      repeat.
+  overlap_bases:
+    source: computed
+    tool: bedtools 2.31.1 intersect -wo, sum of the last column
+    where: Not in the paper. The benchmark authors checked the sum with awk.
+  merged_intervals:
+    source: computed
+    tool: bedtools 2.31.1 merge -d 100 on sorted input
+    where: Not in the paper. The 11628 AluY repeats become 11270 intervals.
+data:
+  source: Files refseq.chr1.exons.bed and aluY.chr1.bed from the bedtools2 source repository
+  url: https://github.com/arq5x/bedtools2/tree/master/data
+  license: >-
+    The bedtools2 repository is under the MIT License. The files are public genome annotation with no
+    personal data.
+  size: 0.6 MB compressed, 3.2 MB as text. 43424 exons and 11628 AluY repeats.

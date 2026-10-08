@@ -1,0 +1,107 @@
+kind: tool tutorial or test suite
+short: Bemis 2015
+field: Mass spectrometry and proteomics
+program: Cardinal (R, Bioconductor), through the cardinal adapter
+citation:
+  authors: Bemis KD, Harry A, Eberlin LS, Ferreira C, van de Ven SM, Mallick P, Stolowitz M, Vitek O
+  title: "Cardinal: an R package for statistical analysis of mass spectrometry-based imaging experiments"
+  venue: Bioinformatics 31(14):2418-2420
+  year: 2015
+  doi: 10.1093/bioinformatics/btv146
+related:
+  - text: "Bemis KA. Segmentation of MS imaging experiments with Cardinal. Vignette of the Bioconductor package CardinalWorkflows 1.44.0. The source of the numbers."
+    url: https://bioconductor.org/packages/release/data/experiment/vignettes/CardinalWorkflows/inst/doc/MSI-segmentation.html
+measured: >-
+  Cardinal is an R package for the statistical analysis of mass spectrometry imaging (MSI). The paper shows an
+  unsupervised segmentation of a pig fetus section, imaged by desorption electrospray ionization (DESI).
+  Spatial shrunken centroids splits the pixels into segments and ranks the ions of each segment. The paper
+  used five adjacent sections and gives no parameter values. The package ships one section, pig206, and its
+  vignette repeats the analysis with stated parameters. The benchmark numbers come from that vignette.
+instruction: >-
+  I have a DESI imaging run of a pig fetus cross-section. Can the tissue regions be found without labels, and
+  which ions distinguish each region? Pick peaks and fit the spatial shrunken centroids models. Tell me how
+  many spectra, m/z values and peaks the data has. Also tell me how many segments each model has, which model
+  you report, and the top ions of the segments.
+instruction_basis: >-
+  The segmentation vignette of CardinalWorkflows 1.44.0, from the peak processing step to the spatial
+  shrunken centroids step. The paper describes the same analysis on its larger data.
+answers:
+  question:
+    decision: Research question
+    value: Can the tissue regions of a whole-animal section be found without labels, and which ions distinguish each region?
+    source: Paper, main text and Figure 1. The paper segments the pig fetus data and lists the peaks of each segment.
+  replicate:
+    decision: Unit of replication
+    value: none; one section, descriptive only
+    source: The data hold one section. Neither the paper nor the vignette tests a difference between groups.
+  normalize:
+    decision: Normalization
+    value: total ion current (TIC)
+    source: Vignette, peak processing step. The paper names TIC as an example method.
+  snr:
+    decision: Signal-to-noise threshold for peak picking
+    value: 3
+    source: Vignette, peak processing step.
+  tolerance:
+    decision: Tolerance to merge peaks
+    value: 0.5 m/z
+    source: Vignette, peak processing step. Peaks closer than this become one peak.
+  sample_size:
+    decision: Fraction of spectra for the reference peaks
+    value: 10%
+    source: Vignette, peak processing step.
+  seed:
+    decision: Random seed
+    value: 1
+    source: Vignette. It sets the seed before the segmentation. A different seed can change the segment numbers.
+  r:
+    decision: Neighborhood radius
+    value: 2 pixels
+    source: Vignette, spatial shrunken centroids step.
+  k:
+    decision: Maximum number of segments
+    value: 8
+    source: Vignette, spatial shrunken centroids step. Empty segments drop out.
+  weights:
+    decision: Spatial weights
+    value: adaptive
+    source: Vignette, spatial shrunken centroids step.
+  sparsity:
+    decision: Sparsity parameter s
+    value: 32
+    source: >-
+      Vignette. It fits s from 2 to 64 and picks s=32, the most sparse model that still keeps the heart.
+  region_labels:
+    decision: Names of the regions
+    value: numbers only, not named
+    source: >-
+      The algorithm gives numbers only. The vignette reads liver, heart and brain from the optical image. The
+      benchmark does not ask for names.
+items:
+  spectra:
+    source: tutorial
+    where: Vignette, data section. The text and the printed object give 4,959 spectra.
+  mz_values:
+    source: tutorial
+    where: >-
+      Vignette, data section. It gives 10,200 m/z values. The paper also gives 10,200 features for its
+      five-section data.
+  peaks:
+    source: tutorial
+    where: >-
+      Vignette, peak processing step, with Cardinal 3.14.0. It gives 687 peaks. The count depends on the random
+      10% sample and on the Cardinal version.
+  segments_s32:
+    source: tutorial
+    where: Vignette, table of the six fitted models. The model with s=32 has 6 segments.
+  segments_s64:
+    source: tutorial
+    where: Vignette, table of the six fitted models. The model with s=64 has 3 segments and loses the heart.
+data:
+  source: Bioconductor package CardinalWorkflows 1.44.0, data set pig206
+  url: https://bioconductor.org/packages/CardinalWorkflows/
+  license: >-
+    Artistic-2.0. Pig tissue, no human data. The package also holds a human data set (rcc) that the benchmark
+    does not use.
+  size: >-
+    7.4 MB file pig206.rda with 4,959 spectra and 10,200 m/z values. The package archive is 56 MB.

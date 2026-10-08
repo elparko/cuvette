@@ -1,0 +1,87 @@
+kind: research paper
+short: Caicedo 2019
+field: Imaging
+program: Cellpose (Python), through the cellpose adapter
+citation:
+  authors: Caicedo JC, Roth J, Goodman A, Becker T, Karhohs KW, Broisin M, Molnar C, McQuin C, et al.
+  title: Evaluation of deep learning strategies for nucleus segmentation in fluorescence images
+  venue: Cytometry Part A 95(9):952-965
+  year: 2019
+  doi: 10.1002/cyto.a.23863
+related:
+  - text: "Broad Bioimage Benchmark Collection, image set BBBC039. The images, the hand masks and the split lists."
+    url: https://bbbc.broadinstitute.org/BBBC039
+measured: >-
+  The paper compares deep learning and classical methods for the segmentation of nuclei in fluorescence
+  images. The authors drew the nuclei by hand in 200 images of U2OS cells stained with Hoechst. They count
+  errors such as missed nuclei and merged nuclei. A predicted nucleus matches a true one if the intersection
+  over union (IoU) is above a threshold. Two CellProfiler pipelines are the classical baselines. The benchmark
+  runs Cellpose, which the paper does not test, so the paper miss rates are a reference only.
+instruction: >-
+  Take the 50 test images of the BBBC039 nucleus set. Segment the nuclei and tell me how many I miss compared
+  with the hand annotation.
+instruction_basis: >-
+  Results, the section on the correct splitting of adjacent nuclei. The paper counts the missed nuclei of
+  each method on the test set at an IoU of 0.7.
+answers:
+  model_type:
+    decision: Cellpose model
+    value: cpsam_v2
+    source: Not in the paper, which does not use Cellpose. The benchmark uses the default model of Cellpose 4.2.
+  cell_diameter:
+    decision: Cell diameter
+    value: 0, the model decides
+    source: Not in the paper. The benchmark uses the Cellpose default.
+  cellprob_threshold:
+    decision: Cell probability threshold
+    value: 0
+    source: Not in the paper. The benchmark uses the Cellpose default.
+  flow_threshold:
+    decision: Flow error threshold
+    value: 0.4
+    source: Not in the paper. The benchmark uses the Cellpose default.
+  min_cell_size:
+    decision: Smallest object to keep
+    value: 15 pixels
+    source: Not in the paper. The benchmark uses the Cellpose default.
+  exclude_border_cells:
+    decision: Remove objects at the image border
+    value: false
+    source: >-
+      Not in the paper text. The CellProfiler pipeline file that comes with the data keeps objects at the
+      border.
+  pixel_size:
+    decision: Pixel size
+    value: 0.656 micrometers for each pixel
+    source: Methods, the DeepCell description. The images are at 20x with 0.656 micrometers for each pixel.
+  replication_unit:
+    decision: Unit of replication
+    value: images or fields
+    source: >-
+      Materials. Each field of view comes from a different compound treatment. The paper scores the 50 test
+      images.
+items:
+  true_nuclei_test:
+    source: published
+    where: >-
+      Captions of Figures 3 and 4 and of Figure S2. The test set has 5,720 nuclei. The benchmark authors got
+      the same count from the masks.
+  missed_fraction_advanced:
+    source: published
+    where: >-
+      Results, the section on the splitting of adjacent nuclei, and Figure S2. The advanced CellProfiler
+      pipeline misses 15.5% of nuclei at an IoU of 0.7. Reference only, because the run uses Cellpose.
+  missed_fraction_basic:
+    source: published
+    where: >-
+      Results, the same section, and Figure S2. The basic CellProfiler pipeline misses 20.1% of nuclei at an
+      IoU of 0.7. Reference only, because the run uses Cellpose.
+data:
+  source: Broad Bioimage Benchmark Collection, image set BBBC039 version 1
+  url: https://bbbc.broadinstitute.org/BBBC039
+  license: >-
+    CC0 (Creative Commons public domain dedication), stated on the BBBC039 page. The paper itself is CC BY-NC
+    4.0.
+  size: >-
+    About 81 MB: 200 images of 520 x 696 pixels (16-bit TIFF), the hand masks, and the split lists of 100
+    training, 50 validation and 50 test images.

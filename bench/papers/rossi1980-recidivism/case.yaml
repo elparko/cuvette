@@ -1,0 +1,104 @@
+kind: tool tutorial or test suite
+short: Rossi 1980
+field: Statistics
+program: lifelines (Python), through the biostats adapter
+citation:
+  authors: Rossi PH, Berk RA, Lenihan KJ
+  title: "Money, Work, and Crime: Experimental Evidence"
+  venue: Academic Press, New York (book)
+  year: 1980
+  url: https://vincentarelbundock.github.io/Rdatasets/doc/carData/Rossi.html
+related:
+  - text: >-
+      lifelines documentation, section on survival regression. It fits a Cox model to these data and prints
+      the summary. Source of the subject count, the event count and the concordance.
+    url: https://lifelines.readthedocs.io/en/latest/Survival%20Regression.html
+  - text: lifelines documentation, notebook on the proportional hazards assumption. It tests each covariate on these data.
+    url: https://lifelines.readthedocs.io/en/latest/jupyter_notebooks/Proportional%20hazard%20assumption.html
+measured: >-
+  The study followed 432 men for one year after their release from Maryland state prisons in the 1970s.
+  Half the men got financial aid by random assignment. The study measured the time to the first re-arrest.
+  The lifelines documentation fits a Cox proportional hazards model to these data with seven background
+  covariates. The question is if financial aid lowers the hazard of re-arrest.
+instruction: >-
+  I followed 432 men for a year after release from prison. Some got financial aid. Does financial aid reduce
+  re-arrest? Give me the effect size with a confidence interval and a p-value, adjusted for age, race, work
+  experience, marriage, parole and prior convictions. Tell me how well the model separates early from late
+  arrests, and if the model assumptions hold.
+instruction_basis: >-
+  The survival regression section of the lifelines documentation, which fits a Cox model with all covariates.
+  The question about the assumptions comes from the lifelines notebook on the proportional hazards test.
+answers:
+  replicate:
+    decision: Unit of replication
+    value: the man, one row for each man
+    source: The data have one row for each of the 432 men.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: Not in the documentation as a choice. The lifelines summary uses 95 percent confidence intervals by default.
+  cox_covariates:
+    decision: Covariates in the Cox model
+    value: fin, age, race, wexp, mar, paro, prio
+    source: Survival regression section. The example fits all the columns except the time and the event.
+  ties:
+    decision: Method for tied event times
+    value: Efron
+    source: Not shown as a choice in the example. The CoxPHFitter class of lifelines handles ties with the Efron method.
+  cox_strata:
+    decision: Strata in the Cox model
+    value: none
+    source: >-
+      Survival regression section. The main model has no strata. The notebook on the proportional hazards
+      assumption shows strata as one fix when a covariate fails the test.
+items:
+  subjects:
+    source: tutorial
+    where: Survival regression section, the Cox model summary. The number of observations is 432.
+  events:
+    source: tutorial
+    where: Survival regression section, the Cox model summary. The number of events is 114.
+  coef_fin:
+    source: computed
+    tool: lifelines 0.30.3 CoxPHFitter
+    where: The documentation gives a rounded value only (-0.38).
+  coef_age:
+    source: computed
+    tool: lifelines 0.30.3 CoxPHFitter
+    where: The documentation gives a rounded value only (-0.06).
+  coef_prio:
+    source: computed
+    tool: lifelines 0.30.3 CoxPHFitter
+    where: The documentation gives a rounded value only (0.09).
+  hazard_ratio_fin:
+    source: computed
+    tool: lifelines 0.30.3 CoxPHFitter
+    where: The documentation gives a rounded value only (0.68).
+  p_fin:
+    source: computed
+    tool: lifelines 0.30.3 CoxPHFitter
+    where: The documentation gives a rounded value only (0.05).
+  concordance:
+    source: tutorial
+    where: Survival regression section, the Cox model summary. The concordance is 0.64. The benchmark run gives 0.6403.
+  logrank_chi2_fin:
+    source: computed
+    tool: lifelines 0.30.3 logrank_test
+    where: Not in the documentation. The benchmark authors compared the two aid groups with a log-rank test.
+  logrank_p_fin:
+    source: computed
+    tool: lifelines 0.30.3 logrank_test
+    where: Not in the documentation. The p-value is 0.0501, just above 0.05.
+  ph_test_p_age:
+    source: computed
+    tool: lifelines 0.30.3 proportional_hazard_test with the rank transform
+    where: >-
+      The notebook on the proportional hazards assumption runs the same test and gives a rounded value only
+      (0.001). Age fails the test.
+data:
+  source: Dataset rossi from the lifelines package (load_rossi). The same data are carData::Rossi in R.
+  url: https://raw.githubusercontent.com/CamDavidsonPilon/lifelines/master/lifelines/datasets/rossi.csv
+  license: >-
+    The lifelines package is under the MIT License. The data come from a published 1980 study and have no
+    names or identifiers.
+  size: 8.7 KB, 432 rows, 9 columns

@@ -1,0 +1,131 @@
+kind: tool tutorial or test suite
+short: Love 2014
+field: Genomics and transcriptomics
+program: DESeq2 (R), through the deseq2 adapter
+citation:
+  authors: Love MI, Huber W, Anders S
+  title: Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2
+  venue: Genome Biology 15(12):550
+  year: 2014
+  doi: 10.1186/s13059-014-0550-8
+related:
+  - text: >-
+      Love MI, Anders S, Kim V, Huber W. RNA-Seq workflow: gene-level exploratory analysis and differential
+      expression. F1000Research 4:1070 (2016), the Bioconductor rnaseqGene workflow. Source of all the
+      workflow numbers.
+    doi: 10.12688/f1000research.7035.2
+  - text: >-
+      Himes BE et al. RNA-Seq transcriptome profiling identifies CRISPLD2 as a glucocorticoid responsive gene
+      that modulates cytokine function in airway smooth muscle cells. PLoS ONE 9(6):e99625 (2014). Source of
+      the airway data.
+    doi: 10.1371/journal.pone.0099625
+measured: >-
+  The DESeq2 paper describes a method that tests RNA sequencing (RNA-seq) counts for differential expression.
+  The method shrinks the dispersion and the fold change of each gene toward a common trend. The rnaseqGene
+  workflow applies DESeq2 to the airway data. Four primary human airway smooth muscle cell lines each give
+  one culture treated with dexamethasone and one untreated culture. The workflow counts the genes that change
+  with the drug. The cell line enters the model, so each treated culture is compared with its own control.
+instruction: >-
+  I have RNA-seq counts from airway smooth muscle cells from four donors. Each donor has a culture treated
+  with dexamethasone and an untreated culture. Which genes change with the drug? Tell me how many genes pass
+  the low-count filter, how many are significant, how many go up and how many go down. Give me a table of
+  the top 20 genes with fold change and significance.
+instruction_basis: >-
+  Sections 3 to 5 of the rnaseqGene workflow. The workflow builds the model with the cell line and the
+  treatment, filters low counts, runs DESeq2 and summarizes the results table.
+answers:
+  question:
+    decision: Research question
+    value: Does dexamethasone change gene expression in human airway smooth muscle cells, and in which genes?
+    source: Workflow section 1.1. The experiment treats four cell lines with dexamethasone and keeps one untreated sample of each.
+  replicate:
+    decision: Unit of replication
+    value: the donor cell line, with one treated and one untreated library for each
+    source: Workflow section 1.1. Each of the four cell lines gives a treated and an untreated sample.
+  design:
+    decision: Design formula
+    value: "~ cell + dex"
+    source: Workflow section 3. The formula controls for the cell line and tests the effect of dexamethasone.
+  variable:
+    decision: Variable to test
+    value: dex (treated or untreated)
+    source: Workflow section 3. The last term of the design formula is the treatment.
+  reference_level:
+    decision: Reference level
+    value: untrt (untreated)
+    source: Workflow section 3. The workflow sets the untreated level as the reference with relevel.
+  test_level:
+    decision: Level to compare with the reference
+    value: trt (treated with dexamethasone)
+    source: Workflow sections 3 and 5.2. The results compare treated with untreated.
+  min_count:
+    decision: Low-count filter, minimum count
+    value: 10
+    source: Workflow section 4.1. A gene must have a count of at least 10 in enough samples.
+  min_samples:
+    decision: Low-count filter, number of samples
+    value: 4
+    source: Workflow section 4.1. The workflow uses the smallest group size, which is four samples.
+  alpha:
+    decision: False discovery rate (FDR) cutoff
+    value: 0.1
+    source: Workflow section 5.2. The results function uses 0.1 by default. The workflow also shows 0.05 as a stricter case.
+  lfc_threshold:
+    decision: Log2 fold change threshold
+    value: 0
+    source: Workflow section 5.2. The default test uses no threshold. The workflow shows a threshold of 1 as an option.
+  exclusions:
+    decision: Samples or genes to remove
+    value: none
+    source: Not in the workflow as a decision. The workflow removes no sample.
+items:
+  genes_after_filter:
+    source: computed
+    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    where: >-
+      The benchmark authors ran the code of workflow section 4.1 on the benchmark CSV. The workflow text prints
+      16637, but that number is for another version of the airway data (58294 genes). The same code on that data
+      gives 16637 exactly.
+  padj_01_workflow:
+    source: computed
+    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    where: >-
+      The benchmark authors ran the code of workflow section 5 on the benchmark CSV. The workflow text prints
+      4381 for the other version of the airway data.
+  up_padj_01:
+    source: computed
+    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    where: >-
+      From summary(res) on the benchmark CSV. The workflow text prints 2362 for the other version of the airway
+      data.
+  down_padj_01:
+    source: computed
+    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    where: >-
+      From summary(res) on the benchmark CSV. The workflow text prints 2019 for the other version of the airway
+      data.
+  padj_005_workflow:
+    source: computed
+    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    where: >-
+      From results(dds, alpha = 0.05) on the benchmark CSV. The workflow text prints 3602 for the other version
+      of the airway data.
+  padj_01_pydeseq2:
+    source: computed
+    tool: pydeseq2 0.5.4
+    where: >-
+      Not in the workflow. The benchmark authors ran pydeseq2 on the benchmark CSV. The deseq2 adapter runs R
+      DESeq2 1.52.0, which gives 4905 genes on the same CSV.
+  padj_005_pydeseq2:
+    source: computed
+    tool: pydeseq2 0.5.4
+    where: >-
+      Not in the workflow. The benchmark authors ran pydeseq2 on the benchmark CSV with alpha 0.05. R DESeq2 can
+      give a different count on the same CSV.
+data:
+  source: Bioconductor data package airway 1.32.0, converted to CSV by the benchmark fetch script
+  url: https://bioconductor.org/packages/release/data/experiment/src/contrib/airway_1.32.0.tar.gz
+  license: >-
+    LGPL, from the package DESCRIPTION file. The samples are cell lines. The data have no patient
+    identifiers. Raw reads are in GEO GSE52778.
+  size: 24.7 MB package. The count CSV is 2.3 MB, 63677 genes by 8 samples.

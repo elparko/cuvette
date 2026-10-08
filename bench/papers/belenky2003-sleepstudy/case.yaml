@@ -1,0 +1,107 @@
+kind: tool tutorial or test suite
+short: Belenky 2003
+field: Statistics
+program: statsmodels mixedlm (Python), through the biostats adapter
+citation:
+  authors: Belenky G, Wesensten NJ, Thorne DR, Thomas ML, Sing HC, Redmond DP, Russo MB, Balkin TJ
+  title: "Patterns of performance degradation and restoration during sleep restriction and subsequent recovery: a sleep dose-response study"
+  venue: Journal of Sleep Research 12(1):1-12
+  year: 2003
+  doi: 10.1046/j.1365-2869.2003.00337.x
+related:
+  - text: "Bates D, Maechler M, Bolker B, Walker S. Fitting linear mixed-effects models using lme4. Journal of Statistical Software 67(1):1-48 (2015). The lme4 example that fits the same model to these data."
+    doi: 10.18637/jss.v067.i01
+measured: >-
+  The study gave volunteers different amounts of time in bed each night and measured how performance fell and
+  then recovered. The R package lme4 holds one group of the study as the sleepstudy data. It has 18 subjects
+  with 3 hours of sleep a night and a mean reaction time for each of 10 days. The benchmark asks for the daily
+  rise in reaction time with its standard error. Each subject has a different start level and slope, so the
+  model needs a random intercept and a random slope for each subject.
+instruction: >-
+  Eighteen people were limited to 3 hours of sleep a night for 10 days. I have their reaction time for each
+  day. How much slower do they get each day? Give me the change per day with a standard error and a
+  confidence interval. People differ in how fast they start and how fast they slow down, so take that into
+  account.
+instruction_basis: >-
+  Not from the 2003 paper, which the benchmark authors did not read. The request follows the sleepstudy
+  example of lme4 (Bates et al. 2015, Section 1.2).
+answers:
+  replicate:
+    decision: Unit of replication
+    value: the subject, with repeated measures in the model
+    source: >-
+      The sleepstudy data hold 10 repeated measures for each of 18 subjects. The lme4 example puts the subject
+      in the model as a grouping factor.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: Not in the paper. The benchmark uses the usual 0.05.
+  model_formula:
+    decision: Fixed-effect formula
+    value: "Reaction ~ Days"
+    source: The lme4 example (Bates et al. 2015, Section 1.2) uses Days as the only fixed effect.
+  random_effects:
+    decision: Random effects
+    value: a random intercept and a random slope for Days for each subject
+    source: The lme4 example, model fm1 (Bates et al. 2015, Section 1.2).
+  reml:
+    decision: Fit by restricted maximum likelihood (REML)
+    value: true
+    source: The lme4 example fits by REML, the lmer default.
+  standard_errors:
+    decision: Standard errors for an ordinary least squares (OLS) model
+    value: clustered by subject
+    source: >-
+      Not in the paper or the lme4 example. It applies only if the run fits an OLS model. Cluster standard
+      errors allow correlated rows within a subject.
+items:
+  days_slope:
+    source: computed
+    tool: statsmodels 0.15.0 mixedlm
+    where: >-
+      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same value, 10.467, for the lme4 fit.
+  intercept:
+    source: computed
+    tool: statsmodels 0.15.0 mixedlm
+    where: >-
+      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same value, 251.405.
+  se_days_random_slope:
+    source: computed
+    tool: statsmodels 0.15.0 mixedlm
+    where: >-
+      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same standard error, 1.546.
+  se_days_random_intercept_trap:
+    source: computed
+    tool: statsmodels 0.15.0 mixedlm, random intercept only
+    where: >-
+      Not in the 2003 paper. This is the result of the wrong model, which leaves out the random slopes. Its
+      standard error is too small. The run must not report it as the result.
+  se_days_ols_trap:
+    source: computed
+    tool: statsmodels 0.15.0 OLS
+    where: >-
+      Not in the 2003 paper. This is the result of OLS, which treats the 180 rows as independent. The run must
+      not report it as the result.
+  intercept_variance:
+    source: computed
+    tool: statsmodels 0.15.0 mixedlm
+    where: >-
+      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print 612.09 for the lme4 fit. The difference is
+      in the last digit.
+  slope_variance:
+    source: computed
+    tool: statsmodels 0.15.0 mixedlm
+    where: >-
+      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same value, 35.07.
+  residual_variance:
+    source: computed
+    tool: statsmodels 0.15.0 mixedlm
+    where: >-
+      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same value, 654.94.
+data:
+  source: Data set sleepstudy of the R package lme4, from the Rdatasets collection
+  url: https://vincentarelbundock.github.io/Rdatasets/csv/lme4/sleepstudy.csv
+  license: >-
+    The lme4 package is GPL-2 or later (GNU General Public License). The Rdatasets collection is GPL-3.
+    Subjects have number codes only.
+  size: 3.3 KB, 180 rows

@@ -1,0 +1,111 @@
+kind: research paper
+short: Bates 2015
+field: Statistics
+program: lme4 with lmerTest (R), through the lme4 adapter
+citation:
+  authors: Bates D, Maechler M, Bolker B, Walker S
+  title: Fitting linear mixed-effects models using lme4
+  venue: Journal of Statistical Software 67(1):1-48
+  year: 2015
+  doi: 10.18637/jss.v067.i01
+related:
+  - text: "Belenky G, et al. Patterns of performance degradation and restoration during sleep restriction and subsequent recovery: a sleep dose-response study. Journal of Sleep Research 12(1):1-12 (2003). Source of the sleepstudy data."
+    doi: 10.1046/j.1365-2869.2003.00337.x
+measured: >-
+  The paper describes lme4, an R package for linear mixed-effects models. Its example is the sleepstudy data:
+  18 subjects with 3 hours of sleep a night and a mean reaction time for each of 10 days. Reaction time rises
+  about linearly with days, but subjects differ in start level and in slope. The model has a fixed intercept
+  and slope, plus a random intercept and a random slope for each subject. The paper prints the full summary of
+  this fit to show the output of the package.
+instruction: >-
+  We have reaction times from 18 subjects over 10 days of sleep restriction. Does reaction time rise with
+  each day, and does the rate differ between subjects? Fit a random intercept and a random slope for each
+  subject by restricted maximum likelihood (REML), with the subject as the independent unit. Give me the
+  fixed effects, the random-effect standard deviations and the REML criterion. Then test the Days effect with
+  a likelihood ratio test against the same model without Days. Give the chi-square, the degrees of freedom
+  and the p value. Plot each subject with the fitted line.
+instruction_basis: >-
+  Section 1.2 fits model fm1 to the sleepstudy data, and Section 5.2 prints its summary. The likelihood ratio
+  test of Days is an addition of the benchmark.
+answers:
+  question:
+    decision: Research question
+    value: Does reaction time rise with days of sleep deprivation, and does the rate differ between subjects?
+    source: >-
+      Section 1.2. The paper notes that reaction time rises about linearly and that slopes and intercepts vary
+      between subjects.
+  replicate:
+    decision: Unit of replication
+    value: the subject, with several observations for each one
+    source: Section 1.2. Each of the 18 subjects has one observation for each day.
+  formula:
+    decision: Model formula
+    value: "Reaction ~ Days + (Days | Subject)"
+    source: Section 1.2, model fm1.
+  reml:
+    decision: Fit by restricted maximum likelihood (REML)
+    value: true
+    source: Sections 1.2 and 5.2. The lmer default is REML, and the summary of fm1 gives the REML criterion.
+  p_value_method:
+    decision: Method for p values
+    value: Satterthwaite degrees of freedom (lmerTest)
+    source: >-
+      Not in the paper. lme4 gives no p values. Section 5.2 names the Satterthwaite method as one approximate
+      option. The benchmark uses the lmerTest default.
+  reduced_formula:
+    decision: Reduced model for the test of Days
+    value: "Reaction ~ 1 + (Days | Subject)"
+    source: >-
+      Not in the paper. The paper compares models that differ in their random effects. The benchmark removes
+      the fixed Days effect to test it.
+  comparison_method:
+    decision: Fit method for the model comparison
+    value: maximum likelihood (ML)
+    source: >-
+      Section 5.2. The anova method refits REML models by ML. The paper says that this is necessary when the
+      models differ in their fixed effects.
+  exclusions:
+    decision: Excluded observations
+    value: none
+    source: Sections 1.2 and 5.2. The fit uses all 180 observations.
+items:
+  fixed_intercept:
+    source: published
+    where: Section 5.2, fixed-effects table of summary(fm1). The intercept is 251.405 ms.
+  fixed_days:
+    source: published
+    where: Section 5.2, fixed-effects table of summary(fm1). The slope is 10.467 ms per day.
+  reml_criterion:
+    source: published
+    where: >-
+      Section 5.2, first lines of summary(fm1). The REML criterion at convergence is 1743.6. The current lme4
+      vignette rounds it to 1744.
+  sd_subject_intercept:
+    source: published
+    where: Section 5.2, random-effects table of summary(fm1), 24.740. Section 1.2 gives 24.74.
+  sd_subject_days:
+    source: published
+    where: Section 5.2, random-effects table of summary(fm1), 5.922. Section 1.2 gives 5.92.
+  sd_residual:
+    source: published
+    where: Section 5.2, random-effects table of summary(fm1), 25.592.
+  random_correlation:
+    source: published
+    where: >-
+      Section 2.2 gives the correlation of the random slope and intercept as 0.066. The table in Section 5.2
+      rounds it to 0.07.
+  lrt_chi2_days:
+    source: computed
+    tool: lme4 2.0.6 and lmerTest 3.2.1 on R 4.6.1
+    where: >-
+      Not in the paper. The anova example in Section 5.2 compares random-effect structures, not the fixed
+      Days effect.
+  n_subjects:
+    source: published
+    where: Section 5.2, summary(fm1). It gives 180 observations in 18 groups of Subject.
+data:
+  source: Data set sleepstudy in the R package lme4, written to CSV by the fetch script of the benchmark
+  url: https://cran.r-project.org/package=lme4
+  license: >-
+    GPL-2 or later (GNU General Public License), the license of lme4. Subjects have number codes only.
+  size: 3.1 KB, 180 rows

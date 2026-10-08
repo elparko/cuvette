@@ -1,0 +1,112 @@
+kind: tool tutorial or test suite
+short: Rouault 2026
+field: Geospatial
+program: GDAL (command-line programs), through the gdal adapter
+citation:
+  authors: Rouault E, Warmerdam F, Schwehr K, et al.
+  title: GDAL
+  venue: Zenodo software record, version 3.13.3
+  year: 2026
+  doi: 10.5281/zenodo.5884351
+  url: https://gdal.org
+related:
+  - text: "GDAL test suite (autotest), test_gdalinfo.py. Its test test_gdalinfo_stac_json checks the size, projection and band statistics of byte.tif."
+    url: https://github.com/OSGeo/gdal/blob/master/autotest/utilities/test_gdalinfo.py
+measured: >-
+  GDAL is a library and a set of command-line programs that read, write and transform geospatial raster and
+  vector data. It has no single paper with result tables. Its test suite runs gdalinfo on a small test raster,
+  byte.tif, and checks the size, the map projection and the band statistics. The benchmark adds a warp to
+  latitude and longitude and two zones that the benchmark authors drew. These steps test the choice of
+  projection, resampling and the rule for pixels that a zone edge cuts.
+instruction: >-
+  I have a small satellite-style image of a patch of land and two squares that I drew on the map. Give me the
+  image size in pixels, its map projection and the ground size of one pixel. Give me the lowest, highest and
+  mean pixel values and the standard deviation. Convert the image to latitude and longitude and give me the new
+  size. Give me the mean value and the pixel count inside the first square. For the second square, count only
+  the pixels whose centers are inside it.
+instruction_basis: >-
+  Questions 1 and 2 follow the gdalinfo checks on byte.tif in the GDAL test suite. Questions 3 to 5 use gdalwarp
+  and zonal statistics on zones that the benchmark authors added.
+answers:
+  target_crs:
+    decision: Target coordinate reference system (CRS)
+    value: latitude and longitude on WGS 84 (EPSG:4326)
+    source: >-
+      The request asks for latitude and longitude. The test suite has no warp step for this file, so the
+      benchmark authors chose this CRS.
+  resampling:
+    decision: Resampling method
+    value: nearest neighbour
+    source: Not in a source. The benchmark uses the gdalwarp default. The warp is only a size check.
+  nodata:
+    decision: Nodata value
+    value: none
+    source: The file has no nodata value. The benchmark sets none.
+  pixel_size:
+    decision: Output pixel size
+    value: GDAL chooses it
+    source: Not in a source. The benchmark uses the gdalwarp default.
+  partial_pixels:
+    decision: Pixels that a zone edge cuts
+    value: count a pixel only if its center is inside the zone
+    source: The request states this rule for the second square. It is also the default in rasterstats.
+items:
+  width:
+    source: tutorial
+    where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a raster shape of 20 by 20 pixels.
+  height:
+    source: tutorial
+    where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a raster shape of 20 by 20 pixels.
+  epsg:
+    source: tutorial
+    where: >-
+      GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks the code EPSG:26711 (North American Datum 1927, Universal Transverse Mercator zone 11
+      north).
+  pixel_size_m:
+    source: tutorial
+    where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The geotransform in the test has a pixel size of 60 m.
+  band_min:
+    source: tutorial
+    where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a minimum of 74.
+  band_max:
+    source: tutorial
+    where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a maximum of 255.
+  band_mean:
+    source: tutorial
+    where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a mean of 126.765.
+  band_std:
+    source: tutorial
+    where: >-
+      GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks 22.928, the population standard deviation.
+      The sample standard deviation is 22.986.
+  warp_width:
+    source: computed
+    tool: GDAL 3.13.3 gdalwarp, checked with pyproj
+    where: Not in the test suite. The benchmark authors ran the warp with nearest neighbour and the default pixel size.
+  warp_height:
+    source: computed
+    tool: GDAL 3.13.3 gdalwarp, checked with pyproj
+    where: Not in the test suite. The benchmark authors ran the warp with nearest neighbour and the default pixel size.
+  zone_a_pixels:
+    source: computed
+    tool: numpy and shapely
+    where: Not in a source. Zone A is a square that the benchmark authors drew on the pixel grid.
+  zone_a_mean:
+    source: computed
+    tool: numpy and shapely
+    where: Not in a source. Zone A is a square that the benchmark authors drew on the pixel grid.
+  zone_b_pixels_centers:
+    source: computed
+    tool: numpy and shapely
+    where: >-
+      Not in a source. Zone B is offset by 40 m from the grid. With all touched pixels the count is 56, not 42.
+  zone_b_mean_centers:
+    source: computed
+    tool: numpy and shapely
+    where: Not in a source. With all touched pixels the mean is 134.857, not 135.0.
+data:
+  source: GDAL test raster byte.tif, plus two square zones that the benchmark authors drew
+  url: https://raw.githubusercontent.com/OSGeo/gdal/master/autotest/gcore/data/byte.tif
+  license: >-
+    GDAL and its test data are MIT licensed. The zone file is part of this benchmark.
+  size: 736 bytes, 20 x 20 pixels (byte.tif). 472 bytes, two polygons (zones.geojson).

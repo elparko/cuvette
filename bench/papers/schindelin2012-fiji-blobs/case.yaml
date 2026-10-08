@@ -1,0 +1,80 @@
+kind: tool tutorial or test suite
+short: Schindelin 2012
+field: Imaging
+program: scikit-image (Python), through the scikit-image adapter
+citation:
+  authors: Schindelin J, Arganda-Carreras I, Frise E, et al.
+  title: "Fiji: an open-source platform for biological-image analysis"
+  venue: Nature Methods 9(7):676-682
+  year: 2012
+  doi: 10.1038/nmeth.2019
+related:
+  - text: "ImageJ sample image Blobs, from the ImageJ sample image collection at the National Institutes of Health (NIH). Source of the image."
+    url: https://imagej.net/ij/images/blobs.gif
+measured: >-
+  The paper describes Fiji, a distribution of ImageJ for biological image analysis. It reports no measurement on
+  this image. Blobs is a small sample image that ships with ImageJ. Teachers use it to show how a threshold and a
+  particle count work. The benchmark uses it to test the choice of object polarity and threshold, and the rule for
+  objects that touch the image edge.
+instruction: >-
+  Here is the blobs sample image from ImageJ. Count the blobs.
+instruction_basis: >-
+  Not from the paper. The request follows the usual ImageJ route for a particle count: an automatic threshold, then
+  Analyze Particles.
+answers:
+  stain_channel:
+    decision: Image channel to segment
+    value: gray (the image has one channel)
+    source: The file is a single 8-bit gray image. The paper does not discuss it.
+  object_polarity:
+    decision: Bright or dark objects
+    value: bright
+    source: >-
+      Not in the paper. The file stores the blobs as high pixel values. An inverted lookup table (LUT) makes them
+      look dark in ImageJ.
+  threshold_method:
+    decision: Threshold method
+    value: IsoData
+    source: >-
+      Not in the paper. The ImageJ Default threshold is a variant of IsoData. The benchmark uses the IsoData method
+      of scikit-image as the nearest match.
+  min_object_size:
+    decision: Smallest object to count
+    value: 0 pixels (no limit)
+    source: Not in the paper. The benchmark uses the Analyze Particles default size range of 0 to infinity.
+  exclude_border_objects:
+    decision: Remove objects that touch the image border
+    value: false
+    source: Not in the paper. The benchmark counts edge objects. The count without them is an optional item.
+  split_touching:
+    decision: Split touching objects with a watershed
+    value: false
+    source: Not in the paper. The benchmark uses no watershed, so touching blobs can count as one.
+  pixel_size:
+    decision: Pixel size
+    value: none (the count is in pixels)
+    source: The file has no spatial calibration. The paper does not discuss it.
+  replication_unit:
+    decision: Unit of replication
+    value: images or fields
+    source: Not in the paper. There is one image, so no statistics across images apply.
+items:
+  particles_edges_included:
+    source: computed
+    tool: ImageJ 1.53 (Default threshold, Analyze Particles)
+    where: >-
+      Not in the paper. No official ImageJ or Fiji tutorial that prints this count was found. The benchmark
+      authors ran ImageJ, which gave 64.
+  particles_edges_excluded:
+    source: computed
+    tool: ImageJ 1.53 (Default threshold, Analyze Particles with edge exclusion)
+    where: >-
+      Not in the paper. No official tutorial that prints this count was found. The benchmark authors ran ImageJ,
+      which gave 46.
+data:
+  source: ImageJ sample image Blobs (blobs.gif)
+  url: https://imagej.net/ij/images/blobs.gif
+  license: >-
+    No license text was found for this file. It is an NIH ImageJ sample image, and NIH ImageJ is public domain.
+    The benchmark uses it as a test image only.
+  size: 25765 bytes, one 8-bit image of 256 x 254 pixels

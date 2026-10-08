@@ -1,0 +1,75 @@
+kind: tool tutorial or test suite
+short: Schramm 2012
+field: Mass spectrometry and proteomics
+program: pyimzML (Python), through the pyimzml adapter
+citation:
+  authors: Schramm T, Hester Z, Klinkert I, Both JP, Heeren RMA, Brunelle A, Laprévote O, Desbenoit N, Robbe MF, Stoeckli M, Spengler B, Römpp A
+  title: "imzML - a common data format for the flexible exchange and processing of mass spectrometry imaging data"
+  venue: Journal of Proteomics 75(16):5106-5110
+  year: 2012
+  doi: 10.1016/j.jprot.2012.07.026
+related:
+  - text: "pyimzML test suite, tests/test_basic.py. It reads the two example files and checks the pixel count, the polarity and the m/z range."
+    url: https://github.com/alexandrovteam/pyimzML/blob/master/tests/test_basic.py
+measured: >-
+  The paper defines imzML, an open file format for mass spectrometry imaging (MSI). Each data set has two files.
+  An XML file holds the metadata, and a binary file (ibd) holds the spectra. In continuous mode all spectra share
+  one m/z array. In processed mode each spectrum has its own m/z array. The benchmark uses two small example files
+  with the same nine pixels in the two modes.
+instruction: >-
+  I have two small imaging mass spectrometry files in imzML format. How many pixels does each file have, and what
+  m/z range do they cover? Why is one binary data file larger than the other when both have the same pixels? Which
+  pixel has the strongest total signal? Do the continuous and processed files hold the same spectra?
+instruction_basis: >-
+  Not from the paper. The request follows the pyimzML test suite, which reads both example files. The question
+  about file size tests the difference between the two storage modes.
+answers:
+  ion_ppm:
+    decision: Mass tolerance for an ion image
+    value: 10 parts per million (ppm)
+    source: Not in a source. The benchmark uses the adapter default. The request asks for no ion image.
+  polarity:
+    decision: Ion polarity
+    value: negative
+    source: The metadata of both files gives negative polarity. The pyimzML test suite checks this.
+  normalization:
+    decision: Normalization of spectra
+    value: none
+    source: Not in a source. The request asks for the raw total signal of each pixel.
+  snr:
+    decision: Signal-to-noise ratio for peak picking
+    value: 3
+    source: Not in a source. The benchmark uses the adapter default. The request asks for no peak picking.
+items:
+  spectra_per_file:
+    source: tutorial
+    where: pyimzML test suite, tests/test_basic.py. The test checks 9 coordinates in each file.
+  mz_min:
+    source: computed
+    tool: pyimzML 1.5.5
+    where: The test suite checks only that all m/z values are between 100 and 800. The exact lowest value is computed.
+  mz_max:
+    source: computed
+    tool: pyimzML 1.5.5
+    where: The test suite checks only that all m/z values are between 100 and 800. The exact highest value is computed.
+  max_pixel_tic:
+    source: computed
+    tool: pyimzML 1.5.5 and numpy
+    where: Not in a source. The total ion current (TIC) of a pixel is the sum of its intensities.
+  mean_tic:
+    source: computed
+    tool: pyimzML 1.5.5 and numpy
+    where: Not in a source. The value is the mean total ion current (TIC) of the nine pixels, with float32 sums.
+  continuous_ibd_bytes:
+    source: computed
+    tool: file size of the downloaded file
+    where: Not in a source. The file holds one shared m/z array and nine intensity arrays.
+  processed_ibd_bytes:
+    source: computed
+    tool: file size of the downloaded file
+    where: Not in a source. The file holds one m/z array and one intensity array for each spectrum.
+data:
+  source: imzML example files in the pyimzML repository (tests/data), Example_Continuous and Example_Processed
+  url: https://github.com/alexandrovteam/pyimzML/tree/master/tests/data
+  license: Apache-2.0 (pyimzML repository)
+  size: Four files, 0.99 MB in total. Each pair holds 9 spectra of 8399 points.

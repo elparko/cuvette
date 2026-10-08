@@ -1,0 +1,73 @@
+kind: research paper
+short: Palmer 2017
+field: Mass spectrometry and proteomics
+program: METASPACE (metaspace2020 Python client), through the metaspace adapter
+citation:
+  authors: Palmer A, Phapale P, Chernyavsky I, Lavigne R, Fay D, Tarasov A, Kovalev V, Fuchser J, Nikolenko S, Pineau C, Becker M, Alexandrov T
+  title: FDR-controlled metabolite annotation for high-resolution imaging mass spectrometry
+  venue: Nature Methods 14(1):57-60
+  year: 2017
+  doi: 10.1038/nmeth.4072
+related:
+  - text: MetaboLights study MTBLS313. Mouse and rat brain imaging data and the table of published annotations.
+    url: https://www.ebi.ac.uk/metabolights/MTBLS313
+measured: >-
+  The paper adds a false discovery rate (FDR) to metabolite annotation in imaging mass spectrometry. It
+  scores each candidate sum formula against the ion images and uses decoy adducts to estimate the FDR. The
+  authors imaged coronal sections of mouse and rat brain with matrix-assisted laser desorption/ionization
+  (MALDI) on a Fourier transform ion cyclotron resonance (FTICR) instrument. Serial sections of one mouse
+  brain test if the annotation is reproducible.
+instruction: >-
+  I imaged three serial sections of one mouse brain by high-resolution MALDI. Which metabolite annotations
+  can I trust? How reproducible is the set of confident annotations across the three sections? Tell me how
+  many sum formulas appear in all three sections.
+instruction_basis: >-
+  Results section and Figure 2e. The paper compares the annotations at an FDR of 10 percent across the serial
+  sections of animal a2.
+answers:
+  fdr:
+    decision: False discovery rate (FDR) level
+    value: 0.1 (10 percent)
+    source: Results section and Figure 2. The paper reports annotations at an FDR of 10 percent.
+  database:
+    decision: Metabolite database
+    value: HMDB version 2.5
+    source: Results section and Supplementary Note 1. The paper uses the Human Metabolome Database (HMDB).
+  adducts:
+    decision: Adducts
+    value: all the adducts of the dataset
+    source: >-
+      Results section. The paper uses +H, +Na and +K. The benchmark accepts every adduct that the public
+      dataset has.
+  exclude_off_sample:
+    decision: Remove off-sample ions
+    value: false
+    source: Not in the paper. The off-sample filter is a later METASPACE feature.
+  "*":
+    decision: Any other decision
+    value: the recommended value
+    source: Not in the paper. The benchmark gives this answer to every other question that the run asks.
+items:
+  formulas_in_all_three_sections:
+    source: published
+    where: >-
+      Figure 2e. In animal a2, 51 sum formulas appear in all three serial sections. The MTBLS313 annotation
+      table also gives 51. The benchmark marks this as a reference value.
+  unique_formulas_three_sections:
+    source: computed
+    tool: Count of the MTBLS313 annotation table (MAF file) by the benchmark authors
+    where: >-
+      Not in the paper. The paper gives 73 as the base for its 51, but the table gives 66 formulas for
+      sections s1 to s3. The benchmark marks this as a reference value.
+  total_formulas:
+    source: published
+    where: >-
+      Main text. The paper reports 103 annotations over all datasets. The MTBLS313 table has 103 unique sum
+      formulas. The benchmark marks this as a reference value.
+data:
+  source: MetaboLights study MTBLS313, mouse animal a2, sections s1 to s3, and the study annotation table
+  url: https://www.ebi.ac.uk/metabolights/MTBLS313
+  license: EMBL-EBI Terms of Use, as the study files state. Mouse tissue, no personal data.
+  size: >-
+    Three zip files of about 35 MB each, each with one centroided imzML and ibd pair. The annotation table is
+    60 KB with 236 rows.

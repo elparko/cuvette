@@ -1,0 +1,106 @@
+kind: research paper
+short: Delaney 2004
+field: Chemistry
+program: RDKit (Python), through the rdkit adapter
+citation:
+  authors: Delaney JS
+  title: "ESOL: estimating aqueous solubility directly from molecular structure"
+  venue: Journal of Chemical Information and Computer Sciences 44(3):1000-1005
+  year: 2004
+  doi: 10.1021/ci034243x
+related:
+  - text: "Lipinski CA, Lombardo F, Dominy BW, Feeney PJ. Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings. Advanced Drug Delivery Reviews 23:3-25 (1997). Source of the rule of five."
+    doi: 10.1016/S0169-409X(96)00423-1
+  - text: "Wu Z et al. MoleculeNet: a benchmark for molecular machine learning. Chemical Science 9:513-530 (2018). Source of the 1128-molecule file."
+    doi: 10.1039/C7SC02664A
+measured: >-
+  Delaney fit a linear model to 2874 measured aqueous solubilities. He started with nine descriptors and kept
+  four. These are the calculated logP, the molecular weight, the number of rotatable bonds and the aromatic
+  proportion. The aim is a simple estimate of solubility from the structure alone.
+  The benchmark scores the published equation on the public 1128-molecule subset. It also counts violations of
+  the rule of five, which is not part of the ESOL paper.
+instruction: >-
+  Here are 1128 small molecules with their structures as SMILES and their measured log solubility in mol per
+  litre. Score Delaney's ESOL equation on them. It uses logP, molecular weight, rotatable bonds and aromatic
+  proportion. How well does it match the measured values? Give me R squared and the root mean square error.
+  Also tell me how many molecules follow Lipinski's rule of five.
+instruction_basis: >-
+  The solubility part comes from the final ESOL equation of the paper. The rule of five count is an addition
+  of the benchmark, with the cut-offs of Lipinski 1997.
+answers:
+  salt_handling:
+    decision: Salts and multi-fragment molecules
+    value: keep each molecule as given
+    source: Not in the paper. The benchmark keeps the structures of the file unchanged.
+  invalid_smiles:
+    decision: SMILES that RDKit cannot parse
+    value: stop with an error
+    source: Not in the paper. All 1128 SMILES parse after the trailing space is removed, so this choice has no effect.
+  logp_method:
+    decision: Method for logP
+    value: Crippen logP of RDKit
+    source: >-
+      The paper uses the Daylight clogP program. RDKit does not have clogP. The Crippen method is the RDKit
+      substitute, and it gives different values.
+  hbd_hba_definition:
+    decision: Definition of hydrogen bond donors and acceptors
+    value: the Lipinski module of RDKit
+    source: Not in the ESOL paper. The donor and acceptor counts matter only for the rule of five.
+  rule_of_five_cutoffs:
+    decision: Rule of five cut-offs
+    value: molecular weight over 500, logP over 5, more than 5 donors, more than 10 acceptors
+    source: Lipinski 1997. Not in the ESOL paper.
+  allowed_violations:
+    decision: Violations allowed for a molecule that follows the rule
+    value: 1
+    source: >-
+      Lipinski 1997. Poor absorption is more likely with two or more violations. Not in the ESOL paper.
+  esol_equation:
+    decision: Solubility equation
+    value: the published equation, logS = 0.16 - 0.63 logP - 0.0062 MW + 0.066 RB - 0.74 AP
+    source: >-
+      The final ESOL equation of the paper. The benchmark authors took the coefficients from a secondary
+      source (a 2018 blog post by Walters). They did not read the full text of the paper.
+  test_fraction:
+    decision: Fraction of molecules held out for testing
+    value: 0.2
+    source: Not used. The published equation needs no fit. The value applies only to a refit.
+  split_seed:
+    decision: Random seed for the train and test split
+    value: 42
+    source: Not used. The published equation needs no split. The value applies only to a refit.
+items:
+  molecules_parsed:
+    source: computed
+    tool: RDKit 2026.03.6
+    where: Not in the paper. The MoleculeNet file has 1128 rows. The set in the paper is larger.
+  zero_violations:
+    source: computed
+    tool: RDKit 2026.03.6
+    where: Not in the paper. The ESOL paper does not use the rule of five.
+  two_or_more_violations:
+    source: computed
+    tool: RDKit 2026.03.6
+    where: Not in the paper. The ESOL paper does not use the rule of five.
+  logp_above_5:
+    source: computed
+    tool: RDKit 2026.03.6, Crippen logP
+    where: Not in the paper. The count changes by a few molecules between RDKit versions.
+  esol_r2:
+    source: computed
+    tool: RDKit 2026.03.6
+    where: >-
+      Not in this form in the paper. The paper used Daylight clogP on its own data set. A secondary source
+      gives R squared 0.74 for the paper. The benchmark authors did not confirm it in the paper text.
+  esol_rmse:
+    source: computed
+    tool: RDKit 2026.03.6
+    where: Not in the paper for this file. The value is the root mean square error in log units.
+data:
+  source: Delaney (ESOL) set as given by MoleculeNet in the DeepChem repository
+  url: https://raw.githubusercontent.com/deepchem/deepchem/master/datasets/delaney-processed.csv
+  license: >-
+    The DeepChem repository has the MIT license. The original data come from the supporting information of the
+    paper. The benchmark authors did not check the license of that supplement. The file holds small molecules
+    only.
+  size: 97 KB, 1128 molecules

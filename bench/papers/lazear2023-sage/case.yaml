@@ -1,0 +1,136 @@
+kind: tool tutorial or test suite
+short: Lazear 2023
+field: Mass spectrometry and proteomics
+program: Sage (command line), through the sage adapter
+citation:
+  authors: Lazear MR
+  title: "Sage: an open-source tool for fast proteomics searching and quantification at scale"
+  venue: Journal of Proteome Research 22(11):3652-3659
+  year: 2023
+  doi: 10.1021/acs.jproteome.3c00486
+related:
+  - text: "OpenMS example data: three ion trap runs of a standard protein mix (BSA1, BSA2, BSA3) and the protein database of the TOPPAS identification example."
+    url: https://github.com/OpenMS/OpenMS/tree/develop/share/OpenMS/examples/BSA
+measured: >-
+  The paper describes Sage, an open-source search engine that matches tandem mass spectra to peptides. It
+  controls the false discovery rate (FDR) with target and decoy sequences. The paper reports speed and
+  identification counts on large public data sets. It has no result for the small data set of this benchmark.
+  The benchmark searches three short runs of a standard protein mix from the OpenMS examples. It counts the
+  peptide-spectrum matches (PSMs) and the peptides at 1 percent and at 5 percent FDR.
+instruction: >-
+  I have three tandem mass spectrometry runs of a standard protein mix and a database of the standard proteins.
+  Which peptides are in the mix? How many spectra match them at 1 percent false discovery rate, and how does the
+  number change at 5 percent?
+instruction_basis: >-
+  The request follows the basic search of the paper: a database search with target-decoy FDR control. The data
+  and the questions come from the benchmark authors, not from the paper.
+answers:
+  fasta:
+    decision: Protein database
+    value: the 119 standard and contaminant proteins (standards.fasta)
+    source: >-
+      The OpenMS example database also holds the proteome of a background organism. The benchmark authors
+      removed it and kept the other 119 proteins.
+  decoys:
+    decision: Decoy sequences
+    value: reversed peptides that Sage makes
+    source: Not set by the paper for this data. Sage makes reversed decoys itself. The benchmark uses them.
+  decoy_tag:
+    decision: Decoy name tag
+    value: rev_
+    source: The tag that Sage gives its reversed decoys.
+  enzyme:
+    decision: Enzyme
+    value: trypsin, no cut before proline
+    source: Not in the paper for this data. Trypsin is the usual enzyme for this type of sample.
+  missed_cleavages:
+    decision: Missed cleavages allowed
+    value: 1
+    source: Not in the paper. The benchmark authors chose it.
+  fixed_mods:
+    decision: Fixed modification
+    value: carbamidomethyl cysteine (C +57.0215)
+    source: Not in the paper for this data. The benchmark authors chose the usual alkylation of cysteine.
+  variable_mods:
+    decision: Variable modification
+    value: oxidized methionine (M +15.9949)
+    source: Not in the paper. The benchmark authors chose it.
+  max_variable_mods:
+    decision: Variable modifications for each peptide, maximum
+    value: 2
+    source: Not in the paper. The benchmark authors chose it.
+  precursor_tol_ppm:
+    decision: Precursor mass tolerance
+    value: 10 ppm
+    source: Not in the paper. The benchmark authors chose it.
+  fragment_tol:
+    decision: Fragment mass tolerance
+    value: 0.5
+    source: >-
+      Not in the paper. The benchmark authors chose a wide tolerance because the fragments come from a low
+      resolution ion trap. A tolerance in ppm finds almost nothing.
+  fragment_tol_unit:
+    decision: Unit of the fragment tolerance
+    value: Da
+    source: Not in the paper. A low resolution ion trap needs a tolerance in daltons.
+  isotope_min:
+    decision: Smallest precursor isotope error
+    value: 0
+    source: Not in the paper. The benchmark authors chose no isotope error.
+  isotope_max:
+    decision: Largest precursor isotope error
+    value: 0
+    source: Not in the paper. The benchmark authors chose no isotope error.
+  max_fragment_charge:
+    decision: Largest fragment charge
+    value: 1
+    source: >-
+      Not in the paper. Without this limit, long peptides with high fragment charges score high on this low
+      resolution data, and no PSM reaches 1 percent FDR.
+  min_peaks:
+    decision: Smallest number of peaks in a spectrum
+    value: 6
+    source: Not in the paper. The benchmark authors chose it.
+  fdr_level:
+    decision: Level of the FDR control
+    value: PSM
+    source: The request counts spectra, so the FDR applies to PSMs. Sage also reports peptide and protein q-values.
+  fdr_threshold:
+    decision: FDR threshold
+    value: 0.01
+    source: The request asks for 1 percent. The 5 percent count comes from a second comparison.
+items:
+  psms_result_table:
+    source: computed
+    tool: Sage 0.14.6 (release binary v0.14.7)
+    where: Not in the paper. The paper has no result for this data.
+  decoy_psms:
+    source: computed
+    tool: Sage 0.14.6 (release binary v0.14.7)
+    where: Not in the paper. The paper has no result for this data.
+  target_psms_fdr1:
+    source: computed
+    tool: Sage 0.14.6 (release binary v0.14.7)
+    where: >-
+      Not in the paper. A Python recount of the q-values from the decoy labels gives the same number.
+  distinct_peptides:
+    source: computed
+    tool: Sage 0.14.6 (release binary v0.14.7)
+    where: Not in the paper. The value counts distinct peptide sequences among the PSMs at 1 percent FDR.
+  decoy_psms_kept:
+    source: computed
+    tool: Sage 0.14.6 (release binary v0.14.7)
+    where: Not in the paper. One decoy PSM passes the 1 percent threshold.
+  target_psms_fdr5:
+    source: computed
+    tool: Sage 0.14.6 (release binary v0.14.7)
+    where: >-
+      Not in the paper. A Python recount of the q-values gives the same number. The run must get it from a
+      comparison at 5 percent.
+data:
+  source: OpenMS example data (BSA1, BSA2, BSA3) and the protein database of the OpenMS TOPPAS identification example
+  url: https://github.com/OpenMS/OpenMS/tree/develop/share/OpenMS/examples
+  license: >-
+    The OpenMS software has the BSD 3-clause license. The license of the example data is not stated. The data
+    come from standard proteins and have no personal information.
+  size: 35 MB, three runs with 1120 tandem mass spectra each and a database of 119 proteins

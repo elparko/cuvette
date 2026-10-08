@@ -1,0 +1,130 @@
+kind: tool tutorial or test suite
+short: White 2021
+field: Flow cytometry
+program: FlowKit (Python), through the flowkit adapter
+citation:
+  authors: White S, Quinn J, Enzor J, Staats J, Mosier SM, Almarode J, Denny TN, Weinhold KJ, Ferrari G, Chan C
+  title: "FlowKit: a Python toolkit for integrated manual and automated cytometry analysis workflows"
+  venue: Frontiers in Immunology 12:768541
+  year: 2021
+  doi: 10.3389/fimmu.2021.768541
+related:
+  - text: "FlowKit tutorial notebook, part 3 (gating strategy and gating results). It gates the same file and prints the CD3+, CD4+ and CD8+ counts."
+    url: https://github.com/whitews/FlowKit/blob/master/docs/notebooks/flowkit-tutorial-part03-gating-strategy-and-gating-results-classes.ipynb
+  - text: "FlowKit test suite, tests/workspace_tests.py. A workspace test checks the CD3+ count of this file."
+    url: https://github.com/whitews/FlowKit/blob/master/tests/workspace_tests.py
+measured: >-
+  The paper describes FlowKit, a Python toolkit for flow cytometry. It reads FCS (Flow Cytometry Standard) files
+  and applies compensation, transforms and gates. It can read gates from Gating-ML files and from FlowJo
+  workspaces. The paper prints no event counts. The benchmark uses one sample of an intracellular cytokine staining
+  (ICS) experiment from the FlowKit repository, with the FlowJo workspace that gated it.
+instruction: >-
+  I have a flow cytometry file from a T cell stimulation experiment and the FlowJo workspace that a colleague gave
+  me. How many events are in the file, and how many are CD3+ T cells? How many of the T cells are CD4+ and how many
+  are CD8+? Do these counts match the FlowJo counts? What happens to the counts if nobody compensated the data, and
+  which gate changes most?
+instruction_basis: >-
+  Not from the text of the paper. The request follows the FlowKit tutorial notebooks and the workspace tests in the
+  FlowKit test suite. The compensation question tests a decision that the workspace already makes.
+answers:
+  gating_file:
+    decision: Gating file or FlowJo workspace
+    value: the FlowJo workspace 8_color_ICS.wsp
+    source: The workspace ships with the data in the FlowKit repository. The FlowKit tests use it.
+  compensation:
+    decision: Compensation for gating
+    value: the matrix in the workspace
+    source: >-
+      The workspace stores the compensation matrix that FlowJo used. The gates were drawn on compensated data.
+  free_compensation:
+    decision: Compensation for tools outside the workspace
+    value: none
+    source: Not used. The request asks only for the gates in the workspace.
+  compensation_matrix:
+    decision: Separate compensation matrix file
+    value: none
+    source: Not used. The workspace holds the matrix.
+  control_sample:
+    decision: Control sample
+    value: none
+    source: Not used. The request has no comparison with a control.
+  transform:
+    decision: Transform for hand-drawn gates
+    value: logicle
+    source: Not used for this request. The workspace has its own transforms. The benchmark keeps the adapter default.
+  transform_t:
+    decision: Logicle top of scale (T)
+    value: 262144
+    source: Not used for this request. The benchmark keeps the adapter default.
+  transform_w:
+    decision: Logicle linear width (W)
+    value: 0.5
+    source: Not used for this request. The benchmark keeps the adapter default.
+  transform_m:
+    decision: Logicle decades (M)
+    value: 4.5
+    source: Not used for this request. The benchmark keeps the adapter default.
+  transform_a:
+    decision: Logicle extra negative decades (A)
+    value: 0
+    source: Not used for this request. The benchmark keeps the adapter default.
+items:
+  events_in_file:
+    source: tutorial
+    where: >-
+      FlowKit tutorial notebook, part 1 (Sample class). It prints this sample with 290172 events. The workspace
+      stores the same count.
+  cd3_flowkit:
+    source: tutorial
+    where: >-
+      FlowKit tutorial notebook, part 3, gating results report. It gates this file with a Gating-ML copy of the same
+      gates. The workspace test in the FlowKit test suite checks the same count.
+  cd3_flowjo:
+    source: computed
+    tool: FlowKit 1.3.2, read from the workspace file
+    where: Not in the paper or a tutorial. FlowJo stored this count in the workspace file.
+  cd4_flowkit:
+    source: tutorial
+    where: FlowKit tutorial notebook, part 3, gating results report, gate CD4-pos.
+  cd4_flowjo:
+    source: computed
+    tool: FlowKit 1.3.2, read from the workspace file
+    where: Not in the paper or a tutorial. FlowJo stored this count in the workspace file.
+  cd8_flowkit:
+    source: tutorial
+    where: FlowKit tutorial notebook, part 3, gating results report, gate CD8-pos.
+  cd8_flowjo:
+    source: computed
+    tool: FlowKit 1.3.2, read from the workspace file
+    where: Not in the paper or a tutorial. FlowJo stored this count in the workspace file.
+  largest_difference_percent:
+    source: computed
+    tool: FlowKit 1.3.2
+    where: >-
+      Not in a source. The differences for CD3+, CD4+ and CD8+ are -0.142, -0.184 and -0.161 percent of the FlowJo
+      count.
+  cd3_no_compensation:
+    source: computed
+    tool: FlowKit 1.3.2
+    where: Not in a source. The benchmark authors ran the workspace gates with compensation set to none.
+  cd4_no_compensation:
+    source: computed
+    tool: FlowKit 1.3.2
+    where: Not in a source. The benchmark authors ran the workspace gates with compensation set to none.
+  cd8_no_compensation:
+    source: computed
+    tool: FlowKit 1.3.2
+    where: Not in a source. The benchmark authors ran the workspace gates with compensation set to none.
+  cd8_ifng_no_compensation:
+    source: computed
+    tool: FlowKit 1.3.2
+    where: >-
+      Not in a source. Without compensation, the interferon gamma (IFNg) gate under CD8+ grows from 2 to 672 events.
+      This is the largest relative change.
+data:
+  source: FlowKit repository, 8-color data set (one FCS file and the FlowJo workspace), commit f2159043
+  url: https://github.com/whitews/FlowKit/tree/f2159043b6a56e527d4baacf97490caf8354618e/data/8_color_data_set
+  license: >-
+    BSD 3-Clause (FlowKit repository). The samples are de-identified. The files that the benchmark read hold no
+    identifiers.
+  size: 17.4 MB FCS file with 290172 events and 15 channels. 436 KB workspace file.

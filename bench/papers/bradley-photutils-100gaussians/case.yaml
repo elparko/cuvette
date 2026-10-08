@@ -1,0 +1,134 @@
+kind: tool tutorial or test suite
+short: Bradley 2026
+field: Astronomy
+program: astropy and photutils (Python), through the astropy adapter
+citation:
+  authors: Bradley L, Sipőcz BM, Robitaille TP, Tollerud EJ, et al.
+  title: Photutils 3.0.0
+  venue: Zenodo, software release
+  year: 2026
+  doi: 10.5281/zenodo.19636730
+related:
+  - text: "Photutils user guide, background estimation. It prints the sky level and sky noise of the example image."
+    url: https://photutils.readthedocs.io/en/stable/user_guide/background.html
+  - text: "Photutils user guide, source detection with image segmentation. It uses the same example image."
+    url: https://photutils.readthedocs.io/en/stable/user_guide/segmentation.html
+  - text: "Astropy Collaboration. The Astropy Project: sustaining and growing a community-oriented open-source project and the latest major release (v5.0) of the core package. The Astrophysical Journal 935:167 (2022)."
+    doi: 10.3847/1538-4357/ac7c74
+measured: >-
+  Photutils is the Astropy package for source detection and photometry. Its user guide uses a simulated image
+  of 100 Gaussian sources on a flat background of 5 counts with Gaussian noise of standard deviation 2. The
+  simulation gives known true values for the background, the noise and the flux of each source. The benchmark
+  asks for the sky level and noise, the number of sources above the noise, and the flux of three isolated
+  sources. A clipped median of the sky is a little above 5, because the sources stay in the sample.
+instruction: >-
+  I have a small telescope image with a lot of stars on a flat sky. What is the sky level, and how noisy is
+  the sky? How many stars stand out from the noise? Measure the brightness of the stars at pixel positions
+  (48.70, 200.33), (145.05, 168.52) and (355.56, 252.20), with the sky taken out.
+instruction_basis: >-
+  The background estimation and source detection pages of the photutils user guide. Both use this example
+  image. The three positions are isolated sources from the table of the simulation.
+answers:
+  background_method:
+    decision: Background model
+    value: one global value for the image
+    source: Photutils background guide. The first example estimates one value with sigma-clipped statistics.
+  clip_sigma:
+    decision: Sigma for the clipping of the background
+    value: 3
+    source: Photutils background guide. It clips at 3 sigma.
+  mask_sources:
+    decision: Mask the sources before the background estimate
+    value: false
+    source: >-
+      Photutils background guide. The first example does not mask sources. The guide then shows a masked
+      estimate that is closer to the true value of 5.
+  detect_nsigma:
+    decision: Detection threshold
+    value: 3 times the background noise
+    source: Not from the guide, which uses 1.5 times the noise. The benchmark uses 3.
+  min_pixels:
+    decision: Smallest number of connected pixels for a source
+    value: 10
+    source: Photutils segmentation guide. It uses 10 connected pixels.
+  kernel_fwhm:
+    decision: Smoothing kernel before detection
+    value: Gaussian with a full width at half maximum (FWHM) of 3 pixels
+    source: Photutils segmentation guide. It smooths with a Gaussian kernel of FWHM 3 pixels.
+  deblend:
+    decision: Split touching sources (deblend)
+    value: false
+    source: >-
+      Photutils segmentation guide. The detection step does not deblend. The guide deblends in a later step,
+      which the benchmark does not use.
+  aperture_radius:
+    decision: Aperture radius
+    value: 10 pixels
+    source: >-
+      Not from the guide. The benchmark picks a radius that holds almost all the flux of these sources, which
+      have a width of 2.5 pixels or less.
+  local_background:
+    decision: Local sky for each aperture
+    value: an annulus around the source
+    source: Not from the guide. The benchmark picks a sky annulus.
+  annulus_inner:
+    decision: Inner radius of the sky annulus
+    value: 15 pixels
+    source: Not from the guide. The benchmark picks the value.
+  annulus_outer:
+    decision: Outer radius of the sky annulus
+    value: 20 pixels
+    source: Not from the guide. The benchmark picks the value.
+  background_estimator:
+    decision: Estimator for a 2D background
+    value: SExtractor estimator
+    source: >-
+      The photutils default for a 2D background. It applies only if the run fits a 2D background in place of
+      the global value.
+  box_size:
+    decision: Box size for a 2D background
+    value: 50 pixels
+    source: >-
+      Photutils segmentation guide. It uses boxes of 50 by 50 pixels. It applies only if the run fits a 2D
+      background.
+items:
+  sky_level:
+    source: tutorial
+    where: >-
+      Photutils background guide. sigma_clipped_stats with sigma=3 prints a median of 5.152. The true
+      background is 5.
+  sky_noise:
+    source: tutorial
+    where: >-
+      Photutils background guide. The same call prints a standard deviation of 2.094. The true noise is 2.
+  sources_detected:
+    source: computed
+    tool: photutils 3.0.0 with astropy 8.0.1, checked with a second method in SciPy only
+    where: >-
+      Not in the guide. The segmentation guide uses a 1.5-sigma threshold and a 2D background, and it finds
+      86 sources. The benchmark uses 3 sigma and one global background.
+  net_flux_48_70_200_33:
+    source: computed
+    tool: photutils 3.0.0, table of the injected sources of make_100gaussians_image
+    where: >-
+      Not in the guide. The value is the injected flux of this source in the simulation table, not a
+      measurement. The tolerance is three times the sky noise in the aperture.
+  net_flux_145_05_168_52:
+    source: computed
+    tool: photutils 3.0.0, table of the injected sources of make_100gaussians_image
+    where: >-
+      Not in the guide. The value is the injected flux of this source in the simulation table, not a
+      measurement. The tolerance is three times the sky noise in the aperture.
+  net_flux_355_56_252_20:
+    source: computed
+    tool: photutils 3.0.0, table of the injected sources of make_100gaussians_image
+    where: >-
+      Not in the guide. The value is the injected flux of this source in the simulation table, not a
+      measurement. The tolerance is three times the sky noise in the aperture.
+data:
+  source: >-
+    Simulated image from photutils.datasets.make_100gaussians_image, written to a Flexible Image Transport
+    System (FITS) file by the data script of the astropy adapter
+  url: https://photutils.readthedocs.io/en/stable/api/photutils.datasets.make_100gaussians_image.html
+  license: BSD 3-clause (photutils). Simulated data, no person and no identifiers.
+  size: 605 KB, one image of 300 x 500 pixels with 100 injected sources
