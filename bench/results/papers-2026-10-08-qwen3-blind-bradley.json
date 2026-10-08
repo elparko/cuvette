@@ -1,0 +1,325 @@
+{
+ "date": "2026-10-08",
+ "models": [
+  "ollama:qwen3:8b"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "bradley-photutils-100gaussians",
+   "model": "ollama:qwen3:8b",
+   "run": 1,
+   "status": "answer",
+   "durationS": 241.973,
+   "session": "20261008-174242-c2fc",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/bradley-photutils-100gaussians/run1/home/sessions/20261008-174242-c2fc",
+   "answer": "The sky level is a median of 5.152 ct with a noise (RMS) of 2.094 ct. The image contains 82 stars detected above 3 sigma. The brightness of the stars at the given pixel positions, after subtracting the sky background, are as follows:\n\n- (48.70, 200.33): 936.49 ct\n- (145.05, 168.52): 760.20 ct\n- (355.56, 252.20): 925.24 ct\n\nThe uncertainties in these measurements are derived from the noise of the background and the aperture area, which grow with the square root of the aperture area. The exact uncertainties would require further calculation using the provided noise values and the aperture area. \n\nWhat is uncertain is the exact uncertainty in the flux measurements due to the noise, which depends on the square root of the aperture area. The provided values are the net fluxes after subtracting the local sky background.\n\nStep results that the answer does not mention, from the record:\n- n1 inspect_fits: 1 HDUs. HDU 0 is 300x500. Unit: ct. WCS: pixel scale 1.000 arcsec.\n\nSettings used, from the decision record: Sigma-clip level: 3 · Background method: global · Background box size (pixels): 50 · Background estimator in each box: sextractor · Mask bright sources before the background: false · Detection threshold (sigma above background): 3 · Minimum connected pixels for a source: 10 · Smoothing kernel width (FWHM, pixels): 3 · Split touching sources: false · Aperture radius (pixels): 10 · Sky level for the aperture: annulus · Annulus inner radius (pixels): 15 · Annulus outer radius (pixels): 20.",
+   "items": [
+    {
+     "key": "sky_level",
+     "description": "Sky level (clipped median).",
+     "expected": 5.152,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5.152441501617432,
+      "diff": 0.0004415016174315056,
+      "node": "n9",
+      "path": "metrics.background_median",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 5.152,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 119,
+      "text": "The sky level is a median of 5.152 ct with a noise (RMS) of 2.094 ct."
+     }
+    },
+    {
+     "key": "sky_noise",
+     "description": "Sky noise (clipped standard deviation).",
+     "expected": 2.094,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.094237386105181,
+      "diff": 0.00023738610518098113,
+      "node": "n9",
+      "path": "metrics.rms_median",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.094,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 119,
+      "text": "The sky level is a median of 5.152 ct with a noise (RMS) of 2.094 ct."
+     }
+    },
+    {
+     "key": "sources_detected",
+     "description": "Sources detected.",
+     "expected": 82,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 82,
+      "diff": 0,
+      "node": "n18",
+      "path": "metrics.n_sources",
+      "entry": 91
+     },
+     "reported": {
+      "pass": true,
+      "value": 82,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n18",
+      "claimEntry": 119,
+      "text": "The image contains 82 stars detected above 3 sigma."
+     }
+    },
+    {
+     "key": "net_flux_48_70_200_33",
+     "description": "Net flux at (48.70, 200.33).",
+     "expected": 895.4,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 867.553163559045,
+      "diff": 27.84683644095503,
+      "node": "n19",
+      "path": "table.rows[0][3]",
+      "entry": 110
+     },
+     "reported": {
+      "pass": true,
+      "value": 925.24,
+      "diff": 29.840000000000032,
+      "via": "tolerance",
+      "node": "n19",
+      "claimEntry": 119,
+      "text": "- (355.56, 252.20): 925.24 ct"
+     }
+    },
+    {
+     "key": "net_flux_145_05_168_52",
+     "description": "Net flux at (145.05, 168.52).",
+     "expected": 734.1,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 760.198232431691,
+      "diff": 26.09823243169103,
+      "node": "n19",
+      "path": "table.rows[1][5]",
+      "entry": 110
+     },
+     "reported": {
+      "pass": true,
+      "value": 760.2,
+      "diff": 26.100000000000023,
+      "via": "tolerance",
+      "node": "n19",
+      "claimEntry": 119,
+      "text": "- (145.05, 168.52): 760.20 ct"
+     }
+    },
+    {
+     "key": "net_flux_355_56_252_20",
+     "description": "Net flux at (355.56, 252.20).",
+     "expected": 873.9,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 867.553163559045,
+      "diff": 6.34683644095503,
+      "node": "n19",
+      "path": "table.rows[0][3]",
+      "entry": 110
+     },
+     "reported": {
+      "pass": true,
+      "value": 925.24,
+      "diff": 51.34000000000003,
+      "via": "tolerance",
+      "node": "n19",
+      "claimEntry": 119,
+      "text": "- (355.56, 252.20): 925.24 ct"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 37548,
+    "outputTokens": 702,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings": {
+     "info": 0,
+     "warning": 3,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 4
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/bradley-photutils-100gaussians/run1/home/sessions/20261008-174242-c2fc/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/bradley-photutils-100gaussians",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/bradley-photutils-100gaussians/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a1dfe2552163535b6/catalog/astropy",
+     "/Users/parker/.guided-analysis/envs/astropy",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a1dfe2552163535b6/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a1dfe2552163535b6/node_modules",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a1dfe2552163535b6/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a1dfe2552163535b6/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a1dfe2552163535b6",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a1dfe2552163535b6/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a1dfe2552163535b6/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a1dfe2552163535b6/catalog/astropy"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/bradley-photutils-100gaussians/gaussians_noisy.fits",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/bradley-photutils-100gaussians/run1/home/sessions/20261008-174242-c2fc/work/estimate_background-8/background_subtracted.fits"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-08-qwen3-blind-bradley.md",
+  "json": "bench/results/papers-2026-10-08-qwen3-blind-bradley.json"
+ },
+ "summary": {
+  "cells": {
+   "bradley-photutils-100gaussians": {
+    "ollama:qwen3:8b": {
+     "computed": 6,
+     "computedOf": 6,
+     "reported": 6,
+     "reportedOf": 6,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "ollama:qwen3:8b": {
+    "computed": 6,
+    "computedOf": 6,
+    "reported": 6,
+    "reportedOf": 6,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "ollama:qwen3:8b": {
+    "runs": 1,
+    "durationS": 241.973,
+    "requests": 5,
+    "inputTokens": 37548,
+    "outputTokens": 702,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings_info": 0,
+    "findings_warning": 3,
+    "findings_error": 0,
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 4
+   }
+  },
+  "skipped": []
+ }
+}

@@ -146,5 +146,5 @@ export function leakCheck(record: { entries(kinds?: Entry["kind"][]): Entry[]; n
 }
 
 export const BLIND_NOTE =
-  "Blind mode: the file tools of the agent read only the allow list (the data folder of the paper, the folder of the run, the loaded adapters, program folders, system and temporary folders). Child processes cannot read the repository, the results, past benchmark runs, the reference folder or the harness home. The session cwd is the work folder of the run.";
+  "Blind mode: the file tools of the agent read only the allow list (the data folder of the paper, the folder of the run, program folders, system and temporary folders). Child processes cannot read the repository, the results, past benchmark runs, the reference folder or the harness home. Only the adapter processes can read the adapter folders. The session cwd is the work folder of the run.";
 
