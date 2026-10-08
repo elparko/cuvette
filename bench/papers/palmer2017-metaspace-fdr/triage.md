@@ -16,3 +16,5 @@ Other findings:
 - e39 to e112 (a): 13 tool calls failed with KeyError: offSample or msm. The answers file sets the database to HMDB v2.5. The dataset 2019-03-28_09h18m57s was processed with HMDB v4, LipidMaps and SwissLipids, so the result table had no columns. Fixed in 3e62321: the error names the databases of the dataset.
 
 Commits in this branch for this paper: 3e62321, 45fa127
+
+Status: not runnable. The numbers need an upload tool for the three section files and a METASPACE account. The adapter has no upload tool. The three items are reference items and leave the score. Claude runs this paper and its numbers differ for the same reason.
