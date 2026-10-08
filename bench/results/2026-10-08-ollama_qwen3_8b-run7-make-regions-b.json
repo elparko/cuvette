@@ -1,0 +1,178 @@
+{
+  "model": "ollama:qwen3:8b",
+  "guidance": "on",
+  "rows": [
+    {
+      "id": "msi-rim-vs-core",
+      "on": {
+        "answer": 0,
+        "traps": 0.3333333333333333,
+        "decisions": 1,
+        "asking": 1,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "Sulfatide 42:2;O3 (m/z 904.62) is higher in the rim.",
+                "found": false
+              },
+              {
+                "description": "HexCer 42:2;O3 (m/z 824.66) is higher in the rim.",
+                "found": false
+              },
+              {
+                "description": "PS 40:6, PE 38:4 or PI 38:4 is higher in the core.",
+                "found": false
+              },
+              {
+                "description": "Sulfatide 42:2;O3 is about 7 times higher in the rim (TIC normalized).",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "pixels_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "fell_in",
+              "score": 0
+            },
+            {
+              "id": "isotope_peaks",
+              "kind": "adduct_or_isotope",
+              "outcome": "neither",
+              "score": 0.5
+            },
+            {
+              "id": "ubiquitous_lipid_normalization",
+              "kind": "normalization_artifact",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 1,
+            "precision": 1,
+            "recall": 1,
+            "asked": [
+              "replicate",
+              "norm"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": []
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 4,
+            "with_route": 4,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-114855-716d"
+    },
+    {
+      "id": "msi-lesion",
+      "on": {
+        "answer": 0,
+        "traps": 0.5,
+        "decisions": 1,
+        "asking": 1,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "A small focal region (lesion) is found inside the tissue.",
+                "found": false
+              },
+              {
+                "description": "LPA 18:1 is higher in the lesion.",
+                "found": false
+              },
+              {
+                "description": "FA 18:1 and FA 22:6 are higher in the lesion.",
+                "found": false
+              },
+              {
+                "description": "LPA 18:1 is about 4 times higher in the lesion than in the core (TIC normalized).",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "pixels_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "neither",
+              "score": 0.5
+            },
+            {
+              "id": "isotope_peaks",
+              "kind": "adduct_or_isotope",
+              "outcome": "neither",
+              "score": 0.5
+            },
+            {
+              "id": "ubiquitous_lipid_normalization",
+              "kind": "normalization_artifact",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 1,
+            "precision": 1,
+            "recall": 1,
+            "asked": [
+              "replicate",
+              "norm"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": []
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 27,
+            "measured": 27
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 4,
+            "with_route": 4,
+            "protocol": true
+          },
+          "has_answer": false
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-115347-d5f1"
+    }
+  ]
+}

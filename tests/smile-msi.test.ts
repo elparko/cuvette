@@ -49,7 +49,7 @@ describe("smile-msi manifest", () => {
     expect(m.locate.paths).toContain("~/Code/SMILE-MSI/.venv/Scripts/python.exe");
     expect(m.module).toBe("adapter.ts");
     expect(adapter.standardsText()).toContain("putative");
-    expect(adapter.skills().map((s) => s.name).sort()).toEqual(["compare-regions", "explore-slide", "follow-mode", "identify-lipids", "teach-mode"]);
+    expect(adapter.skills().map((s) => s.name).sort()).toEqual(["build-regions", "compare-regions", "explore-slide", "follow-mode", "identify-lipids", "teach-mode"]);
     for (const s of adapter.skills()) expect(s.description.length).toBeGreaterThan(10);
   });
 
@@ -113,7 +113,7 @@ describe("smile-msi manifest", () => {
   });
 
   test("known-answer tests are declared", () => {
-    expect(adapter.manifest.tests.map((t) => t.id)).toEqual(["demo-opens", "settings-apply", "demo-planted-lipids", "demo-rim-vs-core", "demo-norm-none"]);
+    expect(adapter.manifest.tests.map((t) => t.id)).toEqual(["demo-opens", "settings-apply", "demo-planted-lipids", "demo-rim-vs-core", "demo-norm-none", "demo-make-regions"]);
   });
 
   test("manualRoute joins the map route and the argument values", async () => {

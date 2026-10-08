@@ -405,6 +405,17 @@ map:
     summary: Ran a script.
     params:
       - { arg: code, label: Script editor }
+  - tool: make_regions
+    route: Regions panel. Draw the tissue outline, the rim band, the core and the lesion. Set a name for each.
+    fidelity: close
+    difference: The tool finds the regions by rule. The tissue is the pixels above the midpoint between background and
+      tissue signal. The rim is the outer 30 percent of the tissue depth. The core is the tissue deeper than 50 percent. The
+      lesion is the smallest compact k-means cluster. In the program you draw the shapes by hand.
+    evidence:
+      source: program_definitions
+      test: demo-make-regions
+      note: Uses the same slide masks and segmentation as the program. The wrapper adds the rule.
+    summary: "Made regions from the tissue signal."
   - tool: send_regions
     route: Draw each region in the Regions panel and set its group
     fidelity: close
@@ -1332,6 +1343,30 @@ tests:
             norm: none
     expect:
       - { path: metrics.n_q_pass, equals: 29 }
+  - id: demo-make-regions
+    description: make_regions builds tissue, rim, core and lesion on the demo slide. The rim differs from the core.
+    calls:
+      - tool: open_slide
+        args:
+          ref: demo
+      - tool: make_regions
+        save_as: made
+      - tool: find_peaks
+        args:
+          max_peaks: 40
+      - tool: run_analysis
+        args:
+          step_id: roi_comparison
+          a: rim
+          b: core
+          params:
+            norm: tic
+    expect:
+      - { path: saved.made.data.lesion_found, equals: true }
+      - { path: saved.made.summary, contains: "tissue (1007 px)" }
+      - { path: saved.made.data.regions.2.n_pixels, equals: 255 }
+      - { path: saved.made.data.regions.3.n_pixels, equals: 41 }
+      - { path: metrics.n_q_pass, equals: 31 }
 data_rules:
   cloud_visibility: all
   note: The tools return summaries and tables of at most 12 rows. Full tables stay in the work folder.

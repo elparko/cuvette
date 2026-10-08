@@ -5,6 +5,7 @@ analysis. Follow these rules in every answer.
 
 ## How to work
 
+- For a question about a rim, a core or a lesion, call `make_regions` first. It makes `tissue`, `rim`, `core` and `lesion`. Then call `run_analysis` with those names. Do not compare Group A and Group B for these questions.
 - Get every number, image and lipid assignment from a tool result in this session. Never state a value that no tool gave.
 - Show an image or a table when it helps the scientist decide. Keep each figure to one purpose.
 - Before a long or important analysis, say in two sentences what you plan to do and why.

@@ -2,6 +2,8 @@ import functools
 import inspect
 import os
 
+import numpy as np
+
 if os.environ.get("GA_WORK_DIR"):
     os.environ["SMILE_MSI_MCP_OUT"] = os.environ["GA_WORK_DIR"]
 
@@ -17,6 +19,7 @@ ROUTES = {
     "find_peaks": "Analyze > This slide > Peaks > Find peaks > Run.",
     "find_peaks_spatial": "Analyze > This slide > Peaks > Find spatial features > Run.",
     "run_script": "Data > Analysis script... > paste the code > Run.",
+    "make_regions": "Regions panel: draw the tissue outline, the rim band, the core and the lesion, and set a name for each.",
     "send_regions": "Draw each region in the Regions panel and set its group.",
     "ion_image": "Ion image tab: click the m/z in the peak table. The Display panel sets the normalization.",
     "mean_spectrum": "Ion image tab: the spectrum plot.",
@@ -115,6 +118,55 @@ def history(ref: str = "") -> dict:
     return {"ref": os.path.basename(path).removesuffix(".json"), "n_runs": len(runs), "steps": steps}
 
 
+def make_regions(rim_fraction: float = 0.3, clusters: int = 4) -> dict:
+    """Make the regions rim, core, lesion and tissue. Call this first for any question about a rim, a core,
+    an outer or inner zone, or a lesion. It takes no required argument. The slide only has the halves left and
+    right until you call it. The tissue is the pixels with signal above the midpoint between background and
+    tissue. The rim is the outer band of the tissue (rim_fraction of the greatest depth). The core is the tissue deeper than half of the
+    greatest depth. The lesion is the smallest compact cluster of a k-means segmentation of the tissue
+    (clusters = 4); it is left out if no cluster has 10 to 150 pixels. Then use the names in
+    run_analysis (roi_comparison with a and b, or discriminating_features with groups)."""
+    from scipy import ndimage
+
+    slide = mcpserver._slide()
+    api, ds = slide.api, slide.ds
+    rim_fraction = float(rim_fraction)
+    if not 0.05 <= rim_fraction <= 0.45:
+        raise ValueError("rim_fraction must be between 0.05 and 0.45")
+    tic = np.asarray(ds.tic(), float)
+    cut = (np.percentile(tic, 5) + np.percentile(tic, 95)) / 2
+    rows, cols = ds._pixel_rows_cols()
+    grid = np.zeros((ds.height, ds.width), bool)
+    grid[rows, cols] = tic > cut
+    grid = ndimage.binary_fill_holes(grid)
+    tissue = grid[rows, cols]
+    if tissue.sum() < 50:
+        raise ValueError("the tissue has fewer than 50 pixels above the background")
+    depth = ndimage.distance_transform_edt(grid)[rows, cols]
+    top = depth.max()
+    rim = tissue & (depth <= rim_fraction * top)
+    core = tissue & (depth > 0.5 * top)
+    lesion = None
+    if not api.get_features():
+        api.find_peaks(snr=3, max_peaks=300)
+    labels = np.asarray(api.segment(n_clusters=int(clusters), mask=tissue).labels)
+    sizes = {c: int((labels == c).sum()) for c in np.unique(labels[labels >= 0])}
+    small = [c for c, n in sizes.items() if 10 <= n <= 150]
+    if small:
+        pick = min(small, key=lambda c: sizes[c])
+        lesion = labels == pick
+        core = core & ~lesion
+        rim = rim & ~lesion
+    made = {"tissue": tissue, "rim": rim, "core": core}
+    if lesion is not None:
+        made["lesion"] = lesion
+    for name, mask in made.items():
+        api.add_region(name, mask)
+    return {"regions": [{"name": k, "n_pixels": int(v.sum())} for k, v in made.items()],
+            "lesion_found": lesion is not None,
+            "note": "Regions are staged. Use the names in run_analysis. Call send_regions to give them to the app."}
+
+
 def state() -> dict:
     """The open slide's live state: slide reference, regions with their groups and pixel counts,
     group sizes, the current extraction settings (ppm, norm, reduce, TIC cap) and the number
@@ -123,7 +175,11 @@ def state() -> dict:
         return {"slide_open": False}
     slide = mcpserver._open["slide"]
     base = mcpserver.state()
+    names = [r["name"] for r in base.get("regions", [])]
+    hint = ({} if {"rim", "core", "lesion"} & set(names) else
+            {"hint": "The regions are only halves of the slide. For a rim, a core or a lesion, call make_regions first."})
     return {
+        **hint,
         "slide_open": True,
         "ref": mcpserver._open["ref"],
         "source": slide.source,
@@ -218,9 +274,12 @@ def _summary(name, args, out, m):
         kind = "spatial features" if args.get("spatial") else "peaks"
         return f"Found {out['n_features']} {kind} ({out['n_detected']} detected before any cap)."
     if name == "open_slide":
-        return f"Opened {out['ref']}: {out['n_pixels']} pixels, {len(out['regions'])} regions."
+        more = " Next: call make_regions for a rim, a core or a lesion." if out.get("hint") else ""
+        return f"Opened {out['ref']}: {out['n_pixels']} pixels, {len(out['regions'])} regions.{more}"
     if name == "annotate":
         return f"Matched {m.get('n_matched', 0)} of {m.get('n_rows', 0)} features to a lipid ({args['mode']} mode)."
+    if name == "make_regions":
+        return "Made regions: " + ", ".join(f"{r['name']} ({r['n_pixels']} px)" for r in out["regions"]) + "."
     if name == "run_script":
         return f"Script: {out['summary']}."
     if name == "apply_settings":
@@ -280,6 +339,8 @@ def build_server():
     own = {"open_slide": open_slide, "state": state}
     tools = tuple((own.get(f.__name__, f), title, ro) for f, title, ro in mcpserver.TOOLS)
     tools += ((apply_settings, "Apply settings to the open slide", False), (history, "Steps the scientist ran in the app", True))
+    at = next(i for i, t in enumerate(tools) if t[0].__name__ == "state") + 1
+    tools = tools[:at] + ((make_regions, "Make tissue, rim, core and lesion regions", False),) + tools[at:]
     mcpserver.TOOLS = tuple((_wrap(f), title, ro) for f, title, ro in tools)
     guard = mcpserver._guarded
     mcpserver._guarded = lambda fn: guard(fn if hasattr(fn, "__signature__") else _wrap(fn))
