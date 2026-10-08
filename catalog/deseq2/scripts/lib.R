@@ -169,6 +169,8 @@ run_tximport <- function(p, cd) {
 
 load_input <- function(p) {
   type <- input_type_of(p)
+  is_rds <- grepl("\\.rds$", need_file(p$counts, "input file"), ignore.case = TRUE)
+  if (is_rds != (type == INPUT_TYPES[4])) fail(sprintf("the input type is %s, but %s %s an .rds file. Give a file of this input type as counts, or ask the scientist to change the input type", type, p$counts, if (is_rds) "is" else "is not"))
   program <- NULL
   len_name <- NA
   cd <- if (!is.null(p$coldata) && nzchar(p$coldata)) read_coldata(p$coldata) else NULL
