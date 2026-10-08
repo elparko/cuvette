@@ -5,3 +5,4 @@ dist/
 __pycache__/
 *.pyc
 bench/results/home/
+.claude/worktrees/
