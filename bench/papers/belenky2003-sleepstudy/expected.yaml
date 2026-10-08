@@ -1,0 +1,25 @@
+tool: statsmodels mixedlm (or R lme4)
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/belenky2003-sleepstudy/sleepstudy.csv
+decisions:
+  formula: "Reaction ~ Days"
+  groups: Subject
+  random_effects: "~Days (random intercept and slope)"
+  reml: true
+  alpha: 0.05
+  replication_unit: "subject (18)"
+expected:
+  - {description: "Days slope (ms per day)", value: 10.467, tolerance: 0.01, source: "lme4 documentation sleepstudy example; computed"}
+  - {description: "intercept (ms)", value: 251.405, tolerance: 0.01, source: "lme4 documentation; computed"}
+  - {description: "SE of Days, random slope model", value: 1.546, tolerance: 0.01, source: "lme4 documentation (1.546); computed"}
+  - {description: "SE of Days, random intercept only", value: 0.804, tolerance: 0.01, source: "lme4; computed"}
+  - {description: "SE of Days, OLS trap", value: 1.238, tolerance: 0.01, source: "computed"}
+  - {description: "subject intercept variance, slope model", value: 612.10, tolerance: 0.5, source: "lme4 documentation; computed"}
+  - {description: "slope variance", value: 35.07, tolerance: 0.1, source: "lme4 documentation; computed"}
+  - {description: "residual variance, slope model", value: 654.94, tolerance: 0.5, source: "lme4 documentation; computed"}
+notes: |
+  Values were not read from the 2003 paper.
+  Trap: OLS gives the same slope, 10.467, with a standard error of 1.238. That treats 180 rows as independent.
+  Trap: a random intercept alone gives a standard error of 0.804. That is too small because each subject has its own slope.
+  The statsmodels random-slope fit matches lme4 on this data. The correlation of intercept and slope is estimated.

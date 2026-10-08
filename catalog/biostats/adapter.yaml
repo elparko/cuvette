@@ -1,0 +1,703 @@
+adapter:
+  name: biostats
+  title: Biostatistics (statsmodels, pingouin, lifelines)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Runs classical tests, ANOVA, regression, mixed models and survival analysis on a CSV file.
+    Each tool reads one CSV file and names its columns. The scientist can repeat each step with
+    the code line in the map.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: statsmodels, pingouin, lifelines
+  version: "lifelines 0.30.3, statsmodels 0.15.0, pingouin 0.7.0, scipy 1.18.1"
+  tested_versions: ["0.30.3"]
+  homepage: https://lifelines.readthedocs.io
+  docs:
+    - https://www.statsmodels.org/stable/mixed_linear.html
+    - https://pingouin-stats.org/build/html/index.html
+    - https://lifelines.readthedocs.io/en/latest/Survival%20Regression.html
+    - https://lifelines.readthedocs.io/en/latest/Survival%20analysis%20with%20lifelines.html
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 600
+
+locate:
+  env: GA_BIOSTATS_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/biostats/bin/python
+    - ~/.guided-analysis/envs/biostats/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import lifelines; print(lifelines.__version__)"]
+  version_pattern: '(\d+\.\d+\.\d+)'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, small tables and the plot. It never sees the rows of the CSV file.
+
+decisions:
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - subjects, patients or animals (one value per subject)
+      - repeated measures on the same subjects (model the subject)
+      - samples measured more than once (average first)
+    default: subjects, patients or animals (one value per subject)
+    group: Design
+    help: >
+      Rows from the same patient, animal or sample are not independent. Count subjects as n.
+      If each subject has many rows, use a mixed model with the subject as the group, or average the rows first.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: alpha
+    label: Significance level (alpha)
+    kind: float
+    default: 0.05
+    lo: 0.0001
+    hi: 0.5
+    group: Inference
+    help: A p-value below alpha is called significant. The confidence level is 1 minus alpha. Choose alpha before you see the p-value.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: compare_two_groups, arg: alpha }
+      - { tool: anova_oneway, arg: alpha }
+      - { tool: adjust_pvalues, arg: alpha }
+      - { tool: fit_ols, arg: alpha }
+      - { tool: fit_mixed_model, arg: alpha }
+      - { tool: kaplan_meier, arg: alpha }
+      - { tool: fit_cox, arg: alpha }
+
+  - key: paired
+    label: Paired test
+    kind: bool
+    group: Two-group comparison
+    help: >
+      Use a paired test if the same subject is measured in both groups (before and after, or both drugs in one patient).
+      Use an unpaired test if the groups hold different subjects. The two choices can give different conclusions.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_two_groups, arg: paired }
+
+  - key: two_group_test
+    label: Test family for two groups
+    kind: choice
+    choices: [t, wilcoxon]
+    default: t
+    group: Two-group comparison
+    help: >
+      t is the t-test. It compares means and gives a confidence interval. wilcoxon is the rank test
+      (signed-rank if paired, Mann-Whitney if unpaired). Use it if the data are far from normal or have outliers.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_two_groups, arg: test }
+
+  - key: equal_variance
+    label: Assume equal variances (unpaired t-test)
+    kind: bool
+    default: false
+    group: Two-group comparison
+    help: False gives the Welch test. It does not assume equal variances. True gives the Student test. Student's test is correct only if the group variances are equal.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_two_groups, arg: equal_variance }
+
+  - key: alternative
+    label: Sidedness
+    kind: choice
+    choices: [two-sided, greater, less]
+    default: two-sided
+    group: Two-group comparison
+    help: >
+      Two-sided tests for a difference in either direction. One-sided tests for one direction only
+      (the second group greater than the first, or less). Choose a one-sided test only if the other direction is not of interest, and decide before you see the data.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_two_groups, arg: alternative }
+
+  - key: anova_variance
+    label: ANOVA variance assumption
+    kind: choice
+    choices: [equal, unequal]
+    default: equal
+    group: ANOVA
+    help: Equal gives the classic F test. Unequal gives the Welch F test. Use unequal if the Levene test or the group spreads show unequal variances.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: anova_oneway, arg: variance }
+
+  - key: posthoc
+    label: Pairwise comparisons after ANOVA
+    kind: choice
+    choices: [none, tukey, games-howell, bonferroni, holm, fdr_bh]
+    default: none
+    group: Multiple comparisons
+    help: >
+      The pairwise comparisons are many tests. Each choice controls the error rate in a different way.
+      Tukey fits equal variances. Games-Howell fits unequal variances. Bonferroni and Holm adjust t-test p-values (Holm is never less powerful than Bonferroni).
+      fdr_bh controls the false discovery rate, not the chance of any false positive.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: anova_oneway, arg: posthoc }
+
+  - key: p_adjust_method
+    label: Correction for a list of p-values
+    kind: choice
+    choices: [bonferroni, holm, sidak, fdr_bh, fdr_by]
+    default: holm
+    group: Multiple comparisons
+    help: >
+      Use this when you ran many tests. Bonferroni, Holm and Sidak control the chance of any false positive.
+      fdr_bh and fdr_by control the share of false positives among the positives.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: adjust_pvalues, arg: method }
+
+  - key: model_formula
+    label: Model formula
+    kind: text
+    group: Regression and mixed model
+    help: >
+      The formula lists the outcome and the covariates, for example "Reaction ~ Days". The covariates you add or leave out
+      change the effect you report. Choose them from the science, not from the p-values. Use C(x) for a category coded as numbers.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_ols, arg: formula }
+      - { tool: fit_mixed_model, arg: formula }
+
+  - key: standard_errors
+    label: Standard errors for the linear model
+    kind: choice
+    choices: [nonrobust, HC3, cluster]
+    default: nonrobust
+    group: Regression and mixed model
+    help: >
+      nonrobust assumes independent rows with equal variance. HC3 allows unequal variance.
+      cluster allows rows from the same subject to be correlated. It needs the cluster column and 30 or more clusters to be reliable.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_ols, arg: cov_type }
+
+  - key: random_effects
+    label: Random effects of the mixed model
+    kind: text
+    default: "1"
+    group: Regression and mixed model
+    help: >
+      "1" gives one random intercept for each subject. "~Days" adds a random slope for Days, so each subject has its own trend.
+      A random intercept alone gives standard errors that are too small for effects that change within a subject.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_mixed_model, arg: re_formula }
+
+  - key: reml
+    label: Fit by REML
+    kind: bool
+    default: true
+    group: Regression and mixed model
+    help: REML gives better variance estimates. Use ML (false) only to compare models that differ in their fixed effects.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_mixed_model, arg: reml }
+
+  - key: cox_covariates
+    label: Covariates of the Cox model
+    kind: text
+    group: Survival
+    help: >
+      Column names, separated by commas. Each is adjusted for in the hazard ratio of the others.
+      Add a covariate only if the science says it belongs. Do not choose by p-value.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_cox, arg: covariates }
+
+  - key: ties
+    label: Ties method of the Cox model
+    kind: choice
+    choices: [efron, breslow]
+    default: efron
+    group: Survival
+    help: >
+      Several subjects can have an event at the same time. Efron handles the ties more accurately. Breslow is simpler and is the default in some programs.
+      The two differ when there are many ties. R coxph uses Efron. SAS and some older programs use Breslow.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_cox, arg: ties }
+    sensitivity:
+      options: [efron, breslow]
+      tool: fit_cox
+      compare: [metrics.concordance, metrics.coef_fin, metrics.log_likelihood]
+      max_runs: 2
+
+  - key: cox_strata
+    label: Strata of the Cox model
+    kind: text
+    group: Survival
+    help: Column names, separated by commas. Each stratum gets its own baseline hazard. Use it for a variable that breaks the proportional hazards assumption. A stratum variable has no hazard ratio.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_cox, arg: strata }
+
+tools:
+  - name: inspect_table
+    title: Inspect the CSV file
+    description: List the columns of a CSV file with the type, the number of missing values, the number of distinct values and the range.
+    read_only: true
+    function: "ga_biostats:inspect_table"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+    required: [path]
+
+  - name: compare_two_groups
+    title: Compare two groups
+    description: >
+      Test the difference of an outcome between two groups. Paired or unpaired. t-test or rank test.
+      The difference is the second group minus the first group, in sorted order of the group labels.
+      A paired test needs id_column.
+    function: "ga_biostats:compare_two_groups"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      outcome: { type: string, description: Column of the measured values. }
+      group: { type: string, description: Column with exactly 2 group labels. }
+      test: { type: string, enum: [t, wilcoxon], default: t, description: "t is the t-test. wilcoxon is the signed-rank test (paired) or the Mann-Whitney test (unpaired)." }
+      paired: { type: boolean, default: false, description: True if the same subject is in both groups. }
+      id_column: { type: string, description: Column that names the subject. Needed if paired. Used to warn if an unpaired test has the same subjects in both groups. }
+      alternative: { type: string, enum: [two-sided, greater, less], default: two-sided, description: "greater means the second group is greater than the first." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. The confidence level is 1 minus alpha. }
+      equal_variance: { type: boolean, default: false, description: "Unpaired t-test only. False is Welch. True is Student." }
+    required: [path, outcome, group]
+    outputs:
+      result: { kind: table, ext: csv, description: The test result. }
+
+  - name: anova_oneway
+    title: One-way ANOVA
+    description: >
+      Test whether the mean of an outcome differs across 3 or more groups. Reports F, p and partial eta squared,
+      the Levene test of equal variances, and optional pairwise comparisons.
+    function: "ga_biostats:anova_oneway"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      outcome: { type: string, description: Column of the measured values. }
+      group: { type: string, description: Column with the group labels. }
+      variance: { type: string, enum: [equal, unequal], default: equal, description: "equal is the classic F test. unequal is the Welch F test." }
+      posthoc: { type: string, enum: [none, tukey, games-howell, bonferroni, holm, fdr_bh], default: none, description: Pairwise comparisons after the F test. }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+    required: [path, outcome, group]
+    outputs:
+      anova: { kind: table, ext: csv, description: The ANOVA table. }
+      posthoc: { kind: table, ext: csv, description: The pairwise comparisons. }
+
+  - name: adjust_pvalues
+    title: Correct p-values for many tests
+    description: Adjust a list of p-values for multiple comparisons and show which pass at alpha.
+    function: "ga_biostats:adjust_pvalues"
+    params:
+      pvalues: { type: array, items: { type: number, minimum: 0, maximum: 1 }, minItems: 1, description: The raw p-values. }
+      method: { type: string, enum: [bonferroni, holm, sidak, fdr_bh, fdr_by], default: holm, description: Correction method. }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+    required: [pvalues]
+    read_only: true
+
+  - name: fit_ols
+    title: Fit a linear model
+    description: >
+      Fit an ordinary least squares model from a formula. Each row counts as one independent observation
+      unless cov_type is cluster. Use fit_mixed_model if subjects have many rows.
+    function: "ga_biostats:fit_ols"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      formula: { type: string, description: 'Model formula, for example "Reaction ~ Days".' }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+      cov_type: { type: string, enum: [nonrobust, HC3, cluster], default: nonrobust, description: Type of standard errors. }
+      cluster: { type: string, description: Column that names the subject. Needed if cov_type is cluster. }
+    required: [path, formula]
+    outputs:
+      coefficients: { kind: table, ext: csv, description: Coefficients with standard errors and confidence intervals. }
+
+  - name: fit_mixed_model
+    title: Fit a linear mixed model
+    description: >
+      Fit a linear mixed model with random effects for each subject. Reports fixed effects with standard
+      errors and the variance of the random effects.
+    function: "ga_biostats:fit_mixed_model"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      formula: { type: string, description: 'Fixed effects, for example "Reaction ~ Days".' }
+      groups: { type: string, description: Column that names the subject. One random effect set for each value. }
+      re_formula: { type: string, default: "1", description: '"1" is a random intercept. "~Days" adds a random slope for Days.' }
+      reml: { type: boolean, default: true, description: True is REML. False is ML. }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+    required: [path, formula, groups]
+    outputs:
+      coefficients: { kind: table, ext: csv, description: Fixed effects. }
+
+  - name: kaplan_meier
+    title: Kaplan-Meier curves and log-rank test
+    description: >
+      Estimate the survival curve, the median survival time and the survival at chosen times.
+      If group is given, draw one curve per group and run the log-rank test.
+    function: "ga_biostats:kaplan_meier"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      duration: { type: string, description: Column of follow-up time. }
+      event: { type: string, description: "Column that is 1 if the event happened and 0 if the subject was censored." }
+      group: { type: string, description: Column with the group labels. }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level for the confidence band. }
+      time_points: { type: array, items: { type: number }, description: Times at which to report survival. }
+    required: [path, duration, event]
+    outputs:
+      curves: { kind: image, ext: png, description: The Kaplan-Meier curves. }
+      summary: { kind: table, ext: csv, description: "Events, medians and survival at the chosen times." }
+
+  - name: fit_cox
+    title: Fit a Cox proportional hazards model
+    description: >
+      Fit a Cox model. Reports coefficients, hazard ratios, the concordance, and a test of the proportional
+      hazards assumption (efron only). Rows with missing values are dropped.
+    function: "ga_biostats:fit_cox"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      duration: { type: string, description: Column of follow-up time. }
+      event: { type: string, description: "Column that is 1 if the event happened and 0 if the subject was censored." }
+      covariates: { type: string, description: Covariate column names, separated by commas. }
+      ties: { type: string, enum: [efron, breslow], default: efron, description: How to handle tied event times. }
+      strata: { type: string, description: Column names to stratify by, separated by commas. }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level for the confidence intervals. }
+    required: [path, duration, event, covariates]
+    outputs:
+      coefficients: { kind: table, ext: csv, description: Coefficients and hazard ratios. }
+
+map:
+  - tool: inspect_table
+    route: "print(pd.read_csv(path).describe(include='all'))"
+    params:
+      - { arg: path, label: path }
+    fidelity: close
+    difference: The tool also counts distinct values and missing values for each column.
+    evidence: { source: docs, test: sleep-paired }
+
+  - tool: compare_two_groups
+    match: { paired: true }
+    route: |
+      wide = df.pivot(index="ID", columns="group", values="extra")
+      scipy.stats.ttest_1samp(wide[2] - wide[1], 0)   # same as ttest_rel(wide[2], wide[1])
+    params:
+      - { arg: outcome, label: values column }
+      - { arg: id_column, label: pairing column }
+      - { arg: alternative, label: alternative, ui_default: two-sided }
+    fidelity: exact
+    evidence: { source: docs, test: sleep-paired, note: "R t.test(extra ~ group, data = sleep, paired = TRUE) gives t = -4.0621, df = 9, p = 0.002833. The sign differs because R subtracts group 2 from group 1." }
+
+  - tool: compare_two_groups
+    match: { paired: false }
+    route: |
+      scipy.stats.ttest_ind(x, y, equal_var=False)   # Welch. equal_var=True is Student.
+      scipy.stats.mannwhitneyu(x, y)                  # rank test
+    params:
+      - { arg: equal_variance, label: equal_var, ui_default: true, note: "scipy ttest_ind uses equal_var=True by default. This tool uses False (Welch), as R t.test does." }
+      - { arg: alternative, label: alternative, ui_default: two-sided }
+    fidelity: exact
+    evidence: { source: docs, test: sleep-unpaired-welch, note: "R t.test(extra ~ group, data = sleep) gives t = -1.8608, df = 17.776, p = 0.07939." }
+
+  - tool: anova_oneway
+    route: |
+      pingouin.anova(df, dv="weight", between="group", detailed=True)
+      pingouin.pairwise_tukey(df, dv="weight", between="group")
+    params:
+      - { arg: variance, label: welch_anova or anova, ui_default: anova }
+      - { arg: posthoc, label: post-hoc function, ui_default: none }
+    fidelity: exact
+    evidence: { source: docs, test: plantgrowth-anova, note: "R summary(aov(weight ~ group, PlantGrowth)) gives F = 4.846 on 2 and 27 df, p = 0.01591. R TukeyHSD gives p = 0.012 for trt2 against trt1." }
+
+  - tool: adjust_pvalues
+    route: "statsmodels.stats.multitest.multipletests(pvals, alpha=0.05, method='holm')"
+    params:
+      - { arg: method, label: method, ui_default: hs, note: "statsmodels default is Holm-Sidak (hs)." }
+    fidelity: exact
+    evidence: { source: docs, test: adjust-holm, note: Holm values checked by hand. }
+
+  - tool: fit_ols
+    route: 'statsmodels.formula.api.ols("Reaction ~ Days", df).fit(cov_type="nonrobust").summary()'
+    params:
+      - { arg: formula, label: formula }
+      - { arg: cov_type, label: cov_type, ui_default: nonrobust }
+    fidelity: exact
+    evidence: { source: docs, test: sleepstudy-ols-trap }
+
+  - tool: fit_mixed_model
+    route: 'statsmodels.formula.api.mixedlm("Reaction ~ Days", df, groups=df["Subject"], re_formula="~Days").fit(reml=True).summary()'
+    params:
+      - { arg: formula, label: formula }
+      - { arg: groups, label: groups }
+      - { arg: re_formula, label: re_formula, ui_default: "1 (random intercept)" }
+      - { arg: reml, label: reml, ui_default: true }
+    fidelity: exact
+    evidence: { source: docs, test: sleepstudy-slope, note: "R lme4 lmer(Reaction ~ Days + (Days | Subject), sleepstudy) gives the same fixed effects, the same variances (612.10, 35.07, 654.94) and the same standard errors." }
+
+  - tool: kaplan_meier
+    route: |
+      kmf = lifelines.KaplanMeierFitter().fit(df.week, df.arrest)
+      lifelines.statistics.logrank_test(a.week, b.week, a.arrest, b.arrest)
+    params:
+      - { arg: duration, label: durations }
+      - { arg: event, label: event_observed }
+    fidelity: exact
+    evidence: { source: docs, test: rossi-km-logrank }
+
+  - tool: fit_cox
+    match: { ties: efron }
+    route: 'lifelines.CoxPHFitter().fit(df, duration_col="week", event_col="arrest").print_summary()'
+    params:
+      - { arg: duration, label: duration_col }
+      - { arg: event, label: event_col }
+      - { arg: strata, label: strata }
+      - { arg: ties, label: ties, ui_default: efron, note: lifelines supports Efron only. }
+    fidelity: exact
+    evidence: { source: docs, test: rossi-cox-efron, note: "The lifelines docs show coef -0.38 for fin, -0.06 for age and concordance 0.64 on the Rossi data." }
+
+  - tool: fit_cox
+    match: { ties: breslow }
+    route: 'statsmodels.duration.hazard_regression.PHReg(df.week, df[covariates], status=df.arrest, ties="breslow").fit().summary()'
+    params:
+      - { arg: ties, label: ties, ui_default: efron }
+    fidelity: close
+    difference: lifelines has no Breslow option, so this route uses statsmodels. The concordance is computed with lifelines from the linear predictor. The proportional hazards test is not run. R coxph(ties = "breslow") was not run.
+    evidence: { source: code, test: rossi-cox-breslow }
+
+checks:
+  - id: id_column_missing
+    severity: warning
+    description: A two-group test was run with no subject column, so pairing was not checked.
+    rule:
+      tool: compare_two_groups
+      arg: id_column
+      op: missing
+      message: Name the subject column. A test with no subject column cannot warn that the same subjects are in both groups.
+  - id: pseudoreplication
+    severity: error
+    description: Rows from the same subject are used as independent observations.
+    text: >
+      If the data hold more than one row for each subject (repeated days, visits or samples), and the
+      answer uses fit_ols with nonrobust errors, or an unpaired test, and reports a p-value for a
+      within-subject effect, flag it as an error. The standard errors are too small. The answer must
+      use fit_mixed_model with the subject as groups, cluster standard errors, or one value for each subject.
+  - id: test_settings_not_reported
+    severity: warning
+    description: The answer gives a p-value but not the test, the sidedness, the alpha and the direction of the difference.
+    text: >
+      If the answer gives a p-value, it must name the test (paired or unpaired, t-test or rank test, Student or
+      Welch), the sidedness, alpha, the direction of the difference (second group minus first group) and the
+      confidence interval. Flag the answer if one is missing. Flag it too if it says "significant" without alpha.
+  - id: multiplicity_not_handled
+    severity: warning
+    description: Several tests or pairwise comparisons were run and no correction is reported.
+    text: >
+      If the answer reports more than 2 tests of one question (pairwise comparisons, many outcomes, many
+      covariates), it must say which correction was used (anova_oneway posthoc or adjust_pvalues) and report
+      the adjusted p-values. Flag the answer if it calls raw p-values significant.
+  - id: cox_assumptions_not_reported
+    severity: warning
+    description: A Cox model is reported without the ties method, the covariates and the proportional hazards test.
+    text: >
+      If the answer reports hazard ratios, it must give the ties method, the covariate list, the number of
+      events and the concordance. It must also report the result of the proportional hazards test
+      (ph_violations in the tool result). If a covariate violates the assumption, the answer must say so and
+      must not present its hazard ratio as constant over time.
+
+tests:
+  - id: sleep-paired
+    description: >
+      Cushny and Peebles sleep data (R dataset sleep). R t.test(extra ~ group, paired = TRUE) gives
+      |t| = 4.0621, df = 9, p = 0.002833, 95 percent CI 0.7001 to 2.4599 for the mean difference 1.58.
+    data: [data/sleep.csv]
+    calls:
+      - tool: compare_two_groups
+        args: { path: "{adapter_dir}/data/sleep.csv", outcome: extra, group: group, paired: true, id_column: ID }
+    expect:
+      - { path: metrics.mean_diff, approx: 1.58, abs: 1.0e-9 }
+      - { path: metrics.statistic, approx: 4.0621, abs: 0.0001 }
+      - { path: metrics.df, equals: 9 }
+      - { path: metrics.p_value, approx: 0.002833, abs: 0.000001 }
+      - { path: metrics.ci_lo, approx: 0.7001, abs: 0.0005 }
+      - { path: metrics.ci_hi, approx: 2.4599, abs: 0.0005 }
+
+  - id: sleep-unpaired-welch
+    description: >
+      The unpaired trap on the same data. R t.test(extra ~ group) gives t = -1.8608, df = 17.776,
+      p = 0.07939. The summary must warn that the same IDs are in both groups.
+    data: [data/sleep.csv]
+    calls:
+      - tool: compare_two_groups
+        args: { path: "{adapter_dir}/data/sleep.csv", outcome: extra, group: group, id_column: ID }
+    expect:
+      - { path: metrics.statistic, approx: 1.8608, abs: 0.0001 }
+      - { path: metrics.df, approx: 17.776, abs: 0.001 }
+      - { path: metrics.p_value, approx: 0.07939, abs: 0.00001 }
+      - { path: summary, contains: both groups }
+
+  - id: sleep-student-and-rank
+    description: >
+      Student (equal variance) p = 0.07919 with 18 df, from the same data (computed with scipy, R var.equal = TRUE).
+      The Wilcoxon signed-rank p is 0.003906 (computed with scipy, no ties).
+    data: [data/sleep.csv]
+    calls:
+      - tool: compare_two_groups
+        args: { path: "{adapter_dir}/data/sleep.csv", outcome: extra, group: group, equal_variance: true }
+        save_as: student
+      - tool: compare_two_groups
+        args: { path: "{adapter_dir}/data/sleep.csv", outcome: extra, group: group, test: wilcoxon, paired: true, id_column: ID }
+    expect:
+      - { path: metrics.p_value, approx: 0.003906, abs: 0.000001 }
+      - { path: "saved.student.metrics.p_value", approx: 0.07919, abs: 0.00001 }
+      - { path: "saved.student.metrics.df", equals: 18 }
+
+  - id: plantgrowth-anova
+    description: >
+      R PlantGrowth data. summary(aov(weight ~ group)) gives F = 4.846 on 2 and 27 df, p = 0.01591.
+      R TukeyHSD gives adjusted p = 0.012 for trt2 against trt1 and no other pair under 0.05.
+    data: [data/plantgrowth.csv]
+    calls:
+      - tool: anova_oneway
+        args: { path: "{adapter_dir}/data/plantgrowth.csv", outcome: weight, group: group, posthoc: tukey }
+    expect:
+      - { path: metrics.F, approx: 4.846, abs: 0.001 }
+      - { path: metrics.df_within, equals: 27 }
+      - { path: metrics.p_value, approx: 0.01591, abs: 0.00001 }
+      - { path: metrics.n_pairs_significant, equals: 1 }
+      - { path: "table.rows[2][5]", approx: 0.012, abs: 0.0005 }
+
+  - id: adjust-holm
+    description: "Holm on 0.01, 0.04, 0.03, worked by hand: sorted 0.01 x 3 = 0.03, 0.03 x 2 = 0.06, 0.04 x 1 = 0.04 raised to 0.06. Adjusted: 0.03, 0.06, 0.06. One passes at 0.05."
+    calls:
+      - tool: adjust_pvalues
+        args: { pvalues: [0.01, 0.04, 0.03], method: holm }
+    expect:
+      - { path: "table.rows[0][1]", approx: 0.03, abs: 1.0e-9 }
+      - { path: "table.rows[1][1]", approx: 0.06, abs: 1.0e-9 }
+      - { path: "table.rows[2][1]", approx: 0.06, abs: 1.0e-9 }
+      - { path: metrics.n_rejected, equals: 1 }
+
+  - id: sleepstudy-intercept
+    description: >
+      R lme4 sleepstudy, lmer(Reaction ~ Days + (1 | Subject)): fixed effects 251.405 and 10.467
+      (standard errors 9.747 and 0.804), subject variance 1378.2, residual variance 960.5.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: fit_mixed_model
+        args: { path: "{adapter_dir}/data/sleepstudy.csv", formula: Reaction ~ Days, groups: Subject }
+    expect:
+      - { path: metrics.coef_Intercept, approx: 251.405, abs: 0.001 }
+      - { path: metrics.coef_Days, approx: 10.467, abs: 0.001 }
+      - { path: metrics.se_Intercept, approx: 9.747, abs: 0.001 }
+      - { path: metrics.se_Days, approx: 0.804, abs: 0.001 }
+      - { path: metrics.group_variance, approx: 1378.2, abs: 0.1 }
+      - { path: metrics.residual_variance, approx: 960.5, abs: 0.1 }
+
+  - id: sleepstudy-slope
+    description: >
+      R lme4 sleepstudy, lmer(Reaction ~ Days + (Days | Subject)): intercept variance 612.10, slope variance 35.07,
+      residual variance 654.94, fixed effects 251.41 and 10.47 with standard errors 6.82 and 1.55.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: fit_mixed_model
+        args: { path: "{adapter_dir}/data/sleepstudy.csv", formula: Reaction ~ Days, groups: Subject, re_formula: "~Days" }
+    expect:
+      - { path: metrics.group_variance, approx: 612.10, abs: 0.05 }
+      - { path: metrics.slope_variance, approx: 35.07, abs: 0.01 }
+      - { path: metrics.residual_variance, approx: 654.94, abs: 0.01 }
+      - { path: metrics.se_Intercept, approx: 6.825, abs: 0.002 }
+      - { path: metrics.se_Days, approx: 1.546, abs: 0.002 }
+
+  - id: sleepstudy-ols-trap
+    description: >
+      The pseudoreplication trap. OLS treats 180 rows as independent. The standard error of Days is 1.238 (computed
+      with statsmodels), against 1.546 in the mixed model with a random slope. The estimate is the same, 10.467.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: fit_ols
+        args: { path: "{adapter_dir}/data/sleepstudy.csv", formula: Reaction ~ Days }
+    expect:
+      - { path: metrics.coef_Days, approx: 10.467, abs: 0.001 }
+      - { path: metrics.se_Days, approx: 1.238, abs: 0.001 }
+      - { path: metrics.n, equals: 180 }
+
+  - id: rossi-cox-efron
+    description: >
+      Rossi recidivism data (lifelines.datasets.load_rossi), 432 men, 114 arrests. The lifelines docs show
+      coef -0.38 (fin), -0.06 (age), 0.09 (prio) and concordance 0.64. The four-digit values were read from a run
+      of lifelines 0.30.3 (CoxPHFitter, Efron ties) on this machine. statsmodels PHReg with Efron ties gives the same coefficients.
+    data: [data/rossi.csv]
+    calls:
+      - tool: fit_cox
+        args: { path: "{adapter_dir}/data/rossi.csv", duration: week, event: arrest, covariates: "fin,age,race,wexp,mar,paro,prio" }
+    expect:
+      - { path: metrics.n, equals: 432 }
+      - { path: metrics.events, equals: 114 }
+      - { path: metrics.coef_fin, approx: -0.3794, abs: 0.0005 }
+      - { path: metrics.coef_age, approx: -0.0574, abs: 0.0005 }
+      - { path: metrics.coef_prio, approx: 0.0915, abs: 0.0005 }
+      - { path: metrics.hr_fin, approx: 0.6843, abs: 0.0005 }
+      - { path: metrics.se_fin, approx: 0.1914, abs: 0.0005 }
+      - { path: metrics.concordance, approx: 0.6403, abs: 0.0005 }
+      - { path: metrics.ph_test_min_p, max: 0.001 }
+
+  - id: rossi-cox-breslow
+    description: >
+      Breslow ties on the Rossi data (computed with statsmodels PHReg 0.15.0). The coefficient of fin moves from -0.3794
+      to -0.3790. The ties method changes the third digit.
+    data: [data/rossi.csv]
+    calls:
+      - tool: fit_cox
+        args: { path: "{adapter_dir}/data/rossi.csv", duration: week, event: arrest, covariates: "fin,age,race,wexp,mar,paro,prio", ties: breslow }
+    expect:
+      - { path: metrics.coef_fin, approx: -0.3790, abs: 0.0002 }
+      - { path: metrics.coef_age, approx: -0.0572, abs: 0.0002 }
+      - { path: metrics.log_likelihood, approx: -659.1206, abs: 0.001 }
+
+  - id: rossi-km-logrank
+    description: >
+      Kaplan-Meier of the Rossi data by financial aid (fin). Log-rank chi-square 3.838, p = 0.0501 on 1 df,
+      read from a run of lifelines 0.30.3. Survival at week 52 for all men is 0.7361.
+    data: [data/rossi.csv]
+    calls:
+      - tool: kaplan_meier
+        args: { path: "{adapter_dir}/data/rossi.csv", duration: week, event: arrest, group: fin }
+        save_as: grouped
+      - tool: kaplan_meier
+        args: { path: "{adapter_dir}/data/rossi.csv", duration: week, event: arrest, time_points: [26, 52] }
+    expect:
+      - { path: metrics.survival_52, approx: 0.7361, abs: 0.0005 }
+      - { path: metrics.survival_26, approx: 0.875, abs: 0.0005 }
+      - { path: saved.grouped.metrics.logrank_chi2, approx: 3.838, abs: 0.001 }
+      - { path: saved.grouped.metrics.logrank_p, approx: 0.0501, abs: 0.0002 }
+      - { path: saved.grouped.metrics.events, equals: 114 }
