@@ -361,14 +361,18 @@ export class Session {
           const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
           const noWork = this.settings.headless && this.adapters.length > 0 && !ranStep;
-          if (promise || asksLeave || noWork) {
+          const plan = this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1)?.data.plan as { step: string; status: string }[] | undefined;
+          const open = (plan ?? []).filter((p) => p.status === "todo" || p.status === "doing");
+          if (promise || asksLeave || noWork || open.length) {
             nudges++;
             this.record.append("assistant", { text: said, final: false });
             const why = asksLeave
               ? "The scientist is not here to answer. Go on with your recommendation."
               : promise
                 ? "You said what you will do next, but you did not call a tool. Do it now with a tool call, or give your final answer."
-                : "No program step has run in this turn, so the request is not answered yet. Run the next step now with a tool. If a tool failed, fix the input and try again.";
+                : noWork
+                  ? "No program step has run in this turn, so the request is not answered yet. Run the next step now with a tool. If a tool failed, fix the input and try again."
+                  : `Your plan still has steps that are not done: ${open.map((p) => p.step).join("; ")}. Do the next one now with a tool. If a step cannot be done, call plan and mark it skipped with the reason. Then give the answer, with every number the request asks for.`;
             this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
             continue;
           }

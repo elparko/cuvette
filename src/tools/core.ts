@@ -119,7 +119,7 @@ export function coreTools(d: CoreDeps): Tool[] {
       {
         steps: {
           type: "array",
-          items: { type: "object", properties: { step: { type: "string" }, status: { type: "string", enum: ["todo", "doing", "done", "waiting"] } }, required: ["step"] },
+          items: { type: "object", properties: { step: { type: "string" }, status: { type: "string", enum: ["todo", "doing", "done", "waiting", "skipped"] } }, required: ["step"] },
         },
       },
       ["steps"],

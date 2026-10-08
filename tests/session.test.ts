@@ -212,3 +212,18 @@ test("a calculate result is a logged step that claims can cite", async () => {
   const claim = session.record.entries(["claim_check"]).at(-1)!.data as { claims: { value: number; label: string; node?: string }[] };
   expect(claim.claims.find((c) => c.value === 0.938)).toMatchObject({ label: "measured", node: node.id });
 });
+
+test("an answer while plan steps are open gets one reminder to finish them", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", status: "done" }, { step: "Blur the image", status: "todo" }] } }] },
+    { text: "There are particles." },
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", status: "done" }, { step: "Blur the image", status: "skipped" }] } }] },
+    { text: "Done." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  const answer = await session.send("Count and blur");
+  const notes = provider.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps that are not done: Blur the image/.test((p as { text: string }).text));
+  expect(notes.length).toBeGreaterThan(0);
+  expect(answer).toMatch(/Done\./);
+});
