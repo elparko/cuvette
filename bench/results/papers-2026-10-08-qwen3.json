@@ -636,9 +636,9 @@
       "via": "main",
       "value": 18,
       "diff": 0,
-      "node": "n1",
-      "path": "data.columns[1].min_rows_per_value",
-      "entry": 8
+      "node": "n4",
+      "path": "metrics.n_groups_Subject",
+      "entry": 24
      },
      "reported": {
       "pass": null,
@@ -999,9 +999,9 @@
       "via": "main",
       "value": 3,
       "diff": 0,
-      "node": "n5",
-      "path": "data.snr",
-      "entry": 32
+      "node": "n6",
+      "path": "metrics.n_segments_s64",
+      "entry": 48
      },
      "reported": {
       "pass": true,
@@ -1616,9 +1616,9 @@
       "via": "main",
       "value": 12,
       "diff": 0,
-      "node": "n2",
-      "path": "table.rows[0][6]",
-      "entry": 19
+      "node": "n3",
+      "path": "metrics.n_two_or_more_violations",
+      "entry": 32
      },
      "reported": {
       "pass": true,
@@ -1863,9 +1863,9 @@
       "via": "main",
       "value": 214,
       "diff": 0,
-      "node": "n1",
-      "path": "metrics.n_residues",
-      "entry": 8
+      "node": "n4",
+      "path": "metrics.residues_A",
+      "entry": 42
      },
      "reported": {
       "pass": true,
@@ -1890,9 +1890,9 @@
       "via": "main",
       "value": 214,
       "diff": 0,
-      "node": "n1",
-      "path": "metrics.n_residues",
-      "entry": 8
+      "node": "n4",
+      "path": "metrics.residues_A",
+      "entry": 42
      },
      "reported": {
       "pass": true,
@@ -2232,13 +2232,12 @@
      "inAnswer": true,
      "reference": false,
      "computed": {
-      "pass": true,
-      "via": "main",
-      "value": 0.10000000149011612,
-      "diff": 0.006800001490116114,
-      "node": "n1",
-      "path": "metrics.highpass",
-      "entry": 8
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
      },
      "reported": {
       "pass": false,
@@ -2260,11 +2259,11 @@
      "reference": false,
      "computed": {
       "pass": false,
-      "value": 40,
-      "diff": 2.1000000000000014,
-      "node": "n1",
-      "path": "metrics.lowpass",
-      "entry": 8
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
      },
      "reported": {
       "pass": false,
@@ -2286,11 +2285,11 @@
      "reference": false,
      "computed": {
       "pass": false,
-      "value": 0.10000000149011612,
-      "diff": 0.013400001490116123,
-      "node": "n1",
-      "path": "metrics.highpass",
-      "entry": 8
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
      },
      "reported": {
       "pass": false,
@@ -2311,13 +2310,12 @@
      "inAnswer": true,
      "reference": false,
      "computed": {
-      "pass": true,
-      "via": "main",
-      "value": 204,
-      "diff": 5,
-      "node": "n1",
-      "path": "metrics.n_grad",
-      "entry": 8
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
      },
      "reported": {
       "pass": false,
@@ -3434,13 +3432,12 @@
      "inAnswer": true,
      "reference": true,
      "computed": {
-      "pass": true,
-      "via": "comparison",
-      "value": 52,
-      "diff": 1,
-      "node": "n3",
-      "path": "metrics.n_off_sample_fdr_20",
-      "entry": 27
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
      },
      "reported": {
       "pass": false,
@@ -5565,9 +5562,9 @@
       "via": "main",
       "value": 7,
       "diff": 0,
-      "node": "n9",
-      "path": "table.rows[6][0]",
-      "entry": 86
+      "node": "n16",
+      "path": "metrics.n_clusters",
+      "entry": 130
      },
      "reported": {
       "pass": true,
@@ -5732,7 +5729,7 @@
    },
    "gramfort2013-mne-sample": {
     "ollama:qwen3:8b": {
-     "computed": 2,
+     "computed": 0,
      "computedOf": 14,
      "reported": 0,
      "reportedOf": 12,
@@ -5949,7 +5946,7 @@
   },
   "totals": {
    "ollama:qwen3:8b": {
-    "computed": 144,
+    "computed": 142,
     "computedOf": 169,
     "reported": 69,
     "reportedOf": 119,

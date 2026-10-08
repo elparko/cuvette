@@ -5,7 +5,7 @@ Each cell: computed passes / reported passes. Computed: a logged number is withi
 
 | Model | Computed | Reported | Runs | Not answered |
 | --- | --- | --- | --- | --- |
-| ollama:qwen3:8b | 144/169 | 69/119 | 28 | 1 error |
+| ollama:qwen3:8b | 142/169 | 69/119 | 28 | 1 error |
 
 ## Matrix
 
@@ -21,7 +21,7 @@ Each cell: computed passes / reported passes. Computed: a logged number is withi
 | danecek2021-bcftools | 5/6 / 4/5 | - | - |
 | delaney2004-esol | 4/6 / 2/4 | - | - |
 | gowers2016-mdanalysis | 6/7 / 2/7 | - | - |
-| gramfort2013-mne-sample | 2/14 / 0/12 | - | - |
+| gramfort2013-mne-sample | 0/14 / 0/12 | - | - |
 | lazear2023-sage | 5/6 / 2/3 | - | - |
 | li2009-samtools | 5/7 / 3/3 | - | - |
 | ljosa2012-bbbc005 | 1/3 / 1/2 | - | - |
@@ -93,7 +93,7 @@ Session: 20261008-141134-6245. Record: /Volumes/T7/guided-analysis/tools/bench-r
 | sd_residual | 25.59 ±0.05 | pass 25.5918 (n4 metrics.sd_residual, entry 24) | pass 25.59 via tolerance (n4, claim check 82) |
 | random_correlation | 0.066 ±0.01 | pass 0.06555124 (n4 metrics.corr_Subject, entry 24) | not asked |
 | lrt_chi2_days | 23.54 ±0.1 | pass 23.53654 (n5 metrics.chisq, entry 41) | pass 23.54 via tolerance (n5, claim check 82) |
-| n_subjects | 18 exact | pass 18 (n1 data.columns[1].min_rows_per_value, entry 8) | not asked |
+| n_subjects | 18 exact | pass 18 (n4 metrics.n_groups_Subject, entry 24) | not asked |
 
 ### belenky2003-sleepstudy | ollama:qwen3:8b | run 1
 
@@ -120,7 +120,7 @@ Session: 20261008-142527-65d4. Record: /Volumes/T7/guided-analysis/tools/bench-r
 | mz_values | 10200 exact | pass 10200 (n1 metrics.n_features, entry 8) | pass 10200 via tolerance (n1, claim check 77) |
 | peaks | 687 ±10 | pass 687 (n5 metrics.n_peaks, entry 32) | pass 687 via tolerance (n5, claim check 77) |
 | segments_s32 | 6 ±1 | pass 6 (n6 metrics.n_models, entry 48) | pass 6 via tolerance (n8, claim check 77) |
-| segments_s64 | 3 ±1 | pass 3 (n5 data.snr, entry 32) | pass 3 via tolerance (n7, claim check 77) |
+| segments_s64 | 3 ±1 | pass 3 (n6 metrics.n_segments_s64, entry 48) | pass 3 via tolerance (n7, claim check 77) |
 
 ### bradley-photutils-100gaussians | ollama:qwen3:8b | run 1
 
@@ -170,7 +170,7 @@ Session: 20261008-144814-0e07. Record: /Volumes/T7/guided-analysis/tools/bench-r
 | --- | --- | --- | --- |
 | molecules_parsed | 1128 exact | pass 1128 (n1 metrics.n_read, entry 13) | not asked |
 | zero_violations | 1018 ±5 | pass 1018 (n3 metrics.n_zero_violations, entry 32) | pass 1018 via tolerance (n3, claim check 61) |
-| two_or_more_violations | 12 ±3 | pass 12 (n2 table.rows[0][6], entry 19) | pass 12 via tolerance (n3, claim check 61) |
+| two_or_more_violations | 12 ±3 | pass 12 (n3 metrics.n_two_or_more_violations, entry 32) | pass 12 via tolerance (n3, claim check 61) |
 | logp_above_5 | 97 ±5 | pass 97 (n3 metrics.n_logp_over_5, entry 32) | not asked |
 | esol_r2 | 0.752 ±0.03 | FAIL - | FAIL 0.9894 (n3, claim check 61) |
 | esol_rmse | 1.1 ±0.1 | FAIL - | FAIL 0.9894 (n3, claim check 61) |
@@ -186,8 +186,8 @@ Session: 20261008-145014-c335. Record: /Volumes/T7/guided-analysis/tools/bench-r
 | frames | 98 exact | pass 98 (n1 metrics.n_frames, entry 8) | FAIL 75 (n4, claim check 52) |
 | backbone_rmsd_last_frame | 6.8203 ±0.01 | pass 6.820322 (n2 metrics.rmsd_last, entry 18) | FAIL 72 (n4, claim check 52) |
 | rg_last_frame | 19.592 ±0.02 | pass 19.59158 (n3 metrics.rg_last, entry 32) | FAIL 72 (n4, claim check 52) |
-| residues_chain_a | 214 exact | pass 214 (n1 metrics.n_residues, entry 8) | pass 214 via tolerance (n4, claim check 52) |
-| residues_chain_b | 214 exact | pass 214 (n1 metrics.n_residues, entry 8) | pass 214 via tolerance (n4, claim check 52) |
+| residues_chain_a | 214 exact | pass 214 (n4 metrics.residues_A, entry 42) | pass 214 via tolerance (n4, claim check 52) |
+| residues_chain_b | 214 exact | pass 214 (n4 metrics.residues_A, entry 42) | pass 214 via tolerance (n4, claim check 52) |
 | ca_rmsd_open_closed | 7.131 ±0.02 | FAIL 7 (n2 table.rows[7][0], entry 18) | FAIL 72 (n4, claim check 52) |
 
 ### gramfort2013-mne-sample | ollama:qwen3:8b | run 1
@@ -207,10 +207,10 @@ Session: 20261008-145154-a83b. Record: /Volumes/T7/guided-analysis/tools/bench-r
 | epochs_dropped | 10 exact | FAIL 9 (n1 metrics.n_stim, entry 8) | not asked |
 | epochs_kept | 309 exact | FAIL 277.7087 (n1 metrics.duration_s, entry 8) | FAIL 0 (n4, claim check 46) |
 | auditory_left_kept | 68 exact | FAIL 60 (n1 metrics.n_eeg, entry 8) | FAIL 0 (n4, claim check 46) |
-| n100_latency_gfp | 0.0932 ±0.007 | pass 0.1 (n1 metrics.highpass, entry 8) | FAIL - |
-| n100_amplitude_gfp | 42.1 ±2 | FAIL 40 (n1 metrics.lowpass, entry 8) | FAIL - |
-| strongest_grad_latency | 0.0866 ±0.007 | FAIL 0.1 (n1 metrics.highpass, entry 8) | FAIL - |
-| strongest_grad_amplitude | abs 199 ±8 | pass 204 (n1 metrics.n_grad, entry 8) | FAIL 0 (n4, claim check 46) |
+| n100_latency_gfp | 0.0932 ±0.007 | FAIL - | FAIL - |
+| n100_amplitude_gfp | 42.1 ±2 | FAIL - | FAIL - |
+| strongest_grad_latency | 0.0866 ±0.007 | FAIL - | FAIL - |
+| strongest_grad_amplitude | abs 199 ±8 | FAIL - | FAIL 0 (n4, claim check 46) |
 
 ### lazear2023-sage | ollama:qwen3:8b | run 1
 
@@ -306,7 +306,7 @@ Session: 20261008-152804-bef7. Record: /Volumes/T7/guided-analysis/tools/bench-r
 
 | Item | Expected | Computed | Reported |
 | --- | --- | --- | --- |
-| formulas_in_all_three_sections (reference) | 51 ±8 | match 52 (n3 metrics.n_off_sample_fdr_20, entry 27) | differs 0 (n5, claim check 144) |
+| formulas_in_all_three_sections (reference) | 51 ±8 | differs - | differs 0 (n5, claim check 144) |
 | unique_formulas_three_sections (reference) | 66 exact | differs 61 (n5 metrics.n_databases, entry 75) | not asked |
 | total_formulas (reference) | 103 ±20 | differs 61 (n5 metrics.n_databases, entry 75) | not asked |
 
@@ -446,5 +446,5 @@ Session: 20261008-154305-7e99. Record: /Volumes/T7/guided-analysis/tools/bench-r
 | genes_after_min_cells | 13714 exact | pass 13714 (n4 metrics.n_genes_after, entry 30) | not asked |
 | cells_after_qc | 2638 exact | pass 2638 (n5 metrics.n_cells_after, entry 46) | pass 2638 via tolerance (n16, claim check 172) |
 | highly_variable_genes | 1838 ±20 | pass 1838 (n7 metrics.n_highly_variable, entry 66) | not asked |
-| leiden_clusters | 7 ±1 | pass 7 (n9 table.rows[6][0], entry 86) | pass 7 via tolerance (n17, claim check 172) |
+| leiden_clusters | 7 ±1 | pass 7 (n16 metrics.n_clusters, entry 130) | pass 7 via tolerance (n17, claim check 172) |
 
