@@ -16,7 +16,7 @@ function fake(numbers: { node: string; path: string; value: number }[], user: st
       return { id: 99, ts: "", session: "s", kind, data } as Entry;
     },
   };
-  return { record: record as any, appended };
+  return { record: record as any, appended, entries };
 }
 
 const nums = [
@@ -124,5 +124,48 @@ describe("annotate", () => {
 
   test("returns text unchanged without unsourced claims", () => {
     expect(annotate("Fine.", [])).toBe("Fine.");
+  });
+});
+
+describe("checkAnswer inputs and small counts", () => {
+  test("a small count counts when a logged result has it", () => {
+    const { record } = fake([{ node: "n1", path: "metrics.n_segments", value: 6 }]);
+    const c = checkAnswer("The model has 6 segments.", record);
+    expect(c.map((x) => [x.value, x.label, x.node])).toEqual([[6, "measured", "n1"]]);
+  });
+
+  test("a small count with no logged match is not flagged", () => {
+    const { record } = fake([{ node: "n1", path: "metrics.n", value: 40 }]);
+    expect(checkAnswer("The 3 groups differ.", record)).toHaveLength(0);
+  });
+
+  test("a small count does not match a comparison run", () => {
+    const { record } = fake([{ node: "n1", path: "metrics.n", value: 6 }]);
+    record.nodes = () => [{ id: "n1", sensitivityOf: "k" }];
+    expect(checkAnswer("The model has 6 segments.", record)).toHaveLength(0);
+  });
+
+  test("a word percent in the request gives the fraction in the answer", () => {
+    const { record } = fake([], ["Keep variants with a frequency of at least 5 percent."]);
+    expect(checkAnswer("The filter was INFO/AF>=0.05.", record)).toHaveLength(0);
+  });
+
+  test("a dataset id with a time stamp is not a number", () => {
+    const { record } = fake([{ node: "n1", path: "metrics.n", value: 414 }]);
+    const c = checkAnswer("| 2022-08-16_10h14m23s | 414 |", record);
+    expect(c.map((x) => [x.value, x.label])).toEqual([[414, "measured"]]);
+  });
+
+  test("numbers in tool arguments and the program version are inputs", () => {
+    const { record, entries } = fake([]);
+    entries.push({ id: 60, ts: "", session: "s", kind: "tool_call", data: { args: { region: "chr20:1000000-1100000", radius: 12.5 } } });
+    entries.push({ id: 61, ts: "", session: "s", kind: "session", data: { adapters: [{ version: "0.1.4", programVersion: "4.2.1.1" }] } });
+    expect(checkAnswer("The radius was 12.5 pixels. Cellpose 4.2 ran the step.", record)).toHaveLength(0);
+  });
+
+  test("numbers typed into a script are not inputs", () => {
+    const { record, entries } = fake([]);
+    entries.push({ id: 60, ts: "", session: "s", kind: "tool_call", data: { tool: "run_script", args: { code: "x = 2.718" } } });
+    expect(checkAnswer("The value is 2.718.", record).map((c) => c.label)).toEqual(["unsourced"]);
   });
 });

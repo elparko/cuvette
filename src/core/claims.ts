@@ -7,6 +7,7 @@ interface Found {
   value: number;
   step: number;
   percent: boolean;
+  small: boolean;
 }
 
 interface Span {
@@ -16,7 +17,7 @@ interface Span {
 }
 
 const NUMBER =
-  /(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)(?:\s?[eE]([-+−]?\d+)|\s?[x×]\s?10\^?([-+−]?\d+))?(\s?%)?/g;
+  /(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)(?:\s?[eE]([-+−]?\d+)|\s?[x×]\s?10\^?([-+−]?\d+))?(\s?%|\s(?:per ?cent|percent)\b)?/g;
 
 const MASKS: RegExp[] = [
   /^[ \t]*(?:[-*•][ \t]+)?\d+[.)](?=\s)/gm,
@@ -25,7 +26,8 @@ const MASKS: RegExp[] = [
   /\bPMID:?\s*\d+/gi,
   /\bPMC\d+/g,
   /\[\d+(?:\s*[,–-]\s*\d+)*\]/g,
-  /\b\d{4}-\d{2}-\d{2}\b/g,
+  /\b\d{4}-\d{2}-\d{2}(?=\b|_)/g,
+  /\b\d{1,2}h\d{1,2}m\d{1,2}s\b/g,
   /(?<![\w.])\d+:\d+(?:;O\d*)?(?![\d.])/g,
   /(?<![\w.])v?\d+\.\d+\.\d+(?:[.-][A-Za-z0-9]+)*/g,
   /\b(?:WGS|NAD|ETRS|GDA|SIRGAS)\s?\d+|\bEPSG:?\s?\d+|\bUTM zone \d+[NS]?/gi,
@@ -53,7 +55,7 @@ function mask(text: string): string {
   return out;
 }
 
-export function extractNumbers(text: string): Found[] {
+export function extractNumbers(text: string, opts: { small?: boolean } = {}): Found[] {
   const masked = mask(text);
   const hasCitation = (s: Span) => CITATION.test(s.text);
   const spans = splitSentences(text);
@@ -76,14 +78,15 @@ export function extractNumbers(text: string): Found[] {
     }
     const plain = dec === 0 && m[2] === undefined && m[3] === undefined && !percent;
     const attached = /^[A-Za-zµ°]/.test(masked.slice(end));
-    if (plain && Math.abs(value) <= 10 && !attached) continue;
+    const small = plain && Math.abs(value) <= 10 && !attached;
+    if (small && !opts.small) continue;
     if (LABEL_BEFORE.test(before)) continue;
     if (THRESHOLD_BEFORE.test(before)) continue;
     if (percent && /^\s*(?:confidence|CI\b)/i.test(masked.slice(end))) continue;
     const sentence = spans.find((s) => start >= s.start && start < s.end);
     if (plain && value >= 1900 && value <= 2100 && sentence && hasCitation(sentence)) continue;
     if (percent) end = start + m[0].length;
-    out.push({ start: from, end, value, step, percent });
+    out.push({ start: from, end, value, step, percent, small });
   }
   return out;
 }
@@ -111,11 +114,12 @@ function variants(f: Found): { value: number; step: number }[] {
   return base;
 }
 
-function matchesAny(f: Found, values: number[]): number | undefined {
+function matchesAny(f: Found, values: number[], allowed?: Set<number>): number | undefined {
   let best: number | undefined;
   let bestDiff = Infinity;
   for (const v of variants(f)) {
     values.forEach((logged, i) => {
+      if (allowed && !allowed.has(i)) return;
       if (!near(v.value, v.step, logged)) return;
       const diff = Math.abs(v.value - logged) / (Math.abs(logged) || 1);
       if (diff < bestDiff) {
@@ -129,16 +133,31 @@ function matchesAny(f: Found, values: number[]): number | undefined {
 
 function leaves(x: unknown, out: number[]): void {
   if (typeof x === "number" && Number.isFinite(x)) out.push(x);
-  else if (typeof x === "string") for (const f of extractNumbers(x)) out.push(f.value);
+  else if (typeof x === "string") for (const f of extractNumbers(x)) out.push(f.value, ...(f.percent ? [f.value / 100] : []));
   else if (Array.isArray(x)) for (const y of x) leaves(y, out);
   else if (x && typeof x === "object") for (const y of Object.values(x)) leaves(y, out);
 }
 
+const FREE_TEXT_TOOLS = new Set(["run_script", "calculate", "note", "plan", "write_file", "run_command", "ask_scientist", "propose_change"]);
+
+function versionParts(v: unknown, out: number[]): void {
+  const parts = String(v ?? "").match(/\d+/g)?.map(Number) ?? [];
+  if (parts.length > 1) out.push(Number(`${parts[0]}.${parts[1]}`));
+  out.push(...parts);
+}
+
 function inputValues(record: AnalysisRecord): number[] {
   const out: number[] = [];
-  for (const e of record.entries(["user", "setup"])) {
+  for (const e of record.entries(["user", "setup", "session", "tool_call"])) {
     if (e.kind === "user") leaves(String(e.data.text ?? ""), out);
-    else leaves(e.data.values, out);
+    else if (e.kind === "setup") leaves(e.data.values, out);
+    else if (e.kind === "tool_call") {
+      if (!FREE_TEXT_TOOLS.has(String(e.data.tool))) leaves(e.data.args, out);
+    }
+    else for (const a of (e.data.adapters ?? []) as { version?: string; programVersion?: string }[]) {
+      versionParts(a.version, out);
+      versionParts(a.programVersion, out);
+    }
   }
   return out;
 }
@@ -151,18 +170,20 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
   const rank = (id: string) => Number(comparison.has(id)) * 2 + Number(stale.has(id));
   const logged = record.numbers().sort((a, b) => rank(a.node) - rank(b.node) || (order.get(b.node) ?? 0) - (order.get(a.node) ?? 0));
   const loggedValues = logged.map((n) => n.value);
+  const plain = new Set(logged.flatMap((n, i) => (comparison.has(n.node) || stale.has(n.node) ? [] : [i])));
   const inputs = inputValues(record);
-  const found = extractNumbers(text);
+  const found = extractNumbers(text, { small: true });
   const claims: Claim[] = [];
   for (const s of splitSentences(text)) {
     const cited = CITATION.test(s.text);
     const hedged = HEDGE.test(s.text);
     const own = found.filter((f) => f.start >= s.start && f.start < s.end);
     const sentenceText = s.text.length > 300 ? s.text.slice(0, 297) + "..." : s.text;
-    const hits = own.map((f) => ({ f, i: matchesAny(f, loggedValues) }));
-    const anyMatched = hits.some((h) => h.i !== undefined);
+    const hits = own.map((f) => ({ f, i: matchesAny(f, loggedValues, f.small ? plain : undefined) }));
+    const anyMatched = hits.some((h) => h.i !== undefined && !h.f.small);
     const before = claims.length;
     for (const { f, i } of hits) {
+      if (f.small && i === undefined) continue;
       if (i !== undefined) {
         claims.push({ text: sentenceText, value: f.value, label: "measured", node: logged[i].node });
         continue;
