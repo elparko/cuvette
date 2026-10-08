@@ -82,6 +82,13 @@ Status: built and checked. The results are in the section "Outcome" at the end.
 | liao2025-scanpy-bone-marrow | scanpy | 10608 and 10046 cells at load; 9612 and 8887 after QC | check_qc.py, numpy and scipy without scanpy: the same four numbers, exact |
 | kanetis2022-iqtree-sporocadaceae | phylo | log-likelihood -15,895.468; 2375 sites | check_iqtree.sh, IQ-TREE 2.0.8 and 3.1.4 called directly: -15895.477 and -15895.483 |
 
+Adapter route with no model (`ga run-step`, 2026-10-08):
+- deseq2 run_deseq on kgn_counts.csv with the answers: 59087 genes tested, 173 at padj < 0.05, 125 up, 48 down.
+- scanpy load_data and filter_cells with prefix mt-: pulse 10608 to 9612, chase 10046 to 8887. With the default prefix MT-, chase keeps 9859 (the trap value).
+- phylo infer_tree with TIM2e+I+G4, ultrafast bootstrap 1000 and the outgroup: 55 sequences, 2375 sites, log-likelihood -15895.4825.
+
+Local model runs (ollama qwen3:8b): not done yet. The run of astapova2021-deseq2-kgn started and stopped when the GPU was needed for other work. It wrote no result.
+
 ### Rejected
 - Li 2025 EMBO Rep (scanpy): the control count matches, but the knockout count (8711) needs "more than 750 genes", and the text says "fewer than 750 removed" (8712). A second scanpy QC case also adds little to Liao 2025.
 - Pei 2023 Int J Mol Sci (scanpy): the yak mitochondrial genes have no common prefix. The scanpy adapter takes only a prefix. Adapter gap.

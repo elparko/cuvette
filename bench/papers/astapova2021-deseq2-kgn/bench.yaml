@@ -3,6 +3,7 @@ prompt: |
   Does dihydrotestosterone (DHT) change gene expression in KGN human granulosa cells? I serum-starved the cells and treated them with 25 nM DHT or with ethanol vehicle for 12 hours. I did five independent experiments on different dates. Each experiment gave one DHT culture and one vehicle culture. The count table is {data}/astapova2021-deseq2-kgn/kgn_counts.csv (gene-level featureCounts, one column for each sample) and the sample table is {data}/astapova2021-deseq2-kgn/kgn_samples.csv (columns treatment and experiment). Tell me how many genes are differentially expressed, how many go up and how many go down with DHT, and give a table of the top 20 genes with fold change and adjusted p value. Write every number in the answer text.
 answers:
   question: "Does dihydrotestosterone change gene expression in KGN granulosa cells, and in which genes?"
+  input_type: count matrix
   replicate: "donors or animals (several libraries for each one)"
   design: "~ experiment + treatment"
   variable: treatment

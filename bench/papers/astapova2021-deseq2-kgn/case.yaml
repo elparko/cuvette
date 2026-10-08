@@ -29,6 +29,12 @@ answers:
     decision: Research question
     value: Does dihydrotestosterone change gene expression in KGN granulosa cells, and in which genes?
     source: Results, the section on androgen receptor activity in granulosa cells. The authors ask how much DHT changes transcription in KGN cells.
+  input_type:
+    decision: Input type
+    value: count matrix (whole-number featureCounts gene counts)
+    source: >-
+      Materials and Methods, "RNA Sequencing". Gene-level counts come from featureCounts (subread 1.6.4). The
+      GEO file holds these whole-number counts.
   replicate:
     decision: Unit of replication
     value: the experiment date, with one DHT and one vehicle library for each
