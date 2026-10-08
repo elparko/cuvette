@@ -232,6 +232,7 @@ export interface AdapterModule {
   hooks?: Hook[];
   tools?: Tool[];
   manualRoute?: (tool: string, args: Record<string, unknown>) => string | undefined;
+  suggest?: (key: string, args: Record<string, unknown>) => { value: unknown; reason: string } | undefined | Promise<{ value: unknown; reason: string } | undefined>;
   openPanel?: (url: string, opts: { sessionDir: string }) => Promise<{ close(): void } | void>;
   historySteps?: (output: import("../core/types.ts").ToolOutput) => { tool: string; args: Record<string, unknown>; line: string }[];
 }

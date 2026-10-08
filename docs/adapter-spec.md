@@ -51,6 +51,7 @@ The checker reports an error for a skill with no `name` or no `description`.
 | `hooks` | list | Extra hooks. Each has `name`, `event`, an optional `matcher`, and a `run` function. |
 | `tools` | list | Extra tools. Each has `name`, `description`, `inputSchema`, `source: "adapter"` and `execute(args, ctx)`. |
 | `manualRoute` | function | `(tool, args) => string or undefined`. It returns the manual route for a call when a fixed template is not enough. |
+| `suggest` | function | `(key, args) => { value, reason } or undefined`. When a call waits for a decision, the harness calls it with the decision key and the call arguments. The card of the question shows the value as the recommendation and the reason as evidence. Use it to detect a value from the input files. |
 
 ## `adapter.yaml`
 

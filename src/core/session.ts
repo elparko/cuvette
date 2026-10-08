@@ -874,12 +874,14 @@ export class Session {
       }
       const d = found?.decision;
       const proposed = d?.links.map((l) => getArg(args, l.arg)).find((v) => v !== undefined && v !== null && v !== "");
+      const hint = found ? await (await found.adapter.module()).suggest?.(key, args) : undefined;
+      if (hint) evidence = [evidence, `Detected from the files: ${String(hint.value)}. ${hint.reason}`].filter(Boolean).join("\n");
       const q = await this.questions.ask({
         decisionKey: key,
         title: d?.label ?? key,
         text: `${d?.help || `The agent needs a value for "${d?.label ?? key}".`} The agent wants to run ${tool.remoteName ?? tool.name}.`,
         options: (d?.choices ?? []).map((c) => ({ value: c, label: String(c) })),
-        recommendation: proposed !== undefined ? { value: proposed, reason: "The agent proposed this value in its tool call." } : d?.default !== undefined ? { value: d.default, reason: "This is the adapter default." } : undefined,
+        recommendation: hint ? { value: hint.value, reason: `The harness detected it from the files. ${hint.reason}` } : proposed !== undefined ? { value: proposed, reason: "The agent proposed this value in its tool call." } : d?.default !== undefined ? { value: d.default, reason: "This is the adapter default." } : undefined,
         evidence,
         default: d?.default,
       });
