@@ -1,0 +1,24 @@
+adapter: { name: model, title: Model fitter, version: "0.1.0" }
+program: { name: Model fitter, version: "1.0" }
+connection:
+  kind: mcp
+  command: ["{node}", "{tsx}", "{adapter_dir}/server.ts"]
+decisions:
+  - key: terms
+    label: Model terms
+    kind: text
+    owner: human
+    stage: when_needed
+    links: [{ tool: fit, arg: terms }]
+  - key: perms
+    label: Number of permutations
+    kind: int
+    default: 99
+    owner: human
+    stage: when_needed
+    links: [{ tool: fit, arg: perms }]
+    sensitivity: { options: [99, 999], tool: fit, compare: [metrics.p] }
+map:
+  - tool: fit
+    route: Model > Fit
+    fidelity: exact

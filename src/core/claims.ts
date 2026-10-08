@@ -78,7 +78,7 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
     const step = 10 ** (exp - dec);
     const percent = Boolean(m[4]);
     const before = masked.slice(0, start);
-    const sign = before.match(/(^|[\s(=<>≤≥])([-−+])$/);
+    const sign = before.match(/(^|[\s(=<>≤≥*_`~[:|])([-−+])$/);
     let from = start;
     if (sign) {
       from = start - 1;
@@ -170,7 +170,7 @@ function inputValues(record: AnalysisRecord): number[] {
   return out;
 }
 
-export function checkAnswer(text: string, record: AnalysisRecord, opts: { small?: boolean } = {}): Claim[] {
+export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
   const nodes = record.nodes?.() ?? [];
   const comparison = new Set(nodes.filter((n) => n.sensitivityOf).map((n) => n.id));
   const stale = record.stale?.() ?? new Set<string>();
@@ -180,7 +180,7 @@ export function checkAnswer(text: string, record: AnalysisRecord, opts: { small?
   const loggedValues = logged.map((n) => n.value);
   const plain = new Set(logged.flatMap((n, i) => (comparison.has(n.node) || stale.has(n.node) ? [] : [i])));
   const inputs = inputValues(record);
-  const found = extractNumbers(text, { small: opts.small });
+  const found = extractNumbers(text, { small: true });
   const claims: Claim[] = [];
   for (const s of splitSentences(text)) {
     const cited = CITATION.test(s.text);

@@ -1,0 +1,96 @@
+DESeq2 1.52.0 airway 1.32.0 
+[1] "Untreated"     "Dexamethasone"
+
+===== workflow: data(gse), ~ cell + dex 
+using counts and average transcript lengths from tximeta
+rows before filter: 58294 
+assays: counts,abundance,avgTxLength 
+rows after filter: 16637 
+
+out of 16637 with nonzero total read count
+adjusted p-value < 0.1
+LFC > 0 (up)       : 2362, 14%
+LFC < 0 (down)     : 2019, 12%
+outliers [1]       : 0, 0%
+low counts [2]     : 646, 3.9%
+(mean count < 12)
+[1] see 'cooksCutoff' argument of ?results
+[2] see 'independentFiltering' argument of ?results
+
+padj<0.1: 4381 
+padj<0.05 (alpha 0.05): 3602 
+
+===== data(airway), ~ cell + dex 
+rows before filter: 63677 
+assays: counts 
+rows after filter: 16139 
+
+out of 16139 with nonzero total read count
+adjusted p-value < 0.1
+LFC > 0 (up)       : 2607, 16%
+LFC < 0 (down)     : 2298, 14%
+outliers [1]       : 0, 0%
+low counts [2]     : 626, 3.9%
+(mean count < 12)
+[1] see 'cooksCutoff' argument of ?results
+[2] see 'independentFiltering' argument of ?results
+
+padj<0.1: 4905 
+padj<0.05 (alpha 0.05): 4081 
+
+CSV identical to assay(airway): TRUE TRUE 
+
+===== repo CSV, ~ cell + dex 
+rows before filter: 63677 
+assays: counts 
+rows after filter: 16139 
+
+out of 16139 with nonzero total read count
+adjusted p-value < 0.1
+LFC > 0 (up)       : 2607, 16%
+LFC < 0 (down)     : 2298, 14%
+outliers [1]       : 0, 0%
+low counts [2]     : 626, 3.9%
+(mean count < 12)
+[1] see 'cooksCutoff' argument of ?results
+[2] see 'independentFiltering' argument of ?results
+
+padj<0.1: 4905 
+padj<0.05 (alpha 0.05): 4081 
+
+===== repo CSV, ~ dex 
+rows before filter: 63677 
+assays: counts 
+rows after filter: 16139 
+
+out of 16139 with nonzero total read count
+adjusted p-value < 0.1
+LFC > 0 (up)       : 1902, 12%
+LFC < 0 (down)     : 1545, 9.6%
+outliers [1]       : 28, 0.17%
+low counts [2]     : 0, 0%
+(mean count < 6)
+[1] see 'cooksCutoff' argument of ?results
+[2] see 'independentFiltering' argument of ?results
+
+padj<0.1: 3447 
+padj<0.05 (alpha 0.05): 2773 
+
+===== data(gse), counts only, no transcript length offset 
+length assay is missing, using original counts without length adjustment
+rows before filter: 58294 
+assays: counts 
+rows after filter: 16637 
+
+out of 16637 with nonzero total read count
+adjusted p-value < 0.1
+LFC > 0 (up)       : 2681, 16%
+LFC < 0 (down)     : 2196, 13%
+outliers [1]       : 0, 0%
+low counts [2]     : 323, 1.9%
+(mean count < 10)
+[1] see 'cooksCutoff' argument of ?results
+[2] see 'independentFiltering' argument of ?results
+
+padj<0.1: 4877 
+padj<0.05 (alpha 0.05): 4108 

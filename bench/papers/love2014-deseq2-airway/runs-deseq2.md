@@ -47,3 +47,7 @@ The padj < 0.05 value comes from the sensitivity run of the adapter (alpha 0.05,
 - Run 2: the review gave 2 errors from the harness and 9 from the referee model. The referee findings say that values such as 4905 and 0.1 are not in the log. They are in the log. These findings are false.
 - Run 2: the harness marked 3.29, 2.94 and six more fold changes as "from a comparison run of another option". I did not check why the harness marked them.
 - Run 1 took 5.4 minutes. Run 2 took 9.6 minutes. Each run includes five sensitivity runs of the decisions min_samples and alpha, each on the full 63677 genes.
+
+## Cause found (2026-10-08, later)
+
+The tool is correct. The expected values were for other data. The rnaseqGene 1.36.0 workflow prints 4381 for `data(gse)` of the airway package (Salmon and tximeta, GENCODE v29, 58294 genes, transcript length offsets). This CSV is `data(airway)` (summarizeOverlaps on Ensembl 75, 63677 genes). The workflow code with DESeq2 1.52.0 gives 16139, 4905 (2607 up, 2298 down) and 4081 on this CSV, the same as these runs. The same code gives 16637, 4381 and 3602 on `data(gse)`. See check_workflow.R and check_workflow.out. bench.yaml now uses the values for this CSV.

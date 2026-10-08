@@ -80,10 +80,10 @@ describe("checkAnswer", () => {
     expect(claims.map((c) => c.value)).toEqual([0.81]);
   });
 
-  test("counts small whole numbers in table rows but not in the header row or in prose", () => {
+  test("counts small whole numbers in table rows and in prose only when a logged result holds them", () => {
     const { record } = fake([{ node: "n5", path: "segments", value: 3 }, ...nums]);
-    const text = "| s | segments |\n|---|---|\n| 64 | 3 |\n\nWe ran 3 steps.";
-    expect(checkAnswer(text, record).map((c) => c.value)).toEqual([64, 3]);
+    const text = "| s | segments |\n|---|---|\n| 64 | 3 |\n\nWe ran 3 steps on 4 images.";
+    expect(checkAnswer(text, record).map((c) => c.value)).toEqual([64, 3, 3]);
   });
 
   test("ignores version numbers", () => {
@@ -116,6 +116,24 @@ describe("checkAnswer", () => {
     const c = checkAnswer("The q-value was 2e-5.", record);
     expect(c[0]).toMatchObject({ label: "measured", node: "n9" });
   });
+
+  test("keeps the minus sign after markdown emphasis and code marks", () => {
+    const { record } = fake([{ node: "n1", path: "metrics.log_likelihood", value: -21152.5377 }]);
+    for (const text of ["The log-likelihood is **-21152.5377**.", "The log-likelihood is *-21152.5377*.", "The log-likelihood is _−21152.5377_.", "The log-likelihood is `-21152.5377`.", "| lnL |-21152.5377 |"]) {
+      const c = checkAnswer(text, record);
+      expect(c.map((x) => [x.value, x.label, x.node])).toEqual([[-21152.5377, "measured", "n1"]]);
+    }
+  });
+
+  test("a hyphen between a word or a number and a digit is not a sign", () => {
+    const { record } = fake([
+      { node: "n1", path: "metrics.a", value: 20 },
+      { node: "n1", path: "metrics.b", value: 30 },
+    ]);
+    const c = checkAnswer("The window was 20-30 bases wide. The substitution model was HKY-85.", record);
+    expect(c.every((x) => (x.value ?? 0) >= 0)).toBe(true);
+    expect(c.filter((x) => x.label === "measured").map((x) => x.value)).toEqual([20, 30]);
+  });
 });
 
 describe("annotate", () => {
@@ -140,11 +158,27 @@ describe("checkAnswer inputs and small counts", () => {
     expect(c.map((x) => [x.value, x.label, x.node])).toEqual([[6, "measured", "n1"]]);
   });
 
-  test("with the small option a small count in prose counts when a logged result has it", () => {
+  test("a small count in prose counts when a logged result has it", () => {
     const { record } = fake([{ node: "n1", path: "metrics.n_clusters", value: 7 }]);
-    const c = checkAnswer("The data fall into 7 clusters.", record, { small: true });
+    const c = checkAnswer("The data fall into 7 clusters.", record);
     expect(c.map((x) => [x.value, x.label, x.node])).toEqual([[7, "measured", "n1"]]);
-    expect(checkAnswer("The data fall into 7 clusters.", record)).toHaveLength(0);
+  });
+
+  test("a small count in prose that matches only a comparison run is not a claim", () => {
+    const { record } = fake([{ node: "n2", path: "metrics.n_clusters", value: 5 }]);
+    record.nodes = () => [{ id: "n2", sensitivityOf: "resolution" }];
+    expect(checkAnswer("The data fall into 5 clusters.", record)).toHaveLength(0);
+  });
+
+  test("the harness and the paper score count the same small numbers", () => {
+    const { record } = fake([{ node: "n1", path: "metrics.n_clusters", value: 7 }]);
+    const text = "The data fall into 7 clusters across 3 samples.\n\n| item | n |\n|---|---|\n| clusters | 7 |";
+    const c = checkAnswer(text, record);
+    expect(c.map((x) => [x.value, x.label])).toEqual([
+      [7, "measured"],
+      [7, "measured"],
+    ]);
+    expect(annotate(text, c)).toBe(text);
   });
 
   test("a small count with no logged match is not flagged", () => {

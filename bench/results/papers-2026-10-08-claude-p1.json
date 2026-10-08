@@ -17,9 +17,9 @@
    "items": [
     {
      "key": "genes_after_filter",
-     "description": "Genes after pre-filter, workflow",
-     "expected": 16637,
-     "tolerance": 600,
+     "description": "Genes after pre-filter, workflow code on this CSV",
+     "expected": 16139,
+     "tolerance": 100,
      "abs": false,
      "inAnswer": true,
      "reference": false,
@@ -27,7 +27,7 @@
       "pass": true,
       "via": "main",
       "value": 16139,
-      "diff": 498,
+      "diff": 0,
       "node": "n7",
       "path": "metrics.n_genes_tested",
       "entry": 60
@@ -35,7 +35,7 @@
      "reported": {
       "pass": true,
       "value": 16139,
-      "diff": 498,
+      "diff": 0,
       "via": "tolerance",
       "node": "n7",
       "claimEntry": 141,
@@ -44,26 +44,26 @@
     },
     {
      "key": "padj_01_workflow",
-     "description": "Genes with padj < 0.1, workflow",
-     "expected": 4381,
-     "tolerance": 400,
+     "description": "Genes with padj < 0.1, workflow code on this CSV",
+     "expected": 4905,
+     "tolerance": 100,
      "abs": false,
      "inAnswer": true,
      "reference": false,
      "computed": {
       "pass": true,
-      "via": "comparison",
-      "value": 4081,
-      "diff": 300,
-      "node": "n5",
+      "via": "main",
+      "value": 4905,
+      "diff": 0,
+      "node": "n7",
       "path": "metrics.n_significant",
-      "entry": 48
+      "entry": 60
      },
      "reported": {
-      "pass": false,
+      "pass": true,
       "value": 4905,
-      "diff": 524,
-      "via": null,
+      "diff": 0,
+      "via": "tolerance",
       "node": "n9",
       "claimEntry": 141,
       "text": "**16139 genes pass the filter**, and **4905 are significant: 2607 up and 2298 down** in treated vs untreated cells."
@@ -71,74 +71,74 @@
     },
     {
      "key": "up_padj_01",
-     "description": "Up-regulated genes at padj < 0.1, workflow",
-     "expected": 2362,
-     "tolerance": 250,
+     "description": "Up-regulated genes at padj < 0.1, workflow code on this CSV",
+     "expected": 2607,
+     "tolerance": 60,
      "abs": false,
      "inAnswer": true,
      "reference": false,
      "computed": {
       "pass": true,
       "via": "main",
-      "value": 2343.57334924977,
-      "diff": 18.426650750229783,
+      "value": 2607,
+      "diff": 0,
       "node": "n7",
-      "path": "table.rows[4][1]",
+      "path": "metrics.n_up",
       "entry": 60
      },
      "reported": {
       "pass": true,
-      "value": 2343.6,
-      "diff": 18.40000000000009,
+      "value": 2607,
+      "diff": 0,
       "via": "tolerance",
-      "node": "n8",
+      "node": "n7",
       "claimEntry": 141,
-      "text": "| 5 | ENSG00000189221 | 2343.6 | 3.350 | 0.142 | 3.54e-119 |"
+      "text": "**16139 genes pass the filter**, and **4905 are significant: 2607 up and 2298 down** in treated vs untreated cells."
      }
     },
     {
      "key": "down_padj_01",
-     "description": "Down-regulated genes at padj < 0.1, workflow",
-     "expected": 2019,
-     "tolerance": 250,
+     "description": "Down-regulated genes at padj < 0.1, workflow code on this CSV",
+     "expected": 2298,
+     "tolerance": 60,
      "abs": false,
      "inAnswer": true,
      "reference": false,
      "computed": {
       "pass": true,
       "via": "main",
-      "value": 2059.02790703009,
-      "diff": 40.027907030089864,
-      "node": "n8",
-      "path": "table.rows[19][1]",
-      "entry": 68
+      "value": 2298,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_down",
+      "entry": 60
      },
      "reported": {
       "pass": true,
-      "value": 2059,
-      "diff": 40,
+      "value": 2298,
+      "diff": 0,
       "via": "tolerance",
-      "node": "n8",
+      "node": "n7",
       "claimEntry": 141,
-      "text": "| 20 | ENSG00000198624 | 2059.0 | 2.914 | 0.162 | 4.24e-69 |"
+      "text": "**16139 genes pass the filter**, and **4905 are significant: 2607 up and 2298 down** in treated vs untreated cells."
      }
     },
     {
      "key": "padj_005_workflow",
-     "description": "Genes with padj < 0.05, workflow",
-     "expected": 3602,
-     "tolerance": 400,
+     "description": "Genes with padj < 0.05, workflow code on this CSV",
+     "expected": 4081,
+     "tolerance": 100,
      "abs": false,
      "inAnswer": false,
      "reference": false,
      "computed": {
       "pass": true,
-      "via": "main",
-      "value": 3659.69602097282,
-      "diff": 57.69602097281995,
-      "node": "n7",
-      "path": "table.rows[8][1]",
-      "entry": 60
+      "via": "comparison",
+      "value": 4081,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.n_significant",
+      "entry": 48
      },
      "reported": {
       "pass": null,
@@ -554,7 +554,7 @@
     "claude": {
      "computed": 5,
      "computedOf": 5,
-     "reported": 3,
+     "reported": 4,
      "reportedOf": 4,
      "runs": 1,
      "statuses": {
@@ -603,7 +603,7 @@
    "claude": {
     "computed": 15,
     "computedOf": 15,
-    "reported": 10,
+    "reported": 11,
     "reportedOf": 11,
     "runs": 4,
     "statuses": {

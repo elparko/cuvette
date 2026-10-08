@@ -772,7 +772,8 @@ export class Session {
 
   private async blockOn(keys: string[], tool: Tool, args: Args, callId: string, signal: AbortSignal): Promise<boolean> {
     const qids: string[] = [];
-    for (const key of keys) {
+    const compared = (k: string) => Boolean(this.decisionOf(k)?.decision.sensitivity);
+    for (const key of [...keys.filter((k) => !compared(k)), ...keys.filter(compared)]) {
       const open = this.questions.open().find((q) => q.decisionKey === key);
       if (open) {
         qids.push(open.qid);
@@ -788,22 +789,46 @@ export class Session {
         const canCompare = sensTool === (tool.remoteName ?? tool.name) || this.record.nodes().some((n) => n.tool === sensTool && !n.sensitivityOf);
         if (link && target && !canCompare) evidence = `No comparison yet: ${sensTool} has not run in this session, so the options cannot be compared before you choose.`;
         if (link && target && canCompare) {
-          this.record.append("notice", { text: `Comparing the options for "${d.label}" before asking you.` });
           const same = sensTool === (tool.remoteName ?? tool.name);
           const lastRun = same ? undefined : this.record.nodes().filter((n) => n.tool === sensTool && !n.sensitivityOf).at(-1);
           const base: Args = same ? structuredClone(args) : lastRun ? structuredClone(lastRun.args) : {};
           const links = this.adapterOf(target)?.linksFor(sensTool) ?? {};
+          const unknown: { arg: string; key: string }[] = [];
           for (const [arg, k] of Object.entries(links)) {
             if (k === key || !keys.includes(k)) continue;
             const other = this.decisionOf(k)?.decision;
-            if (other?.default !== undefined) setArg(base, arg, other.default);
-            else deleteArg(base, arg);
+            if (this.decisions.isSet(k)) setArg(base, arg, this.decisions.value(k));
+            else if (other?.default !== undefined) setArg(base, arg, other.default);
+            else {
+              deleteArg(base, arg);
+              unknown.push({ arg, key: k });
+            }
           }
-          try {
-            const res = await runSensitivity(d, sensTool, base, link.arg, async (_t, a, meta) => this.execute(target, a, `${callId}.s${++this.callCount}`, signal, { sensitivityOf: meta.sensitivityOf }), this.record);
-            evidence = [res.table, ...res.holds, ...res.depends].join("\n");
-          } catch (e) {
-            evidence = `The comparison did not run: ${(e as Error).message}`;
+          for (const u of unknown) {
+            const q = this.questions.open().find((x) => x.decisionKey === u.key);
+            if (!q || !this.settings.askWaits) continue;
+            this.bus.emit({ type: "status", state: "waiting", tool: tool.name });
+            this.waitedQids.add(q.qid);
+            try {
+              await abortable(this.questions.wait(q.qid), signal);
+            } catch {}
+            if (this.decisions.isSet(u.key)) setArg(base, u.arg, this.decisions.value(u.key));
+          }
+          const required = (target.inputSchema.required as string[] | undefined) ?? [];
+          const missing = [
+            ...unknown.filter((u) => !this.decisions.isSet(u.key)).map((u) => `${u.arg} (${this.decisionOf(u.key)?.decision.label ?? u.key})`),
+            ...required.filter((a) => [undefined, null, ""].includes(getArg(base, a) as never) && !unknown.some((u) => u.arg === a)),
+          ];
+          if (missing.length) {
+            evidence = `No comparison yet: the comparison runs of ${sensTool} need a value for ${missing.join(", ")}, and it has none until the scientist answers. The options were not compared.`;
+          } else {
+            this.record.append("notice", { text: `Comparing the options for "${d.label}" before asking you.` });
+            try {
+              const res = await runSensitivity(d, sensTool, base, link.arg, async (_t, a, meta) => this.execute(target, a, `${callId}.s${++this.callCount}`, signal, { sensitivityOf: meta.sensitivityOf }), this.record);
+              evidence = [res.table, ...res.holds, ...res.depends].join("\n");
+            } catch (e) {
+              evidence = `The comparison did not run: ${(e as Error).message}`;
+            }
           }
         }
       }
