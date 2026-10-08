@@ -1,0 +1,44 @@
+tool: mne
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/gramfort2013-mne-sample/MNE-sample-data/MEG/sample/sample_audvis_filt-0-40_raw.fif
+decisions:
+  bad_channels: "MEG 2443,EEG 053"
+  filter_low: 0.1
+  filter_high: 40
+  reference: average
+  use_ica: "no"
+  epoch_tmin: -0.2
+  epoch_tmax: 0.5
+  baseline_start: -0.2
+  baseline_end: 0
+  reject_grad: 4000
+  reject_mag: 4000
+  reject_eeg: 150
+  reject_eog: 250
+  peak_ch_type: grad
+  peak_tmin: 0.08
+  peak_tmax: 0.12
+expected:
+  - {description: "events found on STI 014", value: 319, tolerance: 0, source: "MNE overview tutorial prints 319 events found; computed 319 with MNE 1.13.2"}
+  - {description: "events with id 1 (auditory/left)", value: 72, tolerance: 0, source: "computed with MNE 1.13.2"}
+  - {description: "events with id 2 (auditory/right)", value: 73, tolerance: 0, source: "computed with MNE 1.13.2"}
+  - {description: "events with id 3 (visual/left)", value: 73, tolerance: 0, source: "computed with MNE 1.13.2"}
+  - {description: "events with id 4 (visual/right)", value: 70, tolerance: 0, source: "computed with MNE 1.13.2"}
+  - {description: "events with id 5 (smiley)", value: 15, tolerance: 0, source: "computed with MNE 1.13.2"}
+  - {description: "events with id 32 (buttonpress)", value: 16, tolerance: 0, source: "computed with MNE 1.13.2"}
+  - {description: "epochs dropped by the limits, all six ids", value: 10, tolerance: 0, source: "MNE overview tutorial prints 10 bad epochs dropped"}
+  - {description: "epochs kept, all six ids", value: 309, tolerance: 0, source: "319 minus 10, tutorial"}
+  - {description: "auditory/left epochs kept", value: 68, tolerance: 0, source: "computed with MNE 1.13.2"}
+  - {description: "N100 latency, global field power of good gradiometers, auditory/left", value: 0.0932, tolerance: 0.007, source: "computed with MNE 1.13.2; tolerance is one sample (6.7 ms)"}
+  - {description: "N100 global field power amplitude, gradiometers (fT/cm)", value: 42.1, tolerance: 2.0, source: "computed with MNE 1.13.2"}
+  - {description: "strongest gradiometer channel latency (s)", value: 0.0866, tolerance: 0.007, source: "computed with MNE 1.13.2"}
+  - {description: "strongest gradiometer amplitude (fT/cm, absolute)", value: 199, tolerance: 8, source: "computed with MNE 1.13.2"}
+  - {description: "N100 latency, EEG negative peak (s)", value: 0.0999, tolerance: 0.007, source: "computed with MNE 1.13.2; the tutorial joint plot of both auditory conditions labels 0.093 s"}
+  - {description: "N100 amplitude, EEG negative peak (uV)", value: -6.0, tolerance: 0.4, source: "computed with MNE 1.13.2"}
+notes: |
+  The tutorial prints 319 events found, 319 matching events and 10 bad epochs dropped. It prints no per-condition counts and no N100 latency or amplitude. Those values were computed.
+  The N100 values come from the tools with the decisions above. They depend on the window, the band, the reference, the bad channels and the limits. A run with the EEG limit at 100 uV keeps 125 epochs of the two auditory ids, against 138 at 150 uV.
+  Filtering the file again at 0.1 to 40 Hz changes the gradiometer amplitude by under 0.1 fT/cm and does not change the latencies.
+  Trap: bad channels MEG 2443 and EEG 053 left in. The strongest gradiometer then becomes MEG 2443 at 0.0666 s with 201 fT/cm, which is a different answer.
+  Trap: peak amplitude of a single gradiometer has a sign that depends on the sensor. Use the absolute value or the global field power.

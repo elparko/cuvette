@@ -1,0 +1,858 @@
+adapter:
+  name: mne
+  title: MNE-Python
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Analyzes EEG and MEG recordings with MNE-Python. Each tool does one MNE step on a raw
+    recording, epochs, an evoked response or an ICA model, saves a .fif checkpoint and returns a
+    handle for the next step. The scientist can repeat each step with the MNE call line in the map.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: MNE-Python
+  version: ""
+  tested_versions: ["1.13.2"]
+  homepage: https://mne.tools
+  docs:
+    - https://mne.tools/stable/auto_tutorials/intro/10_overview.html
+    - https://mne.tools/stable/auto_tutorials/epochs/10_epochs_overview.html
+    - https://mne.tools/stable/auto_tutorials/preprocessing/40_artifact_correction_ica.html
+    - https://mne.tools/stable/auto_tutorials/time-freq/20_sensors_time_frequency.html
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: GA_MNE_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/mne/bin/python
+    - ~/.guided-analysis/envs/mne/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import mne; print(mne.__version__)"]
+  version_pattern: '(\d+\.\d+\.\d+)'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and PNG previews. It never sees the raw sensor recording. Recordings of people are personal data.
+
+decisions:
+  - key: bad_channels
+    label: Bad channels
+    kind: text
+    default: "MEG 2443,EEG 053"
+    group: Preprocessing
+    help: >
+      Channel names, separated by commas, that are noisy or flat. MNE leaves them out of
+      averages, rejection and ICA. The default is the list that the MNE sample file carries. Look at the raw plot for your own data. Write none to keep every channel.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: set_bad_channels, arg: bads }
+
+  - key: filter_low
+    label: High-pass edge (Hz)
+    kind: float
+    default: 0.1
+    lo: 0
+    hi: 50
+    group: Preprocessing
+    help: Frequencies below this value are removed. A higher edge removes slow drift but also changes slow evoked components. ICA fits best on data that are high-passed at 1 Hz.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_raw, arg: l_freq }
+
+  - key: filter_high
+    label: Low-pass edge (Hz)
+    kind: float
+    default: 40
+    lo: 1
+    hi: 500
+    group: Preprocessing
+    help: Frequencies above this value are removed. A lower edge removes muscle and line noise but also fast activity.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_raw, arg: h_freq }
+
+  - key: notch_freq
+    label: Notch filter (Hz)
+    kind: choice
+    choices: ["none", "50", "60"]
+    default: "none"
+    group: Preprocessing
+    help: Removes power line noise at this frequency. Use 60 in North America and 50 in Europe. Not needed if the low-pass edge is below the line frequency.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_raw, arg: notch_freq }
+
+  - key: reference
+    label: EEG reference
+    kind: text
+    default: average
+    group: Preprocessing
+    help: >
+      Write average to subtract the mean of all EEG channels. Write channel names separated by
+      commas to use them as the reference, for example the mastoid channels TP9,TP10 if your montage has them. Write none to keep the recording reference. MEG channels are not affected.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: set_reference, arg: ref_channels }
+
+  - key: use_ica
+    label: Use ICA to remove artifacts?
+    kind: choice
+    choices: ["no", "yes"]
+    default: "no"
+    group: Artifacts
+    help: ICA removes components such as eye blinks and heartbeat. It changes every channel. Answer yes only if you will look at the component plots and choose the components.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: ica_n_components
+    label: Number of ICA components
+    kind: int
+    default: 15
+    lo: 2
+    hi: 200
+    group: Artifacts
+    help: More components separate more sources and take longer. The MNE tutorial uses 15.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_ica, arg: n_components }
+
+  - key: ica_random_state
+    label: ICA random seed
+    kind: int
+    default: 97
+    lo: 0
+    hi: 2147483647
+    group: Artifacts
+    help: ICA starts from random numbers. Report the seed so that others get the same components.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_ica, arg: random_state }
+
+  - key: ica_exclude
+    label: ICA components to remove
+    kind: text
+    default: ""
+    group: Artifacts
+    help: Component numbers separated by commas, for example 0,3. Choose them from the component plots, the source traces and the properties. The tool lists components that correlate with the EOG channel, but the list is only a hint. Leave empty to remove none.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: apply_ica, arg: exclude }
+
+  - key: epoch_tmin
+    label: Epoch start (s)
+    kind: float
+    default: -0.2
+    lo: -5
+    hi: 0
+    group: Epochs
+    help: Time before the event where each epoch starts. The baseline must fit inside the epoch.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_epochs, arg: tmin }
+
+  - key: epoch_tmax
+    label: Epoch end (s)
+    kind: float
+    default: 0.5
+    lo: 0.05
+    hi: 10
+    group: Epochs
+    help: Time after the event where each epoch ends. Late components need a longer window.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_epochs, arg: tmax }
+
+  - key: baseline_start
+    label: Baseline start (s)
+    kind: float
+    default: -0.2
+    lo: -5
+    hi: 0
+    group: Epochs
+    help: Start of the interval whose mean is subtracted from each epoch. Use the epoch start for the whole pre-stimulus period.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_epochs, arg: baseline_start }
+
+  - key: baseline_end
+    label: Baseline end (s)
+    kind: float
+    default: 0
+    lo: -5
+    hi: 5
+    group: Epochs
+    help: End of the baseline interval. Use 0 to end at the event.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_epochs, arg: baseline_end }
+
+  - key: reject_grad
+    label: Reject gradiometer epochs above (fT/cm)
+    kind: float
+    default: 4000
+    lo: 0
+    hi: 100000
+    group: Rejection
+    help: An epoch is dropped if any good gradiometer has a peak-to-peak range above this value. Write 0 for no limit. Lower limits drop more epochs.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_epochs, arg: reject_grad }
+
+  - key: reject_mag
+    label: Reject magnetometer epochs above (fT)
+    kind: float
+    default: 4000
+    lo: 0
+    hi: 100000
+    group: Rejection
+    help: An epoch is dropped if any good magnetometer has a peak-to-peak range above this value. Write 0 for no limit.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_epochs, arg: reject_mag }
+
+  - key: reject_eeg
+    label: Reject EEG epochs above (uV)
+    kind: float
+    default: 150
+    lo: 0
+    hi: 5000
+    group: Rejection
+    help: An epoch is dropped if any good EEG channel has a peak-to-peak range above this value. Write 0 for no limit.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_epochs, arg: reject_eeg }
+    sensitivity:
+      options: [100, 150, 200]
+      tool: make_epochs
+      compare: [metrics.n_epochs, metrics.n_dropped, metrics.count_auditory_left]
+      max_runs: 3
+
+  - key: reject_eog
+    label: Reject EOG epochs above (uV)
+    kind: float
+    default: 250
+    lo: 0
+    hi: 5000
+    group: Rejection
+    help: An epoch is dropped if the EOG channel has a peak-to-peak range above this value. This removes blinks. Write 0 for no limit.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_epochs, arg: reject_eog }
+
+  - key: peak_ch_type
+    label: Channel type for the peak
+    kind: choice
+    choices: [grad, mag, eeg]
+    default: grad
+    group: Evoked peak
+    help: The peak is measured in this channel type only. Latencies are similar across types. Amplitudes are in fT/cm, fT or uV.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_peak, arg: ch_type }
+    sensitivity:
+      options: [grad, mag, eeg]
+      tool: measure_peak
+      compare: [metrics.gfp_latency_s, metrics.peak_latency_s]
+      max_runs: 3
+
+  - key: peak_tmin
+    label: Peak window start (s)
+    kind: float
+    default: 0.08
+    lo: 0
+    hi: 1
+    group: Evoked peak
+    help: The N100 is searched for between the window start and the window end. The usual window is 0.08 to 0.12 s.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_peak, arg: tmin }
+
+  - key: peak_tmax
+    label: Peak window end (s)
+    kind: float
+    default: 0.12
+    lo: 0
+    hi: 1
+    group: Evoked peak
+    help: End of the peak search window.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_peak, arg: tmax }
+
+  - key: tfr_fmin
+    label: Time-frequency lowest frequency (Hz)
+    kind: float
+    default: 6
+    lo: 1
+    hi: 200
+    group: Time-frequency
+    help: Lowest Morlet wavelet frequency. Low frequencies need long epochs.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: time_frequency, arg: fmin }
+
+  - key: tfr_fmax
+    label: Time-frequency highest frequency (Hz)
+    kind: float
+    default: 35
+    lo: 2
+    hi: 300
+    group: Time-frequency
+    help: Highest Morlet wavelet frequency.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: time_frequency, arg: fmax }
+
+  - key: tfr_cycles_divisor
+    label: Wavelet cycles divisor
+    kind: float
+    default: 3
+    lo: 1
+    hi: 10
+    group: Time-frequency
+    help: The number of cycles of each wavelet is the frequency divided by this value. A larger divisor gives sharper timing and blurrier frequency. The MNE tutorial uses 2, which needs epochs longer than 0.8 s.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: time_frequency, arg: n_cycles_divisor }
+
+  - key: tfr_baseline_mode
+    label: Time-frequency baseline mode
+    kind: choice
+    choices: [mean, ratio, logratio, percent, zscore, zlogratio]
+    default: logratio
+    group: Time-frequency
+    help: How power is compared with the baseline. Logratio is the log of the ratio. Mean is a plain difference.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: time_frequency, arg: baseline_mode }
+
+tools:
+  - name: inspect_data
+    title: Inspect the data
+    description: Show the object type, sampling rate, filter band, bad channels and channel counts of a raw recording, epochs or an evoked response. Takes a handle or a .fif path.
+    read_only: true
+    function: "ga_mne:inspect_data"
+    params:
+      inst: { type: [object, string], description: 'A handle such as {"handle": "h3"}, or the path of a .fif checkpoint.' }
+    required: [inst]
+
+  - name: load_raw
+    title: Load a raw recording
+    description: >
+      Read a raw .fif file. Returns a handle and saves loaded_raw.fif. Shows the sampling rate, the
+      band that the file already carries and the bad channels stored in the file.
+    function: "ga_mne:load_raw"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the raw .fif file. }
+      preload: { type: boolean, default: true, description: Read all data into memory. }
+    required: [path]
+    outputs:
+      checkpoint: { kind: file, ext: fif, description: The loaded recording. }
+
+  - name: count_events
+    title: Count events
+    description: Find the events on the stimulus channel and count them for each event id. Changes nothing.
+    read_only: true
+    function: "ga_mne:count_events"
+    params:
+      raw: { type: [object, string], description: A handle or a .fif path. }
+      stim_channel: { type: string, default: "STI 014", description: Name of the stimulus channel. }
+      event_id: { type: [object, string], description: 'Names for the ids, such as {"auditory/left": 1} or "auditory/left=1,auditory/right=2".' }
+      min_duration: { type: number, minimum: 0, default: 0, description: Shortest pulse in seconds that counts as an event. }
+    required: [raw]
+    outputs:
+      counts: { kind: table, ext: csv, description: Events for each id. }
+
+  - name: set_bad_channels
+    title: Mark bad channels
+    description: Set the list of bad channels. The list replaces the list stored in the file. Write none for an empty list.
+    function: "ga_mne:set_bad_channels"
+    params:
+      raw: { type: [object, string], description: A handle or a .fif path. }
+      bads: { type: string, description: Channel names separated by commas, or none. }
+    required: [raw]
+
+  - name: filter_raw
+    title: Filter the recording
+    description: >
+      Band-pass the MEG, EEG and EOG channels with the MNE default FIR filter (zero phase). Give
+      l_freq for the high-pass edge and h_freq for the low-pass edge. Optionally apply a notch first. If the file already carries the band, filtering again is not needed.
+    function: "ga_mne:filter_raw"
+    params:
+      raw: { type: [object, string], description: A handle or a .fif path. }
+      l_freq: { type: number, minimum: 0, description: High-pass edge in Hz. Leave out for none. }
+      h_freq: { type: number, minimum: 0, description: Low-pass edge in Hz. Leave out for none. }
+      notch_freq: { type: [string, number], description: 'Line frequency in Hz, or "none".' }
+    required: [raw]
+
+  - name: set_reference
+    title: Set the EEG reference
+    description: Re-reference the EEG channels to the average of all EEG channels, to named channels, or leave them as they are.
+    function: "ga_mne:set_reference"
+    params:
+      raw: { type: [object, string], description: A handle or a .fif path. }
+      ref_channels: { type: string, description: 'average, channel names separated by commas, or none.' }
+      projection: { type: boolean, default: false, description: Add the reference as a projection that is applied later, instead of now. }
+    required: [raw]
+
+  - name: run_ica
+    title: Fit ICA
+    description: >
+      Fit independent component analysis on a copy of the recording that is high-passed at
+      fit_l_freq. Draw the component maps and the source traces. List the components that correlate
+      with the EOG channel. The tool removes nothing. Returns the ICA model as a handle.
+    function: "ga_mne:run_ica"
+    params:
+      raw: { type: [object, string], description: A handle or a .fif path. }
+      n_components: { type: integer, minimum: 2, description: Number of components. }
+      method: { type: string, enum: [fastica, infomax, picard], default: fastica }
+      random_state: { type: integer, minimum: 0, description: Random seed. }
+      fit_l_freq: { type: number, minimum: 0, default: 1.0, description: High-pass edge of the copy that ICA is fitted on. }
+      picks: { type: string, enum: [meg, eeg, "meg+eeg"], default: meg, description: Channel types to fit. }
+    required: [raw]
+    outputs:
+      components: { kind: image, ext: png, description: Component maps. }
+
+  - name: apply_ica
+    title: Remove ICA components
+    description: Remove the listed components from the recording. Give the handle of the ICA model that run_ica returned.
+    function: "ga_mne:apply_ica"
+    params:
+      raw: { type: [object, string], description: A handle or a .fif path. }
+      ica: { type: [object, string], description: The ICA handle or the path of fitted-ica.fif. }
+      exclude: { type: [string, array], description: Component numbers separated by commas, or a list. }
+    required: [raw, ica]
+
+  - name: make_epochs
+    title: Cut epochs
+    description: >
+      Find the events on the stimulus channel, cut an epoch around each event of the named ids,
+      subtract the baseline and drop epochs above the rejection limits. Limits are peak-to-peak
+      ranges in fT/cm (grad), fT (mag) and uV (eeg, eog). Leave out a limit or give 0 for none.
+      Reports the epochs kept for each condition. Bad channels are not tested.
+    function: "ga_mne:make_epochs"
+    params:
+      raw: { type: [object, string], description: A handle or a .fif path. }
+      event_id: { type: [object, string], description: 'Condition names and ids, such as {"auditory/left": 1, "auditory/right": 2} or "auditory/left=1,auditory/right=2".' }
+      tmin: { type: number, description: Epoch start in seconds. }
+      tmax: { type: number, description: Epoch end in seconds. }
+      baseline_start: { type: number, description: Baseline start in seconds. Leave out for the epoch start. }
+      baseline_end: { type: number, description: Baseline end in seconds. }
+      reject_grad: { type: number, minimum: 0, description: Gradiometer limit in fT/cm. }
+      reject_mag: { type: number, minimum: 0, description: Magnetometer limit in fT. }
+      reject_eeg: { type: number, minimum: 0, description: EEG limit in uV. }
+      reject_eog: { type: number, minimum: 0, description: EOG limit in uV. }
+      stim_channel: { type: string, default: "STI 014" }
+    required: [raw, event_id]
+    outputs:
+      counts: { kind: table, ext: csv, description: Epochs kept for each condition. }
+      drop_log: { kind: image, ext: png, description: Percent of epochs dropped for each channel. }
+
+  - name: compute_evoked
+    title: Average one condition
+    description: Average the epochs of one condition to an evoked response.
+    function: "ga_mne:compute_evoked"
+    params:
+      epochs: { type: [object, string], description: A handle or an -epo.fif path. }
+      condition: { type: string, description: 'Condition name, such as "auditory/left".' }
+    required: [epochs, condition]
+
+  - name: measure_peak
+    title: Measure an evoked peak
+    description: >
+      In one channel type, report two peaks inside the window: the latency of the largest global field
+      power (root mean square over channels), and the strongest single channel with its latency and
+      amplitude. Bad channels are left out. Amplitudes are in fT/cm (grad), fT (mag) or uV (eeg).
+    read_only: true
+    function: "ga_mne:measure_peak"
+    params:
+      evoked: { type: [object, string], description: A handle or an -ave.fif path. }
+      ch_type: { type: string, enum: [grad, mag, eeg], description: Channel type. }
+      tmin: { type: number, description: Window start in seconds. }
+      tmax: { type: number, description: Window end in seconds. }
+      mode: { type: string, enum: [abs, neg, pos], default: abs, description: Sign of the single-channel peak. Use neg for an EEG N100. }
+    required: [evoked]
+
+  - name: plot_evoked
+    title: Plot an evoked response
+    description: Draw a butterfly plot, a joint plot with scalp maps, or scalp maps at chosen times. Saves a PNG.
+    read_only: true
+    function: "ga_mne:plot_evoked"
+    params:
+      evoked: { type: [object, string], description: A handle or an -ave.fif path. }
+      kind: { type: string, enum: [butterfly, joint, topomap], default: butterfly }
+      ch_type: { type: string, enum: [grad, mag, eeg], default: grad }
+      times: { type: array, items: { type: number }, description: Times in seconds for the topomap kind. }
+    required: [evoked]
+    outputs:
+      plot: { kind: image, ext: png, description: The plot. }
+
+  - name: time_frequency
+    title: Time-frequency power
+    description: >
+      Compute Morlet wavelet power of one condition at log-spaced frequencies, average over the
+      good channels of one type, subtract the baseline with the chosen mode, and draw it. Saves a PNG and a table.
+    function: "ga_mne:time_frequency"
+    params:
+      epochs: { type: [object, string], description: A handle or an -epo.fif path. }
+      condition: { type: string, description: Condition name. }
+      fmin: { type: number, minimum: 0.5, description: Lowest frequency in Hz. }
+      fmax: { type: number, description: Highest frequency in Hz. }
+      n_freqs: { type: integer, minimum: 2, default: 8, description: Number of log-spaced frequencies. }
+      n_cycles_divisor: { type: number, minimum: 0.5, description: Cycles = frequency divided by this value. }
+      ch_type: { type: string, enum: [grad, mag, eeg], default: eeg }
+      baseline_mode: { type: string, enum: [mean, ratio, logratio, percent, zscore, zlogratio], description: How power is compared with the baseline. }
+      baseline_start: { type: number, description: Baseline start in seconds. Leave out for the epoch start. }
+      baseline_end: { type: number, default: 0 }
+    required: [epochs, condition]
+    outputs:
+      plot: { kind: image, ext: png, description: Power over time and frequency. }
+      power: { kind: table, ext: csv, description: Baseline-corrected power. }
+
+map:
+  - tool: inspect_data
+    route: "print(raw.info)   # or print(epochs), print(evoked)"
+    params:
+      - { arg: inst, label: object }
+    fidelity: close
+    difference: The tool prints a short summary of the same info fields.
+    evidence: { source: docs, test: synthetic-load }
+
+  - tool: load_raw
+    route: "raw = mne.io.read_raw_fif(path, preload=True)"
+    params:
+      - { arg: path, label: fname }
+      - { arg: preload, label: preload, ui_default: false }
+    fidelity: exact
+    evidence: { source: docs, test: synthetic-load, note: "The MNE overview tutorial reads the sample file with this call. The sample file holds 376 channels at 150.15 Hz." }
+
+  - tool: count_events
+    route: |
+      events = mne.find_events(raw, stim_channel="STI 014")
+      np.unique(events[:, 2], return_counts=True)
+    params:
+      - { arg: stim_channel, label: stim_channel, ui_default: null }
+      - { arg: min_duration, label: min_duration, ui_default: 0 }
+    fidelity: exact
+    evidence: { source: docs, test: synthetic-events, note: "The MNE overview tutorial prints 319 events found on stim channel STI 014. The tool gives the same count on the sample file." }
+
+  - tool: set_bad_channels
+    route: 'raw.info["bads"] = ["MEG 2443", "EEG 053"]'
+    params:
+      - { arg: bads, label: "info['bads']" }
+    fidelity: exact
+    evidence: { source: docs, test: synthetic-bad-channel }
+
+  - tool: filter_raw
+    route: |
+      raw.notch_filter(60)   # only if a notch is chosen
+      raw.filter(l_freq=0.1, h_freq=40)
+    params:
+      - { arg: l_freq, label: l_freq, ui_default: null }
+      - { arg: h_freq, label: h_freq, ui_default: null }
+      - { arg: notch_freq, label: freqs of notch_filter, ui_default: null }
+    fidelity: close
+    difference: The tool filters only the MEG, EEG and EOG channels (picks). The stimulus channels are not filtered. The call line without picks filters all data channels, which is the same set in most files.
+    evidence: { source: docs, test: synthetic-filter }
+
+  - tool: set_reference
+    route: 'raw.set_eeg_reference("average", projection=False)   # or ref_channels=["TP9", "TP10"]'
+    params:
+      - { arg: ref_channels, label: ref_channels, ui_default: average }
+      - { arg: projection, label: projection, ui_default: false }
+    fidelity: exact
+    evidence: { source: docs, test: synthetic-bad-channel }
+
+  - tool: run_ica
+    route: |
+      filt_raw = raw.copy().filter(l_freq=1.0, h_freq=None)
+      ica = mne.preprocessing.ICA(n_components=15, method="fastica", random_state=97, max_iter="auto")
+      ica.fit(filt_raw, picks=mne.pick_types(filt_raw.info, meg=True, eeg=False, eog=False))
+      eog_idx, scores = ica.find_bads_eog(filt_raw)
+    params:
+      - { arg: n_components, label: n_components, ui_default: null }
+      - { arg: method, label: method, ui_default: fastica }
+      - { arg: random_state, label: random_state, ui_default: null, note: The MNE tutorial uses 97. }
+      - { arg: fit_l_freq, label: l_freq of the copy, ui_default: null, note: The tutorial high-passes at 1 Hz before ICA. }
+      - { arg: picks, label: picks, ui_default: null }
+    fidelity: close
+    difference: The tutorial fits on the data channels it chooses; the tool fits on the MEG channels by default. The route is not tested against a published component list.
+    evidence: { source: docs }
+
+  - tool: apply_ica
+    route: |
+      ica.exclude = [0, 3]
+      ica.apply(raw)
+    params:
+      - { arg: exclude, label: ica.exclude }
+    fidelity: close
+    difference: Route not tested against a published result.
+    evidence: { source: docs }
+
+  - tool: make_epochs
+    route: |
+      events = mne.find_events(raw, stim_channel="STI 014")
+      reject = dict(grad=4000e-13, mag=4000e-15, eeg=150e-6, eog=250e-6)
+      epochs = mne.Epochs(raw, events, event_id, tmin=-0.2, tmax=0.5, baseline=(None, 0), reject=reject, preload=True)
+    params:
+      - { arg: tmin, label: tmin, ui_default: -0.2 }
+      - { arg: tmax, label: tmax, ui_default: 0.5 }
+      - { arg: baseline_start, label: "baseline[0]", ui_default: null, note: "MNE uses the epoch start (None) if you give none. The decision default -0.2 is the tutorial window start." }
+      - { arg: baseline_end, label: "baseline[1]", ui_default: 0 }
+      - { arg: reject_grad, label: "reject['grad'] in T/m", ui_default: null, note: The tool takes fT/cm. 4000 fT/cm is 4000e-13 T/m. }
+      - { arg: reject_mag, label: "reject['mag'] in T", ui_default: null, note: The tool takes fT. }
+      - { arg: reject_eeg, label: "reject['eeg'] in V", ui_default: null, note: The tool takes uV. }
+      - { arg: reject_eog, label: "reject['eog'] in V", ui_default: null, note: The tool takes uV. }
+    fidelity: exact
+    evidence: { source: docs, test: synthetic-epochs, note: "The MNE overview tutorial prints 319 matching events and 10 bad epochs dropped with these limits on the filtered sample file. The tool gives 309 kept." }
+
+  - tool: compute_evoked
+    route: 'evoked = epochs["auditory/left"].average()'
+    params:
+      - { arg: condition, label: "epochs key" }
+    fidelity: exact
+    evidence: { source: docs, test: synthetic-epochs }
+
+  - tool: measure_peak
+    route: |
+      sub = evoked.copy().pick("grad", exclude="bads")
+      ch, latency, amplitude = sub.get_peak(tmin=0.08, tmax=0.12, mode="abs", return_amplitude=True)
+      gfp = np.sqrt((sub.data ** 2).mean(axis=0))
+    params:
+      - { arg: ch_type, label: ch_type, ui_default: null }
+      - { arg: tmin, label: tmin, ui_default: null }
+      - { arg: tmax, label: tmax, ui_default: null }
+      - { arg: mode, label: mode, ui_default: abs }
+    fidelity: close
+    difference: The global field power line has no single MNE call. The tool computes it with numpy from the picked data. Amplitudes are converted to fT/cm, fT and uV.
+    evidence: { source: docs, test: synthetic-epochs, note: "The peak numbers are checked against a construction with known latency and amplitude. The MNE tutorials print no N100 peak numbers." }
+
+  - tool: plot_evoked
+    route: |
+      evoked.copy().pick("grad", exclude="bads").plot(spatial_colors=True)
+      evoked.plot_joint()
+    params:
+      - { arg: kind, label: plot method }
+      - { arg: ch_type, label: pick }
+      - { arg: times, label: times }
+    fidelity: close
+    difference: The tool saves the figure at 100 dpi with a tight border. The curves are the same.
+    evidence: { source: docs, test: synthetic-epochs }
+
+  - tool: time_frequency
+    route: |
+      freqs = np.logspace(np.log10(6), np.log10(35), 8)
+      tfr = epochs["auditory/left"].compute_tfr("morlet", freqs, n_cycles=freqs / 3, average=True, return_itc=False)
+      tfr.apply_baseline((None, 0), mode="logratio")
+    params:
+      - { arg: fmin, label: freqs }
+      - { arg: fmax, label: freqs }
+      - { arg: n_freqs, label: num of logspace, ui_default: 8 }
+      - { arg: n_cycles_divisor, label: n_cycles, ui_default: null, note: The MNE tutorial uses frequency divided by 2. }
+      - { arg: baseline_mode, label: mode of apply_baseline, ui_default: null }
+    fidelity: close
+    difference: The tool also averages the power over the good channels of one type and draws it as an image. Frequencies are on a log spacing, drawn with equal rows.
+    evidence: { source: docs, test: synthetic-tfr }
+
+checks:
+  - id: epoch_settings_not_reported
+    severity: warning
+    description: The answer gives epoch counts or an evoked result without the epoch window, the baseline and the rejection limits.
+    text: >
+      If the answer gives a number of epochs or an evoked result, it must also give the epoch
+      window (tmin and tmax), the baseline interval and every rejection limit with its unit.
+      Compare with the make_epochs call. Flag the answer if one is missing or differs from the call.
+  - id: no_rejection_limits
+    severity: warning
+    description: Epochs were cut with no rejection limit at all.
+    rule: { tool: make_epochs, arg: reject_eeg, op: missing, message: "make_epochs ran with no EEG limit. State why no limit is used, or ask the scientist." }
+  - id: peak_window_not_reported
+    severity: warning
+    description: A peak latency or amplitude is given without the channel type, the window or the method.
+    text: >
+      If the answer gives a peak latency or amplitude, it must name the channel type, the search
+      window, whether the value is the global field power or one channel (and which), the unit, and the
+      number of epochs averaged. Flag the answer if one is missing. Flag it too if it calls the
+      latency a property of the person without the window.
+  - id: preprocessing_not_reported
+    severity: warning
+    description: The answer does not give the filter band, the reference and the bad channels.
+    text: >
+      The answer must give the filter band (or say that the file band was used), the EEG reference,
+      and the bad channels. Compare with the filter_raw, set_reference and set_bad_channels calls.
+      Flag the answer if one is missing.
+  - id: ica_not_reported
+    severity: warning
+    description: ICA was used without the components, the seed or the reason.
+    text: >
+      If apply_ica ran, the answer must give the removed component numbers, the number of components
+      fitted, the random seed and what each removed component showed. Flag the answer if one is
+      missing, or if it removed components that only the EOG correlation hint proposed, with no look at the maps.
+
+tests:
+  - id: synthetic-load
+    description: >
+      A synthetic file made by data/make_synthetic_raw.py. It holds 2 gradiometers, 1 magnetometer, 3 EEG
+      channels, 1 EOG channel and 1 stimulus channel at 200 Hz for 60 s by construction.
+    data: [data/synthetic_raw.fif]
+    calls:
+      - tool: load_raw
+        args: { path: "{adapter_dir}/data/synthetic_raw.fif" }
+        save_as: a
+      - tool: inspect_data
+        args: { inst: { handle: "{saved.a.data.inst.handle}" } }
+    expect:
+      - { path: metrics.n_grad, equals: 2 }
+      - { path: metrics.n_mag, equals: 1 }
+      - { path: metrics.n_eeg, equals: 3 }
+      - { path: metrics.n_eog, equals: 1 }
+      - { path: metrics.sfreq, approx: 200, abs: 1.0e-6 }
+      - { path: metrics.n_bads, equals: 0 }
+
+  - id: synthetic-events
+    description: The file holds 20 events with id 1 and 10 events with id 2 by construction.
+    data: [data/synthetic_raw.fif]
+    calls:
+      - tool: count_events
+        args: { raw: "{adapter_dir}/data/synthetic_raw.fif" }
+    expect:
+      - { path: metrics.n_events, equals: 30 }
+      - { path: metrics.count_1, equals: 20 }
+      - { path: metrics.count_2, equals: 10 }
+
+  - id: synthetic-epochs
+    description: >
+      By construction, 2 of the 20 id 1 epochs hold a 400 uV EEG spike and 1 of the 10 id 2 epochs holds a
+      300 uV EOG blink, so 27 epochs stay at the limits 150 uV and 250 uV. Each id 1 epoch holds a
+      Gaussian at 0.1 s: EEG amplitudes -5, -3 and -4 uV, gradiometer amplitudes 100 and 60 fT/cm. The
+      global field power is the root mean square over channels, 4.0825 uV and 82.46 fT/cm.
+    data: [data/synthetic_raw.fif]
+    calls:
+      - tool: load_raw
+        args: { path: "{adapter_dir}/data/synthetic_raw.fif" }
+        save_as: a
+      - tool: make_epochs
+        args: { raw: { handle: "{saved.a.data.inst.handle}" }, event_id: "cond_a=1,cond_b=2", tmin: -0.2, tmax: 0.5, baseline_end: 0, reject_grad: 4000, reject_mag: 4000, reject_eeg: 150, reject_eog: 250 }
+        save_as: e
+      - tool: compute_evoked
+        args: { epochs: { handle: "{saved.e.data.inst.handle}" }, condition: cond_a }
+        save_as: v
+      - tool: measure_peak
+        args: { evoked: { handle: "{saved.v.data.inst.handle}" }, ch_type: eeg, tmin: 0.08, tmax: 0.12, mode: neg }
+        save_as: pe
+      - tool: measure_peak
+        args: { evoked: { handle: "{saved.v.data.inst.handle}" }, ch_type: grad, tmin: 0.08, tmax: 0.12, mode: abs }
+        save_as: pg
+      - tool: plot_evoked
+        args: { evoked: { handle: "{saved.v.data.inst.handle}" }, kind: butterfly, ch_type: eeg }
+    expect:
+      - { path: saved.e.metrics.n_matching_events, equals: 30 }
+      - { path: saved.e.metrics.n_epochs, equals: 27 }
+      - { path: saved.e.metrics.count_cond_a, equals: 18 }
+      - { path: saved.e.metrics.count_cond_b, equals: 9 }
+      - { path: saved.v.metrics.nave, equals: 18 }
+      - { path: saved.pe.metrics.peak_latency_s, approx: 0.1, abs: 1.0e-6 }
+      - { path: saved.pe.metrics.peak_amplitude, approx: -5.0, abs: 0.001 }
+      - { path: saved.pe.metrics.gfp_latency_s, approx: 0.1, abs: 1.0e-6 }
+      - { path: saved.pe.metrics.gfp_amplitude, approx: 4.0825, abs: 0.001 }
+      - { path: saved.pg.metrics.peak_amplitude, approx: 100, abs: 0.01 }
+      - { path: saved.pg.metrics.gfp_amplitude, approx: 82.46, abs: 0.01 }
+      - { path: "outputs[0].name", contains: evoked_butterfly }
+
+  - id: synthetic-bad-channel
+    description: >
+      EEG 003 is marked bad, so the global field power uses EEG 001 and EEG 002 only: the root mean square
+      of -5 and -3 uV is 4.1231 uV (by construction).
+    data: [data/synthetic_raw.fif]
+    calls:
+      - tool: set_bad_channels
+        args: { raw: "{adapter_dir}/data/synthetic_raw.fif", bads: EEG 003 }
+        save_as: b
+      - tool: make_epochs
+        args: { raw: { handle: "{saved.b.data.inst.handle}" }, event_id: "cond_a=1", tmin: -0.2, tmax: 0.5, baseline_end: 0, reject_eeg: 150 }
+        save_as: e
+      - tool: compute_evoked
+        args: { epochs: { handle: "{saved.e.data.inst.handle}" }, condition: cond_a }
+        save_as: v
+      - tool: measure_peak
+        args: { evoked: { handle: "{saved.v.data.inst.handle}" }, ch_type: eeg, tmin: 0.08, tmax: 0.12, mode: neg }
+    expect:
+      - { path: saved.b.metrics.n_bads, equals: 1 }
+      - { path: saved.e.metrics.n_epochs, equals: 18 }
+      - { path: metrics.n_channels, equals: 2 }
+      - { path: metrics.gfp_amplitude, approx: 4.1231, abs: 0.001 }
+
+  - id: synthetic-filter
+    description: A high-pass at 1 Hz and a low-pass at 40 Hz set the stored band to 1 and 40 Hz. The reference is set to EEG 003 and the tool reports 1 reference channel.
+    data: [data/synthetic_raw.fif]
+    calls:
+      - tool: filter_raw
+        args: { raw: "{adapter_dir}/data/synthetic_raw.fif", l_freq: 1.0, h_freq: 40.0 }
+        save_as: f
+      - tool: set_reference
+        args: { raw: { handle: "{saved.f.data.inst.handle}" }, ref_channels: "EEG 003" }
+    expect:
+      - { path: saved.f.metrics.highpass, approx: 1.0, abs: 0.001 }
+      - { path: saved.f.metrics.lowpass, approx: 40.0, abs: 0.001 }
+      - { path: metrics.n_ref_channels, equals: 1 }
+
+  - id: synthetic-tfr
+    description: Time-frequency power of the 18 kept id 1 epochs, 10 to 30 Hz. The epoch count is by construction.
+    data: [data/synthetic_raw.fif]
+    calls:
+      - tool: load_raw
+        args: { path: "{adapter_dir}/data/synthetic_raw.fif" }
+        save_as: a
+      - tool: make_epochs
+        args: { raw: { handle: "{saved.a.data.inst.handle}" }, event_id: "cond_a=1", tmin: -0.2, tmax: 0.5, baseline_end: 0, reject_eeg: 150 }
+        save_as: e
+      - tool: time_frequency
+        args: { epochs: { handle: "{saved.e.data.inst.handle}" }, condition: cond_a, fmin: 10, fmax: 30, n_freqs: 4, n_cycles_divisor: 3, ch_type: eeg, baseline_mode: mean }
+    expect:
+      - { path: metrics.n_epochs, equals: 18 }
+      - { path: "outputs[0].name", contains: tfr }
