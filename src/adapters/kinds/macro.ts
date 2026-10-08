@@ -119,7 +119,8 @@ async function runMacroTool(c: KindContext, def: ToolDef, args: Args, call: Call
   const macro = renderMacro(def.macro, scope);
   const macroFile = join(call.dir, `macro${conn.macro_ext}`);
   writeFileSync(macroFile, macro);
-  const manual = mod.manualRoute?.(def.name, args) ?? macro;
+  const shown = renderMacro(def.macro.replace(/\{include:([^}]+)\}/g, (_m, f: string) => `// (the helper file ${f} from the adapter folder goes here)`), scope);
+  const manual = mod.manualRoute?.(def.name, args) ?? shown;
   const fidelity = (mod as { fidelity?: (t: string, a: Args) => Fidelity | undefined }).fidelity?.(def.name, args);
   const argv = conn.interpreter.map((a) => expand(a, { ...c.ph, macro_file: macroFile, call_dir: call.dir }));
   const r = await runProcess(argv, { cwd: call.dir, env: childEnv(c), signal, timeoutMs: conn.call_timeout_s * 1000 });

@@ -23,16 +23,17 @@ export class ToolRunner implements Runner {
     const tools: Tool[] = [];
     const closers: (() => Promise<void>)[] = [];
     for (const name of adapters) {
-      const rt = await startAdapter(findAdapter(name), { workDir, sessionDir: workDir });
+      const a = findAdapter(name);
+      const rt = await startAdapter(a, { workDir, sessionDir: workDir });
       closers.push(() => rt.close());
-      for (const t of await rt.tools()) tools.push({ ...t, adapter: t.adapter ?? name });
+      for (const t of await rt.tools()) tools.push({ ...t, adapter: t.adapter ?? a.name, meta: { ...(t as { meta?: object }).meta, alias: name } } as Tool);
     }
     return new ToolRunner(tools, closers, workDir);
   }
 
   async call(adapter: string, tool: string, args: Args): Promise<ToolOutput> {
     const t = this.tools.find(
-      (x) => x.adapter === adapter && (x.name === tool || x.remoteName === tool || x.name === `${adapter}_${tool}`),
+      (x) => (x.adapter === adapter || (x as { meta?: { alias?: string } }).meta?.alias === adapter) && (x.name === tool || x.remoteName === tool || x.name === `${adapter}_${tool}`),
     );
     if (!t) return { ok: false, error: `no tool "${tool}" in adapter "${adapter}"` };
     const callId = `run-${Date.now()}`;

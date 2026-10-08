@@ -1,0 +1,1116 @@
+adapter:
+  name: qupath
+  title: QuPath
+  version: 0.1.1
+  spec: "1"
+  description: >
+    Counts cells and positive cells in stained tissue images with QuPath. Each tool opens one image
+    or the saved state of the last step, does one step, and saves a new state file. The next step
+    takes the path of that state file. The scientist can repeat each step in the QuPath menus.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: QuPath
+  version: "0.7.0"
+  tested_versions: []
+  homepage: https://qupath.github.io
+  docs:
+    - https://qupath.readthedocs.io/en/0.7/docs/tutorials/cell_detection.html
+    - https://qupath.readthedocs.io/en/0.7/docs/scripting/overview.html
+    - https://qupath.readthedocs.io/en/0.7/docs/reference/commands.html
+
+connection:
+  kind: macro
+  interpreter: ["{program_path}", "script", "{macro_file}"]
+  macro_ext: ".groovy"
+  state_tool: open_image
+  history_tool: get_workflow_script
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: QUPATH
+  paths:
+    - /Volumes/T7/guided-analysis/tools/qupath/expanded/QuPath-*-arm64-app.pkg/Payload/QuPath-*-arm64.app/Contents/MacOS/QuPath-*
+    - /Applications/QuPath-*.app/Contents/MacOS/QuPath-*
+    - ~/Applications/QuPath-*.app/Contents/MacOS/QuPath-*
+    - /Applications/QuPath.app/Contents/MacOS/QuPath
+    - ~/QuPath/bin/QuPath
+    - /opt/QuPath/bin/QuPath
+    - /usr/local/QuPath/bin/QuPath
+    - C:\Program Files\QuPath-*\QuPath-* (console).exe
+    - "{env:LOCALAPPDATA}\\QuPath-*\\QuPath-* (console).exe"
+  which: [QuPath, qupath]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "QuPath v(\\S+)"
+
+module: adapter.ts
+
+data_rules:
+  cloud_visibility: summaries
+  note: Slide images can come from patients. A cloud model sees metrics and tables. It never sees the image files.
+
+decisions:
+  - key: replication_unit
+    label: What is the unit of replication?
+    kind: choice
+    choices: [slide, region of a slide, patient or animal]
+    default: slide
+    group: Design
+    help: >
+      Cells in one slide are not independent samples. Use slides, or patients and animals, for a
+      test. Use cells only to explore.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: image_type
+    label: Image type
+    kind: choice
+    choices: [Brightfield (H&E), Brightfield (H-DAB), Brightfield (other), Fluorescence]
+    group: Image
+    help: >
+      The image type sets how QuPath separates the stains. H&E has hematoxylin and eosin. H-DAB has
+      hematoxylin and a brown DAB stain, such as Ki-67. A wrong type gives wrong positive counts.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: set_image_type, arg: image_type }
+      - { tool: detect_cells, arg: image_type }
+      - { tool: detect_positive_cells, arg: image_type }
+
+  - key: stain_vectors
+    label: Stain vectors
+    kind: text
+    default: default
+    group: Image
+    help: >
+      Write "default" to use the QuPath stain vectors for the image type. To use estimated vectors,
+      run Analyze > Preprocessing > Estimate stain vectors... in QuPath. Paste the text of the
+      setColorDeconvolutionStains line from the workflow history.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: set_image_type, arg: stain_vectors }
+      - { tool: detect_cells, arg: stain_vectors }
+      - { tool: detect_positive_cells, arg: stain_vectors }
+
+  - key: pixel_size_um
+    label: Pixel size of the image (micrometers per pixel)
+    kind: float
+    lo: 0.01
+    hi: 50
+    group: Image
+    help: >
+      QuPath uses the pixel size to turn sizes in micrometers into pixels. Read it from the scanner
+      or the file. The Ki-67 slide of the QuPath workshop has 0.4537. The prostate files have no
+      pixel size.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: set_pixel_size, arg: pixel_width_um }
+      - { tool: detect_cells, arg: pixel_width_um }
+      - { tool: detect_positive_cells, arg: pixel_width_um }
+      - { tool: detect_tissue, arg: pixel_width_um }
+      - { tool: create_tiles, arg: pixel_width_um }
+
+  - key: region_to_analyze
+    label: Region to analyze
+    kind: text
+    group: Design
+    help: >
+      Write "whole image", or x,y,width,height in pixels of the full-resolution image. On a large
+      slide a small region runs much faster, and the tools stop on an image of more than 40 million
+      pixels with no region. Cells on glass or on folds count as cells if the region includes them.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_cells, arg: region }
+      - { tool: detect_positive_cells, arg: region }
+
+  - key: detection_channel
+    label: Detection image (the channel that shows nuclei)
+    kind: choice
+    choices: [Hematoxylin OD, Optical density sum]
+    default: Hematoxylin OD
+    group: Cell detection
+    help: >
+      Hematoxylin OD finds nuclei from the hematoxylin stain. Optical density sum uses all stains,
+      so a strong brown stain can add objects.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_cells, arg: detection_image }
+      - { tool: detect_positive_cells, arg: detection_image }
+
+  - key: requested_pixel_size
+    label: Requested pixel size (micrometers)
+    kind: float
+    default: 0.5
+    lo: 0.1
+    hi: 4
+    group: Cell detection
+    help: >
+      QuPath resamples the image to this pixel size before it detects nuclei. A larger value is
+      faster and blurs small nuclei. The QuPath default is 0.5.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_cells, arg: requested_pixel_size }
+      - { tool: detect_positive_cells, arg: requested_pixel_size }
+
+  - key: background_radius
+    label: Background radius (micrometers)
+    kind: float
+    default: 8.0
+    lo: 0
+    hi: 50
+    group: Cell detection
+    help: >
+      QuPath removes the background with a rolling ball of this radius. Use a value larger than the
+      largest nucleus. The QuPath default is 8.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_cells, arg: background_radius }
+      - { tool: detect_positive_cells, arg: background_radius }
+
+  - key: sigma
+    label: Sigma (micrometers)
+    kind: float
+    default: 1.5
+    lo: 0.5
+    hi: 5
+    group: Cell detection
+    help: >
+      The width of the Gaussian blur before the nuclei are found. A larger value merges close
+      nuclei. A smaller value splits one nucleus into pieces. The QuPath default is 1.5.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_cells, arg: sigma }
+      - { tool: detect_positive_cells, arg: sigma }
+
+  - key: minimum_area
+    label: Smallest nucleus (square micrometers)
+    kind: float
+    default: 10.0
+    lo: 0
+    hi: 200
+    group: Cell detection
+    help: Objects smaller than this are not counted. The QuPath default is 10.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_cells, arg: minimum_area }
+      - { tool: detect_positive_cells, arg: minimum_area }
+
+  - key: maximum_area
+    label: Largest nucleus (square micrometers)
+    kind: float
+    default: 400.0
+    lo: 20
+    hi: 5000
+    group: Cell detection
+    help: Objects larger than this are not counted. The QuPath default is 400.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_cells, arg: maximum_area }
+      - { tool: detect_positive_cells, arg: maximum_area }
+
+  - key: detection_threshold
+    label: Detection threshold
+    kind: float
+    default: 0.1
+    lo: 0.01
+    hi: 5
+    group: Cell detection
+    help: >
+      The lowest hematoxylin intensity that counts as a nucleus. A lower value finds more and
+      fainter nuclei. The QuPath default is 0.1. The agent runs three values and shows the cell
+      counts before you choose.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_cells, arg: threshold }
+      - { tool: detect_positive_cells, arg: threshold }
+    sensitivity:
+      options: [0.05, 0.1, 0.2]
+      compare: [metrics.n_cells]
+      max_runs: 3
+
+  - key: cell_expansion
+    label: Cell expansion (micrometers)
+    kind: float
+    default: 5.0
+    lo: 0
+    hi: 20
+    group: Cell detection
+    help: >
+      QuPath grows each nucleus by this distance to draw the cell. The distance changes the cell
+      area and every cell-level intensity. Use 0 to measure nuclei only. The QuPath default is 5.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_cells, arg: cell_expansion }
+      - { tool: detect_positive_cells, arg: cell_expansion }
+
+  - key: score_compartment
+    label: Score compartment (the measurement that decides positive)
+    kind: choice
+    choices:
+      - "Nucleus: DAB OD mean"
+      - "Nucleus: DAB OD max"
+      - "Cytoplasm: DAB OD mean"
+      - "Cytoplasm: DAB OD max"
+      - "Cell: DAB OD mean"
+      - "Cell: DAB OD max"
+    default: "Nucleus: DAB OD mean"
+    group: Positive cells
+    help: >
+      The brown stain value that is compared with the threshold. Ki-67 stains nuclei, so use a
+      nucleus value. The Bankhead 2017 paper uses the maximum DAB value in the cell area. The
+      QuPath default for H-DAB is the nucleus mean.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_positive_cells, arg: score_compartment }
+
+  - key: single_threshold
+    label: Positivity rule (one threshold or three levels)
+    kind: bool
+    default: true
+    group: Positive cells
+    help: >
+      True gives Negative and Positive with one cutoff. False gives Negative, 1+, 2+ and 3+ with
+      three cutoffs, and an H-score.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_positive_cells, arg: single_threshold }
+
+  - key: positive_threshold
+    label: Positive threshold (Threshold 1+)
+    kind: float
+    default: 0.2
+    lo: 0.01
+    hi: 3
+    group: Positive cells
+    help: >
+      The cutoff for the score compartment. A cell above it is positive. The QuPath default is 0.2.
+      The agent runs three values and shows how the positive fraction moves before you choose.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_positive_cells, arg: threshold_1 }
+    sensitivity:
+      options: [0.1, 0.2, 0.4]
+      compare: [metrics.positive_percent, metrics.n_positive]
+      max_runs: 3
+
+  - key: tissue_threshold
+    label: Tissue threshold (gray value, 0 to 255)
+    kind: int
+    default: 127
+    lo: 0
+    hi: 255
+    group: Tissue
+    help: >
+      The gray value that separates tissue from empty glass. Pale H&E tissue can be lighter than
+      the QuPath default of 127, and then the tool finds no tissue. The agent runs several values
+      and shows the tissue area before you choose.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_tissue, arg: threshold }
+    sensitivity:
+      options: [127, 180, 200, 220]
+      compare: [metrics.tissue_area_mm2]
+      max_runs: 4
+
+map:
+  - tool: open_image
+    route: File > Open... then the Image tab in the left panel
+    steps:
+      - Select the file {input}
+      - The Image tab shows Name, Width, Height, Pixel width, Pixel height and Image type
+    params:
+      - { arg: input, label: File to open }
+    fidelity: close
+    difference: The tool reads the same values with the QuPath script functions. A person has not compared them with the Image tab.
+    evidence: { source: program_definitions, test: open_ome_crop, note: "The pixel size 0.4537 matches the TIFF XResolution of the slide in expected.yaml." }
+    summary: "Opened the image: {metrics.width} by {metrics.height} pixels, calibrated {metrics.calibrated}, {data.values.image_type}."
+
+  - tool: set_image_type
+    route: Image tab > double-click Image type
+    steps:
+      - Select {image_type} in the list
+      - For H&E and H-DAB, QuPath sets its default stain vectors
+      - To use other stain vectors, run Analyze > Preprocessing > Estimate stain vectors...
+    params:
+      - { arg: image_type, label: Image type }
+      - { arg: stain_vectors, label: Stain vectors, ui_default: default }
+    fidelity: close
+    difference: The window step was not run by a person. The history line is the same setImageType call that the window records.
+    evidence: { source: macro_recorder, test: set_type_and_size, note: The workflow history shows setImageType and setColorDeconvolutionStains. }
+    summary: "Set the image type to {data.values.image_type}."
+
+  - tool: set_pixel_size
+    route: Image tab > double-click Pixel width or Pixel height
+    steps:
+      - Pixel width (um) = {pixel_width_um}
+      - Pixel height (um) = {pixel_height_um}
+    params:
+      - { arg: pixel_width_um, label: Pixel width, ui_default: "" }
+      - { arg: pixel_height_um, label: Pixel height, ui_default: "" }
+    fidelity: close
+    difference: The window step was not run by a person. The tool calls setPixelSizeMicrons, the same function that the window uses.
+    evidence: { source: docs, test: set_type_and_size }
+    summary: "Set the pixel size to {metrics.pixel_width_um} um by {metrics.pixel_height_um} um."
+
+  - tool: annotate_full_image
+    route: Objects > Annotations... > Create full image annotation
+    steps:
+      - Click the command
+    params: []
+    fidelity: close
+    difference: The window step was not run by a person. The tool calls createFullImageAnnotation, the same function.
+    evidence: { source: program_definitions, test: full_annotation_area }
+    summary: "Made a full image annotation. Area {metrics.region_area_mm2} mm2."
+
+  - tool: detect_tissue
+    route: Analyze > Preprocessing > Simple tissue detection
+    steps:
+      - Threshold = {threshold}
+      - Requested pixel size = {requested_pixel_size}
+      - Minimum area = {minimum_area}
+      - Max fill area = {max_fill_area}
+      - Dark background = {dark_background}
+      - Single annotation = {single_annotation}
+      - Click Run (QuPath asks for a parent object, the whole image)
+    params:
+      - { arg: pixel_width_um, label: Pixel width, note: Set in the Image tab. }
+      - { arg: threshold, label: Threshold, ui_default: 127 }
+      - { arg: requested_pixel_size, label: Requested pixel size, ui_default: 20.0 }
+      - { arg: minimum_area, label: Minimum area, ui_default: 10000.0 }
+      - { arg: max_fill_area, label: Max fill area, ui_default: 1000000.0 }
+      - { arg: dark_background, label: Dark background, ui_default: false }
+      - { arg: single_annotation, label: Single annotation, ui_default: true }
+    fidelity: close
+    difference: The dialog was not run by a person. The tool runs the same plugin with the same settings. The tool deletes all earlier objects and uses the whole image as the parent.
+    evidence: { source: program_definitions, test: tissue_area, note: "The labels come from the plugin parameter list. The plugin finds no tissue at the default threshold 127 on the prostate crop." }
+    summary: "Found tissue. Area {metrics.tissue_area_mm2} mm2, {metrics.tissue_fraction} of the image."
+
+  - tool: create_tiles
+    route: Analyze > Tiles & superpixels > Create tiles...
+    steps:
+      - Select an annotation
+      - Tile size = {tile_size}
+      - Trim to ROI = {trim_to_roi}
+      - Make annotation tiles = {make_annotation_tiles}
+      - Remove parent annotation = {remove_parent_annotation}
+      - Click Run
+    params:
+      - { arg: pixel_width_um, label: Pixel width, note: Set in the Image tab. }
+      - { arg: tile_size, label: Tile size, ui_default: 100.0 }
+      - { arg: trim_to_roi, label: Trim to ROI, ui_default: true }
+      - { arg: make_annotation_tiles, label: Make annotation tiles, ui_default: false }
+      - { arg: remove_parent_annotation, label: Remove parent annotation, ui_default: false }
+    fidelity: close
+    difference: The dialog was not run by a person. The tool runs the same plugin with the same settings. The tool makes a full image annotation if the state has none.
+    evidence: { source: program_definitions, test: tiles_count }
+    summary: "Made {metrics.n_tiles} tiles of {tile_size} um."
+
+  - tool: detect_cells
+    route: Analyze > Cell detection > Cell detection...
+    steps:
+      - Select the annotation. Use Objects > Annotations... > Create full image annotation if there is none
+      - Detection image = {detection_image}
+      - Requested pixel size = {requested_pixel_size}
+      - Background radius = {background_radius}
+      - Median filter radius = {median_filter_radius}
+      - Sigma = {sigma}
+      - Minimum area = {minimum_area}
+      - Maximum area = {maximum_area}
+      - Threshold = {threshold}
+      - Max background intensity = {max_background_intensity}
+      - Split by shape = {split_by_shape}
+      - Cell expansion = {cell_expansion}
+      - Include cell nucleus = {include_cell_nucleus}
+      - Smooth boundaries = {smooth_boundaries}
+      - Click Run
+    params:
+      - { arg: image_type, label: Image type, note: Set in the Image tab. }
+      - { arg: stain_vectors, label: Stain vectors, ui_default: default }
+      - { arg: pixel_width_um, label: Pixel width, note: Set in the Image tab. }
+      - { arg: detection_image, label: Detection image, ui_default: Hematoxylin OD }
+      - { arg: requested_pixel_size, label: Requested pixel size, ui_default: 0.5 }
+      - { arg: background_radius, label: Background radius, ui_default: 8.0 }
+      - { arg: median_filter_radius, label: Median filter radius, ui_default: 0.0 }
+      - { arg: sigma, label: Sigma, ui_default: 1.5 }
+      - { arg: minimum_area, label: Minimum area, ui_default: 10.0 }
+      - { arg: maximum_area, label: Maximum area, ui_default: 400.0 }
+      - { arg: threshold, label: Threshold, ui_default: 0.1 }
+      - { arg: max_background_intensity, label: Max background intensity, ui_default: 2.0 }
+      - { arg: split_by_shape, label: Split by shape, ui_default: true }
+      - { arg: cell_expansion, label: Cell expansion, ui_default: 5.0 }
+      - { arg: include_cell_nucleus, label: Include cell nucleus, ui_default: true }
+      - { arg: smooth_boundaries, label: Smooth boundaries, ui_default: true }
+      - { arg: region, label: Annotation to run on, ui_default: whole image }
+    fidelity: close
+    difference: The dialog was not run by a person. The tool runs the same plugin (WatershedCellDetection) with the same settings JSON that the workflow history records. A person has not compared the cell counts.
+    evidence: { source: program_definitions, test: cells_crop, note: "The labels and defaults come from the plugin parameter list for a calibrated H&E or H-DAB image. The workflow history line has the same settings." }
+    summary: "At threshold {metrics.threshold_used}: detected {metrics.n_cells} cells. Mean cell area {metrics.mean_cell_area_um2} um2."
+
+  - tool: detect_positive_cells
+    route: Analyze > Cell detection > Positive cell detection...
+    steps:
+      - Select the annotation. Use Objects > Annotations... > Create full image annotation if there is none
+      - Set the same nucleus, intensity and cell settings as in Cell detection...
+      - Score compartment = {score_compartment}
+      - Threshold 1+ = {threshold_1}
+      - Threshold 2+ = {threshold_2}
+      - Threshold 3+ = {threshold_3}
+      - Single threshold = {single_threshold}
+      - Click Run
+    params:
+      - { arg: image_type, label: Image type, note: Set in the Image tab. }
+      - { arg: stain_vectors, label: Stain vectors, ui_default: default }
+      - { arg: pixel_width_um, label: Pixel width, note: Set in the Image tab. }
+      - { arg: detection_image, label: Detection image, ui_default: Hematoxylin OD }
+      - { arg: requested_pixel_size, label: Requested pixel size, ui_default: 0.5 }
+      - { arg: background_radius, label: Background radius, ui_default: 8.0 }
+      - { arg: median_filter_radius, label: Median filter radius, ui_default: 0.0 }
+      - { arg: sigma, label: Sigma, ui_default: 1.5 }
+      - { arg: minimum_area, label: Minimum area, ui_default: 10.0 }
+      - { arg: maximum_area, label: Maximum area, ui_default: 400.0 }
+      - { arg: threshold, label: Threshold, ui_default: 0.1 }
+      - { arg: max_background_intensity, label: Max background intensity, ui_default: 2.0 }
+      - { arg: split_by_shape, label: Split by shape, ui_default: true }
+      - { arg: cell_expansion, label: Cell expansion, ui_default: 5.0 }
+      - { arg: include_cell_nucleus, label: Include cell nucleus, ui_default: true }
+      - { arg: smooth_boundaries, label: Smooth boundaries, ui_default: true }
+      - { arg: score_compartment, label: Score compartment, ui_default: "Nucleus: DAB OD mean", note: "For an H&E image the default is Nucleus: Eosin OD mean." }
+      - { arg: threshold_1, label: Threshold 1+, ui_default: 0.2 }
+      - { arg: threshold_2, label: Threshold 2+, ui_default: 0.4 }
+      - { arg: threshold_3, label: Threshold 3+, ui_default: 0.6 }
+      - { arg: single_threshold, label: Single threshold, ui_default: true }
+      - { arg: region, label: Annotation to run on, ui_default: whole image }
+    fidelity: close
+    difference: The dialog was not run by a person. The tool runs the same plugin (PositiveCellDetection) with the same settings JSON that the workflow history records. A person has not compared the counts or the positive percent.
+    evidence: { source: program_definitions, test: positive_crop, note: "The labels and defaults come from the plugin parameter list for an H-DAB image. The workflow history line has the same settings." }
+    summary: "At Threshold 1+ {metrics.threshold_1_used}, single threshold {metrics.single_threshold_used}: {metrics.n_cells} cells, {metrics.n_positive} positive ({metrics.positive_percent} percent)."
+
+  - tool: export_measurements
+    route: Measure > Export measurements...
+    steps:
+      - "Needs a project. Without a project use Measure > Show detection measurements, then Save"
+      - Output file = the CSV file
+      - Object type = {object_type}
+      - File type = Comma-separated (.csv)
+      - Columns to include = All columns
+      - Click Export
+    params:
+      - { arg: object_type, label: Object type, ui_default: Cells }
+    fidelity: close
+    difference: The window step was not run by a person. The tool calls saveDetectionMeasurements or saveAnnotationMeasurements, then changes the tab-separated file to a comma-separated file.
+    evidence: { source: program_definitions, test: export_cells }
+    summary: "Exported {metrics.n_objects} {object_type} rows."
+
+  - tool: get_workflow_script
+    route: Automate > Show workflow command history, then Create script
+    steps:
+      - The Workflow tab lists each step
+      - The Create script button writes the steps as a Groovy script
+    params: []
+    fidelity: close
+    difference: The tool lists the history lines of the saved state without the header comments that the window adds. The tool removes lines that repeat exactly.
+    evidence: { source: macro_recorder, test: workflow_script }
+    summary: "The history has {metrics.n_steps} steps."
+
+tools:
+  - name: open_image
+    title: Open an image and read its metadata
+    description: >
+      Open an image file, or the state file of an earlier step, and report its size, pixel size,
+      channels and image type. Use this first. The pixel size is missing for many files.
+    read_only: true
+    params:
+      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+    required: [input]
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        def d = gaLoad("{input}")
+        gaImageLines(d)
+      }
+
+  - name: set_image_type
+    title: Set the image type
+    description: >
+      Set the image type so that QuPath can separate the stains. Saves a new state file named state.
+      Use Brightfield (H-DAB) for a brown DAB stain such as Ki-67.
+    params:
+      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      image_type: { type: string, enum: ["Brightfield (H&E)", "Brightfield (H-DAB)", "Brightfield (other)", "Fluorescence"] }
+      stain_vectors: { type: string, description: 'The word default, or the text of a setColorDeconvolutionStains line from QuPath.' }
+    required: [input, image_type]
+    outputs:
+      state: { kind: file, ext: .qpdata, description: The state file for the next step. }
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        def d = gaLoad("{input}")
+        gaSetType(d, "{image_type}", "{stain_vectors}")
+        gaImageLines(d)
+        gaSave(d, "{output.state}")
+      }
+
+  - name: set_pixel_size
+    title: Set the pixel size
+    description: >
+      Set the pixel width and height in micrometers. Use it only if open_image reports calibrated 0,
+      or if the scientist gives another value. Saves a new state file named state. All sizes in
+      micrometers depend on this value.
+    params:
+      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel width in micrometers. }
+      pixel_height_um: { type: number, exclusiveMinimum: 0, description: Pixel height in micrometers. The default is the pixel width. }
+    required: [input, pixel_width_um]
+    outputs:
+      state: { kind: file, ext: .qpdata, description: The state file for the next step. }
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        def d = gaLoad("{input}")
+        def w = gaNum("{pixel_width_um}")
+        def h = gaNum("{pixel_height_um}") ?: w
+        gaSetPixelSize(d, w, h)
+        gaImageLines(d)
+        gaSave(d, "{output.state}")
+      }
+
+  - name: annotate_full_image
+    title: Make an annotation of the full image
+    description: >
+      Add one annotation that covers the whole image. Saves a new state file named state. The
+      detection tools make this annotation by themselves if the state has none.
+    params:
+      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+    required: [input]
+    outputs:
+      state: { kind: file, ext: .qpdata, description: The state file for the next step. }
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        def d = gaLoad("{input}")
+        createFullImageAnnotation(true)
+        println "n_annotations=" + getAnnotationObjects().size()
+        println "region_area_mm2=" + (gaAnnotationArea(d) / 1.0e6)
+        gaSave(d, "{output.state}")
+      }
+
+  - name: detect_tissue
+    title: Find the tissue and skip empty glass
+    description: >
+      Find tissue with a gray value threshold and save one annotation of the tissue. Reports the
+      tissue area in square millimeters. Needs the pixel size. Deletes all earlier objects. Saves a
+      new state file named state.
+    params:
+      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel size of the image in micrometers. Give it to set the pixel size in this call. It is not needed if the file or an earlier step has it. }
+      threshold: { type: integer, minimum: 0, maximum: 255, description: Gray value that separates tissue from glass. }
+      requested_pixel_size: { type: number, minimum: 5, maximum: 100, description: Pixel size in micrometers for the search. Use 10 to 50. This is not the pixel size of the image. A small value makes the search very slow on a slide. }
+      minimum_area: { type: number, minimum: 0, description: Smallest piece of tissue in square micrometers. }
+      max_fill_area: { type: number, minimum: 0, description: Largest hole in the tissue to fill, in square micrometers. }
+      dark_background: { type: boolean, description: True if the background is darker than the tissue. }
+      single_annotation: { type: boolean, description: True to merge all tissue pieces into one annotation. }
+    required: [input]
+    outputs:
+      state: { kind: file, ext: .qpdata, description: The state file for the next step. }
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        def d = gaLoad("{input}")
+        gaPrepare([pixel_width_um: "{pixel_width_um}"], d)
+        gaNeedCalibration(d)
+        def plugin = "qupath.imagej.detect.tissue.SimpleTissueDetection2"
+        def p = Class.forName(plugin).getDeclaredConstructor().newInstance()
+        def params = [:]
+        for (e in p.getParameterList(d).getParameters().entrySet()) {
+          def v = e.getValue()
+          if (v.isHidden() || v.getClass().getSimpleName() == "EmptyParameter") continue
+          params[e.getKey()] = v.getValueOrDefault()
+        }
+        if (gaStr("{threshold}") != null) params["threshold"] = gaNum("{threshold}").intValue()
+        if (gaStr("{requested_pixel_size}") != null) params["requestedPixelSizeMicrons"] = gaNum("{requested_pixel_size}")
+        if (gaStr("{minimum_area}") != null) params["minAreaMicrons"] = gaNum("{minimum_area}")
+        if (gaStr("{max_fill_area}") != null) params["maxHoleAreaMicrons"] = gaNum("{max_fill_area}")
+        if (gaStr("{dark_background}") != null) params["darkBackground"] = gaBool("{dark_background}")
+        if (gaStr("{single_annotation}") != null) params["singleAnnotation"] = gaBool("{single_annotation}")
+        clearAllObjects()
+        createFullImageAnnotation(true)
+        selectAnnotations()
+        runPlugin(plugin, GsonTools.getInstance().toJson(params))
+        def n = getAnnotationObjects().size()
+        println "n_annotations=" + n
+        if (n == 0) println "warning=No tissue found at this threshold. The threshold can be below the gray value of the tissue."
+        def tissue = gaAnnotationArea(d) / 1.0e6
+        def s = d.getServer()
+        def cal = s.getPixelCalibration()
+        def whole = s.getWidth() * cal.getPixelWidthMicrons() * s.getHeight() * cal.getPixelHeightMicrons() / 1.0e6
+        println "tissue_area_mm2=" + tissue
+        println "image_area_mm2=" + whole
+        println "tissue_fraction=" + (tissue / whole)
+        println "threshold_used=" + params["threshold"]
+        gaSave(d, "{output.state}")
+      }
+
+  - name: create_tiles
+    title: Cut the annotation into tiles
+    description: >
+      Cut the annotation into square tiles of a fixed size in micrometers. Needs the pixel size.
+      Makes a full image annotation if the state has none. Saves a new state file named state.
+    params:
+      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel size of the image in micrometers. Give it to set the pixel size in this call. It is not needed if the file or an earlier step has it. }
+      tile_size: { type: number, exclusiveMinimum: 0, description: Tile width and height in micrometers. }
+      trim_to_roi: { type: boolean, description: True to cut tiles at the edge of the annotation. }
+      make_annotation_tiles: { type: boolean, description: True to make annotations instead of tile objects. }
+      remove_parent_annotation: { type: boolean, description: True to delete the annotation that was cut. }
+    required: [input]
+    outputs:
+      state: { kind: file, ext: .qpdata, description: The state file for the next step. }
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        def d = gaLoad("{input}")
+        gaPrepare([pixel_width_um: "{pixel_width_um}"], d)
+        gaNeedCalibration(d)
+        def plugin = "qupath.lib.algorithms.TilerPlugin"
+        def p = Class.forName(plugin).getDeclaredConstructor().newInstance()
+        def params = [:]
+        for (e in p.getParameterList(d).getParameters().entrySet()) {
+          def v = e.getValue()
+          if (v.isHidden() || v.getClass().getSimpleName() == "EmptyParameter") continue
+          params[e.getKey()] = v.getValueOrDefault()
+        }
+        if (gaStr("{tile_size}") != null) params["tileSizeMicrons"] = gaNum("{tile_size}")
+        if (gaStr("{trim_to_roi}") != null) params["trimToROI"] = gaBool("{trim_to_roi}")
+        if (gaStr("{make_annotation_tiles}") != null) params["makeAnnotations"] = gaBool("{make_annotation_tiles}")
+        if (gaStr("{remove_parent_annotation}") != null) params["removeParentAnnotation"] = gaBool("{remove_parent_annotation}")
+        def before = getAnnotationObjects().size()
+        if (before == 0) createFullImageAnnotation(true)
+        selectAnnotations()
+        runPlugin(plugin, GsonTools.getInstance().toJson(params))
+        println "n_tiles=" + d.getHierarchy().getTileObjects().size()
+        println "n_annotations=" + getAnnotationObjects().size()
+        println "tile_size_um=" + params["tileSizeMicrons"]
+        gaSave(d, "{output.state}")
+      }
+
+  - name: detect_cells
+    title: Detect cells
+    description: >
+      Detect nuclei and draw cells around them with QuPath cell detection. Needs the pixel size and
+      the image type: give image_type and pixel_width_um here, or run set_image_type and
+      set_pixel_size first. Runs on all annotations, or on the region. Makes a full image annotation if
+      the state has none. Saves a new state file named state. Leave a setting out to use the
+      decision value or the QuPath default.
+    params:
+      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      image_type: { type: string, enum: ["Brightfield (H&E)", "Brightfield (H-DAB)", "Brightfield (other)", "Fluorescence"], description: Image type. Give it to set the type in this call. It is not needed if an earlier step set it. }
+      stain_vectors: { type: string, description: 'The word default, or the text of a setColorDeconvolutionStains line from QuPath.' }
+      pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel size of the image in micrometers. Give it to set the pixel size in this call. It is not needed if the file or an earlier step has it. }
+      region: { type: string, description: 'The word "whole image", or x,y,width,height in pixels of the full-resolution image.' }
+      detection_image: { type: string, description: 'Hematoxylin OD or Optical density sum. For a fluorescence image, the channel name.' }
+      requested_pixel_size: { type: number, exclusiveMinimum: 0, description: Pixel size in micrometers for the detection. }
+      background_radius: { type: number, minimum: 0, description: Background radius in micrometers. }
+      median_filter_radius: { type: number, minimum: 0, description: Median filter radius in micrometers. }
+      sigma: { type: number, exclusiveMinimum: 0, description: Sigma of the Gaussian blur in micrometers. }
+      minimum_area: { type: number, minimum: 0, description: Smallest nucleus in square micrometers. }
+      maximum_area: { type: number, exclusiveMinimum: 0, description: Largest nucleus in square micrometers. }
+      threshold: { type: number, minimum: 0, maximum: 10, description: Lowest hematoxylin optical density of a nucleus. Typical values are 0.05 to 0.5. The QuPath default is 0.1. }
+      max_background_intensity: { type: number, minimum: 0, maximum: 20, description: Highest background optical density. The QuPath default is 2. }
+      split_by_shape: { type: boolean, description: True to split touching nuclei by their shape. }
+      cell_expansion: { type: number, minimum: 0, description: Distance in micrometers to grow each nucleus to the cell. }
+      include_cell_nucleus: { type: boolean, description: True to keep the nucleus in each cell. }
+      smooth_boundaries: { type: boolean, description: True to smooth the outlines. }
+    required: [input]
+    outputs:
+      state: { kind: file, ext: .qpdata, description: The state file for the next step. }
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        gaDetect([
+          input: "{input}", image_type: "{image_type}", stain_vectors: "{stain_vectors}",
+          pixel_width_um: "{pixel_width_um}", region: "{region}", detection_image: "{detection_image}",
+          requested_pixel_size: "{requested_pixel_size}", background_radius: "{background_radius}",
+          median_filter_radius: "{median_filter_radius}", sigma: "{sigma}",
+          minimum_area: "{minimum_area}", maximum_area: "{maximum_area}", threshold: "{threshold}",
+          max_background_intensity: "{max_background_intensity}", split_by_shape: "{split_by_shape}",
+          cell_expansion: "{cell_expansion}", include_cell_nucleus: "{include_cell_nucleus}",
+          smooth_boundaries: "{smooth_boundaries}",
+        ], "qupath.imagej.detect.cells.WatershedCellDetection", false, "{output.state}")
+      }
+
+  - name: detect_positive_cells
+    title: Detect positive cells
+    description: >
+      Detect cells and class each cell as Negative or Positive from one stain value, or as 1+, 2+
+      and 3+ with three cutoffs. Reports the percent of positive cells. Needs the pixel size and
+      an H-DAB or H&E image type: give image_type and pixel_width_um here, or run set_image_type
+      and set_pixel_size first. Saves a new state file named state. Leave a setting out to use
+      the decision value or the QuPath default.
+    params:
+      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      image_type: { type: string, enum: ["Brightfield (H&E)", "Brightfield (H-DAB)", "Brightfield (other)", "Fluorescence"], description: Image type. Give it to set the type in this call. It is not needed if an earlier step set it. }
+      stain_vectors: { type: string, description: 'The word default, or the text of a setColorDeconvolutionStains line from QuPath.' }
+      pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel size of the image in micrometers. Give it to set the pixel size in this call. It is not needed if the file or an earlier step has it. }
+      region: { type: string, description: 'The word "whole image", or x,y,width,height in pixels of the full-resolution image.' }
+      detection_image: { type: string, description: 'Hematoxylin OD or Optical density sum. For a fluorescence image, the channel name.' }
+      requested_pixel_size: { type: number, exclusiveMinimum: 0, description: Pixel size in micrometers for the detection. }
+      background_radius: { type: number, minimum: 0, description: Background radius in micrometers. }
+      median_filter_radius: { type: number, minimum: 0, description: Median filter radius in micrometers. }
+      sigma: { type: number, exclusiveMinimum: 0, description: Sigma of the Gaussian blur in micrometers. }
+      minimum_area: { type: number, minimum: 0, description: Smallest nucleus in square micrometers. }
+      maximum_area: { type: number, exclusiveMinimum: 0, description: Largest nucleus in square micrometers. }
+      threshold: { type: number, minimum: 0, maximum: 10, description: Lowest hematoxylin optical density of a nucleus. Typical values are 0.05 to 0.5. The QuPath default is 0.1. }
+      max_background_intensity: { type: number, minimum: 0, maximum: 20, description: Highest background optical density. The QuPath default is 2. }
+      split_by_shape: { type: boolean, description: True to split touching nuclei by their shape. }
+      cell_expansion: { type: number, minimum: 0, description: Distance in micrometers to grow each nucleus to the cell. }
+      include_cell_nucleus: { type: boolean, description: True to keep the nucleus in each cell. }
+      smooth_boundaries: { type: boolean, description: True to smooth the outlines. }
+      score_compartment: { type: string, description: 'The measurement that is compared with the cutoff, such as "Nucleus: DAB OD mean".' }
+      threshold_1: { type: number, exclusiveMinimum: 0, maximum: 10, description: Cutoff for positive, or for 1+, in optical density of the score compartment. The QuPath default is 0.2. }
+      threshold_2: { type: number, exclusiveMinimum: 0, maximum: 10, description: Cutoff for 2+. Used when single_threshold is false. }
+      threshold_3: { type: number, exclusiveMinimum: 0, maximum: 10, description: Cutoff for 3+. Used when single_threshold is false. }
+      single_threshold: { type: boolean, description: True for Negative and Positive. False for Negative, 1+, 2+ and 3+. }
+    required: [input]
+    outputs:
+      state: { kind: file, ext: .qpdata, description: The state file for the next step. }
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        gaDetect([
+          input: "{input}", image_type: "{image_type}", stain_vectors: "{stain_vectors}",
+          pixel_width_um: "{pixel_width_um}", region: "{region}", detection_image: "{detection_image}",
+          requested_pixel_size: "{requested_pixel_size}", background_radius: "{background_radius}",
+          median_filter_radius: "{median_filter_radius}", sigma: "{sigma}",
+          minimum_area: "{minimum_area}", maximum_area: "{maximum_area}", threshold: "{threshold}",
+          max_background_intensity: "{max_background_intensity}", split_by_shape: "{split_by_shape}",
+          cell_expansion: "{cell_expansion}", include_cell_nucleus: "{include_cell_nucleus}",
+          smooth_boundaries: "{smooth_boundaries}", score_compartment: "{score_compartment}",
+          threshold_1: "{threshold_1}", threshold_2: "{threshold_2}", threshold_3: "{threshold_3}",
+          single_threshold: "{single_threshold}",
+        ], "qupath.imagej.detect.cells.PositiveCellDetection", true, "{output.state}")
+      }
+
+  - name: export_measurements
+    title: Export measurements to a CSV file
+    description: >
+      Write the measurements of the cells, all detections or the annotations to a CSV file. Each
+      row is one object. Read the file with a table tool for statistics.
+    read_only: true
+    params:
+      input: { type: string, minLength: 1, description: Path of the state file that a detection step saved. }
+      object_type: { type: string, enum: [Cells, Detections, Annotations], default: Cells }
+    required: [input]
+    outputs:
+      measurements: { kind: table, ext: .csv, description: One row for each object. }
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        def d = gaLoad("{input}")
+        def kind = "{object_type}"
+        if (kind == "Cells") {
+          def other = d.getHierarchy().getDetectionObjects().findAll { !it.isCell() }
+          if (!other.isEmpty()) d.getHierarchy().removeObjects(other, false)
+        }
+        gaExport(d, kind, "{output.measurements}")
+        println "n_objects=" + (kind == "Annotations" ? getAnnotationObjects().size() : getDetectionObjects().size())
+      }
+
+  - name: get_workflow_script
+    title: Read the workflow history as a script
+    description: >
+      List the steps that QuPath recorded for the state file, as a Groovy script. The script is the
+      method in QuPath's own words. Give it to the scientist to repeat the steps.
+    read_only: true
+    params:
+      input: { type: string, minLength: 1, description: Path of the state file that a step saved. }
+    required: [input]
+    outputs:
+      script: { kind: file, ext: .groovy, description: The recorded steps. }
+    parse: keyvalue
+    macro: |
+      {include:lib.groovy}
+      gaRun {
+        def d = gaLoad("{input}")
+        def lines = gaWorkflowLines(d)
+        new File("{output.script}").setText(lines.join("\n") + "\n", "UTF-8")
+        println "n_steps=" + lines.size()
+      }
+
+checks:
+  - id: image_type_not_set
+    description: The answer gives positive counts or cell counts, but no step set the image type.
+    severity: error
+    text: >
+      Flag an answer that reports cell counts or a positive percent when no set_image_type step ran
+      or the answer does not name the image type. A wrong image type uses the wrong stain vectors.
+  - id: uncalibrated_units
+    description: The answer gives sizes in micrometers or densities per square millimeter but no step set the pixel size.
+    severity: error
+    text: >
+      Flag an answer that gives areas in micrometers or millimeters, or densities per square
+      millimeter, when the image had no pixel size and no set_pixel_size step ran.
+  - id: pseudoreplication
+    description: A test uses cells as the sample size.
+    severity: error
+    text: >
+      Flag an answer that gives a p-value or a confidence interval with cells as n. Cells from one
+      slide are not independent. The unit is the slide, the patient or the animal.
+  - id: cutoff_not_compared
+    description: The positive percent is given with one cutoff and no comparison with other cutoffs.
+    severity: warning
+    text: >
+      Flag an answer that reports a positive percent and does not say how the percent changes when
+      the positive threshold moves. Look for a comparison of at least two other cutoffs.
+  - id: large_cell_expansion
+    description: A cell expansion above 10 micrometers draws cells that overlap other cells.
+    severity: warning
+    rule:
+      tool: detect_cells
+      arg: cell_expansion
+      op: ">"
+      value: 10
+      message: A cell expansion above 10 micrometers can make cells overlap. Cell-level stain values then include neighbor cells.
+
+tests:
+  - id: open_ome_crop
+    description: >
+      The crop has 300 by 300 pixels by construction. The pixel size 0.4537 um matches the TIFF
+      XResolution of the source slide in the paper expected.yaml (tolerance 0.001). The image type
+      is not set.
+    data: [data/ki67_crop.ome.tif]
+    manual_route_checked: false
+    calls:
+      - { tool: open_image, args: { input: "{adapter_dir}/data/ki67_crop.ome.tif" } }
+    expect:
+      - { path: metrics.width, equals: 300 }
+      - { path: metrics.height, equals: 300 }
+      - { path: metrics.n_channels, equals: 3 }
+      - { path: metrics.calibrated, equals: 1 }
+      - { path: metrics.pixel_width_um, approx: 0.4537, abs: 0.001 }
+      - { path: data.values.image_type, equals: Not set }
+
+  - id: open_png_uncalibrated
+    description: A PNG file has no pixel size. The tool reports calibrated 0.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: open_image, args: { input: "{adapter_dir}/data/ki67_crop.png" } }
+    expect:
+      - { path: metrics.width, equals: 300 }
+      - { path: metrics.calibrated, equals: 0 }
+
+  - id: set_type_and_size
+    description: The type and the pixel size that one step sets are present in the state of the next step.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 0.4537 }, save_as: sized }
+      - { tool: open_image, args: { input: "{saved.sized.data.files.state}" } }
+    expect:
+      - { path: metrics.calibrated, equals: 1 }
+      - { path: metrics.pixel_width_um, approx: 0.4537 }
+      - { path: metrics.pixel_height_um, approx: 0.4537 }
+      - { path: data.values.image_type, equals: Brightfield (H-DAB) }
+
+  - id: full_annotation_area
+    description: >
+      One annotation of the full image has the area 300 by 300 pixels at 0.4537 um. The area is
+      300 x 300 x 0.4537 x 0.4537 / 1e6 = 0.0185259 mm2 (arithmetic, not a program number).
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: set_pixel_size, args: { input: "{adapter_dir}/data/ki67_crop.png", pixel_width_um: 0.4537 }, save_as: sized }
+      - { tool: annotate_full_image, args: { input: "{saved.sized.data.files.state}" } }
+    expect:
+      - { path: metrics.n_annotations, equals: 1 }
+      - { path: metrics.region_area_mm2, approx: 0.0185259, rel: 0.00001 }
+
+  - id: cells_crop
+    description: >
+      Cell detection with the QuPath defaults on the Ki-67 crop. This count is a number from the
+      first run of this tool, not a published number. It shows that the tool is stable.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 0.4537 }, save_as: sized }
+      - { tool: detect_cells, args: { input: "{saved.sized.data.files.state}" } }
+    expect:
+      - { path: metrics.n_cells, equals: 289 }
+      - { path: metrics.mean_cell_area_um2, approx: 56.07, abs: 0.1 }
+      - { path: metrics.mean_nucleus_area_um2, approx: 21.19, abs: 0.1 }
+
+  - id: cells_threshold_moves
+    description: >
+      A lower detection threshold finds more cells. Two numbers from runs of this tool, not
+      published numbers.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 0.4537 }, save_as: sized }
+      - { tool: detect_cells, args: { input: "{saved.sized.data.files.state}", threshold: 0.05 }, save_as: low }
+      - { tool: detect_cells, args: { input: "{saved.sized.data.files.state}", threshold: 0.2 } }
+    expect:
+      - { path: metrics.n_cells, equals: 284 }
+      - { path: saved.low.metrics.n_cells, equals: 289 }
+
+  - id: positive_crop
+    description: >
+      Positive cell detection with the QuPath defaults on the H-DAB crop. Score compartment is
+      Nucleus: DAB OD mean and Threshold 1+ is 0.2. These numbers are from the first run of this
+      tool, not published numbers. The QuPath Annotation table gives the same positive percent.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 0.4537 }, save_as: sized }
+      - { tool: detect_positive_cells, args: { input: "{saved.sized.data.files.state}" } }
+    expect:
+      - { path: metrics.n_cells, equals: 289 }
+      - { path: metrics.n_positive, equals: 24 }
+      - { path: metrics.n_negative, equals: 265 }
+      - { path: metrics.positive_percent, approx: 8.3045, rel: 0.0001 }
+
+  - id: positive_cutoff_moves
+    description: >
+      A lower cutoff gives more positive cells and a higher cutoff gives fewer. Numbers from runs
+      of this tool, not published numbers.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 0.4537 }, save_as: sized }
+      - { tool: detect_positive_cells, args: { input: "{saved.sized.data.files.state}", threshold_1: 0.1 }, save_as: low }
+      - { tool: detect_positive_cells, args: { input: "{saved.sized.data.files.state}", threshold_1: 0.4 } }
+    expect:
+      - { path: metrics.n_positive, equals: 12 }
+      - { path: saved.low.metrics.n_positive, equals: 32 }
+
+  - id: positive_three_levels
+    description: >
+      With three levels the cells are 1+, 2+ and 3+. The H-score is 1 x weak + 2 x moderate + 3 x
+      strong as a percent of all cells. Numbers from runs of this tool, not published numbers.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 0.4537 }, save_as: sized }
+      - { tool: detect_positive_cells, args: { input: "{saved.sized.data.files.state}", single_threshold: false } }
+    expect:
+      - { path: metrics.n_cells, equals: 289 }
+      - { path: metrics.h_score, approx: 14.8789, rel: 0.0001 }
+
+  - id: tissue_area
+    description: >
+      Tissue detection on a 400 by 400 pixel thumbnail of the prostate slide. The slide has no
+      pixel size, so the test sets 10 um for each pixel. The area is in assumed units. The number
+      is from the first run of this tool, not a published number. At the default threshold 127
+      the tool finds no tissue.
+    data: [data/prostate_thumb.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/prostate_thumb.png", image_type: "Brightfield (H&E)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 10 }, save_as: sized }
+      - { tool: detect_tissue, args: { input: "{saved.sized.data.files.state}", threshold: 200 } }
+    expect:
+      - { path: metrics.n_annotations, equals: 1 }
+      - { path: metrics.tissue_area_mm2, approx: 8.7013, rel: 0.001 }
+      - { path: metrics.image_area_mm2, approx: 16, rel: 0.000001 }
+
+  - id: tissue_default_finds_nothing
+    description: At the QuPath default threshold 127 the pale tissue is lighter than the threshold and the tool finds no tissue.
+    data: [data/prostate_thumb.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/prostate_thumb.png", image_type: "Brightfield (H&E)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 10 }, save_as: sized }
+      - { tool: detect_tissue, args: { input: "{saved.sized.data.files.state}" } }
+    expect:
+      - { path: metrics.n_annotations, equals: 0 }
+
+  - id: tiles_count
+    description: >
+      Tiles of 100 um on the 4 mm by 4 mm thumbnail with an assumed 10 um for each pixel. The
+      full image is 40 by 40 tiles (arithmetic: 4000 / 100 = 40, so 1600 tiles).
+    data: [data/prostate_thumb.png]
+    calls:
+      - { tool: set_pixel_size, args: { input: "{adapter_dir}/data/prostate_thumb.png", pixel_width_um: 10 }, save_as: sized }
+      - { tool: create_tiles, args: { input: "{saved.sized.data.files.state}", tile_size: 100 } }
+    expect:
+      - { path: metrics.n_tiles, equals: 1600 }
+
+  - id: export_cells
+    description: The CSV file has one row for each cell and the DAB measurement columns.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 0.4537 }, save_as: sized }
+      - { tool: detect_positive_cells, args: { input: "{saved.sized.data.files.state}" }, save_as: det }
+      - { tool: export_measurements, args: { input: "{saved.det.data.files.state}", object_type: Cells } }
+    expect:
+      - { path: table.n_rows, equals: 289 }
+      - { path: table.columns, contains: "Nucleus: DAB OD mean" }
+      - { path: table.columns, contains: Classification }
+      - { path: "outputs[0].path", contains: ".csv" }
+
+  - id: workflow_script
+    description: The history of the state has the cell detection step with the settings.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: set_image_type, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)" }, save_as: typed }
+      - { tool: set_pixel_size, args: { input: "{saved.typed.data.files.state}", pixel_width_um: 0.4537 }, save_as: sized }
+      - { tool: detect_positive_cells, args: { input: "{saved.sized.data.files.state}" }, save_as: det }
+      - { tool: get_workflow_script, args: { input: "{saved.det.data.files.state}" } }
+    expect:
+      - { path: metrics.n_steps, min: 3 }
+      - { path: data.values.n_steps, min: 3 }
+
+  - id: positive_one_call
+    description: >
+      One call with image_type and pixel_width_um gives the same numbers as the three-step chain of
+      the test positive_crop.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: detect_positive_cells, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)", pixel_width_um: 0.4537 } }
+    expect:
+      - { path: metrics.n_cells, equals: 289 }
+      - { path: metrics.n_positive, equals: 24 }
+      - { path: metrics.positive_percent, approx: 8.3045, rel: 0.0001 }
+
+  - id: positive_region
+    description: >
+      A region of 150 by 150 pixels at 0.4537 um is 150 x 150 x 0.4537 x 0.4537 / 1e6 = 0.00463148
+      mm2 (arithmetic). The cell and positive counts are from the first run of this tool, not
+      published numbers.
+    data: [data/ki67_crop.png]
+    calls:
+      - { tool: detect_positive_cells, args: { input: "{adapter_dir}/data/ki67_crop.png", image_type: "Brightfield (H-DAB)", pixel_width_um: 0.4537, region: "0,0,150,150" } }
+    expect:
+      - { path: metrics.region_area_mm2, approx: 0.00463148, rel: 0.00001 }
+      - { path: metrics.n_cells, equals: 67 }
+      - { path: metrics.n_positive, equals: 4 }

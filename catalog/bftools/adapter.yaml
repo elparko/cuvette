@@ -1,0 +1,328 @@
+adapter:
+  name: bftools
+  title: Bio-Formats command line tools
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Reads the metadata of a microscopy image file and converts one series or one plane to OME-TIFF
+    or PNG with the Bio-Formats command line tools showinf and bfconvert. Each tool is one command
+    that the scientist can type in a terminal.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: Bio-Formats command line tools
+  version: "8.5.0"
+  tested_versions: []
+  homepage: https://www.openmicroscopy.org/bio-formats/
+  docs:
+    - https://bio-formats.readthedocs.io/en/stable/users/comlinetools/index.html
+    - https://bio-formats.readthedocs.io/en/stable/users/comlinetools/display.html
+    - https://bio-formats.readthedocs.io/en/stable/users/comlinetools/conversion.html
+
+connection:
+  kind: cli
+  call_timeout_s: 600
+
+locate:
+  env: BFTOOLS_DIR
+  paths:
+    - /Volumes/T7/guided-analysis/tools/bftools/bftools
+    - ~/bftools
+    - ~/Applications/bftools
+    - /Applications/bftools
+    - /opt/bftools
+    - /usr/local/bftools
+    - C:\bftools
+    - C:\Program Files\bftools
+  version_command: ["{program_path}/showinf", "-version"]
+  version_pattern: "Version: (\\S+)"
+
+data_rules:
+  cloud_visibility: summaries
+  note: Slide images can come from patients. A cloud model sees the text output of the tools. It never sees the image files.
+
+decisions:
+  - key: series
+    label: Series to convert
+    kind: int
+    default: 0
+    lo: 0
+    hi: 1000
+    group: Conversion
+    help: >
+      A file can hold more than one series. For a pyramid file, series 0 is full resolution and
+      each next series is smaller. A smaller series has fewer pixels and a larger pixel size. Read
+      the series list with read_image_info first.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: convert_to_ome_tiff, arg: series }
+      - { tool: convert_to_png, arg: series }
+
+  - key: compression
+    label: OME-TIFF compression
+    kind: choice
+    choices: [Uncompressed, LZW, zlib, JPEG-2000, JPEG]
+    default: Uncompressed
+    group: Conversion
+    help: >
+      Uncompressed, LZW, zlib and JPEG-2000 keep each pixel value. JPEG changes pixel values, so a
+      count or an intensity from a JPEG file can differ from the original.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: convert_to_ome_tiff, arg: compression }
+
+map:
+  - tool: read_image_info
+    route: "Run: showinf -nopix -nometa -no-upgrade <file>"
+    steps:
+      - Add -noflat to list the sub-resolutions of one series instead of one series for each level
+    params:
+      - { arg: path, label: file }
+      - { arg: noflat, label: "-noflat", ui_default: "" }
+    fidelity: exact
+    evidence: { source: docs, test: info_pyramid, note: "The test file has sizes that are known by construction: 300, 150 and 75 pixels." }
+    summary: "Read the core metadata of {path}."
+
+  - tool: read_ome_xml
+    route: "Run: showinf -nopix -omexml-only -no-upgrade <file>"
+    steps:
+      - Look for PhysicalSizeX, PhysicalSizeY and the Channel elements
+    params:
+      - { arg: path, label: file }
+    fidelity: exact
+    evidence: { source: docs, test: ome_xml_pixel_size, note: "The pixel size 0.4537 um matches the TIFF XResolution of the source slide in the paper expected.yaml." }
+    summary: "Read the OME-XML of {path}."
+
+  - tool: convert_to_ome_tiff
+    route: "Run: bfconvert -no-upgrade -overwrite -series <n> <file> <out>.ome.tif"
+    steps:
+      - Add -channel, -z and -timepoint to choose one plane
+      - Add -crop x,y,w,h to cut a region
+      - Add -compression <codec> to compress
+    params:
+      - { arg: path, label: in_file }
+      - { arg: series, label: "-series", ui_default: 0, note: bfconvert converts all series if you leave -series out. }
+      - { arg: channel, label: "-channel" }
+      - { arg: z, label: "-z" }
+      - { arg: timepoint, label: "-timepoint" }
+      - { arg: crop, label: "-crop" }
+      - { arg: compression, label: "-compression", ui_default: Uncompressed }
+    fidelity: exact
+    evidence: { source: docs, test: convert_series_one, note: "The test shows that series 1 of the pyramid has 150 by 150 pixels in the output." }
+    summary: "Wrote an OME-TIFF file from {path}."
+
+  - tool: convert_to_png
+    route: "Run: bfconvert -no-upgrade -overwrite -series <n> <file> <out>.png"
+    steps:
+      - Add -channel, -z and -timepoint to choose one plane
+      - Add -crop x,y,w,h to cut a region
+      - A PNG file has no pixel size
+    params:
+      - { arg: path, label: in_file }
+      - { arg: series, label: "-series", ui_default: 0, note: bfconvert converts all series if you leave -series out. }
+      - { arg: channel, label: "-channel" }
+      - { arg: z, label: "-z" }
+      - { arg: timepoint, label: "-timepoint" }
+      - { arg: crop, label: "-crop" }
+    fidelity: exact
+    evidence: { source: docs, test: convert_png_crop }
+    summary: "Wrote a PNG file from {path}."
+
+tools:
+  - name: read_image_info
+    title: Read the size, series and pixel type of an image file
+    description: >
+      Read the core metadata of an image file with showinf. The text lists each series with its
+      width, height, channels, planes, pixel type and tile size. A pyramid file lists each level as
+      one series, unless you set noflat. Reads no pixels.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the image file. }
+      noflat: { type: string, enum: ["-noflat"], description: 'Write "-noflat" to list the sub-resolutions of one series.' }
+    required: [path]
+    command: ["{program_path}/showinf", "-nopix", "-nometa", "-no-upgrade", "{noflat}", "{path}"]
+
+  - name: read_ome_xml
+    title: Read the OME-XML metadata of an image file
+    description: >
+      Read the OME-XML of an image file with showinf. The XML has the pixel size (PhysicalSizeX,
+      PhysicalSizeY and their units), the channel names and the dimension order. A missing
+      PhysicalSizeX means that the file has no pixel size. Reads no pixels.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the image file. }
+    required: [path]
+    command: ["{program_path}/showinf", "-nopix", "-omexml-only", "-no-upgrade", "{path}"]
+
+  - name: convert_to_ome_tiff
+    title: Convert one series or plane to OME-TIFF
+    description: >
+      Convert an image file to an OME-TIFF file with bfconvert. Choose one series, and one plane
+      with channel, z and timepoint. Crop to a region with crop. The OME-TIFF keeps the pixel size
+      of the series. The file is the output named image.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the image file. }
+      series: { type: integer, minimum: 0, description: Series to convert. Series 0 is the first. }
+      channel: { type: integer, minimum: 0, description: Channel to convert. The first is 0. }
+      z: { type: integer, minimum: 0, description: Z section to convert. The first is 0. }
+      timepoint: { type: integer, minimum: 0, description: Timepoint to convert. The first is 0. }
+      crop: { type: string, pattern: '^\d+,\d+,\d+,\d+$', description: 'Region as x,y,width,height in pixels.' }
+      compression: { type: string, enum: [Uncompressed, LZW, zlib, JPEG-2000, JPEG], description: Codec of the output file. }
+    required: [path]
+    outputs:
+      image: { kind: file, ext: .ome.tif, description: The converted OME-TIFF file. }
+    command:
+      - "{program_path}/bfconvert"
+      - "-no-upgrade"
+      - "-overwrite"
+      - "-series"
+      - "{series}"
+      - "-channel"
+      - "{channel}"
+      - "-z"
+      - "{z}"
+      - "-timepoint"
+      - "{timepoint}"
+      - "-crop"
+      - "{crop}"
+      - "-compression"
+      - "{compression}"
+      - "{path}"
+      - "{output.image}"
+
+  - name: convert_to_png
+    title: Convert one series or plane to PNG
+    description: >
+      Convert an image file to a PNG file with bfconvert. Choose one series, and one plane with
+      channel, z and timepoint. Crop to a region with crop. A PNG file has no pixel size and holds
+      8 bit or 16 bit gray or 8 bit color. The file is the output named image.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the image file. }
+      series: { type: integer, minimum: 0, description: Series to convert. Series 0 is the first. }
+      channel: { type: integer, minimum: 0, description: Channel to convert. The first is 0. }
+      z: { type: integer, minimum: 0, description: Z section to convert. The first is 0. }
+      timepoint: { type: integer, minimum: 0, description: Timepoint to convert. The first is 0. }
+      crop: { type: string, pattern: '^\d+,\d+,\d+,\d+$', description: 'Region as x,y,width,height in pixels.' }
+    required: [path]
+    outputs:
+      image: { kind: image, ext: .png, description: The converted PNG file. }
+    command:
+      - "{program_path}/bfconvert"
+      - "-no-upgrade"
+      - "-overwrite"
+      - "-series"
+      - "{series}"
+      - "-channel"
+      - "{channel}"
+      - "-z"
+      - "{z}"
+      - "-timepoint"
+      - "{timepoint}"
+      - "-crop"
+      - "{crop}"
+      - "{path}"
+      - "{output.image}"
+
+checks:
+  - id: png_has_no_pixel_size
+    description: The answer gives sizes in micrometers from a PNG file or a file that lost its pixel size.
+    severity: warning
+    text: >
+      Flag an answer that gives sizes in micrometers for a measurement on a PNG file, or on a file
+      that read_ome_xml showed with no PhysicalSizeX. A PNG file has no pixel size.
+  - id: lossy_ome_tiff
+    description: The OME-TIFF was written with JPEG compression.
+    severity: warning
+    rule:
+      tool: convert_to_ome_tiff
+      arg: compression
+      op: "=="
+      value: JPEG
+      message: JPEG compression changes pixel values. Counts and intensities from this file can differ from the original.
+  - id: pyramid_level_used
+    description: The answer uses a smaller pyramid series but reports sizes of the full-resolution image.
+    severity: warning
+    text: >
+      Flag an answer that converts a series above 0 of a pyramid file and then gives pixel counts,
+      areas or sizes as if they came from series 0. Each series has its own width, height and
+      pixel size.
+
+tests:
+  - id: info_crop_ome
+    description: >
+      The OME-TIFF crop has one series of 300 by 300 pixels, 3 channels of 8 bit color. The sizes
+      are known by construction of the crop.
+    data: [data/ki67_crop.ome.tif]
+    calls:
+      - { tool: read_image_info, args: { path: "{adapter_dir}/data/ki67_crop.ome.tif" } }
+    expect:
+      - { path: text, contains: "Series count = 1" }
+      - { path: text, contains: "Width = 300" }
+      - { path: text, contains: "Height = 300" }
+      - { path: text, contains: "SizeC = 3" }
+      - { path: text, contains: "RGB = true (3)" }
+      - { path: text, contains: "Pixel type = uint8" }
+
+  - id: info_pyramid
+    description: >
+      The pyramid file has three series of 300, 150 and 75 pixels by construction. With noflat it
+      has one series and three resolutions.
+    data: [data/ki67_pyramid.ome.tif]
+    calls:
+      - { tool: read_image_info, args: { path: "{adapter_dir}/data/ki67_pyramid.ome.tif" }, save_as: flat }
+      - { tool: read_image_info, args: { path: "{adapter_dir}/data/ki67_pyramid.ome.tif", noflat: "-noflat" } }
+    expect:
+      - { path: saved.flat.text, contains: "Series count = 3" }
+      - { path: saved.flat.text, contains: "Width = 150" }
+      - { path: saved.flat.text, contains: "Width = 75" }
+      - { path: text, contains: "Series count = 1" }
+      - { path: text, contains: "Resolutions = 3" }
+
+  - id: ome_xml_pixel_size
+    description: >
+      The OME-XML has the pixel size of the source slide. The value 0.4537 um agrees with the TIFF
+      XResolution of the slide (22042 pixels for each centimeter) in the paper expected.yaml.
+    data: [data/ki67_crop.ome.tif]
+    calls:
+      - { tool: read_ome_xml, args: { path: "{adapter_dir}/data/ki67_crop.ome.tif" } }
+    expect:
+      - { path: text, contains: 'PhysicalSizeX="0.4536793' }
+      - { path: text, contains: 'PhysicalSizeXUnit="µm"' }
+      - { path: text, contains: 'SizeX="300"' }
+
+  - id: convert_series_one
+    description: >
+      Series 1 of the pyramid has 150 by 150 pixels. The converted file has the same size. Read
+      by a second tool.
+    data: [data/ki67_pyramid.ome.tif]
+    calls:
+      - { tool: convert_to_ome_tiff, args: { path: "{adapter_dir}/data/ki67_pyramid.ome.tif", series: 1 }, save_as: s1 }
+      - { tool: read_image_info, args: { path: "{saved.s1.outputs[0].path}" } }
+    expect:
+      - { path: text, contains: "Width = 150" }
+      - { path: text, contains: "Height = 150" }
+      - { path: text, contains: "Series count = 1" }
+
+  - id: convert_png_crop
+    description: A crop of 50 by 40 pixels from series 0 gives a PNG file of 50 by 40 pixels.
+    data: [data/ki67_crop.ome.tif]
+    calls:
+      - { tool: convert_to_png, args: { path: "{adapter_dir}/data/ki67_crop.ome.tif", series: 0, crop: "10,20,50,40" }, save_as: png }
+      - { tool: read_image_info, args: { path: "{saved.png.outputs[0].path}" } }
+    expect:
+      - { path: text, contains: "Width = 50" }
+      - { path: text, contains: "Height = 40" }
+      - { path: text, contains: "RGB = true (3)" }
+
+  - id: convert_keeps_pixel_size
+    description: The OME-TIFF output of series 0 keeps the pixel size.
+    data: [data/ki67_pyramid.ome.tif]
+    calls:
+      - { tool: convert_to_ome_tiff, args: { path: "{adapter_dir}/data/ki67_pyramid.ome.tif", series: 0 }, save_as: s0 }
+      - { tool: read_ome_xml, args: { path: "{saved.s0.outputs[0].path}" } }
+    expect:
+      - { path: text, contains: 'PhysicalSizeX="0.4536793' }
