@@ -130,7 +130,7 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: {
     session: session?.id,
     dir: session?.dir,
     answer: final ? String(final.data.text ?? "") : undefined,
-    items: scoreItems(paper.items, record ?? emptyRecord),
+    items: record ? rescoreItems(paper.items, record) : scoreItems(paper.items, emptyRecord),
     metrics: record ? processMetrics(record) : undefined,
   };
   try {

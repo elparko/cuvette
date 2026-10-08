@@ -170,7 +170,7 @@ function inputValues(record: AnalysisRecord): number[] {
   return out;
 }
 
-export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
+export function checkAnswer(text: string, record: AnalysisRecord, opts: { small?: boolean } = {}): Claim[] {
   const nodes = record.nodes?.() ?? [];
   const comparison = new Set(nodes.filter((n) => n.sensitivityOf).map((n) => n.id));
   const stale = record.stale?.() ?? new Set<string>();
@@ -180,7 +180,7 @@ export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
   const loggedValues = logged.map((n) => n.value);
   const plain = new Set(logged.flatMap((n, i) => (comparison.has(n.node) || stale.has(n.node) ? [] : [i])));
   const inputs = inputValues(record);
-  const found = extractNumbers(text);
+  const found = extractNumbers(text, { small: opts.small });
   const claims: Claim[] = [];
   for (const s of splitSentences(text)) {
     const cited = CITATION.test(s.text);

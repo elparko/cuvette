@@ -140,6 +140,13 @@ describe("checkAnswer inputs and small counts", () => {
     expect(c.map((x) => [x.value, x.label, x.node])).toEqual([[6, "measured", "n1"]]);
   });
 
+  test("with the small option a small count in prose counts when a logged result has it", () => {
+    const { record } = fake([{ node: "n1", path: "metrics.n_clusters", value: 7 }]);
+    const c = checkAnswer("The data fall into 7 clusters.", record, { small: true });
+    expect(c.map((x) => [x.value, x.label, x.node])).toEqual([[7, "measured", "n1"]]);
+    expect(checkAnswer("The data fall into 7 clusters.", record)).toHaveLength(0);
+  });
+
   test("a small count with no logged match is not flagged", () => {
     const { record } = fake([{ node: "n1", path: "metrics.n", value: 40 }]);
     expect(checkAnswer("The 3 groups differ.", record)).toHaveLength(0);
