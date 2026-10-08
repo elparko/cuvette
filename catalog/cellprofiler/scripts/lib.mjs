@@ -87,6 +87,10 @@ export function stageImages(folder, dest, a) {
   if (nth > 1) files = files.filter((_, i) => i % nth === 0);
   if (a.max_images) files = files.slice(0, a.max_images);
   if (!files.length) fail(`No files in ${folder} match ${a.pattern ?? "*"}`);
+  for (const key of ["truth_regex", "group_regex"]) {
+    if (a[key] && !files.some((f) => new RegExp(a[key]).test(f)))
+      fail(`${key} ${a[key]} matches none of the ${files.length} file names, for example ${files[0]}. Write a regular expression with one group that matches part of the file name.`);
+  }
   mkdirSync(dest, { recursive: true });
   for (const f of files) {
     const to = join(dest, f);
