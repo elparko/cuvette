@@ -14,8 +14,8 @@ items:
   - {key: days_slope, description: "Days slope in ms per day", value: 10.467, tolerance: 0.01}
   - {key: intercept, description: "Intercept in ms", value: 251.405, tolerance: 0.01, in_answer: false}
   - {key: se_days_random_slope, description: "SE of Days, random slope model", value: 1.546, tolerance: 0.01}
-  - {key: se_days_random_intercept_trap, description: "SE of Days, random intercept only (trap)", value: 0.804, tolerance: 0.01, in_answer: false}
-  - {key: se_days_ols_trap, description: "SE of Days, OLS (trap)", value: 1.238, tolerance: 0.01, in_answer: false}
+  - {key: se_days_random_intercept_trap, description: "SE of Days, random intercept only (trap)", value: 0.804, tolerance: 0.01, in_answer: false, reference: true}
+  - {key: se_days_ols_trap, description: "SE of Days, OLS (trap)", value: 1.238, tolerance: 0.01, in_answer: false, reference: true}
   - {key: intercept_variance, description: "Subject intercept variance, slope model", value: 612.10, tolerance: 0.5, in_answer: false}
   - {key: slope_variance, description: "Slope variance", value: 35.07, tolerance: 0.1, in_answer: false}
   - {key: residual_variance, description: "Residual variance, slope model", value: 654.94, tolerance: 0.5, in_answer: false}
