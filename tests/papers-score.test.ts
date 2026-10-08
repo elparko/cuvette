@@ -147,6 +147,15 @@ test("rounding does not apply to exact items", () => {
   expect(s.reported.pass).toBe(false);
 });
 
+test("a code that the answer states passes when the claim check masks it", () => {
+  node({ epsg: 26711 });
+  answer("The projection is EPSG:26711 (NAD27).");
+  const it = item({ key: "epsg", value: 26711, exact: true, code: "EPSG:26711" });
+  expect(scoreItems([it], record)[0].reported.pass).toBe(true);
+  answer("The projection is EPSG:4326.");
+  expect(scoreItems([it], record)[0].reported.pass).toBe(false);
+});
+
 test("thousands separators in the answer match", () => {
   node({ n: 133670 });
   answer("There are 133,670 CD3+ events.");

@@ -26,6 +26,7 @@ items:
     description: EPSG code of the raster
     value: 26711
     exact: true
+    code: "EPSG:26711"
   - key: pixel_size_m
     description: Pixel size in metres
     value: 60

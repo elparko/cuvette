@@ -17,7 +17,7 @@ export interface ReportedMatch {
   pass: boolean | null;
   value: number | null;
   diff: number | null;
-  via: "tolerance" | "rounding" | null;
+  via: "tolerance" | "rounding" | "code" | null;
   node: string | null;
   claimEntry: number | null;
   text: string | null;
@@ -109,9 +109,14 @@ function roundedTo(x: number, step: number): number {
   return Math.round(x / step) * step;
 }
 
-export function scoreReported(item: PaperItem, found: { entry: Entry; claims: Claim[] } | undefined): ReportedMatch {
+function statesCode(code: string, answer: string): boolean {
+  return new RegExp(`(^|[^A-Za-z0-9])${code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9]|$)`).test(answer);
+}
+
+export function scoreReported(item: PaperItem, found: { entry: Entry; claims: Claim[] } | undefined, answer = ""): ReportedMatch {
   const none: ReportedMatch = { pass: false, value: null, diff: null, via: null, node: null, claimEntry: found?.entry.id ?? null, text: null };
   if (!item.in_answer) return { ...none, pass: null };
+  if (item.code && statesCode(item.code, answer)) return { ...none, pass: true, value: item.value, diff: 0, via: "code" };
   if (!found) return none;
   let best: ReportedMatch | undefined;
   for (const c of found.claims) {
@@ -134,6 +139,7 @@ export function scoreReported(item: PaperItem, found: { entry: Entry; claims: Cl
 
 export function scoreItems(items: PaperItem[], record: Pick<AnalysisRecord, "numbers" | "nodes" | "node" | "entries">): ItemScore[] {
   const claims = finalClaims(record);
+  const answer = modelAnswer(String(finalAnswer(record)?.data.text ?? ""));
   return items.filter((item) => !item.trap && !item.optional).map((item) => ({
     key: item.key,
     description: item.description,
@@ -143,7 +149,7 @@ export function scoreItems(items: PaperItem[], record: Pick<AnalysisRecord, "num
     inAnswer: item.in_answer,
     reference: item.reference,
     computed: scoreComputed(item, record),
-    reported: scoreReported(item, claims),
+    reported: scoreReported(item, claims, answer),
   }));
 }
 
@@ -199,6 +205,6 @@ export function rescoreItems(items: PaperItem[], record: AnalysisRecord): ItemSc
     inAnswer: item.in_answer,
     reference: item.reference,
     computed: scoreComputed(item, record),
-    reported: scoreReported(item, found),
+    reported: scoreReported(item, found, modelAnswer(String(final?.data.text ?? ""))),
   }));
 }
