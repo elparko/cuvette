@@ -368,12 +368,14 @@ def fit_cox(path, duration, event, covariates, ties="efron", strata=None, alpha=
         metrics["p_" + r["term"]] = r["p"]
     if ph_p:
         metrics["ph_test_min_p"] = min(ph_p.values())
+        for k, v in ph_p.items():
+            metrics["ph_p_" + k] = v
     low = [k for k, v in ph_p.items() if v < alpha]
     summary = "Cox model, ties %s, n = %d, %d events, concordance %.4g. %s." % (
         ties, len(data), metrics["events"], concordance,
-        "; ".join("%s HR %.3g (p = %.3g)" % (r.term, r.hazard_ratio, r.p) for r in table.itertuples()))
+        "; ".join("%s HR %.3g (%g%% CI %.3g to %.3g, p = %.3g)" % (r.term, r.hazard_ratio, 100 * (1 - alpha), r.hr_ci_lo, r.hr_ci_hi, r.p) for r in table.itertuples()))
     if low:
-        summary += " Proportional hazards test p below alpha for: %s." % ", ".join(low)
+        summary += " Proportional hazards test p below alpha for: %s." % ", ".join("%s (p = %.3g)" % (k, ph_p[k]) for k in low)
     return {"ok": True, "summary": summary, "metrics": _metrics(metrics),
             "data": {"ties": ties, "alpha": alpha, "ph_test_p": ph_p, "ph_violations": low},
             "table": _table(table, "cox")}
