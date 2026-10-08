@@ -26,7 +26,8 @@ measured: >-
   one culture treated with dexamethasone and one untreated culture. The workflow counts the genes that change
   with the drug. The cell line enters the model, so each treated culture is compared with its own control.
 instruction: >-
-  I have RNA-seq counts from airway smooth muscle cells from four donors. Each donor has a culture treated
+  I have RNA-seq data from airway smooth muscle cells from four donors, quantified with Salmon and
+  summarized to genes with tximeta. Each donor has a culture treated
   with dexamethasone and an untreated culture. Which genes change with the drug? Tell me how many genes pass
   the low-count filter, how many are significant, how many go up and how many go down. Give me a table of
   the top 20 genes with fold change and significance.
@@ -34,6 +35,10 @@ instruction_basis: >-
   Sections 3 to 5 of the rnaseqGene workflow. The workflow builds the model with the cell line and the
   treatment, filters low counts, runs DESeq2 and summarizes the results table.
 answers:
+  input_type:
+    decision: Input type
+    value: SummarizedExperiment rds (the tximeta object), with the transcript length offsets
+    source: The workflow imports Salmon output with tximeta and builds the DESeqDataSet from the object, so DESeq2 uses the average transcript lengths.
   question:
     decision: Research question
     value: Does dexamethasone change gene expression in human airway smooth muscle cells, and in which genes?
@@ -80,52 +85,61 @@ answers:
     source: Not in the workflow as a decision. The workflow removes no sample.
 items:
   genes_after_filter:
-    source: computed
-    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    source: tutorial
+    tool: the rnaseqGene 1.36.0 workflow vignette (Bioconductor 3.23, DESeq2 1.52.0, airway 1.32.0)
     where: >-
-      The benchmark authors ran the code of workflow section 4.1 on the benchmark CSV. The workflow text prints
-      16637, but that number is for another version of the airway data (58294 genes). The same code on that data
-      gives 16637 exactly.
+      Workflow section 4.1 prints 16637 genes after the filter on data(gse). check_workflow.R and the deseq2
+      adapter give 16637 on the same data.
   padj_01_workflow:
-    source: computed
-    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
-    where: >-
-      The benchmark authors ran the code of workflow section 5 on the benchmark CSV. The workflow text prints
-      4381 for the other version of the airway data.
+    source: tutorial
+    tool: the rnaseqGene 1.36.0 workflow vignette (Bioconductor 3.23, DESeq2 1.52.0, airway 1.32.0)
+    where: Workflow section 5.2, summary(res) on data(gse), adjusted p value below 0.1.
   up_padj_01:
-    source: computed
-    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
-    where: >-
-      From summary(res) on the benchmark CSV. The workflow text prints 2362 for the other version of the airway
-      data.
+    source: tutorial
+    tool: the rnaseqGene 1.36.0 workflow vignette (Bioconductor 3.23, DESeq2 1.52.0, airway 1.32.0)
+    where: Workflow section 5.2, summary(res), LFC > 0 (up).
   down_padj_01:
-    source: computed
-    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
-    where: >-
-      From summary(res) on the benchmark CSV. The workflow text prints 2019 for the other version of the airway
-      data.
+    source: tutorial
+    tool: the rnaseqGene 1.36.0 workflow vignette (Bioconductor 3.23, DESeq2 1.52.0, airway 1.32.0)
+    where: Workflow section 5.2, summary(res), LFC < 0 (down).
   padj_005_workflow:
+    source: tutorial
+    tool: the rnaseqGene 1.36.0 workflow vignette (Bioconductor 3.23, DESeq2 1.52.0, airway 1.32.0)
+    where: Workflow section 5.2, results(dds, alpha = 0.05).
+  csv_genes_after_filter:
     source: computed
     tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
     where: >-
-      From results(dds, alpha = 0.05) on the benchmark CSV. The workflow text prints 3602 for the other version
-      of the airway data.
-  padj_01_pydeseq2:
+      Reference only. Same experiment as read counts on Ensembl 75 genes (data(airway), 63677 genes, no length
+      offsets).
+  csv_padj_01:
+    source: computed
+    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    where: Reference only. Same experiment, read counts on Ensembl 75 genes.
+  csv_up_padj_01:
+    source: computed
+    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    where: Reference only. Same experiment, read counts on Ensembl 75 genes.
+  csv_down_padj_01:
+    source: computed
+    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    where: Reference only. Same experiment, read counts on Ensembl 75 genes.
+  csv_padj_005:
+    source: computed
+    tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
+    where: Reference only. Same experiment, read counts on Ensembl 75 genes, alpha 0.05.
+  csv_padj_01_pydeseq2:
     source: computed
     tool: pydeseq2 0.5.4
-    where: >-
-      Not in the workflow. The benchmark authors ran pydeseq2 on the benchmark CSV. The deseq2 adapter runs R
-      DESeq2 1.52.0, which gives 4905 genes on the same CSV.
-  padj_005_pydeseq2:
-    source: computed
-    tool: pydeseq2 0.5.4
-    where: >-
-      Not in the workflow. The benchmark authors ran pydeseq2 on the benchmark CSV with alpha 0.05. R DESeq2 can
-      give a different count on the same CSV.
+    where: Reference only. pydeseq2 on the Ensembl 75 read counts. Not in the workflow.
 data:
-  source: Bioconductor data package airway 1.32.0, converted to CSV by the benchmark fetch script
+  source: >-
+    Bioconductor data package airway 1.32.0. The benchmark fetch script writes data(gse) as an .rds file and
+    as counts and lengths CSV files (export_gse.R), and data(airway) as a CSV for the reference items
   url: https://bioconductor.org/packages/release/data/experiment/src/contrib/airway_1.32.0.tar.gz
   license: >-
     LGPL, from the package DESCRIPTION file. The samples are cell lines. The data have no patient
     identifiers. Raw reads are in GEO GSE52778.
-  size: 24.7 MB package. The count CSV is 2.3 MB, 63677 genes by 8 samples.
+  size: >-
+    24.7 MB package. airway_gse.rds is 6.2 MB (58294 genes by 8 samples); gse_counts.csv is 2.9 MB and
+    gse_length.csv 6.0 MB. The reference count CSV is 2.3 MB, 63677 genes by 8 samples.
