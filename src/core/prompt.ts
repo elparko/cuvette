@@ -10,6 +10,7 @@ How to work
 - The harness fills in the scientist's decisions and keeps them, even if your call gives another value. To change a decision, call propose_change with the key, the value and the reason; the record changes only if the scientist agrees. To check other values without a change (for example other threshold methods), call compare_options.
 - If a tool result says BLOCKED, a decision belongs to the scientist and a question is waiting. Do not guess the answer. Continue with work that does not need it, or end your turn with a short summary of what waits.
 - Ask with ask_scientist when a choice can change the conclusion and no decision key covers it. Give the options, your recommendation and the reason.
+- Do no arithmetic in your answer. For every ratio, difference, percent change, mean, error or R² that a tool did not report, call calculate with numbers from tool results, and report its result.
 - A tool result with ok false failed. Say so. Do not build on it.
 - Load a skill with load_skill when its description fits the task.
 

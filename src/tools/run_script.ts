@@ -1,11 +1,19 @@
 import { spawn } from "node:child_process";
-import { mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
+import { gaHome } from "../adapters/manifest.ts";
 import { cap, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, type Dirs } from "../adapters/kinds/common.ts";
+
+export function scriptPython(): string {
+  if (process.env.GA_PYTHON) return process.env.GA_PYTHON;
+  const rel = process.platform === "win32" ? ["envs", "science", "Scripts", "python.exe"] : ["envs", "science", "bin", "python"];
+  for (const home of [gaHome(), join(homedir(), ".guided-analysis")]) if (existsSync(join(home, ...rel))) return join(home, ...rel);
+  return process.platform === "win32" ? "python" : "python3";
+}
 
 const GA_API = `import csv
 import json
@@ -159,6 +167,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       "Run Python 3 code for statistics and plots. The work folder is the working directory; new files there are returned. " +
       "Use `from ga_api import call, save_table, save_figure`. `call(tool, **args)` runs another tool and returns its result as a dict. " +
       "`save_table(name, rows)` writes a CSV. `save_figure(name)` writes a PNG of the current figure. " +
+      (scriptPython().includes("science") ? "numpy, pandas, scipy, statsmodels, scikit-learn and matplotlib are installed. " : "Only the standard library is sure to exist; use csv and statistics. ") +
       describeLimits(opts.network),
     inputSchema: schema,
     source: "harness",
@@ -174,7 +183,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       writeFileSync(script, String(v.args.code));
       writeFileSync(join(scriptDir, "ga_api.py"), GA_API);
       const before = snapshot(dirs.workDir, scriptDir);
-      const python = process.env.GA_PYTHON || (process.platform === "win32" ? "python" : "python3");
+      const python = scriptPython();
       const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network);
 
       const child = spawn(argv[0], argv.slice(1), {

@@ -215,6 +215,7 @@ export class Session {
       const { runScriptTool } = await import("../tools/run_script.ts");
       extra.push(runScriptTool({ workDir: this.workDir, sessionDir: this.dir }, { network: this.settings.networkForScripts }));
     } catch {}
+    extra.push((await import("../tools/calculate.ts")).calculateTool());
     extra.push(
       ...coreTools({
         adapters: this.adapters,
@@ -358,7 +359,7 @@ export class Session {
           const promise = /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I will|I'll) (now )?(use|call|run|compute|count|measure|perform|fit|check)\b/i.test(tail);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
           const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
-          const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf);
+          const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
           const noWork = this.settings.headless && this.adapters.length > 0 && !ranStep;
           if (promise || asksLeave || noWork) {
             nudges++;
@@ -483,10 +484,23 @@ export class Session {
       };
     }
     const fids = found.map(({ f, source }) => this.findings.add(f, source).fid);
-    const annotated = annotate(answer, claims);
-    this.record.append("assistant", { text: answer, annotated, final: true, findings: fids });
+    const settings = this.settingsUsed();
+    const shown = settings ? `${answer}\n\n${settings}` : answer;
+    const annotated = annotate(answer, claims) + (settings ? `\n\n${settings}` : "");
+    this.record.append("assistant", { text: shown, annotated, final: true, findings: fids, settings });
     this.lastAnswer = answer;
     return { text: annotated };
+  }
+
+  private settingsUsed(): string {
+    const stale = this.record.stale();
+    const keys = new Set<string>();
+    for (const n of this.record.nodes()) if (!n.sensitivityOf && !stale.has(n.id)) for (const k of Object.keys(n.decisions ?? {})) keys.add(k);
+    const fields = this.decisions.fields().filter((f) => keys.has(f.key) && f.set);
+    if (!fields.length) return "";
+    const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+    const items = fields.map((f) => `${f.label}: ${show(f.value)}${f.owner === "agent" ? " (agent's choice)" : ""}`);
+    return `Settings used, from the decision record: ${items.join(" · ")}.`;
   }
 
   // ------------------------------------------------------------- tool calls
@@ -597,7 +611,7 @@ export class Session {
     let node: string | undefined;
     const argStrings = stringsIn(args);
     const sensitivityOf = meta.sensitivityOf || this.record.nodes().find((n) => n.sensitivityOf && n.outputs.some((o) => argStrings.includes(o.path)))?.sensitivityOf || undefined;
-    const makesNode = output.ok && (tool.source === "adapter" || tool.name === "run_script");
+    const makesNode = output.ok && (tool.source === "adapter" || tool.name === "run_script" || tool.name === "calculate");
     const nodeId = makesNode ? `n${this.record.nodes().length + 1}` : undefined;
     this.record.append(
       "tool_result",

@@ -99,3 +99,12 @@ Same command as run 1. The prompt names `sub_w1/BBBC005_v1_images` and the patte
 ## Not run
 
 `caicedo2019-bbbc039` was not run. The adapter template has one IdentifyPrimaryObjects module and no illumination step. The paper pipeline has 14 modules. Another template is needed.
+
+## Correction of the targets (parent check)
+
+- The 3.36 error and the 0.934 ratio are over all 600 F1 images. The prompt asks for a 100-image sample.
+- On the same 100 images, the published CellProfiler counts give ratio 0.9379 and error 3.11. `expected.yaml` now has both sample values.
+- Against the sample values, run 5 passes both items: ratio 0.9379 and error 3.11. The tool computed these values. The model copied them.
+- Per image, the adapter's counts differ from the published counts in 64 of 100 images. The totals are equal (4696). The adapter does not read the published file.
+- Run 5 still misreported two settings: it said the discard defaults were used, but both were off.
+- All 5 scripts in run 5 failed with `No module named 'pandas'`. `run_script` now uses a science Python (`~/.guided-analysis/envs/science`) with numpy, pandas and scipy.

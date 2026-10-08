@@ -24,7 +24,7 @@ expected:
     value: 0.834
     tolerance: 0.01
     source: computed from BBBC005_results_bray.csv
-  - description: detected / true count ratio, blur size 1, published counts
+  - description: detected / true count ratio, blur size 1, published counts, all 600 F1 images (not the 100-image sample in the prompt)
     value: 0.934
     tolerance: 0.02
     source: computed from BBBC005_results_bray.csv
@@ -32,10 +32,18 @@ expected:
     value: 0.634
     tolerance: 0.02
     source: computed from BBBC005_results_bray.csv
-  - description: mean absolute count error, blur size 1, published counts
+  - description: mean absolute count error, blur size 1, published counts, all 600 F1 images (not the 100-image sample in the prompt)
     value: 3.36
     tolerance: 0.1
     source: computed from BBBC005_results_bray.csv
+  - description: detected / true count ratio, published counts, the 100-image sample of the prompt (every sixth sorted w1 file name, matched by file name)
+    value: 0.9379
+    tolerance: 0.02
+    source: computed from BBBC005_results_bray.csv on the same 100 images
+  - description: mean absolute count error, published counts, the 100-image sample of the prompt
+    value: 3.11
+    tolerance: 0.1
+    source: computed from BBBC005_results_bray.csv on the same 100 images
   - description: sum of true cell counts over 100 sampled in-focus images (w1 or w2, same file names) (every sixth sorted file name)
     value: 5007
     tolerance: 0

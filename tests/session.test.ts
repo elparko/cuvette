@@ -197,3 +197,18 @@ test("a step that uses the output of a comparison run is also a comparison run",
   expect(last.sensitivityOf).toBe("sigma");
   expect(session.record.nodes().filter((n) => !n.sensitivityOf).map((n) => n.tool)).toEqual(["blur"]);
 });
+
+test("a calculate result is a logged step that claims can cite", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "calculate", args: { items: [{ name: "ratio", expression: "4696 / 5007" }] } }] },
+    { text: "The ratio is 0.938." },
+    { text: "The ratio is 0.938." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("What is the ratio?");
+  const node = session.record.nodes().find((n) => n.tool === "calculate")!;
+  expect(node).toBeDefined();
+  const claim = session.record.entries(["claim_check"]).at(-1)!.data as { claims: { value: number; label: string; node?: string }[] };
+  expect(claim.claims.find((c) => c.value === 0.938)).toMatchObject({ label: "measured", node: node.id });
+});
