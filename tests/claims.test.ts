@@ -68,6 +68,12 @@ describe("checkAnswer", () => {
     expect(checkAnswer("There are 47 cells.", record)[0]!.node).toBe("n2");
   });
 
+  test("ignores version numbers", () => {
+    const { record } = fake(nums);
+    const claims = checkAnswer("I used vegan 2.7.6 and lmerTest v3.2.1 for AUC 0.81.", record);
+    expect(claims.map((c) => c.value)).toEqual([0.81]);
+  });
+
   test("skips numbers from the user and setup", () => {
     const { record } = fake(nums, ["use a 25 um window"], { tol: 7.5 });
     const c = checkAnswer("The window of 25 um and tolerance 7.5 were kept.", record);

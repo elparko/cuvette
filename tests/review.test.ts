@@ -200,3 +200,17 @@ test("a choice word in a sentence about something else is not a misreport", asyn
   const wrong = await run({ ...base, answer: "We used TIC normalization." } as never);
   expect(wrong.some((f) => f.check === "decision_misreported")).toBe(true);
 });
+
+test("a number from the comparison run of the chosen value is not flagged; another option's is", async () => {
+  const nodes = [
+    { id: "n2", tool: "count", args: { method: "Default" }, sensitivityOf: "method" },
+    { id: "n3", tool: "count", args: { method: "Otsu" }, sensitivityOf: "method" },
+  ];
+  const record = makeRecord([], nodes);
+  const dec: any = { values: () => ({ method: "Default" }), value: (k: string) => (k === "method" ? "Default" : undefined) };
+  const claims: Claim[] = [{ text: "46 cells", value: 46, label: "measured", node: "n2" } as Claim];
+  const ok = await runChecks(ctx(record, "There are 46 cells.", { decisions: dec, claims }));
+  expect(ok.some((f) => f.check === "number_from_comparison")).toBe(false);
+  const bad = await runChecks(ctx(record, "There are 50 cells.", { decisions: dec, claims: [{ text: "50 cells", value: 50, label: "measured", node: "n3" } as Claim] }));
+  expect(bad.some((f) => f.check === "number_from_comparison")).toBe(true);
+});

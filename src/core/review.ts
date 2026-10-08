@@ -262,7 +262,12 @@ function decisionsMisreported(ctx: ReviewContext): FindingIn[] {
 
 function numbersFromComparisons(ctx: ReviewContext): FindingIn[] {
   const nodes = new Map(ctx.record.nodes().map((n) => [n.id, n]));
-  const hits = ctx.claims.filter((c) => c.node && nodes.get(c.node)?.sensitivityOf);
+  const chosen = (key: string) => (ctx.decisions as { value?: (k: string) => unknown }).value?.(key);
+  const ranChosen = (n: { args?: Record<string, unknown>; sensitivityOf?: string }) => {
+    const v = chosen(n.sensitivityOf ?? "");
+    return v !== undefined && v !== null && Object.values(n.args ?? {}).some((a) => String(a) === String(v));
+  };
+  const hits = ctx.claims.filter((c) => c.node && nodes.get(c.node)?.sensitivityOf && !ranChosen(nodes.get(c.node)!));
   if (!hits.length) return [];
   return [{
     check: "number_from_comparison",
