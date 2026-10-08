@@ -428,5 +428,5 @@ test("samePath joins the two names of one file", async () => {
   const d = mkdtempSync(join(tmpdir(), "same-"));
   writeFileSync(join(d, "a.png"), "x");
   expect(samePath(join(d, "a.png"))).toBe(samePath(join(d, ".", "a.png")));
-  if (process.platform === "darwin") expect(samePath(join("/var", d.replace(/^\/private\/var\//, "").replace(/^\/var\//, ""), "a.png").replace("/var//", "/var/"))).toBe(samePath(join(d, "a.png")));
+  if (process.platform === "darwin" && d.startsWith("/var/")) expect(samePath(join("/private", d, "a.png"))).toBe(samePath(join(d, "a.png")));
 });
