@@ -1,0 +1,6 @@
+{"paper":"rost2016-openms","model":"hand run (no model)","status":"answer","items":[
+{"key":"spectra","expected":7173,"computed":{"pass":true,"value":7173},"reported":null},
+{"key":"ms1_spectra","expected":7173,"computed":{"pass":true,"value":7173},"reported":null},
+{"key":"mass_traces","expected":1880,"computed":{"pass":true,"value":1880},"reported":null},
+{"key":"elution_peaks","expected":2255,"computed":{"pass":true,"value":2255},"reported":null},
+{"key":"features","expected":1887,"computed":{"pass":true,"value":1887},"reported":{"pass":true,"value":1887}}]}

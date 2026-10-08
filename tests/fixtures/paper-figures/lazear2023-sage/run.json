@@ -1,0 +1,6 @@
+{"paper":"lazear2023-sage","model":"ollama:qwen3:8b","status":"answer","items":[
+{"key":"psms_result_table","expected":303,"computed":{"pass":true,"value":303},"reported":{"pass":true,"value":303}},
+{"key":"decoy_psms","expected":43,"computed":{"pass":true,"value":43},"reported":{"pass":true,"value":43}},
+{"key":"target_psms_fdr1","expected":207,"computed":{"pass":true,"value":207},"reported":{"pass":true,"value":207}},
+{"key":"distinct_peptides","expected":47,"computed":{"pass":true,"value":47},"reported":null},
+{"key":"decoy_psms_kept","expected":1,"computed":{"pass":true,"value":1},"reported":null}]}

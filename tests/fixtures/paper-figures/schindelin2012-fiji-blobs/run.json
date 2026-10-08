@@ -1,0 +1,1 @@
+{"paper": "schindelin2012-fiji-blobs", "model": "ollama:qwen3:8b (hand run)", "status": "answer", "items": [{"key": "particles_edges_included", "expected": 64, "tolerance": "exact", "computed": {"pass": true, "value": 64}, "reported": null}, {"key": "particles_edges_excluded", "expected": 46, "tolerance": "exact", "computed": null, "reported": null}]}

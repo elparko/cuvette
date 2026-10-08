@@ -1,0 +1,6 @@
+{"paper":"schramm2012-imzml-pyimzml","model":"hand run (no model)","status":"answer","items":[
+{"key":"spectra_per_file","expected":9,"computed":{"pass":true,"value":9},"reported":null},
+{"key":"mz_min","expected":100.083336,"computed":{"pass":true,"value":100.0833},"reported":null},
+{"key":"mz_max","expected":799.9167,"computed":{"pass":true,"value":799.9167},"reported":null},
+{"key":"max_pixel_tic","expected":243.5395,"computed":{"pass":true,"value":243.5395},"reported":{"pass":false,"value":240}},
+{"key":"mean_tic","expected":161.1444,"computed":{"pass":true,"value":161.1444},"reported":null}]}
