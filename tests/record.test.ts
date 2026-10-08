@@ -89,6 +89,12 @@ test("numbers walks results with dotted paths and skips non-finite values", () =
   expect(big.numbers()).toHaveLength(2000);
 });
 
+test("numbers include numeric strings in table rows, not other strings", () => {
+  const r = new AnalysisRecord(tmp(), "s1");
+  r.addNode(nodeIn({ result: { table: { columns: ["gate", "flowjo_count"], rows: [["CD3+", "133860"], ["CD4+", "82636.5"]] }, data: { note: "7" } } }));
+  expect(r.numbers().map((x) => x.value)).toEqual([133860, 82636.5]);
+});
+
 test("numbers include the values that a script printed", () => {
   const r = new AnalysisRecord(tmp(), "s1");
   const e = r.append("tool_result", { tool: "run_script", text: "n features 11432 AUC range 0.4295703244566881 0.5484182098765432" });

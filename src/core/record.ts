@@ -164,6 +164,9 @@ export class AnalysisRecord {
             out.push({ node: n.id, path, value: v });
             count++;
           }
+        } else if (typeof v === "string" && path.startsWith("table.rows") && /^\s*-?\d+(?:\.\d+)?(?:e[-+]?\d+)?\s*$/i.test(v)) {
+          out.push({ node: n.id, path, value: Number(v) });
+          count++;
         } else if (Array.isArray(v)) {
           v.forEach((x, i) => walk(x, `${path}[${i}]`));
         } else if (v && typeof v === "object") {
