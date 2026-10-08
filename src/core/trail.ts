@@ -31,6 +31,15 @@ export function show(v: unknown): string {
   return JSON.stringify(v);
 }
 
+function plainText(s: string): string {
+  return s
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*\|?[-:| ]+\|[-:| ]*$/gm, "")
+    .replace(/^\s*[-*]\s+/gm, "");
+}
+
 function clip(s: string, max = 300): string {
   const one = s.replace(/\s+/g, " ").trim();
   return one.length > max ? one.slice(0, max - 1) + "…" : one;
@@ -231,7 +240,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
     case "user":
       return { icon: "note", line: `You: ${clip(show(d.text))}`, technical: tech() };
     case "assistant":
-      return d.final ? { icon: "note", line: clip(show(d.text)), details: { text: d.text }, technical: tech() } : undefined;
+      return d.final ? { icon: "note", line: clip(plainText(show(d.text))), details: { text: d.text }, technical: tech() } : undefined;
     default:
       return undefined;
   }

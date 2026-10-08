@@ -197,7 +197,7 @@ function drawTrail() {
     const d = h("details", { class: "t" + (l.stale ? " stale" : "") });
     if (openLines.has(l.entry)) d.open = true;
     d.addEventListener("toggle", () => { d.open ? openLines.add(l.entry) : openLines.delete(l.entry); });
-    d.append(h("summary", {}, l.n + ". " + (icons[l.icon] || "▸") + " " + l.line + (l.stale ? "  (out of date)" : "")));
+    d.append(h("summary", {}, l.n + ". " + (icons[l.icon] || "▸") + " " + l.line));
     if (l.details && Object.keys(l.details).length) {
       const dl = h("dl", {});
       for (const [k, v] of Object.entries(l.details)) dl.append(h("dt", {}, k), h("dd", {}, show(v)));

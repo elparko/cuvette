@@ -595,6 +595,8 @@ export class Session {
     const images = outputs.filter((o) => o.kind === "image" && /\.(png|jpe?g)$/i.test(o.path));
     const summary = output.summary ?? (output.ok ? `Ran ${remote}.` : `Failed: ${output.error ?? "unknown error"}`);
     let node: string | undefined;
+    const argStrings = stringsIn(args);
+    const sensitivityOf = meta.sensitivityOf || this.record.nodes().find((n) => n.sensitivityOf && n.outputs.some((o) => argStrings.includes(o.path)))?.sensitivityOf || undefined;
     const makesNode = output.ok && (tool.source === "adapter" || tool.name === "run_script");
     const nodeId = makesNode ? `n${this.record.nodes().length + 1}` : undefined;
     this.record.append(
@@ -615,7 +617,7 @@ export class Session {
         effectiveArgs: args,
         manualRoute,
         fidelity,
-        sensitivityOf: meta.sensitivityOf,
+        sensitivityOf,
       },
       { node: nodeId },
     );
@@ -640,7 +642,7 @@ export class Session {
         model: this.provider.info.model,
         manualRoute,
         fidelity,
-        sensitivityOf: meta.sensitivityOf ?? "",
+        sensitivityOf: sensitivityOf ?? "",
       });
       node = n.id;
     }

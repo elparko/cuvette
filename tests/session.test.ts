@@ -176,3 +176,24 @@ test("compare_options reruns the last step with other values as comparison runs 
   expect(session.record.entries(["deviation"])).toHaveLength(0);
   expect(results.at(-1)!.text).toMatch(/The record still says "Default"/);
 });
+
+test("a step that uses the output of a comparison run is also a comparison run", async () => {
+  let step = 0;
+  const provider = new FakeProvider(() => {
+    step++;
+    if (step === 1) return { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 1 } }] };
+    if (step === 2) return { calls: [{ name: "compare_options", args: { key: "sigma", values: [3] } }] };
+    if (step === 3) {
+      const comp = session!.record.nodes().find((n) => n.sensitivityOf === "sigma")!;
+      return { calls: [{ name: "count", args: { input: comp.outputs[0]!.path } }] };
+    }
+    return { text: "done" };
+  });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Blur, compare, then count the comparison output");
+  const last = session.record.nodes().at(-1)!;
+  expect(last.tool).toBe("count");
+  expect(last.sensitivityOf).toBe("sigma");
+  expect(session.record.nodes().filter((n) => !n.sensitivityOf).map((n) => n.tool)).toEqual(["blur"]);
+});

@@ -67,7 +67,7 @@ beforeAll(() => {
   rec.append("finding", { fid: "f1", severity: "warning", message: "Small sample", check: "n" });
   rec.append("message", { message: { role: "user", parts: [] } });
   rec.append("usage", { inputTokens: 1 });
-  rec.append("assistant", { text: "All done.", final: true });
+  rec.append("assistant", { text: "**All done.** See `a.csv`.", final: true });
 });
 
 test("level 1 gives one numbered line per visible entry with icons", () => {
@@ -80,6 +80,7 @@ test("level 1 gives one numbered line per visible entry with icons", () => {
   expect(t[2].stale).toBe(true);
   expect(t[3].line).toBe("Failed: file missing");
   expect(t[4].line).toBe("Fitted the curve (no manual route)");
+  expect(t.at(-1)!.line).toBe("All done. See a.csv.");
   expect(t[1].details).toBeUndefined();
 });
 

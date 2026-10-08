@@ -140,8 +140,12 @@ function inputValues(record: AnalysisRecord): number[] {
 }
 
 export function checkAnswer(text: string, record: AnalysisRecord): Claim[] {
-  const comparison = new Set((record.nodes?.() ?? []).filter((n) => n.sensitivityOf).map((n) => n.id));
-  const logged = record.numbers().sort((a, b) => Number(comparison.has(a.node)) - Number(comparison.has(b.node)));
+  const nodes = record.nodes?.() ?? [];
+  const comparison = new Set(nodes.filter((n) => n.sensitivityOf).map((n) => n.id));
+  const stale = record.stale?.() ?? new Set<string>();
+  const order = new Map(nodes.map((n, i) => [n.id, i]));
+  const rank = (id: string) => Number(comparison.has(id)) * 2 + Number(stale.has(id));
+  const logged = record.numbers().sort((a, b) => rank(a.node) - rank(b.node) || (order.get(b.node) ?? 0) - (order.get(a.node) ?? 0));
   const loggedValues = logged.map((n) => n.value);
   const inputs = inputValues(record);
   const found = extractNumbers(text);

@@ -10,13 +10,14 @@ import { imageProtocol, inlineImage } from "./image.ts";
 import { Mapper, type Item } from "./items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
 import { Header, ItemView, StatusLine, type StaticItem } from "./view.tsx";
+import { Markdown } from "./markdown.tsx";
 
 const MODE_ORDER: Mode[] = ["watch", "follow", "teach", "plan"];
 const MAX_SUGGESTIONS = 8;
 
 export function App({ session, opts }: { session: SessionLike; opts: TuiOptions }) {
   const { exit } = useApp();
-  const { write } = useStdout();
+  const { write, stdout } = useStdout();
   const env = opts.env ?? process.env;
   const mapper = useRef(new Mapper(session));
   const counter = useRef(0);
@@ -299,7 +300,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
       </Static>
       {live ? (
         <Box marginTop={1}>
-          <Text>{live}</Text>
+          <Markdown text={live} width={((stdout as unknown as { columns?: number })?.columns ?? 80) - 1} />
         </Box>
       ) : null}
       {status.tool ? <Text dimColor>● Running {status.tool}...</Text> : null}

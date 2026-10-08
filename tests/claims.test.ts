@@ -56,6 +56,18 @@ describe("checkAnswer", () => {
     expect(claims.map((c) => c.value)).toEqual([0.81]);
   });
 
+  test("prefers a current, later step over an out-of-date or comparison step", () => {
+    const { record } = fake([
+      { node: "n1", path: "count", value: 47 },
+      { node: "n2", path: "count", value: 47 },
+      { node: "n3", path: "count", value: 47 },
+      { node: "n4", path: "count", value: 47 },
+    ]);
+    record.nodes = () => [{ id: "n1" }, { id: "n2" }, { id: "n3", sensitivityOf: "method" }, { id: "n4" }];
+    record.stale = () => new Set(["n4"]);
+    expect(checkAnswer("There are 47 cells.", record)[0]!.node).toBe("n2");
+  });
+
   test("skips numbers from the user and setup", () => {
     const { record } = fake(nums, ["use a 25 um window"], { tol: 7.5 });
     const c = checkAnswer("The window of 25 um and tolerance 7.5 were kept.", record);
