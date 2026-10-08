@@ -41,7 +41,7 @@ export async function runScenario(id: string, opts: RunOptions): Promise<RunResu
     });
     session.bus.on((e) => {
       if (e.type !== "question") return;
-      const v = fitAnswer(e.question, answerFor(sc, e.question));
+      const v = e.question.decisionKey ? fitAnswer(e.question, answerFor(sc, e.question)) : answerFor(sc, e.question) ?? "Use your best judgment and state it as an assumption.";
       setTimeout(() => void session.answer(e.question.qid, v ?? "", "simulated scientist").catch(() => {}), 0);
     });
     const setupKeys = new Set(session.decisions.fields().filter((f) => f.stage === "setup").map((f) => f.key));

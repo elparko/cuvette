@@ -102,3 +102,14 @@ test("a promise of an action with no tool call gets one nudge", async () => {
   expect(answer).toBe("The program is open.");
   expect(provider.requests.length).toBe(3);
 });
+
+test("generic file tools stay inside the folders of the analysis", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "ga-cwd-"));
+  const provider = new FakeProvider([{ calls: [{ name: "list_dir", args: { path: "/" } }, { name: "list_dir", args: { path: cwd } }] }, { text: "ok" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd, settings: { guidance: false } });
+  await session.send("look");
+  const results = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "tool_result") as { text: string; isError?: boolean }[];
+  expect(results[0].isError).toBe(true);
+  expect(results[0].text).toMatch(/outside the folders/);
+  expect(results[1].isError).toBeFalsy();
+});

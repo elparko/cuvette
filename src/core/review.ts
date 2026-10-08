@@ -182,7 +182,7 @@ function holds(op: string, actual: unknown, expected: unknown): boolean {
 
 function ruleChecks(ctx: ReviewContext): FindingIn[] {
   const out: FindingIn[] = [];
-  const nodes = ctx.record.nodes();
+  const nodes = ctx.record.nodes().filter((n) => !n.sensitivityOf);
   for (const adapter of ctx.adapters) {
     for (const c of adapter.manifest.checks) {
       const rule = c.rule;
@@ -207,7 +207,7 @@ async function moduleChecks(ctx: ReviewContext): Promise<FindingIn[]> {
   const out: FindingIn[] = [];
   const cctx: AdapterCheckContext = {
     entries: ctx.record.entries(),
-    nodes: ctx.record.nodes(),
+    nodes: ctx.record.nodes().filter((n) => !n.sensitivityOf),
     decisions: ctx.decisions.values(),
     answer: ctx.answer,
   };

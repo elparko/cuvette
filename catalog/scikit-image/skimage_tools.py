@@ -29,56 +29,51 @@ def _read(path):
     return img
 
 
-def _plane(img, channel):
+def _plane(img, stain_channel):
     if img.ndim == 2:
         return img.astype(float)
     if img.ndim != 3 or img.shape[-1] != 3:
         raise ValueError("expected a gray or RGB image, got shape %s" % (img.shape,))
-    if channel == "gray":
+    if stain_channel == "gray":
         return color.rgb2gray(img)
-    if channel in ("hematoxylin", "eosin"):
-        return color.rgb2hed(img)[..., 0 if channel == "hematoxylin" else 1]
-    return img[..., ["red", "green", "blue"].index(channel)].astype(float)
+    if stain_channel in ("hematoxylin", "eosin"):
+        return color.rgb2hed(img)[..., 0 if stain_channel == "hematoxylin" else 1]
+    return img[..., ["red", "green", "blue"].index(stain_channel)].astype(float)
 
 
-def _threshold(plane, method, value):
-    if method == "manual":
+def _threshold(plane, threshold_method, value):
+    if threshold_method == "manual":
         if value is None:
             raise ValueError("method manual needs threshold_value")
         return float(value)
-    return float(getattr(filters, "threshold_" + method)(plane))
+    return float(getattr(filters, "threshold_" + threshold_method)(plane))
 
 
-def _mask(plane, method, value, objects):
-    t = _threshold(plane, method, value)
-    return (plane > t if objects == "bright" else plane <= t), t
+def _mask(plane, threshold_method, value, object_polarity):
+    t = _threshold(plane, threshold_method, value)
+    return (plane > t if object_polarity == "bright" else plane <= t), t
 
 
 def _clean(mask, fill_holes):
     return ndi.binary_fill_holes(mask) if fill_holes else mask
 
 
-def _label(mask, min_size, exclude_border, split_touching, min_distance):
+def _label(mask, min_object_size, exclude_border_objects, split_touching, min_distance):
+    n_before = int(measure.label(mask, connectivity=1).max())
+    if min_object_size > 1:
+        mask = morphology.remove_small_objects(mask, max_size=int(min_object_size) - 1)
+    n_small = n_before - int(measure.label(mask, connectivity=1).max())
     lab = measure.label(mask, connectivity=2)
     if split_touching:
         dist = ndi.distance_transform_edt(mask)
-        peaks = measure.label(morphology.h_maxima(dist, 0.5)) if min_distance <= 0 else None
-        if peaks is None:
-            from skimage.feature import peak_local_max
+        from skimage.feature import peak_local_max
 
-            coords = peak_local_max(dist, min_distance=int(min_distance), labels=lab, exclude_border=False)
-            peaks = np.zeros(lab.shape, dtype=int)
-            peaks[tuple(coords.T)] = np.arange(1, len(coords) + 1)
+        coords = peak_local_max(dist, min_distance=max(int(min_distance), 1), labels=lab, exclude_border=False)
+        peaks = np.zeros(lab.shape, dtype=int)
+        peaks[tuple(coords.T)] = np.arange(1, len(coords) + 1)
         lab = segmentation.watershed(-dist, peaks, mask=mask)
-    n_small = 0
-    if min_size > 0:
-        areas = np.bincount(lab.ravel())
-        small = np.where(areas < min_size)[0]
-        small = small[small > 0]
-        n_small = len(small)
-        lab[np.isin(lab, small)] = 0
     n_border = 0
-    if exclude_border:
+    if exclude_border_objects:
         before = len(np.unique(lab)) - 1
         lab = segmentation.clear_border(lab)
         n_border = before - (len(np.unique(lab)) - 1)
@@ -129,7 +124,32 @@ def _stem(path):
     return Path(path).stem
 
 
+IMAGE_EXT = {".png", ".tif", ".tiff", ".jpg", ".jpeg", ".gif", ".bmp"}
+
+
+def _describe_folder(path):
+    root = Path(path)
+    groups = {}
+    for p in sorted(root.rglob("*")):
+        if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in IMAGE_EXT:
+            parts = p.relative_to(root).parts
+            key = "/".join((["*"] if len(parts) > 2 else []) + list(parts[1:-1] if len(parts) > 2 else parts[:-1]) + ["*" + p.suffix])
+            g = groups.setdefault(key, {"n_files": 0, "example": str(Path(*parts))})
+            g["n_files"] += 1
+    total = sum(g["n_files"] for g in groups.values())
+    lines = ["%s: %d files, for example %s" % (k, g["n_files"], g["example"]) for k, g in groups.items()]
+    return {
+        "ok": True,
+        "summary": "Folder with %d image files in %d pattern(s). %s" % (total, len(groups), "; ".join(lines[:6])),
+        "metrics": {"n_files": total, "n_patterns": len(groups)},
+        "data": {"patterns": groups, "note": "Give the folder as the path and one pattern to the segmentation tool. Give the folder of the hand-drawn masks as truth_folder and a part of its path as truth_match."},
+        "outputs": [],
+    }
+
+
 def inspect_image(path):
+    if Path(path).is_dir():
+        return _describe_folder(path)
     img = _read(path)
     ext = Path(path).suffix.lower()
     channels = 1 if img.ndim == 2 else img.shape[-1]
@@ -161,10 +181,10 @@ def inspect_image(path):
     }
 
 
-def threshold_image(path, channel="gray", method="otsu", threshold_value=None, objects="bright", fill_holes=False):
+def threshold_image(path, stain_channel="gray", threshold_method="otsu", threshold_value=None, object_polarity="bright", fill_holes=False):
     img = _read(path)
-    plane = _plane(img, channel)
-    mask, t = _mask(plane, method, threshold_value, objects)
+    plane = _plane(img, stain_channel)
+    mask, t = _mask(plane, threshold_method, threshold_value, object_polarity)
     mask = _clean(mask, fill_holes)
     stem = _stem(path)
     mpath = _out(stem, "mask.tif")
@@ -174,18 +194,18 @@ def threshold_image(path, channel="gray", method="otsu", threshold_value=None, o
     frac = float(mask.mean())
     return {
         "ok": True,
-        "summary": "%s threshold %.4g on %s; %.1f percent of the pixels are objects" % (method, t, channel, frac * 100),
+        "summary": "%s threshold %.4g on %s; %.1f percent of the pixels are objects" % (threshold_method, t, stain_channel, frac * 100),
         "metrics": {"threshold": t, "foreground_fraction": frac, "foreground_pixels": int(mask.sum())},
         "outputs": [{"path": mpath, "kind": "image", "name": "mask"}, {"path": ppath, "kind": "image", "name": "mask preview"}],
         "mask": mpath,
     }
 
 
-def label_objects(mask, min_size=0, exclude_border=False, split_touching=False, min_distance=0, pixel_size=0.0, intensity_image=None):
+def label_objects(mask, min_object_size=0, exclude_border_objects=False, split_touching=False, min_distance=7, pixel_size=0.0, intensity_image=None):
     m = _read(mask) > 0
     if m.ndim != 2:
         raise ValueError("the mask must be a 2D image")
-    lab, n_small, n_border = _label(m, min_size, exclude_border, split_touching, min_distance)
+    lab, n_small, n_border = _label(m, min_object_size, exclude_border_objects, split_touching, min_distance)
     props, areas, scale = _stats(lab, pixel_size)
     stem = _stem(mask)
     lpath, cpath, ppath = _out(stem, "labels.tif"), _out(stem, "objects.csv"), _out(stem, "outlines.png")
@@ -203,6 +223,7 @@ def _result(lab, areas, scale, n_small, n_border, lpath, cpath, ppath, rows, col
     metrics = {
         "n_objects": n,
         "mean_area_px": float(areas.mean()) if n else 0.0,
+        "total_area_px": float(areas.sum()),
         "median_area_px": float(np.median(areas)) if n else 0.0,
         "removed_small": n_small,
         "removed_border": n_border,
@@ -219,27 +240,36 @@ def _result(lab, areas, scale, n_small, n_border, lpath, cpath, ppath, rows, col
             {"path": cpath, "kind": "table", "name": "objects"},
         ],
         "table": _table(cpath, cols, rows),
+        "label_image": lpath,
     }
 
 
 def count_objects(
     path,
-    channel="gray",
-    method="otsu",
+    pattern="*",
+    only_listed_in=None,
+    truth_folder=None,
+    truth_match="",
+    stain_channel="gray",
+    threshold_method="otsu",
     threshold_value=None,
-    objects="bright",
+    object_polarity="bright",
     fill_holes=False,
-    min_size=0,
-    exclude_border=False,
+    min_object_size=0,
+    exclude_border_objects=False,
     split_touching=False,
-    min_distance=0,
+    min_distance=7,
     pixel_size=0.0,
 ):
+    if Path(path).is_dir():
+        return _count_folder(
+            path, pattern, only_listed_in, truth_folder, truth_match, stain_channel, threshold_method, threshold_value, object_polarity, fill_holes, min_object_size, exclude_border_objects, split_touching, min_distance
+        )
     img = _read(path)
-    plane = _plane(img, channel)
-    mask, t = _mask(plane, method, threshold_value, objects)
+    plane = _plane(img, stain_channel)
+    mask, t = _mask(plane, threshold_method, threshold_value, object_polarity)
     mask = _clean(mask, fill_holes)
-    lab, n_small, n_border = _label(mask, min_size, exclude_border, split_touching, min_distance)
+    lab, n_small, n_border = _label(mask, min_object_size, exclude_border_objects, split_touching, min_distance)
     props, areas, scale = _stats(lab, pixel_size)
     stem = _stem(path)
     lpath, cpath, ppath = _out(stem, "labels.tif"), _out(stem, "objects.csv"), _out(stem, "outlines.png")
@@ -251,7 +281,8 @@ def count_objects(
     r = _result(lab, areas, scale, n_small, n_border, lpath, cpath, ppath, rows, cols)
     r["metrics"]["threshold"] = t
     r["metrics"]["foreground_fraction"] = float(mask.mean())
-    r["summary"] = "%d objects with %s threshold %.4g on %s; mean area %.1f px" % (r["metrics"]["n_objects"], method, t, channel, r["metrics"]["mean_area_px"])
+    r["summary"] = "%d objects with %s threshold %.4g on %s; mean area %.1f px" % (r["metrics"]["n_objects"], threshold_method, t, stain_channel, r["metrics"]["mean_area_px"])
+    r["label_image"] = lpath
     r["data"] = {"area_unit": "pixel" if scale == 1.0 else "calibrated unit squared", "calibrated": scale != 1.0}
     return r
 
@@ -290,10 +321,10 @@ def _score(pred, truth):
         tp = int((ious >= thr).sum())
         f1s.append(2.0 * tp / max(npred + ntrue, 1))
         if abs(thr - 0.5) < 1e-9:
-            out["f1_iou_0.5"] = f1s[-1]
+            out["f1_iou_50"] = f1s[-1]
         if abs(thr - 0.7) < 1e-9:
-            out["f1_iou_0.7"] = f1s[-1]
-            out["missed_fraction_iou_0.7"] = 1.0 - tp / max(ntrue, 1)
+            out["f1_iou_70"] = f1s[-1]
+            out["missed_fraction_iou_70"] = 1.0 - tp / max(ntrue, 1)
     out["average_f1"] = float(np.mean(f1s))
     return out
 
@@ -309,7 +340,7 @@ def compare_masks(prediction, truth):
     s = _score(pred, tr)
     return {
         "ok": True,
-        "summary": "Dice %.3f, F1 at IoU 0.5 %.3f, average F1 %.3f; %d objects found, %d true objects" % (s["dice"], s["f1_iou_0.5"], s["average_f1"], s["n_pred"], s["n_truth"]),
+        "summary": "Dice %.3f, F1 at IoU 0.5 %.3f, average F1 %.3f; %d objects found, %d true objects" % (s["dice"], s["f1_iou_50"], s["average_f1"], s["n_pred"], s["n_truth"]),
         "metrics": s,
         "outputs": [],
     }
@@ -323,6 +354,7 @@ def _listed(path):
 
 
 def _truth_index(folder, match):
+    match = (match or "").strip("*")
     idx = {}
     for p in Path(folder).rglob("*"):
         if p.is_file() and not p.name.startswith(".") and (not match or match in str(p.parent)):
@@ -330,44 +362,52 @@ def _truth_index(folder, match):
     return idx
 
 
-def batch_count(
+def _count_folder(
     folder,
-    pattern="*.tif",
+    pattern="*",
     only_listed_in=None,
     truth_folder=None,
     truth_match="",
-    channel="gray",
-    method="otsu",
+    stain_channel="gray",
+    threshold_method="otsu",
     threshold_value=None,
-    objects="bright",
+    object_polarity="bright",
     fill_holes=False,
-    min_size=0,
-    exclude_border=False,
+    min_object_size=0,
+    exclude_border_objects=False,
     split_touching=False,
-    min_distance=0,
+    min_distance=7,
 ):
     root = Path(folder)
-    files = sorted(p for p in root.glob(pattern) if p.is_file() and not p.name.startswith("."))
+    files = sorted(p for p in root.glob(pattern) if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in IMAGE_EXT)
     listed = _listed(only_listed_in)
     if listed is not None:
         files = [p for p in files if p.name in listed or p.stem in {Path(n).stem for n in listed}]
     if not files:
         raise FileNotFoundError("no files match %s in %s" % (pattern, folder))
+    if truth_folder and not Path(truth_folder).is_dir():
+        name = Path(str(truth_folder).strip("*/")).name
+        if name and any(d.is_dir() and d.name == name for d in root.rglob("*")):
+            truth_folder, truth_match = str(root), truth_match or name
+        else:
+            raise FileNotFoundError("truth folder not found: %s. Give a real folder path." % truth_folder)
     truth = _truth_index(truth_folder, truth_match) if truth_folder else {}
-    cols = ["image", "group", "n_objects", "mean_area_px", "n_truth", "dice", "f1_iou_0.5", "average_f1"]
+    if truth_folder and not any(p.stem in truth for p in files):
+        raise FileNotFoundError("no truth file in %s (with %r in its path) has the same name stem as the images" % (truth_folder, truth_match))
+    cols = ["image", "group", "n_objects", "mean_area_px", "n_truth", "dice", "f1_iou_50", "average_f1"]
     rows = []
     for p in files:
         img = _read(p)
-        plane = _plane(img, channel)
-        mask, _ = _mask(plane, method, threshold_value, objects)
-        lab, _, _ = _label(_clean(mask, fill_holes), min_size, exclude_border, split_touching, min_distance)
+        plane = _plane(img, stain_channel)
+        mask, _ = _mask(plane, threshold_method, threshold_value, object_polarity)
+        lab, _, _ = _label(_clean(mask, fill_holes), min_object_size, exclude_border_objects, split_touching, min_distance)
         areas = np.bincount(lab.ravel())[1:]
         rel = p.relative_to(root)
         group = rel.parts[0] if len(rel.parts) > 1 else "all"
         row = [str(rel), group, int(len(areas)), round(float(areas.mean()), 2) if len(areas) else 0.0, "", "", "", ""]
         if p.stem in truth:
             s = _score(lab.astype(np.int64), _read_truth(truth[p.stem]))
-            row[4:] = [s["n_truth"], round(s["dice"], 4), round(s["f1_iou_0.5"], 4), round(s["average_f1"], 4)]
+            row[4:] = [s["n_truth"], round(s["dice"], 4), round(s["f1_iou_50"], 4), round(s["average_f1"], 4)]
         rows.append(row)
     ipath, gpath = os.path.abspath("per_image.csv"), os.path.abspath("per_group.csv")
     _write_table(ipath, cols, rows)
@@ -388,14 +428,14 @@ def batch_count(
         ])
     _write_table(gpath, gcols, grows)
     scored = [r for r in rows if r[5] != ""]
-    metrics = {"n_images": len(rows), "total_objects": sum(r[2] for r in rows), "mean_objects_per_image": sum(r[2] for r in rows) / len(rows), "n_groups": len(groups)}
+    metrics = {"n_images": len(rows), "n_objects": sum(r[2] for r in rows), "total_objects": sum(r[2] for r in rows), "mean_objects_per_image": sum(r[2] for r in rows) / len(rows), "n_groups": len(groups)}
     if scored:
         metrics.update(
             {
                 "n_scored": len(scored),
                 "total_truth": sum(r[4] for r in scored),
                 "mean_dice": float(np.mean([r[5] for r in scored])),
-                "mean_f1_iou_0.5": float(np.mean([r[6] for r in scored])),
+                "mean_f1_iou_50": float(np.mean([r[6] for r in scored])),
                 "mean_average_f1": float(np.mean([r[7] for r in scored])),
             }
         )

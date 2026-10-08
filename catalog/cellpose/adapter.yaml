@@ -1,0 +1,344 @@
+adapter:
+  name: cellpose
+  title: Cellpose
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Segments cells and nuclei in an image or a folder of images with a Cellpose model, and scores
+    the result against hand-drawn masks. Each tool takes file paths and writes TIFF, PNG and CSV
+    files. The Python call is the manual route. The Cellpose window repeats the same settings.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: Cellpose
+  version: "4.2.1.1"
+  tested_versions: []
+  homepage: https://www.cellpose.org
+  docs:
+    - https://cellpose.readthedocs.io/en/latest/api.html
+    - https://cellpose.readthedocs.io/en/latest/settings.html
+    - https://github.com/MouseLand/cellpose
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: CELLPOSE_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/cellpose/bin/python
+    - ~/.guided-analysis/envs/cellpose/Scripts/python.exe
+  version_command: ["{program_path}", "-c", "import importlib.metadata as m; print(m.version('cellpose'))"]
+  version_pattern: "([0-9]+\\.[0-9]+(?:\\.[0-9]+)*)"
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and small PNG previews. It never sees the original image files.
+
+decisions:
+  - key: question
+    label: What question do you ask with these images?
+    kind: text
+    group: Question
+    help: Example - How many nuclei are in each image? How many true nuclei does the model miss?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replication_unit
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - cells in one image (exploratory)
+      - images or fields
+      - biological replicates (animals, patients, cultures)
+    default: images or fields
+    group: Design
+    help: >
+      Cells in one image are not independent samples. Use images or biological replicates for a
+      test. Use cells only to explore.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: pixel_size
+    label: Pixel size in micrometers (0 = uncalibrated)
+    kind: float
+    default: 0
+    lo: 0
+    group: Design
+    help: Micrometers for each pixel. Write 0 if you do not know it. Then all sizes stay in pixels.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: segment_cells, arg: pixel_size }
+
+  - key: model_type
+    label: Cellpose model
+    kind: choice
+    choices: [cpsam_v2, cpsam]
+    default: cpsam_v2
+    group: Segmentation
+    help: >
+      The trained network. cpsam_v2 is the default of Cellpose 4.2. cpsam is the first Cellpose-SAM
+      model. Different models can give different counts and outlines.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: segment_cells, arg: model_type }
+
+  - key: cell_diameter
+    label: Cell diameter in pixels (0 = the model decides)
+    kind: float
+    default: 0
+    lo: 0
+    hi: 500
+    group: Segmentation
+    help: >
+      If you give a value, Cellpose resizes the image so that cells have 30 pixels. Use 0 to run
+      without resizing. A wrong value can merge or split cells.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: segment_cells, arg: cell_diameter }
+    sensitivity:
+      options: [0, 60]
+      tool: segment_cells
+      compare: [metrics.n_cells]
+      max_runs: 2
+
+  - key: cellprob_threshold
+    label: Cell probability threshold
+    kind: float
+    default: 0
+    lo: -6
+    hi: 6
+    group: Segmentation
+    help: A lower value keeps more pixels and finds more and larger cells. A higher value keeps fewer pixels. The range is -6 to 6.
+    owner: human
+    stage: setup
+    links:
+      - { tool: segment_cells, arg: cellprob_threshold }
+
+  - key: flow_threshold
+    label: Flow error threshold
+    kind: float
+    default: 0.4
+    lo: 0
+    hi: 3
+    group: Segmentation
+    help: Cellpose drops a mask if its flow error is above this value. A higher value keeps more masks. 0 turns the test off.
+    owner: agent
+    stage: setup
+    links:
+      - { tool: segment_cells, arg: flow_threshold }
+
+  - key: min_cell_size
+    label: Smallest cell to keep (pixels)
+    kind: int
+    default: 15
+    lo: 0
+    hi: 100000
+    group: Segmentation
+    help: Cellpose removes masks with fewer pixels. The Cellpose default is 15. A higher value removes debris and small cells.
+    owner: human
+    stage: setup
+    links:
+      - { tool: segment_cells, arg: min_cell_size }
+
+  - key: exclude_border_cells
+    label: Remove cells that touch the image border
+    kind: bool
+    default: false
+    group: Segmentation
+    help: Cells cut by the image border have a wrong size. Removing them lowers the count.
+    owner: human
+    stage: setup
+    links:
+      - { tool: segment_cells, arg: exclude_border_cells }
+
+tools:
+  - name: inspect_image
+    title: Inspect an image
+    description: Read the size, the channels, the bit depth and the value range of an image file. If the path is a folder, list the image file patterns that it holds. Warn about JPEG files and saturated pixels. Use it before any other tool.
+    read_only: true
+    function: "cellpose_tools:inspect_image"
+    params:
+      path: { type: string, minLength: 1, description: Path of an image file, or of a folder of images. }
+    required: [path]
+
+  - name: segment_cells
+    title: Segment cells
+    description: >-
+      Find the cells or nuclei in one image, or in all images of a folder, with a Cellpose model. For a folder, give the folder as the path (use "." for the current folder), a pattern and optionally a truth folder to score each image. Folder example: path "images", truth_folder "masks". Writes a label image, an outline PNG and a CSV of areas.
+    function: "cellpose_tools:segment_cells"
+    params:
+      path: { type: string, minLength: 1, description: Path of one image file, or of a folder of images. }
+      model_type: { type: string, enum: [cpsam_v2, cpsam], default: cpsam_v2, description: Cellpose model name. }
+      cell_diameter: { type: number, minimum: 0, default: 0, description: Cell diameter in pixels. 0 means no resizing. }
+      flow_threshold: { type: number, minimum: 0, default: 0.4 }
+      cellprob_threshold: { type: number, minimum: -6, maximum: 6, default: 0 }
+      min_cell_size: { type: integer, minimum: 0, default: 15, description: Smallest cell to keep, in pixels. }
+      exclude_border_cells: { type: boolean, default: false }
+      pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
+      use_gpu: { type: boolean, default: true, description: Use the GPU if there is one. }
+      pattern: { type: string, default: "*", description: For a folder. File pattern under the folder, such as "*/tissue images/*.png". The default takes all image files directly in the folder. }
+      only_listed_in: { type: string, description: "For a folder. Path of a text file with one image file name for each line. Only these images are used. Always give it when the scientist names a list of images, such as a test set." }
+      truth_folder: { type: string, description: For a folder. Folder with the hand-drawn masks. The mask has the same file name stem as the image. }
+      truth_match: { type: string, default: "", description: For a folder. Text that the mask folder path must contain. }
+    required: [path]
+
+  - name: score_masks
+    title: Compare a segmentation with hand-drawn masks
+    description: Score a label image against a truth mask. Gives Dice, pixel IoU, the F1 score at IoU 0.5 and 0.7, the average F1 over IoU 0.5 to 0.95, and the fraction of true cells that are missed.
+    read_only: true
+    function: "cellpose_tools:score_masks"
+    params:
+      prediction: { type: string, minLength: 1, description: Path of the label image. segment_cells returns it as label_image in its result. }
+      truth: { type: string, minLength: 1, description: Path of the truth mask. A 16-bit file holds one number for each cell. An 8-bit file is split into connected cells. }
+    required: [prediction, truth]
+
+map:
+  - tool: inspect_image
+    route: "In Python: cellpose.io.imread(path); then img.shape, img.dtype, img.min(), img.max()"
+    steps:
+      - "Cellpose window: File > Load image (*.tif, *.png, *.jpg)"
+      - "Fiji: Image > Show Info... shows the size and the bit depth"
+    params:
+      - { arg: path, label: File to open }
+    fidelity: exact
+    evidence: { source: code, test: crop_info }
+
+  - tool: segment_cells
+    route: "In Python: models.CellposeModel(gpu=True, pretrained_model=model).eval(img, diameter=None, flow_threshold=0.4, cellprob_threshold=0.0, min_size=15)"
+    steps:
+      - "Start the window: python -m cellpose"
+      - "File > Load image, then choose the file {path}"
+      - "Set diameter to {cell_diameter}. Leave the box empty for no resizing"
+      - "Set flow threshold to {flow_threshold}"
+      - "Set cellprob threshold to {cellprob_threshold}"
+      - "Click run in the segmentation panel"
+      - "The window keeps min_size at 15 and uses the model cpsam. Route not tested in the window."
+    params:
+      - { arg: model_type, label: Model, ui_default: cpsam_v2, note: The window shows the Cellpose-SAM model. }
+      - { arg: cell_diameter, label: "diameter:", ui_default: "" }
+      - { arg: flow_threshold, label: "flow threshold:", ui_default: 0.4 }
+      - { arg: cellprob_threshold, label: "cellprob threshold:", ui_default: 0.0 }
+      - { arg: min_cell_size, label: Smallest mask in pixels, ui_default: 15, note: The window has no field for this. }
+      - { arg: exclude_border_cells, label: Remove masks on the border, ui_default: false, note: The window has no field for this. }
+    fidelity: exact
+    evidence: { source: code, test: crop_segment_score, note: "The labels of the window were read from the Cellpose source. The window route is not tested. The Python call is the manual route." }
+
+  - tool: score_masks
+    route: "In Python: dice = 2 * (pred > 0 & true > 0).sum() / ((pred > 0).sum() + (true > 0).sum())"
+    steps:
+      - "Dice is the pixel overlap. It is not an object count."
+      - "A predicted cell is correct at an IoU threshold if its IoU with one true cell is at least the threshold. F1 = 2 TP / (2 TP + FP + FN)."
+    params:
+      - { arg: prediction, label: Label image of the segmentation }
+      - { arg: truth, label: Hand-drawn mask }
+    fidelity: exact
+    evidence: { source: code, test: crop_segment_score, note: "The numbers come from our own run on a cropped image. They show that the tool is stable." }
+    summary: "Dice {metrics.dice}, average F1 {metrics.average_f1}, {metrics.n_pred} cells found, {metrics.n_truth} true cells."
+
+checks:
+  - id: border_cells_kept
+    description: Cells that touch the image border are counted. Their sizes are wrong.
+    severity: warning
+    rule:
+      tool: segment_cells
+      arg: exclude_border_cells
+      op: "=="
+      value: false
+      message: Cells that touch the border are in the count. Report the count with and without them.
+  - id: model_and_settings_not_reported
+    description: The report does not name the model, the diameter and the thresholds.
+    severity: warning
+    text: The report must name the Cellpose model, the diameter (or say that there was no resizing), the flow threshold, the cell probability threshold and the smallest cell size.
+  - id: training_data_overlap
+    description: The score is called a fair test but the model may have seen the images.
+    severity: warning
+    text: Cellpose models were trained on many public image sets. If the report scores the model on a public image set, it must say that the model may have seen those images, and that the score is not a held-out test.
+  - id: uncalibrated_units
+    description: The answer gives sizes in micrometers but pixel_size is 0.
+    severity: error
+    text: The report must not give a size in micrometers or square micrometers unless the scientist gave the pixel size. If the pixel size is 0, all sizes must be in pixels.
+  - id: pseudoreplication
+    description: A p-value is computed from cells in too few images.
+    severity: error
+    text: The report must not give a p-value or a confidence interval that uses cells in one image as independent samples. The test must use images or biological replicates.
+
+tests:
+  - id: crop_info
+    description: A 256 by 256 pixel crop of a BBBC039 test image. 16 bit. The size comes from the crop.
+    data: [data/bbbc039-mini/images/crop1.tif]
+    calls:
+      - tool: inspect_image
+        args: { path: "{adapter_dir}/data/bbbc039-mini/images/crop1.tif" }
+    expect:
+      - { path: metrics.width, equals: 256 }
+      - { path: metrics.height, equals: 256 }
+      - { path: metrics.bit_depth, equals: 16 }
+
+  - id: folder_info
+    description: Inspect a folder. The mini set holds 2 images and 2 masks, in 2 patterns.
+    data: [data/bbbc039-mini/images/crop1.tif]
+    calls:
+      - tool: inspect_image
+        args: { path: "{adapter_dir}/data/bbbc039-mini" }
+    expect:
+      - { path: metrics.n_files, equals: 4 }
+      - { path: metrics.n_patterns, equals: 2 }
+
+  - id: crop_segment_score
+    description: >
+      A 256 by 256 pixel crop of a BBBC039 test image. The hand-drawn mask has 36 cells (cut cells
+      at the crop edge included). The other numbers come from our own run with Cellpose 4.2.1.1 on
+      an Apple GPU. They show that the tool is stable. The tolerance allows a small change of
+      the count between computers.
+    data: [data/bbbc039-mini/images/crop1.tif, data/bbbc039-mini/masks/crop1.png]
+    calls:
+      - tool: segment_cells
+        args: { path: "{adapter_dir}/data/bbbc039-mini/images/crop1.tif" }
+        save_as: seg
+      - tool: score_masks
+        args:
+          prediction: "{saved.seg.data.label_image}"
+          truth: "{adapter_dir}/data/bbbc039-mini/masks/crop1.png"
+    expect:
+      - { path: metrics.n_truth, equals: 36 }
+      - { path: metrics.n_pred, approx: 34, abs: 2 }
+      - { path: metrics.dice, approx: 0.9467, abs: 0.02 }
+      - { path: metrics.f1_iou_50, min: 0.85 }
+
+  - id: crop_folder
+    description: >
+      Two crops with truth masks. The truth count 50 is the number of connected objects in the
+      masks. The Dice value comes from our own run.
+    data: [data/bbbc039-mini/images/crop1.tif, data/bbbc039-mini/images/crop2.tif, data/bbbc039-mini/masks/crop1.png, data/bbbc039-mini/masks/crop2.png]
+    calls:
+      - tool: segment_cells
+        args:
+          path: "{adapter_dir}/data/bbbc039-mini/images"
+          pattern: "*.tif"
+          truth_folder: "{adapter_dir}/data/bbbc039-mini/masks"
+    expect:
+      - { path: metrics.n_images, equals: 2 }
+      - { path: metrics.total_truth, equals: 50 }
+      - { path: metrics.mean_dice, approx: 0.9116, abs: 0.02 }
+
+  - id: crop_border
+    description: Removing the cells on the border of crop1 leaves about 21 cells and removes 13. The numbers come from our own run.
+    data: [data/bbbc039-mini/images/crop1.tif]
+    calls:
+      - tool: segment_cells
+        args: { path: "{adapter_dir}/data/bbbc039-mini/images/crop1.tif", exclude_border_cells: true }
+    expect:
+      - { path: metrics.n_cells, approx: 21, abs: 2 }
+      - { path: metrics.removed_border, approx: 13, abs: 2 }

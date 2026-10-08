@@ -91,8 +91,8 @@ export class QuestionQueue {
         q.options.find((o) => o.value === value) ??
         q.options.find((o) => String(o.value).toLowerCase() === text) ??
         q.options.find((o) => o.label.trim().toLowerCase() === text);
-      if (!hit) throw new Error(`Answer must be one of: ${q.options.map((o) => o.label).join(", ")}.`);
-      chosen = hit.value;
+      if (!hit && q.decisionKey) throw new Error(`Answer must be one of: ${q.options.map((o) => o.label).join(", ")}.`);
+      chosen = hit ? hit.value : value;
     }
     q.status = "answered";
     q.answer = chosen;

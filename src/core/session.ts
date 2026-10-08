@@ -498,6 +498,7 @@ export class Session {
       this.record.append("tool_result", { callId, tool: tool.name, adapter: tool.adapter, ok: false, error: message, text: message });
       return { text: `ERROR: ${message}`, isError: true };
     };
+    if (tool.source === "generic" && !this.pathAllowed(args)) return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
     if ((this.mode === "plan" || this.mode === "teach") && !tool.readOnly)
       return error(this.mode === "plan" ? "Plan mode: the agent plans and runs only read-only tools. Switch to watch mode to run steps." : "Teach mode: the scientist runs the steps and the agent runs only read-only tools.");
     const pre = await this.hooks.pre({ event: "PreToolUse", session: this.id, mode: this.mode, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args, readOnly: tool.readOnly } as never);
@@ -656,6 +657,16 @@ export class Session {
   }
 
   // ------------------------------------------------------------- decisions owned by the scientist
+
+  private pathAllowed(args: Args): boolean {
+    const paths = ["path", "folder", "cwd"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && v.length > 0).map((v) => resolve(this.cwd, v));
+    if (!paths.length) return true;
+    const named = this.record.entries(["user", "setup"]).flatMap((e) => stringsIn(e.data)).flatMap((t) => t.match(/(?:~|\/|[A-Za-z]:\\)[^\s"'`,;]+/g) ?? []).map((t) => resolve(this.cwd, t.replace(/^~(?=\/)/, process.env.HOME ?? "~").replace(/[.)\]]+$/, "")));
+    const roots = [this.cwd, this.dir, gaHome(), ...this.adapters.map((a) => a.root), ...named, ...named.map((n) => join(n, ".."))];
+    const nodeFiles = this.record.nodes().flatMap((n) => n.outputs.map((o) => join(o.path, "..")));
+    roots.push(...nodeFiles);
+    return paths.every((p) => roots.some((r) => p === r || p.startsWith(r.endsWith("/") ? r : r + "/")));
+  }
 
   private decisionOf(key: string) {
     for (const a of this.adapters) {

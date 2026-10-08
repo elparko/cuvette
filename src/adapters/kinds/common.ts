@@ -460,11 +460,16 @@ export function fmtNumber(n: number): string {
 export function makeSummary(entry: MapEntry | undefined, title: string, args: Args, extra: { metrics?: Record<string, number>; data?: unknown; table?: TablePreview }): string {
   if (entry?.summary) {
     const scope = { ...args, metrics: extra.metrics ?? {}, data: extra.data, n_rows: extra.table?.n_rows };
-    return entry.summary.replace(NAME, (all, name: string) => {
+    let missing = false;
+    const text = entry.summary.replace(NAME, (all, name: string) => {
       const v = lookup(scope, name);
-      if (v === undefined) return all;
+      if (v === undefined) {
+        missing = true;
+        return all;
+      }
       return typeof v === "number" ? fmtNumber(v) : scalar(v);
     });
+    if (!missing) return text;
   }
   const m = Object.entries(extra.metrics ?? {}).slice(0, 4).map(([k, v]) => `${k}=${fmtNumber(v)}`);
   const parts = [`${title} finished.`];

@@ -1,0 +1,452 @@
+adapter:
+  name: scikit-image
+  title: scikit-image
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Finds and counts objects such as nuclei in an image or a folder of images with scikit-image
+    (threshold, label, watershed) and scores the result against hand-drawn masks. Each tool takes
+    file paths and writes TIFF, PNG and CSV files. The Python call is the manual route.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: scikit-image
+  version: "0.26.0"
+  tested_versions: []
+  homepage: https://scikit-image.org
+  docs:
+    - https://scikit-image.org/docs/stable/api/skimage.filters.html
+    - https://scikit-image.org/docs/stable/api/skimage.measure.html
+    - https://scikit-image.org/docs/stable/auto_examples/applications/plot_thresholding_guide.html
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  call_timeout_s: 900
+
+locate:
+  env: SKIMAGE_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/skimage/bin/python
+    - ~/.guided-analysis/envs/skimage/Scripts/python.exe
+  version_command: ["{program_path}", "-c", "import skimage; print(skimage.__version__)"]
+  version_pattern: "([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and small PNG previews. It never sees the original image files.
+
+decisions:
+  - key: question
+    label: What question do you ask with these images?
+    kind: text
+    group: Question
+    help: Example - How many nuclei are in each organ? How close is the automatic outline to the hand-drawn one?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replication_unit
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - objects in one image (exploratory)
+      - images or fields
+      - biological replicates (animals, patients, cultures)
+    default: images or fields
+    group: Design
+    help: >
+      Nuclei in one image are not independent samples. Use images or biological replicates for a
+      test. Use objects only to explore.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: pixel_size
+    label: Pixel size in micrometers (0 = uncalibrated)
+    kind: float
+    default: 0
+    lo: 0
+    group: Design
+    help: Micrometers for each pixel. Write 0 if you do not know it. Then all sizes stay in pixels.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: count_objects, arg: pixel_size }
+      - { tool: label_objects, arg: pixel_size }
+
+  - key: stain_channel
+    label: Image channel to segment
+    kind: choice
+    choices: [gray, hematoxylin, eosin, red, green, blue]
+    default: gray
+    group: Segmentation
+    help: >
+      The plane that the threshold reads. For H&E images, hematoxylin is the usual choice for
+      nuclei. Hematoxylin and eosin use color deconvolution (rgb2hed). Gray images ignore this.
+    owner: human
+    stage: setup
+    links:
+      - { tool: threshold_image, arg: stain_channel }
+      - { tool: count_objects, arg: stain_channel }
+
+  - key: object_polarity
+    label: Are the objects bright or dark in that channel?
+    kind: choice
+    choices: [bright, dark]
+    default: bright
+    group: Segmentation
+    help: Bright keeps the pixels above the threshold. Dark keeps the pixels at or below it.
+    owner: human
+    stage: setup
+    links:
+      - { tool: threshold_image, arg: object_polarity }
+      - { tool: count_objects, arg: object_polarity }
+
+  - key: threshold_method
+    label: Threshold method
+    kind: choice
+    choices: [otsu, li, triangle, isodata, yen, mean, minimum]
+    default: otsu
+    group: Segmentation
+    help: >
+      The threshold decides which pixels are objects. Different methods can give different
+      counts. The agent runs the main methods and shows you the counts before you choose.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: threshold_image, arg: threshold_method }
+      - { tool: count_objects, arg: threshold_method }
+    sensitivity:
+      options: [otsu, li, isodata, triangle]
+      tool: count_objects
+      compare: [metrics.n_objects]
+      max_runs: 4
+
+  - key: min_object_size
+    label: Smallest object to count (pixels)
+    kind: int
+    default: 0
+    lo: 0
+    hi: 100000
+    group: Segmentation
+    help: >
+      Pixel groups with fewer pixels are removed before counting. Use 0 to keep all of them. Tiny
+      groups are often noise and can change the count by a large factor.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: label_objects, arg: min_object_size }
+      - { tool: count_objects, arg: min_object_size }
+    sensitivity:
+      options: [0, 15, 30, 60]
+      tool: count_objects
+      compare: [metrics.n_objects]
+      max_runs: 4
+
+  - key: exclude_border_objects
+    label: Remove objects that touch the image border
+    kind: bool
+    default: false
+    group: Segmentation
+    help: Objects cut by the image border have a wrong size. Removing them lowers the count.
+    owner: human
+    stage: setup
+    links:
+      - { tool: label_objects, arg: exclude_border_objects }
+      - { tool: count_objects, arg: exclude_border_objects }
+
+  - key: split_touching
+    label: Split touching objects with a watershed
+    kind: bool
+    default: false
+    group: Segmentation
+    help: A watershed on the distance map cuts merged objects apart. It can also cut one object in two.
+    owner: human
+    stage: setup
+    links:
+      - { tool: label_objects, arg: split_touching }
+      - { tool: count_objects, arg: split_touching }
+
+tools:
+  - name: inspect_image
+    title: Inspect an image
+    description: Read the size, the channels, the bit depth and the value range of an image file. If the path is a folder, list the image file patterns that it holds. Warn about JPEG files and saturated pixels. Use it before any other tool.
+    read_only: true
+    function: "skimage_tools:inspect_image"
+    params:
+      path: { type: string, minLength: 1, description: Path of an image file, or of a folder of images. }
+    required: [path]
+
+  - name: threshold_image
+    title: Threshold an image
+    description: Make a binary mask from one image channel with a threshold method. Writes the mask as TIFF and PNG. Use label_objects next.
+    function: "skimage_tools:threshold_image"
+    params:
+      path: { type: string, minLength: 1, description: Path of an image file, or of a folder of images. }
+      stain_channel: { type: string, enum: [gray, hematoxylin, eosin, red, green, blue], default: gray }
+      threshold_method: { type: string, enum: [otsu, li, triangle, isodata, yen, mean, minimum, manual], default: otsu }
+      threshold_value: { type: number, description: Cutoff value. Only for method manual. }
+      object_polarity: { type: string, enum: [bright, dark], default: bright }
+      fill_holes: { type: boolean, default: false }
+    required: [path]
+    outputs:
+      mask: { kind: image, ext: tif, description: Binary mask. }
+
+  - name: label_objects
+    title: Label objects in a mask
+    description: Find the connected objects in a mask file. Remove small objects and border objects. Optionally split touching objects. Writes a label image, an outline PNG and a CSV of areas.
+    function: "skimage_tools:label_objects"
+    params:
+      mask: { type: string, minLength: 1, description: Path of the mask file from threshold_image. }
+      min_object_size: { type: integer, minimum: 0, default: 0, description: Smallest object to keep, in pixels. }
+      exclude_border_objects: { type: boolean, default: false }
+      split_touching: { type: boolean, default: false }
+      min_distance: { type: integer, minimum: 1, default: 7, description: Smallest distance between watershed centers, in pixels. }
+      pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
+      intensity_image: { type: string, description: Optional image for the outline picture. }
+    required: [mask]
+
+  - name: count_objects
+    title: Count objects
+    description: >-
+      Threshold, label and count the objects in one image, or in all images of a folder. For a folder, give the folder as the path (use "." for the current folder), a pattern, and optionally a truth folder to score each image with Dice. Folder example: path ".", pattern "*/tissue images/*.png", truth_folder ".", truth_match "label masks". Writes label images, outlines and CSV files.
+    function: "skimage_tools:count_objects"
+    params:
+      path: { type: string, minLength: 1, description: Path of one image file, or of a folder of images. }
+      pattern: { type: string, default: "*", description: For a folder. File pattern under the folder, such as "*/tissue images/*.png". The default takes all image files directly in the folder. }
+      only_listed_in: { type: string, description: "For a folder. Path of a text file with one image file name for each line. Only these images are used. Always give it when the scientist names a list of images, such as a test set." }
+      truth_folder: { type: string, description: For a folder. Folder with the hand-drawn masks. The mask has the same file name stem as the image. }
+      truth_match: { type: string, default: "", description: For a folder. Text that the mask folder path must contain, such as "label masks". }
+      stain_channel: { type: string, enum: [gray, hematoxylin, eosin, red, green, blue], default: gray }
+      threshold_method: { type: string, enum: [otsu, li, triangle, isodata, yen, mean, minimum, manual], default: otsu }
+      threshold_value: { type: number, description: Cutoff value. Only for method manual. }
+      object_polarity: { type: string, enum: [bright, dark], default: bright }
+      fill_holes: { type: boolean, default: false }
+      min_object_size: { type: integer, minimum: 0, default: 0, description: Smallest object to keep, in pixels. }
+      exclude_border_objects: { type: boolean, default: false }
+      split_touching: { type: boolean, default: false }
+      min_distance: { type: integer, minimum: 1, default: 7 }
+      pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
+    required: [path]
+
+  - name: compare_masks
+    title: Compare a segmentation with hand-drawn masks
+    description: Score a label image against a truth mask. Gives Dice, pixel IoU, the F1 score at IoU 0.5 and 0.7, the average F1 over IoU 0.5 to 0.95, and the fraction of true objects that are missed.
+    read_only: true
+    function: "skimage_tools:compare_masks"
+    params:
+      prediction: { type: string, minLength: 1, description: Path of the label image. count_objects and label_objects return it as label_image in their result. }
+      truth: { type: string, minLength: 1, description: Path of the truth mask. A 16-bit file holds one number for each object. An 8-bit file is split into connected objects. }
+    required: [prediction, truth]
+
+map:
+  - tool: inspect_image
+    route: "In Python: skimage.io.imread(path); then img.shape, img.dtype, img.min(), img.max()"
+    steps:
+      - "Fiji: File > Open..., then Image > Show Info... shows the size and the bit depth"
+      - "Fiji: Analyze > Measure shows the mean, the minimum and the maximum"
+      - "napari: File > Open File(s)..., then read the layer information in the layer list"
+    params:
+      - { arg: path, label: File to open }
+    fidelity: exact
+    evidence: { source: code, test: blobs_info, note: The numbers match the ImageJ adapter test for the same file. }
+
+  - tool: threshold_image
+    route: "In Python: t = skimage.filters.threshold_otsu(plane); mask = plane > t"
+    steps:
+      - "Fiji: Image > Adjust > Threshold..., choose the method in the first list, click Auto, then Process > Binary > Convert to Mask"
+      - "napari: Tools > Segmentation / binarization > Threshold (Otsu et al 1979, scikit-image) with the napari-assistant plugin"
+      - "For a H&E image the plane is skimage.color.rgb2hed(img)[..., 0] (hematoxylin)"
+    params:
+      - { arg: stain_channel, label: Plane of the image, ui_default: gray }
+      - { arg: threshold_method, label: Method in the threshold list, ui_default: otsu }
+      - { arg: object_polarity, label: Bright or dark objects, ui_default: bright }
+      - { arg: threshold_value, label: Manual cutoff }
+      - { arg: fill_holes, label: Fill holes, ui_default: false }
+    fidelity: exact
+    evidence: { source: code, test: blobs_two_steps, note: "The isodata threshold of blobs.gif is 124.7. The pixels above it are the pixels that ImageJ selects with the range 126-255, because no pixel has the value 125." }
+    summary: "{threshold_method} threshold {metrics.threshold}; {metrics.foreground_fraction} of the pixels are objects."
+
+  - tool: label_objects
+    route: "In Python: remove_small_objects, measure.label(mask, connectivity=2), measure.regionprops(labels)"
+    steps:
+      - "Fiji: Analyze > Analyze Particles..., Size = {min_object_size}-Infinity, Exclude on edges = {exclude_border_objects}, Show = Outlines, click OK"
+      - "napari: Tools > Segmentation post-processing > Connected component labeling (scikit-image, nsbatwm)"
+      - "Watershed: skimage.segmentation.watershed on the negative distance map. Fiji: Process > Binary > Watershed"
+    params:
+      - { arg: min_object_size, label: Size (minimum), ui_default: 0 }
+      - { arg: exclude_border_objects, label: Exclude on edges, ui_default: false }
+      - { arg: split_touching, label: Watershed, ui_default: false }
+      - { arg: min_distance, label: Smallest distance between centers, ui_default: 7 }
+      - { arg: pixel_size, label: Pixel size in micrometers, ui_default: 0 }
+    fidelity: exact
+    evidence: { source: code, test: blobs_two_steps }
+    summary: "{metrics.n_objects} objects, mean area {metrics.mean_area_px} pixels."
+
+  - tool: count_objects
+    route: "In Python: t = filters.threshold_otsu(plane); mask = plane > t; labels = measure.label(remove_small_objects(mask, max_size=min_object_size - 1), connectivity=2)"
+    steps:
+      - "Fiji: Image > Adjust > Threshold... with the method {threshold_method}, then Process > Binary > Convert to Mask"
+      - "Fiji: Analyze > Analyze Particles... with Size = {min_object_size}-Infinity and Exclude on edges = {exclude_border_objects}"
+      - "napari: threshold and connected component labeling from the napari-assistant plugin, then Tools > Measurement > Regionprops"
+    params:
+      - { arg: stain_channel, label: Plane of the image, ui_default: gray }
+      - { arg: threshold_method, label: Method in the threshold list, ui_default: otsu }
+      - { arg: object_polarity, label: Bright or dark objects, ui_default: bright }
+      - { arg: min_object_size, label: Size (minimum), ui_default: 0 }
+      - { arg: exclude_border_objects, label: Exclude on edges, ui_default: false }
+      - { arg: split_touching, label: Watershed, ui_default: false }
+      - { arg: pixel_size, label: Pixel size in micrometers, ui_default: 0 }
+    fidelity: exact
+    evidence: { source: code, test: blobs_count_edges_included, note: "The counts 64 and 46 come from an ImageJ 1.53 run. The tool gives the same counts with the isodata method." }
+
+  - tool: compare_masks
+    route: "In Python: dice = 2 * (pred_mask & true_mask).sum() / (pred_mask.sum() + true_mask.sum())"
+    steps:
+      - "Dice is the pixel overlap. It is not an object count."
+      - "The F1 score at an IoU threshold counts a predicted object as correct if its IoU with one true object is at least the threshold."
+    params:
+      - { arg: prediction, label: Label image of the segmentation }
+      - { arg: truth, label: Hand-drawn mask }
+    fidelity: exact
+    evidence: { source: code, test: nuinsseg_mini_dice, note: "The numbers come from our own run on a cropped patch. They show that the tool is stable." }
+    summary: "Dice {metrics.dice}, average F1 {metrics.average_f1}, {metrics.n_pred} objects found, {metrics.n_truth} true objects."
+
+checks:
+  - id: border_objects_kept
+    description: Objects that touch the image border are counted. Their sizes are wrong.
+    severity: warning
+    rule:
+      tool: count_objects
+      arg: exclude_border_objects
+      op: "=="
+      value: false
+      message: Objects that touch the border are in the count. Report the count with and without them.
+  - id: no_size_filter
+    description: No smallest object size is set, so noise can count as objects.
+    severity: warning
+    rule:
+      tool: count_objects
+      arg: min_object_size
+      op: "=="
+      value: 0
+      message: No size filter was used. Tiny pixel groups count as objects. Show the count at other sizes.
+  - id: threshold_not_compared
+    description: The count was not checked with other threshold methods.
+    severity: warning
+    text: The report must show the count with at least two threshold methods, or say why it does not. Flag the report if the count changes by more than 20 percent between methods and the report does not say so.
+  - id: uncalibrated_units
+    description: The answer gives sizes in micrometers but pixel_size is 0.
+    severity: error
+    text: The report must not give a size in micrometers or square micrometers unless the scientist gave the pixel size. If the pixel size is 0, all sizes must be in pixels.
+  - id: pseudoreplication
+    description: A p-value is computed from objects in too few images.
+    severity: error
+    text: The report must not give a p-value or a confidence interval that uses objects in one image as independent samples. The test must use images or biological replicates.
+
+tests:
+  - id: blobs_info
+    description: The sample image blobs.gif is 256 by 254 pixels, 8 bit, with raw values from 8 to 248. The numbers match the ImageJ adapter test.
+    data: [data/blobs.gif]
+    calls:
+      - tool: inspect_image
+        args: { path: "{adapter_dir}/data/blobs.gif" }
+    expect:
+      - { path: metrics.width, equals: 256 }
+      - { path: metrics.height, equals: 254 }
+      - { path: metrics.min_value, equals: 8 }
+      - { path: metrics.max_value, equals: 248 }
+      - { path: metrics.saturated_fraction, equals: 0 }
+
+  - id: folder_info
+    description: Inspect a folder. The two organ crops hold 2 tissue images and 2 label masks, in 2 patterns.
+    data: [data/nuinsseg-mini/human_liver/tissue images/human_liver_01.png]
+    calls:
+      - tool: inspect_image
+        args: { path: "{adapter_dir}/data/nuinsseg-mini" }
+    expect:
+      - { path: metrics.n_files, equals: 4 }
+      - { path: metrics.n_patterns, equals: 2 }
+
+  - id: blobs_count_edges_included
+    description: ImageJ 1.53 finds 64 particles in blobs.gif with the range 126-255 and no edge exclusion. The total area 22243 and the mean area 347.547 come from the ImageJ adapter test. The isodata threshold of scikit-image selects the same pixels, because no pixel has the value 125.
+    data: [data/blobs.gif]
+    manual_route_checked: true
+    calls:
+      - tool: count_objects
+        args: { path: "{adapter_dir}/data/blobs.gif", threshold_method: isodata, object_polarity: bright, exclude_border_objects: false, min_object_size: 0 }
+    expect:
+      - { path: metrics.n_objects, equals: 64 }
+      - { path: metrics.threshold, approx: 124.71875, abs: 0.01 }
+      - { path: metrics.total_area_px, equals: 22243 }
+      - { path: metrics.mean_area_px, approx: 347.547, rel: 0.00001 }
+      - { path: table.n_rows, equals: 64 }
+
+  - id: blobs_count_edges_excluded
+    description: ImageJ 1.53 finds 46 particles in blobs.gif if it excludes the particles on the edges. The mean area 384.478 comes from the ImageJ adapter test.
+    data: [data/blobs.gif]
+    manual_route_checked: true
+    calls:
+      - tool: count_objects
+        args: { path: "{adapter_dir}/data/blobs.gif", threshold_method: isodata, exclude_border_objects: true }
+    expect:
+      - { path: metrics.n_objects, equals: 46 }
+      - { path: metrics.removed_border, equals: 18 }
+      - { path: metrics.mean_area_px, approx: 384.478, rel: 0.00001 }
+
+  - id: blobs_two_steps
+    description: Threshold, then label, in two calls. The count is 64 as in the one-call test.
+    data: [data/blobs.gif]
+    calls:
+      - tool: threshold_image
+        args: { path: "{adapter_dir}/data/blobs.gif", threshold_method: isodata }
+        save_as: thr
+      - tool: label_objects
+        args: { mask: "{saved.thr.data.mask}" }
+    expect:
+      - { path: metrics.n_objects, equals: 64 }
+      - { path: saved.thr.metrics.foreground_fraction, approx: 0.34207, abs: 0.0001 }
+
+  - id: nuinsseg_mini_dice
+    description: >
+      A 128 by 128 pixel crop of mouse_spleen_01 from NuInsSeg. The hand-drawn mask has 24
+      nuclei. The other numbers come from our own run, not from a paper. They show that the tool
+      is stable.
+    data: [data/nuinsseg-mini/mouse_spleen/tissue images/mouse_spleen_01.png, data/nuinsseg-mini/mouse_spleen/label masks/mouse_spleen_01.tif]
+    calls:
+      - tool: count_objects
+        args: { path: "{adapter_dir}/data/nuinsseg-mini/mouse_spleen/tissue images/mouse_spleen_01.png", stain_channel: hematoxylin, threshold_method: otsu, min_object_size: 30 }
+        save_as: seg
+      - tool: compare_masks
+        args:
+          prediction: "{saved.seg.data.label_image}"
+          truth: "{adapter_dir}/data/nuinsseg-mini/mouse_spleen/label masks/mouse_spleen_01.tif"
+    expect:
+      - { path: metrics.n_truth, equals: 24 }
+      - { path: metrics.n_pred, equals: 10 }
+      - { path: metrics.dice, approx: 0.72839, abs: 0.0005 }
+
+  - id: nuinsseg_mini_folder
+    description: >
+      Two 128 by 128 pixel crops in two organ folders. The folder mode groups the result by organ.
+      The truth count 27 is the number of labels in the crops. The Dice value comes from our own run.
+    data: [data/nuinsseg-mini/human_liver/tissue images/human_liver_01.png, data/nuinsseg-mini/human_liver/label masks/human_liver_01.tif, data/nuinsseg-mini/mouse_spleen/tissue images/mouse_spleen_01.png, data/nuinsseg-mini/mouse_spleen/label masks/mouse_spleen_01.tif]
+    calls:
+      - tool: count_objects
+        args:
+          path: "{adapter_dir}/data/nuinsseg-mini"
+          pattern: "*/tissue images/*.png"
+          truth_folder: "{adapter_dir}/data/nuinsseg-mini"
+          truth_match: label masks
+          stain_channel: hematoxylin
+          threshold_method: otsu
+          min_object_size: 30
+    expect:
+      - { path: metrics.n_images, equals: 2 }
+      - { path: metrics.n_groups, equals: 2 }
+      - { path: metrics.total_truth, equals: 27 }
+      - { path: metrics.mean_dice, approx: 0.70745, abs: 0.0005 }
