@@ -64,7 +64,7 @@ describe("transcript", () => {
     expect(text).toContain("⚠ Deviation: tolerance ppm 10 (setup says 5)");
     expect(text).toContain("● Step 3  Found 14 features different between endo and epi");
     expect(text).toContain("▸ Analyze > Discriminating features · group a endo");
-    expect(text).toMatch(/image: [\s\S]*\.png[\s\S]*\(open\s+with\s+\/open 1\)/);
+    expect(text).toMatch(/image:\s*[\s\S]*\.png[\s\S]*\(open\s+with\s+\/open 1\)/);
     expect(text).toContain("✗ Step 4  Folder is read-only");
     expect(text).toContain("◇ code only: no manual route");
     expect(text).toMatch(/\d+(\.\d)?k? in \/ \d+ out/);
