@@ -286,3 +286,13 @@ test("a result shows the text and the main files before the long list of picture
   expect(parsed.outputs[0].name).toBe("data.txt");
   expect(parsed.outputs.length + parsed.outputs_omitted).toBe(41);
 });
+
+test("a result that used the recorded value says so to the model", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", min_size: 99 } }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count");
+  const results = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "tool_result") as { text: string }[];
+  expect(results[0]!.text).toMatch(/min_size.* = 5 \(you gave 99\)\. This result is for the recorded value, not for the value you gave\./);
+  expect(results[0]!.text).toMatch(/call compare_options/);
+});

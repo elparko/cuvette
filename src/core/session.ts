@@ -614,8 +614,9 @@ export class Session {
     }
     if (pre.decision === "instruct") return this.followStep(tool, eff, callId, signal, pre.applied ?? {});
     const kept = (pre.deviations ?? []).filter((d) => d.overwritten);
+    const many = kept.length > 1;
     const keptNote = kept.length
-      ? `The harness used the recorded decision${kept.length > 1 ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.requested)})`).join("; ")}. The scientist owns ${kept.length > 1 ? "these values" : "this value"}. To change it, call propose_change. To check other values without a change, call compare_options.`
+      ? `The harness used the recorded decision${many ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.requested)})`).join("; ")}. This result is for the recorded ${many ? "values" : "value"}, not for the ${many ? "values" : "value"} you gave. Do not report it as the result for ${many ? "those values" : "that value"}. To see the result for ${many ? "other values" : "another value"}, call compare_options. To change the record, call propose_change. The scientist owns ${many ? "these values" : "this value"}.`
       : "";
     const out = await this.execute(tool, eff, callId, signal, { applied: pre.applied ?? {} });
     const post = await this.hooks.post({ event: "PostToolUse", session: this.id, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args: eff, output: out.output, node: out.node });
