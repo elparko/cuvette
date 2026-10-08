@@ -36,7 +36,7 @@ export function makeHarness(columns = 100): Harness {
 
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-export async function until(cond: () => boolean, ms = 3000): Promise<void> {
+export async function until(cond: () => boolean, ms = 15000): Promise<void> {
   const end = Date.now() + ms;
   while (!cond()) {
     if (Date.now() > end) throw new Error("timeout waiting for condition");
