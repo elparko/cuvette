@@ -8,7 +8,8 @@ export type ImageProtocol = "iterm" | "kitty" | undefined;
 
 export function imageProtocol(env: Record<string, string | undefined> = process.env): ImageProtocol {
   if (env.KITTY_WINDOW_ID || env.TERM === "xterm-kitty") return "kitty";
-  if (env.TERM_PROGRAM === "iTerm.app") return "iterm";
+  if (env.TERM_PROGRAM === "ghostty" || env.TERM === "xterm-ghostty") return "kitty";
+  if (env.TERM_PROGRAM === "iTerm.app" || env.TERM_PROGRAM === "WezTerm") return "iterm";
   return undefined;
 }
 

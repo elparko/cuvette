@@ -256,6 +256,8 @@ describe("pieces", () => {
   test("image protocol follows the terminal", () => {
     expect(imageProtocol({ TERM_PROGRAM: "iTerm.app" })).toBe("iterm");
     expect(imageProtocol({ KITTY_WINDOW_ID: "3" })).toBe("kitty");
+    expect(imageProtocol({ TERM_PROGRAM: "ghostty", TERM: "xterm-ghostty" })).toBe("kitty");
+    expect(imageProtocol({ TERM_PROGRAM: "WezTerm" })).toBe("iterm");
     expect(imageProtocol({ TERM_PROGRAM: "Apple_Terminal" })).toBeUndefined();
     expect(inlineImage("/missing.png", "iterm")).toBeUndefined();
   });
