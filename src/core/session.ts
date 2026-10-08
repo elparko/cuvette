@@ -387,7 +387,7 @@ export class Session {
           this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
           continue;
         }
-        if (!calls.length && nudges < 3) {
+        if (!calls.length && nudges < 3 && !forceAnswer) {
           const tail = said.slice(-400);
           const promise = endsWithPromise(said) || announcesStep(said);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);

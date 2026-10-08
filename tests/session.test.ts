@@ -130,6 +130,14 @@ test("three identical calls in a row end in a forced final answer", async () => 
   expect(provider.requests.at(-1)!.tools.length).toBe(0);
 });
 
+test("after a forced final answer the harness does not ask for a tool call", async () => {
+  const same = { calls: [{ name: "note", args: { text: "x" } }] };
+  const provider = new FakeProvider([same, same, same, { text: "The count is 64. I will now give the final answer." }, { text: "other" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false, headless: true } });
+  expect(await session.send("go")).toBe("The count is 64. I will now give the final answer.");
+  expect(provider.requests.length).toBe(4);
+});
+
 test("propose_change asks the scientist, and an agreed change updates the record for later steps", async () => {
   const provider = new FakeProvider([
     { calls: [{ name: "count", args: { input: "/data/a.tif" } }] },

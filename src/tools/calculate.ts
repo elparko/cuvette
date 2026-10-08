@@ -156,7 +156,7 @@ export function calculateTool(): Tool {
   return {
     name: "calculate",
     description:
-      "Do arithmetic on numbers from tool results. Use it for every ratio, difference, percent change, mean or error that you report; do not do arithmetic in your answer. " +
+      "Do arithmetic on numbers from tool results. Use it for each ratio, difference, percent change, mean or error that you report and that no tool reported; do not do arithmetic in your answer. If a tool result already has the value, report that value and do not compute it again. mae, rmse and r2 take one pair of numbers for each sample or image, not the totals. " +
       "Write one expression per item, for example \"ratio(4696, 5007)\", \"pct_change(46, 50)\", \"mae([48,10],[50,10])\", \"r2([1,2,3],[1,2,4])\". " +
       "Operators: + - * / ^ and brackets. Lists: [1, 2, 3]. Functions: " + Object.keys(FUNCS).join(", ") + ".",
     inputSchema: {
