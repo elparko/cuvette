@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdtempSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 
@@ -10,7 +10,7 @@ const ROSSI = join(DIR, "data/rossi.csv");
 
 function call(fn: string, args: Record<string, unknown>): { ok: boolean; error?: string; metrics?: Record<string, number> } {
   const code = `import json, sys\nsys.path.insert(0, ${JSON.stringify(DIR)})\nimport ga_biostats as b\nprint(json.dumps(b.${fn}(**json.loads(sys.argv[1]))))`;
-  const out = execFileSync(PY, ["-c", code, JSON.stringify(args)], { encoding: "utf8", cwd: resolve("."), env: { ...process.env, PYTHONWARNINGS: "ignore" } });
+  const out = execFileSync(PY, ["-c", code, JSON.stringify(args)], { encoding: "utf8", cwd: mkdtempSync(join(tmpdir(), "biostats-")), env: { ...process.env, PYTHONWARNINGS: "ignore" } });
   return JSON.parse(out.trim().split("\n").at(-1)!);
 }
 
