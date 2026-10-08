@@ -52,7 +52,7 @@ describe("transcript", () => {
     await type(h, "y");
     await until(() => h.all().includes("Which AUC cutoff do you want?"));
     await type(h, "1");
-    await until(() => h.all().includes("14 features differ between endo and epi at AUC 0.7.") && h.all().includes("✗ Step 4") && /open with \/open 1/.test(h.all()));
+    await until(() => h.all().includes("14 features differ between endo and epi at AUC 0.7.") && h.all().includes("✗ Step 4") && /open with\s+\/open 1/.test(h.all()));
     const text = h.all();
     expect(text).toContain("● Step 1  Loaded 2 samples with 4812 spectra");
     expect(text).toContain("▸ File > Open > endo_epi.imzML · path endo_epi.imzML");
@@ -60,7 +60,7 @@ describe("transcript", () => {
     expect(text).toContain("⚠ Deviation: tolerance ppm 10 (setup says 5)");
     expect(text).toContain("● Step 3  Found 14 features different between endo and epi");
     expect(text).toContain("▸ Analyze > Discriminating features · group a endo");
-    expect(text).toMatch(/image: [\s\S]*\.png[\s\S]*\(open with \/open 1\)/);
+    expect(text).toMatch(/image: [\s\S]*\.png[\s\S]*\(open with\s+\/open 1\)/);
     expect(text).toContain("✗ Step 4  Folder is read-only");
     expect(text).toContain("◇ code only: no manual route");
     expect(text).toMatch(/\d+(\.\d)?k? in \/ \d+ out/);
