@@ -336,6 +336,15 @@ describe("ollama", () => {
     expect(r.message.parts).toEqual([{ type: "text", text: "ok" }]);
   });
 
+  test("complete streams the reply, so the 300 s wait for response headers does not apply", async () => {
+    const seen = stubOllama(() => ndjson([{ message: { content: "<think>x</think>Fin" } }, { message: { content: "dings." } }, { done: true }]));
+    const p = await makeProvider("ollama:x");
+    expect(await p.complete("S", "Q")).toBe("Findings.");
+    const chat = seen.find((s) => s.url.endsWith("/api/chat"))!.body;
+    expect(chat.stream).toBe(true);
+    expect(chat.options.num_predict).toBe(8192);
+  });
+
   test("converts a tool call written as JSON text", async () => {
     stubOllama(() => ndjson([{ message: { content: 'Sure.\n```json\n{"name": "add", "arguments": {"a": 2, "b": 3}}\n```' } }, { done: true }]));
     const p = await makeProvider("ollama:x");
