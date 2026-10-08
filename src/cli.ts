@@ -15,6 +15,7 @@ Usage
   ga adapter approve <name|dir> --by <name>
   ga onboard <program> --model <model> [--docs <url>] [--kind cli]
   ga models                            list the models
+  ga spend                             Claude spend by day and model (set GA_BUDGET_USD to stop at a limit)
   ga key [status|remove|workspace <id>] save, show or remove your Claude API key
   ga eln setup [--url <address>]       save your eLabFTW address and API key
   ga eln status|remove                 show or remove the saved eLabFTW key
@@ -220,6 +221,17 @@ async function main() {
         console.error((e as Error).message);
       }
       return s.close();
+    }
+    case "spend": {
+      const { readSpend, spendFile, budgetUsd } = await import("./core/spend.ts");
+      const rows = readSpend();
+      const by = new Map<string, number>();
+      for (const r of rows) by.set(`${r.t.slice(0, 10)} ${r.model}`, (by.get(`${r.t.slice(0, 10)} ${r.model}`) ?? 0) + (Number(r.usd) || 0));
+      for (const [k, v] of [...by].sort()) console.log(`${k.padEnd(36)} $${v.toFixed(2)}`);
+      const total = rows.reduce((s, r) => s + (Number(r.usd) || 0), 0);
+      const b = budgetUsd();
+      console.log(`Total: $${total.toFixed(2)} (list prices, from ${spendFile()})${b ? `. Budget: $${b.toFixed(2)} (GA_BUDGET_USD).` : ""}`);
+      return;
     }
     case "models": {
       const { listModels } = await import("./providers/index.ts");

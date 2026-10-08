@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
 import { ProviderError } from "../core/types.ts";
 import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
+import { budgetProblem, recordSpend } from "../core/spend.ts";
 import { ImageBudget } from "./images.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
@@ -140,6 +141,8 @@ export class ClaudeProvider implements Provider {
   }
 
   async step(req: StepRequest): Promise<StepResult> {
+    const over = budgetProblem();
+    if (over) throw new ProviderError(over);
     const base = this.params(req.system, req.messages, req.tools);
     const run = async (): Promise<any> => {
       const useFallback = this.fallbacks;
@@ -163,7 +166,9 @@ export class ClaudeProvider implements Provider {
     } catch (e) {
       throw mapError(e, this.model);
     }
-    return this.fromNative(msg);
+    const out = this.fromNative(msg);
+    if (!this.fixedClient) recordSpend(this.model, out.usage);
+    return out;
   }
 
   private fromNative(msg: any): StepResult {
@@ -208,7 +213,11 @@ export class ClaudeProvider implements Provider {
       output_config: { effort: this.effort },
     };
     try {
+      const over = budgetProblem();
+      if (over) throw new ProviderError(over);
       const msg = await this.client.messages.create(params, signal ? { signal } : undefined);
+      const u = msg.usage ?? {};
+      if (!this.fixedClient) recordSpend(this.model, { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0 });
       return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n");
     } catch (e) {
       throw mapError(e, this.model);

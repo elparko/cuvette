@@ -1,3 +1,5 @@
+import { costUsd } from "../core/spend.ts";
+import { DEFAULT_CLAUDE_MODEL } from "../providers/claude.ts";
 import type { ItemScore, ProcessMetrics } from "./papers-score.ts";
 import type { PapersResult, PaperRun } from "./papers.ts";
 
@@ -109,6 +111,17 @@ export function renderPapersReport(result: PapersResult): string {
   for (const m of result.models) {
     const x = sum.metrics[m];
     if (x) L.push(`| ${m} | ${METRIC_COLUMNS.map(([k]) => fixed(x[k] ?? 0, 0)).join(" | ")} |`);
+  }
+  const paid = result.models.filter((m) => m.startsWith("claude"));
+  if (paid.length) {
+    L.push("", "Estimated Claude cost from the token counts (list prices, before any discount):", "");
+    for (const m of paid) {
+      const x = sum.metrics[m];
+      if (!x) continue;
+      const model = m.includes(":") ? m.slice(m.indexOf(":") + 1) : DEFAULT_CLAUDE_MODEL;
+      const usd = costUsd(model, { inputTokens: x.inputTokens ?? 0, outputTokens: x.outputTokens ?? 0, cacheRead: x.cacheRead ?? 0, cacheWrite: x.cacheWrite ?? 0 });
+      L.push(`- ${m}: $${usd.toFixed(2)} for ${x.runs ?? 0} runs`);
+    }
   }
   L.push("", "## Details", "");
   for (const r of result.runs) {
