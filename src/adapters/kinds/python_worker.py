@@ -25,7 +25,7 @@ def new_handle(obj):
 
 def resolve(value):
     if isinstance(value, dict):
-        if set(value.keys()) == {"handle"} and isinstance(value["handle"], str):
+        if isinstance(value.get("handle"), str) and set(value.keys()) <= {"handle", "type", "repr"}:
             if value["handle"] not in handles:
                 raise KeyError("unknown handle %s (handles are lost when the worker restarts)" % value["handle"])
             return handles[value["handle"]]

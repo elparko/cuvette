@@ -83,7 +83,7 @@ describe("runChecks", () => {
     ];
     const out = await runChecks(ctx(makeRecord([], [], ["n2"]), "x", { claims }));
     expect(out.map((f) => [f.check, f.severity])).toEqual([
-      ["unsourced_numbers", "warning"],
+      ["unsourced_numbers", "error"],
       ["stale_used", "error"],
     ]);
   });

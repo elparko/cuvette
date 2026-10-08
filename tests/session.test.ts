@@ -25,6 +25,7 @@ test("a scientist-owned decision blocks, runs the sensitivity check, and resumes
     { text: "I will blur, then count.", calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
     { calls: [{ name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 10 } }] },
     { text: "There are 66 particles with the Triangle method (step 2). Also 999 cells." },
+    { text: "There are 66 particles with the Triangle method (step 2). Also 999 cells." },
   ]);
   session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
   session.bus.on((e) => {
@@ -48,6 +49,7 @@ test("a scientist-owned decision blocks, runs the sensitivity check, and resumes
   expect(session.decisions.value("method")).toBe("Triangle");
   expect(lastToolText(provider)).toMatch(/66/);
   expect(answer).toMatch(/999 \[no source\]/);
+  expect(session.record.entries(["notice"]).some((e) => /revises the answer/.test(String(e.data.text)))).toBe(true);
   const claim = session.record.entries(["claim_check"]).at(-1)!.data as { claims: { value: number; label: string; node?: string }[] };
   expect(claim.claims.find((c) => c.value === 66)?.label).toBe("measured");
 });

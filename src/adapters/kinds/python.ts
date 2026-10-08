@@ -5,7 +5,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { Args, OutputFile, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
-import { childEnv, collectOutputs, defTool, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, tail, type CallDir, type KindContext } from "./common.ts";
+import { expand, childEnv, collectOutputs, defTool, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, tail, type CallDir, type KindContext } from "./common.ts";
 import type { ToolDef } from "../manifest.ts";
 
 const WORKER = join(dirname(fileURLToPath(import.meta.url)), "python_worker.py");
@@ -52,7 +52,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   let ready: Promise<void> | undefined;
 
   const interpreter = (): string[] => {
-    const given = conn.interpreter.map((a) => a.replace(/\{(\w+)\}/g, (all, n: string) => c.ph[n] ?? all));
+    const given = conn.interpreter.map((a) => expand(a, c.ph));
     return given.length ? given : [process.platform === "win32" ? "python" : "python3"];
   };
 

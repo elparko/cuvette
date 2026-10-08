@@ -120,8 +120,8 @@ function unsourcedNumbers(ctx: ReviewContext): FindingIn[] {
   return [
     {
       check: "unsourced_numbers",
-      severity: "warning",
-      message: `${bad.length} number${bad.length === 1 ? "" : "s"} in the answer match no logged tool result: ${values}.`,
+      severity: "error",
+      message: `${bad.length} number${bad.length === 1 ? "" : "s"} in the answer match no logged tool result: ${values}. Run the tool that measures each number, or remove the number, or say how you derived it from logged results.`,
     },
   ];
 }
