@@ -4,7 +4,10 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
-import { describeLimits, runScriptTool } from "../src/tools/run_script.ts";
+import { describeLimits, runScriptTool, scriptPython } from "../src/tools/run_script.ts";
+import { setBlindPolicy } from "../src/adapters/blind.ts";
+import { blindPolicyFor } from "../src/bench/papers-blind.ts";
+import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
 
 const root = mkdtempSync(join(tmpdir(), "ga-script-"));
 let n = 0;
@@ -132,3 +135,25 @@ test.skipIf(!sandboxed)("macOS sandbox: blocks a socket connect unless network i
     server.close();
   }
 });
+
+const science = scriptPython();
+const hasScience = science.includes(join("envs", "science"));
+
+test.skipIf(!hasScience || !sandboxed)("the script environment has the statistics packages and works in blind mode", async () => {
+  const { run, dirs } = setup();
+  const paper = loadPaper(paperIds().find((id) => id.startsWith("kasurinen"))!);
+  setBlindPolicy(blindPolicyFor({ paper, runDir: join(dirs.workDir, ".."), scratch: join(root, "scratch"), home: join(homedir(), ".guided-analysis"), adapterRoots: [], programs: [] }));
+  try {
+    const r = await run([
+      "import numpy, pandas, scipy, statsmodels, lifelines",
+      "from lifelines import CoxPHFitter",
+      "df = pandas.DataFrame({'t': [5, 6, 6, 2, 4, 4, 8, 9], 'e': [1, 0, 1, 1, 1, 0, 0, 1], 'x': [0, 0, 1, 1, 0, 1, 0, 1]})",
+      "c = CoxPHFitter().fit(df, 't', 'e')",
+      "print('ok', lifelines.__version__, statsmodels.__version__, round(float(c.params_['x']), 3))",
+    ].join("\n"));
+    expect(r.ok, r.error).toBe(true);
+    expect(r.text).toMatch(/ok 0\.30\.3 0\.15\.0 /);
+  } finally {
+    setBlindPolicy(undefined);
+  }
+}, 120000);

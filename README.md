@@ -120,7 +120,8 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 pandoc). Every catalog adapter has status `draft`: approve each one with
 `node bin/ga.js adapter approve <name>` after you read it. The Python adapters use virtual
 environments in `~/.guided-analysis/envs/`; large programs and paper data are on the T7 drive
-(`/Volumes/T7/guided-analysis/`). See `docs/onboarding-queue.md`.
+(`/Volumes/T7/guided-analysis/`). See `docs/onboarding-queue.md`. The `run_script` tool uses
+`~/.guided-analysis/envs/science`. Its packages are in `src/tools/science-requirements.txt`.
 
 New program: `node bin/ga.js onboard <program> --model claude`. The agent finds the program,
 reads its help and docs, writes a draft adapter in `~/.guided-analysis/drafts/`, and runs the
