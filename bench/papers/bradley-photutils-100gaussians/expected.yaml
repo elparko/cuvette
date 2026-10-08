@@ -1,0 +1,27 @@
+tool: astropy and photutils
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/bradley-photutils-100gaussians/gaussians_noisy.fits
+decisions:
+  background_method: global
+  clip_sigma: 3
+  mask_sources: false
+  detect_nsigma: 3
+  min_pixels: 10
+  kernel_fwhm: 3
+  deblend: false
+  aperture_radius: 10
+  local_background: annulus
+  annulus_inner: 15
+  annulus_outer: 20
+expected:
+  - {description: "sky level (clipped median)", value: 5.152, tolerance: 0.01, source: "astropy sigma_clipped_stats direct call; the true value of the image is 5"}
+  - {description: "sky noise (clipped std)", value: 2.094, tolerance: 0.01, source: "astropy direct call; the true value is 2"}
+  - {description: "sources detected", value: 82, tolerance: 0, source: "photutils, confirmed by a scipy-only second method"}
+  - {description: "net flux at (48.70, 200.33)", value: 895.4, tolerance: 106, source: "injected flux; tolerance is 3 x sky noise in the aperture. Tool value 936.5"}
+  - {description: "net flux at (145.05, 168.52)", value: 734.1, tolerance: 106, source: "injected flux. Tool value 760.2"}
+  - {description: "net flux at (355.56, 252.20)", value: 873.9, tolerance: 106, source: "injected flux. Tool value 923.3"}
+notes: |
+  Trap: the sky level from the clipped median is 5.15, not the true 5, because sources stay in the sample. A pass accepts 5.0 to 5.2 only if the answer says whether sources were masked.
+  Trap: the count of 82 depends on the threshold, the minimum pixels, the smoothing and the background method. The answer must give them.
+  Trap: the aperture flux is an aperture flux. It loses the wings of the source. The three sources have sigma up to 2.5 pixels, so a radius of 10 loses almost nothing.

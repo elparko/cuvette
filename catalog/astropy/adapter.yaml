@@ -1,0 +1,693 @@
+adapter:
+  name: astropy
+  title: Astropy and photutils
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Reads a FITS image, measures the background, finds sources and measures aperture fluxes with
+    astropy and photutils. Each tool does one step on a FITS file. The scientist can repeat each
+    step with the code line in the map.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: astropy and photutils
+  version: "astropy 8.0.1, photutils 3.0.0, numpy 2.5.3, scipy 1.18.1"
+  tested_versions: ["8.0.1"]
+  homepage: https://www.astropy.org
+  docs:
+    - https://photutils.readthedocs.io/en/stable/user_guide/background.html
+    - https://photutils.readthedocs.io/en/stable/user_guide/segmentation.html
+    - https://photutils.readthedocs.io/en/stable/user_guide/aperture.html
+    - https://docs.astropy.org/en/stable/stats/robust.html
+    - https://docs.astropy.org/en/stable/wcs/index.html
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 600
+
+locate:
+  env: GA_ASTROPY_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/astropy/bin/python
+    - ~/.guided-analysis/envs/astropy/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import astropy; print(astropy.__version__)"]
+  version_pattern: '(\d+\.\d+\.\d+)'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, small tables and plot previews. It never sees the pixel values of the FITS file.
+
+decisions:
+  - key: clip_sigma
+    label: Sigma-clip level
+    kind: float
+    default: 3.0
+    lo: 1.0
+    hi: 10.0
+    group: Background
+    help: >
+      Pixels more than this many standard deviations from the median are dropped, and the
+      statistics are computed again, until nothing more is dropped. A low level also drops sky noise.
+      A high level keeps faint sources in the sky estimate.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: clip_statistics, arg: clip_sigma }
+      - { tool: estimate_background, arg: clip_sigma }
+      - { tool: detect_sources, arg: clip_sigma }
+      - { tool: measure_apertures, arg: clip_sigma }
+    sensitivity:
+      options: [2.0, 3.0, 5.0]
+      tool: clip_statistics
+      compare: [metrics.median, metrics.std, metrics.n_clipped]
+      max_runs: 3
+
+  - key: background_method
+    label: Background method
+    kind: choice
+    choices: [background2d, global]
+    default: background2d
+    group: Background
+    help: >
+      background2d fits a smooth map from the median in each box. Use it when the sky changes across
+      the image. global uses one clipped median and one standard deviation for the whole image.
+      Use it when the sky is flat.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: estimate_background, arg: method }
+    sensitivity:
+      options: [background2d, global]
+      tool: estimate_background
+      compare: [metrics.background_median, metrics.rms_median]
+      max_runs: 2
+
+  - key: box_size
+    label: Background box size (pixels)
+    kind: int
+    default: 50
+    lo: 8
+    hi: 2000
+    group: Background
+    help: >
+      Side of the square boxes for the background map. Make boxes larger than the largest source,
+      or the source raises the background. Small boxes follow the sky closely but are noisy.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: estimate_background, arg: box_size }
+    sensitivity:
+      options: [25, 50, 100]
+      tool: estimate_background
+      compare: [metrics.background_median, metrics.background_min, metrics.background_max, metrics.rms_median]
+      max_runs: 3
+
+  - key: background_estimator
+    label: Background estimator in each box
+    kind: choice
+    choices: [sextractor, median, mean, mmm]
+    default: sextractor
+    group: Background
+    help: >
+      The statistic that gives the sky level in each box after clipping. sextractor is the
+      SExtractor estimator (2.5 x median - 1.5 x mean, with a rule for crowded boxes). mmm is the
+      DAOPHOT mode estimator (3 x median - 2 x mean). median and mean are the plain statistics.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: estimate_background, arg: estimator }
+
+  - key: mask_sources
+    label: Mask bright sources before the background
+    kind: bool
+    default: false
+    group: Background
+    help: >
+      True runs a first detection (3 sigma, 5 connected pixels, grown by 11 pixels) and leaves those
+      pixels out of the background. Sources raise the sky level, so masking lowers it. In a crowded
+      field, masking removes many pixels.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: clip_statistics, arg: mask_sources }
+      - { tool: estimate_background, arg: mask_sources }
+    sensitivity:
+      options: [false, true]
+      tool: estimate_background
+      compare: [metrics.background_median, metrics.rms_median, metrics.n_masked]
+      max_runs: 2
+
+  - key: detect_nsigma
+    label: Detection threshold (sigma above background)
+    kind: float
+    default: 3.0
+    lo: 0.5
+    hi: 20.0
+    group: Detection
+    help: >
+      A pixel counts as source if the smoothed image is this many background standard deviations
+      above the background. A low value finds faint sources and more noise peaks. A high value misses faint sources.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_sources, arg: nsigma }
+    sensitivity:
+      options: [2.0, 3.0, 5.0]
+      tool: detect_sources
+      compare: [metrics.n_sources, metrics.n_source_pixels]
+      max_runs: 3
+
+  - key: min_pixels
+    label: Minimum connected pixels for a source
+    kind: int
+    default: 10
+    lo: 1
+    hi: 1000
+    group: Detection
+    help: >
+      A group of pixels above the threshold must have at least this many connected pixels. A small
+      value lets single noise spikes through. A large value drops small, faint sources.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_sources, arg: min_pixels }
+    sensitivity:
+      options: [5, 10, 20]
+      tool: detect_sources
+      compare: [metrics.n_sources]
+      max_runs: 3
+
+  - key: kernel_fwhm
+    label: Smoothing kernel width (FWHM, pixels)
+    kind: float
+    default: 3.0
+    lo: 0.0
+    hi: 20.0
+    group: Detection
+    help: >
+      The image is smoothed with a Gaussian of this full width at half maximum before the
+      threshold. Match it to the width of the sources. Smoothing raises the signal-to-noise of faint
+      point sources. 0 means no smoothing.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_sources, arg: kernel_fwhm }
+
+  - key: deblend
+    label: Split touching sources
+    kind: bool
+    default: false
+    group: Detection
+    help: >
+      True splits one connected group of pixels into several sources at local peaks. This changes
+      the source count in crowded fields. False keeps each connected group as one source.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_sources, arg: deblend }
+    sensitivity:
+      options: [false, true]
+      tool: detect_sources
+      compare: [metrics.n_sources]
+      max_runs: 2
+
+  - key: aperture_radius
+    label: Aperture radius (pixels)
+    kind: float
+    lo: 0.5
+    hi: 500.0
+    group: Photometry
+    help: >
+      Radius of the circle that is summed around each source. A small radius loses the flux in the
+      wings of the source. A large radius adds more sky noise and neighbors. For a Gaussian
+      source, a radius of 4 sigma holds 99.97 percent of the flux.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_apertures, arg: radius }
+
+  - key: local_background
+    label: Sky level for the aperture
+    kind: choice
+    choices: [annulus, none]
+    default: annulus
+    group: Photometry
+    help: >
+      annulus subtracts the clipped median of a ring around the source, times the aperture area.
+      none keeps the raw sum. Use none only if the image is already background-subtracted.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_apertures, arg: local_background }
+
+  - key: annulus_inner
+    label: Annulus inner radius (pixels)
+    kind: float
+    lo: 1.0
+    hi: 1000.0
+    group: Photometry
+    help: >
+      Inner edge of the sky ring. It must be larger than the aperture radius and outside the wings of the source.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_apertures, arg: annulus_inner }
+
+  - key: annulus_outer
+    label: Annulus outer radius (pixels)
+    kind: float
+    lo: 2.0
+    hi: 2000.0
+    group: Photometry
+    help: >
+      Outer edge of the sky ring. A wide ring gives a stable sky level. A ring that is too wide
+      reaches neighbor sources and the sky gradient.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_apertures, arg: annulus_outer }
+
+tools:
+  - name: inspect_fits
+    title: Inspect a FITS file
+    description: >
+      List the HDUs of a FITS file and read the shape, unit, world coordinate system (WCS) and the range of the pixel
+      values of one image HDU.
+    function: "ga_astropy:inspect_fits"
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the FITS file. }
+      hdu: { type: integer, minimum: 0, default: 0, description: Index of the HDU to read. }
+    required: [path]
+    outputs:
+      hdus: { kind: table, ext: csv, description: One row for each HDU. }
+
+  - name: clip_statistics
+    title: Sigma-clipped statistics
+    description: >
+      Compute the mean, median and standard deviation of all pixels after repeated sigma clipping.
+      Optionally leave out bright sources first.
+    function: "ga_astropy:clip_statistics"
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the FITS file. }
+      hdu: { type: integer, minimum: 0, default: 0, description: Index of the image HDU. }
+      clip_sigma: { type: number, minimum: 1, maximum: 10, default: 3.0, description: Clip level in standard deviations. }
+      clip_maxiters: { type: integer, minimum: 1, maximum: 100, default: 10, description: Maximum number of clipping passes. }
+      mask_sources: { type: boolean, default: false, description: Leave out detected sources before the statistics. }
+    required: [path]
+
+  - name: estimate_background
+    title: Estimate the background
+    description: >
+      Estimate the sky background and its noise. Writes the image with the background subtracted.
+      The file also holds the background map (BKG) and the noise map (RMS) as extensions. Pass that
+      file to detect_sources.
+    function: "ga_astropy:estimate_background"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the FITS file. }
+      hdu: { type: integer, minimum: 0, default: 0, description: Index of the image HDU. }
+      method: { type: string, enum: [background2d, global], default: background2d, description: background2d is a map from boxes. global is one value. }
+      clip_sigma: { type: number, minimum: 1, maximum: 10, default: 3.0, description: Clip level in standard deviations. }
+      clip_maxiters: { type: integer, minimum: 1, maximum: 100, default: 10, description: Maximum number of clipping passes. }
+      box_size: { type: integer, minimum: 8, maximum: 2000, default: 50, description: Side of a background box in pixels (background2d). }
+      filter_size: { type: integer, minimum: 1, maximum: 15, default: 3, description: "Side of the median filter over the box map, in boxes (background2d)." }
+      estimator: { type: string, enum: [sextractor, median, mean, mmm], default: sextractor, description: Statistic in each box (background2d). }
+      mask_sources: { type: boolean, default: false, description: Leave out detected sources before the estimate. }
+    required: [path]
+    outputs:
+      subtracted: { kind: file, ext: fits, description: "Image minus background. Extensions BKG and RMS." }
+      plot: { kind: image, ext: png, description: "Image, background map and noise map." }
+
+  - name: detect_sources
+    title: Detect sources
+    description: >
+      Smooth the image, find groups of connected pixels above a threshold, and list the sources
+      with their centroids and fluxes. If the file has an RMS extension, the threshold uses it.
+      Otherwise the tool uses a global clipped median and standard deviation.
+    function: "ga_astropy:detect_sources"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of a FITS file. Use the file from estimate_background. }
+      hdu: { type: integer, minimum: 0, default: 0, description: Index of the image HDU. }
+      nsigma: { type: number, minimum: 0.5, maximum: 20, default: 3.0, description: Threshold in background standard deviations. }
+      min_pixels: { type: integer, minimum: 1, maximum: 1000, default: 10, description: Minimum connected pixels for a source. }
+      kernel_fwhm: { type: number, minimum: 0, maximum: 20, default: 3.0, description: FWHM of the smoothing kernel in pixels. 0 is no smoothing. }
+      deblend: { type: boolean, default: false, description: Split touching sources. }
+      clip_sigma: { type: number, minimum: 1, maximum: 10, default: 3.0, description: Clip level for the global noise estimate. }
+      clip_maxiters: { type: integer, minimum: 1, maximum: 100, default: 10, description: Maximum number of clipping passes. }
+    required: [path]
+    outputs:
+      sources: { kind: table, ext: csv, description: "label, x_centroid, y_centroid (0-based pixels), area, max_value, segment_flux." }
+      plot: { kind: image, ext: png, description: The image with the source outlines. }
+
+  - name: measure_apertures
+    title: Aperture photometry
+    description: >
+      Sum the pixels in a circle around each position. Subtract the sky from a ring if asked.
+      Positions come from a CSV file or from x and y lists. Pixel positions are 0-based.
+    function: "ga_astropy:measure_apertures"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the FITS file. }
+      hdu: { type: integer, minimum: 0, default: 0, description: Index of the image HDU. }
+      radius: { type: number, minimum: 0.5, maximum: 500, description: Aperture radius in pixels. }
+      positions_csv: { type: string, description: "CSV file with the pixel positions, for example sources.csv from detect_sources." }
+      x_column: { type: string, default: x_centroid, description: Column of x positions in the CSV file. }
+      y_column: { type: string, default: y_centroid, description: Column of y positions in the CSV file. }
+      x: { type: array, items: { type: number }, description: x positions in pixels. Use with y if there is no CSV file. }
+      y: { type: array, items: { type: number }, description: y positions in pixels. }
+      local_background: { type: string, enum: [annulus, none], default: annulus, description: annulus subtracts the sky from a ring. none keeps the raw sum. }
+      annulus_inner: { type: number, minimum: 1, maximum: 1000, description: Inner radius of the ring in pixels. }
+      annulus_outer: { type: number, minimum: 2, maximum: 2000, description: Outer radius of the ring in pixels. }
+      clip_sigma: { type: number, minimum: 1, maximum: 10, default: 3.0, description: Clip level for the ring statistics. }
+      clip_maxiters: { type: integer, minimum: 1, maximum: 100, default: 10, description: Maximum number of clipping passes. }
+    required: [path, radius]
+    outputs:
+      photometry: { kind: table, ext: csv, description: "id, x, y, aperture_sum, background_per_pixel, net_flux, and ra_deg, dec_deg if the file has a WCS." }
+      plot: { kind: image, ext: png, description: The image with the apertures and rings. }
+
+  - name: pixel_to_sky
+    title: Pixel to sky coordinates
+    description: Convert pixel positions (0-based) to right ascension and declination in degrees with the WCS of the file.
+    function: "ga_astropy:pixel_to_sky"
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the FITS file. }
+      hdu: { type: integer, minimum: 0, default: 0, description: Index of the image HDU. }
+      x: { type: array, items: { type: number }, description: x positions in pixels. }
+      y: { type: array, items: { type: number }, description: y positions in pixels. }
+    required: [path, x, y]
+    outputs:
+      sky: { kind: table, ext: csv, description: Pixel and sky positions. }
+
+map:
+  - tool: inspect_fits
+    route: |
+      from astropy.io import fits
+      fits.info(path)
+      fits.getheader(path, hdu)
+    params:
+      - { arg: path, label: path }
+      - { arg: hdu, label: ext, ui_default: 0 }
+    fidelity: close
+    difference: The tool also counts non-finite pixels and reports the range and the WCS pixel scale.
+    evidence: { source: docs, test: header-and-wcs }
+
+  - tool: clip_statistics
+    route: |
+      from astropy.stats import sigma_clipped_stats
+      mean, median, std = sigma_clipped_stats(data, sigma=3.0, maxiters=10)
+    params:
+      - { arg: clip_sigma, label: sigma, ui_default: 3.0 }
+      - { arg: clip_maxiters, label: maxiters, ui_default: 5, note: "astropy uses 5 by default. The tool uses 10, as Background2D does." }
+      - { arg: mask_sources, label: mask, ui_default: false }
+    fidelity: exact
+    evidence: { source: docs, test: clip-stats-noisy, note: "A direct call of sigma_clipped_stats with maxiters=10 gives mean 5.19947, median 5.15240, std 2.09372, the same as the tool." }
+
+  - tool: estimate_background
+    match: { method: global }
+    route: |
+      mean, median, std = sigma_clipped_stats(data, sigma=3.0, maxiters=10)
+      subtracted = data - median
+    params:
+      - { arg: clip_sigma, label: sigma, ui_default: 3.0 }
+    fidelity: exact
+    evidence: { source: docs, test: background-global-detect, note: "The median 5.15240 and std 2.09372 equal a direct sigma_clipped_stats call." }
+
+  - tool: estimate_background
+    match: { method: background2d }
+    route: |
+      from photutils.background import Background2D, SExtractorBackground
+      bkg = Background2D(data, (50, 50), filter_size=(3, 3), sigma_clip=SigmaClip(sigma=3.0, maxiters=10),
+                         bkg_estimator=SExtractorBackground(), mask=mask)
+      subtracted = data - bkg.background
+    params:
+      - { arg: box_size, label: box_size, ui_default: 50, note: "Background2D has no default. The photutils tutorial uses (50, 50)." }
+      - { arg: filter_size, label: filter_size, ui_default: 3 }
+      - { arg: estimator, label: bkg_estimator, ui_default: sextractor }
+      - { arg: clip_sigma, label: sigma_clip, ui_default: 3.0 }
+      - { arg: mask_sources, label: mask, ui_default: false }
+    fidelity: close
+    difference: >
+      A direct Background2D call with the same settings gives the same median background (5.0933) and
+      noise (2.1023) without a mask. With mask_sources the mask comes from the tool's own first
+      detection (3 sigma, 5 pixels, grown by 11 pixels). A mask that you build gives other numbers.
+    evidence: { source: docs, test: background2d-masked }
+
+  - tool: detect_sources
+    route: |
+      from photutils.segmentation import SourceFinder, SourceCatalog, make_2dgaussian_kernel
+      convolved = convolve(data, make_2dgaussian_kernel(3.0, size=5))
+      segm = SourceFinder(n_pixels=10, deblend=False)(convolved, 3.0 * rms)
+      cat = SourceCatalog(data, segm, convolved_data=convolved)
+    params:
+      - { arg: nsigma, label: threshold = nsigma * rms, ui_default: 3.0, note: "photutils detect_threshold uses nsigma=3." }
+      - { arg: min_pixels, label: n_pixels, ui_default: 10, note: "The photutils tutorial uses 10." }
+      - { arg: kernel_fwhm, label: make_2dgaussian_kernel fwhm, ui_default: 3.0 }
+      - { arg: deblend, label: deblend, ui_default: false }
+    fidelity: close
+    difference: >
+      The tool sizes the smoothing kernel as 2 x round(2 x FWHM) + 1 pixels. The tutorial uses 5 pixels
+      for FWHM 3. A second method that uses only scipy (Gaussian filter, label) gives the same count
+      of 82 on the global background.
+    evidence: { source: docs, test: background-global-detect }
+
+  - tool: measure_apertures
+    route: |
+      from photutils.aperture import CircularAperture, CircularAnnulus, ApertureStats, aperture_photometry
+      aper = CircularAperture(positions, r=10)
+      raw = aperture_photometry(data, aper)["aperture_sum"]
+      sky = ApertureStats(data, CircularAnnulus(positions, r_in=15, r_out=20), sigma_clip=SigmaClip(3.0)).median
+      net = raw - sky * aper.area
+    params:
+      - { arg: radius, label: r, note: "No default. The photutils tutorial uses 3 to 5 pixels." }
+      - { arg: annulus_inner, label: r_in, note: "The photutils tutorial uses 6." }
+      - { arg: annulus_outer, label: r_out, note: "The photutils tutorial uses 8." }
+      - { arg: clip_sigma, label: sigma_clip, ui_default: 3.0 }
+    fidelity: exact
+    evidence: { source: docs, test: aperture-noiseless-annulus, note: "On the noise-free image the net flux equals the injected flux to 0.02 percent, and the raw sum equals flux + 5 x area. A direct aperture_photometry call gives the same sums." }
+
+  - tool: pixel_to_sky
+    route: |
+      from astropy.wcs import WCS
+      WCS(header).pixel_to_world(x, y)
+    params:
+      - { arg: x, label: x, note: "0-based. FITS header CRPIX is 1-based." }
+      - { arg: y, label: y }
+    fidelity: exact
+    evidence: { source: docs, test: header-and-wcs, note: "The reference pixel (CRPIX 250, 150, 1-based) gives CRVAL (150, 2) exactly." }
+
+checks:
+  - id: sources_not_masked
+    severity: warning
+    description: The background was estimated with bright sources inside it.
+    text: >
+      If the answer reports a background level or a noise level from an image that holds sources, it must say
+      whether bright sources were masked (mask_sources). Sources raise the sigma-clipped median. On the
+      photutils 100-source test image the unmasked median is 5.15 and the masked median is 5.03 for a
+      true value of 5. Flag the answer if it does not say.
+  - id: threshold_not_reported
+    severity: warning
+    description: A source count is given with no threshold.
+    text: >
+      If the answer gives a number of sources, it must give the threshold in sigma, the minimum number of
+      connected pixels, the smoothing width, whether sources were split, and how the background was
+      estimated. The count changes with each of these. Flag the answer if one is missing.
+  - id: aperture_settings_not_reported
+    severity: warning
+    description: A flux is given with no aperture radius or sky ring.
+    text: >
+      If the answer gives an aperture flux, it must give the radius, the sky method and the ring radii in pixels, and
+      the unit of the image. Flag the answer if it calls the flux a total flux of the source without saying that
+      the aperture loses the wings of the source.
+  - id: annulus_missing
+    severity: warning
+    description: An aperture was measured with no sky ring.
+    rule:
+      tool: measure_apertures
+      arg: annulus_inner
+      op: missing
+      message: Set annulus_inner and annulus_outer, or set local_background to none for an image that is already background-subtracted.
+
+tests:
+  - id: header-and-wcs
+    description: >
+      By construction. The test image has 300 x 500 pixels, BUNIT ct and a TAN WCS with 1 arcsec pixels.
+      FITS CRPIX is 1-based, so 0-based pixel (249, 149) is the reference pixel and must map to
+      CRVAL = (150, 2) degrees.
+    data: [data/gaussians_noisy.fits]
+    calls:
+      - tool: inspect_fits
+        args: { path: "{adapter_dir}/data/gaussians_noisy.fits" }
+        save_as: info
+      - tool: pixel_to_sky
+        args: { path: "{adapter_dir}/data/gaussians_noisy.fits", x: [249.0], y: [149.0] }
+    expect:
+      - { path: metrics.ra_deg, approx: 150.0, abs: 1.0e-9 }
+      - { path: metrics.dec_deg, approx: 2.0, abs: 1.0e-9 }
+      - { path: saved.info.metrics.n_rows, equals: 300 }
+      - { path: saved.info.metrics.n_columns, equals: 500 }
+      - { path: saved.info.metrics.has_wcs, equals: 1 }
+      - { path: saved.info.metrics.pixel_scale_arcsec, approx: 1.0, abs: 1.0e-6 }
+      - { path: saved.info.data.data.bunit, equals: ct }
+
+  - id: clip-stats-noisy
+    description: >
+      The photutils example image is a constant background of 5 plus Gaussian noise of standard deviation 2
+      (seed 0) plus 100 Gaussian sources. A direct astropy sigma_clipped_stats call (sigma 3, maxiters 10)
+      gives mean 5.19947, median 5.15240, std 2.09372. The sources raise the median by 0.15 above the true 5.
+    data: [data/gaussians_noisy.fits]
+    calls:
+      - tool: clip_statistics
+        args: { path: "{adapter_dir}/data/gaussians_noisy.fits" }
+    expect:
+      - { path: metrics.median, approx: 5.15240, abs: 0.00005 }
+      - { path: metrics.mean, approx: 5.19947, abs: 0.00005 }
+      - { path: metrics.std, approx: 2.09372, abs: 0.00005 }
+      - { path: metrics.median, min: 5.1 }
+
+  - id: clip-stats-masked-truth
+    description: >
+      With the sources masked, the clipped median must return to the true background of 5 (within 0.05) and
+      the standard deviation to the true noise of 2 (within 0.05). The clipped standard deviation of Gaussian noise at 3 sigma
+      reads 1.5 percent low, which is inside this limit.
+    data: [data/gaussians_noisy.fits]
+    calls:
+      - tool: clip_statistics
+        args: { path: "{adapter_dir}/data/gaussians_noisy.fits", mask_sources: true }
+    expect:
+      - { path: metrics.median, approx: 5.0, abs: 0.05 }
+      - { path: metrics.std, approx: 2.0, abs: 0.05 }
+
+  - id: background2d-masked
+    description: >
+      Background2D with 50 pixel boxes and the sources masked. The true background is 5 and the true noise is 2.
+      Without the mask the median is 5.093 (direct Background2D call), 0.09 too high.
+    data: [data/gaussians_noisy.fits]
+    calls:
+      - tool: estimate_background
+        args: { path: "{adapter_dir}/data/gaussians_noisy.fits", mask_sources: true }
+        save_as: masked
+      - tool: estimate_background
+        args: { path: "{adapter_dir}/data/gaussians_noisy.fits", mask_sources: false }
+    expect:
+      - { path: metrics.background_median, approx: 5.0933, abs: 0.0005 }
+      - { path: metrics.rms_median, approx: 2.1023, abs: 0.0005 }
+      - { path: saved.masked.metrics.background_median, approx: 5.0, abs: 0.05 }
+      - { path: saved.masked.metrics.rms_median, approx: 2.0, abs: 0.05 }
+
+  - id: background-global-detect
+    description: >
+      Global background, then detection at 3 sigma, 10 pixels, smoothing FWHM 3. A second method with
+      scipy only (Gaussian filter, label, same threshold) finds 82 sources. Every one of the 82 lies within 6 pixels
+      of a different injected source (checked outside the adapter).
+    data: [data/gaussians_noisy.fits]
+    calls:
+      - tool: estimate_background
+        args: { path: "{adapter_dir}/data/gaussians_noisy.fits", method: global }
+        save_as: bkg
+      - tool: detect_sources
+        args: { path: "{saved.bkg.data.outputs[0].path}" }
+    expect:
+      - { path: saved.bkg.metrics.background_median, approx: 5.15240, abs: 0.00005 }
+      - { path: saved.bkg.metrics.rms_median, approx: 2.09372, abs: 0.00005 }
+      - { path: metrics.n_sources, equals: 82 }
+      - { path: metrics.threshold_median, approx: 6.28117, abs: 0.0005 }
+
+  - id: aperture-noiseless-annulus
+    description: >
+      By construction. In the noise-free image each source has a known injected flux (isolated_truth.csv) on a
+      constant background of 5. A radius of 10 pixels holds more than 4 sigma of each source. The ring
+      15 to 20 pixels gives a sky of exactly 5. The net flux must equal the injected flux within 0.05 percent (the
+      difference is the pixel sampling of the model).
+    data: [data/gaussians_noiseless.fits, data/isolated_truth.csv]
+    calls:
+      - tool: measure_apertures
+        args:
+          path: "{adapter_dir}/data/gaussians_noiseless.fits"
+          positions_csv: "{adapter_dir}/data/isolated_truth.csv"
+          x_column: x_mean
+          y_column: y_mean
+          radius: 10
+          annulus_inner: 15
+          annulus_outer: 20
+    expect:
+      - { path: metrics.n_sources, equals: 5 }
+      - { path: metrics.median_background_per_pixel, approx: 5.0, abs: 0.001 }
+      - { path: "table.rows[0][5]", approx: 873.857, rel: 0.0005 }
+      - { path: "table.rows[1][5]", approx: 895.411, rel: 0.0005 }
+      - { path: "table.rows[2][5]", approx: 609.475, rel: 0.0005 }
+      - { path: "table.rows[3][5]", approx: 734.053, rel: 0.0005 }
+      - { path: "table.rows[4][5]", approx: 765.725, rel: 0.0005 }
+
+  - id: aperture-noiseless-raw
+    description: >
+      By construction. With no sky subtraction the raw sum is the injected flux plus 5 x the aperture area.
+      The area of a circle of radius 10 is 314.159 pixels, so source 47 sums to 734.053 + 1570.796 = 2304.849.
+    data: [data/gaussians_noiseless.fits, data/isolated_truth.csv]
+    calls:
+      - tool: measure_apertures
+        args:
+          path: "{adapter_dir}/data/gaussians_noiseless.fits"
+          positions_csv: "{adapter_dir}/data/isolated_truth.csv"
+          x_column: x_mean
+          y_column: y_mean
+          radius: 10
+          local_background: none
+    expect:
+      - { path: metrics.aperture_area, approx: 314.159, abs: 0.001 }
+      - { path: "table.rows[3][3]", approx: 2304.849, rel: 0.0005 }
+
+  - id: aperture-noisy-within-noise
+    description: >
+      In the noisy image the sky noise in the aperture is 2 x sqrt(314.16) = 35.4 counts. Each net flux must
+      be within 3 times that, 106 counts, of the injected flux. The ring 15 to 20 pixels.
+    data: [data/gaussians_noisy.fits, data/isolated_truth.csv]
+    calls:
+      - tool: measure_apertures
+        args:
+          path: "{adapter_dir}/data/gaussians_noisy.fits"
+          positions_csv: "{adapter_dir}/data/isolated_truth.csv"
+          x_column: x_mean
+          y_column: y_mean
+          radius: 10
+          annulus_inner: 15
+          annulus_outer: 20
+    expect:
+      - { path: "table.rows[0][5]", approx: 873.857, abs: 106 }
+      - { path: "table.rows[1][5]", approx: 895.411, abs: 106 }
+      - { path: "table.rows[2][5]", approx: 609.475, abs: 106 }
+      - { path: "table.rows[3][5]", approx: 734.053, abs: 106 }
+      - { path: "table.rows[4][5]", approx: 765.725, abs: 106 }
+      - { path: metrics.median_background_per_pixel, approx: 5.0, abs: 0.2 }
+
+  - id: detect-then-measure
+    description: >
+      Two tools in order. Background2D with masking, detection at 3 sigma, then aperture photometry at the
+      detected centroids. The count is the value of the run, so this test proves that the tools are stable.
+    data: [data/gaussians_noisy.fits]
+    calls:
+      - tool: estimate_background
+        args: { path: "{adapter_dir}/data/gaussians_noisy.fits", mask_sources: true }
+        save_as: bkg
+      - tool: detect_sources
+        args: { path: "{saved.bkg.data.outputs[0].path}" }
+        save_as: det
+      - tool: measure_apertures
+        args: { path: "{saved.bkg.data.outputs[0].path}", positions_csv: "{saved.det.data.outputs[0].path}", radius: 8, local_background: none }
+    expect:
+      - { path: saved.det.metrics.n_sources, min: 80 }
+      - { path: saved.det.metrics.n_sources, max: 90 }
+      - { path: metrics.n_sources, min: 80 }
