@@ -13,7 +13,7 @@ items:
   - {key: mapped_reads, description: "Mapped reads", value: 3271, exact: true}
   - {key: properly_paired, description: "Properly paired reads", value: 3144, exact: true}
   - {key: singletons, description: "Singletons", value: 127, exact: true, in_answer: false}
-  - {key: reads_seq1, description: "Reads mapped to seq1", value: 1482, exact: true, in_answer: false}
-  - {key: reads_seq2, description: "Reads mapped to seq2", value: 1789, exact: true, in_answer: false}
-  - {key: mapq_ge_30, description: "Reads with MAPQ 30 or more", value: 3210, exact: true, in_answer: false}
+  - {key: reads_seq1, description: "Reads mapped to seq1", value: 1482, exact: true, in_answer: false, reference: true}
+  - {key: reads_seq2, description: "Reads mapped to seq2", value: 1789, exact: true, in_answer: false, reference: true}
+  - {key: mapq_ge_30, description: "Reads with MAPQ 30 or more", value: 3210, exact: true, in_answer: false, reference: true}
   - {key: reads_seq2_100_200, description: "Reads in seq2:100-200", value: 79, exact: true}
