@@ -240,7 +240,7 @@ function checkObject(path: string, schema: Record<string, unknown>, args: Args):
   const out: Args = {};
   const prefix = path ? `${path}.` : "";
   for (const key of Object.keys(args)) {
-    if (!(key in props) && schema.additionalProperties === false) return { args, error: `unknown argument ${prefix}${key}` };
+    if (!(key in props) && schema.additionalProperties === false) return { args, error: `unknown argument ${prefix}${key}. The arguments of this tool are: ${Object.keys(props).join(", ")}. Leave out the others.` };
   }
   for (const [key, sub] of Object.entries(props)) {
     let v = args[key];
