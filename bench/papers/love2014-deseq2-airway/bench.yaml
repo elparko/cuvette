@@ -1,8 +1,9 @@
 adapters: [deseq2]
 prompt: |
-  Does dexamethasone change gene expression in human airway smooth muscle cells, and in which genes? The samples come from four donors, each with a treated and an untreated culture. The count table is {data}/love2014-deseq2-airway/airway_counts.csv and the sample table is {data}/love2014-deseq2-airway/airway_coldata.csv (columns cell and dex). Tell me how many genes pass the filter, how many genes are significant, how many go up and how many go down, and give a table of the top 20 genes with fold change and significance. Write every number in the answer text.
+  Does dexamethasone change gene expression in human airway smooth muscle cells, and in which genes? The samples come from four donors, each with a treated and an untreated culture. We quantified the reads with Salmon and summarized them to GENCODE genes with tximeta. The tximeta object is saved as {data}/love2014-deseq2-airway/airway_gse.rds (sample columns cell and dex). I also exported it as two tables, {data}/love2014-deseq2-airway/gse_counts.csv (estimated counts) and {data}/love2014-deseq2-airway/gse_length.csv (average transcript lengths), with the sample table {data}/love2014-deseq2-airway/gse_coldata.csv. Tell me how many genes pass the filter, how many genes are significant, how many go up and how many go down, and give a table of the top 20 genes with fold change and significance. Write every number in the answer text.
 answers:
   question: "Does dexamethasone change gene expression in human airway smooth muscle cells, and in which genes?"
+  input_type: SummarizedExperiment rds
   replicate: "donors or animals (several libraries for each one)"
   design: "~ cell + dex"
   variable: dex
@@ -15,25 +16,29 @@ answers:
   exclusions: none
 allow: all
 timeout_s: 1800
-data: [love2014-deseq2-airway/airway_counts.csv, love2014-deseq2-airway/airway_coldata.csv]
+data: [love2014-deseq2-airway/airway_gse.rds, love2014-deseq2-airway/gse_counts.csv, love2014-deseq2-airway/gse_length.csv, love2014-deseq2-airway/gse_coldata.csv]
 items:
-  # Source of the values: the rnaseqGene 1.36.0 workflow code (Bioconductor 3.23), run with
-  # DESeq2 1.52.0 and R 4.6.1 on airway_counts.csv: DESeqDataSetFromMatrix(design = ~ cell + dex,
-  # dex reference untrt), keep <- rowSums(counts(dds) >= 10) >= 4, DESeq(dds), results(dds) and
-  # results(dds, alpha = 0.05). Script: check_workflow.R, output: check_workflow.out.
-  # The workflow text prints 16637, 4381 (2362 up, 2019 down) and 3602. Those numbers are for
-  # data(gse) of the airway package (Salmon and tximeta, GENCODE v29, 58294 genes, with average
-  # transcript length offsets). airway_counts.csv is data(airway) (Ensembl GRCh37.75 read counts,
-  # 63677 genes), so the same code gives the values below. The same code on data(gse) gives the
-  # printed workflow numbers exactly.
-  # Tolerance: about 2% of each count, for numerical changes between DESeq2 releases. A different
-  # filter (16596 genes with 3 samples, 15690 with 5), the design ~ dex (3447 genes) or pydeseq2
-  # 0.5.4 (4647 genes, 2481 up, 2166 down) falls outside it.
-  - {key: genes_after_filter, description: "Genes after pre-filter, workflow code on this CSV", value: 16139, tolerance: 100}
-  - {key: padj_01_workflow, description: "Genes with padj < 0.1, workflow code on this CSV", value: 4905, tolerance: 100}
-  - {key: up_padj_01, description: "Up-regulated genes at padj < 0.1, workflow code on this CSV", value: 2607, tolerance: 60}
-  - {key: down_padj_01, description: "Down-regulated genes at padj < 0.1, workflow code on this CSV", value: 2298, tolerance: 60}
-  - {key: padj_005_workflow, description: "Genes with padj < 0.05, workflow code on this CSV", value: 4081, tolerance: 100, in_answer: false}
-  # pydeseq2 0.5.4 on this CSV, same filter and design. A recheck on 2026-10-08 gave 4647 and 3879.
-  - {key: padj_01_pydeseq2, description: "Genes with padj < 0.1 on this CSV, pydeseq2 0.5.4", value: 4643, tolerance: 100, in_answer: false, optional: true}
-  - {key: padj_005_pydeseq2, description: "Genes with padj < 0.05 on this CSV, pydeseq2 0.5.4", value: 3872, tolerance: 100, in_answer: false, optional: true}
+  # Source of the values: the rnaseqGene workflow vignette 1.36.0 (Bioconductor 3.23, DESeq2 1.52.0,
+  # airway 1.32.0). It runs on data(gse): Salmon, tximeta, GENCODE v29, 58294 genes, with average
+  # transcript length offsets. The vignette prints 16637 genes after the filter, 4381 at padj < 0.1
+  # (2362 up, 2019 down) and 3602 with alpha 0.05. check_workflow.R gives the same numbers with
+  # DESeq2 1.52.0 on R 4.6.1. The adapter gives them exactly on airway_gse.rds and on the CSV pair
+  # (export_gse.R).
+  # Tolerance: a correct run gives the exact value. Numbers that the tolerance rejects (same data):
+  # filter with 3 samples 17213 genes, 4406 at padj < 0.1 (2391 up, 2015 down); filter with 5
+  # samples 16081, 4364 (2337 up, 2027 down); no length offsets 4877 (2681 up, 2196 down) and 4108
+  # at alpha 0.05; design ~ dex 3076. The down count is close for the filter variants, so its
+  # tolerance is 3.
+  - {key: genes_after_filter, description: "Genes after pre-filter, rnaseqGene workflow on data(gse)", value: 16637, tolerance: 10}
+  - {key: padj_01_workflow, description: "Genes with padj < 0.1, rnaseqGene workflow on data(gse)", value: 4381, tolerance: 10}
+  - {key: up_padj_01, description: "Up-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)", value: 2362, tolerance: 10}
+  - {key: down_padj_01, description: "Down-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)", value: 2019, tolerance: 3}
+  - {key: padj_005_workflow, description: "Genes with padj < 0.05 (alpha 0.05), rnaseqGene workflow on data(gse)", value: 3602, tolerance: 10, in_answer: false}
+  # Reference items. They do not count. Same experiment, read counts on Ensembl 75 genes:
+  # data(airway) (airway_counts.csv, 63677 genes), the same workflow code with DESeq2 1.52.0.
+  - {key: csv_genes_after_filter, description: "Same experiment, read counts on Ensembl 75 genes: genes after pre-filter", value: 16139, tolerance: 10, in_answer: false, reference: true}
+  - {key: csv_padj_01, description: "Same experiment, read counts on Ensembl 75 genes: genes with padj < 0.1", value: 4905, tolerance: 10, in_answer: false, reference: true}
+  - {key: csv_up_padj_01, description: "Same experiment, read counts on Ensembl 75 genes: up at padj < 0.1", value: 2607, tolerance: 10, in_answer: false, reference: true}
+  - {key: csv_down_padj_01, description: "Same experiment, read counts on Ensembl 75 genes: down at padj < 0.1", value: 2298, tolerance: 10, in_answer: false, reference: true}
+  - {key: csv_padj_005, description: "Same experiment, read counts on Ensembl 75 genes: genes with padj < 0.05 (alpha 0.05)", value: 4081, tolerance: 10, in_answer: false, reference: true}
+  - {key: csv_padj_01_pydeseq2, description: "Same experiment, read counts on Ensembl 75 genes: genes with padj < 0.1, pydeseq2 0.5.4", value: 4643, tolerance: 10, in_answer: false, reference: true, optional: true}

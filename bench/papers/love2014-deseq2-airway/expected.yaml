@@ -1,9 +1,12 @@
 tool: DESeq2 (R) or pydeseq2 (Python)
 adapter_kind: script
 data:
-  - /Volumes/T7/guided-analysis/data/love2014-deseq2-airway/airway_counts.csv
-  - /Volumes/T7/guided-analysis/data/love2014-deseq2-airway/airway_coldata.csv
+  - /Volumes/T7/guided-analysis/data/love2014-deseq2-airway/airway_gse.rds
+  - /Volumes/T7/guided-analysis/data/love2014-deseq2-airway/gse_counts.csv
+  - /Volumes/T7/guided-analysis/data/love2014-deseq2-airway/gse_length.csv
+  - /Volumes/T7/guided-analysis/data/love2014-deseq2-airway/gse_coldata.csv
 decisions:
+  input_type: "SummarizedExperiment rds (or counts and lengths); transcript length offsets used"
   design: "~ cell + dex"
   reference_level: untrt
   replication_unit: "cell line (4 pairs)"
@@ -12,20 +15,27 @@ decisions:
   fold_change_cutoff: "none (lfcThreshold 1 as optional stricter test)"
   exclusions: none
 expected:
-  - {description: "genes after pre-filter, workflow code on this CSV", value: 16139, tolerance: 100, source: "rnaseqGene 1.36.0 code, DESeq2 1.52.0, check_workflow.R"}
-  - {description: "genes with padj < 0.1, workflow code on this CSV", value: 4905, tolerance: 100, source: "rnaseqGene 1.36.0 code, DESeq2 1.52.0, check_workflow.R"}
-  - {description: "up-regulated at padj < 0.1, workflow code on this CSV", value: 2607, tolerance: 60, source: "check_workflow.R, summary(res)"}
-  - {description: "down-regulated at padj < 0.1, workflow code on this CSV", value: 2298, tolerance: 60, source: "check_workflow.R, summary(res)"}
-  - {description: "genes with padj < 0.05, workflow code on this CSV", value: 4081, tolerance: 100, source: "check_workflow.R, results(alpha=0.05)"}
-  - {description: "genes with padj < 0.1 on this CSV, pydeseq2 0.5.4", value: 4643, tolerance: 100, source: "computed"}
-  - {description: "genes with padj < 0.05 on this CSV, pydeseq2 0.5.4", value: 3872, tolerance: 100, source: "computed"}
+  - {description: "genes after pre-filter, rnaseqGene workflow on data(gse)", value: 16637, tolerance: 10, source: "rnaseqGene 1.36.0 vignette output; check_workflow.R, DESeq2 1.52.0"}
+  - {description: "genes with padj < 0.1, rnaseqGene workflow on data(gse)", value: 4381, tolerance: 10, source: "rnaseqGene 1.36.0 vignette output, summary(res); check_workflow.R"}
+  - {description: "up-regulated at padj < 0.1, rnaseqGene workflow on data(gse)", value: 2362, tolerance: 10, source: "rnaseqGene 1.36.0 vignette output, summary(res); check_workflow.R"}
+  - {description: "down-regulated at padj < 0.1, rnaseqGene workflow on data(gse)", value: 2019, tolerance: 3, source: "rnaseqGene 1.36.0 vignette output, summary(res); check_workflow.R"}
+  - {description: "genes with padj < 0.05 (alpha 0.05), rnaseqGene workflow on data(gse)", value: 3602, tolerance: 10, source: "rnaseqGene 1.36.0 vignette output, results(dds, alpha = 0.05); check_workflow.R"}
+  - {description: "reference: same experiment, read counts on Ensembl 75 genes, genes after pre-filter", value: 16139, tolerance: 10, source: "check_workflow.R on data(airway)"}
+  - {description: "reference: same experiment, read counts on Ensembl 75 genes, padj < 0.1", value: 4905, tolerance: 10, source: "check_workflow.R on data(airway)"}
+  - {description: "reference: same experiment, read counts on Ensembl 75 genes, up at padj < 0.1", value: 2607, tolerance: 10, source: "check_workflow.R on data(airway)"}
+  - {description: "reference: same experiment, read counts on Ensembl 75 genes, down at padj < 0.1", value: 2298, tolerance: 10, source: "check_workflow.R on data(airway)"}
+  - {description: "reference: same experiment, read counts on Ensembl 75 genes, padj < 0.05", value: 4081, tolerance: 10, source: "check_workflow.R on data(airway)"}
+  - {description: "reference: same experiment, read counts on Ensembl 75 genes, padj < 0.1, pydeseq2 0.5.4", value: 4643, tolerance: 10, source: "computed"}
 notes: |
-  The workflow text prints 16637, 4381 (2362 up, 2019 down) and 3602. Those numbers are for data(gse)
-  of the airway package: Salmon and tximeta, GENCODE v29, 58294 genes, with average transcript length
-  offsets. This CSV is data(airway): Ensembl GRCh37.75 read counts, 63677 genes. The same workflow code
-  with DESeq2 1.52.0 gives 16139, 4905 (2607 up, 2298 down) and 4081 on this CSV, and gives the printed
-  workflow numbers exactly on data(gse). See check_workflow.R and check_workflow.out.
-  The DESeq2 2014 paper does not report airway counts. Numbers come from the rnaseqGene workflow code.
-  Trap: leaving out the cell term in the design changes the result (3447 genes at padj < 0.1). The scientist owns this choice.
-  Trap: pydeseq2 needs samples as rows, so transpose the CSV. pydeseq2 0.5.4 gives about 260 fewer genes than R DESeq2 on this CSV; the cause is not known.
+  The expected values are the numbers that the rnaseqGene workflow vignette 1.36.0 prints. The
+  vignette runs on data(gse) of the airway package 1.32.0: Salmon quantification summarized to
+  GENCODE v29 genes by tximeta, 58294 genes, with average transcript lengths that DESeq2 uses as
+  offsets. export_gse.R writes data(gse) as airway_gse.rds and as the CSV pair gse_counts.csv and
+  gse_length.csv. The deseq2 adapter gives the vignette numbers exactly on both.
+  The reference values are data(airway) (airway_counts.csv): read counts from summarizeOverlaps on
+  Ensembl GRCh37.75 genes, 63677 genes, no length offsets. They do not count.
+  Trap: rounding the estimated counts of gse_counts.csv into a count matrix drops the length offsets
+  and gives 4877 genes at padj < 0.1. The adapter refuses counts with decimals in the count matrix path.
+  Trap: leaving out the cell term in the design changes the result (3076 genes at padj < 0.1). The scientist owns this choice.
+  The DESeq2 2014 paper does not report airway counts. Numbers come from the rnaseqGene workflow.
   I did not verify the gene symbol of the top Ensembl id.

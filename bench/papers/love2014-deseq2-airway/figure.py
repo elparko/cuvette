@@ -263,9 +263,9 @@ def draw_left(fig, spec, ctx):
     pyd = ctx.item("padj < 0.1.*pydeseq2|padj.*0\\.1.*pydeseq2")
     lines = [f"Significant here: {int(sig.sum()):,}"]
     if exp_n and exp_n["expected"]:
-        lines.append(f"Workflow: {fmt(exp_n['expected'])}")
+        lines.append(f"Workflow (data(gse)): {fmt(exp_n['expected'])}")
     if pyd and pyd["expected"]:
-        lines.append(f"pydeseq2 on this CSV: {fmt(pyd['expected'])}")
+        lines.append(f"pydeseq2 on the Ensembl 75 CSV: {fmt(pyd['expected'])}")
     ax.text(0.02, 0.03, "\n".join(lines), transform=ax.transAxes, fontsize=9.5, va="bottom", bbox=dict(boxstyle="round", fc="white", ec=GREY))
     ax.spines[["top", "right"]].set_visible(False)
 
