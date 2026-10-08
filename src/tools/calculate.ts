@@ -37,6 +37,7 @@ const FUNCS: Record<string, (...a: Val[]) => Val> = {
   rmse: (p, t) => Math.sqrt(pairs(p, t).reduce((s, [x, y]) => s + (x - y) ** 2, 0) / pairs(p, t).length),
   r2: (x, y) => {
     const pr = pairs(x, y);
+    if (pr.length < 2) throw new Error("r2 needs at least two pairs of numbers, one pair for each sample or image");
     const mx = pr.reduce((s, [a]) => s + a, 0) / pr.length;
     const my = pr.reduce((s, [, b]) => s + b, 0) / pr.length;
     let sxy = 0, sxx = 0, syy = 0;
@@ -45,6 +46,7 @@ const FUNCS: Record<string, (...a: Val[]) => Val> = {
       sxx += (a - mx) ** 2;
       syy += (b - my) ** 2;
     }
+    if (!sxx || !syy) throw new Error("r2 is not defined when all numbers in one list are equal");
     return (sxy * sxy) / (sxx * syy);
   },
 };

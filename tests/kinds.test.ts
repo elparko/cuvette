@@ -53,7 +53,7 @@ test("schema check: type, enum, range, pattern, defaults, unknown keys", () => {
   expect(validateArgs(schema, { a: 1.5 }).error).toMatch(/integer/);
   expect(validateArgs(schema, { a: 1, m: "z" }).error).toMatch(/one of/);
   expect(validateArgs(schema, { a: 1, p: "A1" }).error).toMatch(/pattern/);
-  expect(validateArgs(schema, { a: 1, q: 1 }).error).toMatch(/unknown argument q/);
+  expect(validateArgs(schema, { a: 1, q: 1 }).error).toMatch(/unknown argument q\. The arguments of this tool are: a/);
 });
 
 test("parsers: csv, table preview, key-value", () => {

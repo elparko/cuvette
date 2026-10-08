@@ -1,7 +1,7 @@
 adapter:
   name: phylo
   title: MAFFT and IQ-TREE
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Aligns DNA or protein sequences with MAFFT and builds maximum-likelihood trees with IQ-TREE.
@@ -167,7 +167,7 @@ tools:
       the input sequences. Use the alignment path in later steps.
     params:
       path: { type: string, minLength: 1, description: Absolute path of the FASTA file with unaligned sequences. }
-      algorithm: { type: string, enum: [auto, linsi, ginsi, einsi, fftns2], description: MAFFT method. }
+      algorithm: { type: string, enum: [auto, linsi, ginsi, einsi, fftns2], default: auto, description: MAFFT method. }
     required: [path]
     outputs:
       aln: { kind: file, ext: .fasta, description: The aligned sequences in FASTA format. }

@@ -1,7 +1,7 @@
 adapter:
   name: biostats
   title: Biostatistics (statsmodels, pingouin, lifelines)
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Runs classical tests, ANOVA, regression, mixed models and survival analysis on a CSV file.

@@ -55,3 +55,4 @@ items:
     description: Target PSMs at 5 percent PSM FDR
     value: 242
     exact: true
+    from_comparison: true

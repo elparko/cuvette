@@ -20,6 +20,8 @@ test("rejects unsafe or broken input", () => {
   expect(() => evaluate("process.exit(1)")).toThrow();
   expect(() => evaluate("foo(1)")).toThrow(/unknown function foo/);
   expect(() => evaluate("mae([1,2],[1])")).toThrow(/same length/);
+  expect(() => evaluate("r2([4706], [5007])")).toThrow(/at least two pairs/);
+  expect(() => evaluate("r2([1,1,1], [1,2,3])")).toThrow(/all numbers in one list are equal/);
   expect(() => evaluate("2 +")).toThrow();
   expect(() => evaluate("mean([1,2]) ; 3")).toThrow();
 });

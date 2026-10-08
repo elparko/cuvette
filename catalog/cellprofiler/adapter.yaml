@@ -1,7 +1,7 @@
 adapter:
   name: cellprofiler
   title: CellProfiler
-  version: 0.1.1
+  version: 0.1.2
   spec: "1"
   description: >
     Counts and measures nuclei in microscope images with CellProfiler. The adapter writes a

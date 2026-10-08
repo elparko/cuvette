@@ -15,6 +15,13 @@ The benchmark picks the logged number nearest to the expected value. The report 
 
 An item with `in_answer: false` has a computed score only. The request does not ask the model to state that value.
 
+### Item flags
+
+- `in_answer: false` — computed score only.
+- `from_comparison: true` — the computed score also reads the comparison runs. Use it for a value that exists only in a comparison run, such as the count for a database that the setup does not choose.
+- `tool: <name>` — the computed score reads only the nodes of that tool. Use it when another tool logs a number that is near the expected value by chance.
+- `reference: true` — the item shows a value that the request does not ask for, a trap value (the result of a wrong method), or a value from another method, such as a published number of a different program. The report shows "match" or "differs". The item is not in the pass counts.
+
 ### Matching rules
 
 - Tolerance is absolute. `exact: true` means the number must be equal.

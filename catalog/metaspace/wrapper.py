@@ -168,6 +168,9 @@ def list_databases():
 
 def _results(ds, database, fdr):
     df = _retry(lambda: ds.results(database=_database(database), fdr=fdr))
+    if "offSample" not in df.columns or "msm" not in df.columns:
+        names = ", ".join("%s %s" % (d.name, d.version) for d in ds.database_details) or "none"
+        raise ValueError("No results for the database %s in this dataset. The dataset was processed with: %s. Use one of these." % (database, names))
     return df
 
 

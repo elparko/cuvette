@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { Session } from "../src/core/session.ts";
+import { Session, announcesStep, endsWithPromise } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
 let session: Session | undefined;
@@ -175,6 +175,7 @@ test("compare_options reruns the last step with other values as comparison runs 
   expect(session.decisions.value("method")).toBe("Default");
   expect(session.record.entries(["deviation"])).toHaveLength(0);
   expect(results.at(-1)!.text).toMatch(/The record still says "Default"/);
+  expect(results.at(-1)!.text).toMatch(/of the last step, count \(.*input=\/data\/a\.tif.*\)\. Only that step was repeated/);
 });
 
 test("a step that uses the output of a comparison run is also a comparison run", async () => {
@@ -262,4 +263,36 @@ test("an answer that still ends with a promise after three nudges is marked unfi
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   await session.send("Count");
   expect(session.findings.list().some((f) => f.check === "answer_unfinished")).toBe(true);
+});
+
+test("a promise survives a file name with a dot and verbs such as analyze", () => {
+  expect(endsWithPromise("Done with the trajectory.\n\nNext, I will analyze the closed structure (1AKE.pdb) to see how different it is from chain A.")).toBe(true);
+  expect(endsWithPromise("The RMSD is 6.8 A. We need to run the filter next.")).toBe(true);
+  expect(endsWithPromise("The RMSD is 6.8 A. The structures differ by 7.1 A.")).toBe(false);
+});
+
+test("an answer that says it needs to run a tool is an announced step", () => {
+  expect(announcesStep("3. To keep the variants, we need to run the `filter_variants` tool. This will give the count.")).toBe(true);
+  expect(announcesStep("The count is 328. We checked the filter.")).toBe(false);
+});
+
+test("a result shows the text and the main files before the long list of pictures", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "x" }]), cwd: tmpdir(), settings: { guidance: false } });
+  const tool = session.allTools().find((t) => t.name === "count")!;
+  const outputs = [...Array.from({ length: 40 }, (_, i) => ({ name: `p${i}.png`, kind: "image" as const, path: `/w/p${i}.png` })), { name: "data.txt", kind: "file" as const, path: "/w/data.txt" }];
+  const out = (session as any).render(tool, { ok: true, summary: "s", metrics: { n: 1 }, text: "data_file=/w/data.txt", outputs });
+  const parsed = JSON.parse(out.text);
+  expect(Object.keys(parsed).slice(0, 4)).toEqual(["ok", "summary", "metrics", "text"]);
+  expect(parsed.outputs[0].name).toBe("data.txt");
+  expect(parsed.outputs.length + parsed.outputs_omitted).toBe(41);
+});
+
+test("a result that used the recorded value says so to the model", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", min_size: 99 } }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count");
+  const results = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "tool_result") as { text: string }[];
+  expect(results[0]!.text).toMatch(/min_size.* = 5 \(you gave 99\)\. This result is for the recorded value, not for the value you gave\./);
+  expect(results[0]!.text).toMatch(/call compare_options/);
 });

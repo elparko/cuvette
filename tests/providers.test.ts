@@ -273,6 +273,7 @@ describe("ollama", () => {
     const chat = seen.find((s) => s.url.endsWith("/api/chat"))!.body;
     expect(chat.stream).toBe(true);
     expect(chat.options.num_ctx).toBe(32768);
+    expect(chat.options.num_predict).toBe(8192);
     expect(chat.think).toBe(false);
     expect(chat.messages[0]).toEqual({ role: "system", content: "SYS" });
     expect(chat.tools[0]).toEqual({ type: "function", function: { name: "add", description: "Add two numbers", parameters: tools[0].inputSchema } });
@@ -333,6 +334,15 @@ describe("ollama", () => {
     expect(chats[0].body.think).toBe(false);
     expect("think" in chats[1].body).toBe(false);
     expect(r.message.parts).toEqual([{ type: "text", text: "ok" }]);
+  });
+
+  test("complete streams the reply, so the 300 s wait for response headers does not apply", async () => {
+    const seen = stubOllama(() => ndjson([{ message: { content: "<think>x</think>Fin" } }, { message: { content: "dings." } }, { done: true }]));
+    const p = await makeProvider("ollama:x");
+    expect(await p.complete("S", "Q")).toBe("Findings.");
+    const chat = seen.find((s) => s.url.endsWith("/api/chat"))!.body;
+    expect(chat.stream).toBe(true);
+    expect(chat.options.num_predict).toBe(8192);
   });
 
   test("converts a tool call written as JSON text", async () => {

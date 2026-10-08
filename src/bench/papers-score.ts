@@ -30,6 +30,7 @@ export interface ItemScore {
   tolerance: number | "exact";
   abs: boolean;
   inAnswer: boolean;
+  reference: boolean;
   computed: ComputedMatch;
   reported: ReportedMatch;
 }
@@ -72,10 +73,13 @@ export function finalClaims(record: Pick<AnalysisRecord, "entries">): { entry: E
 }
 
 export function scoreComputed(item: PaperItem, record: Pick<AnalysisRecord, "numbers" | "nodes" | "node">): ComputedMatch {
-  const comparison = new Set(record.nodes().filter((n) => n.sensitivityOf).map((n) => n.id));
+  const nodes = record.nodes();
+  const comparison = new Set(nodes.filter((n) => n.sensitivityOf).map((n) => n.id));
+  const wrongTool = new Set(nodes.filter((n) => item.tool && n.tool !== item.tool).map((n) => n.id));
   let main: { n: { node: string; path: string; value: number }; d: number } | undefined;
   let comp: typeof main;
   for (const n of record.numbers()) {
+    if (wrongTool.has(n.node)) continue;
     const d = gap(item, n.value);
     if (comparison.has(n.node)) {
       if (!comp || d < comp.d) comp = { n, d };
@@ -113,6 +117,7 @@ export function scoreReported(item: PaperItem, found: { entry: Entry; claims: Cl
   for (const c of found.claims) {
     if (c.label !== "measured" || c.value === null) continue;
     for (const r of reportedSteps(c)) {
+      if (Number.isInteger(r.value) && Math.abs(r.value) <= 10 && !Number.isInteger(item.value)) continue;
       const d = gap(item, r.value);
       let via: ReportedMatch["via"] = within(item, d) ? "tolerance" : null;
       if (!via && !item.exact && r.step > 0 && r.value !== 0 && r.step <= Math.abs(item.value) / 10) {
@@ -136,6 +141,7 @@ export function scoreItems(items: PaperItem[], record: Pick<AnalysisRecord, "num
     tolerance: tolerance(item),
     abs: item.abs,
     inAnswer: item.in_answer,
+    reference: item.reference,
     computed: scoreComputed(item, record),
     reported: scoreReported(item, claims),
   }));
@@ -191,6 +197,7 @@ export function rescoreItems(items: PaperItem[], record: AnalysisRecord): ItemSc
     tolerance: tolerance(item),
     abs: item.abs,
     inAnswer: item.in_answer,
+    reference: item.reference,
     computed: scoreComputed(item, record),
     reported: scoreReported(item, found),
   }));

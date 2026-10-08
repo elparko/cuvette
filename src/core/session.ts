@@ -102,9 +102,18 @@ function abortable<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
   });
 }
 
+const ACTION = "use|call|run|compute|count|measure|perform|fit|check|merge|filter|align|infer|analy[sz]e|calculate|load|inspect|compare|plot|apply|test|examine|determine|fetch|read";
+
 export function endsWithPromise(text: string): boolean {
+  const last = text.trim().slice(-400).split(/(?<=[.!?:])\s+/).at(-1) ?? "";
+  const intent = /\b(I will|I'll|we will|we'll|Let me|Let's|(?:Next|Now),? (?:I|we)|I am going to|I'm going to|we are going to|we're going to)\b/i;
+  const need = new RegExp(`\\b(?:I|we) (?:need|have|must) to (?:${ACTION})\\b|\\bthe next step is to\\b`, "i");
+  return intent.test(last) || need.test(last);
+}
+
+export function announcesStep(text: string): boolean {
   const tail = text.trim().slice(-400);
-  return /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I need to|I have to|the next step is to)\s+(use|call|run|compute|count|measure|perform|fit|check|merge|filter|align|infer)\b[^.?!]*[.:]?\s*$/i.test(tail);
+  return new RegExp(`\\b(?:I will|I'll|we will|we'll) (?:now )?(?:${ACTION})\\b|\\b(?:I|we) (?:need|have|must) to (?:${ACTION})\\b|\\bthe next step is to\\b`, "i").test(tail);
 }
 
 export class Session {
@@ -361,7 +370,7 @@ export class Session {
         }
         if (!calls.length && nudges < 3) {
           const tail = said.slice(-400);
-          const promise = /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I will|I'll) (now )?(use|call|run|compute|count|measure|perform|fit|check)\b/i.test(tail) || /\b(I need to|I have to|I must|the next step is to|next, I need to)\s+(use|call|run|compute|count|measure|perform|fit|check|merge|filter|align|infer)\b/i.test(tail);
+          const promise = endsWithPromise(said) || announcesStep(said);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
           const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
@@ -605,8 +614,9 @@ export class Session {
     }
     if (pre.decision === "instruct") return this.followStep(tool, eff, callId, signal, pre.applied ?? {});
     const kept = (pre.deviations ?? []).filter((d) => d.overwritten);
+    const many = kept.length > 1;
     const keptNote = kept.length
-      ? `The harness used the recorded decision${kept.length > 1 ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.requested)})`).join("; ")}. The scientist owns ${kept.length > 1 ? "these values" : "this value"}. To change it, call propose_change. To check other values without a change, call compare_options.`
+      ? `The harness used the recorded decision${many ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.requested)})`).join("; ")}. This result is for the recorded ${many ? "values" : "value"}, not for the ${many ? "values" : "value"} you gave. Do not report it as the result for ${many ? "those values" : "that value"}. To see the result for ${many ? "other values" : "another value"}, call compare_options. To change the record, call propose_change. The scientist owns ${many ? "these values" : "this value"}.`
       : "";
     const out = await this.execute(tool, eff, callId, signal, { applied: pre.applied ?? {} });
     const post = await this.hooks.post({ event: "PostToolUse", session: this.id, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args: eff, output: out.output, node: out.node });
@@ -720,10 +730,15 @@ export class Session {
     if (o.summary) obj.summary = o.summary;
     if (vis !== "none") {
       if (o.metrics && Object.keys(o.metrics).length) obj.metrics = o.metrics;
-      if (o.outputs?.length) obj.outputs = o.outputs.map((f) => ({ name: f.name, kind: f.kind, path: f.path }));
-      if (o.table) obj.table = vis === "summaries" ? { columns: o.table.columns, n_rows: o.table.n_rows, path: o.table.path } : { ...o.table, rows: o.table.rows.slice(0, small ? 5 : 12) };
-      if (vis === "all" && o.data !== undefined) obj.data = o.data;
       if (vis === "all" && o.text) obj.text = o.text;
+      if (o.table) obj.table = vis === "summaries" ? { columns: o.table.columns, n_rows: o.table.n_rows, path: o.table.path } : { ...o.table, rows: o.table.rows.slice(0, small ? 5 : 12) };
+      if (o.outputs?.length) {
+        const cap = small ? 12 : 30;
+        const files = [...o.outputs.filter((f) => f.kind !== "image"), ...o.outputs.filter((f) => f.kind === "image")];
+        obj.outputs = files.slice(0, cap).map((f) => ({ name: f.name, kind: f.kind, path: f.path }));
+        if (files.length > cap) obj.outputs_omitted = files.length - cap;
+      }
+      if (vis === "all" && o.data !== undefined) obj.data = o.data;
     }
     if (o.manualRoute && !small) obj.manual_route = o.manualRoute;
     let text = JSON.stringify(obj, null, small ? 0 : 1);
@@ -899,7 +914,8 @@ export class Session {
     }
     const plan = { ...d, sensitivity: { options: values, tool: last.tool, args: {}, compare: d.sensitivity?.compare ?? [], max_runs: values.length } };
     const res = await runSensitivity(plan, last.tool, structuredClone(last.args), link.arg, async (_t, a, meta) => this.execute(target, a, `cmp${++this.callCount}`, signal, { sensitivityOf: meta.sensitivityOf }), this.record);
-    const summary = `Compared ${values.length} values of ${d.label} as comparison runs. The record still says ${JSON.stringify(this.decisions.value(d.key))}.`;
+    const ran = Object.entries(last.args).filter(([k, v]) => k !== link.arg && (typeof v === "number" || typeof v === "boolean" || (typeof v === "string" && v.length <= 60))).map(([k, v]) => `${k}=${v}`);
+    const summary = `Compared ${values.length} values of ${d.label} as comparison runs of the last step, ${last.tool}${ran.length ? ` (${ran.join(", ")})` : ""}. Only that step was repeated. To compare another step, run it again first. The record still says ${JSON.stringify(this.decisions.value(d.key))}.`;
     return {
       ok: true,
       summary,

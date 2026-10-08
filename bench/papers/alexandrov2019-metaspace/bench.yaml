@@ -17,7 +17,7 @@ data:
   - alexandrov2019-metaspace/2022-08-16_12h31m33s_HMDB_fdr10.csv
 items:
   - {key: d1_lipidmaps_fdr10, description: "Dataset 10h14m23s, LipidMaps annotations at FDR 10%.", value: 414, exact: true}
-  - {key: d1_hmdb_fdr10, description: "Dataset 10h14m23s, HMDB annotations at FDR 10%.", value: 263, exact: true}
+  - {key: d1_hmdb_fdr10, description: "Dataset 10h14m23s, HMDB annotations at FDR 10%.", value: 263, exact: true, from_comparison: true}
   - {key: d2_lipidmaps_fdr10, description: "Dataset 12h31m33s, LipidMaps annotations at FDR 10%.", value: 191, exact: true}
-  - {key: d2_hmdb_fdr10, description: "Dataset 12h31m33s, HMDB annotations at FDR 10%.", value: 123, exact: true}
+  - {key: d2_hmdb_fdr10, description: "Dataset 12h31m33s, HMDB annotations at FDR 10%.", value: 123, exact: true, from_comparison: true}
   - {key: d1_lipidmaps_fdr5, description: "Dataset 10h14m23s, LipidMaps annotations at FDR 5%.", value: 144, exact: true, in_answer: false}

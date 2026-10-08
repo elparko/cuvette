@@ -75,6 +75,23 @@ test("trap items are left out of the score", () => {
   expect(scored.map((x) => x.key)).toEqual(["q"]);
 });
 
+test("an item with from_comparison counts comparison runs", () => {
+  const main = node({ count: 40 });
+  const cmp = node({ count: 66 }, { sensitivityOf: main.id });
+  const [s] = scoreItems([item({ key: "count", value: 66, exact: true, from_comparison: true })], record);
+  expect(s.computed).toMatchObject({ pass: true, node: cmp.id });
+});
+
+test("an item with tool only looks at the nodes of that tool", () => {
+  node({ r2: 0.7333 }, { tool: "rule_of_five" });
+  const [a] = scoreItems([item({ key: "r2", value: 0.752, tolerance: 0.03, tool: "fit_solubility_model" })], record);
+  expect(a.computed.pass).toBe(false);
+  expect(a.computed.value).toBeNull();
+  node({ r2: 0.75 }, { tool: "fit_solubility_model" });
+  const [b] = scoreItems([item({ key: "r2", value: 0.752, tolerance: 0.03, tool: "fit_solubility_model" })], record);
+  expect(b.computed.pass).toBe(true);
+});
+
 test("reported passes when the answer states a measured value in tolerance", () => {
   node({ mean: 1.58 });
   answer("The mean difference is 1.58 hours.");
@@ -103,6 +120,17 @@ test("a rounded reported number equal to the rounded expected value passes", () 
   answer("The two-sided p-value is 0.0028.");
   const [s] = scoreItems([item({ key: "p", value: 0.002833, tolerance: 0.00001 })], record);
   expect(s.reported).toMatchObject({ pass: true, via: "rounding" });
+});
+
+test("a small whole number does not count for an item that is not a whole number", () => {
+  node({ rmse: 1.1, allowed: 1 });
+  answer("One violation is allowed, 1 in all. The RMSE is 1.1.");
+  const [low] = scoreItems([item({ key: "rmse", value: 1.04, tolerance: 0.1 })], record);
+  expect(low.reported).toMatchObject({ pass: true, value: 1.1 });
+  node({ allowed: 1 });
+  answer("Only 1 violation is allowed.");
+  const [s] = scoreItems([item({ key: "rmse", value: 1.1, tolerance: 0.1 })], record);
+  expect(s.reported.pass).toBe(false);
 });
 
 test("a wrong rounded number fails", () => {
