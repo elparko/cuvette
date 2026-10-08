@@ -1,7 +1,7 @@
 adapter:
   name: metaspace
   title: METASPACE public annotations
-  version: 0.1.0
+  version: 0.1.4
   spec: "1"
   description: Searches public METASPACE datasets, reads their metadata, lists annotations at an FDR level and database, counts annotations at FDR 5, 10 and 20 percent, and saves one ion image as a PNG file. Read only. No upload and no private data.
   authors: [onboarding agent]
@@ -45,6 +45,7 @@ decisions:
     help: An annotation is kept if its false discovery rate is at or below this value. METASPACE offers 5, 10, 20 and 50 percent. The website shows 10 percent first. The count changes a lot between levels.
     links:
       - { tool: list_annotations, arg: fdr }
+      - { tool: overlap_annotations, arg: fdr }
     sensitivity:
       options: [0.05, 0.1, 0.2]
       tool: list_annotations
@@ -52,30 +53,25 @@ decisions:
       max_runs: 3
 
   - key: database
-    label: Molecular database
+    label: Molecular database and version
     kind: choice
-    choices: [HMDB, LipidMaps, SwissLipids, ChEBI, LIPID_MAPS]
-    default: HMDB
+    choices: ["HMDB v4", "LipidMaps 2017-12-12", "SwissLipids 2018-02-02", "HMDB v2.5", "ChEBI 2018-01", "LIPID_MAPS 2016"]
+    default: "HMDB v4"
     owner: human
     group: Annotation
     stage: when_needed
     essential: true
-    help: The engine scores only the molecular formulas that are in this database. A lipid database gives a different count than HMDB. Use list_databases to see the others.
+    changes_conclusion: true
+    help: The engine scores only the molecular formulas that are in this database. Write the name and the version, such as LipidMaps 2017-12-12. The dataset must have been processed with it. Use get_dataset_info for the databases of a dataset and list_databases for all of them.
     links:
       - { tool: list_annotations, arg: database }
       - { tool: compare_fdr_counts, arg: database }
-
-  - key: database_version
-    label: Molecular database version
-    kind: text
-    default: v4
-    owner: human
-    group: Annotation
-    stage: when_needed
-    help: The version of the database, such as v4 for HMDB or 2017-12-12 for LipidMaps. The dataset must have been processed with this version. Use get_dataset_info to see the versions of a dataset.
-    links:
-      - { tool: list_annotations, arg: database_version }
-      - { tool: compare_fdr_counts, arg: database_version }
+      - { tool: overlap_annotations, arg: database }
+    sensitivity:
+      options: ["HMDB v4", "LipidMaps 2017-12-12"]
+      tool: compare_fdr_counts
+      compare: [metrics.n_fdr_10]
+      max_runs: 2
 
   - key: adducts
     label: Adduct to count
@@ -101,6 +97,7 @@ decisions:
     links:
       - { tool: list_annotations, arg: exclude_off_sample }
       - { tool: compare_fdr_counts, arg: exclude_off_sample }
+      - { tool: overlap_annotations, arg: exclude_off_sample }
 
 tools:
   - name: search_datasets
@@ -110,6 +107,7 @@ tools:
     function: "wrapper:search_datasets"
     params:
       name: { type: string, description: Part of the dataset name. }
+      dataset_id: { type: string, description: "One dataset id, or several ids joined with |, such as 2022-08-16_10h14m23s." }
       organism: { type: string, description: "Organism as METASPACE writes it, such as Mouse or Human." }
       polarity: { type: string, enum: [Positive, Negative] }
       submitter: { type: string, description: Part of the name of the submitter. The tool checks only the newest 1500 datasets that fit the other filters. Add group or organism to narrow the search. }
@@ -139,28 +137,36 @@ tools:
     description: List the annotations of one dataset at a maximum FDR for one database. Each row has formula, adduct, m/z, MSM, FDR, the off-sample flag and molecule names. The full list is saved as a CSV file. An annotation is a putative sum formula, not an identification.
     read_only: true
     function: "wrapper:list_annotations"
-    outputs:
-      annotations: { kind: table, ext: csv, description: All annotation rows. }
     params:
       dataset_id: { type: string }
-      database: { type: string, description: "Database name, such as HMDB or LipidMaps.", default: HMDB }
-      database_version: { type: string, description: "Database version, such as v4 or 2017-12-12.", default: v4 }
-      fdr: { type: number, enum: [0.05, 0.1, 0.2, 0.5], default: 0.1 }
-      exclude_off_sample: { type: boolean, default: false }
+      database: { type: string, description: "Database name and version, such as HMDB v4 or LipidMaps 2017-12-12." }
+      fdr: { type: number, enum: [0.05, 0.1, 0.2, 0.5] }
+      exclude_off_sample: { type: boolean, default: false, description: "Leave this out unless the scientist decided to remove off-sample annotations. The result already shows the number of off-sample annotations." }
       adduct: { type: string, description: "An adduct such as +H, or all.", default: all }
     required: [dataset_id]
 
   - name: compare_fdr_counts
     title: Compare annotation counts at FDR 5, 10 and 20 percent
-    description: Count the annotations of one dataset and one database at FDR 5, 10 and 20 percent. Also count the off-sample annotations at each level.
+    description: Count the annotations of one dataset and one database at FDR 5, 10 and 20 percent. Also count the off-sample annotations at each level. To compare databases, call it once for each database.
     read_only: true
     function: "wrapper:compare_fdr_counts"
     params:
       dataset_id: { type: string }
-      database: { type: string, default: HMDB }
-      database_version: { type: string, default: v4 }
-      exclude_off_sample: { type: boolean, default: false }
+      database: { type: string, description: "Database name and version, such as HMDB v4 or LipidMaps 2017-12-12." }
+      exclude_off_sample: { type: boolean, default: false, description: "Leave this out unless the scientist decided to remove off-sample annotations. The result already shows the number of off-sample annotations." }
     required: [dataset_id]
+
+  - name: overlap_annotations
+    title: Compare the annotations of 2 to 6 datasets
+    description: Count the ions (sum formula plus adduct) that all given datasets share, at one FDR level and one database. Use it to ask if serial sections or two datasets agree.
+    read_only: true
+    function: "wrapper:overlap_annotations"
+    params:
+      dataset_ids: { type: string, description: "2 to 6 dataset ids joined with a comma." }
+      database: { type: string, description: "Database name and version, such as HMDB v4 or LipidMaps 2017-12-12." }
+      fdr: { type: number, enum: [0.05, 0.1, 0.2, 0.5] }
+      exclude_off_sample: { type: boolean, default: false, description: "Leave this out unless the scientist decided to remove off-sample annotations." }
+    required: [dataset_ids]
 
   - name: get_ion_image
     title: Save an ion image
@@ -184,6 +190,7 @@ map:
       - "Read the id of each dataset on its Dataset overview page, or in the address after ds="
     params:
       - { arg: name, label: Enter keywords }
+      - { arg: dataset_id, label: Select dataset }
       - { arg: organism, label: Select organism }
       - { arg: polarity, label: Select polarity }
       - { arg: submitter, label: Select submitter }
@@ -221,7 +228,7 @@ map:
     route: "Datasets page > open the dataset > Browse annotations > Annotations page > set filters Database and FDR > Export to CSV"
     steps:
       - "Open https://metaspace2020.org/annotations?ds={dataset_id}"
-      - "Set the filter Database to {database} - {database_version}"
+      - "Set the filter Database to {database}"
       - "Set the filter FDR to the value of fdr, such as 10%"
       - "Add filter > Show/hide off-sample annotations, to hide off-sample annotations if you choose that"
       - "Add filter > Select adduct, if you filter on one adduct"
@@ -229,8 +236,7 @@ map:
       - "Click Export to CSV to save the table"
     params:
       - { arg: dataset_id, label: Dataset }
-      - { arg: database, label: Database }
-      - { arg: database_version, label: Database, note: "The website shows name and version together, such as LipidMaps - 2017-12-12." }
+      - { arg: database, label: Database, note: "The website shows name and version together, such as LipidMaps - 2017-12-12." }
       - { arg: fdr, label: FDR, ui_default: 0.1 }
       - { arg: exclude_off_sample, label: Show/hide off-sample annotations, ui_default: false }
       - { arg: adduct, label: Select adduct, ui_default: all }
@@ -249,11 +255,26 @@ map:
     params:
       - { arg: dataset_id, label: Dataset }
       - { arg: database, label: Database }
-      - { arg: database_version, label: Database }
       - { arg: exclude_off_sample, label: Show/hide off-sample annotations, ui_default: false }
     fidelity: exact
     evidence: { source: docs, test: fdr-counts-lipidmaps, note: "The 10 percent count was read on the website (414). The 5 and 20 percent counts come from the same API data and from the paper table of the benchmark folder, not from a second look at the website." }
     summary: "FDR 5/10/20 percent: {metrics.n_fdr_05} / {metrics.n_fdr_10} / {metrics.n_fdr_20} annotations"
+
+  - tool: overlap_annotations
+    route: "Annotations page > set Database and FDR > Export to CSV for each dataset > compare the formula and adduct columns in a spreadsheet"
+    steps:
+      - "For each dataset, open https://metaspace2020.org/annotations?ds=<id>"
+      - "Set the filters Database and FDR"
+      - "Click Export to CSV"
+      - "Compare the columns formula and adduct of the files in a spreadsheet"
+    params:
+      - { arg: database, label: Database }
+      - { arg: fdr, label: FDR, ui_default: 0.1 }
+      - { arg: exclude_off_sample, label: Show/hide off-sample annotations, ui_default: false }
+    fidelity: close
+    difference: "The website has no overlap view. The overlap is done by hand on the exported files. The route was not run."
+    evidence: { source: unverified, test: overlap-pinned, note: "Route not tested." }
+    summary: "{metrics.n_in_all} of {metrics.n_in_union} ions are in all {metrics.n_datasets} datasets"
 
   - tool: get_ion_image
     route: "Annotations page > click the annotation row > Image viewer > Export image"
@@ -335,7 +356,7 @@ tests:
   - id: annotations-lipidmaps-fdr10
     description: "Network test. 414 annotations at FDR 10 percent in LipidMaps 2017-12-12 for 2022-08-16_10h14m23s; 26 are off-sample. The 414 was read on the website on 2026-10-08."
     calls:
-      - { tool: list_annotations, args: { dataset_id: "2022-08-16_10h14m23s", database: LipidMaps, database_version: "2017-12-12", fdr: 0.1, exclude_off_sample: false, adduct: all } }
+      - { tool: list_annotations, args: { dataset_id: "2022-08-16_10h14m23s", database: "LipidMaps 2017-12-12", fdr: 0.1, exclude_off_sample: false, adduct: all } }
     expect:
       - { path: metrics.n_annotations, equals: 414 }
       - { path: metrics.n_off_sample_in_fdr_set, equals: 26 }
@@ -344,14 +365,14 @@ tests:
   - id: annotations-off-sample-removed
     description: "Network test. Removing the 26 off-sample annotations leaves 388. The number is derived from the two known numbers above (414 minus 26)."
     calls:
-      - { tool: list_annotations, args: { dataset_id: "2022-08-16_10h14m23s", database: LipidMaps, database_version: "2017-12-12", fdr: 0.1, exclude_off_sample: true, adduct: all } }
+      - { tool: list_annotations, args: { dataset_id: "2022-08-16_10h14m23s", database: "LipidMaps 2017-12-12", fdr: 0.1, exclude_off_sample: true, adduct: all } }
     expect:
       - { path: metrics.n_annotations, equals: 388 }
 
   - id: fdr-counts-lipidmaps
     description: "Network test. LipidMaps 2017-12-12 counts at FDR 5, 10 and 20 percent: 144, 414, 903. Source - benchmark folder alexandrov2019-metaspace, computed on 2026-10-07. The 10 percent count was also read on the website."
     calls:
-      - { tool: compare_fdr_counts, args: { dataset_id: "2022-08-16_10h14m23s", database: LipidMaps, database_version: "2017-12-12", exclude_off_sample: false } }
+      - { tool: compare_fdr_counts, args: { dataset_id: "2022-08-16_10h14m23s", database: "LipidMaps 2017-12-12", exclude_off_sample: false } }
     expect:
       - { path: metrics.n_fdr_05, equals: 144 }
       - { path: metrics.n_fdr_10, equals: 414 }
@@ -360,11 +381,20 @@ tests:
   - id: fdr-counts-hmdb
     description: "Network test. HMDB v4 counts at FDR 5, 10 and 20 percent: 14, 263, 819. Source - benchmark folder alexandrov2019-metaspace, computed on 2026-10-07."
     calls:
-      - { tool: compare_fdr_counts, args: { dataset_id: "2022-08-16_10h14m23s", database: HMDB, database_version: v4, exclude_off_sample: false } }
+      - { tool: compare_fdr_counts, args: { dataset_id: "2022-08-16_10h14m23s", database: "HMDB v4", exclude_off_sample: false } }
     expect:
       - { path: metrics.n_fdr_05, equals: 14 }
       - { path: metrics.n_fdr_10, equals: 263 }
       - { path: metrics.n_fdr_20, equals: 819 }
+
+  - id: overlap-pinned
+    description: "Network test. The two Michael et al. 2022 datasets share ions in LipidMaps 2017-12-12 at FDR 10 percent. The counts per dataset (414, 191) come from the benchmark folder. The shared count is stable, not independent; it comes from a run of the tool."
+    calls:
+      - { tool: overlap_annotations, args: { dataset_ids: "2022-08-16_10h14m23s,2022-08-16_12h31m33s", database: "LipidMaps 2017-12-12", fdr: 0.1 } }
+    expect:
+      - { path: metrics.n_dataset_1, equals: 414 }
+      - { path: metrics.n_dataset_2, equals: 191 }
+      - { path: metrics.n_in_all, min: 1 }
 
   - id: ion-image-pinned
     description: "Network test. The ion image of C39H78NO8P+H (a PC 32:0 sum formula) has 350 by 489 pixels. The size is the image size of the dataset. This number is stable, not independent; it comes from a run of the tool."
@@ -378,8 +408,8 @@ tests:
   - id: fdr-then-list
     description: "Network test with two tools in order. The count at FDR 10 percent from compare_fdr_counts equals the count from list_annotations."
     calls:
-      - { tool: compare_fdr_counts, args: { dataset_id: "2022-08-16_12h31m33s", database: LipidMaps, database_version: "2017-12-12" }, save_as: counts }
-      - { tool: list_annotations, args: { dataset_id: "2022-08-16_12h31m33s", database: LipidMaps, database_version: "2017-12-12", fdr: 0.1 } }
+      - { tool: compare_fdr_counts, args: { dataset_id: "2022-08-16_12h31m33s", database: "LipidMaps 2017-12-12" }, save_as: counts }
+      - { tool: list_annotations, args: { dataset_id: "2022-08-16_12h31m33s", database: "LipidMaps 2017-12-12", fdr: 0.1 } }
     expect:
       - { path: metrics.n_annotations, equals: 191 }
       - { path: saved.counts.metrics.n_fdr_10, equals: 191 }

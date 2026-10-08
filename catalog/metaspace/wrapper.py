@@ -1,5 +1,6 @@
 import csv
 import os
+import re
 import time
 
 FDR_LEVELS = (0.05, 0.1, 0.2, 0.5)
@@ -35,12 +36,9 @@ def _dataset(dataset_id):
     return _retry(lambda: _client().dataset(id=dataset_id))
 
 
-def _database(database, version):
-    return (database, version) if version else database
-
-
-def _db_label(database, version):
-    return "%s %s" % (database, version) if version else database
+def _database(database):
+    parts = database.strip().rsplit(" ", 1)
+    return (parts[0], parts[1]) if len(parts) == 2 else database.strip()
 
 
 def _check_fdr(fdr):
@@ -61,8 +59,12 @@ query($f: DatasetFilter, $o: Int, $l: Int) {
 """
 
 
-def search_datasets(name=None, organism=None, polarity=None, submitter=None, maldi_matrix=None, analyzer_type=None, ionisation_source=None, group=None, limit=20):
+def search_datasets(name=None, organism=None, polarity=None, submitter=None, maldi_matrix=None, analyzer_type=None, ionisation_source=None, group=None, dataset_id=None, limit=20):
     flt = {}
+    if name and re.fullmatch(r"\d{4}-\d\d-\d\d_\d\dh\d\dm\d\ds", name.strip()):
+        dataset_id, name = name.strip(), None
+    if dataset_id:
+        flt["ids"] = dataset_id if isinstance(dataset_id, str) else "|".join(dataset_id)
     if name:
         flt["name"] = name
     if organism:
@@ -113,7 +115,7 @@ def search_datasets(name=None, organism=None, polarity=None, submitter=None, mal
         "n_found": len(found),
         "n_scanned": scanned,
         "scan_capped": capped,
-        "warning": "The search read only the newest %d datasets that match the filters. Add a filter to narrow it." % scan_cap if capped else "",
+        "warning": "The search read only the newest %d datasets that match the filters. Add a filter to narrow it." % scan_cap if capped else ("No dataset matched. The dataset can be private, or a filter value can be spelled differently. Try get_dataset_info with the id." if not found else ""),
         "table": {"columns": columns, "rows": table_rows, "n_rows": len(table_rows)},
     }
 
@@ -164,16 +166,16 @@ def list_databases():
     return {"n_databases": len(rows), "table": {"columns": ["id", "name", "version"], "rows": rows, "n_rows": len(rows)}}
 
 
-def _results(ds, database, version, fdr):
-    df = _retry(lambda: ds.results(database=_database(database, version), fdr=fdr))
+def _results(ds, database, fdr):
+    df = _retry(lambda: ds.results(database=_database(database), fdr=fdr))
     return df
 
 
-def list_annotations(dataset_id, database="HMDB", database_version="v4", fdr=0.1, exclude_off_sample=False, adduct="all"):
+def list_annotations(dataset_id, database="HMDB v4", fdr=0.1, exclude_off_sample=False, adduct="all"):
     try:
         _check_fdr(fdr)
         ds = _dataset(dataset_id)
-        df = _results(ds, database, database_version, fdr)
+        df = _results(ds, database, fdr)
     except Exception as e:
         return _fail(str(e))
     df = df.reset_index()
@@ -189,14 +191,14 @@ def list_annotations(dataset_id, database="HMDB", database_version="v4", fdr=0.1
     for _, r in df.iterrows():
         names = r["moleculeNames"] if isinstance(r["moleculeNames"], list) else []
         rows.append([r["formula"], r["adduct"], round(float(r["mz"]), 5), round(float(r["msm"]), 4), float(r["fdr"]), bool(r["offSample"]), "; ".join(names[:5])])
-    path = os.path.join(os.getcwd(), "annotations_%s_%s_fdr%g.csv" % (dataset_id, _db_label(database, database_version).replace(" ", "_"), fdr))
+    path = os.path.join(os.getcwd(), "annotations_%s_%s_fdr%g.csv" % (dataset_id, database.replace(" ", "_"), fdr))
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(columns)
         w.writerows(rows)
     return {
         "dataset_id": dataset_id,
-        "database": _db_label(database, database_version),
+        "database": database,
         "fdr_max": fdr,
         "n_annotations": len(rows),
         "n_off_sample_in_fdr_set": n_off,
@@ -207,14 +209,14 @@ def list_annotations(dataset_id, database="HMDB", database_version="v4", fdr=0.1
     }
 
 
-def compare_fdr_counts(dataset_id, database="HMDB", database_version="v4", exclude_off_sample=False):
+def compare_fdr_counts(dataset_id, database="HMDB v4", exclude_off_sample=False):
     try:
         ds = _dataset(dataset_id)
-        df = _results(ds, database, database_version, 0.2).reset_index()
+        df = _results(ds, database, 0.2).reset_index()
     except Exception as e:
         return _fail(str(e))
     off = df["offSample"].fillna(False).astype(bool)
-    out = {"dataset_id": dataset_id, "database": _db_label(database, database_version), "off_sample_excluded": bool(exclude_off_sample)}
+    out = {"dataset_id": dataset_id, "database": database, "off_sample_excluded": bool(exclude_off_sample)}
     rows = []
     for level in (0.05, 0.1, 0.2):
         sel = df["fdr"] <= level + 1e-9
@@ -259,3 +261,29 @@ def get_ion_image(dataset_id, formula, adduct, hotspot_clipping=True):
         "hotspot_clipping": bool(hotspot_clipping),
         "path": path,
     }
+
+
+def overlap_annotations(dataset_ids, database="HMDB v4", fdr=0.1, exclude_off_sample=False):
+    if isinstance(dataset_ids, str):
+        dataset_ids = [d.strip() for d in dataset_ids.replace("|", ",").split(",") if d.strip()]
+    dataset_ids = list(dict.fromkeys(dataset_ids))
+    if len(dataset_ids) < 2 or len(dataset_ids) > 6:
+        return _fail("give 2 to 6 different dataset ids")
+    try:
+        _check_fdr(fdr)
+        sets = {}
+        for d in dataset_ids:
+            df = _results(_dataset(d), database, fdr).reset_index()
+            if exclude_off_sample:
+                df = df[~df["offSample"].fillna(False).astype(bool)]
+            sets[d] = set(zip(df["formula"], df["adduct"]))
+            time.sleep(0.5)
+    except Exception as e:
+        return _fail(str(e))
+    shared = set.intersection(*sets.values())
+    union = set.union(*sets.values())
+    out = {"database": database, "fdr_max": fdr, "off_sample_excluded": bool(exclude_off_sample), "n_datasets": len(sets), "n_in_all": len(shared), "n_in_union": len(union), "fraction_in_all": round(len(shared) / len(union), 3) if union else None}
+    for i, (d, s) in enumerate(sets.items(), 1):
+        out["n_dataset_%d" % i] = len(s)
+    out["table"] = {"columns": ["dataset", "annotations", "only_in_this_dataset"], "rows": [[d, len(s), len(s - set.union(*[o for k, o in sets.items() if k != d]))] for d, s in sets.items()], "n_rows": len(sets)}
+    return out
