@@ -29,6 +29,7 @@ Usage
   ga bench [scenario|all] --model <model> [--guidance on|off|both]
   ga bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run]
   ga bench site --results a.json[,b.json] --out <folder>
+  ga bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]
   ga mcp                               run the harness as an MCP server on stdio
 
 Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
@@ -62,6 +63,7 @@ const { values: o, positionals: pos } = parseArgs({
     runs: { type: "string" },
     results: { type: "string" },
     out: { type: "string" },
+    style: { type: "string" },
     "dry-run": { type: "boolean" },
     "run-tests": { type: "boolean" },
     generic: { type: "boolean" },
@@ -307,6 +309,16 @@ async function main() {
         const { buildSite } = await import("./bench/papers-site.ts");
         const info = buildSite({ results, out, log: (l) => console.error(l) });
         console.log(`${info.index}\n${info.images.length} images, ${info.papers} papers, ${info.runs} runs`);
+        return;
+      }
+      if (a1 === "cases") {
+        const results = (str(o.results) ?? "").split(",").filter(Boolean);
+        const out = str(o.out);
+        if (!results.length || !out) return fail("usage: ga bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]");
+        const { buildCases } = await import("./bench/papers-cases.ts");
+        const info = buildCases({ results, out, style: str(o.style), log: (l) => console.error(l) });
+        for (const p of info.problems) console.error(`problem: ${p}`);
+        console.log(`${info.index}\n${info.pages.length} pages, ${info.records.length} session records`);
         return;
       }
       const { runBench } = await import("./bench/run.ts");
