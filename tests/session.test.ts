@@ -275,3 +275,14 @@ test("an answer that says it needs to run a tool is an announced step", () => {
   expect(announcesStep("3. To keep the variants, we need to run the `filter_variants` tool. This will give the count.")).toBe(true);
   expect(announcesStep("The count is 328. We checked the filter.")).toBe(false);
 });
+
+test("a result shows the text and the main files before the long list of pictures", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "x" }]), cwd: tmpdir(), settings: { guidance: false } });
+  const tool = session.allTools().find((t) => t.name === "count")!;
+  const outputs = [...Array.from({ length: 40 }, (_, i) => ({ name: `p${i}.png`, kind: "image" as const, path: `/w/p${i}.png` })), { name: "data.txt", kind: "file" as const, path: "/w/data.txt" }];
+  const out = (session as any).render(tool, { ok: true, summary: "s", metrics: { n: 1 }, text: "data_file=/w/data.txt", outputs });
+  const parsed = JSON.parse(out.text);
+  expect(Object.keys(parsed).slice(0, 4)).toEqual(["ok", "summary", "metrics", "text"]);
+  expect(parsed.outputs[0].name).toBe("data.txt");
+  expect(parsed.outputs.length + parsed.outputs_omitted).toBe(41);
+});

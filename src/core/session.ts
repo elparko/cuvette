@@ -729,10 +729,15 @@ export class Session {
     if (o.summary) obj.summary = o.summary;
     if (vis !== "none") {
       if (o.metrics && Object.keys(o.metrics).length) obj.metrics = o.metrics;
-      if (o.outputs?.length) obj.outputs = o.outputs.map((f) => ({ name: f.name, kind: f.kind, path: f.path }));
-      if (o.table) obj.table = vis === "summaries" ? { columns: o.table.columns, n_rows: o.table.n_rows, path: o.table.path } : { ...o.table, rows: o.table.rows.slice(0, small ? 5 : 12) };
-      if (vis === "all" && o.data !== undefined) obj.data = o.data;
       if (vis === "all" && o.text) obj.text = o.text;
+      if (o.table) obj.table = vis === "summaries" ? { columns: o.table.columns, n_rows: o.table.n_rows, path: o.table.path } : { ...o.table, rows: o.table.rows.slice(0, small ? 5 : 12) };
+      if (o.outputs?.length) {
+        const cap = small ? 12 : 30;
+        const files = [...o.outputs.filter((f) => f.kind !== "image"), ...o.outputs.filter((f) => f.kind === "image")];
+        obj.outputs = files.slice(0, cap).map((f) => ({ name: f.name, kind: f.kind, path: f.path }));
+        if (files.length > cap) obj.outputs_omitted = files.length - cap;
+      }
+      if (vis === "all" && o.data !== undefined) obj.data = o.data;
     }
     if (o.manualRoute && !small) obj.manual_route = o.manualRoute;
     let text = JSON.stringify(obj, null, small ? 0 : 1);
