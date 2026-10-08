@@ -1,0 +1,52 @@
+concat_v2_mfp: Input data: 55 sequences with 2375 nucleotide sites
+concat_v2_mfp: Number of constant sites: 1546 (= 65.0947% of all sites)
+concat_v2_mfp: Number of parsimony informative sites: 611
+concat_v2_mfp: Best-fit model according to BIC: TIM2e+I+G4
+concat_v2_mfp: Log-likelihood of the tree: -15895.4774 (s.e. 395.5987)
+concat_v3_mfp: Input data: 55 sequences with 2375 nucleotide sites
+concat_v3_mfp: Number of constant sites: 1546 (= 65.0947% of all sites)
+concat_v3_mfp: Number of parsimony informative sites: 611
+concat_v3_mfp: Best-fit model according to BIC: TIM2+R3
+concat_v3_mfp: Log-likelihood of the tree: -15891.3674 (s.e. 395.1011)
+concat_v3_fixed: Input data: 55 sequences with 2375 nucleotide sites
+concat_v3_fixed: Number of constant sites: 1546 (= 65.0947% of all sites)
+concat_v3_fixed: Number of parsimony informative sites: 611
+concat_v3_fixed: Log-likelihood of the tree: -15895.4851 (s.e. 395.5335)
+BT_algn_realigned2_v2_mfp: Input data: 49 sequences with 716 nucleotide sites
+BT_algn_realigned2_v2_mfp: Number of constant sites: 307 (= 42.8771% of all sites)
+BT_algn_realigned2_v2_mfp: Number of parsimony informative sites: 319
+BT_algn_realigned2_v2_mfp: Best-fit model according to BIC: HKY+F+I+G4
+BT_algn_realigned2_v2_mfp: Log-likelihood of the tree: -7037.6637 (s.e. 235.2056)
+BT_algn_realigned2_v3_fixed: Input data: 49 sequences with 716 nucleotide sites
+BT_algn_realigned2_v3_fixed: Number of constant sites: 307 (= 42.8771% of all sites)
+BT_algn_realigned2_v3_fixed: Number of parsimony informative sites: 319
+BT_algn_realigned2_v3_fixed: Log-likelihood of the tree: -7037.6637 (s.e. 235.2053)
+TEF_algn_realigned_v2_mfp: Input data: 48 sequences with 377 nucleotide sites
+TEF_algn_realigned_v2_mfp: Number of constant sites: 95 (= 25.1989% of all sites)
+TEF_algn_realigned_v2_mfp: Number of parsimony informative sites: 217
+TEF_algn_realigned_v2_mfp: Best-fit model according to BIC: HKY+F+R2
+TEF_algn_realigned_v2_mfp: Log-likelihood of the tree: -4807.0529 (s.e. 177.7759)
+TEF_algn_realigned_v3_fixed: Input data: 48 sequences with 377 nucleotide sites
+TEF_algn_realigned_v3_fixed: Number of constant sites: 95 (= 25.1989% of all sites)
+TEF_algn_realigned_v3_fixed: Number of parsimony informative sites: 217
+TEF_algn_realigned_v3_fixed: Log-likelihood of the tree: -4880.5166 (s.e. 179.6993)
+ITS_algn_realigned_v2_mfp: Input data: 55 sequences with 498 nucleotide sites
+ITS_algn_realigned_v2_mfp: Number of constant sites: 406 (= 81.5261% of all sites)
+ITS_algn_realigned_v2_mfp: Number of parsimony informative sites: 51
+ITS_algn_realigned_v2_mfp: Best-fit model according to BIC: K2P+R2
+ITS_algn_realigned_v2_mfp: Log-likelihood of the tree: -1639.3461 (s.e. 97.7019)
+ITS_algn_realigned_v3_fixed: Input data: 55 sequences with 498 nucleotide sites
+ITS_algn_realigned_v3_fixed: Number of constant sites: 406 (= 81.5261% of all sites)
+ITS_algn_realigned_v3_fixed: Number of parsimony informative sites: 51
+ITS_algn_realigned_v3_fixed: Log-likelihood of the tree: -1641.8892 (s.e. 97.5914)
+LSU_algn_clean_subalign_v2_mfp: Input data: 55 sequences with 780 nucleotide sites
+LSU_algn_clean_subalign_v2_mfp: Number of constant sites: 704 (= 90.2564% of all sites)
+LSU_algn_clean_subalign_v2_mfp: Number of parsimony informative sites: 26
+LSU_algn_clean_subalign_v2_mfp: Best-fit model according to BIC: K2P+R2
+LSU_algn_clean_subalign_v2_mfp: Log-likelihood of the tree: -1735.0738 (s.e. 74.9627)
+LSU_algn_clean_subalign_v3_fixed: Input data: 55 sequences with 780 nucleotide sites
+LSU_algn_clean_subalign_v3_fixed: Number of constant sites: 704 (= 90.2564% of all sites)
+LSU_algn_clean_subalign_v3_fixed: Number of parsimony informative sites: 26
+LSU_algn_clean_subalign_v3_fixed: Log-likelihood of the tree: -1744.6237 (s.e. 75.3447)
+IQ-TREE multicore version 2.0.8 for Mac OS X 64-bit built Jul  9 2020
+IQ-TREE single-core version 3.1.4 for MacOS ARM 64-bit built Sep 10 2026

@@ -1,0 +1,27 @@
+tool: IQ-TREE (2.0.3 in the paper, 3.1.4 in the adapter)
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/kanetis2022-iqtree-sporocadaceae/concat_dush_subalign.fas
+decisions:
+  alignment: "given (MAFFT 7.490 default, edited by hand, concatenated with SeqKit); do not realign"
+  trim: false
+  model: TIM2e+I+G4
+  bootstrap: "ultrafast, 1000 replicates"
+  outgroup: Beltrania_rhombica_CBS_123.58
+expected:
+  - {description: "log-likelihood of the ML tree, concatenated alignment, TIM2e+I+G4", value: -15895.468, tolerance: 0.1, source: "paper Figure 1 caption; check_iqtree.sh"}
+  - {description: "sites in the concatenated alignment", value: 2375, tolerance: 0, source: "paper Results; IQ-TREE input line"}
+  - {description: "sequences in the concatenated alignment", value: 55, tolerance: 0, source: "alignment file"}
+  - {description: "log-likelihood with the IQ-TREE 3 ModelFinder model TIM2+F+R3", value: -15891.367, tolerance: 0.1, source: "check_iqtree.sh"}
+notes: |
+  check_iqtree.sh runs IQ-TREE 2.0.8 and IQ-TREE 3.1.4 directly, not through the adapter. Output: check_iqtree.out.
+  Concatenated alignment: 2.0.8 ModelFinder picks TIM2e+I+G4, the model of the paper, and gives -15895.477.
+  IQ-TREE 3.1.4 ModelFinder picks TIM2+F+R3 and gives -15891.367. With the paper model fixed, IQ-TREE 3.1.4 gives
+  -15895.485, or -15895.483 with -B 1000 and the outgroup. The benchmark fixes the model that the paper reports.
+  Site counts: the paper prints 1539 constant and 616 parsimony-informative sites (sum with 229 other variable
+  sites: 2384, not 2375). IQ-TREE counts 1546 constant and 611 informative sites. The paper counts probably come
+  from the parsimony program. The benchmark does not score them, and the adapter does not report informative sites.
+  Single-locus trees (Figures S1 to S4): with the paper models, IQ-TREE 3 gives -1641.889 for ITS (paper -1641.838)
+  and -1744.624 for LSU (paper -1744.611). tub2 gives -7037.664 (paper -7026.633) and tef1-a gives -4880.517
+  (paper -4806.893), so the deposited tub2 and tef1-a files or models differ from the paper. The phylo adapter
+  takes one model for each session, so the benchmark does not score the single-locus trees.

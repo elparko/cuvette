@@ -1,0 +1,82 @@
+kind: research paper
+short: Kanetis 2022
+field: Phylogenetics
+program: IQ-TREE 3.1.4 (command line), through the phylo adapter
+citation:
+  authors: Kanetis LI, Taliadoros D, Makris G, Christoforou M
+  title: A Novel Seimatosporium and Other Sporocadaceae Species Associated with Grapevine Trunk Diseases in Cyprus
+  venue: Plants 11(20):2733
+  year: 2022
+  doi: 10.3390/plants11202733
+related:
+  - text: Kanetis LI et al. Alignments of the Sporocadaceae phylogeny, figshare item 20530188. Source of the alignment.
+    doi: 10.6084/m9.figshare.20530188
+measured: >-
+  The paper identifies the Sporocadaceae fungi that the authors isolated from grapevine trunk cankers in Cyprus.
+  The authors sequenced four loci (ITS, LSU, tub2 and tef1-a), aligned them with reference species and built a
+  maximum-likelihood (ML) tree of the concatenated alignment with IQ-TREE. The tree places the isolates in four
+  species, one of them new (Seimatosporium cyprium).
+instruction: >-
+  I have a concatenated alignment of four loci from my Cyprus Sporocadaceae isolates and reference species.
+  Build the maximum-likelihood tree with branch support, rooted on Beltrania rhombica. Tell me the number of
+  sequences and sites, the model, the log-likelihood and where my isolates group.
+instruction_basis: >-
+  Materials and Methods, section 4.3, and Results, section 2.1 with Figure 1. The paper builds
+  the ML tree of the concatenated alignment and prints its log-likelihood in the Figure 1 caption.
+answers:
+  algorithm:
+    decision: Alignment method (MAFFT)
+    value: auto (not used, the alignment is given)
+    source: >-
+      Materials and Methods, section 4.3. The authors aligned each locus with MAFFT 7.490 with default parameters and edited
+      the alignment by hand. The benchmark gives the deposited alignment, so no realignment is needed.
+  trim:
+    decision: Trim the alignment
+    value: false
+    source: Materials and Methods, section 4.3. The paper names no trimming step after the manual edit.
+  model:
+    decision: Substitution model
+    value: TIM2e+I+G4
+    source: >-
+      Results, section 2.1. ModelFinder of IQ-TREE 2.0.3 chose "TIM2e + I + G" for the concatenated dataset. The
+      benchmark fixes this model because ModelFinder of IQ-TREE 3 picks TIM2+F+R3 on the same alignment.
+  bootstrap_type:
+    decision: Bootstrap type
+    value: ufboot
+    source: Materials and Methods, section 4.3. The ML analysis used the ultrafast bootstrap approximation.
+  replicates:
+    decision: Number of bootstrap replicates
+    value: 1000
+    source: Materials and Methods, section 4.3. The authors performed 1000 bootstrap replicates.
+  outgroup:
+    decision: Outgroup
+    value: Beltrania_rhombica_CBS_123.58
+    source: Materials and Methods, section 4.3. "Beltrania rhombica (CBS 123.58) was selected as the outgroup taxon".
+items:
+  log_likelihood:
+    source: published
+    where: >-
+      Figure 1 caption: "Phylogenetic tree (log-likelihood: -15,895.468)". IQ-TREE 2.0.8 gives -15895.477 and
+      IQ-TREE 3.1.4 gives -15895.483 with the same model, bootstrap and outgroup (check_iqtree.sh).
+  alignment_sites:
+    source: published
+    where: >-
+      Results, section 2.1: the four loci "resulted in a 2375-character dataset". The deposited alignment has
+      2375 sites.
+  sequences:
+    source: computed
+    tool: IQ-TREE 3.1.4 input summary (check_iqtree.sh)
+    where: >-
+      Not printed as one number. The Figure 1 caption names 54 Sporocadaceae, and the alignment adds the
+      outgroup, so it has 55 sequences.
+  log_likelihood_iqtree3_modelfinder:
+    source: computed
+    tool: IQ-TREE 3.1.4 with -m MFP (check_iqtree.sh)
+    where: >-
+      Not in the paper. ModelFinder of IQ-TREE 3 picks TIM2+F+R3, and the tree has a log-likelihood of
+      -15891.367. A reference value that shows the effect of the model choice.
+data:
+  source: figshare item 20530188 version 3, the alignments of Kanetis 2022
+  url: https://doi.org/10.6084/m9.figshare.20530188
+  license: CC BY 4.0 (figshare item). Fungal DNA sequences.
+  size: 264 kB for five FASTA alignments. The concatenated alignment is 134 kB, 55 sequences by 2375 sites.

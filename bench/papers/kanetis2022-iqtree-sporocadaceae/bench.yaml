@@ -1,0 +1,26 @@
+adapters: [phylo]
+prompt: |
+  I isolated Sporocadaceae fungi from grapevine trunk cankers in Cyprus (isolates with names that start with L or P) and sequenced ITS, LSU, tub2 and tef1-a. The four loci are aligned and concatenated with reference species in {data}/kanetis2022-iqtree-sporocadaceae/concat_dush_subalign.fas. Build the maximum-likelihood tree with branch support, rooted on Beltrania rhombica CBS 123.58. Tell me the number of sequences and sites, the substitution model, the log-likelihood of the tree, and which reference species each of my isolates groups with. Write every number in the answer text.
+setup: &values
+  algorithm: auto
+  trim: false
+  model: TIM2e+I+G4
+  bootstrap_type: ufboot
+  replicates: 1000
+  outgroup: Beltrania_rhombica_CBS_123.58
+answers: *values
+allow: all
+timeout_s: 1200
+data:
+  - kanetis2022-iqtree-sporocadaceae/concat_dush_subalign.fas
+items:
+  # Source: Kanetis 2022, Figure 1 caption: "Phylogenetic tree (log-likelihood: -15,895.468) resulting from the
+  # combined analysis of ITS, LSU, tub2, and tef1 sequence data". IQ-TREE 2.0.3, model TIM2e+I+G (Results).
+  # check_iqtree.sh: IQ-TREE 2.0.8 with ModelFinder picks TIM2e+I+G4 and gives -15895.477. IQ-TREE 3.1.4 with
+  # the fixed model gives -15895.485, and -15895.483 with the ultrafast bootstrap and the outgroup (the adapter
+  # call). Tolerance 0.1: the ML optimizers of the releases differ by up to 0.02. The tree with the model that
+  # ModelFinder of IQ-TREE 3 picks (TIM2+F+R3, -15891.367) is far outside it.
+  - {key: log_likelihood, description: "Log-likelihood of the ML tree, concatenated alignment, TIM2e+I+G4", value: -15895.468, tolerance: 0.1}
+  - {key: alignment_sites, description: "Sites in the concatenated alignment", value: 2375, exact: true}
+  - {key: sequences, description: "Sequences in the concatenated alignment (54 Sporocadaceae and the outgroup)", value: 55, exact: true, in_answer: false}
+  - {key: log_likelihood_iqtree3_modelfinder, description: "Log-likelihood with the model that ModelFinder of IQ-TREE 3 picks (TIM2+F+R3)", value: -15891.367, tolerance: 0.1, in_answer: false, reference: true}
