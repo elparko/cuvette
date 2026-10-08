@@ -67,6 +67,23 @@ test("comparison runs do not count as computed", () => {
   expect(s.computed.pass).toBe(false);
 });
 
+test("an item with from_comparison counts comparison runs", () => {
+  const main = node({ count: 40 });
+  const cmp = node({ count: 66 }, { sensitivityOf: main.id });
+  const [s] = scoreItems([item({ key: "count", value: 66, exact: true, from_comparison: true })], record);
+  expect(s.computed).toMatchObject({ pass: true, node: cmp.id });
+});
+
+test("an item with tool only looks at the nodes of that tool", () => {
+  node({ r2: 0.7333 }, { tool: "rule_of_five" });
+  const [a] = scoreItems([item({ key: "r2", value: 0.752, tolerance: 0.03, tool: "fit_solubility_model" })], record);
+  expect(a.computed.pass).toBe(false);
+  expect(a.computed.value).toBeNull();
+  node({ r2: 0.75 }, { tool: "fit_solubility_model" });
+  const [b] = scoreItems([item({ key: "r2", value: 0.752, tolerance: 0.03, tool: "fit_solubility_model" })], record);
+  expect(b.computed.pass).toBe(true);
+});
+
 test("reported passes when the answer states a measured value in tolerance", () => {
   node({ mean: 1.58 });
   answer("The mean difference is 1.58 hours.");

@@ -17,10 +17,11 @@ const emptyCell = (): Cell => ({ computed: 0, computedOf: 0, reported: 0, report
 function add(cell: Cell, r: PaperRun): void {
   cell.runs++;
   cell.statuses[r.status] = (cell.statuses[r.status] ?? 0) + 1;
-  cell.computed += r.items.filter((i) => i.computed.pass).length;
-  cell.computedOf += r.items.length;
-  cell.reported += r.items.filter((i) => i.reported.pass).length;
-  cell.reportedOf += r.items.filter((i) => i.inAnswer).length;
+  const scored = r.items.filter((i) => !i.reference);
+  cell.computed += scored.filter((i) => i.computed.pass).length;
+  cell.computedOf += scored.length;
+  cell.reported += scored.filter((i) => i.reported.pass).length;
+  cell.reportedOf += scored.filter((i) => i.inAnswer).length;
 }
 
 export function summarize(result: PapersResult) {
@@ -58,9 +59,10 @@ function itemRows(items: ItemScore[]): string[] {
     const tol = i.tolerance === "exact" ? "exact" : `±${i.tolerance}`;
     const c = i.computed;
     const rp = i.reported;
-    const computed = `${c.pass ? "pass" : "FAIL"} ${num(c.value)}${c.node ? ` (${c.node} ${c.path || "result"}, entry ${c.entry})` : ""}`;
-    const reported = rp.pass === null ? "not asked" : `${rp.pass ? "pass" : "FAIL"} ${num(rp.value)}${rp.via ? ` via ${rp.via}` : ""}${rp.node ? ` (${rp.node}, claim check ${rp.claimEntry})` : ""}`;
-    return `| ${i.key} | ${i.abs ? "abs " : ""}${i.expected} ${tol} | ${computed} | ${reported} |`;
+    const label = (ok: boolean) => (i.reference ? (ok ? "match" : "differs") : ok ? "pass" : "FAIL");
+    const computed = `${label(c.pass)} ${num(c.value)}${c.node ? ` (${c.node} ${c.path || "result"}, entry ${c.entry})` : ""}`;
+    const reported = rp.pass === null ? "not asked" : `${label(rp.pass)} ${num(rp.value)}${rp.via ? ` via ${rp.via}` : ""}${rp.node ? ` (${rp.node}, claim check ${rp.claimEntry})` : ""}`;
+    return `| ${i.key}${i.reference ? " (reference)" : ""} | ${i.abs ? "abs " : ""}${i.expected} ${tol} | ${computed} | ${reported} |`;
   });
 }
 

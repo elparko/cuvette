@@ -21,5 +21,5 @@ items:
   - {key: zero_violations, description: "Molecules with zero rule-of-five violations.", value: 1018, tolerance: 5}
   - {key: two_or_more_violations, description: "Molecules with two or more violations.", value: 12, tolerance: 3}
   - {key: logp_above_5, description: "Molecules with logP above 5.", value: 97, tolerance: 5, in_answer: false}
-  - {key: esol_r2, description: "R squared of the ESOL equation (Crippen logP) against measured values.", value: 0.752, tolerance: 0.03}
-  - {key: esol_rmse, description: "RMSE of the ESOL equation against measured values, in log units.", value: 1.10, tolerance: 0.1}
+  - {key: esol_r2, description: "R squared of the ESOL equation (Crippen logP) against measured values.", value: 0.752, tolerance: 0.03, tool: fit_solubility_model}
+  - {key: esol_rmse, description: "RMSE of the ESOL equation against measured values, in log units.", value: 1.10, tolerance: 0.1, tool: fit_solubility_model}

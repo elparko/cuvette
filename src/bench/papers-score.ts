@@ -29,6 +29,7 @@ export interface ItemScore {
   tolerance: number | "exact";
   abs: boolean;
   inAnswer: boolean;
+  reference: boolean;
   computed: ComputedMatch;
   reported: ReportedMatch;
 }
@@ -71,10 +72,11 @@ export function finalClaims(record: Pick<AnalysisRecord, "entries">): { entry: E
 }
 
 export function scoreComputed(item: PaperItem, record: Pick<AnalysisRecord, "numbers" | "nodes" | "node">): ComputedMatch {
-  const comparison = new Set(record.nodes().filter((n) => n.sensitivityOf).map((n) => n.id));
+  const nodes = record.nodes();
+  const skip = new Set(nodes.filter((n) => (n.sensitivityOf && !item.from_comparison) || (item.tool && n.tool !== item.tool)).map((n) => n.id));
   let best: { n: { node: string; path: string; value: number }; d: number } | undefined;
   for (const n of record.numbers()) {
-    if (comparison.has(n.node)) continue;
+    if (skip.has(n.node)) continue;
     const d = gap(item, n.value);
     if (!best || d < best.d) best = { n, d };
   }
@@ -130,6 +132,7 @@ export function scoreItems(items: PaperItem[], record: Pick<AnalysisRecord, "num
     tolerance: tolerance(item),
     abs: item.abs,
     inAnswer: item.in_answer,
+    reference: item.reference,
     computed: scoreComputed(item, record),
     reported: scoreReported(item, claims),
   }));

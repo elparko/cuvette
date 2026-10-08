@@ -25,7 +25,9 @@ items:
     description: Fraction of true nuclei missed at IoU 0.7, CellProfiler advanced pipeline.
     value: 0.155
     tolerance: 0.05
+    reference: true
   - key: missed_fraction_basic
     description: Fraction of true nuclei missed at IoU 0.7, CellProfiler basic pipeline.
     value: 0.201
     tolerance: 0.05
+    reference: true

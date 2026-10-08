@@ -16,6 +16,9 @@ const Item = z
     exact: z.boolean().optional(),
     abs: z.boolean().default(false),
     in_answer: z.boolean().default(true),
+    from_comparison: z.boolean().default(false),
+    reference: z.boolean().default(false),
+    tool: z.string().optional(),
   })
   .refine((i) => (i.tolerance === undefined) !== (i.exact === undefined), { message: "give exactly one of tolerance or exact" })
   .refine((i) => i.exact !== false, { message: "exact must be true when given" });
