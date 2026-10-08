@@ -1,7 +1,7 @@
 adapter:
   name: metaspace
   title: METASPACE public annotations
-  version: 0.1.4
+  version: 0.1.5
   spec: "1"
   description: Searches public METASPACE datasets, reads their metadata, lists annotations at an FDR level and database, counts annotations at FDR 5, 10 and 20 percent, and saves one ion image as a PNG file. Read only. No upload and no private data.
   authors: [onboarding agent]
