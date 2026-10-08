@@ -286,6 +286,8 @@ test("a promise survives a file name with a dot and verbs such as analyze", () =
   expect(endsWithPromise("The RMSD is 6.8 A. We need to run the filter next.")).toBe(true);
   expect(endsWithPromise("The RMSD is 6.8 A. The structures differ by 7.1 A.")).toBe(false);
   expect(endsWithPromise("328 variants remain. Let me know if you need further analysis!")).toBe(false);
+  expect(endsWithPromise("The image is 20 by 20 pixels.\n\n5. The average pixel value will be determined after the zonal statistics step.")).toBe(true);
+  expect(endsWithPromise("The new size will be determined after the reprojecting step.")).toBe(true);
 });
 
 test("an answer that says it needs to run a tool is an announced step", () => {

@@ -127,7 +127,8 @@ export function endsWithPromise(text: string): boolean {
   const last = text.trim().slice(-400).split(/(?<=[.!?:])\s+/).at(-1) ?? "";
   const intent = /\b(I will|I'll|we will|we'll|Let me(?! know)|Let's|(?:Next|Now),? (?:I|we)|I am going to|I'm going to|we are going to|we're going to)\b/i;
   const need = new RegExp(`\\b(?:I|we) (?:need|have|must) to (?:${ACTION})\\b|\\bthe next step is to\\b`, "i");
-  return intent.test(last) || need.test(last);
+  const later = /\bwill be (?:determined|calculated|computed|measured|counted|reported|obtained|done)\b[^.]*\b(?:after|in|by) (?:the|a) (?:next|later|following|\w+ statistics|\w+ing) step\b/i;
+  return intent.test(last) || need.test(last) || later.test(last);
 }
 
 export function announcesStep(text: string): boolean {
