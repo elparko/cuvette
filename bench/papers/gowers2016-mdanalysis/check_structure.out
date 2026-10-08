@@ -1,0 +1,15 @@
+atoms in PSF: 3341
+frames in DCD: 98
+backbone atoms: 855
+backbone RMSD, last frame on frame 0, Kabsch fit: 6.8203
+radius of gyration, mass weighted, frame 0: 16.669
+radius of gyration, mass weighted, last frame: 19.5916
+4AKE chain A: residues in ATOM records: 214 SEQRES length: 214
+4AKE chain B: residues in ATOM records: 214 SEQRES length: 214
+CA pairs, 4AKE A and 1AKE A: 214
+CA RMSD after Kabsch fit of 4AKE A on 1AKE A: 7.1307
+dcdplugin) detected standard 32-bit DCD file of native endianness
+dcdplugin) CHARMM format DCD file (also NAMD 2.1 and later)
+dcdplugin) Warning: DCD header claims 500 frames, but 
+dcdplugin) file size (3891252) indicates there are actually 
+98 frames of size (40116)

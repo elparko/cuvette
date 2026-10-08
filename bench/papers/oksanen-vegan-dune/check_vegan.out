@@ -1,0 +1,6 @@
+shannon_site1 1.4405
+permanova_r2 0.3416
+permanova_f 2.7672
+permanova_p, 999 permutations, numpy seeds 1 2 3 42 123: 0.002 0.005 0.002 0.002 0.003
+negative eigenvalues 5
+dispersion_f 1.9506

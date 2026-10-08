@@ -58,36 +58,55 @@ items:
   mean_difference:
     source: published
     where: Illustration I, the table of the ten patients. The mean of the differences is +1.58 hours.
+    check: R 4.6.1 gives 1.5800 (check_ttest.R).
   paired_t:
     source: computed
     tool: SciPy 1.x ttest_rel
     where: >-
       Not in this form in the paper. Student gives the mean as 1.35 times the standard deviation, with n as
       the divisor. The modern t statistic uses n - 1.
+    independence: independent
+    check: >-
+      R 4.6.1 t.test with paired = TRUE gives 4.0621. The formula mean / (sd / sqrt(n)), computed by hand,
+      gives the same value (check_ttest.R).
   degrees_of_freedom:
     source: computed
     tool: SciPy 1.x ttest_rel
     where: Not in the paper. Student indexes his table by the number of experiments (10).
+    independence: independent
+    check: R 4.6.1 t.test with paired = TRUE gives 9 (check_ttest.R).
   paired_p:
     source: computed
     tool: SciPy 1.x ttest_rel
     where: >-
       Not in the paper. Student gives a probability of 0.9985 (odds of about 666 to 1) that drug 2 is better,
       from his own table.
+    independence: independent
+    check: >-
+      R 4.6.1 t.test with paired = TRUE gives 0.002833. The t distribution, computed by hand, gives the same
+      value (check_ttest.R).
   ci_lower:
     source: computed
     tool: SciPy 1.x
     where: Not in the paper. Student does not give a confidence interval.
+    independence: independent
+    check: R 4.6.1 t.test with paired = TRUE gives 0.7001 (check_ttest.R).
   ci_upper:
     source: computed
     tool: SciPy 1.x
     where: Not in the paper. Student does not give a confidence interval.
+    independence: independent
+    check: R 4.6.1 t.test with paired = TRUE gives 2.4599 (check_ttest.R).
   welch_p_trap:
     source: computed
     tool: SciPy 1.x ttest_ind with equal_var=False
     where: >-
       Not in the paper. This is the result of the wrong test: an unpaired test on paired data. The run must
       not report it as the result.
+    independence: independent
+    check: >-
+      R 4.6.1 t.test with var.equal = FALSE gives 0.07939, with t 1.8608 and 17.776 degrees of freedom
+      (check_ttest.R).
 data:
   source: R dataset sleep, from the Rdatasets collection
   url: https://vincentarelbundock.github.io/Rdatasets/csv/datasets/sleep.csv

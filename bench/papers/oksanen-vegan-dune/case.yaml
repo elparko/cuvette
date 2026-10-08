@@ -96,7 +96,10 @@ items:
   shannon_site1:
     source: computed
     tool: vegan 2.7.6
-    where: Not printed in the vignettes for the dune data. The benchmark authors ran diversity on the dune table.
+    where: >-
+      Not printed in the vignettes for the dune data. The benchmark authors ran diversity on the dune table.
+    independence: independent
+    check: The formula -sum(p ln p) in numpy on the cover values of site 1 gives 1.4405 (check_vegan.py).
   nmds_stress:
     source: tutorial
     where: Introduction vignette, section 1.2. The metaMDS output for the dune data shows a stress of 0.1183186.
@@ -104,20 +107,34 @@ items:
     source: computed
     tool: vegan 2.7.6 adonis2
     where: Not in the help page. The help example uses another model, Management with A1 and their interaction.
+    independence: independent
+    check: >-
+      A numpy implementation of the PERMANOVA sums of squares of McArdle and Anderson (2001), on Bray-Curtis
+      distances from SciPy, gives 0.3416 (check_vegan.py).
   permanova_f:
     source: computed
     tool: vegan 2.7.6 adonis2
     where: Not in the help page. The help example uses another model. The F value does not depend on the seed.
+    independence: independent
+    check: The same numpy implementation gives a pseudo-F of 2.7672 (check_vegan.py).
   permanova_p:
     source: computed
     tool: vegan 2.7.6 adonis2, 999 permutations
     where: >-
       Not in the help page. The p-value changes in the third decimal with the seed. Seeds 1 and 42 give 0.002
       and 0.003.
+    independence: independent
+    check: >-
+      The numpy implementation with 999 random permutations gives 0.002, 0.005, 0.002, 0.002 and 0.003 for
+      five seeds. All are inside the tolerance (check_vegan.py).
   dispersion_f:
     source: computed
     tool: vegan 2.7.6 betadisper and permutest
     where: Not in the vignettes or help pages for the dune data. The test is not significant (p above 0.1).
+    independence: independent
+    check: >-
+      A numpy implementation of the betadisper method (principal coordinates, spatial median for each group,
+      correction for the 5 negative eigenvalues) followed by a one-way ANOVA gives 1.9506 (check_vegan.py).
 data:
   source: Datasets dune and dune.env in the R package vegan, written to CSV by the benchmark fetch script
   url: https://CRAN.R-project.org/package=vegan

@@ -74,28 +74,50 @@ items:
     source: computed
     tool: RDKit 2026.03.6
     where: Not in the paper. The MoleculeNet file has 1128 rows. The set in the paper is larger.
+    independence: independent
+    check: Open Babel 3.1.0 (openbabel-wheel) parses all 1128 SMILES of the file (check_esol.py, check_esol.out).
   zero_violations:
     source: computed
     tool: RDKit 2026.03.6
     where: Not in the paper. The ESOL paper does not use the rule of five.
+    independence: same path
+    check: >-
+      Open Babel 3.1.0 gives 1000, which is outside the tolerance of 5 (check_esol.py). Open Babel uses its own
+      copy of the Wildman-Crippen logP, and it gives more molecules with logP above 5 (111 against 97). The
+      check script also counts donors and acceptors with the Lipinski 1997 definitions (OH plus NH, N plus O),
+      not with the RDKit Lipinski module. The value depends on the program, so it is not checked independently.
   two_or_more_violations:
     source: computed
     tool: RDKit 2026.03.6
     where: Not in the paper. The ESOL paper does not use the rule of five.
+    independence: independent
+    check: Open Babel 3.1.0 with the Lipinski 1997 donor and acceptor definitions gives 13 (check_esol.py).
   logp_above_5:
     source: computed
     tool: RDKit 2026.03.6, Crippen logP
     where: Not in the paper. The count changes by a few molecules between RDKit versions.
+    independence: same path
+    check: >-
+      Open Babel 3.1.0 gives 111, which is outside the tolerance of 5 (check_esol.py). Both programs use the
+      Wildman-Crippen method, but their atom types differ. The logP of 299 of the 1128 molecules differs by more
+      than 0.1 between the two programs.
   esol_r2:
     source: computed
     tool: RDKit 2026.03.6
     where: >-
       Not in this form in the paper. The paper used Daylight clogP on its own data set. A secondary source
       gives R squared 0.74 for the paper. The benchmark authors did not confirm it in the paper text.
+    independence: independent
+    check: >-
+      The published equation with Open Babel 3.1.0 descriptors gives a squared correlation of 0.7469
+      (check_esol.py). The predictions in the file column "ESOL predicted", which use Delaney's clogP, give
+      0.8231. That column is a different quantity.
   esol_rmse:
     source: computed
     tool: RDKit 2026.03.6
     where: Not in the paper for this file. The value is the root mean square error in log units.
+    independence: independent
+    check: The published equation with Open Babel 3.1.0 descriptors gives an RMSE of 1.0898 log units (check_esol.py).
 data:
   source: Delaney (ESOL) set as given by MoleculeNet in the DeepChem repository
   url: https://raw.githubusercontent.com/deepchem/deepchem/master/datasets/delaney-processed.csv

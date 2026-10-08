@@ -53,17 +53,27 @@ items:
     where: >-
       Figure 2e. In animal a2, 51 sum formulas appear in all three serial sections. The MTBLS313 annotation
       table also gives 51. The benchmark marks this as a reference value.
+    check: >-
+      check_maf_counts.py reads the MTBLS313 v2 MAF table with the Python csv module. It gives 51 formulas with an
+      entry in all three columns a2s1, a2s2 and a2s3.
   unique_formulas_three_sections:
     source: computed
     tool: Count of the MTBLS313 annotation table (MAF file) by the benchmark authors
     where: >-
       Not in the paper. The paper gives 73 as the base for its 51, but the table gives 66 formulas for
       sections s1 to s3. The benchmark marks this as a reference value.
+    independence: independent
+    check: >-
+      check_maf_counts.py counts the union of the formulas in columns a2s1 to a2s3 with the Python csv module. It
+      gives 66. The METASPACE adapter does not read this table. The union for a2s1 to a2s5 is 76. No column set
+      gives the 73 of the paper.
   total_formulas:
     source: published
     where: >-
       Main text. The paper reports 103 annotations over all datasets. The MTBLS313 table has 103 unique sum
       formulas. The benchmark marks this as a reference value.
+    check: >-
+      check_maf_counts.py gives 103 unique formulas in the 236 rows of the MAF table.
 data:
   source: MetaboLights study MTBLS313, mouse animal a2, sections s1 to s3, and the study annotation table
   url: https://www.ebi.ac.uk/metabolights/MTBLS313

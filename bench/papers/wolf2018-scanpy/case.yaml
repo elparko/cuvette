@@ -11,6 +11,8 @@ citation:
 related:
   - text: "Scanpy tutorial on the preprocessing and clustering of 3k peripheral blood mononuclear cells (PBMCs). Source of the steps and of the cell and gene counts."
     url: https://scanpy.readthedocs.io/en/stable/tutorials/basics/clustering-2017.html
+  - text: "The same tutorial in the scanpy 1.10.x documentation, with the older default gene selection. Source of the count of highly variable genes."
+    url: https://scanpy.readthedocs.io/en/1.10.x/tutorials/basics/clustering-2017.html
 measured: >-
   The paper describes scanpy, a Python toolkit for single-cell gene expression data. The tutorial applies it to
   about 2700 peripheral blood mononuclear cells (PBMCs) from one healthy donor. It removes poor-quality cells and
@@ -89,18 +91,31 @@ items:
   cells_after_qc:
     source: tutorial
     where: Tutorial, filter step after the quality metrics. The printed data object has 2638 cells.
+    check: The plain numpy filters in check_hvg_leiden.py (no scanpy) keep 2638 cells.
   highly_variable_genes:
-    source: computed
-    tool: scanpy 1.12.4
+    source: tutorial
     where: >-
-      Not in the current tutorial, which uses another method and prints no count. The value uses the older default
-      method with the tutorial cutoffs.
+      Legacy tutorial "Preprocessing and clustering 3k PBMCs (legacy workflow)", scanpy 1.10.x documentation
+      (https://scanpy.readthedocs.io/en/1.10.x/tutorials/basics/clustering-2017.html). It calls
+      highly_variable_genes with min_mean 0.0125, max_mean 3 and min_disp 0.5 and the default seurat flavor.
+      The printed object after the gene selection is 2638 x 1838. The scanpy-tutorials pbmc3k notebook for
+      scanpy 1.4.5 prints the same shape. The current tutorial uses the seurat_v3 method and prints no count.
+    check: >-
+      Own numpy code of the seurat dispersion method (20 mean bins, normalized log dispersion) without scanpy
+      gives 1838 genes. Script check_hvg_leiden.py, output check_hvg_leiden.out.
   leiden_clusters:
     source: computed
     tool: scanpy 1.12.4
     where: >-
-      The current tutorial reports 8 clusters with its own gene selection. The benchmark run gives 7. The tolerance
-      of 1 accepts both.
+      No tutorial prints a count for these settings. The current tutorial (resolution 0.7, seurat_v3 genes)
+      reports 8 clusters. The legacy tutorials (default genes, resolution 0.9 or 1.0) also report 8. The
+      benchmark run gives 7. The tolerance of 1 accepts 6 to 8.
+    independence: independent
+    check: >-
+      check_hvg_leiden.py redoes the pipeline without scanpy: numpy regression and scaling, a SciPy SVD for
+      the principal components, scikit-learn exact neighbors, own code for the UMAP neighbor weights, and
+      leidenalg instead of the igraph Leiden code that scanpy uses. At resolution 0.7 it gives 7 clusters with
+      seed 0, and 7 clusters with 7 of 10 seeds (6 with the other 3). Output check_hvg_leiden.out.
 data:
   source: 10x Genomics public data set, 3k PBMCs from a healthy donor, filtered gene-barcode matrices (hg19)
   url: https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz

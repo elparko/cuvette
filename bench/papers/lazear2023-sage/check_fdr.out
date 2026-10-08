@@ -1,0 +1,7 @@
+psms_result_table 303
+decoy_psms 43
+(decoys + 1) / targets at 0.01: target_psms 207, decoy_psms_kept 1, distinct peptides 47 (without modifications 45)
+(decoys + 1) / targets at 0.05: target_psms 242, decoy_psms_kept 11, distinct peptides 64 (without modifications 61)
+decoys / targets at 0.01: target_psms 214, decoy_psms_kept 2, distinct peptides 50 (without modifications 48)
+decoys / targets at 0.05: target_psms 243, decoy_psms_kept 12, distinct peptides 65 (without modifications 62)
+for comparison, Sage spectrum_q column: target_psms at 0.01 207 at 0.05 242

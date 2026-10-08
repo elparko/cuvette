@@ -1,0 +1,7 @@
+R version 4.6.1 (2026-06-24) 
+mean_difference 1.5800
+paired_t 4.0621 (by hand 4.0621)
+degrees_of_freedom 9
+paired_p 0.002833 (by hand 0.002833)
+ci_lower 0.7001 ci_upper 2.4599
+welch_p_trap 0.07939 (t 1.8608, df 17.776)

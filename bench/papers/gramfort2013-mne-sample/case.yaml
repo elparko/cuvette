@@ -103,73 +103,128 @@ items:
   events_total:
     source: tutorial
     where: The overview tutorial prints 319 events found on the trigger channel STI 014.
+    independence: independent
+    check: >-
+      A numpy scan of the STI 014 channel for rising steps to a non-zero value finds 319 events
+      (check_events_epochs.py). MNE only reads the FIF file.
   events_id1:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+    independence: independent
+    check: >-
+      A numpy scan of the STI 014 channel finds 72 events with id 1 (check_events_epochs.py). MNE only reads
+      the FIF file.
   events_id2:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+    independence: independent
+    check: >-
+      A numpy scan of the STI 014 channel finds 73 events with id 2 (check_events_epochs.py).
   events_id3:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+    independence: independent
+    check: >-
+      A numpy scan of the STI 014 channel finds 73 events with id 3 (check_events_epochs.py).
   events_id4:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+    independence: independent
+    check: >-
+      A numpy scan of the STI 014 channel finds 70 events with id 4 (check_events_epochs.py).
   events_id5:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+    independence: independent
+    check: >-
+      A numpy scan of the STI 014 channel finds 15 events with id 5 (check_events_epochs.py).
   events_id32:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+    independence: independent
+    check: >-
+      A numpy scan of the STI 014 channel finds 16 events with id 32 (check_events_epochs.py).
   epochs_dropped:
     source: tutorial
     where: >-
       The overview tutorial prints 10 bad epochs dropped. The tutorial removes two ICA components first. The
       benchmark run without ICA drops the same 10 epochs.
+    independence: independent
+    check: >-
+      Numpy code cuts the epochs, removes the baseline, applies the four projectors of the file and the peak-
+      to-peak limits. It drops 10 epochs (check_events_epochs.py). MNE only reads the FIF file.
   epochs_kept:
     source: computed
     tool: MNE-Python 1.13.2
     where: The tutorial does not print this number. It is 319 events minus 10 dropped epochs.
+    independence: independent
+    check: >-
+      The same numpy code keeps 309 epochs (check_events_epochs.py).
   auditory_left_kept:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial. The tutorial prints only the pooled auditory counts after it equalizes the conditions.
+    independence: independent
+    check: >-
+      The same numpy code keeps 68 auditory/left epochs (check_events_epochs.py).
   n100_latency_gfp:
     source: computed
     tool: MNE-Python 1.13.2
     where: >-
       Not in the tutorial or the paper. The value is the peak of the global field power of the good
       gradiometers. The tolerance is one sample (6.7 ms).
+    independence: independent
+    check: >-
+      The numpy average of the 68 kept auditory/left epochs gives a peak of the gradiometer global field power
+      at 0.0932 s (check_events_epochs.py).
   n100_amplitude_gfp:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial or the paper.
+    independence: independent
+    check: >-
+      The same numpy average gives a gradiometer global field power peak of 42.11 fT/cm
+      (check_events_epochs.py).
   strongest_grad_latency:
     source: computed
     tool: MNE-Python 1.13.2
     where: >-
       Not in the tutorial or the paper. If the bad channel MEG 2443 stays in, it becomes the strongest channel
       and the answer changes.
+    independence: independent
+    check: >-
+      The same numpy average gives the largest absolute gradiometer value at 0.0866 s, on MEG 1332
+      (check_events_epochs.py).
   strongest_grad_amplitude:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial or the paper. The sign of one gradiometer depends on the sensor, so the score uses the absolute value.
+    independence: independent
+    check: >-
+      The same numpy average gives 198.96 fT/cm on MEG 1332 (check_events_epochs.py).
   n100_latency_eeg:
     source: computed
     tool: MNE-Python 1.13.2
     where: >-
       Not in the tutorial text. A joint plot of both auditory conditions in the tutorial marks 0.093 s, but it
       does not call that time the N100.
+    independence: independent
+    check: >-
+      The same numpy average, with the average EEG reference projector, gives the most negative EEG value at
+      0.0999 s, on EEG 012 (check_events_epochs.py).
   n100_amplitude_eeg:
     source: computed
     tool: MNE-Python 1.13.2
     where: Not in the tutorial or the paper.
+    independence: independent
+    check: >-
+      The same numpy average gives -6.01 uV on EEG 012 (check_events_epochs.py).
 data:
   source: MNE sample dataset (mne.datasets.sample), recorded at the Martinos Center with MEG and EEG at the same time
   url: https://mne.tools/stable/documentation/datasets.html

@@ -1,0 +1,10 @@
+R version 4.6.1 (2026-06-24) survival 3.8.6 
+subjects 432 events 114
+coef_fin -0.3794 coef_age -0.0574 coef_prio 0.0915
+hazard_ratio_fin 0.6843
+p_fin 0.0474
+concordance 0.6403
+logrank_chi2_fin 3.8376 logrank_p_fin 0.0501
+ph_test_p_age (cox.zph, rank transform, survival 3 score test) chisq 0.896 p 0.34374
+ph_test_p_age (cox.zph, km transform, survival 3 score test) chisq 5.974 p 0.01452
+ph_test_p_age (Grambsch-Therneau 1994 approximation, rank transform, by hand) chisq 11.157 p 0.00084

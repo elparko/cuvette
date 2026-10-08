@@ -81,22 +81,39 @@ items:
   spectra:
     source: tutorial
     where: Vignette, data section. The text and the printed object give 4,959 spectra.
+    check: >-
+      Checked on 2026-10-08 in the vignette "Segmentation of MS imaging experiments with Cardinal"
+      (CardinalWorkflows 1.44.0, Bioconductor release, built with Cardinal 3.14.0), section 2. The printed object
+      reads "MSImagingExperiment with 10200 features and 4959 spectra".
   mz_values:
     source: tutorial
     where: >-
       Vignette, data section. It gives 10,200 m/z values. The paper also gives 10,200 features for its
       five-section data.
+    check: >-
+      Checked on 2026-10-08 in the same vignette, section 2. The text says "4,959 spectra with 10,200 m/z
+      values".
   peaks:
     source: tutorial
     where: >-
       Vignette, peak processing step, with Cardinal 3.14.0. It gives 687 peaks. The count depends on the random
       10% sample and on the Cardinal version.
+    check: >-
+      Checked on 2026-10-08 in the same vignette, section 2.1 (Pre-processing). The printed object has 687
+      features, and the text says "a centroided dataset with 687 peaks". The session information names Cardinal
+      3.14.0.
   segments_s32:
     source: tutorial
     where: Vignette, table of the six fitted models. The model with s=32 has 6 segments.
+    check: >-
+      Checked on 2026-10-08 in the same vignette, section 2.3. The printed table of the six models gives 6
+      clusters for r=2, k=8, s=32.
   segments_s64:
     source: tutorial
     where: Vignette, table of the six fitted models. The model with s=64 has 3 segments and loses the heart.
+    check: >-
+      Checked on 2026-10-08 in the same vignette, section 2.3. The printed table gives 3 clusters for r=2, k=8,
+      s=64.
 data:
   source: Bioconductor package CardinalWorkflows 1.44.0, data set pig206
   url: https://bioconductor.org/packages/CardinalWorkflows/

@@ -1,0 +1,12 @@
+events found: 319
+events with id 1: 72
+events with id 2: 73
+events with id 3: 73
+events with id 4: 70
+events with id 5: 15
+events with id 32: 16
+epochs: 319 kept: 309 dropped: 10
+auditory/left epochs kept: 68
+gradiometer GFP peak: 0.0932 s, 42.11 fT/cm
+strongest gradiometer: MEG 1332 at 0.0866 s, 198.96 fT/cm
+EEG most negative channel: EEG 012 at 0.0999 s, -6.01 uV

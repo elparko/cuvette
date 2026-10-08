@@ -57,25 +57,46 @@ items:
     where: >-
       Not in the paper. The paper does not use this dataset. The count can change if METASPACE processes the
       dataset again.
+    independence: same path
+    check: >-
+      check_counts.py queries the METASPACE GraphQL API without the metaspace2020 client and counts the
+      annotations by FDR level itself. It gives 414 on 2026-10-08. The annotations and their FDR come from the
+      same METASPACE engine, so this check confirms the count but not the annotation.
   d1_hmdb_fdr10:
     source: computed
     tool: METASPACE, queried with metaspace2020 2.0.9 on 2026-10-07
     where: >-
       Not in the paper. HMDB is the comparison database, so the run must find this value in a comparison run.
+    independence: same path
+    check: >-
+      check_counts.py gives 263 on 2026-10-08 through the GraphQL API. The annotations come from the same
+      METASPACE engine.
   d2_lipidmaps_fdr10:
     source: computed
     tool: METASPACE, queried with metaspace2020 2.0.9 on 2026-10-07
     where: Not in the paper. The paper does not use this dataset.
+    independence: same path
+    check: >-
+      check_counts.py gives 191 on 2026-10-08 through the GraphQL API. The annotations come from the same
+      METASPACE engine.
   d2_hmdb_fdr10:
     source: computed
     tool: METASPACE, queried with metaspace2020 2.0.9 on 2026-10-07
     where: >-
       Not in the paper. HMDB is the comparison database, so the run must find this value in a comparison run.
+    independence: same path
+    check: >-
+      check_counts.py gives 123 on 2026-10-08 through the GraphQL API. The annotations come from the same
+      METASPACE engine.
   d1_lipidmaps_fdr5:
     source: computed
     tool: METASPACE, queried with metaspace2020 2.0.9 on 2026-10-07
     where: >-
       Not in the paper. It shows how the count falls at the stricter FDR level of 5%.
+    independence: same path
+    check: >-
+      check_counts.py gives 144 on 2026-10-08 through the GraphQL API. The annotations come from the same
+      METASPACE engine.
 data:
   source: >-
     Two public METASPACE datasets from the project AP-MALDI-PPI Mouse Brain. The method is atmospheric pressure

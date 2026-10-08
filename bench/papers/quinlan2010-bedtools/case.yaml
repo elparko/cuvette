@@ -53,20 +53,34 @@ items:
     source: computed
     tool: bedtools 2.31.1 intersect -u
     where: Not in the paper. The paper gives no numbers for these files.
+    independence: independent
+    check: >-
+      A plain Python interval sweep (no bedtools) counts 126 exons that overlap an AluY repeat by at least one
+      base. Script check_counts.py, output check_counts.out.
   overlapping_pairs:
     source: computed
     tool: bedtools 2.31.1 intersect -wo
     where: >-
       Not in the paper. There are 129 pairs but 126 exons, because one exon can overlap more than one
       repeat.
+    independence: independent
+    check: The plain Python interval sweep in check_counts.py counts 129 exon and repeat pairs.
   overlap_bases:
     source: computed
     tool: bedtools 2.31.1 intersect -wo, sum of the last column
     where: Not in the paper. The benchmark authors checked the sum with awk.
+    independence: independent
+    check: >-
+      The earlier awk check only summed the bedtools output. The plain Python interval sweep in
+      check_counts.py computes each overlap length itself and gives 33713 bases.
   merged_intervals:
     source: computed
     tool: bedtools 2.31.1 merge -d 100 on sorted input
     where: Not in the paper. The 11628 AluY repeats become 11270 intervals.
+    independence: independent
+    check: >-
+      The plain Python merge in check_counts.py joins sorted repeats with a gap of 100 bases or less and gives
+      11270 intervals.
 data:
   source: Files refseq.chr1.exons.bed and aluY.chr1.bed from the bedtools2 source repository
   url: https://github.com/arq5x/bedtools2/tree/master/data

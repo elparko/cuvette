@@ -48,36 +48,56 @@ items:
     source: computed
     tool: samtools 1.24 through pysam 0.24.1, flagstat
     where: Not in the paper or the README. The paper has no results for this data.
+    independence: independent
+    check: >-
+      A plain Python reader of the SAM text (gzip module, no samtools, htslib or pysam) counts 3307 records.
+      Script check_counts.py, output check_counts.out.
   mapped_reads:
     source: computed
     tool: samtools 1.24 through pysam 0.24.1, flagstat
     where: Not in the paper or the README. The value is 98.91 percent of all reads.
+    independence: independent
+    check: The plain Python reader in check_counts.py counts 3271 records without the unmapped flag (0x4).
   properly_paired:
     source: computed
     tool: samtools 1.24 through pysam 0.24.1, flagstat
     where: Not in the paper or the README. The value is 95.07 percent of all reads.
+    independence: independent
+    check: The plain Python reader in check_counts.py counts 3144 primary mapped reads with the proper pair flag (0x2).
   singletons:
     source: computed
     tool: samtools 1.24 through pysam 0.24.1, flagstat
     where: Not in the paper or the README. A singleton is a mapped read with an unmapped mate.
+    independence: independent
+    check: The plain Python reader in check_counts.py counts 127 primary paired reads that are mapped with an unmapped mate.
   reads_seq1:
     source: computed
     tool: samtools 1.24 through pysam 0.24.1, idxstats
     where: Not in the paper or the README. The request does not ask for this count.
+    independence: independent
+    check: The plain Python reader in check_counts.py counts 1482 mapped reads on seq1.
   reads_seq2:
     source: computed
     tool: samtools 1.24 through pysam 0.24.1, idxstats
     where: Not in the paper or the README. The request does not ask for this count.
+    independence: independent
+    check: The plain Python reader in check_counts.py counts 1789 mapped reads on seq2.
   mapq_ge_30:
     source: computed
     tool: samtools 1.24 through pysam 0.24.1, view -c -q 30
     where: Not in the paper or the README. The request does not ask for a mapping quality filter.
+    independence: independent
+    check: The plain Python reader in check_counts.py counts 3210 reads with a mapping quality of 30 or more.
   reads_seq2_100_200:
     source: computed
     tool: samtools 1.24 through pysam 0.24.1, view -c
     where: >-
       Not in the paper or the README. The README views a different region, seq2 from 450 to 550, and prints no
       count.
+    independence: independent
+    check: >-
+      The plain Python reader in check_counts.py gets the reference span of each read from its CIGAR string
+      and counts 79 reads that overlap seq2:100-200.
 data:
   source: samtools repository, examples folder (ex1.fa and ex1.sam.gz)
   url: https://github.com/samtools/samtools/tree/develop/examples

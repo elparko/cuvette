@@ -66,16 +66,26 @@ items:
     where: >-
       Captions of Figures 3 and 4 and of Figure S2. The test set has 5,720 nuclei. The benchmark authors got
       the same count from the masks.
+    check: >-
+      The benchmark authors counted the objects in the 50 test masks with skimage.measure.label, one pass for
+      each mask color. It gives 5720, the same as the paper. The cellpose adapter uses scipy.ndimage for this
+      count. Script check_true_nuclei_test.py.
   missed_fraction_advanced:
     source: published
     where: >-
       Results, the section on the splitting of adjacent nuclei, and Figure S2. The advanced CellProfiler
       pipeline misses 15.5% of nuclei at an IoU of 0.7. Reference only, because the run uses Cellpose.
+    check: >-
+      The benchmark authors read the value again in the bioRxiv full text (10.1101/335216), section 4.2:
+      advanced CellProfiler 15.5% at a minimum IoU of 0.7.
   missed_fraction_basic:
     source: published
     where: >-
       Results, the same section, and Figure S2. The basic CellProfiler pipeline misses 20.1% of nuclei at an
       IoU of 0.7. Reference only, because the run uses Cellpose.
+    check: >-
+      The benchmark authors read the value again in the bioRxiv full text (10.1101/335216), section 4.2: basic
+      CellProfiler 20.1% at a minimum IoU of 0.7.
 data:
   source: Broad Bioimage Benchmark Collection, image set BBBC039 version 1
   url: https://bbbc.broadinstitute.org/BBBC039

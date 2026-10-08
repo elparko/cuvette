@@ -92,16 +92,29 @@ items:
     where: >-
       Not in the paper or on the BBBC005 page. The benchmark authors took the published counts for the same 100
       images and divided the detected total by the true total. The published counts come from the w2 files.
+    independence: independent
+    check: >-
+      The counts come from the results file that Bray et al. published (BBBC005 page, published results), not
+      from the cellprofiler adapter. A Python standard library script repeats the division: 0.9379. Script
+      check_sample_counts.py.
   mean_abs_error_sample:
     source: computed
     tool: pandas, on the published CellProfiler counts in BBBC005_results_bray.csv
     where: >-
       Not in the paper or on the BBBC005 page. The benchmark authors computed the mean absolute error of the
       published counts for the same 100 images.
+    independence: independent
+    check: >-
+      The counts come from the published results file of Bray et al., not from the adapter. A Python standard
+      library script repeats the mean absolute error: 3.110. Script check_sample_counts.py.
   true_total_sample:
     source: computed
     tool: Python, from the C values in the file names
     where: Not in the paper. The value is the sum of the true counts in the names of the 100 sampled files.
+    independence: independent
+    check: >-
+      The truth is the C value in each simulated file name. A Python standard library script sums it over every
+      sixth sorted w2 file: 5007. Script check_sample_counts.py.
 data:
   source: Broad Bioimage Benchmark Collection, image set BBBC005 version 1, made with the SIMCEP simulator
   url: https://bbbc.broadinstitute.org/BBBC005

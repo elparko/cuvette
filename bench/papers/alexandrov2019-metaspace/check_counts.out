@@ -1,0 +1,7 @@
+queried 2026-10-08
+2022-08-16_10h14m23s MouseBrain_PlasmaPI_Pos20um FINISHED [(22, 'HMDB', 'v4'), (24, 'LipidMaps', '2017-12-12')]
+  HMDB v4: own count by FDR level {0.05: 14, 0.1: 263, 0.2: 819, 0.5: 2069}; server countAnnotations {0.05: 14, 0.1: 263}
+  LipidMaps 2017-12-12: own count by FDR level {0.05: 144, 0.1: 414, 0.2: 903, 0.5: 1934}; server countAnnotations {0.05: 144, 0.1: 414}
+2022-08-16_12h31m33s MouseBrain_PlasmaPI_Pos_TIMS FINISHED [(22, 'HMDB', 'v4'), (24, 'LipidMaps', '2017-12-12')]
+  HMDB v4: own count by FDR level {0.05: 46, 0.1: 123, 0.2: 279, 0.5: 1134}; server countAnnotations {0.05: 46, 0.1: 123}
+  LipidMaps 2017-12-12: own count by FDR level {0.05: 84, 0.1: 191, 0.2: 444, 0.5: 1456}; server countAnnotations {0.05: 84, 0.1: 191}

@@ -59,6 +59,12 @@ items:
     where: >-
       Not in the paper or the tutorial. The tutorial names the model TIM2+I+G4 but prints no log-likelihood.
       The benchmark authors ran -m MFP -B 1000 and got -21152.5377.
+    independence: independent
+    check: >-
+      Own Felsenstein pruning code in numpy and SciPy (no IQ-TREE) evaluates the IQ-TREE tree under
+      TIM2+F+I+G4 with the rate, frequency, invariant and gamma values of the IQ-TREE report. It gives
+      -21152.5378 on 1152 site patterns. This checks the likelihood calculation, not the tree search or the
+      parameter fit. Script check_log_likelihood.py, output check_log_likelihood.out.
 data:
   source: File example.phy from the example folder of the IQ-TREE 2 source repository
   url: https://raw.githubusercontent.com/iqtree/iqtree2/master/example/example.phy

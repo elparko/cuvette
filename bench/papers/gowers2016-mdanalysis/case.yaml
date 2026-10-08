@@ -74,33 +74,62 @@ items:
   atoms:
     source: tutorial
     where: The MDAnalysis quickstart prints a universe with 3341 atoms for these files.
+    independence: independent
+    check: A direct read of the !NATOM line of adk.psf gives 3341 (check_structure.py).
   frames:
     source: tutorial
     where: The MDAnalysis quickstart prints a trajectory length of 98 frames.
+    independence: independent
+    check: The DCD reader of MDTraj 1.11.2 reads 98 frames (check_structure.py).
   backbone_rmsd_last_frame:
-    source: computed
-    tool: MDAnalysis 2.10.0, rms.RMSD
+    source: tutorial
     where: >-
-      Not in the paper. The quickstart shows only the first five frames of this analysis. It also prints 6.853
-      angstrom for the first and last frames without a fit. The benchmark value uses a backbone fit.
+      MDAnalysis User Guide, example "Calculating the root mean square deviation of atomic structures"
+      (examples/analysis/alignment_and_rms/rmsd), notebook last updated with MDAnalysis 2.4.0-dev0, guide
+      version 2.9.0. It runs rms.RMSD(u, u, select='backbone', ref_frame=0) on the same PSF and DCD files. The
+      printed table gives 6.820322 angstrom in the Backbone column for frame 97, the last frame.
+    independence: independent
+    check: >-
+      MDTraj 1.11.2 reads the DCD. A numpy Kabsch fit of the 855 backbone atoms (N, CA, C, O) of the last frame
+      on frame 0 gives 6.8203 angstrom (check_structure.py).
   rg_last_frame:
-    source: computed
-    tool: MDAnalysis 2.10.0
+    source: tutorial
     where: >-
-      Not in the paper. The quickstart prints the radius of gyration for frames 0 to 19 only. Its value for
-      frame 0, 16.669 angstrom, agrees with the benchmark run.
+      MDAnalysis User Guide, example "Writing your own trajectory analysis"
+      (examples/analysis/custom_trajectory_analysis), notebook last updated with MDAnalysis 2.4.0-dev0, guide
+      version 2.9.0. The table rog_base.df for select_atoms('protein') prints a radius of gyration of 19.591575
+      angstrom for frame 97, the last frame, and 16.669018 for frame 0.
+    independence: independent
+    check: >-
+      MDTraj 1.11.2 reads the DCD. A numpy mass-weighted radius of gyration with the masses of adk.psf gives
+      19.5916 angstrom for the last frame and 16.669 for frame 0 (check_structure.py).
   residues_chain_a:
     source: computed
     tool: Bio.PDB (Biopython 1.88)
     where: Not in the paper. The benchmark authors counted the residues of chain A of PDB entry 4AKE.
+    independence: independent
+    check: >-
+      A plain text read of 4AKE.pdb gives 214 residue numbers in the ATOM records of chain A. The SEQRES records
+      also give 214 (check_structure.py).
   residues_chain_b:
     source: computed
     tool: Bio.PDB (Biopython 1.88)
     where: Not in the paper. The benchmark authors counted the residues of chain B of PDB entry 4AKE.
+    independence: independent
+    check: >-
+      A plain text read of 4AKE.pdb gives 214 residue numbers in the ATOM records of chain B. The SEQRES records
+      also give 214 (check_structure.py).
   ca_rmsd_open_closed:
     source: computed
     tool: Bio.PDB (Biopython 1.88), Superimposer
-    where: Not in the paper or the quickstart. The value is the RMSD after a fit of 4AKE chain A on 1AKE chain A.
+    where: >-
+      Not in the paper or the quickstart. The value is the RMSD after a fit of 4AKE chain A on 1AKE chain A. The
+      MDAnalysis User Guide example "Aligning a structure to another" aligns open and closed AdK, but it uses
+      other files (CRD and DCD2 against PSF and DCD) and prints 6.817 angstrom.
+    independence: independent
+    check: >-
+      A plain text read of the CA atoms of both PDB files and a numpy Kabsch fit of the 214 matched pairs give
+      7.1307 angstrom (check_structure.py).
 data:
   source: MDAnalysis test data (adk.psf, adk_dims.dcd) and PDB entries 4AKE and 1AKE
   url: https://github.com/MDAnalysis/mdanalysis/tree/develop/testsuite/MDAnalysisTests/data

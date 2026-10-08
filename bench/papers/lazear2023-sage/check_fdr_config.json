@@ -1,0 +1,23 @@
+{
+  "database": {
+    "bucket_size": 8192,
+    "enzyme": { "missed_cleavages": 1, "min_len": 5, "max_len": 50, "cleave_at": "KR", "restrict": "P" },
+    "static_mods": { "C": 57.0215 },
+    "variable_mods": { "M": [15.9949] },
+    "max_variable_mods": 2,
+    "decoy_tag": "rev_",
+    "generate_decoys": true,
+    "fasta": "/Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta"
+  },
+  "precursor_tol": { "ppm": [-10, 10] },
+  "fragment_tol": { "da": [-0.5, 0.5] },
+  "isotope_errors": [0, 0],
+  "report_psms": 1,
+  "min_peaks": 6,
+  "max_fragment_charge": 1,
+  "mzml_paths": [
+    "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA1.mzML",
+    "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA2.mzML",
+    "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA3.mzML"
+  ]
+}

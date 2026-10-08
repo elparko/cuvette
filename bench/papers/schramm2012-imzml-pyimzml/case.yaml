@@ -44,30 +44,57 @@ items:
   spectra_per_file:
     source: tutorial
     where: pyimzML test suite, tests/test_basic.py. The test checks 9 coordinates in each file.
+    check: >-
+      A standard library XML parse counts 9 spectrum elements in each imzML file (check_spectra.py).
   mz_min:
     source: computed
     tool: pyimzML 1.5.5
     where: The test suite checks only that all m/z values are between 100 and 800. The exact lowest value is computed.
+    independence: independent
+    check: >-
+      check_spectra.py reads the imzML with the Python XML parser and the ibd file with numpy, without pyimzML. It
+      gives 100.083336 in both files.
   mz_max:
     source: computed
     tool: pyimzML 1.5.5
     where: The test suite checks only that all m/z values are between 100 and 800. The exact highest value is computed.
+    independence: independent
+    check: >-
+      check_spectra.py reads the imzML with the Python XML parser and the ibd file with numpy, without pyimzML. It
+      gives 799.916687 in both files.
   max_pixel_tic:
     source: computed
     tool: pyimzML 1.5.5 and numpy
     where: Not in a source. The total ion current (TIC) of a pixel is the sum of its intensities.
+    independence: independent
+    check: >-
+      check_spectra.py sums the intensity arrays that it reads from the ibd file with numpy. It gives 243.5395 at
+      pixel (3, 3). The imzML file itself stores a TIC for each spectrum (MS:1000285), and its largest value is
+      also 243.5395.
   mean_tic:
     source: computed
     tool: pyimzML 1.5.5 and numpy
     where: Not in a source. The value is the mean total ion current (TIC) of the nine pixels, with float32 sums.
+    independence: independent
+    check: >-
+      check_spectra.py gives 161.1444 with float32 sums and with float64 sums. The mean of the nine TIC values
+      stored in the imzML file is the same.
   continuous_ibd_bytes:
     source: computed
     tool: file size of the downloaded file
     where: Not in a source. The file holds one shared m/z array and nine intensity arrays.
+    independence: independent
+    check: >-
+      check_spectra.py reads 335976 bytes from the file system. The imzML layout gives the same number: a 16-byte
+      UUID, one m/z array and nine intensity arrays of 8399 float32 values.
   processed_ibd_bytes:
     source: computed
     tool: file size of the downloaded file
     where: Not in a source. The file holds one m/z array and one intensity array for each spectrum.
+    independence: independent
+    check: >-
+      check_spectra.py reads 604744 bytes from the file system. The imzML layout gives the same number: a 16-byte
+      UUID and nine pairs of m/z and intensity arrays of 8399 float32 values.
 data:
   source: imzML example files in the pyimzML repository (tests/data), Example_Continuous and Example_Processed
   url: https://github.com/alexandrovteam/pyimzML/tree/master/tests/data
