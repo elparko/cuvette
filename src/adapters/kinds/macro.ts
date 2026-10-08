@@ -5,7 +5,7 @@ import { locate } from "../locate.ts";
 import type { AdapterModule, LoadedAdapter, ToolDef } from "../manifest.ts";
 import type { AdapterRuntime } from "../runtime.ts";
 import {
-  cap, childEnv, defTool, expand, fileKind, fmtNumber, inflight, lookup, makeRuntime, makeSummary, numberOrString,
+  cap, childEnv, samePath, defTool, expand, fileKind, fmtNumber, inflight, lookup, makeRuntime, makeSummary, numberOrString,
   placeholders, processFailure, runProcess, scalar, tablePreview, type CallDir, type Dirs, type KindContext,
 } from "./common.ts";
 
@@ -87,16 +87,6 @@ function textFor(def: ToolDef, p: ParsedStdout, files: OutputFile[], stdout: str
   for (const w of p.warnings) lines.push(`Warning: ${w}`);
   if (def.parse === "text" || (!vals.length && !files.length)) lines.push(stdout.trim());
   return cap(lines.filter(Boolean).join("\n"), 20000);
-}
-
-function samePath(p: string): string {
-  let r: string;
-  try {
-    r = realpathSync.native(p);
-  } catch {
-    r = resolve(p);
-  }
-  return process.platform === "win32" ? r.toLowerCase() : r;
 }
 
 function outputList(call: CallDir, def: ToolDef, extra: string[], macroFile: string): OutputFile[] {

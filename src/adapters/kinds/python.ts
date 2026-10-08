@@ -5,7 +5,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { Args, OutputFile, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
-import { expand, childEnv, collectOutputs, defTool, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, tail, type CallDir, type KindContext } from "./common.ts";
+import { expand, childEnv, collectOutputs, defTool, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, samePath, tail, type CallDir, type KindContext } from "./common.ts";
 import type { ToolDef } from "../manifest.ts";
 
 const WORKER = join(dirname(fileURLToPath(import.meta.url)), "python_worker.py");
@@ -160,9 +160,9 @@ export function startPython(c: KindContext): AdapterRuntime {
     }
     const files: OutputFile[] = collectOutputs(call, def);
     const f = readFields(reply.result, { scanPaths: true, inferMetrics: true });
-    const outputs = new Map<string, OutputFile>(files.map((o) => [o.path, o]));
-    for (const o of (reply.files ?? []).map((p) => outputFile(p))) outputs.set(o.path, o);
-    for (const o of f.outputs ?? []) if (!outputs.has(o.path)) outputs.set(o.path, o);
+    const outputs = new Map<string, OutputFile>(files.map((o) => [samePath(o.path), o]));
+    for (const o of (reply.files ?? []).map((p) => outputFile(p))) outputs.set(samePath(o.path), o);
+    for (const o of f.outputs ?? []) if (!outputs.has(samePath(o.path))) outputs.set(samePath(o.path), o);
     const metrics = { ...(f.metrics ?? {}), ...(reply.metrics ?? {}) };
     const entry = c.adapter.mapEntry(def.name, args);
     const out: ToolOutput = {

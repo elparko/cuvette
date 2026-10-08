@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { crc32, deflateSync } from "node:zlib";
@@ -301,6 +301,16 @@ export function prepareCall(dirs: Dirs, def: ToolDef): CallDir {
   return { dir, outputs };
 }
 
+export function samePath(p: string): string {
+  let r: string;
+  try {
+    r = realpathSync.native(p);
+  } catch {
+    r = resolve(p);
+  }
+  return process.platform === "win32" ? r.toLowerCase() : r;
+}
+
 export function listFiles(dir: string): string[] {
   const out: string[] = [];
   const walk = (d: string) => {
@@ -439,7 +449,7 @@ export function readFields(obj: unknown, opts: { inferMetrics?: boolean; scanPat
   const found = new Map<string, OutputFile>();
   if (Array.isArray(o.outputs)) for (const v of o.outputs) {
     const of = asOutputFile(v);
-    if (of) found.set(of.path, of);
+    if (of) found.set(samePath(of.path), of);
   }
   if (opts.scanPaths) pathOutputs(o, found);
   if (found.size) f.outputs = [...found.values()];

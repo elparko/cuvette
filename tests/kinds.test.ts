@@ -422,3 +422,11 @@ test("a map summary can include the tool's own summary", async () => {
   expect(makeSummary(entry, "T", {}, { summary: "Fitted the model." })).toBe("Fitted the model. Route checked.");
   expect(makeSummary(entry, "T", {}, { metrics: { n: 3 } })).toBe("T finished. n=3.");
 });
+
+test("samePath joins the two names of one file", async () => {
+  const { samePath } = await import("../src/adapters/kinds/common.ts");
+  const d = mkdtempSync(join(tmpdir(), "same-"));
+  writeFileSync(join(d, "a.png"), "x");
+  expect(samePath(join(d, "a.png"))).toBe(samePath(join(d, ".", "a.png")));
+  if (process.platform === "darwin") expect(samePath(join("/var", d.replace(/^\/private\/var\//, "").replace(/^\/var\//, ""), "a.png").replace("/var//", "/var/"))).toBe(samePath(join(d, "a.png")));
+});
