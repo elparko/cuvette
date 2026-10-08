@@ -7,8 +7,8 @@ HasImagePlaneDetails:False
 
 Images:[module_num:1|svn_version:'Unknown'|variable_revision_number:2|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
     :
-    Filter images?:Images only
-    Select the rule criteria:and (extension does isimage) (directory doesnot containregexp "[\\\\\\\\/]\\\\.")
+    Filter images?:Custom
+    Select the rule criteria:and (extension does isimage) (file doesnot startwith ".") (directory doesnot containregexp "[\\\\\\\\/]\\\\.")
 
 Metadata:[module_num:2|svn_version:'Unknown'|variable_revision_number:6|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
     Extract metadata?:No
@@ -52,7 +52,6 @@ Groups:[module_num:4|svn_version:'Unknown'|variable_revision_number:2|show_windo
     Do you want to group your images?:No
     grouping metadata count:1
     Metadata category:None
-
 
 IdentifyPrimaryObjects:[module_num:5|svn_version:'Unknown'|variable_revision_number:14|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
     Select the input image:DNA

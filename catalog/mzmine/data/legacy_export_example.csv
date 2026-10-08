@@ -1,0 +1,5 @@
+row ID,row m/z,row retention time,a.mzML Peak height,a.mzML Peak area,b.mzML Peak height,b.mzML Peak area
+1,100.0500,5.10,2000,300,2500,350
+2,150.1000,6.25,0,0,1800,200
+3,200.1500,7.40,5000,900,4000,800
+4,250.2000,8.55,1000,100,0,0

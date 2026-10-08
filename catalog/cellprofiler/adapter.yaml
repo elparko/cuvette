@@ -1,0 +1,464 @@
+adapter:
+  name: cellprofiler
+  title: CellProfiler
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Counts and measures nuclei in microscope images with CellProfiler. The adapter writes a
+    pipeline file (.cppipe) from a template with the decision values, runs CellProfiler headless
+    on a folder of images, and reads the exported CSV files. The scientist can open the same
+    pipeline file in the CellProfiler window.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: CellProfiler
+  version: "4.2.8"
+  tested_versions: []
+  homepage: https://cellprofiler.org
+  docs:
+    - https://cellprofiler-manual.s3.amazonaws.com/CellProfiler-4.2.8/index.html
+    - https://cellprofiler-manual.s3.amazonaws.com/CellProfiler-4.2.8/modules/objectprocessing.html
+
+connection:
+  kind: script
+  interpreter: ["{node}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: CELLPROFILER_PATH
+  paths:
+    - /Volumes/T7/guided-analysis/tools/cellprofiler/CellProfiler.app/Contents/MacOS/cp
+    - /Applications/CellProfiler.app/Contents/MacOS/cp
+    - ~/Applications/CellProfiler.app/Contents/MacOS/cp
+    - C:\Program Files\CellProfiler\CellProfiler.exe
+    - C:\Program Files (x86)\CellProfiler\CellProfiler.exe
+    - ~/AppData/Local/Programs/CellProfiler/CellProfiler.exe
+  which: [cellprofiler]
+  version_command: ["{program_path}", "-c", "--version"]
+  version_pattern: "Starting CellProfiler (\\d+\\.\\d+\\.\\d+)"
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return counts, areas and tables. They do not return image pixels.
+
+decisions:
+  - key: question
+    label: What question do you ask with these images?
+    kind: text
+    group: Question
+    help: Example - Does blur change the nucleus count?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - nuclei (exploratory)
+      - images or fields
+      - biological replicates (wells, animals, cultures)
+    default: images or fields
+    group: Design
+    help: >
+      Nuclei in one image are not independent samples. Use images or biological replicates for a
+      test. Use nuclei only to explore.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: pixel_size
+    label: Pixel size of the images
+    kind: text
+    default: uncalibrated
+    group: Design
+    help: Write the size and the unit, such as "0.656 um/pixel". Write "uncalibrated" if you do not know it.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: diameter_min
+    label: Smallest typical nucleus diameter (pixels)
+    kind: int
+    default: 10
+    lo: 1
+    hi: 2000
+    group: Segmentation
+    help: >
+      First number of "Typical diameter of objects, in pixel units (Min,Max)". CellProfiler uses it
+      to size the filters. Measure a few nuclei in the image before you choose. The default is the
+      CellProfiler default.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_nuclei, arg: diameter_min }
+      - { tool: write_pipeline, arg: diameter_min }
+
+  - key: diameter_max
+    label: Largest typical nucleus diameter (pixels)
+    kind: int
+    default: 40
+    lo: 2
+    hi: 5000
+    group: Segmentation
+    help: >
+      Second number of "Typical diameter of objects, in pixel units (Min,Max)". If the nuclei are
+      larger than this number, the tool can discard them or split them. The default is the
+      CellProfiler default.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_nuclei, arg: diameter_max }
+      - { tool: write_pipeline, arg: diameter_max }
+    sensitivity:
+      options: [40, 80, 120]
+      tool: count_nuclei
+      compare: [metrics.n_objects_total, metrics.mean_area]
+      max_runs: 3
+
+  - key: threshold_strategy
+    label: Threshold strategy
+    kind: choice
+    choices: [Global, Adaptive]
+    default: Global
+    group: Segmentation
+    help: >
+      Global uses one threshold for the whole image. Adaptive computes a threshold in a moving
+      window. Use Adaptive if the background is uneven.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_nuclei, arg: threshold_strategy }
+      - { tool: write_pipeline, arg: threshold_strategy }
+
+  - key: threshold_method
+    label: Thresholding method
+    kind: choice
+    choices: [Otsu, Minimum Cross-Entropy, Robust Background]
+    default: Otsu
+    group: Segmentation
+    help: >
+      The threshold decides which pixels belong to nuclei. Different methods can give different
+      counts. The agent runs the methods and shows you the counts before you choose.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_nuclei, arg: threshold_method }
+      - { tool: write_pipeline, arg: threshold_method }
+    sensitivity:
+      options: [Otsu, Minimum Cross-Entropy, Robust Background]
+      tool: count_nuclei
+      compare: [metrics.n_objects_total, metrics.mean_area]
+      max_runs: 3
+
+  - key: declump_method
+    label: Method to distinguish clumped objects
+    kind: choice
+    choices: [Intensity, Shape, None]
+    default: Intensity
+    group: Segmentation
+    help: >
+      Touching nuclei form clumps. Shape splits a clump at its narrow parts. Intensity splits it at
+      dark lines. None keeps a clump as one object, so the count is too low.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_nuclei, arg: declump_method }
+      - { tool: write_pipeline, arg: declump_method }
+    sensitivity:
+      options: [Intensity, Shape, None]
+      tool: count_nuclei
+      compare: [metrics.n_objects_total, metrics.mean_area]
+      max_runs: 3
+
+  - key: discard_border
+    label: Discard objects touching the border of the image
+    kind: bool
+    default: true
+    group: Segmentation
+    help: >
+      Nuclei cut by the image edge have a wrong size. If you discard them, the count is lower than
+      the number of nuclei in the field. The default is the CellProfiler default.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_nuclei, arg: discard_border }
+      - { tool: write_pipeline, arg: discard_border }
+
+  - key: discard_outside
+    label: Discard objects outside the diameter range
+    kind: bool
+    default: true
+    group: Segmentation
+    help: >
+      Objects smaller or larger than the diameter range leave the count. A merged clump is larger
+      than the range and leaves the count. Ask the scientist before you change it.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_nuclei, arg: discard_outside }
+      - { tool: write_pipeline, arg: discard_outside }
+
+  - key: threshold_correction
+    label: Threshold correction factor
+    kind: float
+    default: 1.0
+    lo: 0.1
+    hi: 5
+    group: Segmentation
+    help: A value above 1 raises the threshold and shrinks the objects. A value below 1 does the opposite.
+    owner: agent
+    stage: when_needed
+    links:
+      - { tool: count_nuclei, arg: threshold_correction }
+      - { tool: write_pipeline, arg: threshold_correction }
+
+map:
+  - tool: write_pipeline
+    route: "File > Import > Pipeline from File... (open the .cppipe file), or add the modules by hand with Adjust modules (+)"
+    steps:
+      - "Adjust modules (+) > Object Processing > IdentifyPrimaryObjects. Select the input image DNA. Name the objects Nuclei."
+      - "Set Use advanced settings? to Yes. Then set the fields listed under params."
+      - "Adjust modules (+) > Measurement > MeasureObjectSizeShape. Select the object set Nuclei."
+      - "Adjust modules (+) > File Processing > ExportToSpreadsheet. Data to export: Image and Nuclei."
+      - "The Images, Metadata, NamesAndTypes and Groups modules stay at their defaults. In NamesAndTypes assign the name DNA to all images."
+    params:
+      - { arg: diameter_min, label: "Typical diameter of objects, in pixel units (Min,Max)", ui_default: 10, note: First number }
+      - { arg: diameter_max, label: "Typical diameter of objects, in pixel units (Min,Max)", ui_default: 40, note: Second number }
+      - { arg: discard_outside, label: Discard objects outside the diameter range?, ui_default: true }
+      - { arg: discard_border, label: Discard objects touching the border of the image?, ui_default: true }
+      - { arg: declump_method, label: Method to distinguish clumped objects, ui_default: Intensity }
+      - { arg: dividing_lines, label: Method to draw dividing lines between clumped objects, ui_default: Intensity }
+      - { arg: smoothing_filter_size, label: Size of smoothing filter, ui_default: 10, note: "Shown after you set Automatically calculate size of smoothing filter for declumping? to No." }
+      - { arg: min_maxima_distance, label: Suppress local maxima that are closer than this minimum allowed distance, ui_default: 7, note: "Shown after you set Automatically calculate minimum allowed distance between local maxima? to No." }
+      - { arg: threshold_strategy, label: Threshold strategy, ui_default: Global }
+      - { arg: threshold_method, label: Thresholding method, ui_default: Otsu }
+      - { arg: threshold_classes, label: Two-class or three-class thresholding?, ui_default: Two classes }
+      - { arg: threshold_smoothing, label: Threshold smoothing scale, ui_default: 1.3488 }
+      - { arg: threshold_correction, label: Threshold correction factor, ui_default: 1.0 }
+      - { arg: adaptive_window, label: Size of adaptive window, ui_default: 50 }
+    fidelity: close
+    difference: "The setting labels come from the .cppipe text of CellProfiler 4.2.8. The pipeline was not opened in the CellProfiler window by a person. Route not tested by hand."
+    evidence: { source: program_definitions, test: write_pipeline_settings, note: "The labels are the setting lines of the 4.2.8 example pipeline ExampleFly.cppipe." }
+    summary: "Wrote a pipeline: diameter {diameter_min} to {diameter_max} pixels."
+
+  - tool: run_pipeline
+    route: "cellprofiler -c -r -p <pipeline.cppipe> -i <image folder> -o <output folder>"
+    steps:
+      - "File > Import > Pipeline from File... and select the .cppipe file."
+      - "Drag the image folder into the Images module panel."
+      - "File > Preferences: set the Default Output Folder."
+      - "Click Analyze Images."
+      - "Open Image.csv in the output folder. Read Count_Nuclei and Mean_Nuclei_AreaShape_Area."
+    params:
+      - { arg: pipeline, label: Pipeline file (.cppipe) }
+      - { arg: folder, label: Image folder (Images module) }
+    fidelity: close
+    difference: "The tool copies the selected files to a work folder before the run. In the CellProfiler window the Images module reads the folder. Route not tested by hand."
+    evidence: { source: docs, test: pipeline_then_run, note: "The command line is the headless run of the CellProfiler manual." }
+    summary: "{metrics.n_objects_total} nuclei in {metrics.n_images} images, mean area {metrics.mean_area} pixels."
+
+  - tool: count_nuclei
+    route: "File > Import > Pipeline from File... (the .cppipe file that the tool wrote), then Analyze Images, or: cellprofiler -c -r -p <pipeline.cppipe> -i <image folder> -o <output folder>"
+    steps:
+      - "Do the steps of write_pipeline."
+      - "Do the steps of run_pipeline."
+    params:
+      - { arg: folder, label: Image folder (Images module) }
+      - { arg: diameter_min, label: "Typical diameter of objects, in pixel units (Min,Max)", ui_default: 10, note: First number }
+      - { arg: diameter_max, label: "Typical diameter of objects, in pixel units (Min,Max)", ui_default: 40, note: Second number }
+      - { arg: discard_outside, label: Discard objects outside the diameter range?, ui_default: true }
+      - { arg: discard_border, label: Discard objects touching the border of the image?, ui_default: true }
+      - { arg: declump_method, label: Method to distinguish clumped objects, ui_default: Intensity }
+      - { arg: dividing_lines, label: Method to draw dividing lines between clumped objects, ui_default: Intensity }
+      - { arg: smoothing_filter_size, label: Size of smoothing filter, ui_default: 10 }
+      - { arg: min_maxima_distance, label: Suppress local maxima that are closer than this minimum allowed distance, ui_default: 7 }
+      - { arg: threshold_strategy, label: Threshold strategy, ui_default: Global }
+      - { arg: threshold_method, label: Thresholding method, ui_default: Otsu }
+      - { arg: threshold_classes, label: Two-class or three-class thresholding?, ui_default: Two classes }
+      - { arg: threshold_smoothing, label: Threshold smoothing scale, ui_default: 1.3488 }
+      - { arg: threshold_correction, label: Threshold correction factor, ui_default: 1.0 }
+      - { arg: adaptive_window, label: Size of adaptive window, ui_default: 50 }
+    fidelity: close
+    difference: "Same as write_pipeline and run_pipeline. Route not tested by hand."
+    evidence: { source: program_definitions, test: count_known_counts, note: "Known counts come from the C value in the BBBC005 file names." }
+    summary: "{metrics.n_objects_total} nuclei in {metrics.n_images} images, mean area {metrics.mean_area} pixels."
+
+checks:
+  - id: border_discarded
+    description: The count leaves out nuclei that touch the image border.
+    severity: warning
+    rule:
+      tool: count_nuclei
+      arg: discard_border
+      op: "=="
+      value: true
+      message: "Objects that touch the image border are discarded. The count is lower than the number of nuclei in the field. Say this, or run again with discard_border false when you compare with known counts."
+  - id: diameter_range_fit
+    description: The report does not say if the diameter range fits the nuclei.
+    severity: warning
+    text: "The report must give the diameter range, the mean object area and say whether the range fits the nuclei. It must say if merged clumps or debris leave the count because of the range."
+  - id: threshold_not_compared
+    description: The count depends on the threshold method or the declumping method, and the report does not say so.
+    severity: warning
+    text: "The report must say whether the count changes with the threshold method and the declumping method. The comparison runs must be shown as a range, not as one count."
+  - id: pseudoreplication
+    description: Statistics over nuclei from few images, shown with p-values.
+    severity: error
+    text: "The report must not give a p-value that treats nuclei from the same image as independent samples. Compare images or biological replicates."
+  - id: accuracy_not_per_group
+    description: A comparison with known counts gives one number and hides the trend with blur or density.
+    severity: warning
+    text: "If the report compares counts with known counts, it must give the error for each group (for example each blur level) and the unit of the comparison (image)."
+
+tests:
+  - id: write_pipeline_settings
+    description: The pipeline file holds the settings that the tool received. Values are set by the test, not measured.
+    calls:
+      - tool: write_pipeline
+        args: { diameter_min: 30, diameter_max: 120, discard_outside: false, discard_border: false, declump_method: Shape, dividing_lines: Shape }
+    expect:
+      - { path: ok, equals: true }
+      - { path: data.settings.diameter_min, equals: 30 }
+      - { path: data.settings.diameter_max, equals: 120 }
+      - { path: data.settings.discard_border, equals: "No" }
+      - { path: data.settings.declump_method, equals: Shape }
+      - { path: "outputs[0].path", contains: ".cppipe" }
+
+  - id: count_known_counts
+    description: >
+      Three BBBC005 images (file names give 1, 5 and 10 cells). With diameter 30 to 120, no
+      discard and declumping by shape, CellProfiler finds the same counts. The true counts come
+      from the C value in the file names. The mean area is a stability number from one run of
+      this tool, not a published number.
+    data: [data/bbbc005/SIMCEPImages_A01_C1_F1_s01_w2.TIF, data/bbbc005/SIMCEPImages_A02_C5_F1_s01_w2.TIF, data/bbbc005/SIMCEPImages_A03_C10_F1_s01_w2.TIF]
+    calls:
+      - tool: count_nuclei
+        args:
+          folder: "{adapter_dir}/data/bbbc005"
+          pattern: "*.TIF"
+          truth_regex: "_C(\\d+)_F"
+          group_regex: "_F(\\d+)_"
+          diameter_min: 30
+          diameter_max: 120
+          discard_outside: false
+          discard_border: false
+          declump_method: Shape
+          dividing_lines: Shape
+    expect:
+      - { path: metrics.n_images, equals: 3 }
+      - { path: metrics.true_total, equals: 16 }
+      - { path: metrics.n_objects_total, equals: 16 }
+      - { path: metrics.mean_abs_error, approx: 0, abs: 0.001 }
+      - { path: "table.rows[0][1]", equals: 1 }
+      - { path: "table.rows[1][1]", equals: 5 }
+      - { path: "table.rows[2][1]", equals: 10 }
+      - { path: metrics.mean_area, approx: 2705.4, rel: 0.01 }
+
+  - id: pipeline_then_run
+    description: >
+      Two tools in order. write_pipeline writes the file and run_pipeline runs it on the same
+      three images. The counts are the same as in count_known_counts.
+    data: [data/bbbc005/SIMCEPImages_A01_C1_F1_s01_w2.TIF, data/bbbc005/SIMCEPImages_A02_C5_F1_s01_w2.TIF, data/bbbc005/SIMCEPImages_A03_C10_F1_s01_w2.TIF]
+    calls:
+      - tool: write_pipeline
+        args: { diameter_min: 30, diameter_max: 120, discard_outside: false, discard_border: false, declump_method: Shape, dividing_lines: Shape }
+        save_as: wp
+      - tool: run_pipeline
+        args:
+          pipeline: "{saved.wp.data.pipeline}"
+          folder: "{adapter_dir}/data/bbbc005"
+          pattern: "*.TIF"
+          truth_regex: "_C(\\d+)_F"
+    expect:
+      - { path: metrics.n_images, equals: 3 }
+      - { path: metrics.n_objects_total, equals: 16 }
+      - { path: metrics.true_total, equals: 16 }
+
+tools:
+  - name: write_pipeline
+    title: Write a CellProfiler pipeline
+    description: >
+      Write a .cppipe file from the template with the segmentation settings. The pipeline reads
+      all images as DNA, runs IdentifyPrimaryObjects (Nuclei), MeasureObjectSizeShape and
+      ExportToSpreadsheet. It runs no images.
+    params:
+      diameter_min: { type: integer, minimum: 1, maximum: 2000, description: "Leave out. The harness sets it from the decision record. Smallest typical diameter of a nucleus in pixels. First number of Typical diameter of objects, in pixel units (Min,Max)." }
+      diameter_max: { type: integer, minimum: 2, maximum: 5000, description: "Leave out. The harness sets it from the decision record. Largest typical diameter of a nucleus in pixels. Second number of Typical diameter of objects, in pixel units (Min,Max)." }
+      discard_outside: { type: boolean, description: "Leave out. The harness sets it from the decision record. True to discard objects outside the diameter range." }
+      discard_border: { type: boolean, description: "Leave out. The harness sets it from the decision record. True to discard objects that touch the image border." }
+      declump_method: { type: string, enum: [Intensity, Shape, None], description: "Leave out. The harness sets it from the decision record. Method to distinguish clumped objects. None keeps each clump as one object." }
+      dividing_lines: { type: string, enum: [Intensity, Shape, Propagate], description: "Method to draw dividing lines between clumped objects. Leave out unless the scientist chose it. If absent, Intensity (None if the declump method is None)." }
+      smoothing_filter_size: { type: integer, minimum: 0, maximum: 500, description: "Size of smoothing filter for declumping in pixels. If absent or 0, CellProfiler calculates it from the diameter." }
+      min_maxima_distance: { type: integer, minimum: 0, maximum: 500, description: "Smallest allowed distance between local maxima in pixels. If absent or 0, CellProfiler calculates it from the diameter." }
+      threshold_strategy: { type: string, enum: [Global, Adaptive], description: "Leave out. The harness sets it from the decision record. Threshold strategy. Global uses one threshold for the image. Adaptive uses a window." }
+      threshold_method: { type: string, enum: [Otsu, Minimum Cross-Entropy, Robust Background], description: "Leave out. The harness sets it from the decision record. Thresholding method." }
+      threshold_classes: { type: string, enum: [Two classes, Three classes], default: Two classes, description: "Two-class or three-class thresholding (Otsu only). Leave out unless the scientist chose it." }
+      threshold_smoothing: { type: number, minimum: 0, default: 1.3488, description: "Threshold smoothing scale. Leave out unless the scientist chose it. 0 means 1.3488." }
+      threshold_correction: { type: number, minimum: 0.1, maximum: 5, description: "Leave out. The harness sets it from the decision record. Threshold correction factor. A value above 1 raises the threshold." }
+      adaptive_window: { type: integer, minimum: 0, maximum: 1000, default: 50, description: "Size of adaptive window in pixels. Used only with the Adaptive strategy. Leave out otherwise. 0 means 50." }
+    outputs:
+      pipeline: { kind: file, ext: .cppipe, description: The pipeline file. }
+    script: scripts/write_pipeline.mjs
+    parse: json
+
+  - name: run_pipeline
+    title: Run a pipeline on a folder
+    description: >
+      Run a .cppipe file with CellProfiler headless on the images of a folder. Gives the object
+      count and the mean area for each image. The pipeline must name the images DNA and the
+      objects Nuclei, as the file from write_pipeline does.
+    params:
+      pipeline: { type: string, description: Full path of the .cppipe file. }
+      folder: { type: string, description: "Full path of the folder with the images." }
+      pattern: { type: string, default: "*", description: "File name pattern with * and ? wildcards, such as *_w2.TIF. Not case sensitive." }
+      every_nth: { type: integer, minimum: 1, default: 1, description: "Use every nth file of the sorted list. 1 uses all files." }
+      max_images: { type: integer, minimum: 0, default: 0, description: "Use at most this many files. 0 means no limit." }
+      truth_regex: { type: string, description: "Optional regular expression with one group that reads the known count from the file name, such as _C(\\d+)_F." }
+      group_regex: { type: string, description: "Optional regular expression with one group that reads a group label from the file name, such as _F(\\d+)_. Gives accuracy for each group." }
+    required: [pipeline, folder]
+    outputs:
+      per_image: { kind: table, ext: .csv, description: One row for each image. }
+    script: scripts/run_pipeline.mjs
+    parse: json
+
+  - name: count_nuclei
+    title: Count nuclei in a folder
+    description: >
+      Write a pipeline with the settings and run it on the images of a folder in one step. Gives
+      the nucleus count and the mean area for each image, and the error against known counts if
+      truth_regex is set. Leave out the segmentation settings that the scientist decides. The harness fills them from the decision record. A run takes about one minute for CellProfiler to start, then a few
+      seconds for each image.
+    params:
+      folder: { type: string, description: "Full path of the folder with the images." }
+      pattern: { type: string, default: "*", description: "File name pattern with * and ? wildcards, such as *_w2.TIF. Not case sensitive." }
+      every_nth: { type: integer, minimum: 1, default: 1, description: "Use every nth file of the sorted list. 1 uses all files." }
+      max_images: { type: integer, minimum: 0, default: 0, description: "Use at most this many files. 0 means no limit." }
+      truth_regex: { type: string, description: "Optional regular expression with one group that reads the known count from the file name, such as _C(\\d+)_F." }
+      group_regex: { type: string, description: "Optional regular expression with one group that reads a group label from the file name, such as _F(\\d+)_. Gives accuracy for each group." }
+      diameter_min: { type: integer, minimum: 1, maximum: 2000, description: "Leave out. The harness sets it from the decision record. Smallest typical diameter of a nucleus in pixels. First number of Typical diameter of objects, in pixel units (Min,Max)." }
+      diameter_max: { type: integer, minimum: 2, maximum: 5000, description: "Leave out. The harness sets it from the decision record. Largest typical diameter of a nucleus in pixels. Second number of Typical diameter of objects, in pixel units (Min,Max)." }
+      discard_outside: { type: boolean, description: "Leave out. The harness sets it from the decision record. True to discard objects outside the diameter range." }
+      discard_border: { type: boolean, description: "Leave out. The harness sets it from the decision record. True to discard objects that touch the image border." }
+      declump_method: { type: string, enum: [Intensity, Shape, None], description: "Leave out. The harness sets it from the decision record. Method to distinguish clumped objects. None keeps each clump as one object." }
+      dividing_lines: { type: string, enum: [Intensity, Shape, Propagate], description: "Method to draw dividing lines between clumped objects. Leave out unless the scientist chose it. If absent, Intensity (None if the declump method is None)." }
+      smoothing_filter_size: { type: integer, minimum: 0, maximum: 500, description: "Size of smoothing filter for declumping in pixels. If absent or 0, CellProfiler calculates it from the diameter." }
+      min_maxima_distance: { type: integer, minimum: 0, maximum: 500, description: "Smallest allowed distance between local maxima in pixels. If absent or 0, CellProfiler calculates it from the diameter." }
+      threshold_strategy: { type: string, enum: [Global, Adaptive], description: "Leave out. The harness sets it from the decision record. Threshold strategy. Global uses one threshold for the image. Adaptive uses a window." }
+      threshold_method: { type: string, enum: [Otsu, Minimum Cross-Entropy, Robust Background], description: "Leave out. The harness sets it from the decision record. Thresholding method." }
+      threshold_classes: { type: string, enum: [Two classes, Three classes], default: Two classes, description: "Two-class or three-class thresholding (Otsu only). Leave out unless the scientist chose it." }
+      threshold_smoothing: { type: number, minimum: 0, default: 1.3488, description: "Threshold smoothing scale. Leave out unless the scientist chose it. 0 means 1.3488." }
+      threshold_correction: { type: number, minimum: 0.1, maximum: 5, description: "Leave out. The harness sets it from the decision record. Threshold correction factor. A value above 1 raises the threshold." }
+      adaptive_window: { type: integer, minimum: 0, maximum: 1000, default: 50, description: "Size of adaptive window in pixels. Used only with the Adaptive strategy. Leave out otherwise. 0 means 50." }
+    required: [folder]
+    outputs:
+      pipeline: { kind: file, ext: .cppipe, description: The pipeline file that the tool wrote. }
+      per_image: { kind: table, ext: .csv, description: One row for each image. }
+    script: scripts/count_nuclei.mjs
+    parse: json

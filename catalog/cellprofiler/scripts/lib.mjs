@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,8 +34,8 @@ export function fail(error) {
 export function renderPipeline(p) {
   const q = { ...DEFAULTS, ...p };
   if (q.diameter_min >= q.diameter_max) fail("diameter_min must be smaller than diameter_max");
-  const lines = q.declump_method === "None" ? "None" : q.dividing_lines ?? "Intensity";
-  const auto = (v) => v === undefined || v === null;
+  const lines = q.declump_method === "None" ? "None" : q.dividing_lines && q.dividing_lines !== "None" ? q.dividing_lines : "Intensity";
+  const auto = (v) => v === undefined || v === null || v === 0;
   const values = {
     diameter_min: q.diameter_min,
     diameter_max: q.diameter_max,
@@ -49,10 +49,10 @@ export function renderPipeline(p) {
     auto_distance: yn(auto(q.min_maxima_distance)),
     threshold_strategy: q.threshold_strategy,
     threshold_method: q.threshold_method,
-    threshold_smoothing: q.threshold_smoothing,
+    threshold_smoothing: q.threshold_smoothing || 1.3488,
     threshold_correction: q.threshold_correction,
     threshold_classes: q.threshold_classes,
-    adaptive_window: q.adaptive_window,
+    adaptive_window: q.adaptive_window || 50,
   };
   const text = readFileSync(TEMPLATE, "utf8").replace(/@@(\w+)@@/g, (_, k) => {
     if (!(k in values)) throw new Error(`template field ${k} has no value`);
@@ -90,11 +90,7 @@ export function stageImages(folder, dest, a) {
   mkdirSync(dest, { recursive: true });
   for (const f of files) {
     const to = join(dest, f);
-    try {
-      symlinkSync(join(folder, f), to);
-    } catch {
-      copyFileSync(join(folder, f), to);
-    }
+    copyFileSync(join(folder, f), to);
   }
   return files;
 }
@@ -105,7 +101,7 @@ export function runCellProfiler(pipeline, inputDir, outDir, timeoutMs) {
   const jh = javaHome();
   if (jh) env.JAVA_HOME = jh;
   const r = spawnSync(programPath(), ["-c", "-r", "-p", pipeline, "-i", inputDir, "-o", outDir], { env, encoding: "utf8", maxBuffer: 64e6, timeout: timeoutMs });
-  const log = `${r.stdout ?? ""}\n${r.stderr ?? ""}`;
+  const log = `${r.stdout ?? ""}\n${r.stderr ?? ""}`.split("\n").filter((l) => !/LOADER|PyInstaller/.test(l)).join("\n");
   if (r.error || r.status !== 0) fail(`CellProfiler failed (exit ${r.status}): ${(r.error?.message ?? log).slice(-1500)}`);
   if (!existsSync(join(outDir, "Image.csv"))) fail(`CellProfiler wrote no Image.csv: ${log.slice(-1500)}`);
   return log;
@@ -147,7 +143,8 @@ export function summarize(outDir, a) {
     const file = r.FileName_DNA ?? "";
     const count = Number(r.Count_Nuclei);
     const area = Number(r.Mean_Nuclei_AreaShape_Area);
-    const out = { file, count, mean_area: Number.isFinite(area) ? round(area, 3) : null, median_area: Number(r.Median_Nuclei_AreaShape_Area) || null };
+    const eqd = Number(r.Mean_Nuclei_AreaShape_EquivalentDiameter);
+    const out = { file, count, mean_area: Number.isFinite(area) ? round(area, 3) : null, median_area: Number(r.Median_Nuclei_AreaShape_Area) || null, mean_diameter: Number.isFinite(eqd) ? round(eqd, 2) : null };
     if (a.truth_regex) {
       const m = new RegExp(a.truth_regex).exec(file);
       out.true_count = m ? Number(m[1]) : null;
@@ -161,12 +158,14 @@ export function summarize(outDir, a) {
   rows.sort((x, y) => x.file.localeCompare(y.file));
   const counts = rows.map((r) => r.count);
   const areas = rows.map((r) => r.mean_area).filter((x) => x !== null);
+  const diameters = rows.map((r) => r.mean_diameter).filter((x) => x !== null);
   const metrics = {
     n_images: rows.length,
     n_objects_total: counts.reduce((s, x) => s + x, 0),
     mean_objects_per_image: round(mean(counts), 4),
     median_objects_per_image: median(counts),
     mean_area: round(mean(areas), 3),
+    mean_diameter: round(mean(diameters), 2),
   };
   const data = {};
   if (a.truth_regex) {
@@ -213,8 +212,10 @@ export function result(rows, metrics, data, extra = {}) {
   const cols = Object.keys(rows[0] ?? {});
   return {
     ok: true,
+    manualRoute: `cellprofiler -c -r -p ${extra.pipeline} -i <image folder> -o <output folder>`,
     metrics,
-    data: { ...data, ...extra },
+    ...data,
+    ...extra,
     table: { columns: cols, rows: rows.slice(0, 12).map((r) => cols.map((c) => r[c])), n_rows: rows.length, path: extra.per_image },
   };
 }

@@ -1,0 +1,376 @@
+adapter:
+  name: mzmine
+  title: MZmine
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Finds LC-MS features in mzML files with MZmine batch mode. The adapter writes a batch file
+    (mass detection, ADAP chromatogram builder, local minimum resolver, 13C isotope filter, join
+    aligner, CSV export) from a template with the decision values, runs mzmine headless, and
+    reads the exported CSV file. Blocker in mzmine 4.10.90 without a user login - only the first
+    steps (import, mass detection, chromatogram builder) run. See evidence/blocker.md.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: MZmine
+  version: "4.10.90"
+  tested_versions: []
+  homepage: https://mzmine.github.io
+  docs:
+    - https://mzmine.github.io/mzmine_documentation/
+
+connection:
+  kind: script
+  interpreter: ["{node}"]
+  startup_timeout_s: 60
+  call_timeout_s: 900
+
+locate:
+  env: MZMINE_PATH
+  paths:
+    - /Volumes/T7/guided-analysis/tools/mzmine/mzmine.app/Contents/MacOS/mzmine
+    - /Applications/mzmine.app/Contents/MacOS/mzmine
+    - ~/Applications/mzmine.app/Contents/MacOS/mzmine
+    - C:\Program Files\mzmine\mzmine.exe
+    - C:\Program Files\MZmine\MZmine.exe
+    - /opt/mzmine/bin/mzmine
+  which: [mzmine]
+  version_command: ["{program_path}", "-help"]
+  version_pattern: "Starting mzmine (\\d+\\.\\d+\\.\\d+)"
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return counts and feature tables. Some mzML data sets have no stated license. Check before you share files.
+
+decisions:
+  - key: question
+    label: What question do you ask with these runs?
+    kind: text
+    group: Question
+    help: Example - Which features differ between the low and the high spike-in level?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - features in one run (exploratory)
+      - injections (technical replicates)
+      - biological replicates (samples, animals, patients)
+    default: injections (technical replicates)
+    group: Design
+    help: Features in one run are not independent samples. Compare groups of injections or biological replicates.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: noise_level
+    label: Noise level (intensity units)
+    kind: float
+    lo: 0
+    group: Feature detection
+    help: >
+      Centroid mass detector. Peaks below this intensity are noise. Look at the intensity of the
+      baseline in the raw data. The adapter has no default. You must choose it.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_features, arg: noise_level }
+      - { tool: write_batch, arg: noise_level }
+    sensitivity:
+      options: [500, 1000, 3000]
+      tool: detect_features
+      compare: [metrics.n_features]
+      max_runs: 3
+
+  - key: mz_tolerance_ppm
+    label: m/z tolerance (ppm)
+    kind: float
+    lo: 0.1
+    hi: 1000
+    group: Feature detection
+    help: >
+      Two m/z values closer than this belong to one feature. Use the mass accuracy of the
+      instrument. The unit is ppm (parts per million), not Da. The adapter has no default.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_features, arg: mz_tolerance_ppm }
+      - { tool: write_batch, arg: mz_tolerance_ppm }
+    sensitivity:
+      options: [5, 10, 20]
+      tool: detect_features
+      compare: [metrics.n_features]
+      max_runs: 3
+
+  - key: min_height
+    label: Minimum feature height (intensity units)
+    kind: float
+    lo: 0
+    group: Feature detection
+    help: Features with a lower peak height are not kept. A high value removes noise and small real features. The adapter has no default.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_features, arg: min_height }
+      - { tool: write_batch, arg: min_height }
+    sensitivity:
+      options: [1000, 3000, 10000]
+      tool: detect_features
+      compare: [metrics.n_features]
+      max_runs: 3
+
+  - key: rt_tolerance_min
+    label: Retention time tolerance (minutes)
+    kind: float
+    lo: 0.001
+    hi: 60
+    group: Alignment
+    help: >
+      Features of different runs match if their retention times differ by less than this value.
+      Look at the drift of the retention time between your runs. The unit is minutes. The adapter has no default.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_features, arg: rt_tolerance_min }
+      - { tool: write_batch, arg: rt_tolerance_min }
+    sensitivity:
+      options: [0.05, 0.1, 0.3]
+      tool: detect_features
+      compare: [metrics.n_features, metrics.n_features_in_all_files]
+      max_runs: 3
+
+map:
+  - tool: write_batch
+    route: "Batch mode dialog: add the steps, then Save batch. The file is a .mzbatch (XML)."
+    steps:
+      - "Mass detection. Scan filters MS level 1. Mass detector Centroid. Noise level."
+      - "Chromatogram builder (ADAP). Minimum consecutive scans, Minimum intensity for consecutive scans, Minimum absolute height, Scan to scan accuracy (m/z)."
+      - "Local minimum feature resolver. Minimum absolute height, Minimum search range RT/Mobility (absolute), Peak duration range (min/mobility), Minimum scans (data points)."
+      - "13C isotope filter (formerly: isotope grouper). m/z tolerance, Retention time tolerance, Maximum charge."
+      - "Join aligner. m/z tolerance (sample-to-sample), Retention time tolerance, Weight for m/z, Weight for RT."
+      - "Export CSV (legacy MZmine 2). Export common elements row ID, row m/z, row retention time. Export data file elements Peak height, Peak area."
+    params:
+      - { arg: noise_level, label: "Noise level (Mass detection, Centroid) and Minimum intensity for consecutive scans (Chromatogram builder)" }
+      - { arg: mz_tolerance_ppm, label: "Scan to scan accuracy (m/z) ppm; m/z tolerance ppm of the 13C isotope filter; m/z tolerance (sample-to-sample) ppm of the Join aligner" }
+      - { arg: min_height, label: "Minimum absolute height (Chromatogram builder and Local minimum feature resolver)" }
+      - { arg: rt_tolerance_min, label: "Retention time tolerance (13C isotope filter and Join aligner), unit minutes" }
+      - { arg: min_scans, label: "Minimum consecutive scans (Chromatogram builder); Minimum scans (data points) (resolver)" }
+      - { arg: max_charge, label: "Maximum charge" }
+      - { arg: rt_search_range_min, label: "Minimum search range RT/Mobility (absolute)" }
+      - { arg: max_peak_duration_min, label: "Peak duration range (min/mobility), maximum" }
+    fidelity: close
+    difference: "The step names and parameter labels come from the program files of mzmine 4.10.90. The menu path and the values in the dialogs were not checked in the window. The steps after the chromatogram builder could not run without a user login. Route not tested by hand."
+    evidence: { source: program_definitions, test: write_batch_settings, note: "Labels read from the parameter classes in the mzmine jar. The program loaded the batch file with no parameter warning." }
+    summary: "Wrote a batch file up to the step {stop_after}."
+
+  - tool: run_batch
+    route: "mzmine -b <batch.mzbatch> -i <mzML file, folder pattern or list file>"
+    steps:
+      - "Import the mzML files with Raw data methods > Raw data import (drag the files into the window)."
+      - "Open Batch mode, load the batch file, click OK."
+      - "Open the exported CSV file."
+    params:
+      - { arg: batch, label: Batch file (.mzbatch) }
+      - { arg: input, label: Raw data files (-i option) }
+    fidelity: close
+    difference: "mzmine imports the files with the -i option. In the window the files are imported first. The export file name in the batch file is replaced by a path in the call folder. Route not tested by hand."
+    evidence: { source: docs, test: chromatograms_only, note: "The command line is the headless batch option of mzmine -help. The full run is blocked by the user login." }
+    summary: "{metrics.steps_finished} steps finished, {metrics.n_scans} scans read."
+
+  - tool: detect_features
+    route: "Batch mode dialog with the steps of write_batch, or: mzmine -b <batch.mzbatch> -i <files>"
+    steps:
+      - "Do the steps of write_batch."
+      - "Do the steps of run_batch."
+    params:
+      - { arg: input, label: Raw data files (-i option) }
+      - { arg: noise_level, label: "Noise level (Mass detection, Centroid) and Minimum intensity for consecutive scans (Chromatogram builder)" }
+      - { arg: mz_tolerance_ppm, label: "Scan to scan accuracy (m/z) ppm; m/z tolerance ppm of the 13C isotope filter; m/z tolerance (sample-to-sample) ppm of the Join aligner" }
+      - { arg: min_height, label: "Minimum absolute height (Chromatogram builder and Local minimum feature resolver)" }
+      - { arg: rt_tolerance_min, label: "Retention time tolerance (13C isotope filter and Join aligner), unit minutes" }
+      - { arg: min_scans, label: "Minimum consecutive scans (Chromatogram builder); Minimum scans (data points) (resolver)" }
+      - { arg: max_charge, label: "Maximum charge" }
+      - { arg: rt_search_range_min, label: "Minimum search range RT/Mobility (absolute)" }
+      - { arg: max_peak_duration_min, label: "Peak duration range (min/mobility), maximum" }
+    fidelity: close
+    difference: "Same as write_batch and run_batch. Route not tested by hand."
+    evidence: { source: program_definitions, test: chromatograms_only, note: "Only the first three steps could run." }
+    summary: "{metrics.steps_finished} steps finished, {metrics.n_scans} scans read, {metrics.n_features} features."
+
+  - tool: read_feature_table
+    route: "Open the exported CSV file in a spreadsheet program."
+    params:
+      - { arg: path, label: CSV file }
+    fidelity: close
+    difference: "The test file was written by hand in the layout of Export CSV (legacy MZmine 2). No file from a real export was read. Route not tested by hand."
+    evidence: { source: docs, test: read_table_fixture, note: "Column names row ID, row m/z, row retention time and Peak height follow the export element names in the program files." }
+    summary: "{metrics.n_features} features in {metrics.n_files} files."
+
+checks:
+  - id: batch_stopped_early
+    description: The batch stopped before the export step. There is no feature table.
+    severity: warning
+    rule:
+      tool: detect_features
+      arg: stop_after
+      op: "!="
+      value: exported
+      message: "The batch stopped before the export step. No feature count exists. Do not report a feature count from this run."
+  - id: ppm_not_da
+    description: The report mixes ppm and Da for the m/z tolerance.
+    severity: warning
+    text: "The report must give the m/z tolerance with its unit. The adapter uses ppm (parts per million). It must not call the value Da."
+  - id: settings_not_reported
+    description: The report does not give the noise level, the minimum height and the tolerances.
+    severity: warning
+    text: "The report must give the noise level, the minimum feature height, the m/z tolerance and the retention time tolerance that made the feature count."
+  - id: features_not_independent
+    description: Statistics over features or over runs of one sample as if they were independent.
+    severity: error
+    text: "The report must not give a p-value from features of one run. The unit of replication is the injection or the biological replicate."
+  - id: threshold_sensitivity
+    description: The feature count depends on the noise level and the minimum height, and the report does not say so.
+    severity: warning
+    text: "The report must say whether the feature count changes with the noise level, the minimum height and the tolerances. Show the comparison runs as a range."
+
+tests:
+  - id: write_batch_settings
+    description: The batch file holds the values that the tool received. Values are set by the test, not measured.
+    calls:
+      - tool: write_batch
+        args: { noise_level: 1000, mz_tolerance_ppm: 10, min_height: 3000, rt_tolerance_min: 0.1 }
+    expect:
+      - { path: ok, equals: true }
+      - { path: data.settings.noise_level, equals: 1000 }
+      - { path: data.settings.mz_tolerance_ppm, equals: 10 }
+      - { path: data.settings.min_height, equals: 3000 }
+      - { path: data.stop_after, equals: exported }
+      - { path: "outputs[0].path", contains: ".mzbatch" }
+
+  - id: chromatograms_only
+    description: >
+      The cut mzML file (RT 600 to 660 s, m/z 100 to 200 of 2012_02_03_PStd_050_1) has 238 MS1
+      scans. The scan count comes from pyOpenMS and is independent of this tool. mzmine reads 238 scans and
+      runs three steps (import, mass detection, chromatogram builder). Later steps need a user login.
+    data: [data/PStd_050_1_rt600-660_mz100-200.mzML]
+    calls:
+      - tool: detect_features
+        args:
+          input: "{adapter_dir}/data/PStd_050_1_rt600-660_mz100-200.mzML"
+          noise_level: 1000
+          mz_tolerance_ppm: 10
+          min_height: 3000
+          rt_tolerance_min: 0.1
+          stop_after: chromatograms
+    expect:
+      - { path: ok, equals: true }
+      - { path: metrics.n_scans, equals: 238 }
+      - { path: metrics.n_files, equals: 1 }
+      - { path: metrics.steps_finished, equals: 3 }
+
+  - id: two_tools_chromatograms
+    description: write_batch then run_batch in order, with the same result as chromatograms_only.
+    data: [data/PStd_050_1_rt600-660_mz100-200.mzML]
+    calls:
+      - tool: write_batch
+        args: { noise_level: 1000, mz_tolerance_ppm: 10, min_height: 3000, rt_tolerance_min: 0.1, stop_after: chromatograms }
+        save_as: wb
+      - tool: run_batch
+        args:
+          batch: "{saved.wb.data.batch}"
+          input: "{adapter_dir}/data/PStd_050_1_rt600-660_mz100-200.mzML"
+    expect:
+      - { path: metrics.n_scans, equals: 238 }
+      - { path: metrics.steps_finished, equals: 3 }
+
+  - id: read_table_fixture
+    description: The parser reads a hand-made table in the layout of Export CSV (legacy MZmine 2). The numbers are set by the file, not measured by mzmine.
+    data: [data/legacy_export_example.csv]
+    calls:
+      - tool: read_feature_table
+        args: { path: "{adapter_dir}/data/legacy_export_example.csv" }
+    expect:
+      - { path: metrics.n_features, equals: 4 }
+      - { path: metrics.n_files, equals: 2 }
+      - { path: metrics.n_features_in_all_files, equals: 2 }
+      - { path: metrics.mean_mz, approx: 175.125, abs: 0.0001 }
+      - { path: metrics.median_height, approx: 2250, abs: 0.1 }
+
+tools:
+  - name: write_batch
+    title: Write an mzmine batch file
+    description: >
+      Write a .mzbatch file from the template: mass detection, ADAP chromatogram builder, local
+      minimum resolver, 13C isotope filter, join aligner and CSV export. It runs no data. Use
+      stop_after to cut the batch.
+    params:
+      noise_level: { type: number, minimum: 0, description: "Noise level of the Centroid mass detector, in intensity units. Intensities below it are noise. Also the minimum intensity for consecutive scans of the chromatogram builder. The scientist chooses it." }
+      mz_tolerance_ppm: { type: number, exclusiveMinimum: 0, maximum: 1000, description: "m/z tolerance in ppm (parts per million). Used for chromatogram building, deisotoping and alignment." }
+      min_height: { type: number, minimum: 0, description: "Minimum absolute height of a feature, in intensity units." }
+      rt_tolerance_min: { type: number, exclusiveMinimum: 0, maximum: 60, description: "Retention time tolerance in minutes. Used for deisotoping and alignment." }
+      min_scans: { type: integer, minimum: 1, default: 5, description: "Minimum consecutive scans of a chromatogram and minimum data points of a feature. Template value, not a program default." }
+      max_charge: { type: integer, minimum: 1, maximum: 8, default: 2, description: "Maximum charge for the 13C isotope filter. Template value." }
+      rt_search_range_min: { type: number, exclusiveMinimum: 0, default: 0.05, description: "Minimum search range in minutes of the local minimum feature resolver. Template value." }
+      max_peak_duration_min: { type: number, exclusiveMinimum: 0, default: 1.0, description: "Longest feature duration in minutes for the resolver. Template value." }
+      stop_after: { type: string, enum: [chromatograms, resolved, deisotoped, aligned, exported], default: exported, description: "Last step to include. mzmine 4.10.90 needs a user login for every step after chromatograms. Without a login only chromatograms runs." }
+    required: [noise_level, mz_tolerance_ppm, min_height, rt_tolerance_min]
+    outputs:
+      batch: { kind: file, ext: .mzbatch, description: The batch file. }
+    script: scripts/write_batch.mjs
+    parse: json
+
+  - name: run_batch
+    title: Run a batch file
+    description: >
+      Run a .mzbatch file with mzmine headless on mzML files. Reads the exported CSV file if the
+      batch has the export step. The batch file must come from write_batch.
+    params:
+      batch: { type: string, description: Full path of the .mzbatch file. }
+      input: { type: string, description: "mzML file, a glob pattern such as /data/*.mzML, or a text file with one path on each line." }
+    required: [batch, input]
+    outputs:
+      features: { kind: table, ext: .csv, description: The feature table that the export step wrote. }
+    script: scripts/run_batch.mjs
+    parse: json
+
+  - name: detect_features
+    title: Detect features in mzML files
+    description: >
+      Write the batch file and run it in one step. Gives the number of scans read, the steps that
+      finished, and the feature table if the export step ran. mzmine 4.10.90 needs a user login for
+      every step after the chromatogram builder.
+    params:
+      input: { type: string, description: "mzML file, a glob pattern such as /data/*.mzML, or a text file with one path on each line." }
+      noise_level: { type: number, minimum: 0, description: "Noise level of the Centroid mass detector, in intensity units. Intensities below it are noise. Also the minimum intensity for consecutive scans of the chromatogram builder. The scientist chooses it." }
+      mz_tolerance_ppm: { type: number, exclusiveMinimum: 0, maximum: 1000, description: "m/z tolerance in ppm (parts per million). Used for chromatogram building, deisotoping and alignment." }
+      min_height: { type: number, minimum: 0, description: "Minimum absolute height of a feature, in intensity units." }
+      rt_tolerance_min: { type: number, exclusiveMinimum: 0, maximum: 60, description: "Retention time tolerance in minutes. Used for deisotoping and alignment." }
+      min_scans: { type: integer, minimum: 1, default: 5, description: "Minimum consecutive scans of a chromatogram and minimum data points of a feature. Template value, not a program default." }
+      max_charge: { type: integer, minimum: 1, maximum: 8, default: 2, description: "Maximum charge for the 13C isotope filter. Template value." }
+      rt_search_range_min: { type: number, exclusiveMinimum: 0, default: 0.05, description: "Minimum search range in minutes of the local minimum feature resolver. Template value." }
+      max_peak_duration_min: { type: number, exclusiveMinimum: 0, default: 1.0, description: "Longest feature duration in minutes for the resolver. Template value." }
+      stop_after: { type: string, enum: [chromatograms, resolved, deisotoped, aligned, exported], default: exported, description: "Last step to include. mzmine 4.10.90 needs a user login for every step after chromatograms. Without a login only chromatograms runs." }
+    required: [input, noise_level, mz_tolerance_ppm, min_height, rt_tolerance_min]
+    outputs:
+      batch: { kind: file, ext: .mzbatch, description: The batch file that the tool wrote. }
+      features: { kind: table, ext: .csv, description: The feature table that the export step wrote. }
+    script: scripts/detect_features.mjs
+    parse: json
+
+  - name: read_feature_table
+    title: Read a feature table
+    description: Read a CSV file in the layout of Export CSV (legacy MZmine 2). Gives the number of features, the m/z and retention time means and the detections in each file.
+    params:
+      path: { type: string, description: Full path of the CSV file. }
+    required: [path]
+    read_only: true
+    script: scripts/read_feature_table.mjs
+    parse: json
