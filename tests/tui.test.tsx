@@ -134,18 +134,21 @@ describe("cards", () => {
     const { h, s } = start({ autoSetup: true });
     await until(() => h.all().includes("Setup: your choices for this analysis"));
     h.type("\r");
-    await sleep(250);
+    await sleep(600);
     await type(h, "Does X differ?");
     h.type("\r");
-    await sleep(250);
+    await sleep(600);
     await type(h, "\x1b[B");
     h.type("\r");
-    await sleep(250);
+    await sleep(600);
     await type(h, "\x7f");
     await type(h, "12");
     h.type("\r");
-    await sleep(250);
-    for (let i = 0; i < 6; i++) await type(h, "\x1b[B");
+    await sleep(600);
+    for (let i = 0; i < 6; i++) {
+      await type(h, "\x1b[B");
+      await sleep(60);
+    }
     h.type("\r");
     await until(() => s.record.entries(["setup"]).length === 1);
     expect(s.decisions.value("question")).toBe("Does X differ?");
