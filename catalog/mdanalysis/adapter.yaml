@@ -1,0 +1,733 @@
+adapter:
+  name: mdanalysis
+  title: MDAnalysis and Bio.PDB
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Measures molecular dynamics trajectories with MDAnalysis (RMSD, RMSF, radius of gyration,
+    contacts, hydrogen bonds) and structure files with Bio.PDB (residues per chain, distances,
+    superposition). Each tool is one Python call that the scientist can repeat by hand.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: MDAnalysis
+  version: ""
+  tested_versions: ["2.10.0"]
+  homepage: https://www.mdanalysis.org
+  docs:
+    - https://userguide.mdanalysis.org/stable/examples/analysis/alignment_and_rms/rmsd.html
+    - https://docs.mdanalysis.org/stable/documentation_pages/analysis/rms.html
+    - https://docs.mdanalysis.org/stable/documentation_pages/analysis/hydrogenbonds.html
+    - https://biopython.org/docs/latest/api/Bio.PDB.html
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: GA_MDANALYSIS_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/mdanalysis/bin/python
+    - ~/.guided-analysis/envs/mdanalysis/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import MDAnalysis; print(MDAnalysis.__version__)"]
+  version_pattern: '(\d+\.\d+\.\d+)'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and plots. It never sees the coordinate files.
+
+decisions:
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - frames of one trajectory (descriptive only)
+      - independent simulations or independent structures
+    default: independent simulations or independent structures
+    group: Design
+    help: >
+      Frames of one trajectory are correlated. They are not independent samples. Use independent
+      simulations, with different starting velocities, to compare conditions.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: fit_select
+    label: Atoms used to fit (superpose) each frame
+    kind: text
+    default: backbone
+    group: Reference and fit
+    help: >
+      An MDAnalysis selection. The fit removes rotation and translation of the whole molecule.
+      The atoms chosen here set what counts as stable. A fit on the whole protein hides a
+      moving domain. A fit on one domain shows the other domain as moving.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: rmsd_trajectory, arg: fit_select }
+      - { tool: rmsf_per_residue, arg: fit_select }
+
+  - key: fit_before_rmsd
+    label: Fit (superpose) each frame before the measurement
+    kind: bool
+    default: true
+    group: Reference and fit
+    help: >
+      With a fit, RMSD measures the change of shape. Without a fit, RMSD also counts rotation
+      and translation of the whole molecule. Choose no fit only if the frames are already aligned.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: rmsd_trajectory, arg: fit }
+      - { tool: rmsf_per_residue, arg: fit }
+    sensitivity:
+      options: [true, false]
+      tool: rmsd_trajectory
+      compare: [metrics.rmsd_last, metrics.rmsd_mean]
+      max_runs: 2
+
+  - key: reference_frame
+    label: Reference frame
+    kind: int
+    default: 0
+    lo: 0
+    hi: 100000000
+    group: Reference and fit
+    help: >
+      Index of the frame that all other frames are compared with. Frame 0 is the first frame.
+      The first frame is often not the most relaxed structure. A crystal structure or an average
+      structure is a different reference. The RMSD values change with this choice.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: rmsd_trajectory, arg: reference_frame }
+      - { tool: rmsf_per_residue, arg: reference_frame }
+
+  - key: rmsd_select
+    label: Atoms measured for RMSD
+    kind: text
+    default: backbone
+    group: Measurement
+    help: >
+      An MDAnalysis selection. The backbone selection is N, CA, C and O of protein residues. An
+      all-atom selection gives larger values because side chains move more. Report the selection
+      with every RMSD value.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: rmsd_trajectory, arg: select }
+
+  - key: frame_stride
+    label: Frame stride
+    kind: int
+    default: 1
+    lo: 1
+    hi: 100000
+    group: Measurement
+    help: >
+      Use every nth frame. A stride of 1 uses all frames. A larger stride saves time and can
+      skip fast events. The last frame is not used if the stride does not reach it.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: rmsd_trajectory, arg: stride }
+      - { tool: rmsf_per_residue, arg: stride }
+      - { tool: radius_of_gyration, arg: stride }
+      - { tool: count_contacts, arg: stride }
+      - { tool: find_hydrogen_bonds, arg: stride }
+
+  - key: rmsf_select
+    label: Atoms measured for RMSF
+    kind: text
+    default: protein and name CA
+    group: Measurement
+    help: An MDAnalysis selection. The default gives one value for each residue (the alpha carbon).
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: rmsf_per_residue, arg: select }
+
+  - key: rg_select
+    label: Atoms for the radius of gyration
+    kind: text
+    default: protein
+    group: Measurement
+    help: An MDAnalysis selection. The radius of gyration is weighted by atom mass.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: radius_of_gyration, arg: select }
+
+  - key: contact_select_a
+    label: First group for contacts
+    kind: text
+    group: Contacts
+    help: An MDAnalysis selection, for example "resid 1-50 and backbone". The two groups must have no common atoms.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_contacts, arg: select_a }
+
+  - key: contact_select_b
+    label: Second group for contacts
+    kind: text
+    group: Contacts
+    help: An MDAnalysis selection. The two groups must have no common atoms.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_contacts, arg: select_b }
+
+  - key: contact_cutoff
+    label: Contact cutoff (angstrom)
+    kind: float
+    default: 4.5
+    lo: 0.5
+    hi: 30
+    group: Contacts
+    help: Two atoms are in contact if their distance is at most this value. The MDAnalysis contacts tutorial uses 4.5 A. The count changes strongly with this value.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_contacts, arg: cutoff }
+    sensitivity:
+      options: [3.5, 4.5, 6.0]
+      tool: count_contacts
+      compare: [metrics.pairs_mean, metrics.pairs_last]
+      max_runs: 3
+
+  - key: hbond_donors
+    label: Hydrogen bond donor atoms
+    kind: text
+    default: protein and name N
+    group: Hydrogen bonds
+    help: >
+      An MDAnalysis selection for the heavy atoms that carry the hydrogen. The default covers the
+      backbone amide nitrogen only. Add side chain donors if the question needs them.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_hydrogen_bonds, arg: donors_sel }
+
+  - key: hbond_hydrogens
+    label: Hydrogen bond hydrogen atoms
+    kind: text
+    default: protein and name HN
+    group: Hydrogen bonds
+    help: An MDAnalysis selection for the hydrogens. The name HN is the amide hydrogen in CHARMM force fields. Other force fields use H.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_hydrogen_bonds, arg: hydrogens_sel }
+
+  - key: hbond_acceptors
+    label: Hydrogen bond acceptor atoms
+    kind: text
+    default: protein and name O
+    group: Hydrogen bonds
+    help: An MDAnalysis selection for the acceptors. The default covers the backbone carbonyl oxygen only.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_hydrogen_bonds, arg: acceptors_sel }
+
+  - key: hbond_distance_cutoff
+    label: Hydrogen bond donor-acceptor distance cutoff (angstrom)
+    kind: float
+    default: 3.0
+    lo: 1.5
+    hi: 6
+    group: Hydrogen bonds
+    help: The MDAnalysis default is 3.0 A, measured between the donor and the acceptor.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_hydrogen_bonds, arg: d_a_cutoff }
+    sensitivity:
+      options: [2.8, 3.0, 3.5]
+      tool: find_hydrogen_bonds
+      compare: [metrics.hbonds_mean, metrics.n_unique_donor_acceptor_pairs]
+      max_runs: 3
+
+  - key: hbond_angle_cutoff
+    label: Hydrogen bond angle cutoff (degrees)
+    kind: float
+    default: 150
+    lo: 90
+    hi: 180
+    group: Hydrogen bonds
+    help: The MDAnalysis default is 150 degrees for the donor-hydrogen-acceptor angle. A bond must have at least this angle.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_hydrogen_bonds, arg: d_h_a_angle_cutoff }
+
+  - key: pdb_fit_atoms
+    label: Atoms used to superpose two structures
+    kind: choice
+    choices: [CA, backbone]
+    default: CA
+    group: Structures
+    help: CA fits the alpha carbons only. Backbone fits N, CA, C and O. The RMSD after the fit depends on this choice and on which chains the scientist pairs.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: superpose_structures, arg: fit_atoms }
+
+tools:
+  - name: inspect_trajectory
+    title: Inspect the trajectory
+    description: Show the number of atoms, residues, frames, the time step, the segment names and the atom count of common selections. Run this before any measurement.
+    read_only: true
+    function: "ga_mdanalysis:inspect_trajectory"
+    params:
+      topology: { type: string, minLength: 1, description: "Absolute path of the topology file (PSF, PDB, GRO, TPR and others that MDAnalysis reads)." }
+      trajectory: { type: string, description: "Absolute path of the trajectory file (DCD, XTC, TRR and others). Leave out for a single structure." }
+    required: [topology]
+
+  - name: rmsd_trajectory
+    title: RMSD over the trajectory
+    description: >
+      Root mean square deviation of the selected atoms in each frame against the reference frame.
+      With fit true, each frame is superposed on the reference using fit_select first. Writes a
+      table and a plot. Values are in angstrom.
+    function: "ga_mdanalysis:rmsd_trajectory"
+    params:
+      topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
+      trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
+      select: { type: string, description: Atoms to measure, as an MDAnalysis selection. }
+      fit_select: { type: string, description: Atoms for the superposition, as an MDAnalysis selection. If empty, select is used. }
+      fit: { type: boolean, description: Superpose each frame before the measurement. }
+      reference_frame: { type: integer, minimum: 0, description: Index of the reference frame. }
+      stride: { type: integer, minimum: 1, description: Use every nth frame. }
+      start: { type: integer, minimum: 0, default: 0, description: First frame index. }
+      stop: { type: integer, description: Frame index to stop before. If empty, use all frames to the end. }
+    required: [topology, trajectory]
+    outputs:
+      table: { kind: table, ext: csv, description: "Frame, time and RMSD." }
+      plot: { kind: image, ext: png, description: RMSD against time. }
+
+  - name: rmsf_per_residue
+    title: RMSF of the selected atoms
+    description: >
+      Root mean square fluctuation of each selected atom around its mean position. With fit true,
+      all frames are superposed on the reference frame first. Writes a table and a plot. Values are in angstrom.
+    function: "ga_mdanalysis:rmsf_per_residue"
+    params:
+      topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
+      trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
+      select: { type: string, description: Atoms to measure, as an MDAnalysis selection. }
+      fit_select: { type: string, description: Atoms for the superposition, as an MDAnalysis selection. }
+      fit: { type: boolean, description: Superpose each frame before the measurement. }
+      reference_frame: { type: integer, minimum: 0, description: Index of the reference frame. }
+      stride: { type: integer, minimum: 1, description: Use every nth frame. }
+      start: { type: integer, minimum: 0, default: 0 }
+      stop: { type: integer }
+    required: [topology, trajectory]
+    outputs:
+      table: { kind: table, ext: csv, description: Residue and RMSF. }
+      plot: { kind: image, ext: png, description: RMSF along the selection. }
+
+  - name: radius_of_gyration
+    title: Radius of gyration
+    description: Mass-weighted radius of gyration of the selected atoms in each frame, in angstrom. Writes a table and a plot.
+    function: "ga_mdanalysis:radius_of_gyration"
+    params:
+      topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
+      trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
+      select: { type: string, description: Atoms to measure, as an MDAnalysis selection. }
+      stride: { type: integer, minimum: 1, description: Use every nth frame. }
+      start: { type: integer, minimum: 0, default: 0 }
+      stop: { type: integer }
+    required: [topology, trajectory]
+    outputs:
+      table: { kind: table, ext: csv, description: "Frame, time and radius of gyration." }
+      plot: { kind: image, ext: png, description: Radius of gyration against time. }
+
+  - name: count_contacts
+    title: Count contacts between two groups
+    description: >
+      Count atom pairs, one atom from each group, with a distance of at most the cutoff in each
+      frame. Also counts the residue pairs. Writes a table and a plot.
+    function: "ga_mdanalysis:count_contacts"
+    params:
+      topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
+      trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
+      select_a: { type: string, description: First group, as an MDAnalysis selection. }
+      select_b: { type: string, description: Second group, as an MDAnalysis selection. }
+      cutoff: { type: number, minimum: 0.5, description: Contact distance in angstrom. }
+      stride: { type: integer, minimum: 1, description: Use every nth frame. }
+      start: { type: integer, minimum: 0, default: 0 }
+      stop: { type: integer }
+    required: [topology, trajectory]
+    outputs:
+      table: { kind: table, ext: csv, description: Contacts in each frame. }
+      plot: { kind: image, ext: png, description: Contacts against time. }
+
+  - name: find_hydrogen_bonds
+    title: Find hydrogen bonds
+    description: >
+      Find hydrogen bonds with the MDAnalysis geometric rule: donor-acceptor distance at most
+      d_a_cutoff and donor-hydrogen-acceptor angle at least d_h_a_angle_cutoff. The topology must
+      have hydrogen atoms. Writes the count in each frame, every bond event and a plot.
+    function: "ga_mdanalysis:find_hydrogen_bonds"
+    params:
+      topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
+      trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
+      donors_sel: { type: string, description: Donor heavy atoms, as an MDAnalysis selection. }
+      hydrogens_sel: { type: string, description: Hydrogen atoms, as an MDAnalysis selection. }
+      acceptors_sel: { type: string, description: Acceptor atoms, as an MDAnalysis selection. }
+      d_a_cutoff: { type: number, minimum: 1.5, description: Donor-acceptor distance cutoff in angstrom. }
+      d_h_a_angle_cutoff: { type: number, minimum: 90, maximum: 180, description: Minimum donor-hydrogen-acceptor angle in degrees. }
+      stride: { type: integer, minimum: 1, description: Use every nth frame. }
+      start: { type: integer, minimum: 0, default: 0 }
+      stop: { type: integer }
+    required: [topology, trajectory]
+    outputs:
+      per_frame: { kind: table, ext: csv, description: Hydrogen bonds in each frame. }
+      events: { kind: table, ext: csv, description: "Each hydrogen bond with residues, distance and angle." }
+      plot: { kind: image, ext: png, description: Hydrogen bonds against frame. }
+
+  - name: inspect_structure
+    title: Inspect a structure file
+    description: Read a PDB or mmCIF file with Bio.PDB. Show the number of models, the chains, and the standard residues, hetero residues and water molecules of each chain.
+    read_only: true
+    function: "ga_mdanalysis:inspect_structure"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the PDB or mmCIF file. }
+    required: [path]
+
+  - name: measure_distance
+    title: Distance between two atoms
+    description: Distance in angstrom between two named atoms of standard residues in one model, read with Bio.PDB.
+    read_only: true
+    function: "ga_mdanalysis:measure_distance"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the PDB file. }
+      chain_a: { type: string, description: Chain id of the first atom. }
+      resid_a: { type: integer, description: Residue number of the first atom. }
+      atom_a: { type: string, description: Atom name of the first atom, such as CA. }
+      chain_b: { type: string, description: Chain id of the second atom. }
+      resid_b: { type: integer, description: Residue number of the second atom. }
+      atom_b: { type: string, description: Atom name of the second atom. }
+      model: { type: integer, minimum: 0, default: 0, description: Model index. }
+    required: [path, chain_a, resid_a, atom_a, chain_b, resid_b, atom_b]
+
+  - name: superpose_structures
+    title: Superpose two chains
+    description: >
+      Fit one chain on another with Bio.PDB Superimposer. Residues are paired by residue number
+      and must have the same name. Reports the RMSD in angstrom before and after the fit and writes
+      the fitted chain as a PDB file.
+    function: "ga_mdanalysis:superpose_structures"
+    params:
+      mobile_path: { type: string, minLength: 1, description: Absolute path of the PDB file with the chain that moves. }
+      reference_path: { type: string, minLength: 1, description: Absolute path of the PDB file with the reference chain. }
+      mobile_chain: { type: string, description: Chain id in the mobile file. }
+      reference_chain: { type: string, description: Chain id in the reference file. }
+      fit_atoms: { type: string, enum: [CA, backbone], description: "CA fits alpha carbons. backbone fits N, CA, C and O." }
+      mobile_model: { type: integer, minimum: 0, default: 0 }
+      reference_model: { type: integer, minimum: 0, default: 0 }
+    required: [mobile_path, reference_path, mobile_chain, reference_chain]
+    outputs:
+      fitted: { kind: file, ext: pdb, description: The fitted chain. }
+
+map:
+  - tool: inspect_trajectory
+    route: |
+      u = mda.Universe(topology, trajectory)
+      print(len(u.atoms), len(u.residues), len(u.trajectory))
+    params:
+      - { arg: topology, label: topology }
+      - { arg: trajectory, label: trajectory }
+    fidelity: exact
+    evidence: { source: docs, test: adk-inspect, note: "The MDAnalysis quickstart prints 3341 atoms and 98 frames for the AdK files." }
+
+  - tool: rmsd_trajectory
+    match: { fit: true }
+    route: |
+      from MDAnalysis.analysis import rms
+      R = rms.RMSD(u, u, select="backbone", ref_frame=0).run(step=1)
+      R.results.rmsd   # columns: frame, time, RMSD
+    params:
+      - { arg: select, label: select, ui_default: all }
+      - { arg: reference_frame, label: ref_frame, ui_default: 0 }
+      - { arg: stride, label: step, ui_default: 1 }
+      - { arg: fit_select, label: select (fit atoms; groupselections hold the measured atoms) }
+    fidelity: exact
+    evidence: { source: docs, test: adk-rmsd-last, note: "A numpy Kabsch fit gives the same RMSD. The MDAnalysis RMSD guide uses the same call." }
+
+  - tool: rmsd_trajectory
+    match: { fit: false }
+    route: |
+      R = rms.RMSD(u, u, select="backbone", superposition=False, ref_frame=0).run(step=1)
+    params:
+      - { arg: select, label: select }
+      - { arg: reference_frame, label: ref_frame, ui_default: 0 }
+    fidelity: exact
+    evidence: { source: docs, test: adk-rmsd-nofit }
+
+  - tool: rmsf_per_residue
+    route: |
+      ref = mda.Universe(topology, trajectory); ref.trajectory[0]
+      u.transfer_to_memory(step=1)
+      align.AlignTraj(u, ref, select="backbone", in_memory=True).run()
+      rms.RMSF(u.select_atoms("protein and name CA")).run().results.rmsf
+    params:
+      - { arg: select, label: RMSF atom group, ui_default: protein and name CA }
+      - { arg: fit_select, label: select (AlignTraj), ui_default: all }
+      - { arg: reference_frame, label: reference frame }
+      - { arg: stride, label: step }
+    fidelity: exact
+    evidence: { source: docs, test: adk-rmsf, note: "A numpy Kabsch fit and RMSF calculation gives the same mean and maximum." }
+
+  - tool: radius_of_gyration
+    route: |
+      ag = u.select_atoms("protein")
+      [ag.radius_of_gyration() for ts in u.trajectory[::1]]
+    params:
+      - { arg: select, label: select }
+      - { arg: stride, label: slice step }
+    fidelity: exact
+    evidence: { source: docs, test: adk-rg, note: "A numpy mass-weighted calculation gives the same last-frame value." }
+
+  - tool: count_contacts
+    route: |
+      from MDAnalysis.lib.distances import capped_distance
+      pairs = capped_distance(a.positions, b.positions, 4.5, box=u.dimensions, return_distances=False)
+      len(pairs)   # for each frame
+    params:
+      - { arg: select_a, label: first group }
+      - { arg: select_b, label: second group }
+      - { arg: cutoff, label: max_cutoff, ui_default: null, note: "The function has no default. The contacts tutorial uses 4.5." }
+      - { arg: stride, label: slice step }
+    fidelity: exact
+    evidence: { source: docs, test: adk-contacts, note: "A scipy cKDTree count gives the same pairs in the first and last frame." }
+
+  - tool: find_hydrogen_bonds
+    route: |
+      from MDAnalysis.analysis.hydrogenbonds import HydrogenBondAnalysis as HBA
+      h = HBA(u, donors_sel="protein and name N", hydrogens_sel="protein and name HN", acceptors_sel="protein and name O",
+              d_a_cutoff=3.0, d_h_a_angle_cutoff=150).run()
+      h.results.hbonds   # columns: frame, donor, hydrogen, acceptor, distance, angle
+    params:
+      - { arg: donors_sel, label: donors_sel }
+      - { arg: hydrogens_sel, label: hydrogens_sel }
+      - { arg: acceptors_sel, label: acceptors_sel }
+      - { arg: d_a_cutoff, label: d_a_cutoff, ui_default: 3.0 }
+      - { arg: d_h_a_angle_cutoff, label: d_h_a_angle_cutoff, ui_default: 150 }
+      - { arg: stride, label: step }
+    fidelity: close
+    difference: The same MDAnalysis call. No separate calculation checked the bond counts. The test pins a value from a run of the tool.
+    evidence: { source: docs, test: adk-hbonds }
+
+  - tool: inspect_structure
+    route: |
+      from Bio.PDB import PDBParser
+      s = PDBParser(QUIET=True).get_structure("x", path)
+      [(c.id, len([r for r in c if r.id[0] == " "])) for c in s[0]]
+    params:
+      - { arg: path, label: file }
+    fidelity: exact
+    evidence: { source: docs, test: pdb-4ake-chains, note: "The PDB header of 4AKE gives 214 residues for each chain." }
+
+  - tool: measure_distance
+    route: |
+      s[0]["A"][1]["CA"] - s[0]["A"][214]["CA"]
+    params:
+      - { arg: atom_a, label: atom name }
+      - { arg: atom_b, label: atom name }
+    fidelity: exact
+    evidence: { source: docs, test: pdb-4ake-distance, note: "A numpy distance from the PDB text gives the same value." }
+
+  - tool: superpose_structures
+    route: |
+      from Bio.PDB import Superimposer
+      sup = Superimposer()
+      sup.set_atoms(reference_atoms, mobile_atoms)
+      sup.rms
+    params:
+      - { arg: fit_atoms, label: atom names of the paired atoms, ui_default: CA }
+    fidelity: exact
+    evidence: { source: docs, test: pdb-4ake-superpose, note: "A numpy Kabsch fit on the same alpha carbons gives the same RMSD." }
+
+checks:
+  - id: rmsd_without_fit
+    severity: warning
+    description: RMSD was computed without a fit.
+    rule:
+      tool: rmsd_trajectory
+      arg: fit
+      op: "=="
+      value: false
+      message: RMSD without a fit also counts rotation and translation of the whole molecule. State why the frames need no fit.
+  - id: rmsd_not_fully_reported
+    severity: warning
+    description: An RMSD value is given without the atom selection, the reference frame, the fit and the stride.
+    text: >
+      If the answer gives an RMSD value, it must also give the measured atom selection, the atoms
+      used for the fit (or say that there was no fit), the reference frame and the frame stride.
+      Flag the answer if one is missing, or if the numbers differ from the rmsd_trajectory result.
+  - id: frames_used_as_replicates
+    severity: error
+    description: Frames of one trajectory are used as independent samples.
+    text: >
+      Frames of one trajectory are correlated. If the answer reports a p-value, a confidence
+      interval or the word significant from frames of one simulation, flag it as an error. The
+      answer must count independent simulations as n.
+  - id: cutoff_not_reported
+    severity: warning
+    description: A contact or hydrogen bond count is given without the cutoffs.
+    text: >
+      If the answer gives a contact count, it must also give the distance cutoff and the two
+      atom groups. If it gives a hydrogen bond count, it must also give the donor-acceptor
+      distance cutoff, the angle cutoff and the donor, hydrogen and acceptor selections. Flag the
+      answer if one is missing. Flag it also if it says the count is a fixed property and does
+      not say that the count changes with the cutoff.
+
+tests:
+  - id: adk-inspect
+    description: >
+      The small files hold the 855 backbone atoms and the 203 amide hydrogens of the AdK trajectory
+      from MDAnalysisTests 2.10.0 (adk.psf and adk_dims.dcd, 98 frames). The small file keeps 21
+      frames: every fifth frame to frame 95, and frame 97. data/make_adk_small.py makes it. The
+      full files have 3341 atoms and 98 frames (MDAnalysis quickstart). The counts here are
+      from the small files.
+    data: [data/adk_backbone_h.pdb, data/adk_backbone_h.dcd]
+    calls:
+      - tool: inspect_trajectory
+        args: { topology: "{adapter_dir}/data/adk_backbone_h.pdb", trajectory: "{adapter_dir}/data/adk_backbone_h.dcd" }
+    expect:
+      - { path: metrics.n_atoms, equals: 1058 }
+      - { path: metrics.n_residues, equals: 214 }
+      - { path: metrics.n_frames, equals: 21 }
+      - { path: metrics.n_backbone, equals: 855 }
+      - { path: metrics.n_protein_ca, equals: 214 }
+
+  - id: adk-rmsd-last
+    description: >
+      Backbone RMSD of the last frame (frame 97 of the full trajectory) against frame 0 after a
+      fit on the backbone. The same value, 6.8203 A, comes from the full 98-frame trajectory
+      (MDAnalysis 2.10.0). A numpy Kabsch fit on the 855 backbone atoms gives 6.820322.
+    data: [data/adk_backbone_h.pdb, data/adk_backbone_h.dcd]
+    calls:
+      - tool: rmsd_trajectory
+        args: { topology: "{adapter_dir}/data/adk_backbone_h.pdb", trajectory: "{adapter_dir}/data/adk_backbone_h.dcd", select: backbone, fit_select: backbone, fit: true, reference_frame: 0, stride: 1 }
+    expect:
+      - { path: metrics.n_frames_used, equals: 21 }
+      - { path: metrics.rmsd_first, approx: 0, abs: 1.0e-4 }
+      - { path: metrics.rmsd_last, approx: 6.820322, abs: 0.0005 }
+      - { path: "outputs[1].name", contains: ".png" }
+
+  - id: adk-rmsd-nofit
+    description: >
+      The AdK frames are already aligned, so the RMSD without a fit equals the RMSD with a fit
+      (6.8203 A). The stride of 5 uses frames 0, 5, 10, 15 and 20 of the small file.
+    data: [data/adk_backbone_h.pdb, data/adk_backbone_h.dcd]
+    calls:
+      - tool: rmsd_trajectory
+        args: { topology: "{adapter_dir}/data/adk_backbone_h.pdb", trajectory: "{adapter_dir}/data/adk_backbone_h.dcd", select: backbone, fit: false, reference_frame: 0, stride: 5 }
+    expect:
+      - { path: metrics.n_frames_used, equals: 5 }
+      - { path: metrics.last_frame_index, equals: 20 }
+      - { path: metrics.rmsd_last, approx: 6.820322, abs: 0.0005 }
+
+  - id: adk-rg
+    description: A numpy mass-weighted calculation of the backbone radius of gyration in the last frame gives 19.469877 A.
+    data: [data/adk_backbone_h.pdb, data/adk_backbone_h.dcd]
+    calls:
+      - tool: radius_of_gyration
+        args: { topology: "{adapter_dir}/data/adk_backbone_h.pdb", trajectory: "{adapter_dir}/data/adk_backbone_h.dcd", select: backbone }
+    expect:
+      - { path: metrics.rg_last, approx: 19.469877, abs: 0.0005 }
+      - { path: metrics.n_frames_used, equals: 21 }
+
+  - id: adk-contacts
+    description: >
+      A scipy cKDTree count of backbone atom pairs within 8.0 A, between residues 1 to 50 and
+      residues 150 to 214, gives 188 pairs in frame 0 and 121 pairs in the last frame.
+    data: [data/adk_backbone_h.pdb, data/adk_backbone_h.dcd]
+    calls:
+      - tool: count_contacts
+        args: { topology: "{adapter_dir}/data/adk_backbone_h.pdb", trajectory: "{adapter_dir}/data/adk_backbone_h.dcd", select_a: "resid 1-50 and backbone", select_b: "resid 150-214 and backbone", cutoff: 8.0 }
+    expect:
+      - { path: metrics.pairs_first, equals: 188 }
+      - { path: metrics.pairs_last, equals: 121 }
+
+  - id: adk-rmsf
+    description: >
+      A numpy Kabsch fit of all frames on the backbone atoms to frame 0, then the RMSF of the 214
+      alpha carbons, gives a mean of 1.975396 A and a maximum at residue 149 (5.9718 A).
+    data: [data/adk_backbone_h.pdb, data/adk_backbone_h.dcd]
+    calls:
+      - tool: rmsf_per_residue
+        args: { topology: "{adapter_dir}/data/adk_backbone_h.pdb", trajectory: "{adapter_dir}/data/adk_backbone_h.dcd", select: "protein and name CA", fit_select: backbone, fit: true, reference_frame: 0 }
+    expect:
+      - { path: metrics.n_atoms, equals: 214 }
+      - { path: metrics.rmsf_mean, approx: 1.975396, abs: 0.0005 }
+      - { path: metrics.rmsf_max, approx: 5.971842, abs: 0.0005 }
+      - { path: metrics.resid_of_max, equals: 149 }
+
+  - id: adk-hbonds
+    description: >
+      Numbers from a run of this tool with MDAnalysis 2.10.0 and the defaults 3.0 A and 150
+      degrees. They show that the result is stable. They are not published numbers and no
+      separate calculation checked them.
+    data: [data/adk_backbone_h.pdb, data/adk_backbone_h.dcd]
+    calls:
+      - tool: find_hydrogen_bonds
+        args: { topology: "{adapter_dir}/data/adk_backbone_h.pdb", trajectory: "{adapter_dir}/data/adk_backbone_h.dcd", donors_sel: "name N", hydrogens_sel: "name HN", acceptors_sel: "name O" }
+    expect:
+      - { path: metrics.hbonds_first, equals: 33 }
+      - { path: metrics.hbonds_last, equals: 46 }
+      - { path: metrics.n_events, equals: 812 }
+
+  - id: pdb-4ake-chains
+    description: >
+      PDB entry 4AKE (adenylate kinase, open form) has chains A and B with 214 residues each
+      (SEQRES in the file header). Chain A holds 72 water molecules and chain B holds 75.
+    data: [data/4AKE.pdb]
+    calls:
+      - tool: inspect_structure
+        args: { path: "{adapter_dir}/data/4AKE.pdb" }
+    expect:
+      - { path: metrics.n_models, equals: 1 }
+      - { path: metrics.n_chains, equals: 2 }
+      - { path: metrics.residues_A, equals: 214 }
+      - { path: metrics.residues_B, equals: 214 }
+      - { path: metrics.water_A, equals: 72 }
+      - { path: metrics.water_B, equals: 75 }
+
+  - id: pdb-4ake-distance
+    description: A numpy distance from the ATOM lines of 4AKE gives 10.101166 A between the alpha carbon of residue 1 and of residue 214 in chain A.
+    data: [data/4AKE.pdb]
+    calls:
+      - tool: measure_distance
+        args: { path: "{adapter_dir}/data/4AKE.pdb", chain_a: A, resid_a: 1, atom_a: CA, chain_b: A, resid_b: 214, atom_b: CA }
+    expect:
+      - { path: metrics.distance_angstrom, approx: 10.101166, abs: 0.0005 }
+
+  - id: pdb-4ake-superpose
+    description: >
+      A numpy Kabsch fit of the 214 alpha carbons of chain A on chain B of 4AKE gives 48.266043 A
+      before the fit and 0.607165 A after the fit.
+    data: [data/4AKE.pdb]
+    calls:
+      - tool: superpose_structures
+        args: { mobile_path: "{adapter_dir}/data/4AKE.pdb", reference_path: "{adapter_dir}/data/4AKE.pdb", mobile_chain: A, reference_chain: B, fit_atoms: CA }
+    expect:
+      - { path: metrics.n_atoms_fitted, equals: 214 }
+      - { path: metrics.rmsd_before_fit, approx: 48.266043, abs: 0.001 }
+      - { path: metrics.rmsd_after_fit, approx: 0.607165, abs: 0.0005 }

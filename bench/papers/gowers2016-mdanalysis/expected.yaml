@@ -1,0 +1,28 @@
+tool: mdanalysis
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/gowers2016-mdanalysis/adk.psf
+  - /Volumes/T7/guided-analysis/data/gowers2016-mdanalysis/adk_dims.dcd
+  - /Volumes/T7/guided-analysis/data/gowers2016-mdanalysis/4AKE.pdb
+  - /Volumes/T7/guided-analysis/data/gowers2016-mdanalysis/1AKE.pdb
+decisions:
+  fit_select: backbone
+  fit_before_rmsd: true
+  reference_frame: 0
+  rmsd_select: backbone
+  frame_stride: 1
+  pdb_fit_atoms: CA
+expected:
+  - {description: "atoms in the AdK system", value: 3341, tolerance: 0, source: "MDAnalysis quickstart; counted with MDAnalysis 2.10.0"}
+  - {description: "frames in the AdK trajectory", value: 98, tolerance: 0, source: "MDAnalysis quickstart; counted with MDAnalysis 2.10.0"}
+  - {description: "backbone RMSD of the last frame against frame 0, fit on the backbone (angstrom)", value: 6.8203, tolerance: 0.01, source: "computed with MDAnalysis 2.10.0; a numpy Kabsch fit gives the same value"}
+  - {description: "radius of gyration of the protein, last frame (angstrom)", value: 19.592, tolerance: 0.02, source: "computed with MDAnalysis 2.10.0"}
+  - {description: "residues in chain A of 4AKE", value: 214, tolerance: 0, source: "PDB header SEQRES of 4AKE; counted with Bio.PDB 1.88"}
+  - {description: "residues in chain B of 4AKE", value: 214, tolerance: 0, source: "PDB header SEQRES of 4AKE; counted with Bio.PDB 1.88"}
+  - {description: "CA RMSD after fitting 4AKE chain A on 1AKE chain A (angstrom)", value: 7.131, tolerance: 0.02, source: "computed with Bio.PDB 1.88"}
+  - {description: "distance CA(1) to CA(214), chain A of 4AKE (angstrom)", value: 10.101, tolerance: 0.01, source: "computed with Bio.PDB; numpy gives the same"}
+notes: |
+  No RMSD number is printed in the two papers. The atom and frame counts are in the MDAnalysis quickstart.
+  The RMSD, the radius of gyration and the structure numbers were computed with explicit selections.
+  Trap: the trajectory frames are already aligned, so a fit changes nothing. A stride of 10 stops at frame 90 and gives 6.854.
+  Trap: a different reference frame or a different atom selection gives a different RMSD (whole protein 6.929, CA atoms 6.814).
