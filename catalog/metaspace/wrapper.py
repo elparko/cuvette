@@ -32,8 +32,15 @@ def _fail(msg):
     return {"ok": False, "error": msg}
 
 
+def _split_ids(ids):
+    return [d.strip() for d in re.split(r"[,|;\s]+", ids) if d.strip()]
+
+
 def _dataset(dataset_id):
-    return _retry(lambda: _client().dataset(id=dataset_id))
+    ids = _split_ids(str(dataset_id))
+    if len(ids) > 1:
+        raise ValueError("dataset_id takes one id, and you gave %d (%s). Call the tool once for each dataset." % (len(ids), ", ".join(ids)))
+    return _retry(lambda: _client().dataset(id=dataset_id.strip()))
 
 
 def _database(database):
@@ -64,7 +71,7 @@ def search_datasets(name=None, organism=None, polarity=None, submitter=None, mal
     if name and re.fullmatch(r"\d{4}-\d\d-\d\d_\d\dh\d\dm\d\ds", name.strip()):
         dataset_id, name = name.strip(), None
     if dataset_id:
-        flt["ids"] = dataset_id if isinstance(dataset_id, str) else "|".join(dataset_id)
+        flt["ids"] = "|".join(_split_ids(dataset_id) if isinstance(dataset_id, str) else dataset_id)
     if name:
         flt["name"] = name
     if organism:
@@ -123,6 +130,8 @@ def search_datasets(name=None, organism=None, polarity=None, submitter=None, mal
 def get_dataset_info(dataset_id):
     try:
         ds = _dataset(dataset_id)
+    except ValueError as e:
+        return _fail(str(e))
     except Exception as e:
         return _fail("dataset not found or not public: %s" % e)
     md = ds.metadata

@@ -107,7 +107,7 @@ tools:
     function: "wrapper:search_datasets"
     params:
       name: { type: string, description: Part of the dataset name. }
-      dataset_id: { type: string, description: "One dataset id, or several ids joined with |, such as 2022-08-16_10h14m23s." }
+      dataset_id: { type: string, description: "One dataset id, or several ids joined with | or a comma, such as 2022-08-16_10h14m23s." }
       organism: { type: string, description: "Organism as METASPACE writes it, such as Mouse or Human." }
       polarity: { type: string, enum: [Positive, Negative] }
       submitter: { type: string, description: Part of the name of the submitter. The tool checks only the newest 1500 datasets that fit the other filters. Add group or organism to narrow the search. }
@@ -123,7 +123,7 @@ tools:
     read_only: true
     function: "wrapper:get_dataset_info"
     params:
-      dataset_id: { type: string, description: "METASPACE dataset id, such as 2022-08-16_10h14m23s." }
+      dataset_id: { type: string, description: "One dataset id, such as 2022-08-16_10h14m23s. Call the tool once for each dataset." }
     required: [dataset_id]
 
   - name: list_databases
@@ -138,7 +138,7 @@ tools:
     read_only: true
     function: "wrapper:list_annotations"
     params:
-      dataset_id: { type: string }
+      dataset_id: { type: string, description: "One dataset id, such as 2022-08-16_10h14m23s. Call the tool once for each dataset." }
       database: { type: string, description: "Database name and version, such as HMDB v4 or LipidMaps 2017-12-12." }
       fdr: { type: number, enum: [0.05, 0.1, 0.2, 0.5] }
       exclude_off_sample: { type: boolean, default: false, description: "Leave this out unless the scientist decided to remove off-sample annotations. The result already shows the number of off-sample annotations." }
@@ -151,7 +151,7 @@ tools:
     read_only: true
     function: "wrapper:compare_fdr_counts"
     params:
-      dataset_id: { type: string }
+      dataset_id: { type: string, description: "One dataset id, such as 2022-08-16_10h14m23s. Call the tool once for each dataset." }
       database: { type: string, description: "Database name and version, such as HMDB v4 or LipidMaps 2017-12-12." }
       exclude_off_sample: { type: boolean, default: false, description: "Leave this out unless the scientist decided to remove off-sample annotations. The result already shows the number of off-sample annotations." }
     required: [dataset_id]
@@ -174,7 +174,7 @@ tools:
     read_only: true
     function: "wrapper:get_ion_image"
     params:
-      dataset_id: { type: string }
+      dataset_id: { type: string, description: "One dataset id, such as 2022-08-16_10h14m23s. Call the tool once for each dataset." }
       formula: { type: string, description: "Neutral sum formula, such as C39H78NO8P." }
       adduct: { type: string, description: "Adduct such as +H." }
       hotspot_clipping: { type: boolean, default: true, description: "Clip the brightest pixels as the website does." }
