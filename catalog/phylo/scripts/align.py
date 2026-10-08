@@ -1,3 +1,4 @@
+import re
 import subprocess
 import sys
 
@@ -11,6 +12,10 @@ flags = {
     "einsi": ["--genafpair", "--maxiterate", "1000"],
     "fftns2": ["--retree", "2", "--maxiterate", "0"],
 }[algorithm]
+with open(src) as f:
+    first = f.readline()
+if re.fullmatch(r"\s*\d+\s+\d+\s*", first):
+    sys.exit("error: this file is a PHYLIP file, so the sequences are already aligned. Do not align it. Give the path to infer_tree.")
 proc = subprocess.run([mafft, "--quiet", "--thread", threads, *flags, src], capture_output=True, text=True)
 if proc.returncode != 0 or not proc.stdout.strip():
     sys.exit("error: mafft failed: " + proc.stderr.strip()[-400:])
