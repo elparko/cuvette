@@ -195,7 +195,7 @@ export function modelAnswer(text: string): string {
 
 export function rescoreItems(items: PaperItem[], record: AnalysisRecord): ItemScore[] {
   const final = finalAnswer(record);
-  const found = final ? { entry: final, claims: checkAnswer(modelAnswer(String(final.data.text ?? "")), { numbers: () => record.numbers(), nodes: () => record.nodes(), stale: () => record.stale(), entries: () => [], append: () => final } as never, { small: true }) } : undefined;
+  const found = final ? { entry: final, claims: checkAnswer(modelAnswer(String(final.data.text ?? "")), { numbers: () => record.numbers(), nodes: () => record.nodes(), stale: () => record.stale(), entries: () => [], append: () => final } as never) } : undefined;
   return items.filter((item) => !item.trap && !item.optional).map((item) => ({
     key: item.key,
     description: item.description,

@@ -80,10 +80,10 @@ describe("checkAnswer", () => {
     expect(claims.map((c) => c.value)).toEqual([0.81]);
   });
 
-  test("counts small whole numbers in table rows but not in the header row or in prose", () => {
+  test("counts small whole numbers in table rows and in prose only when a logged result holds them", () => {
     const { record } = fake([{ node: "n5", path: "segments", value: 3 }, ...nums]);
-    const text = "| s | segments |\n|---|---|\n| 64 | 3 |\n\nWe ran 3 steps.";
-    expect(checkAnswer(text, record).map((c) => c.value)).toEqual([64, 3]);
+    const text = "| s | segments |\n|---|---|\n| 64 | 3 |\n\nWe ran 3 steps on 4 images.";
+    expect(checkAnswer(text, record).map((c) => c.value)).toEqual([64, 3, 3]);
   });
 
   test("ignores version numbers", () => {
@@ -158,11 +158,27 @@ describe("checkAnswer inputs and small counts", () => {
     expect(c.map((x) => [x.value, x.label, x.node])).toEqual([[6, "measured", "n1"]]);
   });
 
-  test("with the small option a small count in prose counts when a logged result has it", () => {
+  test("a small count in prose counts when a logged result has it", () => {
     const { record } = fake([{ node: "n1", path: "metrics.n_clusters", value: 7 }]);
-    const c = checkAnswer("The data fall into 7 clusters.", record, { small: true });
+    const c = checkAnswer("The data fall into 7 clusters.", record);
     expect(c.map((x) => [x.value, x.label, x.node])).toEqual([[7, "measured", "n1"]]);
-    expect(checkAnswer("The data fall into 7 clusters.", record)).toHaveLength(0);
+  });
+
+  test("a small count in prose that matches only a comparison run is not a claim", () => {
+    const { record } = fake([{ node: "n2", path: "metrics.n_clusters", value: 5 }]);
+    record.nodes = () => [{ id: "n2", sensitivityOf: "resolution" }];
+    expect(checkAnswer("The data fall into 5 clusters.", record)).toHaveLength(0);
+  });
+
+  test("the harness and the paper score count the same small numbers", () => {
+    const { record } = fake([{ node: "n1", path: "metrics.n_clusters", value: 7 }]);
+    const text = "The data fall into 7 clusters across 3 samples.\n\n| item | n |\n|---|---|\n| clusters | 7 |";
+    const c = checkAnswer(text, record);
+    expect(c.map((x) => [x.value, x.label])).toEqual([
+      [7, "measured"],
+      [7, "measured"],
+    ]);
+    expect(annotate(text, c)).toBe(text);
   });
 
   test("a small count with no logged match is not flagged", () => {
