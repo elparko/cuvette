@@ -6,6 +6,19 @@ An AI agent analyzes data in any existing science program, while the scientist o
 decisions and can repeat each step by hand. SMILE MSI's chat (`smile_msi/agent/`) is the stage 1
 proof of concept. The general harness is in this repo.
 
+## Decisions so far
+
+| Date | Decision |
+| --- | --- |
+| 2026-10-07 | **What this is:** a science-focused harness that attaches to existing software and uses it. |
+| 2026-10-07 | **First users:** Parker, lab colleagues with little technical experience, medical students who start research, and any scientist who meets new software. Wet-lab scientists especially. |
+| 2026-10-07 | **Chat first, with an audit trail.** The trail must be simple, easy to read, expandable for details, settings and decisions, and saveable. The graph view comes next. |
+| 2026-10-07 | **Tool use first.** The agent uses mapped tools by default. It can write a script when no tool fits; the script calls the adapter's API, so the decision checks still apply. |
+| 2026-10-07 | **Model choice belongs to the user.** |
+| 2026-10-07 | **Two ways to get adapters:** a hosted catalog of adapters that we build and test, and a published adapter spec, so that people can use a model to build their own. |
+| 2026-10-07 | **First adapter:** SMILE MSI. |
+| Open | **Product name.** Parker wants a proprietary name. |
+
 ## Design rules
 
 Five rules shape every feature below. A feature that breaks one of them must change.
@@ -109,6 +122,14 @@ done.
 Adapters can be shared. A lab can publish an approved adapter, and another lab can use it after
 its own tests pass.
 
+**Two ways to get adapters.** Both use the same published adapter spec.
+
+- **The catalog.** A hosted repo of adapters that we build, test and maintain. SMILE MSI is the
+  first one. Each entry is also a worked example of the spec.
+- **Build your own.** The spec, an onboarding guide that a model can follow step by step, and a
+  checker that validates a new adapter (schema, map, known-answer tests) before its first use.
+  The user picks the model that builds it.
+
 ## The tool-to-UI map
 
 The map links each tool to the steps that a person does in the program to get the same result.
@@ -206,6 +227,22 @@ The record is a graph, not a transcript. The chat is one view of the graph.
   marks every node downstream of it as out of date.
 - **Append-only log.** The harness never edits or deletes an entry. A correction is a new entry
   that points to the old one.
+
+**The audit trail.** The trail is the readable view of the record. It is not a second record:
+SMILE MSI has four records that overlap (`provenance.py`, `runs.py`, `gui/audit.py` and the
+agent log), and that made its trail complicated. Here there is one record and one trail view.
+
+- **One line for each step, in plain language.** For example: "3. Found 14 features that are
+  different between endo and epi." A non-technical reader can read the trail from top to bottom.
+- **Few entry kinds, each with an icon:** setup, step, your decision, question and answer,
+  deviation, review finding, note.
+- **Three levels of detail.** A click opens the next level:
+    1. the line;
+    2. the details: the manual route, the settings, the decisions that applied, the result table
+       or figure;
+    3. the technical record: the tool call, the arguments, the hashes, the versions.
+- **Saveable.** The trail saves with the session. It exports as one HTML file that keeps the
+  expand and collapse, as a PDF of levels 1 and 2, and as JSON Lines for programs.
 
 **Claims linked to results.** Each number and each finding in the agent's answer links to a node.
 Each claim has a label: *measured* (a tool output), *inferred* (the agent's reasoning from
@@ -386,17 +423,15 @@ the first test set.
 
 ## Open questions
 
-- **Who is the first user?** Wet-lab scientists who do not write code need the guidance and the
-  manual routes most. Computational scientists need replay and claim links most.
-- **What does the user see first?** A chat with the graph at the side, or the graph with the chat
-  at the side.
+- **Product name.** A proprietary name for the product, and maybe for the trail.
 - **Which second program?** It must be very different from SMILE MSI to show that the split
   works. Candidates: scanpy, a command-line program, Fiji.
-- **Typed tools or free code?** One option: free code calls the adapter's API, and the decision
-  checks sit inside that API.
 - **Shared adapters.** Who approves an adapter that another lab will use, and how does the second
-  lab trust it?
+  lab trust it? Proposal: the second lab runs the known-answer tests on its own computer before
+  the first use.
 - **Patient data.** Which data can go to a cloud model, and how does the setup enforce that rule?
+  Proposal: a setup decision with "summaries only" as the default, enforced in the result
+  renderer.
 
 ## Prior work and sources
 
