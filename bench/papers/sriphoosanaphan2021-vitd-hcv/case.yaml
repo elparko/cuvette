@@ -1,0 +1,167 @@
+kind: research paper
+short: Sriphoosanaphan 2021
+field: Statistics
+program: SciPy (Python), through the biostats adapter
+citation:
+  authors: Sriphoosanaphan S, Thanapirom K, Kerr SJ, Suksawatamnuay S, Thaimai P, Sittisomwong S, Sonsiri K, Srisoonthorn N, Teeratorn N, Tanpowpong N, Chaopathomkul B, Treeprasertsuk S, Poovorawan Y, Komolmit P
+  title: >-
+    Effect of vitamin D supplementation in patients with chronic hepatitis C after direct-acting antiviral
+    treatment: a randomized, double-blind, placebo-controlled trial
+  venue: PeerJ 9:e10709
+  year: 2021
+  doi: 10.7717/peerj.10709
+related:
+  - text: "Data: Komolmit P. Effect of vitamin D supplementation in patients with chronic hepatitis C after direct-acting antiviral treatment. Dryad (2020), CC0. The benchmark downloads the copy on Zenodo, record 4404285."
+    doi: 10.5061/dryad.573n5tb4h
+  - text: "Thai Clinical Trials Registry TCTR20171206003."
+measured: >-
+  The trial randomized 75 patients with chronic hepatitis C, a sustained virological response after
+  direct-acting antivirals, liver fibrosis and a serum 25(OH)D below 30 ng/mL. 37 patients got ergocalciferol
+  and 38 got placebo for 6 weeks. The trial measured serum 25(OH)D and four markers of liver fibrogenesis
+  (TGF-beta1, TIMP-1, MMP-9 and P3NP) at baseline and at week 6. The primary analysis compares the change from
+  baseline between the arms with an independent t-test.
+instruction: >-
+  Did vitamin D raise 25(OH)D, and did it change the four fibrosis markers compared with placebo? For each,
+  give the difference in the mean change from baseline, vitamin D minus placebo, with a 95% confidence
+  interval and a p-value.
+instruction_basis: >-
+  The Statistical analysis section and Table 3. The paper reports the mean difference in the change from
+  baseline to week 6, vitamin D against placebo, with a 95% confidence interval and a p-value from the
+  independent t-test.
+answers:
+  replicate:
+    decision: Unit of replication
+    value: the patient, one row for each patient
+    source: Patient characteristics section. Each of the 75 randomized patients gives one change for each marker.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: Sample size calculation section. The trial used a two-sided significance level of 5%.
+  paired:
+    decision: Paired or unpaired test
+    value: false
+    source: >-
+      Statistical analysis section. The test compares the change in the vitamin D arm with the change in the
+      placebo arm. The arms hold different patients. The pairing of baseline and week 6 is already in the
+      change column.
+  two_group_test:
+    decision: Test family for two groups
+    value: t-test
+    source: >-
+      Statistical analysis section, "the independent t-test". The quantile regression in Table 4 is a
+      sensitivity analysis.
+  equal_variance:
+    decision: Equal variances for an unpaired test
+    value: true
+    source: >-
+      Not stated in the paper. The paper used Stata 16.1, whose ttest command assumes equal variances by
+      default. The Student test reproduces the printed upper bound for 25(OH)D (26.4). The Welch test gives 26.5.
+  alternative:
+    decision: Sidedness
+    value: two-sided
+    source: Sample size calculation section, "a 2-sided significance level of 5%".
+items:
+  n_vitamin_d:
+    source: published
+    where: Abstract and Table 2. 37 patients in the vitamin D arm.
+    check: R 4.6.1 gives 37 (check.R).
+  n_placebo:
+    source: published
+    where: Abstract and Table 2. 38 patients in the placebo arm.
+    check: R 4.6.1 gives 38 (check.R).
+  vd_diff:
+    source: published
+    where: Changes in VD levels section and Table 3. 23.1 ng/mL.
+    check: R 4.6.1 t.test gives 23.0864 (check.R).
+  vd_ci_lo:
+    source: published
+    where: Table 3. 19.7.
+    check: R 4.6.1 t.test gives 19.7338 (check.R).
+  vd_ci_hi:
+    source: published
+    where: Table 3. 26.4.
+    check: R 4.6.1 t.test gives 26.4390. The Welch test gives 26.5212 (check.R).
+  tgf_diff:
+    source: published
+    where: Abstract and Table 3. -0.6 ng/mL.
+    check: R 4.6.1 t.test gives -0.5543 (check.R).
+  tgf_ci_lo:
+    source: published
+    where: Abstract and Table 3. -2.8.
+    check: R 4.6.1 t.test gives -2.8393 (check.R).
+  tgf_ci_hi:
+    source: published
+    where: Abstract and Table 3. 1.7.
+    check: R 4.6.1 t.test gives 1.7307 (check.R).
+  tgf_p:
+    source: published
+    where: Abstract and Table 3. 0.63.
+    check: R 4.6.1 t.test gives 0.63022 (check.R).
+  timp_diff:
+    source: published
+    where: Abstract and Table 3. -5.5 ng/mL.
+    check: R 4.6.1 t.test gives -5.5102 (check.R).
+  timp_ci_lo:
+    source: published
+    where: Abstract and Table 3. -26.4.
+    check: R 4.6.1 t.test gives -26.3613 (check.R).
+  timp_ci_hi:
+    source: published
+    where: Abstract and Table 3. 15.3.
+    check: R 4.6.1 t.test gives 15.3410 (check.R).
+  timp_p:
+    source: published
+    where: Abstract and Table 3. 0.60.
+    check: R 4.6.1 t.test gives 0.60002 (check.R).
+  mmp_diff:
+    source: published
+    where: Abstract and Table 3. 122.9 ng/mL.
+    check: R 4.6.1 t.test gives 122.9206 (check.R).
+  mmp_ci_lo:
+    source: published
+    where: Abstract and Table 3. -69.0.
+    check: R 4.6.1 t.test gives -68.9647 (check.R).
+  mmp_ci_hi:
+    source: published
+    where: Abstract and Table 3. 314.8.
+    check: R 4.6.1 t.test gives 314.8059 (check.R).
+  mmp_p:
+    source: published
+    where: Abstract and Table 3. 0.21.
+    check: R 4.6.1 t.test gives 0.20575 (check.R).
+  p3np_diff:
+    source: published
+    where: Abstract and Table 3. -0.1 ng/mL.
+    check: R 4.6.1 t.test gives -0.1104 (check.R).
+  p3np_ci_lo:
+    source: published
+    where: Abstract and Table 3. -2.4.
+    check: R 4.6.1 t.test gives -2.3719 (check.R).
+  p3np_ci_hi:
+    source: published
+    where: Abstract and Table 3. 2.2.
+    check: R 4.6.1 t.test gives 2.1511 (check.R).
+  p3np_p:
+    source: published
+    where: Abstract and Table 3. 0.92.
+    check: R 4.6.1 t.test gives 0.92277 (check.R).
+  mmp_week6_trap:
+    source: computed
+    tool: SciPy ttest_ind with equal_var=True on MMP6
+    where: >-
+      Not in the paper. This is the result of a wrong method: a comparison of the week-6 values that ignores
+      the baseline. The run must not report it as the result.
+    independence: independent
+    check: R 4.6.1 t.test(MMP6 ~ arm, var.equal = TRUE) gives 129.0598, p 0.12724 (check.R).
+data:
+  source: >-
+    Dryad dataset 10.5061/dryad.573n5tb4h, copied on Zenodo record 4404285. fetch.sh converts the Excel sheet
+    to one CSV file. It renames the column Group to arm (A is vitamin_d, B is placebo) and adds the columns
+    VD_change, AST_change, ALT_change, TGF_change, TIMP_change, MMP_change and P3NP_change (week 6 minus
+    baseline), because compare_two_groups reads one outcome column. The readme does not name the arms. The
+    group sizes, the sex counts and the means of each group match Tables 2 and 3 of the paper.
+  url: https://zenodo.org/records/4404285
+  license: >-
+    CC0 1.0 public domain dedication, from the Dryad and Zenodo records. The file has a case number, sex and an
+    age range for each patient, and no names. The paper is CC BY 4.0.
+  size: 20 KB Excel file, 75 rows and 24 columns. The CSV has 75 rows and 31 columns.

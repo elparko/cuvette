@@ -1,0 +1,172 @@
+kind: research paper
+short: Kasurinen 2018
+field: Statistics
+program: lifelines and statsmodels (Python), through the biostats adapter
+citation:
+  authors: Kasurinen A, Tervahartiala T, Laitinen A, Kokkola A, Sorsa T, Böckelman C, Haglund C
+  title: High serum MMP-14 predicts worse survival in gastric cancer
+  venue: PLOS ONE 13(12):e0208800
+  year: 2018
+  doi: 10.1371/journal.pone.0208800
+related:
+  - text: "Data: Kasurinen A et al. Data from: High serum MMP-14 predicts worse survival in gastric cancer. Dryad (2018), CC0. The benchmark downloads the copy on Zenodo, record 4945997."
+    doi: 10.5061/dryad.hb62394
+measured: >-
+  The study measured serum MMP-14 (matrix metalloproteinase-14) before surgery in 240 patients with gastric
+  adenocarcinoma at Helsinki University Hospital, 2000 to 2009. A cut-off of 0.073 ng/ml from a ROC (receiver
+  operating characteristic) analysis splits the patients into a low and a high group. The outcome is
+  disease-specific survival from the date of surgery. The paper compares the groups with Kaplan-Meier curves and
+  the log-rank test, and fits Cox models without and with adjustment for age, stage and Lauren type.
+instruction: >-
+  Do patients with a high serum MMP-14 have worse disease-specific survival? Give the 5-year survival in each
+  group with the log-rank p. Give the hazard ratio for a high MMP-14, unadjusted and adjusted for age 67 or
+  more, stage and Lauren type. Give the unadjusted hazard ratio in the intestinal type and in the diffuse type.
+instruction_basis: >-
+  The abstract, the Survival analyses section, Table 2 (unadjusted and adjusted Cox models) and Table 3 (Cox
+  models in subgroups). The paper uses the age split at 67 years and stage as a category with stage I as the
+  reference.
+answers:
+  replicate:
+    decision: Unit of replication
+    value: the patient, one row for each patient
+    source: Patients section. Each of the 240 patients has one serum sample and one follow-up.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: Statistical analyses section. "We considered a p-value of less than 0.05 as statistically significant."
+  cox_covariates:
+    decision: Covariates in the Cox model
+    value: none fixed. The prompt names the covariates of each model.
+    source: >-
+      Statistical analyses section and Table 2. The adjusted model has age, stage (a category), Lauren type and
+      serum MMP-14. The unadjusted models have serum MMP-14 only. The answer is empty because the harness
+      applies one value of this decision to every fit_cox call. A fixed value would turn the unadjusted model
+      into the adjusted one.
+  ties:
+    decision: Method for tied event times
+    value: Breslow
+    source: >-
+      Not in the paper. The paper used SPSS 24, and the SPSS Cox procedure uses the Breslow method. Efron ties
+      change the hazard ratios in the third or fourth digit only.
+  cox_strata:
+    decision: Strata in the Cox model
+    value: none
+    source: Statistical analyses section. The paper fits no stratified model.
+items:
+  patients:
+    source: published
+    where: Patients section and abstract. 240 gastric cancer patients.
+    check: R 4.6.1 gives 240 rows (check.R).
+  events:
+    source: computed
+    tool: lifelines 0.30.3 KaplanMeierFitter
+    where: Not in the paper. The paper gives the number alive at the end of follow-up for all patients only.
+    independence: independent
+    check: R 4.6.1 survival 3.8.6 gives 138 events (check.R).
+  surv5_low:
+    source: published
+    where: Abstract, Survival analyses section and Fig 1. 49.2% (95% CI 45.5 to 52.9).
+    check: R 4.6.1 survfit gives 0.4923 (check.R).
+  surv5_high:
+    source: published
+    where: Abstract, Survival analyses section and Fig 1. 22.1% (95% CI 15.2 to 29.0).
+    check: R 4.6.1 survfit gives 0.2211 (check.R).
+  logrank_chi2:
+    source: computed
+    tool: lifelines 0.30.3 logrank_test
+    where: Not in the paper. The paper gives the p-value only.
+    independence: independent
+    check: R 4.6.1 survdiff gives 10.2337 (check.R).
+  logrank_p:
+    source: published
+    where: Abstract and Fig 1, rounded to p = 0.001. The computed value is 0.00138.
+    check: R 4.6.1 survdiff gives 0.00138 (check.R).
+  hr_unadjusted:
+    source: published
+    where: Table 2, univariate analysis, serum MMP-14 high. 1.92.
+    check: R 4.6.1 coxph gives 1.9180 with Breslow ties and 1.9183 with Efron ties (check.R).
+  hr_unadjusted_ci_lo:
+    source: published
+    where: Table 2, univariate analysis. 1.28.
+    check: R 4.6.1 coxph gives 1.2778 (check.R).
+  hr_unadjusted_ci_hi:
+    source: published
+    where: Table 2, univariate analysis. 2.88.
+    check: R 4.6.1 coxph gives 2.8790 (check.R).
+  p_unadjusted:
+    source: published
+    where: Table 2, univariate analysis. 0.002. The computed value is 0.00167.
+    check: R 4.6.1 coxph gives 0.00167 (check.R).
+  hr_adjusted:
+    source: published
+    where: Abstract, Survival analyses section and Table 2, multivariate analysis. 1.55.
+    check: R 4.6.1 coxph gives 1.5487 with Breslow ties and 1.5485 with Efron ties (check.R).
+  hr_adjusted_ci_lo:
+    source: published
+    where: Table 2, multivariate analysis. 1.02.
+    check: R 4.6.1 coxph gives 1.0205 (check.R).
+  hr_adjusted_ci_hi:
+    source: published
+    where: Table 2, multivariate analysis. 2.35.
+    check: R 4.6.1 coxph gives 2.3504 (check.R).
+  p_adjusted:
+    source: published
+    where: Abstract and Table 2, multivariate analysis. 0.040.
+    check: R 4.6.1 coxph gives 0.03987 (check.R).
+  hr_age_ge67:
+    source: published
+    where: Table 2, multivariate analysis, age 67 or more. 2.52 (1.76 to 3.60).
+    check: R 4.6.1 coxph gives 2.5156 (check.R).
+  hr_stage2:
+    source: published
+    where: Table 2, multivariate analysis, stage II. 6.88 (2.35 to 20.1).
+    check: R 4.6.1 coxph gives 6.8753 (check.R).
+  hr_stage3:
+    source: published
+    where: Table 2, multivariate analysis, stage III. 22.0 (7.98 to 60.8).
+    check: R 4.6.1 coxph gives 22.0138 (check.R).
+  hr_stage4:
+    source: published
+    where: Table 2, multivariate analysis, stage IV. 74.5 (25.8 to 215).
+    check: R 4.6.1 coxph gives 74.4526 with Breslow ties and 74.5144 with Efron ties (check.R).
+  hr_diffuse:
+    source: published
+    where: Table 2, multivariate analysis, diffuse type. 2.23 (1.50 to 3.32).
+    check: R 4.6.1 coxph gives 2.2322 (check.R).
+  hr_intestinal:
+    source: published
+    where: Abstract, Survival analyses section and Table 3, intestinal type. 3.54.
+    check: R 4.6.1 coxph gives 3.5424 (check.R).
+  hr_intestinal_ci_lo:
+    source: published
+    where: Table 3, intestinal type. 1.51.
+    check: R 4.6.1 coxph gives 1.5066 (check.R).
+  hr_intestinal_ci_hi:
+    source: published
+    where: Table 3, intestinal type. 8.33.
+    check: R 4.6.1 coxph gives 8.3293 (check.R).
+  p_intestinal:
+    source: published
+    where: Abstract and Table 3, intestinal type. 0.004. The computed value is 0.00374.
+    check: R 4.6.1 coxph gives 0.00374 (check.R).
+  hr_diffuse_type:
+    source: published
+    where: Survival analyses section and Table 3, diffuse type. 1.54 (0.96 to 2.45).
+    check: R 4.6.1 coxph gives 1.5355 (check.R).
+  p_diffuse_type:
+    source: published
+    where: Table 3, diffuse type. 0.071.
+    check: R 4.6.1 coxph gives 0.07105 (check.R).
+data:
+  source: >-
+    Dryad dataset 10.5061/dryad.hb62394, copied on Zenodo record 4945997. fetch.sh converts the Excel sheet to
+    three CSV files. It keeps the 240 cancer patients with a serum MMP-14 value, makes the event column
+    dss_event = 1 - "Disease specific censor" (the raw column is 1 for a censored patient), maps the 8 TNM 7
+    stage codes to stages I to IV, and adds the 0/1 columns age_ge67, stage2, stage3, stage4 and diffuse,
+    because fit_cox reads numeric columns only and cannot select rows. The two subgroup files hold the
+    intestinal and the diffuse type.
+  url: https://zenodo.org/records/4945997
+  license: >-
+    CC0 1.0 public domain dedication, from the Dryad and Zenodo records. The file has a study number for each
+    patient and no names. The paper is CC BY 4.0.
+  size: 31 KB Excel file, 301 cancer patients and 48 controls. The main CSV has 240 rows and 18 columns.

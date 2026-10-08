@@ -1,0 +1,44 @@
+tool: lifelines (KaplanMeierFitter), statsmodels (PHReg, Breslow ties)
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric.csv
+  - /Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric_intestinal.csv
+  - /Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric_diffuse.csv
+decisions:
+  covariates: "none (unadjusted), then age_ge67, stage2, stage3, stage4, diffuse, mmp14_high"
+  ties: breslow
+  alpha: 0.05
+  strata: none
+  replication_unit: "patient (240 rows, one per patient)"
+expected:
+  - {description: "patients", value: 240, tolerance: 0, source: "paper, Patients section"}
+  - {description: "deaths from gastric cancer", value: 138, tolerance: 0, source: "data"}
+  - {description: "5-year disease-specific survival, low MMP-14", value: 0.4923, tolerance: 0.001, source: "paper 49.2%, abstract and Fig 1"}
+  - {description: "5-year disease-specific survival, high MMP-14", value: 0.2211, tolerance: 0.001, source: "paper 22.1%, abstract and Fig 1"}
+  - {description: "log-rank chi-square", value: 10.234, tolerance: 0.01, source: "computed"}
+  - {description: "log-rank p", value: 0.00138, tolerance: 0.0005, source: "paper p = 0.001 (abstract); computed 0.00138"}
+  - {description: "HR high MMP-14, unadjusted", value: 1.918, tolerance: 0.005, source: "paper Table 2: 1.92"}
+  - {description: "95% CI lower bound, unadjusted", value: 1.278, tolerance: 0.005, source: "paper Table 2: 1.28"}
+  - {description: "95% CI upper bound, unadjusted", value: 2.879, tolerance: 0.005, source: "paper Table 2: 2.88"}
+  - {description: "p, unadjusted", value: 0.00167, tolerance: 0.0005, source: "paper Table 2: 0.002"}
+  - {description: "HR high MMP-14, adjusted", value: 1.5487, tolerance: 0.005, source: "paper Table 2 and abstract: 1.55"}
+  - {description: "95% CI lower bound, adjusted", value: 1.0205, tolerance: 0.005, source: "paper: 1.02"}
+  - {description: "95% CI upper bound, adjusted", value: 2.3504, tolerance: 0.005, source: "paper: 2.35"}
+  - {description: "p, adjusted", value: 0.0399, tolerance: 0.0005, source: "paper: 0.040"}
+  - {description: "adjusted HR age 67 or more", value: 2.516, tolerance: 0.01, source: "paper Table 2: 2.52"}
+  - {description: "adjusted HR stage II", value: 6.876, tolerance: 0.02, source: "paper Table 2: 6.88"}
+  - {description: "adjusted HR stage III", value: 22.01, tolerance: 0.05, source: "paper Table 2: 22.0"}
+  - {description: "adjusted HR stage IV", value: 74.45, tolerance: 0.2, source: "paper Table 2: 74.5"}
+  - {description: "adjusted HR diffuse type", value: 2.232, tolerance: 0.005, source: "paper Table 2: 2.23"}
+  - {description: "HR high MMP-14, intestinal type", value: 3.542, tolerance: 0.01, source: "paper Table 3 and abstract: 3.54"}
+  - {description: "95% CI lower bound, intestinal type", value: 1.507, tolerance: 0.01, source: "paper: 1.51"}
+  - {description: "95% CI upper bound, intestinal type", value: 8.329, tolerance: 0.02, source: "paper: 8.33"}
+  - {description: "p, intestinal type", value: 0.00374, tolerance: 0.0005, source: "paper: 0.004"}
+  - {description: "HR high MMP-14, diffuse type", value: 1.5355, tolerance: 0.005, source: "paper Table 3: 1.54"}
+  - {description: "p, diffuse type", value: 0.0711, tolerance: 0.001, source: "paper Table 3: 0.071"}
+notes: |
+  The paper used SPSS 24, which handles tied times with the Breslow method. Efron ties change the hazard ratios in the third or fourth digit only. Every tolerance accepts both.
+  R 4.6.1 survival 3.8.6 coxph gives the same values to four digits with stage as a factor (check.R, check.out).
+  Trap: the raw column "Disease specific censor" is 1 for a censored patient. fetch.sh makes dss_event = 1 - censor. With the raw column as the event, the analysis gives wrong results.
+  Trap: 61 of the 301 cancer patients in the raw file have no serum MMP-14 value. fetch.sh removes them. The paper reports 240 patients.
+  The unadjusted hazard ratios for age (1.44) and Lauren type (1.45) in Table 2 match the 301 patients, not the 240. The unadjusted stage hazard ratios in Table 2 (4.98, 14.8, 41.5) match neither set. They are not items.

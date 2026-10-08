@@ -1,0 +1,41 @@
+adapters: [biostats]
+prompt: |
+  I have 240 patients who had surgery for gastric adenocarcinoma, with a serum MMP-14 level before surgery. The file is {data}/kasurinen2018-mmp14-gastric/mmp14_gastric.csv. The columns are years (follow-up from surgery), dss_event (1 if the patient died of gastric cancer, 0 if censored), mmp14_high (1 if serum MMP-14 is 0.073 ng/ml or more), age_ge67 (1 if age 67 or more), stage (1 to 4) with the indicator columns stage2, stage3 and stage4, lauren (1 intestinal, 2 diffuse) and diffuse (1 if diffuse type). Do patients with a high serum MMP-14 have worse disease-specific survival? Give me the 5-year disease-specific survival in the low and the high group with the log-rank p. Give me the hazard ratio for a high MMP-14 with a 95% confidence interval and a p-value, first unadjusted, then adjusted for age_ge67, stage (stage2, stage3, stage4) and diffuse. The files mmp14_gastric_intestinal.csv and mmp14_gastric_diffuse.csv in the same folder hold the patients with each Lauren type. Give me the unadjusted hazard ratio for a high MMP-14 in each type, with a 95% confidence interval and a p-value. Write every number in your final answer text.
+answers:
+  replicate: "subjects, patients or animals (one value per subject)"
+  alpha: 0.05
+  cox_covariates: ""
+  ties: breslow
+  cox_strata: ""
+allow: all
+timeout_s: 1800
+data:
+  - kasurinen2018-mmp14-gastric/mmp14_gastric.csv
+  - kasurinen2018-mmp14-gastric/mmp14_gastric_intestinal.csv
+  - kasurinen2018-mmp14-gastric/mmp14_gastric_diffuse.csv
+items:
+  - {key: patients, description: "Number of patients", value: 240, exact: true, in_answer: false}
+  - {key: events, description: "Deaths from gastric cancer", value: 138, exact: true, in_answer: false}
+  - {key: surv5_low, description: "5-year disease-specific survival, low MMP-14", value: 0.4923, tolerance: 0.001}
+  - {key: surv5_high, description: "5-year disease-specific survival, high MMP-14", value: 0.2211, tolerance: 0.001}
+  - {key: logrank_chi2, description: "Log-rank chi-square, high against low MMP-14", value: 10.234, tolerance: 0.01, in_answer: false}
+  - {key: logrank_p, description: "Log-rank p, high against low MMP-14", value: 0.00138, tolerance: 0.0005}
+  - {key: hr_unadjusted, description: "Hazard ratio, high MMP-14, unadjusted", value: 1.918, tolerance: 0.005, tool: fit_cox}
+  - {key: hr_unadjusted_ci_lo, description: "95% CI lower bound, unadjusted", value: 1.278, tolerance: 0.005, tool: fit_cox}
+  - {key: hr_unadjusted_ci_hi, description: "95% CI upper bound, unadjusted", value: 2.879, tolerance: 0.005, tool: fit_cox}
+  - {key: p_unadjusted, description: "p for high MMP-14, unadjusted", value: 0.00167, tolerance: 0.0005, tool: fit_cox}
+  - {key: hr_adjusted, description: "Hazard ratio, high MMP-14, adjusted for age, stage and Lauren type", value: 1.5487, tolerance: 0.005, tool: fit_cox}
+  - {key: hr_adjusted_ci_lo, description: "95% CI lower bound, adjusted", value: 1.0205, tolerance: 0.005, tool: fit_cox}
+  - {key: hr_adjusted_ci_hi, description: "95% CI upper bound, adjusted", value: 2.3504, tolerance: 0.005, tool: fit_cox}
+  - {key: p_adjusted, description: "p for high MMP-14, adjusted", value: 0.0399, tolerance: 0.0005, tool: fit_cox}
+  - {key: hr_age_ge67, description: "Adjusted hazard ratio, age 67 or more", value: 2.516, tolerance: 0.01, in_answer: false, tool: fit_cox}
+  - {key: hr_stage2, description: "Adjusted hazard ratio, stage II", value: 6.876, tolerance: 0.02, in_answer: false, tool: fit_cox}
+  - {key: hr_stage3, description: "Adjusted hazard ratio, stage III", value: 22.01, tolerance: 0.05, in_answer: false, tool: fit_cox}
+  - {key: hr_stage4, description: "Adjusted hazard ratio, stage IV", value: 74.45, tolerance: 0.2, in_answer: false, tool: fit_cox}
+  - {key: hr_diffuse, description: "Adjusted hazard ratio, diffuse type", value: 2.232, tolerance: 0.005, in_answer: false, tool: fit_cox}
+  - {key: hr_intestinal, description: "Hazard ratio, high MMP-14, intestinal type", value: 3.542, tolerance: 0.01, tool: fit_cox}
+  - {key: hr_intestinal_ci_lo, description: "95% CI lower bound, intestinal type", value: 1.507, tolerance: 0.01, tool: fit_cox}
+  - {key: hr_intestinal_ci_hi, description: "95% CI upper bound, intestinal type", value: 8.329, tolerance: 0.02, tool: fit_cox}
+  - {key: p_intestinal, description: "p for high MMP-14, intestinal type", value: 0.00374, tolerance: 0.0005, tool: fit_cox}
+  - {key: hr_diffuse_type, description: "Hazard ratio, high MMP-14, diffuse type", value: 1.5355, tolerance: 0.005, tool: fit_cox}
+  - {key: p_diffuse_type, description: "p for high MMP-14, diffuse type", value: 0.0711, tolerance: 0.001, tool: fit_cox}

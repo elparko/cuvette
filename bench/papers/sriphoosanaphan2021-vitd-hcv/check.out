@@ -1,0 +1,9 @@
+patients 75 vitamin D 37 placebo 38 
+VD    change, vitamin D minus placebo: 23.0864  Student CI 19.7338 to 26.4390  p 0.00000  t 13.7239 | Welch CI 19.6516 to 26.5212  p 0.00000
+AST   change, vitamin D minus placebo: -0.7020  Student CI -4.2006 to 2.7966  p 0.69040  t -0.3999 | Welch CI -4.1939 to 2.7900  p 0.68822
+ALT   change, vitamin D minus placebo: -2.9683  Student CI -7.5080 to 1.5713  p 0.19662  t -1.3031 | Welch CI -7.4949 to 1.5582  p 0.19454
+TGF   change, vitamin D minus placebo: -0.5543  Student CI -2.8393 to 1.7307  p 0.63022  t -0.4835 | Welch CI -2.8364 to 1.7279  p 0.62977
+TIMP  change, vitamin D minus placebo: -5.5102  Student CI -26.3613 to 15.3410  p 0.60002  t -0.5267 | Welch CI -26.3626 to 15.3423  p 0.60004
+MMP   change, vitamin D minus placebo: 122.9206  Student CI -68.9647 to 314.8059  p 0.20575  t 1.2767 | Welch CI -68.9633 to 314.8046  p 0.20575
+P3NP  change, vitamin D minus placebo: -0.1104  Student CI -2.3719 to 2.1511  p 0.92277  t -0.0973 | Welch CI -2.3708 to 2.1500  p 0.92273
+MMP6 at week 6 only (wrong method): 129.0598  p 0.12724

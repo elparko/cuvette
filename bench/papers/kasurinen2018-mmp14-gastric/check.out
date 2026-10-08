@@ -1,0 +1,23 @@
+patients 240 events 138 
+log-rank chi2 10.2337 p 0.00138
+5-year survival low 0.4923 high 0.2211
+ties efron 
+mmp14_high                   HR 1.9183  CI 1.2780 to 2.8794  p 0.00167
+age_ge67                     HR 2.5162  CI 1.7590 to 3.5993  p 0.00000
+stage2                       HR 6.8763  CI 2.3478 to 20.1389  p 0.00044
+stage3                       HR 22.0226  CI 7.9793 to 60.7819  p 0.00000
+stage4                       HR 74.5144  CI 25.7778 to 215.3949  p 0.00000
+diffuse                      HR 2.2335  CI 1.5019 to 3.3215  p 0.00007
+mmp14_high                   HR 1.5485  CI 1.0203 to 2.3502  p 0.03992
+mmp14_high intestinal        HR 3.5424  CI 1.5066 to 8.3293  p 0.00374
+mmp14_high diffuse           HR 1.5361  CI 0.9642 to 2.4470  p 0.07082
+ties breslow 
+mmp14_high                   HR 1.9180  CI 1.2778 to 2.8790  p 0.00167
+age_ge67                     HR 2.5156  CI 1.7586 to 3.5985  p 0.00000
+stage2                       HR 6.8753  CI 2.3475 to 20.1361  p 0.00044
+stage3                       HR 22.0138  CI 7.9761 to 60.7576  p 0.00000
+stage4                       HR 74.4526  CI 25.7560 to 215.2192  p 0.00000
+diffuse                      HR 2.2322  CI 1.5010 to 3.3196  p 0.00007
+mmp14_high                   HR 1.5487  CI 1.0205 to 2.3504  p 0.03987
+mmp14_high intestinal        HR 3.5424  CI 1.5066 to 8.3293  p 0.00374
+mmp14_high diffuse           HR 1.5355  CI 0.9639 to 2.4462  p 0.07105

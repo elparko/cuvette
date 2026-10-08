@@ -1,0 +1,39 @@
+tool: SciPy (ttest_ind, equal variances)
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/sriphoosanaphan2021-vitd-hcv/vitd_hcv.csv
+decisions:
+  test: "Student t-test on the change from baseline, unpaired, two-sided"
+  equal_variance: true
+  alpha: 0.05
+  replication_unit: "patient (75 rows, one per patient)"
+expected:
+  - {description: "patients, vitamin D arm", value: 37, tolerance: 0, source: "paper Table 2"}
+  - {description: "patients, placebo arm", value: 38, tolerance: 0, source: "paper Table 2"}
+  - {description: "25(OH)D change difference", value: 23.086, tolerance: 0.01, source: "paper Table 3: 23.1"}
+  - {description: "25(OH)D CI lower", value: 19.734, tolerance: 0.01, source: "paper Table 3: 19.7"}
+  - {description: "25(OH)D CI upper", value: 26.439, tolerance: 0.01, source: "paper Table 3: 26.4; the Welch test gives 26.52"}
+  - {description: "TGF-beta1 change difference", value: -0.554, tolerance: 0.005, source: "paper Table 3: -0.6"}
+  - {description: "TGF-beta1 CI lower", value: -2.839, tolerance: 0.005, source: "paper Table 3: -2.8"}
+  - {description: "TGF-beta1 CI upper", value: 1.731, tolerance: 0.005, source: "paper Table 3: 1.7"}
+  - {description: "TGF-beta1 p", value: 0.6302, tolerance: 0.001, source: "paper Table 3: 0.63"}
+  - {description: "TIMP-1 change difference", value: -5.510, tolerance: 0.01, source: "paper Table 3: -5.5"}
+  - {description: "TIMP-1 CI lower", value: -26.361, tolerance: 0.01, source: "paper Table 3: -26.4"}
+  - {description: "TIMP-1 CI upper", value: 15.341, tolerance: 0.01, source: "paper Table 3: 15.3"}
+  - {description: "TIMP-1 p", value: 0.6000, tolerance: 0.001, source: "paper Table 3: 0.60"}
+  - {description: "MMP-9 change difference", value: 122.92, tolerance: 0.05, source: "paper Table 3: 122.9"}
+  - {description: "MMP-9 CI lower", value: -68.96, tolerance: 0.05, source: "paper Table 3: -69.0"}
+  - {description: "MMP-9 CI upper", value: 314.81, tolerance: 0.05, source: "paper Table 3: 314.8"}
+  - {description: "MMP-9 p", value: 0.2058, tolerance: 0.001, source: "paper Table 3: 0.21"}
+  - {description: "P3NP change difference", value: -0.110, tolerance: 0.005, source: "paper Table 3: -0.1"}
+  - {description: "P3NP CI lower", value: -2.372, tolerance: 0.005, source: "paper Table 3: -2.4"}
+  - {description: "P3NP CI upper", value: 2.151, tolerance: 0.005, source: "paper Table 3: 2.2"}
+  - {description: "P3NP p", value: 0.9228, tolerance: 0.001, source: "paper Table 3: 0.92"}
+  - {description: "MMP-9 at week 6 only (trap)", value: 129.06, tolerance: 0.05, source: "computed, Student t-test on MMP6"}
+notes: |
+  Every value was computed with SciPy through the adapter and checked with R 4.6.1 t.test(var.equal = TRUE) on changes that R computes from the raw columns (check.R, check.out).
+  The paper used Stata 16.1. Its ttest command assumes equal variances unless the option unequal is given. The Welch test gives an upper bound of 26.52 for 25(OH)D, which rounds to 26.5, not the printed 26.4. The other Welch values round to the printed values.
+  Trap: a comparison of the week-6 values only ignores the baseline. For MMP-9 it gives 129.06 (p 0.127) instead of 122.92.
+  Trap: a paired test of week 6 against baseline inside one arm does not compare the arms.
+  Group A in the raw file is the vitamin D arm. The readme does not say this. The group sizes, the sex counts and the means of each group match Tables 2 and 3.
+  Table 3 prints the ALT interval as -7.5 to 15. The computed interval is -7.51 to 1.57. The printed upper bound (15) is a misprint. ALT is not an item.

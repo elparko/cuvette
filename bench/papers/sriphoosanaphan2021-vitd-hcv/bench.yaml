@@ -1,0 +1,35 @@
+adapters: [biostats]
+prompt: |
+  In a randomized, double-blind trial, 75 patients with chronic hepatitis C and low vitamin D got vitamin D2 or placebo for 6 weeks after antiviral cure. The file {data}/sriphoosanaphan2021-vitd-hcv/vitd_hcv.csv has one row for each patient. The column arm is vitamin_d or placebo. VD0 and VD6 are serum 25(OH)D in ng/mL at baseline and at week 6. TGF0 and TGF6 are TGF-beta1, TIMP0 and TIMP6 are TIMP-1, MMP0 and MMP6 are MMP-9, and P3NP0 and P3NP6 are P3NP, all in ng/mL. The columns VD_change, TGF_change, TIMP_change, MMP_change and P3NP_change are the week-6 value minus the baseline value. Did vitamin D raise 25(OH)D, and did it change the four fibrosis markers compared with placebo? For 25(OH)D and for each marker, give me the difference in the mean change from baseline, vitamin D minus placebo, with a 95% confidence interval and a p-value. Write every number in your final answer text.
+answers:
+  replicate: "subjects, patients or animals (one value per subject)"
+  alpha: 0.05
+  paired: false
+  two_group_test: t
+  equal_variance: true
+  alternative: two-sided
+allow: all
+data: [sriphoosanaphan2021-vitd-hcv/vitd_hcv.csv]
+items:
+  - {key: n_vitamin_d, description: "Patients in the vitamin D arm", value: 37, exact: true, in_answer: false}
+  - {key: n_placebo, description: "Patients in the placebo arm", value: 38, exact: true, in_answer: false}
+  - {key: vd_diff, description: "25(OH)D change, vitamin D minus placebo, ng/mL", value: 23.086, tolerance: 0.01}
+  - {key: vd_ci_lo, description: "25(OH)D, 95% CI lower bound", value: 19.734, tolerance: 0.01}
+  - {key: vd_ci_hi, description: "25(OH)D, 95% CI upper bound", value: 26.439, tolerance: 0.01}
+  - {key: tgf_diff, description: "TGF-beta1 change, vitamin D minus placebo, ng/mL", value: -0.554, tolerance: 0.005}
+  - {key: tgf_ci_lo, description: "TGF-beta1, 95% CI lower bound", value: -2.839, tolerance: 0.005}
+  - {key: tgf_ci_hi, description: "TGF-beta1, 95% CI upper bound", value: 1.731, tolerance: 0.005}
+  - {key: tgf_p, description: "TGF-beta1, p", value: 0.6302, tolerance: 0.001}
+  - {key: timp_diff, description: "TIMP-1 change, vitamin D minus placebo, ng/mL", value: -5.510, tolerance: 0.01}
+  - {key: timp_ci_lo, description: "TIMP-1, 95% CI lower bound", value: -26.361, tolerance: 0.01}
+  - {key: timp_ci_hi, description: "TIMP-1, 95% CI upper bound", value: 15.341, tolerance: 0.01}
+  - {key: timp_p, description: "TIMP-1, p", value: 0.6000, tolerance: 0.001}
+  - {key: mmp_diff, description: "MMP-9 change, vitamin D minus placebo, ng/mL", value: 122.92, tolerance: 0.05}
+  - {key: mmp_ci_lo, description: "MMP-9, 95% CI lower bound", value: -68.96, tolerance: 0.05}
+  - {key: mmp_ci_hi, description: "MMP-9, 95% CI upper bound", value: 314.81, tolerance: 0.05}
+  - {key: mmp_p, description: "MMP-9, p", value: 0.2058, tolerance: 0.001}
+  - {key: p3np_diff, description: "P3NP change, vitamin D minus placebo, ng/mL", value: -0.110, tolerance: 0.005}
+  - {key: p3np_ci_lo, description: "P3NP, 95% CI lower bound", value: -2.372, tolerance: 0.005}
+  - {key: p3np_ci_hi, description: "P3NP, 95% CI upper bound", value: 2.151, tolerance: 0.005}
+  - {key: p3np_p, description: "P3NP, p", value: 0.9228, tolerance: 0.001}
+  - {key: mmp_week6_trap, description: "MMP-9 at week 6 only, vitamin D minus placebo (trap result)", value: 129.06, tolerance: 0.05, in_answer: false, trap: true}
