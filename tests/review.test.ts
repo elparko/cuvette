@@ -219,3 +219,18 @@ test("a number from the comparison run of the chosen value is not flagged; anoth
   const bad = await runChecks(ctx(record, "There are 50 cells.", { decisions: dec, claims: [{ text: "50 cells", value: 50, label: "measured", node: "n3" } as Claim] }));
   expect(bad.some((f) => f.check === "number_from_comparison")).toBe(true);
 });
+
+test("a sentence that says comparison is not a misreport and its numbers are not flagged", async () => {
+  const { runChecks: run } = await import("../src/core/review.ts");
+  const adapter = { name: "x", manifest: { decisions: [{ key: "db", label: "Molecular database", kind: "choice", choices: ["LipidMaps", "HMDB v4"] }], checks: [] }, module: async () => ({}) };
+  const nodes = [{ id: "n3", tool: "count", args: { db: "HMDB v4" }, sensitivityOf: "db" }];
+  const record = { ...makeRecord([], nodes), numbers: () => [] };
+  const dec: any = { values: () => ({ db: "LipidMaps" }), value: (k: string) => (k === "db" ? "LipidMaps" : undefined) };
+  const claims: Claim[] = [{ text: "In comparison runs with the database HMDB v4, the count was 263.", value: 263, label: "measured", node: "n3" } as Claim];
+  const base = { decisions: dec, adapters: [adapter], claims };
+  const ok = await run(ctx(record, "In comparison runs with the database HMDB v4, the count was 263.", base) as never);
+  expect(ok.some((f) => f.check === "decision_misreported" || f.check === "number_from_comparison")).toBe(false);
+  const bad = await run(ctx(record, "The database was HMDB v4 and the count was 263.", { ...base, claims: [{ ...claims[0], text: "The database was HMDB v4 and the count was 263." }] }) as never);
+  expect(bad.some((f) => f.check === "decision_misreported")).toBe(true);
+  expect(bad.some((f) => f.check === "number_from_comparison")).toBe(true);
+});

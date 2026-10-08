@@ -233,13 +233,15 @@ async function moduleChecks(ctx: ReviewContext): Promise<FindingIn[]> {
   return out;
 }
 
+const SAYS_COMPARISON = /\bcompar(?:ison|ed|ing|e)\b/i;
+
 function decisionsMisreported(ctx: ReviewContext): FindingIn[] {
   const out: FindingIn[] = [];
   const values = ctx.decisions.values();
   const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const word = (t: string) => new RegExp(`(^|[^A-Za-z0-9])${esc(t)}([^A-Za-z0-9]|$)`, "i");
   const STOP = new Set(["what", "which", "with", "from", "that", "this", "unit", "value", "values", "pixels", "none", "used"]);
-  const sentences = ctx.answer.split(/(?<=[.!?\n])\s+/);
+  const sentences = ctx.answer.split(/(?<=[.!?\n])\s+/).filter((s) => !SAYS_COMPARISON.test(s));
   for (const a of ctx.adapters)
     for (const d of a.manifest.decisions ?? []) {
       if (d.kind !== "choice" || !(d.key in values)) continue;
@@ -267,7 +269,7 @@ function numbersFromComparisons(ctx: ReviewContext): FindingIn[] {
     const v = chosen(n.sensitivityOf ?? "");
     return v !== undefined && v !== null && Object.values(n.args ?? {}).some((a) => String(a) === String(v));
   };
-  const hits = ctx.claims.filter((c) => c.node && nodes.get(c.node)?.sensitivityOf && !ranChosen(nodes.get(c.node)!));
+  const hits = ctx.claims.filter((c) => c.node && nodes.get(c.node)?.sensitivityOf && !ranChosen(nodes.get(c.node)!) && !SAYS_COMPARISON.test(c.text));
   if (!hits.length) return [];
   return [{
     check: "number_from_comparison",
