@@ -21,6 +21,11 @@ Classes: a = tool or adapter fault, b = harness fault, c = benchmark spec fault,
 | qwen3:8b | n100_amplitude_gfp | 42.1 | computed by chance from file metrics | d | No evoked step ran. | model fault |
 | qwen3:8b | strongest_grad_latency | 0.0866 | computed by chance from file metrics | d | No evoked step ran. | model fault |
 | qwen3:8b | strongest_grad_amplitude | 199 | computed by chance from file metrics | d | No evoked step ran. | model fault |
-| qwen3:8b | n100_amplitude_eeg | -6.0 | computed 0 | d | No evoked step ran. | model fault |
+| qwen3:8b | n100_amplitude_eeg | -6.0 | computed 0 | c | The prompt asks for the peak in the gradiometers only. The two EEG items are not asked for. | be4c6c3 (reference item) |
+| claude | n100_amplitude_eeg | -6.0 | computed -0.2 | c | Same cause. The other items pass. | be4c6c3 |
 
-Commits in this branch for this paper: 8ccb2ee
+Other findings:
+
+- Claude, e21 and e23 (a): count_events and set_bad_channels failed because raw was the text {"handle": "h1"}, not an object. The tool read the text as a file name. Fixed in 89a7816. Claude then retried and passed all other items.
+
+Commits in this branch for this paper: 89a7816, 8ccb2ee, be4c6c3

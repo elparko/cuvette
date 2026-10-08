@@ -12,7 +12,7 @@ Classes: a = tool or adapter fault, b = harness fault, c = benchmark spec fault,
 
 Other findings:
 
-- e49: the referee did not run because Ollama was not reachable at that time. This is not a harness fault.
+- e49: the referee did not run ("Cannot reach Ollama") exactly 5 min 01 s after the claim check e48 (19:41:36 to 19:46:38). This is the 300 s wait for response headers of Node fetch: complete() used stream false. Fixed in 54adf28.
 - e58: the revised answer is a note about the review, not an answer. The review had flagged the Cellpose version `4.2` as unsourced (a). The version is in the session record. Fixed in aa463a6, which counts program versions and tool arguments as inputs.
 
-Commits in this branch for this paper: 75d0ec4, aa463a6
+Commits in this branch for this paper: 54adf28, 75d0ec4, aa463a6
