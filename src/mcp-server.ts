@@ -8,7 +8,7 @@ import { FakeProvider } from "./providers/fake.ts";
 
 type Handler = (a: Args) => Promise<{ text: string; isError?: boolean }>;
 
-const SHARED = new Set(["read_file", "list_dir", "load_skill", "note", "plan"]);
+const SHARED = new Set(["read_file", "list_dir", "load_skill", "note", "plan", "propose_change", "compare_options"]);
 
 export async function runMcpServer(opts: { adapters: string[] }) {
   const session = await Session.create({

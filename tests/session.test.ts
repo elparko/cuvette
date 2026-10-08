@@ -121,3 +121,58 @@ test("three identical calls in a row end in a forced final answer", async () => 
   expect(await session.send("go")).toBe("Final.");
   expect(provider.requests.at(-1)!.tools.length).toBe(0);
 });
+
+test("propose_change asks the scientist, and an agreed change updates the record for later steps", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "count", args: { input: "/data/a.tif" } }] },
+    { calls: [{ name: "propose_change", args: { key: "min_size", value: "20", reason: "Objects under 20 px are noise." } }] },
+    { calls: [{ name: "count", args: { input: "/data/a.tif" } }] },
+    { calls: [{ name: "propose_change", args: { key: "method", value: "Otsu", reason: "Try Otsu." } }] },
+    { calls: [{ name: "propose_change", args: { key: "nope", value: 1, reason: "x" } }] },
+    { text: "done" },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  const asked: { key: string; options: string[] }[] = [];
+  session.bus.on((e) => {
+    if (e.type !== "question") return;
+    asked.push({ key: e.question.decisionKey, options: e.question.options.map((o) => o.label) });
+    const keep = e.question.decisionKey === "method";
+    setTimeout(() => session!.answer(e.question.qid, e.question.options[keep ? 1 : 0]!.value), 0);
+  });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count the particles in a.tif");
+
+  expect(asked).toEqual([
+    { key: "min_size", options: ["Change to 20", "Keep 5"] },
+    { key: "method", options: ["Change to Otsu", "Keep Default"] },
+  ]);
+  expect(session.decisions.value("min_size")).toBe(20);
+  expect(session.decisions.value("method")).toBe("Default");
+  const counts = session.record.nodes().filter((n) => n.tool === "count" && !n.sensitivityOf);
+  expect(counts.map((n) => n.decisions.min_size)).toEqual([5, 20]);
+  const change = session.record.entries(["decision"]).find((e) => e.data.key === "min_size");
+  expect(change?.data).toMatchObject({ old: 5, new: 20, by: "human" });
+  const results = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "tool_result") as { text: string }[];
+  expect(results.at(-1)!.text).toMatch(/No decision nope/);
+});
+
+test("compare_options reruns the last step with other values as comparison runs and keeps the record", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "compare_options", args: { key: "method", values: ["Otsu"] } }] },
+    { calls: [{ name: "count", args: { input: "/data/a.tif" } }] },
+    { calls: [{ name: "compare_options", args: { key: "method", values: ["Otsu", "Triangle"] } }] },
+    { text: "done" },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
+  await session.send("Count, then check other methods");
+
+  const results = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "tool_result") as { text: string }[];
+  expect(results[0]!.text).toMatch(/No step that uses Threshold method has run yet/);
+  const comps = session.record.nodes().filter((n) => n.sensitivityOf === "method");
+  expect(comps.map((n) => n.args.method)).toEqual(["Otsu", "Triangle"]);
+  expect(comps.every((n) => n.args.min_size === 5 && n.args.input === "/data/a.tif")).toBe(true);
+  expect(session.decisions.value("method")).toBe("Default");
+  expect(session.record.entries(["deviation"])).toHaveLength(0);
+  expect(results.at(-1)!.text).toMatch(/The record still says "Default"/);
+});

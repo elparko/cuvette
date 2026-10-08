@@ -7,6 +7,8 @@ export interface CoreDeps {
   allTools: () => Tool[];
   activate: (names: string[]) => void;
   ask: (spec: { question: string; options: string[]; recommendation?: string; reason?: string; wait: boolean }) => Promise<ToolOutput>;
+  proposeChange: (spec: { key: string; value: unknown; reason: string; wait: boolean }) => Promise<ToolOutput>;
+  compare: (spec: { key: string; values: unknown[] }) => Promise<ToolOutput>;
   proposeLab: (adapter: string, kind: string, payload: Record<string, unknown>, reason: string) => ToolOutput;
   log: (kind: "note", data: Record<string, unknown>) => void;
 }
@@ -88,6 +90,28 @@ export function coreTools(d: CoreDeps): Tool[] {
           reason: a.reason ? String(a.reason) : undefined,
           wait: a.wait !== false,
         }),
+    ),
+    tool(
+      "propose_change",
+      "Ask the scientist to change a decision in the record, for example a setup value. Give the decision key, the new value and the reason. If the scientist agrees, the record changes and later steps use the new value. Use this, not ask_scientist, for any decision that has a key.",
+      {
+        key: { type: "string", description: "The decision key, for example particle_size_min." },
+        value: { description: "The new value." },
+        reason: { type: "string" },
+        wait: { type: "boolean", default: true },
+      },
+      ["key", "value", "reason"],
+      (a) => d.proposeChange({ key: String(a.key), value: a.value, reason: String(a.reason ?? ""), wait: a.wait !== false }),
+    ),
+    tool(
+      "compare_options",
+      "Run the last step that used a decision again with other values of that decision, as comparison runs. The record does not change. Use it for a check such as other threshold methods. Report comparison results as a range or a check, not as the result.",
+      {
+        key: { type: "string", description: "The decision key, for example threshold_method." },
+        values: { type: "array", items: {}, description: "The values to compare. Leave empty to use the adapter's list." },
+      },
+      ["key"],
+      (a) => d.compare({ key: String(a.key), values: Array.isArray(a.values) ? a.values : [] }),
     ),
     tool(
       "plan",

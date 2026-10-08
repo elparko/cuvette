@@ -221,6 +221,8 @@ export class Session {
         allTools: () => [...this.tools.values()],
         activate: (names) => names.forEach((n) => this.active.add(n)),
         ask: (spec) => this.askTool(spec),
+        proposeChange: (spec) => this.proposeChange(spec),
+        compare: (spec) => this.compareOptions(spec),
         proposeLab: (adapter, kind, payload, reason) => {
           const c = propose(adapter, kind as "default", payload, reason, this.record);
           return { ok: true, summary: `Proposed lab rule ${c.pid}. The scientist approves it with /lab.` };
@@ -545,7 +547,7 @@ export class Session {
     if (pre.decision === "instruct") return this.followStep(tool, eff, callId, signal, pre.applied ?? {});
     const kept = (pre.deviations ?? []).filter((d) => d.overwritten);
     const keptNote = kept.length
-      ? `The harness used the recorded decision${kept.length > 1 ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.requested)})`).join("; ")}. The scientist owns ${kept.length > 1 ? "these values" : "this value"}. To change it, ask the scientist with ask_scientist and say why.`
+      ? `The harness used the recorded decision${kept.length > 1 ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.requested)})`).join("; ")}. The scientist owns ${kept.length > 1 ? "these values" : "this value"}. To change it, call propose_change. To check other values without a change, call compare_options.`
       : "";
     const out = await this.execute(tool, eff, callId, signal, { applied: pre.applied ?? {} });
     const post = await this.hooks.post({ event: "PostToolUse", session: this.id, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args: eff, output: out.output, node: out.node });
@@ -775,6 +777,74 @@ export class Session {
     } catch {
       return { ok: false, error: "the question is still open" };
     }
+  }
+
+  private async proposeChange(spec: { key: string; value: unknown; reason: string; wait: boolean }): Promise<ToolOutput> {
+    const fields = this.decisions.fields();
+    const f = fields.find((x) => x.key === spec.key);
+    if (!f) return { ok: false, error: `No decision ${spec.key}. Decisions: ${fields.map((x) => x.key).join(", ")}.` };
+    if (f.owner === "fixed") return { ok: false, error: `${f.label} is fixed for this analysis. Nobody can change it in this session.` };
+    const value = (f.kind === "int" || f.kind === "float") && typeof spec.value === "string" && spec.value.trim() !== "" && Number.isFinite(Number(spec.value)) ? Number(spec.value) : spec.value;
+    if (f.choices.length && !f.choices.some((c) => String(c) === String(value))) return { ok: false, error: `${f.label} must be one of: ${f.choices.map(String).join(", ")}.` };
+    if (f.owner === "agent") {
+      this.decisions.change(f.key, value, { by: "agent", reason: spec.reason });
+      return { ok: true, summary: `You own ${f.label}. The record now says ${JSON.stringify(this.decisions.value(f.key))}.` };
+    }
+    const current = f.set ? f.value : f.default;
+    if (current !== undefined && String(current) === String(value)) return { ok: true, summary: `The record already says ${JSON.stringify(current)} for ${f.label}.` };
+    const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+    let q = this.questions.open().find((x) => x.decisionKey === f.key);
+    if (!q) {
+      q = await this.questions.ask({
+        decisionKey: f.key,
+        title: `Change ${f.label}?`,
+        text: `The agent asks to change "${f.label}" from ${current === undefined ? "not set" : show(current)} to ${show(value)}. Reason: ${spec.reason}`,
+        options: [{ value, label: `Change to ${show(value)}` }, ...(current === undefined ? [] : [{ value: current, label: `Keep ${show(current)}` }])],
+        recommendation: { value, reason: spec.reason },
+        evidence: "",
+      });
+      this.bus.emit({ type: "question", question: q });
+    }
+    if ((!spec.wait && !this.settings.headless) || !this.settings.askWaits) return { ok: true, summary: `Question ${q.qid} is waiting for the scientist. The record changes only if the scientist agrees.` };
+    this.bus.emit({ type: "status", state: "waiting" });
+    this.waitedQids.add(q.qid);
+    try {
+      await abortable(this.questions.wait(q.qid), this.abort?.signal);
+      const now = this.decisions.value(f.key);
+      return { ok: true, summary: `The scientist answered. The record now says ${JSON.stringify(now)} for ${f.label}.`, data: { key: f.key, value: now } };
+    } catch {
+      return { ok: false, error: "the question is still open" };
+    }
+  }
+
+  private async compareOptions(spec: { key: string; values: unknown[] }): Promise<ToolOutput> {
+    const found = this.decisionOf(spec.key);
+    if (!found) return { ok: false, error: `No decision ${spec.key}.` };
+    const d = found.decision;
+    const tools = new Set(d.links.map((l) => l.tool));
+    const last = this.record.nodes().filter((n) => tools.has(n.tool) && !n.sensitivityOf).at(-1);
+    if (!last) return { ok: false, error: `No step that uses ${d.label} has run yet. Run one first, then compare.` };
+    const link = d.links.find((l) => l.tool === last.tool)!;
+    const target = this.findTool(last.tool);
+    if (!target) return { ok: false, error: `The tool ${last.tool} is not available.` };
+    const values = (spec.values.length ? spec.values : d.sensitivity?.options.length ? d.sensitivity.options : d.choices).slice(0, 5);
+    if (!values.length) return { ok: false, error: `Give the values to compare for ${d.label}.` };
+    const signal = this.abort?.signal ?? new AbortController().signal;
+    const perm = this.sessionAllow.has(target.name) ? "allow" : this.permissions.check(target, last.args);
+    if (perm === "deny") return { ok: false, error: "the permission rules deny this tool" };
+    if (perm === "ask") {
+      const res = await this.requestPermission(target, { ...last.args, [link.arg]: values }, signal);
+      if (!res.ok) return { ok: false, error: `the scientist did not allow the comparison runs${res.note ? `: ${res.note}` : ""}` };
+    }
+    const plan = { ...d, sensitivity: { options: values, tool: last.tool, args: {}, compare: d.sensitivity?.compare ?? [], max_runs: values.length } };
+    const res = await runSensitivity(plan, last.tool, structuredClone(last.args), link.arg, async (_t, a, meta) => this.execute(target, a, `cmp${++this.callCount}`, signal, { sensitivityOf: meta.sensitivityOf }), this.record);
+    const summary = `Compared ${values.length} values of ${d.label} as comparison runs. The record still says ${JSON.stringify(this.decisions.value(d.key))}.`;
+    return {
+      ok: true,
+      summary,
+      text: [summary, res.table, ...res.holds, ...res.depends].join("\n"),
+      data: { table: res.table, holds: res.holds, depends: res.depends },
+    };
   }
 
   // ------------------------------------------------------------- permissions and follow mode

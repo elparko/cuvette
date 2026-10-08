@@ -3,6 +3,7 @@ import { runTui } from "../src/tui/app.tsx";
 import { FakeSession } from "../src/tui/fake-session.ts";
 import { imageProtocol, inlineImage } from "../src/tui/image.ts";
 import { Mapper, settingsLine } from "../src/tui/items.ts";
+import { tableLines } from "../src/tui/markdown.tsx";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 import { renderGraph, suggestions } from "../src/tui/commands.ts";
 
@@ -71,7 +72,95 @@ describe("transcript", () => {
   });
 });
 
+describe("markdown", () => {
+  test("assistant text shows no raw Markdown marks", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.record.append("assistant", {
+      text: "## Result\nThe **AUC** is `0.8` [no source]\n- first item\n1. numbered item\n\n| Gene | Value |\n|---|---|\n| TP53 | 0.8 |\n| BRCA1 | 0.6 |",
+      final: true,
+    });
+    await until(() => h.all().includes("BRCA1"));
+    const text = h.all();
+    expect(text).toContain("Result");
+    expect(text).not.toContain("##");
+    expect(text).not.toContain("**");
+    expect(text).not.toContain("`");
+    expect(text).toContain("The AUC is 0.8 [no source]");
+    expect(text).toContain("• first item");
+    expect(text).toContain("1. numbered item");
+    expect(text).not.toContain("|---");
+    expect(text).toMatch(/TP53\s+│ 0\.8/);
+    expect(text).toMatch(/Gene\s+│ Value/);
+  });
+
+  test("tables shrink to fit the width", () => {
+    const rows = [["Name", "Notes"], ["a", "word ".repeat(30).trim()]];
+    const lines = tableLines(rows, 40);
+    expect(lines.length).toBeGreaterThan(3);
+    for (const l of lines) expect(l.text.length).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("queue", () => {
+  test("a message typed while busy waits and is sent when the turn ends", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "status", state: "thinking" });
+    await sleep(40);
+    await submit(h, "next question");
+    await until(() => h.all().includes("Queued: next question"));
+    expect(s.sent).toEqual([]);
+    s.bus.emit({ type: "status", state: "idle" });
+    await until(() => s.sent.includes("next question"));
+  });
+
+  test("slash commands run at once while busy", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "status", state: "thinking" });
+    await sleep(40);
+    await submit(h, "/help");
+    await until(() => h.all().includes("/trail"));
+    expect(h.all()).not.toContain("Queued: /help");
+  });
+
+  test("Esc stops the agent and clears the queue", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "status", state: "thinking" });
+    await sleep(40);
+    await submit(h, "later");
+    await until(() => h.all().includes("Queued: later"));
+    await type(h, "\x1b");
+    await until(() => s.interrupts === 1);
+    s.bus.emit({ type: "status", state: "idle" });
+    await sleep(100);
+    expect(s.sent).toEqual([]);
+  });
+});
+
+describe("follow step lines", () => {
+  test("no warning while the step waits", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.record.append("follow_step", { step: 1, tool: "t", instruction: "x", status: "waiting" });
+    s.record.append("follow_step", { step: 2, tool: "t", status: "done", match: false, differences: ["area 3 vs 4"] });
+    await until(() => h.all().includes("Step 2 differs: area 3 vs 4"));
+    expect(h.all()).not.toContain("undefined");
+    expect(h.all()).not.toContain("Step 1 differs");
+  });
+});
+
 describe("cards", () => {
+  test("permission card lists the code once", async () => {
+    const { h } = start();
+    await sleep(100);
+    await submit(h, "go");
+    await until(() => h.all().includes("Permission needed: run_script"));
+    expect(h.all().match(/import numpy as np/g)).toHaveLength(1);
+  });
+
   test("permission: n asks for a note and denies", async () => {
     const { h, s } = start();
     await sleep(100);

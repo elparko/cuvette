@@ -331,7 +331,9 @@ export function logText(record: AnalysisRecord): string {
       if (route) bits.push(`manual route: ${clip(route, 200)}`);
       if (d.fidelity) bits.push(`fidelity ${d.fidelity}`);
       if (e.node) bits.push(`node ${e.node}`);
-      lines.push(`${id} step ${step} result of ${d.tool ?? call?.data.tool}: ${bits.join("; ")}`);
+      if (d.tool === "run_script" && d.ok !== false && d.text) bits.push(`printed output: ${clip(d.text, 1500)}`);
+      const label = d.sensitivityOf ? `comparison run for ${d.sensitivityOf}` : `step ${step}`;
+      lines.push(`${id} ${label} result of ${d.tool ?? call?.data.tool}: ${bits.join("; ")}`);
     } else if (e.kind === "decision") lines.push(`${id} decision ${d.key}: ${clip(d.old)} -> ${clip(d.new)} by ${d.by}${d.reason ? ` (${clip(d.reason)})` : ""}`);
     else if (e.kind === "owner_change") lines.push(`${id} owner of ${d.key}: ${d.old} -> ${d.new} by ${d.by}`);
     else if (e.kind === "deviation") lines.push(`${id} deviation in ${d.tool}: ${clip(d.deviations, 300)}`);

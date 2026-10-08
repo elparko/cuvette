@@ -38,6 +38,12 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
   const [openQ, setOpenQ] = useState(() => session.questions.open().length);
   const [tokens, setTokens] = useState({ input: 0, output: 0 });
   const [hint, setHint] = useState("");
+  const [queue, setQueue] = useState<string[]>([]);
+  const queueRef = useRef<string[]>([]);
+  const updateQueue = useCallback((next: string[]) => {
+    queueRef.current = next;
+    setQueue(next);
+  }, []);
 
   const push = useCallback((...more: Item[]) => setItems((x) => [...x, ...more]), []);
   const line = useCallback(
@@ -129,7 +135,14 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           break;
         case "status":
           setStatus({ state: e.state, tool: e.tool });
-          if (e.state === "idle") setLive("");
+          if (e.state === "idle") {
+            setLive("");
+            const [next, ...rest] = queueRef.current;
+            if (next !== undefined) {
+              updateQueue(rest);
+              session.send(next).catch((err: Error) => line("✗", `The agent stopped: ${err.message}`, "red"));
+            }
+          }
           break;
         case "permission":
           addCard({ t: "permission", rid: e.rid, tool: e.tool, args: e.args, code: e.code, touches: e.touches });
@@ -227,7 +240,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     setInput("");
     setSel(0);
     if (text.startsWith("/")) return void runCommand(text);
-    if (status.state !== "idle") return line("▸", "The agent is working. Press Esc to stop it.", undefined, true);
+    if (status.state !== "idle") return updateQueue([...queueRef.current, text]);
     setHint("");
     session.send(text).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
   };
@@ -243,7 +256,10 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     }
     if (cards.length) return;
     if (key.escape) {
-      if (status.state !== "idle") session.interrupt();
+      if (status.state !== "idle") {
+        updateQueue([]);
+        session.interrupt();
+      }
       else if (input) setText("");
     } else if (key.tab && key.shift) {
       const next = MODE_ORDER[(MODE_ORDER.indexOf(session.mode) + 1) % MODE_ORDER.length]!;
@@ -349,10 +365,15 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
               setSel(0);
             }}
             onSubmit={submit}
-            placeholder={status.state === "idle" ? "Ask for an analysis step, or type / for commands" : "The agent is working. Esc stops it."}
+            placeholder={status.state === "idle" ? "Ask for an analysis step, or type / for commands" : "The agent is working. Your message waits. Esc stops it."}
           />
         )}
       </Box>
+      {queue.map((q, i) => (
+        <Text key={i} dimColor>
+          Queued: {q}
+        </Text>
+      ))}
       {sugg.map((c, i) => (
         <Text key={c.name} color={c === selected ? "cyan" : undefined} dimColor={c !== selected}>
           {c === selected ? "▸" : " "} /{c.name}

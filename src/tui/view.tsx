@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useStdout } from "ink";
 import type { Mode } from "../core/types.ts";
 import { fidelityLabel, type Item } from "./items.ts";
+import { Markdown } from "./markdown.tsx";
 import type { SessionLike } from "./types.ts";
 
 export type StaticItem = Item | { key: string; t: "header" };
@@ -43,11 +44,7 @@ export function ItemView({ item }: { item: StaticItem }) {
         </Box>
       );
     case "assistant":
-      return (
-        <Box marginTop={1}>
-          <Text>{item.text}</Text>
-        </Box>
-      );
+      return <AssistantView text={item.text} />;
     case "line":
       return (
         <Box>
@@ -66,6 +63,15 @@ export function ItemView({ item }: { item: StaticItem }) {
     case "step":
       return <StepView item={item} />;
   }
+}
+
+function AssistantView({ text }: { text: string }) {
+  const { stdout } = useStdout();
+  return (
+    <Box marginTop={1}>
+      <Markdown text={text} width={((stdout as unknown as { columns?: number })?.columns ?? 80) - 1} />
+    </Box>
+  );
 }
 
 function StepView({ item }: { item: Extract<Item, { t: "step" }> }) {

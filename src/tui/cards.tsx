@@ -60,7 +60,9 @@ export function PermissionCard(props: {
     },
     { isActive: !asking },
   );
-  const args = Object.entries(card.args).map(([k, v]) => `${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`);
+  const args = Object.entries(card.args)
+    .filter(([, v]) => !(card.code && typeof v === "string" && v.trim() === card.code.trim()))
+    .map(([k, v]) => `${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`);
   const lines = card.code?.split("\n") ?? [];
   return (
     <Frame title={`Permission needed: ${card.tool}`} color="yellow">

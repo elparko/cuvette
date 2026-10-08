@@ -18,7 +18,7 @@ export function taskTool(d: TaskDeps): Tool {
     readOnly: true,
     permission: "allow",
     async execute(args, ctx): Promise<ToolOutput> {
-      const tools = d.tools().filter((t) => t.readOnly && t.name !== "task" && t.name !== "ask_scientist");
+      const tools = d.tools().filter((t) => t.readOnly && t.name !== "task" && t.name !== "ask_scientist" && t.name !== "propose_change" && t.name !== "compare_options");
       const schemas = tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
       const history: Message[] = [{ role: "user", parts: [{ type: "text", text: String(args.job) }] }];
       for (let i = 0; i < (d.maxSteps ?? 12); i++) {

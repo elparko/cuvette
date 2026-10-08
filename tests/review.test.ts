@@ -142,6 +142,18 @@ describe("referee", () => {
     expect(text).toContain("Answer here");
   });
 
+  test("the log shows script output and labels comparison runs", () => {
+    const more: any[] = [
+      ...seed,
+      { kind: "tool_call", data: { callId: "b", tool: "run_script", args: { code: "print(1)" } } },
+      { kind: "tool_result", data: { callId: "b", tool: "run_script", ok: true, summary: "The script finished.", text: "n= 47 mean= 382.1" } },
+      { kind: "tool_result", data: { callId: "b.s1", tool: "stats", ok: true, summary: "AUC 0.6", sensitivityOf: "method" } },
+    ];
+    const { text } = refereePrompt(ctx(makeRecord(more), "x"));
+    expect(text).toContain("printed output: n= 47 mean= 382.1");
+    expect(text).toContain("#6 comparison run for method result of stats: ok AUC 0.6");
+  });
+
   test("parses fenced JSON lines and arrays", () => {
     const lines = '```json\n{"severity":"warning","message":"A","entries":[3]}\n{"severity":"bogus","message":"B"}\n```';
     expect(parseReferee(lines)).toEqual([

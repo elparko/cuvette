@@ -103,12 +103,14 @@ export class Mapper {
         return line("✓", `Finding ${d.fid}: ${d.action}`, "green");
       case "mode":
         return line("▸", `Mode: ${d.old} → ${d.new}`, "cyan");
-      case "follow_step":
-        return line(
-          d.match ? "✓" : "⚠",
-          d.match ? `Step ${d.step} matches.` : `Step ${d.step} differs: ${show(d.differences)}`,
-          d.match ? "green" : "yellow",
-        );
+      case "follow_step": {
+        const diffs = Array.isArray(d.differences) ? (d.differences as unknown[]).map(show) : [];
+        if (d.status === "waiting") return [];
+        if (d.status === "agent did it") return line("▸", `Step ${d.step}: the agent did it.`, undefined, true);
+        if (diffs.length) return line("⚠", `Step ${d.step} differs: ${diffs.join(" ")}`, "yellow");
+        if (d.match === true) return line("✓", `Step ${d.step} matches.`, "green");
+        return [];
+      }
       case "permission":
         return line("▸", `Permission for ${d.tool}: ${d.decision}`, undefined, true);
       case "compaction":

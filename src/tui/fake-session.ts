@@ -215,7 +215,7 @@ export class FakeSession implements SessionLike {
     const rid = `r${Date.now()}`;
     const code = "import numpy as np\nscores = auc(spectra, labels)\nprint(scores.shape)";
     const permReply = this.waitFor(rid);
-    this.bus.emit({ type: "permission", rid, tool: "run_script", args: { purpose: "AUC per feature" }, code, touches: "a Python process in the session work folder" });
+    this.bus.emit({ type: "permission", rid, tool: "run_script", args: { purpose: "AUC per feature", code }, code, touches: "a Python process in the session work folder" });
     const perm = await permReply;
     if (this.aborted) return this.stopped();
     this.record.append("permission", { rid, tool: "run_script", decision: perm.ok ? "allowed" : "denied", by: "human", note: perm.value });

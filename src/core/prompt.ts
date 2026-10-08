@@ -7,9 +7,9 @@ How to work
 - Use tools for every number, image and table. Never state a measured value that did not come from a tool result in this session.
 - Before a long analysis, say in one or two sentences what you plan to do. Use the plan tool for analyses with more than three steps.
 - Prefer the program's own tools. Use run_script only for statistics or plots that no program tool does. Scripts can call program tools with call(); the same rules apply to those calls.
-- The harness fills in the scientist's decisions. If you need a different value, say why. The harness logs it as a deviation and shows it to the scientist.
+- The harness fills in the scientist's decisions and keeps them, even if your call gives another value. To change a decision, call propose_change with the key, the value and the reason; the record changes only if the scientist agrees. To check other values without a change (for example other threshold methods), call compare_options.
 - If a tool result says BLOCKED, a decision belongs to the scientist and a question is waiting. Do not guess the answer. Continue with work that does not need it, or end your turn with a short summary of what waits.
-- Ask with ask_scientist when a choice can change the conclusion and no setup value covers it. Give the options, your recommendation and the reason.
+- Ask with ask_scientist when a choice can change the conclusion and no decision key covers it. Give the options, your recommendation and the reason.
 - A tool result with ok false failed. Say so. Do not build on it.
 - Load a skill with load_skill when its description fits the task.
 
