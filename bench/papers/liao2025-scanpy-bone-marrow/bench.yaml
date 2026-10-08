@@ -1,0 +1,30 @@
+adapters: [scanpy]
+prompt: |
+  I sorted tdTomato-positive stromal cells from the endosteal bone marrow of Adipoq-CreERT2;Ai9 male mice, 24 hours (pulse) or 4 weeks (chase) after tamoxifen, and ran 10x 3' v3.1 single-cell RNA-seq. The Cell Ranger filtered matrices are in two folders: {data}/liao2025-scanpy-bone-marrow/pulse and {data}/liao2025-scanpy-bone-marrow/chase. Do the usual cell quality control on each sample separately, so that I keep only good cells for clustering later. Tell me how many cells each sample has before and after quality control. Write every number in the answer text.
+answers:
+  replicate: "cells in one sample (descriptive only)"
+  min_genes_per_cell: 200
+  max_genes_per_cell: 6000
+  max_pct_mito: 10
+  min_cells_per_gene: 0
+allow: all
+timeout_s: 1200
+data:
+  - liao2025-scanpy-bone-marrow/pulse
+  - liao2025-scanpy-bone-marrow/chase
+items:
+  # Source: Liao 2025, Materials and Methods, "Single-Cell RNA-seq": "10,608 and 10,046 cells were recovered from
+  # the pulse and chase samples, respectively." and "9,612 and 8,887 cells remained from the pulse and chase
+  # samples, respectively, for further analyses." QC: "Cells with nFeature > 6,000 or <200 or >10% mitochondrial
+  # genes were excluded". check_qc.py (numpy and scipy, no scanpy) gives the same four numbers. The count does
+  # not change if the bounds are strict or not, so max_genes_per_cell 6000 (the tool removes 6000 genes or more)
+  # gives the same cells as the paper rule (more than 6000 genes removed).
+  - {key: pulse_cells_loaded, description: "Cells in the pulse matrix", value: 10608, exact: true}
+  - {key: chase_cells_loaded, description: "Cells in the chase matrix", value: 10046, exact: true}
+  - {key: pulse_cells_after_qc, description: "Pulse cells after quality control", value: 9612, exact: true}
+  - {key: chase_cells_after_qc, description: "Chase cells after quality control", value: 8887, exact: true}
+  - {key: genes_in_matrix, description: "Genes in each matrix", value: 32286, exact: true, in_answer: false}
+  # Trap: the mouse mitochondrial genes start with "mt-". With the human prefix "MT-" no gene is mitochondrial,
+  # the mitochondrial filter removes nothing, and the gene filters alone keep 10392 (pulse) and 9859 (chase) cells.
+  - {key: pulse_cells_human_mito_prefix, description: "Pulse cells kept if the mitochondrial prefix is MT- (no match in mouse)", value: 10392, exact: true, in_answer: false, trap: true}
+  - {key: chase_cells_human_mito_prefix, description: "Chase cells kept if the mitochondrial prefix is MT- (no match in mouse)", value: 9859, exact: true, in_answer: false, trap: true}

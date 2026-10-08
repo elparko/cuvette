@@ -1,0 +1,31 @@
+tool: scanpy (or Seurat 4.1.1 in the paper)
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow/pulse
+  - /Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow/chase
+decisions:
+  replication_unit: "cells in one sample (descriptive); one sample of four pooled mice for each time point"
+  min_genes_per_cell: 200
+  max_genes_per_cell: "remove more than 6000 (tool value 6000 gives the same cells)"
+  max_pct_mito: 10
+  mito_prefix: "mt- (mouse)"
+  min_cells_per_gene: "none stated (0)"
+expected:
+  - {description: "cells in the pulse matrix", value: 10608, tolerance: 0, source: "paper Methods; check_qc.py"}
+  - {description: "cells in the chase matrix", value: 10046, tolerance: 0, source: "paper Methods; check_qc.py"}
+  - {description: "pulse cells after quality control", value: 9612, tolerance: 0, source: "paper Methods; check_qc.py"}
+  - {description: "chase cells after quality control", value: 8887, tolerance: 0, source: "paper Methods; check_qc.py"}
+  - {description: "genes in each matrix", value: 32286, tolerance: 0, source: "features.tsv.gz"}
+  - {description: "pulse cells kept with the prefix MT- (trap)", value: 10392, tolerance: 0, source: "check_qc.py"}
+  - {description: "chase cells kept with the prefix MT- (trap)", value: 9859, tolerance: 0, source: "check_qc.py"}
+notes: |
+  check_qc.py reads the matrices with scipy and counts the genes and the mitochondrial share of each cell with
+  numpy. It gives 10608 and 10046 cells at load and 9612 and 8887 after quality control. Strict and non-strict
+  bounds give the same counts.
+  Removed in pulse: 154 cells with fewer than 200 genes, 62 with more than 6000 genes, 919 with more than 10%
+  mitochondrial counts. Removed in chase: 136, 51 and 1097.
+  The matrices have 32286 features. The mm10-2020-A reference has 32285, so one feature is probably the tdTomato
+  reporter. This was not checked.
+  The 13 mitochondrial genes start with "mt-". The adapter default prefix is "MT-" (human). With that prefix the
+  mitochondrial filter removes nothing (trap values 10392 and 9859).
+  The paper gives no cluster resolution, so the benchmark scores no cluster count.

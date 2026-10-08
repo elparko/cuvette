@@ -1,0 +1,87 @@
+kind: research paper
+short: Liao 2025
+field: Genomics and transcriptomics
+program: scanpy (Python), through the scanpy adapter
+citation:
+  authors: Liao X, Koehnken Sawall J, Seeley R, Song F, Ji X, Liu X, Song C, Long F
+  title: An adipo-osteoprogenitor population in the endosteal niche contributes to bone and fat formation in adult mouse bone marrow
+  venue: Proceedings of the National Academy of Sciences 122(47):e2502436122
+  year: 2025
+  doi: 10.1073/pnas.2502436122
+related:
+  - text: GEO series GSE253262. Source of the two Cell Ranger matrices.
+    url: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE253262
+measured: >-
+  The paper looks for the cells in adult mouse bone marrow that make both bone and fat. The authors marked
+  Adipoq-expressing cells with tdTomato after a tamoxifen dose. They sorted the labeled stromal cells from the
+  endosteal bone marrow 24 hours (pulse) or 4 weeks (chase) after the dose and profiled them by single-cell RNA
+  sequencing (scRNA-seq). Before clustering, they removed cells with too few or too many genes or with a high
+  share of mitochondrial counts.
+instruction: >-
+  I sorted tdTomato-positive endosteal stromal cells from mouse bone marrow at a pulse and a chase time point
+  and ran 10x single-cell RNA-seq. Do the usual cell quality control on each sample and tell me how many cells
+  each sample has before and after it.
+instruction_basis: >-
+  Materials and Methods, the section "Single-Cell RNA-seq". The paper gives the cells that Cell Ranger recovered
+  and the cells that remain after quality control for each sample.
+answers:
+  replicate:
+    decision: Unit of replication
+    value: cells in one sample (descriptive only)
+    source: >-
+      Materials and Methods, "Single-Cell RNA-seq". Four mice were pooled for each sample, and there is one
+      sample for each time point. The cell counts describe each sample.
+  min_genes_per_cell:
+    decision: Minimum genes per cell
+    value: 200
+    source: Materials and Methods, "Single-Cell RNA-seq". Cells with nFeature "<200" were excluded.
+  max_genes_per_cell:
+    decision: Maximum genes per cell
+    value: 6000 (the tool removes cells with 6000 genes or more)
+    source: >-
+      Materials and Methods, "Single-Cell RNA-seq". Cells with "nFeature > 6,000" were excluded. No cell has
+      exactly 6000 genes, so the two rules keep the same cells.
+  max_pct_mito:
+    decision: Maximum percent mitochondrial counts
+    value: 10
+    source: Materials and Methods, "Single-Cell RNA-seq". Cells with ">10% mitochondrial genes" were excluded.
+  min_cells_per_gene:
+    decision: Minimum cells per gene
+    value: 0 (no gene filter)
+    source: Not in the paper. The paper names no gene filter, and the Seurat default keeps all genes.
+items:
+  pulse_cells_loaded:
+    source: published
+    where: >-
+      Materials and Methods, "Single-Cell RNA-seq": "10,608 and 10,046 cells were recovered from the pulse and
+      chase samples, respectively." The benchmark authors counted 10608 barcodes in the pulse matrix.
+  chase_cells_loaded:
+    source: published
+    where: Materials and Methods, the same sentence. The benchmark authors counted 10046 barcodes in the chase matrix.
+  pulse_cells_after_qc:
+    source: published
+    where: >-
+      Materials and Methods, "Single-Cell RNA-seq": "9,612 and 8,887 cells remained from the pulse and chase
+      samples, respectively, for further analyses." check_qc.py gives 9612.
+  chase_cells_after_qc:
+    source: published
+    where: Materials and Methods, the same sentence. check_qc.py gives 8887.
+  genes_in_matrix:
+    source: computed
+    tool: Python gzip read of features.tsv.gz (check_qc.py)
+    where: Not in the paper. Each matrix has 32286 features.
+  pulse_cells_human_mito_prefix:
+    source: computed
+    tool: numpy and scipy (check_qc.py)
+    where: >-
+      Not in the paper. A trap value: with the human prefix "MT-" no mouse gene counts as mitochondrial, and the
+      gene filters alone keep 10392 pulse cells.
+  chase_cells_human_mito_prefix:
+    source: computed
+    tool: numpy and scipy (check_qc.py)
+    where: Not in the paper. The same trap for the chase sample keeps 9859 cells.
+data:
+  source: GEO series GSE253262, samples GSM8017442 (pulse) and GSM8017443 (chase), Cell Ranger filtered matrices
+  url: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE253262
+  license: NCBI GEO puts no restrictions on the use of the data. Mouse cells. The paper is CC BY-NC-ND 4.0.
+  size: About 188 MB of gzip files. 10608 and 10046 cells by 32286 features.

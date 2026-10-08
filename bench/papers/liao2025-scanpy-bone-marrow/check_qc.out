@@ -1,0 +1,10 @@
+pulse: genes 32286, cells 10608, mitochondrial genes 13
+  kept with 200 <= genes <= 6000, mito <= 10: 9612
+  kept with 200 <= genes < 6000, mito < 10: 9612
+  kept with 200 < genes < 6000, mito < 10: 9612
+  removed: fewer than 200 genes 154, more than 6000 genes 62, more than 10% mito 919
+chase: genes 32286, cells 10046, mitochondrial genes 13
+  kept with 200 <= genes <= 6000, mito <= 10: 8887
+  kept with 200 <= genes < 6000, mito < 10: 8887
+  kept with 200 < genes < 6000, mito < 10: 8887
+  removed: fewer than 200 genes 136, more than 6000 genes 51, more than 10% mito 1097
