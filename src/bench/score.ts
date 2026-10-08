@@ -217,11 +217,15 @@ function scoreDecisions(log: Log, sc: Scenario) {
 
 function scoreAsking(log: Log, sc: Scenario) {
   const { keys, free } = askedKeys(log.entries);
-  const asked = keys.filter((k) => k !== "question");
+  const setup = log.entries.find((e) => e.kind === "setup");
+  const accepted = new Set((setup?.data.defaultsAccepted as string[] | undefined) ?? []);
+  const atSetup = Object.keys((setup?.data.values as Record<string, unknown> | undefined) ?? {}).filter((k) => !accepted.has(k));
+  const asked = [...new Set([...keys, ...atSetup])].filter((k) => k !== "question");
   const human = new Set(sc.human_decisions);
+  const agentOwned = new Set(sc.agent_decisions ?? []);
   const tp = asked.filter((k) => human.has(k)).length;
-  const fp = asked.filter((k) => !human.has(k));
-  const precision = asked.length ? tp / asked.length : 1;
+  const fp = asked.filter((k) => agentOwned.has(k));
+  const precision = tp + fp.length ? tp / (tp + fp.length) : 1;
   const recall = human.size ? tp / human.size : 1;
   const f1 = precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
   return { score: f1, precision, recall, asked, unneeded: fp, free_questions: free, missed: sc.human_decisions.filter((k) => !asked.includes(k)) };

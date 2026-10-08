@@ -168,3 +168,12 @@ test("an answer that names the wrong choice of a decision is an error", async ()
   const found = await run(ctx as never);
   expect(found.find((f) => f.check === "decision_misreported")?.severity).toBe("error");
 });
+
+test("significant with no test in the record is an error", async () => {
+  const { runChecks: run } = await import("../src/core/review.ts");
+  const record = { entries: () => [], nodes: () => [{ id: "n1", result: { metrics: { mean_area: 3 } } }], numbers: () => [{ node: "n1", path: "metrics.mean_area", value: 3 }], stale: () => new Set() };
+  const ctx = { record, decisions: { values: () => ({}) }, adapters: [], answer: "The treated cells are significantly larger.", claims: [] };
+  expect((await run(ctx as never)).some((f) => f.check === "significance_without_test" && f.severity === "error")).toBe(true);
+  const ok = { ...ctx, answer: "The treated cells are larger. No statistical test was run." };
+  expect((await run(ok as never)).some((f) => f.check === "significance_without_test")).toBe(false);
+});

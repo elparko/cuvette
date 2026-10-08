@@ -263,8 +263,25 @@ function numbersFromComparisons(ctx: ReviewContext): FindingIn[] {
   }];
 }
 
+function significanceWithoutTest(ctx: ReviewContext): FindingIn[] {
+  if (!/\bsignifican(t|tly|ce)\b/i.test(ctx.answer)) return [];
+  if (/\bnot (statistically )?significan|\bno (statistical )?test|\bwithout a (statistical )?test|cannot (be )?test/i.test(ctx.answer)) return [];
+  const testKey = /^(p|q|p_?val(ue)?|q_?val(ue)?|p_adj|padj|fdr|pvalue|qvalue)$/i;
+  const tested = ctx.record.nodes().some((n) => {
+    const m = (n.result as { metrics?: Record<string, number> } | undefined)?.metrics ?? {};
+    return Object.keys(m).some((k) => testKey.test(k) || /(^|_)(p|q)_?value/i.test(k));
+  }) || ctx.record.numbers().some((x) => /(^|[._\[])(p|q|p_?value|q_?value|padj|fdr)($|[._\]])/i.test(x.path));
+  if (tested) return [];
+  return [{
+    check: "significance_without_test",
+    severity: "error",
+    message: "The answer uses the word significant, but no statistical test ran in this session. Say that the difference is descriptive, or run a test with the right unit of replication.",
+  }];
+}
+
 export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
   return [
+    ...significanceWithoutTest(ctx),
     ...numbersFromComparisons(ctx),
     ...decisionsMisreported(ctx),
     ...failedNotRepeated(ctx),
