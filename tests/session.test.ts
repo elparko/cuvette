@@ -296,3 +296,38 @@ test("a result that used the recorded value says so to the model", async () => {
   expect(results[0]!.text).toMatch(/min_size.* = 5 \(you gave 99\)\. This result is for the recorded value, not for the value you gave\./);
   expect(results[0]!.text).toMatch(/call compare_options/);
 });
+
+test("comparison runs before a question wait for the other open decisions of the same call", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "fit", args: { data: "/data/x.csv", terms: "A + B", perms: 999 } }] }, { text: "done" }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/model")], provider, cwd: tmpdir() });
+  const asked: string[] = [];
+  session.bus.on((e) => {
+    if (e.type !== "question") return;
+    asked.push(e.question.decisionKey);
+    setTimeout(() => session!.answer(e.question.qid, e.question.decisionKey === "terms" ? "A + B" : 999), 0);
+  });
+  session.decisions.applySetup({ question: "Does A change the outcome?" });
+  await session.send("Fit the model");
+
+  expect(asked).toEqual(["terms", "perms"]);
+  const comps = session.record.nodes().filter((n) => n.sensitivityOf === "perms");
+  expect(comps.map((n) => n.args.perms)).toEqual([99, 999]);
+  expect(comps.every((n) => n.args.terms === "A + B")).toBe(true);
+  expect(session.record.entries(["tool_result"]).filter((e) => e.data.ok === false)).toHaveLength(0);
+  const q = session.record.entries(["question"]).find((e) => e.data.decisionKey === "perms")!;
+  expect(String(q.data.evidence)).not.toMatch(/No comparison yet|failed/);
+  const main = session.record.nodes().filter((n) => !n.sensitivityOf);
+  expect(main.map((n) => [n.args.terms, n.args.perms])).toEqual([["A + B", 999]]);
+});
+
+test("without a wait for answers, the comparison names the missing argument and does not run", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "fit", args: { data: "/data/x.csv", terms: "A", perms: 999 } }] }, { text: "done" }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/model")], provider, cwd: tmpdir(), settings: { askWaits: false, autoResume: false } });
+  session.decisions.applySetup({ question: "Does A change the outcome?" });
+  await session.send("Fit the model");
+
+  expect(session.record.nodes().filter((n) => n.sensitivityOf)).toHaveLength(0);
+  expect(session.record.entries(["tool_result"]).some((e) => /length zero/.test(String(e.data.error ?? "")))).toBe(false);
+  const q = session.record.entries(["question"]).find((e) => e.data.decisionKey === "perms")!;
+  expect(String(q.data.evidence)).toMatch(/No comparison yet: the comparison runs of fit need a value for terms \(Model terms\)/);
+});
