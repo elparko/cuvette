@@ -1,0 +1,136 @@
+{
+  "model": "ollama:qwen3:8b",
+  "guidance": "on",
+  "rows": [
+    {
+      "id": "confound",
+      "on": {
+        "answer": 1,
+        "traps": 0.5,
+        "decisions": 1,
+        "asking": 0.8,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 1,
+            "found": [
+              {
+                "description": "Treated cells have higher mean intensity than control cells.",
+                "found": true
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "treatment_equals_batch",
+              "kind": "confounder",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.8,
+            "precision": 1,
+            "recall": 0.6666666666666666,
+            "asked": [
+              "threshold_method",
+              "background_subtraction",
+              "replicate"
+            ],
+            "unneeded": [],
+            "free_questions": 1,
+            "missed": [
+              "batch_handling"
+            ]
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 7,
+            "with_route": 7,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-023713-51c5"
+    },
+    {
+      "id": "saturation",
+      "on": {
+        "answer": 1,
+        "traps": 0,
+        "decisions": 1,
+        "asking": 0.8,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 1,
+            "found": [
+              {
+                "description": "Treated cells are brighter than control cells.",
+                "found": true
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "clipped_image",
+              "kind": "saturation",
+              "outcome": "fell_in",
+              "score": 0
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.8,
+            "precision": 1,
+            "recall": 0.6666666666666666,
+            "asked": [
+              "threshold_method",
+              "background_subtraction",
+              "replicate"
+            ],
+            "unneeded": [],
+            "free_questions": 1,
+            "missed": [
+              "exclusion"
+            ]
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 4,
+            "with_route": 4,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-024452-c083"
+    }
+  ]
+}
