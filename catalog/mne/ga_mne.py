@@ -28,6 +28,10 @@ def _handle(name):
 def _get(x):
     if isinstance(x, dict) and isinstance(x.get("handle"), str):
         x = _handle(x["handle"])
+    if isinstance(x, str):
+        named = re.search(r'"handle"\s*:\s*"(h\d+)"', x)
+        if named:
+            x = named.group(1)
     if isinstance(x, str) and re.fullmatch(r"h\d+", x):
         x = _handle(x)
     if isinstance(x, (mne.io.BaseRaw, mne.BaseEpochs, mne.Evoked, mne.preprocessing.ICA)):
