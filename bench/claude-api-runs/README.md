@@ -33,3 +33,13 @@ error).
 3. An overwritten value was logged as `used: none` although the step ran with TIC. Claude and the
    referee both read it wrongly. The log now records `requested` (the model's value) and `used`
    (the value that ran).
+
+## Runs after the fixes (10:41 to 11:06)
+
+| Run | What it shows | Requests | Uncached input | Cache reads | Cache writes | Output |
+| --- | --- | --- | --- | --- | --- | --- |
+| ImageJ in the terminal (`imagej-2-tui-log.jsonl`) | `propose_change` changed the smallest size from 0 to 50 px² after the scientist agreed; `compare_options` ran Otsu, Huang, Li, IsoData and Triangle as comparison runs. 47 cells, mean 382.1 px². | see log | | | | |
+| SMILE MSI (`smile-msi-2-log.jsonl`) | Same request as before. Claude used `compare_options` for the normalization check and labelled those numbers "comparison run". | 16 | 600k | 173k | | 15.7k |
+| SMILE MSI with conversation caching (`smile-msi-3-log.jsonl`) | The cache breakpoint on the latest message works on the real API. | 20 | 44 | 1.19M | 96k | 20.2k |
+
+Cache reads cost about one tenth of uncached input, and cache writes cost 1.25 times. For runs of this size the input cost falls by about 60%.

@@ -1,0 +1,166 @@
+{
+ "session": "20261008-110034-a269",
+ "dir": "/Users/parker/.guided-analysis/sessions/20261008-110034-a269",
+ "answer": "Left and right don't differ, because both halves contain the whole tissue. The real differences are between three compartments: a core, a rim and a small lesion. Ten ions mark them, and the main ones hold under TIC, RMS and no normalization. One replicate here is a pixel, so all of this is exploratory.\n\n**Corrections after review**\n- The left/right pixel counts (792 each) come from `state`, which I re-ran.\n- I removed the count of markers cut by the per-group cap.\n- The lesion-vs-core normalization claim now rests on a new logged run, and I limited it to the 10 key ions.\n\n**Steps I ran**\n- **Open slide** (File > Load demo dataset): 1,584 pixels. `state` shows two regions, \"left\" (Group A) and \"right\" (Group B), 792 px each.\n- **Find peaks** (Analyze > This slide > Peaks > Find peaks, S/N 3): 11,432 peaks. This tool sets Min rel. intensity to 0, while the dialog uses 0.002, so most of these are noise.\n- **Left vs right** (Statistics > Region comparison (A vs B), Mann-Whitney, TIC, 10 ppm): 3 features pass q ≤ 0.05, none also pass AUC ≥ 0.7, and every AUC is between 0.43 and 0.55. The 3 that pass are noise-level ions (mean about 0.001, AUC about 0.43).\n- **Ion images** show why: the tissue is an ellipse with a core, a rim and a small lesion, surrounded by background. Both halves cut through all of it.\n- **New regions:** you chose a one-vs-rest comparison of the compartments with background excluded. I built the regions from the ion images in a script: tissue 1,007 px, rim 552, core 416, lesion 39, background 577. **Sending them to the app failed**, because the demo slide has no saved session. You haven't been able to review them in the app.\n- **One-vs-rest** (Statistics > Discriminating features (per group), AUC ≥ 0.7, q ≤ 0.05): the step kept 54 markers. More passed but were cut by its 15-per-group cap. I pulled the full list in a script and folded M+1/M+2 isotopes into their parent ions, which leaves 14 marker entries.\n- **Lesion vs core:** a direct comparison as a supplement, because the lesion's \"rest\" is mostly rim.\n- **Normalization check** (TIC, RMS, none; comparison runs only, the record stays at TIC): run on the 10 key ions, for the one-vs-rest contrasts and for lesion vs core.\n- **Annotation** (Annotation > Annotate lipids, negative mode, 5 ppm). The dialog uses 10 ppm.\n\n**Results** (TIC; AUC is region vs the rest of the tissue; log2 fold change from the main one-vs-rest run)\n\n| Higher in | m/z | AUC | log2 FC | Putative ID (sum composition) |\n|---|---|---|---|---|\n| core | 834.5287 | 1.00 | +2.18 | PS 40:6 [M-H]⁻, −0.4 ppm |\n| core | 885.5488 | 1.00 | +1.51 | PI 38:4 [M-H]⁻, −1.2 ppm |\n| core | 766.5388 | 1.00 | +1.27 | PE 38:4 [M-H]⁻, −0.6 ppm, tied with PC 36:4 [M-CH3]⁻ |\n| core | 327.2322 | 0.93 | +0.78 | FA 22:6 [M-H]⁻, −2.3 ppm |\n| rim | 890.6388 | 1.00 | +3.08 | Sulfatide 42:1;O2 [M-H]⁻, −1.0 ppm |\n| rim | 904.6187 | 1.00 | +2.61 | Sulfatide 42:2;O3 [M-H]⁻, −0.2 ppm |\n| rim | 824.6593 | 1.00 | +1.92 | HexCer 42:2;O3 [M-H]⁻, −3.4 ppm |\n| lesion | 435.2505 | 1.00 | +2.88 | LPA 18:1 [M-H]⁻, −2.8 ppm |\n| lesion | 327.2322 | 1.00 | +1.46 | FA 22:6 (as above) |\n| lesion | 281.2486 | 1.00 | +1.20 | FA 18:1 [M-H]⁻, 0.0 ppm (only \"High\" confidence call) |\n| lesion | 744.5577 | 1.00 | +0.38 | PC 34:1 [M-CH3]⁻, 3.8 ppm, tied with PE 36:1 [M-H]⁻ |\n\n**Lesion vs core, the 10 key ions, under TIC / RMS / none:**\n- Higher in the lesion (AUC 1.000 under all three):\n  - 435.25 (log2 FC +1.91 / +1.94 / +1.93)\n  - 281.25 (+1.04 / +1.07 / +1.05)\n  - 327.23 (+0.84 / +0.87 / +0.85)\n  - 904.62 (+0.45 / +0.47 / +0.46)\n  - 744.56 (+0.31 / +0.34 / +0.33)\n  - 824.66 (+0.24 / +0.27 / +0.26)\n  - 890.64 (+0.19 / +0.22 / +0.21)\n- Higher in the core (AUC 0.000 under all three):\n  - 834.53 (−0.67 / −0.64 / −0.66)\n  - 885.55 (−0.39 / −0.36 / −0.37)\n  - 766.54 (−0.31 / −0.27 / −0.29)\n- Because the shifts are the same with no normalization, they are not a TIC artifact.\n\n**Normalization, one-vs-rest:** all the effects in the table keep their AUC and direction under TIC, RMS and none. Two core markers were dropped because they depend on TIC: m/z 744.56 and 281.25 (AUC about 0.80 with TIC, 0.47–0.55 with RMS or none, fold change near 0).\n\n**What is uncertain**\n- **Pixels are not replicates.** Every test here (region comparison, discriminating features, the script comparisons) ran on pixels. Neighbouring pixels are not independent, so the p and q values describe pixels, not biology, and they are far too optimistic. Only the AUCs and fold changes carry information, and the results stay exploratory until they are confirmed on independent sections or animals.\n- **Circular regions.** The rim was defined from m/z 904.62 and the lesion from m/z 744.56. Those two results partly restate how the regions were drawn. The other ions are independent of the region definitions.\n- **Small lesion.** It has 39 pixels, and some of them sit on its edge.\n- **Lesion vs core is checked only for the 10 key ions.** I checked the other ions in the earlier lesion-vs-core table under TIC only.\n- **Lipid names are putative.** They are sum-composition matches from m/z alone, with no MS/MS. 766.54 and 744.56 each have an equally good alternative match. Most hits are capped at \"Medium\" because the isotope check failed. FA 18:1, FA 22:6 and LPA 18:1 could be in-source fragments of larger lipids rather than free species (my inference).\n- **Fold-change mismatch.** In the 10-ion runs the AUCs match the full run, but the fold changes come out lower (for example 435.25 lesion vs rest: 2.24 vs 2.88). I don't know why, so treat fold-change values as approximate.\n\n**Waiting for you**\n- Review the four regions. They can't be sent to the demo slide, so you would have to draw them in the app or use these on a slide with a saved session.\n- Whether to re-pick peaks with the dialog's Min rel. intensity of 0.002, to drop the noise peaks from the feature set.\n\nFiles are in `…/20261008-110034-a269/work/`: `discriminating_features.csv`, `Monoisotopic_markers_one-vs-rest_tissue_only.csv`, `Supplementary_lesion_A_vs_core_B_passing_q_AUC.csv`, `Normalization_sensitivity_comparison_runs_record_tic.csv`, `Lesion_vs_core_under_tic_rms_none_comparison_runs_record_tic.csv` and `annotate-negative.csv`.",
+ "findings": [
+  {
+   "check": "failed_result_used",
+   "severity": "warning",
+   "message": "Step 16 (send_regions) failed and was not repeated. Error: Error executing tool send_regions: RuntimeError: this slide has no saved session (the demo, or an imzML the app has never opened) — there is nowhere to deliver ",
+   "entries": [
+    88
+   ],
+   "fid": "f1",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "pixel_replication",
+   "severity": "error",
+   "message": "The unit of replication is pixels, and statistical tests ran (roi_comparison, scripting_guide, run_script, discriminating_features). Neighboring pixels are not independent, so the p-values and q-values describe pixels and not biology. Report the effect sizes, call the results exploratory, and confirm them on independent sections or animals.",
+   "nodes": [
+    "n3",
+    "n4",
+    "n5",
+    "n12",
+    "n13",
+    "n16"
+   ],
+   "fid": "f2",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "no_question",
+   "severity": "info",
+   "message": "The setup has no study question. A reader cannot tell planned choices from exploratory ones.",
+   "fid": "f3",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "The answer says left and right do not differ because both halves contain the whole tissue, and that the ion images show this. Every ion image was masked to 'left' only, and the scientist was told the lesion sits in the upper right of the core, so no logged image shows the right half or both halves cutting through all compartments.",
+   "entries": [
+    50,
+    53,
+    56,
+    59,
+    68
+   ],
+   "fid": "f4",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "The lesion is higher than the core for the rim markers 904.62, 890.64 and 824.66. Its mean 904.62 (0.186) lies between core (0.115) and rim (0.743), and its lesion-vs-rest AUC of 0.43 equals the core's share of the rest. This fits partial overlap with the rim or an edge effect at least as well as real lesion biology, but the answer lists these shifts as lesion effects without that caveat.",
+   "entries": [
+    81,
+    141,
+    172
+   ],
+   "fid": "f5",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "The answer says the ions other than 904.62 and 744.56 are independent of the region definitions. The core is the tissue minus the 904.62-defined rim and the 744.56-defined lesion. Ions that co-localize or anti-localize with 904.62 (890.64, 824.66, 766.54, 834.53, 885.55) will get AUC near 1 or 0 partly by construction, so independence is overstated.",
+   "entries": [
+    81,
+    98
+   ],
+   "fid": "f6",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "The script reported 14 monoisotopic marker entries (core 7, rim 3, lesion 4). The final table has 11 rows, and only two removals (744.56 and 281.25 as core markers) are explained. One core entry is missing without comment; for example, 435.25 has core-vs-rest AUC 0.934 and was not flagged as non-robust.",
+   "entries": [
+    98,
+    125,
+    141
+   ],
+   "fid": "f7",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "Fold changes do not match across runs. 435.25 lesion vs rest is 2.88 in one run and 2.24 in the other. Lesion vs core for 904.62 is reported as +0.45, while the region means from the script (0.186 vs 0.115) give about +0.69. The answer flags the mismatch but still presents exact log2 FC values in the main table and lists.",
+   "entries": [
+    81,
+    141,
+    172
+   ],
+   "fid": "f8",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "info",
+   "message": "The 792-pixel left/right counts are attributed to `state`. The logged state result shows only n_pixels 1584 and n_features 11432, so 792 per region is not visible in the log.",
+   "entries": [
+    168
+   ],
+   "fid": "f9",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "info",
+   "message": "Sending the regions to the app failed. The scientist asked for the regions for review, but all later one-vs-rest, lesion-vs-core and normalization results use regions the scientist has not reviewed. The answer discloses the failure.",
+   "entries": [
+    70,
+    88,
+    90
+   ],
+   "fid": "f10",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "info",
+   "message": "No tool result supports the statement that most of the 11,432 peaks are noise because Min rel. intensity is 0. It is a reasonable inference but is stated as fact.",
+   "entries": [
+    22
+   ],
+   "fid": "f11",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "info",
+   "message": "The annotation details are not visible in the logged result, which shows only '10 of 15 matched'. These include the tied alternatives for 766.54 and 744.56, the single 'High' confidence call and the failed isotope check. The annotation CSV was never read.",
+   "entries": [
+    73
+   ],
+   "fid": "f12",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "info",
+   "message": "The step 23 script failed with an AttributeError and was rerun successfully as step 24. Nothing was built on the failed run.",
+   "entries": [
+    133,
+    141
+   ],
+   "fid": "f13",
+   "source": "referee",
+   "status": "open"
+  }
+ ]
+}

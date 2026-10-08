@@ -1,0 +1,195 @@
+{
+ "session": "20261008-105508-e622",
+ "dir": "/Users/parker/.guided-analysis/sessions/20261008-105508-e622",
+ "answer": "I found no lipid that differs between the \"left\" and \"right\" regions. Lipids do differ between three tissue compartments I drew from the ion images (option A): an outer rim, a central core and a small spot. Two cautions apply. The rim and spot were defined by thresholding two of the ions, so those two ions' perfect separation is built in, not a finding. And one replicate is a pixel on a single slide, so this is all exploratory.\n\n**Settings:** every reported result used the decision record's settings: TIC normalization, 10 ppm, sum, cap 3×. I ran no normalization and RMS only as a robustness check. Numbers from that check are labelled \"comparison run\".\n\n**What one replicate is:** a pixel. Neighbouring pixels are not independent. All p- and q-values describe pixels, not animals or sections, so I rely on effect sizes (AUC, log2FC). Confirming any of this needs independent sections or animals.\n\n## 1. Left vs right: no difference\n- **Step:** roi_comparison, Mann-Whitney test, TIC, on all 11,432 features from find_peaks. Manual route: Analyze > This slide > Statistics > Region comparison (A vs B), A = left, B = right.\n- **Result:** 3 features have q ≤ 0.05, and none also reaches AUC ≥ 0.7. Across all features AUC only runs from 0.43 to 0.55.\n- **The 3 q-hits are noise:**\n  - m/z 837.93, 430.27 and 302.10 have mean intensities around 0.001, AUC 0.43–0.44 and log2FC about −0.2.\n  - They reach q ≤ 0.05 only because there are many pixels (the engine's pseudoreplication warning).\n- **Why there is no difference (my reading of the ion images):** the tissue is arranged in rings around the centre, so two halves of it are nearly the same. Both halves also include off-tissue background.\n\n## 2. Rim, core and spot\n**How I built the regions** (region-building script, TIC):\n- **Tissue:** 744.56 > 0.2.\n- **Spot:** 744.56 > 0.5.\n- **Rim:** 904.62 > 0.45.\n- **Core:** the remaining tissue.\n- **The cuts fall in clear gaps.** Under TIC, 904.62 reads 0.11–0.12 in the core and 0.70–0.78 in the rim.\n- **Sizes:** rim 552 pixels, core 416, spot 39.\n\n**send_regions failed:** \"this slide has no saved session (the demo…)\". The regions exist only in this engine session, not in the app. They do not affect the analysis below, which used them by name inside the engine. To check or reuse them in the app, draw them by hand or rerun the script.\n\n**Comparison step:** discriminating_features, each region against the other two (TIC). Manual route: Analyze > This slide > Statistics > Discriminating features (per group), Min AUC 0.7, Max q 0.05. Its summary line: \"kept 41 markers of 11432 ions\". The 41 rows are 10 distinct ions plus their isotope peaks.\n\n**Built in by the region definitions (not findings):**\n- 904.62 in the rim (AUC 1.00, log2FC 2.61), with its isotopes 905.62 and 906.63.\n- 744.56 in the spot (AUC 1.00, log2FC 0.38), with its isotopes 745.56 and 746.56.\n\n**Ions not used to define any region.** These separations are the findings (log2FC from the discriminating_features step, TIC):\n\n| Higher in (vs the other two regions) | m/z | AUC | log2FC | Putative identity (annotate, negative mode, 5 ppm) |\n|---|---|---|---|---|\n| Rim | 890.64 | 1.00 | 3.08 | Sulfatide 42:1;O2, [M−H]−, −1.0 ppm |\n| Rim | 824.66 | 1.00 | 1.92 | HexCer 42:2;O3, [M−H]−, −3.4 ppm |\n| Core | 834.53 | 1.00 | 2.18 | PS 40:6, [M−H]−, −0.4 ppm |\n| Core | 885.55 | 1.00 | 1.51 | PI 38:4, [M−H]−, −1.2 ppm |\n| Core | 766.54 | 1.00 | 1.27 | PE 38:4, [M−H]−, −0.6 ppm (same mass as PC 36:4 [M−CH3]−) |\n| Spot | 435.25 | 1.00 | 2.88 | LPA 18:1, [M−H]−, −2.8 ppm |\n| Spot | 327.23 | 1.00 | 1.46 | FA 22:6, [M−H]−, −2.3 ppm |\n| Spot | 281.25 | 1.00 | 1.20 | FA 18:1, [M−H]−, 0.0 ppm |\n\nThese are less circular, but not fully independent of the regions. The rim is \"where 904.62 is high\", so any ion that sits in the same place as 904.62 will separate the rim almost by construction. What the table does show: these ions follow the same compartments as the defining ions. In the ion images (my reading), 766.54 and 885.55 do show the same core/rim layout.\n\n**Robustness (comparison run, not the chosen setting):** I recomputed AUC for these 8 ions under none and RMS. AUC stays 1.00 under all three normalizations.\n\n## 3. What is uncertain\n- **Two \"core\" markers depend on TIC.** In discriminating_features (TIC), 744.56 and 281.25 pass for the core with AUC about 0.80 and log2FC about 0.01 and −0.08 [no source]. In the comparison run, their AUC is about 0.55 under RMS, and under no normalization they are not listed. Because the effect appears only under TIC, I treat it as a TIC artifact, not a core result.\n- **Weak core signals for 327.23 and 435.25.** These are core vs the other two regions (rim plus spot), not core vs rim; I did not test core vs rim directly.\n  - In discriminating_features (TIC), core shows AUC 0.93 for both, with log2FC 0.78 (327.23) and 0.32 (435.25).\n  - My script gives lower log2FC for the same comparison: 0.59–0.62 for 327.23 and 0.18–0.21 for 435.25 across the three normalizations. I can't explain the gap between script and step, so I take the step's values as the result.\n  - Both are mainly spot markers. Their core effect is small.\n- **Small spot region.** It has only 39 pixels, so its effect sizes rest on very few, neighbouring pixels.\n- **Identities are putative.** All are sum compositions from mass alone; none is confirmed without MS/MS.\n  - The annotation table marks \"isotope check failed\" for 890.64, 885.55, 834.53 and the region-defining 904.62. That caps their confidence at Medium.\n  - 766.54 and 744.56 each match two lipids of the same mass.\n- **Noisy feature list.** find_peaks uses Min rel. intensity 0, while the app's dialog uses 0.002. That gave 11,432 features, mostly noise, which makes the multiple-testing correction stricter.\n- **Annotation tolerance.** annotate used 5 ppm, as the decision record says, while the app's dialog uses 10 ppm.\n- **compare_options gave no numbers.** It returned only \"ok\" for each normalization, so the robustness numbers above come from my script.\n\n## 4. What waits for you\n- **Region definitions:** check that core, rim and spot are the right compartments. The cleaner design is to draw them from histology or another stain, not from the ions being tested. Then even 904.62 and 744.56 could be judged fairly.\n- **Feature list:** decide whether to rerun peak picking with the 0.002 intensity threshold.\n- **Real p-values:** these need several sections or animals per group, compared with the cohort steps where each sample is one replicate. Until then, these results are exploratory.\n\nNumbers marked [no source] do not match any logged tool result.",
+ "findings": [
+  {
+   "check": "number_from_comparison",
+   "severity": "error",
+   "message": "The answer uses 0.11, 3.08 from a comparison run of another option (norm), not from the setting that was chosen. Use the result of the chosen setting, or say clearly that the number is from the comparison.",
+   "nodes": [
+    "n14",
+    "n13"
+   ],
+   "fid": "f1",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "decision_misreported",
+   "severity": "error",
+   "message": "The answer names rms for \"Normalization\", but the decision record says tic. Report the value that was used.",
+   "fid": "f2",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "failed_result_used",
+   "severity": "warning",
+   "message": "Step 15 (send_regions) failed and was not repeated. Error: Error executing tool send_regions: RuntimeError: this slide has no saved session (the demo, or an imzML the app has never opened) — there is nowhere to deliver ",
+   "entries": [
+    86
+   ],
+   "fid": "f3",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "unsourced_numbers",
+   "severity": "error",
+   "message": "1 number in the answer match no logged tool result: -0.08. Run the tool that measures each number, or remove the number, or say how you derived it from logged results.",
+   "fid": "f4",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "pixel_replication",
+   "severity": "error",
+   "message": "The unit of replication is pixels, and statistical tests ran (roi_comparison, scripting_guide, run_script, discriminating_features). Neighboring pixels are not independent, so the p-values and q-values describe pixels and not biology. Report the effect sizes, call the results exploratory, and confirm them on independent sections or animals.",
+   "nodes": [
+    "n3",
+    "n4",
+    "n5",
+    "n11"
+   ],
+   "fid": "f5",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "failed_result_ignored",
+   "severity": "error",
+   "message": "The tool send_regions failed (Error executing tool send_regions: RuntimeError: this slide has no saved session (the demo, or an imzML the app has never opened) — there is nowhere to deliver ) and the text after it never mentions the failure. Later conclusions can rest on a step that did not run.",
+   "entries": [
+    86
+   ],
+   "fid": "f6",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "no_question",
+   "severity": "info",
+   "message": "The setup has no study question. A reader cannot tell planned choices from exploratory ones.",
+   "fid": "f7",
+   "source": "rule",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "The answer says compare_options \"gave no numbers\" and returned only \"ok\", but the log shows marker counts for each run: 41 under TIC, 36 under none and 36 under RMS. The drop of 5 markers away from TIC is a robustness result that the answer leaves out.",
+   "entries": [
+    101,
+    103,
+    105,
+    108
+   ],
+   "fid": "f8",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "The answer says AUC stays 1.00 under all three normalizations for all 8 non-defining ions. The visible script output only shows region-0 rows, and those include null AUC_none values for 281.25 and 744.56. The spot rows for 281.25 under no normalization are not shown, so this robustness claim is not supported in the log.",
+   "entries": [
+    115,
+    122
+   ],
+   "fid": "f9",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "All four ion images were made with mask \"left\". Even so, the answer and the question to the scientist describe the whole tissue: concentric rings, a core/rim layout for 766.54 and 885.55, and a focal spot in the upper right. Those descriptions are not supported by images limited to the left region.",
+   "entries": [
+    50,
+    53,
+    56,
+    59,
+    69
+   ],
+   "fid": "f10",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "\"The cuts fall in clear gaps\" rests on paired values like 0.11–0.12 vs 0.70–0.78 (and 0.41–0.47 vs 0.55–0.59 for 744.56). These look like interval or quantile summaries, not minimum and maximum values. They do not show that no pixels lie near the thresholds of 0.45 and 0.5.",
+   "entries": [
+    79
+   ],
+   "fid": "f11",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "warning",
+   "message": "The answer flags that the rim and spot, and ions co-located with 904.62, are circular. Core is defined as tissue with low 904.62 and low 744.56, so the core markers' AUC 1.00 (766.54, 885.55, 834.53) is just as partly built in by anti-correlation with 904.62. Calling these \"the findings\" is stronger than the region definition allows.",
+   "entries": [
+    77,
+    79,
+    88
+   ],
+   "fid": "f12",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "info",
+   "message": "The log2FC of about −0.08 for 281.25 in the core has no visible source. The script table shows −0.07 under TIC, and the discriminating_features CSV contents are not shown.",
+   "entries": [
+    95,
+    115
+   ],
+   "fid": "f13",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "info",
+   "message": "Several values come from the discriminating_features CSV, whose contents are not shown in the log. These include log2FC 0.78 and 0.32 for core, the AUC and log2FC values in the table, and the statement that the 41 rows are 10 ions plus isotopes. The answer's own note of a script/step log2FC mismatch (0.59–0.62 vs 0.78) is unresolved.",
+   "entries": [
+    94,
+    95,
+    115
+   ],
+   "fid": "f14",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "info",
+   "message": "The send_regions failure is correctly reported, and the regions exist only in the engine session. The scientist cannot inspect the thresholded regions in the app before trusting the results, even though that was the stated reason for choosing option A.",
+   "entries": [
+    71,
+    86
+   ],
+   "fid": "f15",
+   "source": "referee",
+   "status": "open"
+  },
+  {
+   "check": "referee",
+   "severity": "info",
+   "message": "Statistics are handled appropriately for pixel-level replication. The answer relies on AUC and log2FC, labels the results exploratory, uses the q ≤ 0.05 and AUC ≥ 0.7 thresholds from the record, and reports annotations as putative sum compositions.",
+   "entries": [
+    2,
+    29,
+    88,
+    124
+   ],
+   "fid": "f16",
+   "source": "referee",
+   "status": "open"
+  }
+ ]
+}
