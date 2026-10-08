@@ -78,8 +78,10 @@ results, and summarizes old turns near the context limit.
   Each result is a node with its arguments, its decisions, and the hashes of its input and output
   files. A changed decision marks the results that used the old value as out of date.
 - **Claims.** Each number in the final answer is matched to a logged result. A number with no
-  source gets a `[no source]` flag. Rule checks and an optional referee model review the answer;
-  the agent must fix error findings before the answer reaches the scientist.
+  source gets a `[no source]` flag. Rule checks and a referee review the answer; the agent must
+  fix error findings once before the answer reaches the scientist. The referee reads only the
+  log, in a fresh context. By default it is the agent's own model; `--referee claude:claude-haiku-5-5`
+  picks another model, and `--referee none` turns it off.
 
 ## Adapters
 

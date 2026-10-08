@@ -26,7 +26,7 @@ export interface Settings {
 
 export const DEFAULTS: Settings = {
   model: "claude",
-  referee: "",
+  referee: "same",
   mode: "watch",
   maxSteps: 40,
   guidance: true,

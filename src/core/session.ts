@@ -175,7 +175,8 @@ export class Session {
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd)));
     this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
-    else if (this.settings.referee) this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
+    else if (this.settings.referee === "same") this.refereeProvider = this.provider;
+    else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
 
     const { startAdapter } = await import("../adapters/runtime.ts");
     const runtimeInfo: { adapter: LoadedAdapter; programVersion: string; instructions: string }[] = [];
