@@ -319,10 +319,11 @@ export class DecisionRecord {
         else if (s.owner === "human" && s.def.stage === "when_needed" && !waiting.includes(key)) waiting.push(key);
       } else if (s.set) {
         if (!same(s.value, given)) {
-          if (s.owner === "fixed") {
+          if (s.owner === "agent") this.change(key, given, { by: "agent", reason: "the agent changed its own choice" });
+          else {
             setPath(out, arg, s.value);
             deviations.push({ arg, key, setup: s.value, used: given, overwritten: true });
-          } else deviations.push({ arg, key, setup: s.value, used: given });
+          }
         }
       } else if (s.owner === "human" && s.def.stage === "when_needed") {
         if (!waiting.includes(key)) waiting.push(key);

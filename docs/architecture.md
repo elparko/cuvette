@@ -383,3 +383,8 @@ ga mcp
   `expireQuestions()` runs every 30 s; the `task` tool runs a read-only helper agent.
 - **Answers.** `src/core/answers.ts` `fitAnswer(question, wanted)` turns an answer that is not
   one of the options into a valid one (headless mode and the benchmark).
+- **Scientist-owned values win.** When the model gives a value that differs from a decision
+  owned by the scientist (or fixed), the harness uses the recorded value, logs the deviation
+  with `overwritten: true`, and tells the model to ask the scientist if it needs a change. An
+  agent-owned decision changes when the agent gives a new value (logged as a `decision` by the
+  agent). In headless mode `ask_scientist` always waits, because the answer comes at once.

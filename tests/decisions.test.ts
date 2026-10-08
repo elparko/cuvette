@@ -108,11 +108,11 @@ describe("enforce", () => {
     expect(e.applied).toMatchObject({ tol: 5, method: "a" });
   });
 
-  test("deviation keeps model value; numeric string equal", () => {
+  test("a scientist-owned value wins over the model value; numeric string equal", () => {
     expect(dr.enforce("x", "run", { params: { tol: "5" } }).deviations).toEqual([]);
     const e = dr.enforce("x", "run", { params: { tol: 8 } });
-    expect(e.deviations).toEqual([{ arg: "params.tol", key: "tol", setup: 5, used: 8 }]);
-    expect((e.args.params as any).tol).toBe(8);
+    expect(e.deviations).toEqual([{ arg: "params.tol", key: "tol", setup: 5, used: 8, overwritten: true }]);
+    expect((e.args.params as any).tol).toBe(5);
   });
 
   test("fixed owner overwrites", () => {

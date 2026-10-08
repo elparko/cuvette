@@ -524,11 +524,16 @@ export class Session {
       if (!res.ok) return error(`the scientist did not allow this${res.note ? `: ${res.note}` : ""}. Ask what they want instead.`);
     }
     if (pre.decision === "instruct") return this.followStep(tool, eff, callId, signal, pre.applied ?? {});
+    const kept = (pre.deviations ?? []).filter((d) => d.overwritten);
+    const keptNote = kept.length
+      ? `The harness used the recorded decision${kept.length > 1 ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.used)})`).join("; ")}. The scientist owns ${kept.length > 1 ? "these values" : "this value"}. To change it, ask the scientist with ask_scientist and say why.`
+      : "";
     const out = await this.execute(tool, eff, callId, signal, { applied: pre.applied ?? {} });
     const post = await this.hooks.post({ event: "PostToolUse", session: this.id, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args: eff, output: out.output, node: out.node });
     for (const f of post.findings ?? []) this.findings.add(f, "hook");
     const r = this.render(tool, out.output);
-    return { text: post.additionalContext ? `${r.text}\n\nNote: ${post.additionalContext}` : r.text, images: r.images, isError: !out.output.ok, output: out.output };
+    const extra = [keptNote, post.additionalContext].filter(Boolean).join("\n");
+    return { text: extra ? `${r.text}\n\nNote: ${extra}` : r.text, images: r.images, isError: !out.output.ok, output: out.output };
   }
 
   async execute(tool: Tool, args: Args, callId: string, signal: AbortSignal, meta: { applied?: Record<string, unknown>; sensitivityOf?: string }): Promise<{ output: ToolOutput; node?: string }> {
@@ -728,7 +733,7 @@ export class Session {
       evidence: "",
     });
     this.bus.emit({ type: "question", question: q });
-    if (!spec.wait || !this.settings.askWaits) return { ok: true, summary: `Question ${q.qid} is waiting for the scientist. Continue with other work.` };
+    if ((!spec.wait && !this.settings.headless) || !this.settings.askWaits) return { ok: true, summary: `Question ${q.qid} is waiting for the scientist. Continue with other work.` };
     this.bus.emit({ type: "status", state: "waiting" });
     this.waitedQids.add(q.qid);
     try {
