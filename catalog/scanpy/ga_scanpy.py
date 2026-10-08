@@ -1,5 +1,7 @@
 import hashlib
 import os
+import re
+import sys
 import warnings
 
 import matplotlib
@@ -16,11 +18,22 @@ warnings.filterwarnings("ignore")
 sc.settings.verbosity = 0
 
 
+def _handle(name):
+    table = getattr(sys.modules.get("__main__"), "handles", {})
+    if name not in table:
+        raise KeyError("unknown handle %s. Handles are lost when the worker restarts. Pass the .h5ad checkpoint path instead." % name)
+    return table[name]
+
+
 def _get(x):
+    if isinstance(x, dict) and isinstance(x.get("handle"), str):
+        x = _handle(x["handle"])
+    if isinstance(x, str) and re.fullmatch(r"h\d+", x):
+        x = _handle(x)
     if isinstance(x, ad.AnnData):
         return x.copy()
     if isinstance(x, str):
-        return sc.read_h5ad(x)
+        return sc.read_h5ad(os.path.expanduser(x))
     raise TypeError('adata must be a handle such as {"handle": "h3"} or the path of an .h5ad file')
 
 
@@ -110,7 +123,7 @@ def _state(adata):
 
 
 def inspect_data(adata):
-    a = adata if isinstance(adata, ad.AnnData) else _get(adata)
+    a = _get(adata)
     x = a.X
     vmax = float(x.max()) if x.shape[0] and x.shape[1] else 0.0
     counts = _is_counts(a)
@@ -118,7 +131,7 @@ def inspect_data(adata):
         "ok": True,
         "summary": "%d cells x %d genes. X holds %s." % (a.n_obs, a.n_vars, "raw counts" if counts else "non-integer values (normalized or scaled)"),
         "metrics": {"n_cells": int(a.n_obs), "n_genes": int(a.n_vars), "x_max": vmax, "x_is_counts": int(counts)},
-        "data": _state(a),
+        "state": _state(a),
     }
 
 
@@ -291,11 +304,11 @@ def build_neighbors(adata, n_neighbors=15, n_pcs=None, random_state=0):
     return _result(a, "neighbors", summary, metrics)
 
 
-def run_umap(adata, color="leiden", random_state=0, min_dist=0.5):
+def run_umap(adata, color="leiden", random_state=0, min_dist=0.5, n_components=2):
     a = _get(adata)
     if "neighbors" not in a.uns:
         return _fail("No neighbor graph found. Run build_neighbors first.")
-    sc.tl.umap(a, min_dist=min_dist, random_state=int(random_state))
+    sc.tl.umap(a, min_dist=min_dist, n_components=int(n_components), random_state=int(random_state))
     colors = [c for c in ([color] if isinstance(color, str) else color or []) if c in a.obs or c in a.var_names]
     sc.pl.umap(a, color=colors or None, show=False)
     plot = _png("umap")

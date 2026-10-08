@@ -73,9 +73,10 @@ async function headless(prompt: string) {
     if (e.type === "question") {
       const q = e.question;
       const wanted = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : "*" in answers ? answers["*"] : q.recommendation?.value;
-      const v = q.options.length ? fitAnswer(q, wanted) : wanted;
+      const v = q.options.length ? fitAnswer(q, wanted) : wanted ?? "The scientist is not available. Use your recommendation and state it as an assumption.";
       if (v === undefined) return;
-      setTimeout(() => s.answer(q.qid, v, "answered from the answers file").catch((err) => console.error(String(err))), 0);
+      const note = wanted === undefined ? "no answer in the answers file; the harness used the recommendation or the first option" : "answered from the answers file";
+      setTimeout(() => s.answer(q.qid, v, note).catch((err) => console.error(String(err))), 0);
     }
     if (e.type === "permission") s.respondPermission(e.rid, allow.has("all") || allow.has(e.tool), allow.size ? "" : "headless mode denies by default; pass --allow");
     if (e.type === "instruction") s.followDone(e.step, "", true);

@@ -669,9 +669,13 @@ export class Session {
         const sensTool = d.sensitivity!.tool || (tool.remoteName ?? tool.name);
         const link = d.links.find((l) => l.tool === sensTool);
         const target = this.findTool(sensTool);
-        if (link && target) {
+        const canCompare = sensTool === (tool.remoteName ?? tool.name) || this.record.nodes().some((n) => n.tool === sensTool && !n.sensitivityOf);
+        if (link && target && !canCompare) evidence = `No comparison yet: ${sensTool} has not run in this session, so the options cannot be compared before you choose.`;
+        if (link && target && canCompare) {
           this.record.append("notice", { text: `Comparing the options for "${d.label}" before asking you.` });
-          const base: Args = sensTool === (tool.remoteName ?? tool.name) ? structuredClone(args) : {};
+          const same = sensTool === (tool.remoteName ?? tool.name);
+          const lastRun = same ? undefined : this.record.nodes().filter((n) => n.tool === sensTool && !n.sensitivityOf).at(-1);
+          const base: Args = same ? structuredClone(args) : lastRun ? structuredClone(lastRun.args) : {};
           const links = this.adapterOf(target)?.linksFor(sensTool) ?? {};
           for (const [arg, k] of Object.entries(links)) {
             if (k === key || !keys.includes(k)) continue;

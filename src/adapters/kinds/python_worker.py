@@ -32,6 +32,8 @@ def resolve(value):
         return {k: resolve(v) for k, v in value.items()}
     if isinstance(value, list):
         return [resolve(v) for v in value]
+    if isinstance(value, str) and value in handles and value[:1] == "h" and value[1:].isdigit():
+        return handles[value]
     return value
 
 

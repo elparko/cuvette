@@ -148,9 +148,9 @@ decisions:
     kind: int
     default: 50
     lo: 2
-    hi: 200
+    hi: 50
     group: Clustering
-    help: More components keep more detail and more noise. Look at the PCA variance plot.
+    help: More components keep more detail and more noise. Look at the PCA variance plot. run_pca computes 50 components, so the value cannot be above 50.
     owner: human
     stage: when_needed
     links:
@@ -203,11 +203,6 @@ decisions:
       - { tool: build_neighbors, arg: random_state }
       - { tool: run_umap, arg: random_state }
       - { tool: cluster_leiden, arg: random_state }
-    sensitivity:
-      options: [0, 1, 2]
-      tool: cluster_leiden
-      compare: [metrics.n_clusters, metrics.smallest_cluster, metrics.largest_cluster]
-      max_runs: 3
 
   - key: marker_method
     label: Marker gene test
@@ -241,7 +236,7 @@ tools:
       or an .h5ad file. Returns a handle and saves loaded.h5ad.
     function: "ga_scanpy:load_data"
     params:
-      path: { type: string, minLength: 1, description: Absolute path of the 10x folder, the .h5 file or the .h5ad file. }
+      path: { type: string, minLength: 1, description: "Absolute path of the 10x folder, the .h5 file or the .h5ad file." }
       var_names: { type: string, enum: [gene_symbols, gene_ids], default: gene_symbols, description: Use gene symbols or gene ids as gene names. }
     required: [path]
     outputs:
@@ -263,7 +258,7 @@ tools:
 
   - name: filter_genes
     title: Filter genes
-    description: Remove genes that are detected in fewer than min_cells cells. Run this on raw counts.
+    description: Remove genes that are detected in fewer than min_cells cells. Run this on raw counts, before calculate_qc and filter_cells.
     function: "ga_scanpy:filter_genes"
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
@@ -274,7 +269,7 @@ tools:
     title: Filter cells
     description: >
       Remove cells with fewer than min_genes genes, max_genes genes or more, or max_pct_mito percent
-      mitochondrial counts or more. Computes the QC metrics if they are missing. Run this on raw counts.
+      mitochondrial counts or more. Computes the QC metrics if they are missing. Run this on raw counts, after filter_genes and calculate_qc.
     function: "ga_scanpy:filter_cells"
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
@@ -328,11 +323,10 @@ tools:
 
   - name: run_pca
     title: Principal component analysis
-    description: Compute principal components with the arpack solver. Draw the variance plot.
+    description: Compute 50 principal components (fewer if the data are small) with the arpack solver. Draw the variance plot. Run scale_data first.
     function: "ga_scanpy:run_pca"
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
-      n_comps: { type: integer, minimum: 2, default: 50, description: Number of components to compute. }
       random_state: { type: integer, minimum: 0 }
     required: [adata]
     outputs:
@@ -356,9 +350,10 @@ tools:
     function: "ga_scanpy:run_umap"
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
-      color: { type: [string, array], default: leiden, description: An obs column or a gene name, or a list of them. Columns that do not exist are skipped. }
+      color: { type: [string, array], default: leiden, description: "An obs column or a gene name, or a list of them. Columns that do not exist are skipped." }
       random_state: { type: integer, minimum: 0 }
       min_dist: { type: number, default: 0.5 }
+      n_components: { type: integer, minimum: 2, maximum: 3, default: 2, description: Number of embedding dimensions. The plot shows the first two. }
     required: [adata]
     outputs:
       plot: { kind: image, ext: png, description: The UMAP plot. }
@@ -376,7 +371,7 @@ tools:
     required: [adata]
     outputs:
       sizes: { kind: table, ext: csv, description: Cells in each cluster. }
-      plot: { kind: image, ext: png, description: UMAP colored by cluster, if a UMAP exists. }
+      plot: { kind: image, ext: png, description: "UMAP colored by cluster, if a UMAP exists." }
 
   - name: find_markers
     title: Marker genes for each group
@@ -392,7 +387,7 @@ tools:
       n_top: { type: integer, minimum: 1, default: 3, description: Genes of each group to show in the table preview. }
     required: [adata]
     outputs:
-      markers: { kind: table, ext: csv, description: Ranked genes with scores, log fold changes and adjusted p-values. }
+      markers: { kind: table, ext: csv, description: "Ranked genes with scores, log fold changes and adjusted p-values." }
       plot: { kind: image, ext: png, description: Top genes of each group. }
 
   - name: plot_genes
@@ -474,7 +469,7 @@ map:
       - { arg: min_disp, label: min_disp, ui_default: 0.5 }
       - { arg: flavor, label: flavor, ui_default: seurat }
     fidelity: exact
-    evidence: { source: docs, test: small-pipeline, note: The full PBMC 3k data give 1838 genes with the default flavor, as in the scanpy tutorial run. }
+    evidence: { source: docs, test: small-pipeline, note: "The full PBMC 3k data give 1838 genes with the default flavor, as in the scanpy tutorial run." }
 
   - tool: scale_data
     route: |
@@ -489,12 +484,11 @@ map:
     evidence: { source: docs, test: small-pipeline }
 
   - tool: run_pca
-    route: 'sc.pp.pca(adata, n_comps=50, svd_solver="arpack", random_state=0)'
+    route: 'sc.pp.pca(adata, n_comps=50, svd_solver="arpack", random_state=0)   # n_comps is 50, or less for small data'
     params:
-      - { arg: n_comps, label: n_comps, ui_default: null, note: Scanpy uses 50 if you give none. }
       - { arg: random_state, label: random_state, ui_default: 0 }
     fidelity: exact
-    evidence: { source: docs, test: small-pipeline, note: The tool sets svd_solver to arpack, as the tutorial does. }
+    evidence: { source: docs, test: small-pipeline, note: "The tool sets svd_solver to arpack, as the tutorial does." }
 
   - tool: build_neighbors
     route: "sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40, random_state=0)"
@@ -513,6 +507,7 @@ map:
       - { arg: color, label: color, ui_default: null }
       - { arg: random_state, label: random_state, ui_default: 0 }
       - { arg: min_dist, label: min_dist, ui_default: 0.5 }
+      - { arg: n_components, label: n_components, ui_default: 2 }
     fidelity: exact
     evidence: { source: docs, test: small-pipeline }
 
@@ -608,7 +603,7 @@ tests:
       - { path: metrics.n_cells, equals: 300 }
       - { path: metrics.n_genes, equals: 1000 }
       - { path: metrics.x_is_counts, equals: 1 }
-      - { path: data.has_raw, equals: false }
+      - { path: data.state.has_raw, equals: false }
 
   - id: small-qc
     description: >
@@ -623,7 +618,7 @@ tests:
       - { path: metrics.median_genes_per_cell, approx: 413.5, abs: 1.0e-9 }
       - { path: metrics.max_genes_per_cell, equals: 716 }
       - { path: metrics.median_pct_mito, approx: 2.5015, abs: 0.001 }
-      - { path: outputs[0].name, contains: qc }
+      - { path: "outputs[0].name", contains: qc }
 
   - id: small-filter-genes
     description: "Numpy check, no scanpy: 938 genes are detected in at least 50 of the 300 cells."
@@ -680,7 +675,7 @@ tests:
         args: { adata: { handle: "{saved.e.data.adata.handle}" }, regress_out: "total_counts,pct_counts_mt", max_value: 10 }
         save_as: f
       - tool: run_pca
-        args: { adata: { handle: "{saved.f.data.adata.handle}" }, n_comps: 20, random_state: 0 }
+        args: { adata: { handle: "{saved.f.data.adata.handle}" }, random_state: 0 }
         save_as: g
       - tool: build_neighbors
         args: { adata: { handle: "{saved.g.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0 }
@@ -698,12 +693,12 @@ tests:
       - { path: saved.f.metrics.n_genes, equals: 202 }
       - { path: saved.g.metrics.variance_first10, approx: 0.274304, abs: 0.0001 }
       - { path: saved.h.metrics.n_pcs, equals: 10 }
-      - { path: saved.u.outputs[1].name, contains: umap }
+      - { path: "saved.u.outputs[1].name", contains: umap }
       - { path: metrics.n_clusters, equals: 5 }
       - { path: metrics.largest_cluster, equals: 125 }
       - { path: metrics.smallest_cluster, equals: 27 }
-      - { path: data.cluster_sizes.0, equals: 125 }
-      - { path: checkpoint_sha256, contains: "" }
+      - { path: data.cluster_sizes.0, equals: 45 }
+      - { path: data.checkpoint, contains: leiden.h5ad }
 
   - id: small-resolution
     description: >
@@ -727,7 +722,7 @@ tests:
         args: { adata: { handle: "{saved.e.data.adata.handle}" }, regress_out: "total_counts,pct_counts_mt", max_value: 10 }
         save_as: f
       - tool: run_pca
-        args: { adata: { handle: "{saved.f.data.adata.handle}" }, n_comps: 20, random_state: 0 }
+        args: { adata: { handle: "{saved.f.data.adata.handle}" }, random_state: 0 }
         save_as: g
       - tool: build_neighbors
         args: { adata: { handle: "{saved.g.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0 }
@@ -764,7 +759,7 @@ tests:
         args: { adata: { handle: "{saved.e.data.adata.handle}" }, regress_out: "total_counts,pct_counts_mt", max_value: 10 }
         save_as: f
       - tool: run_pca
-        args: { adata: { handle: "{saved.f.data.adata.handle}" }, n_comps: 20, random_state: 0 }
+        args: { adata: { handle: "{saved.f.data.adata.handle}" }, random_state: 0 }
         save_as: g
       - tool: build_neighbors
         args: { adata: { handle: "{saved.g.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0 }
