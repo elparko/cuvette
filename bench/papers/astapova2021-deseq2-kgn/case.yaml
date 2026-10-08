@@ -1,0 +1,104 @@
+kind: research paper
+short: Astapova 2021
+field: Genomics and transcriptomics
+program: DESeq2 (R), through the deseq2 adapter
+citation:
+  authors: Astapova O, Seger C, Hammes SR
+  title: Ligand Binding Prolongs Androgen Receptor Protein Half-Life by Reducing its Degradation
+  venue: Journal of the Endocrine Society 5(5):bvab035
+  year: 2021
+  doi: 10.1210/jendso/bvab035
+related:
+  - text: GEO series GSE158218. Source of the gene count table.
+    url: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE158218
+measured: >-
+  The paper asks why androgens have small effects on gene expression in ovarian granulosa cells. The authors
+  treated KGN cells, a human granulosa-like cell line, with 25 nM dihydrotestosterone (DHT) or ethanol vehicle
+  for 12 hours. They did five experiments on different dates. They sequenced the RNA and tested each gene with
+  DESeq2 in a paired comparison. Few genes changed, and the changes were small.
+instruction: >-
+  I treated KGN granulosa cells with DHT or vehicle in five experiments on different dates. Each date gave one
+  DHT culture and one vehicle culture. Which genes change with DHT? Tell me how many genes are significant, how
+  many go up and how many go down, and give me a table of the top 20 genes.
+instruction_basis: >-
+  Materials and Methods, the section "RNA Sequencing", and Results, the section "Androgen-induced Androgen
+  Receptor Transcriptional Activity Is Limited in Granulosa Cells". The paper counts the genes that change in
+  the paired comparison of DHT with vehicle.
+answers:
+  question:
+    decision: Research question
+    value: Does dihydrotestosterone change gene expression in KGN granulosa cells, and in which genes?
+    source: Results, the section on androgen receptor activity in granulosa cells. The authors ask how much DHT changes transcription in KGN cells.
+  replicate:
+    decision: Unit of replication
+    value: the experiment date, with one DHT and one vehicle library for each
+    source: Results, the same section. The cells were treated "in 5 independent experiments", and the samples were compared in pairs by date.
+  design:
+    decision: Design formula
+    value: "~ experiment + treatment"
+    source: >-
+      Results, the same section. The authors analysed the data "only in paired comparisons to eliminate
+      variability due to sample collections on different dates". The Discussion names this term "the pair factor".
+  variable:
+    decision: Variable to test
+    value: treatment (DHT or vehicle)
+    source: Materials and Methods, "RNA Sequencing". The cells got 25 nM DHT or ethanol for 12 hours.
+  reference_level:
+    decision: Reference level
+    value: VEH (ethanol vehicle)
+    source: Results, the same section. The paper compares "DHT-treated compared with vehicle-treated cells".
+  test_level:
+    decision: Level to compare with the reference
+    value: DHT
+    source: Results, the same section. Up-regulated genes are "upregulated by DHT".
+  min_count:
+    decision: Low-count filter, minimum count
+    value: 0 (no pre-filter)
+    source: Not in the paper. The methods name no pre-filter, so the benchmark keeps all genes and relies on the independent filtering of DESeq2.
+  min_samples:
+    decision: Low-count filter, number of samples
+    value: 1 (no pre-filter)
+    source: Not in the paper. With a minimum count of 0, every gene passes.
+  alpha:
+    decision: False discovery rate (FDR) cutoff
+    value: 0.05
+    source: >-
+      Materials and Methods, "RNA Sequencing": DESeq2 1.22.1 "with a P value threshold of .05". The Results say
+      the genes pass after the adjustment for multiple testing.
+  lfc_threshold:
+    decision: Log2 fold change threshold
+    value: 0
+    source: Materials and Methods, "RNA Sequencing". The paper names no fold change cutoff.
+  exclusions:
+    decision: Samples or genes to remove
+    value: none
+    source: Not in the paper as a decision. All ten KGN samples of experiment 1 are on GEO and in the analysis.
+items:
+  significant_padj_005:
+    source: published
+    where: >-
+      Results, the section "Androgen-induced Androgen Receptor Transcriptional Activity Is Limited in Granulosa
+      Cells", and Figure 1A: "173 genes were differentially expressed in DHT-treated compared with
+      vehicle-treated cells". The benchmark authors got 173 with DESeq2 1.52.0 (check_deseq2.R).
+  up_padj_005:
+    source: published
+    where: Results, the same section. "Of these, 125 genes were upregulated by DHT". check_deseq2.R gives 125.
+  down_padj_005:
+    source: published
+    where: Results, the same section. The paper names "the 48 genes that were downregulated by DHT". check_deseq2.R gives 48.
+  genes_in_table:
+    source: computed
+    tool: R read.delim on the GEO count file (check_deseq2.R)
+    where: Not in the paper. The GEO count file has 59087 genes.
+  significant_without_pairing:
+    source: published
+    where: >-
+      Discussion: "Without the pair factor, only 2 genes were differentially expressed in these samples." A trap
+      value: the design ~ treatment gives it. check_deseq2.R gives 2.
+data:
+  source: GEO series GSE158218, file GSE158218_experiment1_deSeq2_counts.txt.gz, converted to CSV by the benchmark fetch script
+  url: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE158218
+  license: >-
+    NCBI GEO puts no restrictions on the use of the data. The samples are a cell line with no patient
+    identifiers. The paper is CC BY-NC-ND 4.0.
+  size: 666 kB download. The count CSV is 2.0 MB, 59087 genes by 10 samples.

@@ -1,0 +1,30 @@
+tool: DESeq2 (R)
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_counts.csv
+  - /Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_samples.csv
+decisions:
+  design: "~ experiment + treatment"
+  reference_level: VEH
+  replication_unit: "experiment date (5 pairs of DHT and vehicle cultures)"
+  low_count_filter: none
+  fdr_cutoff: 0.05
+  fold_change_cutoff: none
+  exclusions: none
+expected:
+  - {description: "genes with padj < 0.05, DHT vs vehicle, paired design", value: 173, tolerance: 2, source: "paper Results and Figure 1A; check_deseq2.R gives 173"}
+  - {description: "genes up with DHT at padj < 0.05", value: 125, tolerance: 2, source: "paper Results; check_deseq2.R gives 125"}
+  - {description: "genes down with DHT at padj < 0.05", value: 48, tolerance: 2, source: "paper Results; check_deseq2.R gives 48"}
+  - {description: "genes in the count table", value: 59087, tolerance: 0, source: "GEO count file"}
+  - {description: "genes with padj < 0.05 with the design ~ treatment (trap)", value: 2, tolerance: 0.5, source: "paper Discussion; check_deseq2.R gives 2"}
+notes: |
+  The paper used DESeq2 1.22.1 on R 3.5.1. check_deseq2.R uses DESeq2 1.52.0 on R 4.6.1 and gives the printed
+  counts exactly: 173 genes, 125 up, 48 down. With alpha 0.1 the same fit gives 230 (160 up, 70 down).
+  The methods say "a P value threshold of .05". The Results say the genes pass after the adjustment for multiple
+  testing. padj < 0.05 gives the printed numbers. Raw p < 0.05 gives 1035 genes.
+  The paper says the largest fold change among the up genes is 1.37 and among the down genes 0.87. The DESeq2
+  maximum likelihood fold changes of the 173 genes range from 0.74 to 1.64. The paper does not say how it got
+  1.37 and 0.87, so the benchmark does not score them.
+  Trap: leaving out the experiment term (design ~ treatment) gives 2 genes. The paper reports this in the Discussion.
+  The mouse granulosa cell data of the same GEO series (experiment2) gives no significant gene in the paper. The
+  benchmark does not use it.

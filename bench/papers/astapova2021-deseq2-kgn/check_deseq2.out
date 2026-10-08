@@ -1,0 +1,17 @@
+genes 59087 samples 10 duplicated ids 0 all integer TRUE 
+         treatment experiment
+DHT10_23       DHT      10_23
+DHT10_28       DHT      10_28
+DHT11_1        DHT       11_1
+DHT11_5        DHT       11_5
+DHT12_4        DHT       12_4
+VEH10_23       VEH      10_23
+VEH10_28       VEH      10_28
+VEH11_1        VEH       11_1
+VEH11_5        VEH       11_5
+VEH12_4        VEH       12_4
+~ experiment + treatment | alpha 0.05 | significant 173 up 125 down 48 | raw p < 0.05 1035 
+~ experiment + treatment | alpha 0.1 | significant 230 up 160 down 70 | raw p < 0.05 1035 
+~ treatment | alpha 0.05 | significant 2 up 2 down 0 | raw p < 0.05 385 
+~ treatment | alpha 0.1 | significant 3 up 3 down 0 | raw p < 0.05 385 
+DESeq2 1.52.0 R R version 4.6.1 (2026-06-24) 
