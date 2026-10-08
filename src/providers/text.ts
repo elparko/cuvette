@@ -103,6 +103,7 @@ export function extractTextToolCall(
     if (!args || typeof args !== "object" || Array.isArray(args)) continue;
     const rest = (text.slice(0, start) + text.slice(end))
       .replace(/```(?:json)?\s*```/g, "")
+      .replace(/<\/?tool_call>/g, "")
       .trim();
     return { name: obj.name, args, rest };
   }
@@ -117,4 +118,28 @@ export function lastCallNumber(messages: { parts: { type: string; id?: string }[
       if (hit) max = Math.max(max, Number(hit[1]));
     }
   return max;
+}
+
+function argLine(name: string, schema: any, required: boolean): string {
+  const type = Array.isArray(schema?.enum) ? `one of ${schema.enum.map((e: unknown) => JSON.stringify(e)).join(", ")}` : schema?.type === "array" ? `list of ${schema.items?.type ?? "values"}` : (schema?.type ?? "any");
+  const desc = typeof schema?.description === "string" ? `: ${schema.description.replace(/\s+/g, " ").slice(0, 160)}` : "";
+  return `    ${name} (${type}${required ? ", required" : ""})${desc}`;
+}
+
+export function promptedToolsText(tools: { name: string; description: string; inputSchema: Record<string, unknown> }[]): string {
+  const lines = [
+    "# Tools",
+    "You can call one tool in each reply. To call a tool, reply with only this block and nothing after it:",
+    '<tool_call>{"name": "TOOL_NAME", "arguments": {"ARG": "VALUE"}}</tool_call>',
+    "The harness runs the tool and replies with <tool_result>. Read the result before the next step.",
+    "When you have the answer for the scientist, reply with plain text and no tool call.",
+    "",
+  ];
+  for (const t of tools) {
+    lines.push(`- ${t.name}: ${t.description.replace(/\s+/g, " ").slice(0, 400)}`);
+    const props = ((t.inputSchema as any)?.properties ?? {}) as Record<string, unknown>;
+    const req = new Set<string>(((t.inputSchema as any)?.required ?? []) as string[]);
+    for (const [k, v] of Object.entries(props)) lines.push(argLine(k, v, req.has(k)));
+  }
+  return lines.join("\n");
 }

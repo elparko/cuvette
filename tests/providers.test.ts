@@ -287,9 +287,34 @@ describe("ollama", () => {
     expect(r.usage).toEqual({ inputTokens: 11, outputTokens: 7 });
   });
 
-  test("rejects a model without tools", async () => {
-    stubOllama(() => json({}), showBody(["completion"]));
-    await expect(makeProvider("ollama:gemma:2b")).rejects.toThrow("gemma:2b cannot call tools; pick a model with tool support, for example qwen3:8b");
+  test("a model without native tools gets prompted tool calls", async () => {
+    const seen = stubOllama(
+      () =>
+        ndjson([
+          { message: { role: "assistant", content: 'I will add them.\n<tool_call>{"name": "add", "arguments": {"a": 1, "b": 2}}</tool_call>' } },
+          { done: true, done_reason: "stop", prompt_eval_count: 5, eval_count: 9, message: { role: "assistant", content: "" } },
+        ]),
+      showBody(["completion"]),
+    );
+    const p = await makeProvider("ollama:medgemma:4b");
+    const history: Message[] = [
+      user("add"),
+      { role: "assistant", parts: [{ type: "tool_call", id: "call_1", name: "add", args: { a: 5, b: 1 } }] },
+      { role: "user", parts: [{ type: "tool_result", callId: "call_1", name: "add", text: "6" }] },
+    ];
+    const r = await p.step(req(history));
+    const chat = seen.find((s) => s.url.endsWith("/api/chat"))!.body;
+    expect(chat.tools).toBeUndefined();
+    expect(chat.messages[0].content).toMatch(/^SYS\n\n# Tools\n/);
+    expect(chat.messages[0].content).toContain("- add: Add two numbers");
+    expect(chat.messages[2]).toEqual({ role: "assistant", content: '<tool_call>{"name":"add","arguments":{"a":5,"b":1}}</tool_call>' });
+    expect(chat.messages[3]).toEqual({ role: "user", content: '<tool_result name="add">\n6\n</tool_result>' });
+    expect(chat.messages.some((m: any) => m.role === "tool")).toBe(false);
+    expect(r.message.parts).toEqual([
+      { type: "text", text: "I will add them." },
+      { type: "tool_call", id: "call_2", name: "add", args: { a: 1, b: 2 } },
+    ]);
+    expect(r.note).toBeUndefined();
   });
 
   test("numCtx option, model context smaller than default, and large-model small flag", async () => {

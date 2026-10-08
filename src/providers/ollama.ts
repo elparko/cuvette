@@ -1,7 +1,7 @@
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
 import { ProviderError } from "../core/types.ts";
 import { ImageBudget } from "./images.ts";
-import { ThinkSplitter, extractTextToolCall, lastCallNumber } from "./text.ts";
+import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText } from "./text.ts";
 
 const TIMEOUT_MS = 600_000;
 const DEFAULT_NUM_CTX = 32768;
@@ -9,6 +9,7 @@ const DEFAULT_NUM_CTX = 32768;
 export interface OllamaOpts {
   numCtx?: number;
   think?: boolean;
+  promptedTools?: boolean;
 }
 
 export function ollamaHost(): string {
@@ -59,9 +60,8 @@ export async function showModel(model: string, signal?: AbortSignal): Promise<Ol
 
 export async function createOllama(model: string, opts: OllamaOpts = {}): Promise<OllamaProvider> {
   const show = await showModel(model);
-  if (!show.capabilities.includes("tools"))
-    throw new ProviderError(`${model} cannot call tools; pick a model with tool support, for example qwen3:8b`);
-  return new OllamaProvider(model, show, opts);
+  const promptedTools = opts.promptedTools ?? !show.capabilities.includes("tools");
+  return new OllamaProvider(model, show, { ...opts, promptedTools });
 }
 
 export class OllamaProvider implements Provider {
@@ -69,10 +69,12 @@ export class OllamaProvider implements Provider {
   private numCtx: number;
   private think: boolean;
   private thinkOk = true;
+  readonly promptedTools: boolean;
 
   constructor(readonly model: string, show: OllamaShow, opts: OllamaOpts = {}) {
     this.numCtx = opts.numCtx ?? Math.min(DEFAULT_NUM_CTX, show.contextLength ?? DEFAULT_NUM_CTX);
     this.think = opts.think ?? false;
+    this.promptedTools = opts.promptedTools ?? false;
     this.info = {
       provider: "ollama",
       model,
@@ -89,9 +91,14 @@ export class OllamaProvider implements Provider {
       if (m.role === "assistant") {
         const text = m.parts.filter((p) => p.type === "text").map((p) => (p as any).text).join("\n\n");
         const calls = m.parts.filter((p) => p.type === "tool_call") as Extract<Part, { type: "tool_call" }>[];
+        const args = (c: Extract<Part, { type: "tool_call" }>) => (c.args && typeof c.args === "object" ? c.args : {});
+        if (this.promptedTools) {
+          const blocks = calls.map((c) => `<tool_call>${JSON.stringify({ name: c.name, arguments: args(c) })}</tool_call>`);
+          out.push({ role: "assistant", content: [text, ...blocks].filter(Boolean).join("\n") });
+          continue;
+        }
         const msg: any = { role: "assistant", content: text };
-        if (calls.length)
-          msg.tool_calls = calls.map((c) => ({ function: { name: c.name, arguments: c.args && typeof c.args === "object" ? c.args : {} } }));
+        if (calls.length) msg.tool_calls = calls.map((c) => ({ function: { name: c.name, arguments: args(c) } }));
         out.push(msg);
         continue;
       }
@@ -108,7 +115,8 @@ export class OllamaProvider implements Provider {
               if (images.length) body += `\n[${images.length} image(s) follow in the next message]`;
             } else body += `\n(image not shown to this model)`;
           }
-          out.push({ role: "tool", tool_name: p.name, content: p.isError ? `Error: ${body}` : body });
+          if (this.promptedTools) texts.push(`<tool_result name="${p.name}">\n${p.isError ? `Error: ${body}` : body}\n</tool_result>`);
+          else out.push({ role: "tool", tool_name: p.name, content: p.isError ? `Error: ${body}` : body });
         } else if (p.type === "text") texts.push(p.text);
         else if (p.type === "image") {
           if (this.info.vision) pics.push(...budget.pick([p.path]).images.map((i) => i.data));
@@ -155,11 +163,11 @@ export class OllamaProvider implements Provider {
     const signal = this.signal(req.signal);
     const body: Record<string, unknown> = {
       model: this.model,
-      messages: this.toNative(req.system, req.messages),
+      messages: this.toNative(this.promptedTools && req.tools.length ? `${req.system}\n\n${promptedToolsText(req.tools)}` : req.system, req.messages),
       stream: true,
       options: { num_ctx: this.numCtx },
     };
-    if (req.tools.length)
+    if (req.tools.length && !this.promptedTools)
       body.tools = req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
     if (this.thinkOk) body.think = this.think;
 
@@ -260,7 +268,7 @@ export class OllamaProvider implements Provider {
       if (hit) {
         calls.push({ name: hit.name, args: hit.args });
         text = hit.rest;
-        note = "converted a tool call written as text";
+        if (!this.promptedTools) note = "converted a tool call written as text";
       }
     }
     if (thinking) parts.push({ type: "thinking", text: thinking });
