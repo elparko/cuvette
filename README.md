@@ -89,12 +89,31 @@ An adapter connects one program. It is a folder: `adapter.yaml` (tools, decision
 tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and an optional
 `adapter.ts`. See [docs/adapter-spec.md](docs/adapter-spec.md).
 
-| Adapter | Program | Connection |
-| --- | --- | --- |
-| `imagej` | ImageJ 1.x or Fiji | macro language, one batch run for each step |
-| `smile-msi` | SMILE MSI | its MCP server, with a small wrapper |
-| `onboarding` | the onboarding tools | MCP; used by `ga onboard` |
-| `examples/adapters/*` | wc, a Python module, pandoc | command line and Python |
+| Adapter | Program | Connection | Field |
+| --- | --- | --- | --- |
+| `imagej` | ImageJ 1.x or Fiji | macro language, one batch run for each step | microscopy |
+| `smile-msi` | SMILE MSI | its MCP server, with a small wrapper | mass-spectrometry imaging |
+| `pyimzml` | pyimzML | Python library | mass-spectrometry imaging files |
+| `pyopenms` | pyOpenMS | Python library | mass spectrometry |
+| `metaspace` | METASPACE | Python client over the web API | MSI annotation |
+| `mzmine` | MZmine | batch file, command line | LC-MS features |
+| `scikit-image` | scikit-image | Python library | image segmentation |
+| `cellpose` | Cellpose | Python library | cell segmentation |
+| `cellprofiler` | CellProfiler | pipeline file, headless | image cytometry |
+| `qupath` | QuPath | Groovy scripts, one batch run for each step | histology |
+| `bftools` | Bio-Formats tools | command line | image formats |
+| `scanpy` | scanpy | Python library | single-cell RNA |
+| `samtools` | samtools | command line | sequencing alignments |
+| `fastqc` | FastQC | command line | sequencing quality |
+| `rdkit` | RDKit | Python library | chemistry |
+| `openbabel` | Open Babel | command line | chemistry |
+| `onboarding` | the onboarding tools | MCP; used by `ga onboard` | any |
+
+`examples/adapters/` holds three small worked examples (a command-line tool, a Python module,
+pandoc). Every catalog adapter has status `draft`: approve each one with
+`node bin/ga.js adapter approve <name>` after you read it. The Python adapters use virtual
+environments in `~/.guided-analysis/envs/`; large programs and paper data are on the T7 drive
+(`/Volumes/T7/guided-analysis/`). See `docs/onboarding-queue.md`.
 
 New program: `node bin/ga.js onboard <program> --model claude`. The agent finds the program,
 reads its help and docs, writes a draft adapter in `~/.guided-analysis/drafts/`, and runs the
