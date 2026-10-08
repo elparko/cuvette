@@ -1,0 +1,19 @@
+adapters: [fastqc]
+prompt: |
+  Here are two sequencing read files: {data}/andrews-fastqc/good_sequence_short.txt and {data}/andrews-fastqc/bad_sequence.txt. Check their quality and tell me if either has a problem. How many reads does each file have, and what is the read length? Which file would you not trust, and why?
+setup:
+  encoding: phred64
+  action_on_fail: decide_later
+answers:
+  encoding: phred64
+  action_on_fail: decide_later
+allow: all
+data: [andrews-fastqc/good_sequence_short.txt, andrews-fastqc/bad_sequence.txt]
+items:
+  - {key: good_total_sequences, description: "Good file total sequences", value: 250000, exact: true}
+  - {key: bad_total_sequences, description: "Bad file total sequences", value: 395288, exact: true}
+  - {key: sequence_length, description: "Sequence length, both files", value: 40, exact: true}
+  - {key: good_gc_percent, description: "Good file %GC", value: 45, tolerance: 1, in_answer: false}
+  - {key: bad_gc_percent, description: "Bad file %GC", value: 47, tolerance: 1, in_answer: false}
+  - {key: good_modules_not_pass, description: "Good file modules not PASS", value: 0, exact: true, in_answer: false}
+  - {key: bad_modules_warning, description: "Bad file modules with WARNING", value: 4, exact: true, in_answer: false}

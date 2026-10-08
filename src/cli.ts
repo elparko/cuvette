@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { adapterDirs, gaHome, loadAdapter } from "./adapters/manifest.ts";
-import { fitAnswer } from "./core/answers.ts";
+import { applyHeadlessSetup, attachHeadless } from "./core/headless.ts";
 import type { Mode } from "./core/types.ts";
 
 const HELP = `ga - a guided analysis agent for science programs
@@ -26,6 +26,7 @@ Usage
   ga run-step <adapter> <tool> '<json args>'
   ga questions                         open questions in every session
   ga bench [scenario|all] --model <model> [--guidance on|off|both]
+  ga bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run]
   ga mcp                               run the harness as an MCP server on stdio
 
 Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
@@ -54,6 +55,11 @@ const { values: o, positionals: pos } = parseArgs({
     kind: { type: "string" },
     url: { type: "string" },
     guidance: { type: "string" },
+    papers: { type: "string" },
+    models: { type: "string" },
+    runs: { type: "string" },
+    out: { type: "string" },
+    "dry-run": { type: "boolean" },
     "run-tests": { type: "boolean" },
     generic: { type: "boolean" },
     help: { type: "boolean", short: "h" },
@@ -74,28 +80,13 @@ async function headless(prompt: string) {
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = str(o.output) ?? "text";
   const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: { headless: true } });
+  attachHeadless(s, { answers, allow });
   s.bus.on((e) => {
     if (out === "stream-json") process.stdout.write(JSON.stringify(e) + "\n");
-    if (e.type === "question") {
-      const q = e.question;
-      const wanted = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : "*" in answers ? answers["*"] : q.recommendation?.value;
-      const fallback = "The scientist is not available. Use your recommendation and state it as an assumption.";
-      const v = q.decisionKey ? (q.options.length ? fitAnswer(q, wanted) : wanted) : wanted ?? fallback;
-      if (v === undefined) return;
-      const note = wanted === undefined ? "no answer in the answers file; the harness used the recommendation or the first option" : "answered from the answers file";
-      setTimeout(() => s.answer(q.qid, v, note).catch((err) => console.error(String(err))), 0);
-    }
-    if (e.type === "permission") s.respondPermission(e.rid, allow.has("all") || allow.has(e.tool), allow.size ? "" : "headless mode denies by default; pass --allow");
-    if (e.type === "instruction") s.followDone(e.step, "", true);
     if (out !== "stream-json" && e.type === "entry" && (e.entry.kind === "error" || e.entry.kind === "notice")) process.stderr.write(`${e.entry.kind === "error" ? "Error" : "Note"}: ${e.entry.data.message ?? e.entry.data.text}\n`);
     if (out === "text" && e.type === "entry" && e.entry.kind === "tool_result") process.stderr.write(`  ${e.entry.data.ok ? "●" : "✗"} ${e.entry.data.summary ?? e.entry.data.error ?? e.entry.data.tool}\n`);
   });
-  s.settings.autoResume = false;
-  const setup = readJson(str(o.setup)) as Record<string, unknown> | undefined;
-  const setupKeys = new Set(s.decisions.fields().filter((f) => f.stage === "setup").map((f) => f.key));
-  const fromAnswers = Object.fromEntries(Object.entries(answers).filter(([k]) => setupKeys.has(k)));
-  if (setup || Object.keys(fromAnswers).length || s.setupNeeded())
-    s.decisions.applySetup({ ...fromAnswers, ...(setup ?? {}) }, { how: setup || Object.keys(fromAnswers).length ? "from the setup and answers files" : "defaults accepted (headless)" });
+  applyHeadlessSetup(s, readJson(str(o.setup)) as Record<string, unknown> | undefined, answers);
   const answer = await s.send(prompt);
   if (out === "json") console.log(JSON.stringify({ session: s.id, dir: s.dir, answer, findings: s.findings.list() }, null, 1));
   else if (out === "text") console.log(`${answer}\n\nSession: ${s.id}\nRecord: ${join(s.dir, "log.jsonl")}`);
@@ -275,6 +266,16 @@ async function main() {
       return;
     }
     case "bench": {
+      if (a1 === "papers") {
+        const { runPapers } = await import("./bench/papers.ts");
+        const models = (str(o.models) ?? str(o.model) ?? "").split(",").filter(Boolean);
+        if (!models.length) return fail("usage: ga bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run]");
+        const papers = str(o.papers);
+        const r = await runPapers({ papers: !papers || papers === "all" ? "all" : papers.split(","), models, runs: str(o.runs) ? Number(str(o.runs)) : 1, out: str(o.out), dryRun: !!o["dry-run"] });
+        if (r.problems.length) process.exitCode = 1;
+        if (r.paths) console.log(`${r.paths.md}\n${r.paths.json}`);
+        return;
+      }
       const { runBench } = await import("./bench/run.ts");
       const g = (str(o.guidance) ?? "both") as "on" | "off" | "both";
       const r = await runBench(!a1 || a1 === "all" ? "all" : a1.split(","), { model: str(o.model) ?? "claude", guidance: g });

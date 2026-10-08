@@ -1,0 +1,19 @@
+adapters: [samtools]
+prompt: |
+  I have a small set of aligned sequencing reads, {data}/li2009-samtools/ex1.sam.gz, and the reference they were aligned to, {data}/li2009-samtools/ex1.fa. How many reads mapped, and how many are properly paired? Sort and index my alignments so I can open them in a viewer. How many reads fall on the second reference sequence between positions 100 and 200?
+answers:
+  reference: /Volumes/T7/guided-analysis/data/li2009-samtools/ex1.fa
+  min_mapq: 0
+  exclude_flags: 0
+  require_flags: 0
+allow: all
+data: [li2009-samtools/ex1.fa, li2009-samtools/ex1.sam.gz]
+items:
+  - {key: total_reads, description: "Total reads", value: 3307, exact: true, in_answer: false}
+  - {key: mapped_reads, description: "Mapped reads", value: 3271, exact: true}
+  - {key: properly_paired, description: "Properly paired reads", value: 3144, exact: true}
+  - {key: singletons, description: "Singletons", value: 127, exact: true, in_answer: false}
+  - {key: reads_seq1, description: "Reads mapped to seq1", value: 1482, exact: true, in_answer: false}
+  - {key: reads_seq2, description: "Reads mapped to seq2", value: 1789, exact: true, in_answer: false}
+  - {key: mapq_ge_30, description: "Reads with MAPQ 30 or more", value: 3210, exact: true, in_answer: false}
+  - {key: reads_seq2_100_200, description: "Reads in seq2:100-200", value: 79, exact: true}

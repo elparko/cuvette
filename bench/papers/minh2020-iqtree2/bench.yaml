@@ -1,0 +1,20 @@
+adapters: [phylo]
+prompt: |
+  What is the best-fit substitution model and the maximum-likelihood tree, with branch support, for the 17 mitochondrial sequences in {data}/minh2020-iqtree2/example.phy? Use the model chosen by the data, and report the log-likelihood. Call the tree tool.
+setup: &values
+  algorithm: auto
+  trim: false
+  model: MFP
+  bootstrap_type: ufboot
+  replicates: 1000
+  outgroup: ""
+answers: *values
+allow: all
+timeout_s: 1800
+data:
+  - minh2020-iqtree2/example.phy
+items:
+  - key: log_likelihood
+    description: Log-likelihood of the ML tree
+    value: -21152.54
+    tolerance: 1

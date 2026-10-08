@@ -1,0 +1,26 @@
+adapters: [deseq2]
+prompt: |
+  Does dexamethasone change gene expression in human airway smooth muscle cells, and in which genes? The samples come from four donors, each with a treated and an untreated culture. The count table is {data}/love2014-deseq2-airway/airway_counts.csv and the sample table is {data}/love2014-deseq2-airway/airway_coldata.csv (columns cell and dex). Tell me how many genes pass the filter, how many genes are significant, how many go up and how many go down, and give a table of the top 20 genes with fold change and significance. Write every number in the answer text.
+answers:
+  question: "Does dexamethasone change gene expression in human airway smooth muscle cells, and in which genes?"
+  replicate: "donors or animals (several libraries for each one)"
+  design: "~ cell + dex"
+  variable: dex
+  reference_level: untrt
+  test_level: trt
+  min_count: 10
+  min_samples: 4
+  alpha: 0.1
+  lfc_threshold: 0
+  exclusions: none
+allow: all
+timeout_s: 1800
+data: [love2014-deseq2-airway/airway_counts.csv, love2014-deseq2-airway/airway_coldata.csv]
+items:
+  - {key: genes_after_filter, description: "Genes after pre-filter, workflow", value: 16637, tolerance: 600}
+  - {key: padj_01_workflow, description: "Genes with padj < 0.1, workflow", value: 4381, tolerance: 400}
+  - {key: up_padj_01, description: "Up-regulated genes at padj < 0.1, workflow", value: 2362, tolerance: 250}
+  - {key: down_padj_01, description: "Down-regulated genes at padj < 0.1, workflow", value: 2019, tolerance: 250}
+  - {key: padj_005_workflow, description: "Genes with padj < 0.05, workflow", value: 3602, tolerance: 400, in_answer: false}
+  - {key: padj_01_pydeseq2, description: "Genes with padj < 0.1 on this CSV, pydeseq2 0.5.4", value: 4643, tolerance: 100, in_answer: false}
+  - {key: padj_005_pydeseq2, description: "Genes with padj < 0.05 on this CSV, pydeseq2 0.5.4", value: 3872, tolerance: 100, in_answer: false}

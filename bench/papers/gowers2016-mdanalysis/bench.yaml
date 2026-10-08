@@ -1,0 +1,50 @@
+adapters: [mdanalysis]
+prompt: |
+  I have a molecular dynamics run of adenylate kinase. The topology is {data}/gowers2016-mdanalysis/adk.psf and the trajectory is {data}/gowers2016-mdanalysis/adk_dims.dcd . I also have the open crystal structure {data}/gowers2016-mdanalysis/4AKE.pdb and the closed one {data}/gowers2016-mdanalysis/1AKE.pdb . Tell me how many atoms and frames the run has. Tell me how far the backbone moves from the first frame to the last frame. Tell me the radius of gyration at the start and at the end. Then tell me how many residues each chain of the open structure has and how different the open and closed structures are (use chain A of each).
+setup: {}
+answers:
+  replicate: frames of one trajectory (descriptive only)
+  fit_select: backbone
+  fit_before_rmsd: true
+  reference_frame: 0
+  rmsd_select: backbone
+  frame_stride: 1
+  rmsf_select: protein and name CA
+  rg_select: protein
+  pdb_fit_atoms: CA
+allow: all
+timeout_s: 1800
+data:
+  - gowers2016-mdanalysis/adk.psf
+  - gowers2016-mdanalysis/adk_dims.dcd
+  - gowers2016-mdanalysis/4AKE.pdb
+  - gowers2016-mdanalysis/1AKE.pdb
+items:
+  - key: atoms
+    description: Atoms in the AdK system
+    value: 3341
+    exact: true
+  - key: frames
+    description: Frames in the AdK trajectory
+    value: 98
+    exact: true
+  - key: backbone_rmsd_last_frame
+    description: Backbone RMSD of the last frame against frame 0, in angstrom
+    value: 6.8203
+    tolerance: 0.01
+  - key: rg_last_frame
+    description: Radius of gyration of the protein, last frame, in angstrom
+    value: 19.592
+    tolerance: 0.02
+  - key: residues_chain_a
+    description: Residues in chain A of 4AKE
+    value: 214
+    exact: true
+  - key: residues_chain_b
+    description: Residues in chain B of 4AKE
+    value: 214
+    exact: true
+  - key: ca_rmsd_open_closed
+    description: CA RMSD after fit of 4AKE chain A on 1AKE chain A, in angstrom
+    value: 7.131
+    tolerance: 0.02

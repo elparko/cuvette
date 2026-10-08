@@ -1,0 +1,24 @@
+adapters: [lme4]
+prompt: |
+  Does reaction time rise with days of sleep deprivation, and does the rate differ between subjects? Fit a model with a random intercept and a random slope for each subject by REML. The 18 subjects are the independent units. The data table is {data}/bates2015-lme4-sleepstudy/sleepstudy.csv (columns Reaction, Days, Subject). Report the fixed effects, the random-effect standard deviations and the REML criterion. Then compare this model with the same model without the Days effect, and give the likelihood ratio chi-square, the degrees of freedom and the p value. Draw a plot of each subject with their fitted line. Write every number in the answer text.
+answers:
+  question: "Does reaction time rise with days of sleep deprivation, and does the rate differ between subjects?"
+  replicate: "subjects or sites (several observations for each one)"
+  formula: "Reaction ~ Days + (Days | Subject)"
+  reml: true
+  p_value_method: satterthwaite
+  reduced_formula: "Reaction ~ 1 + (Days | Subject)"
+  comparison_method: ML
+  exclusions: none
+allow: all
+data: [bates2015-lme4-sleepstudy/sleepstudy.csv]
+items:
+  - {key: fixed_intercept, description: "Fixed effect Intercept", value: 251.405, tolerance: 0.01}
+  - {key: fixed_days, description: "Fixed effect Days", value: 10.467, tolerance: 0.01}
+  - {key: reml_criterion, description: "REML criterion", value: 1743.6, tolerance: 0.1}
+  - {key: sd_subject_intercept, description: "SD of Subject intercept", value: 24.74, tolerance: 0.05}
+  - {key: sd_subject_days, description: "SD of Subject Days", value: 5.92, tolerance: 0.05}
+  - {key: sd_residual, description: "Residual SD", value: 25.59, tolerance: 0.05}
+  - {key: random_correlation, description: "Correlation of random intercept and slope", value: 0.066, tolerance: 0.01, in_answer: false}
+  - {key: lrt_chi2_days, description: "Likelihood ratio chi-square for Days, ML", value: 23.54, tolerance: 0.1}
+  - {key: n_subjects, description: "Number of subjects", value: 18, exact: true, in_answer: false}

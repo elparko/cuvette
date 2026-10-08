@@ -1,0 +1,29 @@
+adapters: [vegan]
+prompt: |
+  Does the plant community of Dutch dune meadows differ between the four management types, and is that difference a difference in community composition rather than in spread? The 20 sites are the independent units. The species table is {data}/oksanen-vegan-dune/dune.csv and the site table is {data}/oksanen-vegan-dune/dune_env.csv (column Management has the four types). Tell me the Shannon diversity of site 1. Tell me the PERMANOVA R2, F and p for Management, and the p of the dispersion test. Draw an NMDS map and tell me the stress. Write every number in the answer text.
+answers:
+  question: "Does the plant community differ between the four management types?"
+  replicate: "sites (one row for each independent site)"
+  distance: bray
+  transform: none
+  diversity_index: shannon
+  shannon_base: e
+  permanova_terms: Management
+  permanova_by: terms
+  dispersion_variable: Management
+  nmds_k: 2
+  nmds_trymax: 20
+  permutations: 999
+  seed: 1
+  strata: none
+  exclusions: none
+allow: all
+timeout_s: 1800
+data: [oksanen-vegan-dune/dune.csv, oksanen-vegan-dune/dune_env.csv]
+items:
+  - {key: shannon_site1, description: "Shannon index of site 1, natural log", value: 1.4405, tolerance: 0.001}
+  - {key: nmds_stress, description: "NMDS stress, Bray-Curtis, k=2", value: 0.1183, tolerance: 0.001}
+  - {key: permanova_r2, description: "PERMANOVA R2 of Management", value: 0.3416, tolerance: 0.001}
+  - {key: permanova_f, description: "PERMANOVA F of Management", value: 2.767, tolerance: 0.01}
+  - {key: permanova_p, description: "PERMANOVA p of Management, 999 permutations", value: 0.003, tolerance: 0.003}
+  - {key: dispersion_f, description: "Dispersion test F of Management", value: 1.951, tolerance: 0.01, in_answer: false}

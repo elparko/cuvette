@@ -1,0 +1,25 @@
+adapters: [rdkit]
+prompt: |
+  Can a simple equation of size, lipophilicity, flexibility and aromatic content predict the measured aqueous solubility of this set of small molecules? The file is {data}/delaney2004-esol/delaney-processed.csv . The column "smiles" holds the structures. The column "measured log solubility in mols per litre" holds the measured values. How many of the molecules follow Lipinski's rule of five?
+setup: {}
+answers:
+  salt_handling: keep
+  invalid_smiles: stop
+  logp_method: crippen
+  hbd_hba_definition: lipinski
+  rule_of_five_cutoffs: lipinski_1997
+  allowed_violations: 1
+  esol_equation: published
+  test_fraction: 0.2
+  split_seed: 42
+allow: all
+timeout_s: 900
+data:
+  - delaney2004-esol/delaney-processed.csv
+items:
+  - {key: molecules_parsed, description: "Molecules parsed.", value: 1128, exact: true, in_answer: false}
+  - {key: zero_violations, description: "Molecules with zero rule-of-five violations.", value: 1018, tolerance: 5}
+  - {key: two_or_more_violations, description: "Molecules with two or more violations.", value: 12, tolerance: 3}
+  - {key: logp_above_5, description: "Molecules with logP above 5.", value: 97, tolerance: 5, in_answer: false}
+  - {key: esol_r2, description: "R squared of the ESOL equation (Crippen logP) against measured values.", value: 0.752, tolerance: 0.03}
+  - {key: esol_rmse, description: "RMSE of the ESOL equation against measured values, in log units.", value: 1.10, tolerance: 0.1}

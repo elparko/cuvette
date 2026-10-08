@@ -1,0 +1,72 @@
+adapters: [gdal]
+prompt: |
+  The raster is {data}/rouault-gdal-autotest/byte.tif and the two squares are in {data}/rouault-gdal-autotest/zones.geojson . The name of each square is in the field id. 1. I have a small satellite-style image of a patch of land. How many pixels wide and high is it, which map projection does it use, and how large is one pixel on the ground? 2. What are the lowest, highest and average pixel values, and the standard deviation? 3. Convert the image to latitude and longitude. How many pixels wide and high is the new image? 4. I drew two squares on the map. What is the average pixel value inside the first one, and how many pixels does it cover? 5. The second square cuts through pixels. How many pixels and what average do I get if I count only pixels whose center is inside the square?
+setup: &values
+  target_crs: "EPSG:4326"
+  resampling: near
+  nodata: ""
+  pixel_size: ""
+  partial_pixels: centers
+answers: *values
+allow: all
+timeout_s: 900
+data:
+  - rouault-gdal-autotest/byte.tif
+  - rouault-gdal-autotest/zones.geojson
+items:
+  - key: width
+    description: Raster width in pixels
+    value: 20
+    exact: true
+  - key: height
+    description: Raster height in pixels
+    value: 20
+    exact: true
+  - key: epsg
+    description: EPSG code of the raster
+    value: 26711
+    exact: true
+  - key: pixel_size_m
+    description: Pixel size in metres
+    value: 60
+    exact: true
+  - key: band_min
+    description: Band minimum
+    value: 74
+    exact: true
+  - key: band_max
+    description: Band maximum
+    value: 255
+    exact: true
+  - key: band_mean
+    description: Band mean
+    value: 126.765
+    tolerance: 0.01
+  - key: band_std
+    description: Band standard deviation
+    value: 22.93
+    tolerance: 0.05
+  - key: warp_width
+    description: Width after warp to EPSG:4326
+    value: 22
+    exact: true
+  - key: warp_height
+    description: Height after warp to EPSG:4326
+    value: 18
+    exact: true
+  - key: zone_a_pixels
+    description: Zone A pixel count
+    value: 100
+    exact: true
+  - key: zone_a_mean
+    description: Zone A mean
+    value: 129.5
+    tolerance: 0.01
+  - key: zone_b_pixels_centers
+    description: Zone B pixel count, pixel centers
+    value: 42
+    exact: true
+  - key: zone_b_mean_centers
+    description: Zone B mean, pixel centers
+    value: 135.0
+    tolerance: 0.01

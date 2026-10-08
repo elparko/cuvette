@@ -1,0 +1,25 @@
+adapters: [scikit-image]
+prompt: |
+  Count the blobs in this image: {data}/schindelin2012-fiji-blobs/blobs.gif
+answers:
+  stain_channel: gray
+  object_polarity: bright
+  threshold_method: isodata
+  min_object_size: 0
+  exclude_border_objects: false
+  split_touching: false
+  pixel_size: 0
+  replication_unit: images or fields
+allow: all
+data:
+  - schindelin2012-fiji-blobs/blobs.gif
+items:
+  - key: particles_edges_included
+    description: Particles, edge particles included.
+    value: 64
+    exact: true
+  - key: particles_edges_excluded
+    description: Particles, edge particles excluded.
+    value: 46
+    exact: true
+    in_answer: false

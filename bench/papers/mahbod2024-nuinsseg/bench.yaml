@@ -1,0 +1,31 @@
+adapters: [scikit-image]
+prompt: |
+  Outline the nuclei in these H&E patches and tell me how close the outlines are to the hand-drawn ones. Use all organ folders. The patches are in the folder '{data}/mahbod2024-nuinsseg/x'. Each organ folder has a 'tissue images' folder with PNG files and a 'label masks' folder with the hand-drawn masks.
+answers:
+  stain_channel: hematoxylin
+  object_polarity: bright
+  threshold_method: otsu
+  min_object_size: 30
+  exclude_border_objects: false
+  split_touching: false
+  pixel_size: 0
+  replication_unit: images or fields
+allow: all
+timeout_s: 1800
+data:
+  - mahbod2024-nuinsseg/x
+items:
+  - key: mean_dice_otsu
+    description: Mean pixel Dice, Otsu on the hematoxylin channel.
+    value: 0.538
+    tolerance: 0.02
+  - key: image_patches
+    description: Image patches in the dataset.
+    value: 665
+    exact: true
+    in_answer: false
+  - key: nuclei_label_masks
+    description: Nuclei in the released label masks.
+    value: 35138
+    exact: true
+    in_answer: false

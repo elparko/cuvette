@@ -1,0 +1,57 @@
+adapters: [sage]
+prompt: |
+  The three tandem mass spectrometry runs are {data}/lazear2023-sage/BSA1.mzML , {data}/lazear2023-sage/BSA2.mzML and {data}/lazear2023-sage/BSA3.mzML . The protein sequence file is {data}/lazear2023-sage/standards.fasta . Which peptides are in this protein mix, how many spectra match them at 1 percent FDR, and how does the number change at 5 percent?
+setup: &values
+  fasta: /Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta
+  decoys: sage_reverse
+  decoy_tag: rev_
+  enzyme: trypsin
+  missed_cleavages: 1
+  fixed_mods: C+57.0215
+  variable_mods: M+15.9949
+  max_variable_mods: 2
+  precursor_tol_ppm: 10
+  fragment_tol: 0.5
+  fragment_tol_unit: da
+  isotope_min: 0
+  isotope_max: 0
+  max_fragment_charge: 1
+  min_peaks: 6
+  fdr_level: psm
+  fdr_threshold: 0.01
+answers: *values
+allow: all
+timeout_s: 1800
+data:
+  - lazear2023-sage/BSA1.mzML
+  - lazear2023-sage/BSA2.mzML
+  - lazear2023-sage/BSA3.mzML
+  - lazear2023-sage/standards.fasta
+items:
+  - key: psms_result_table
+    description: PSMs in the result table
+    value: 303
+    exact: true
+    in_answer: false
+  - key: decoy_psms
+    description: Decoy PSMs in the result table
+    value: 43
+    exact: true
+    in_answer: false
+  - key: target_psms_fdr1
+    description: Target PSMs at 1 percent PSM FDR
+    value: 207
+    exact: true
+  - key: distinct_peptides
+    description: Distinct peptides among the PSMs at 1 percent
+    value: 47
+    exact: true
+  - key: decoy_psms_kept
+    description: Decoy PSMs among the kept PSMs
+    value: 1
+    exact: true
+    in_answer: false
+  - key: target_psms_fdr5
+    description: Target PSMs at 5 percent PSM FDR
+    value: 242
+    exact: true

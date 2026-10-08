@@ -1,0 +1,24 @@
+adapters: [pyimzml]
+prompt: |
+  I have two small imaging files: {data}/schramm2012-imzml-pyimzml/Example_Continuous.imzML and {data}/schramm2012-imzml-pyimzml/Example_Processed.imzML . How many pixels does each have and what m/z range do they cover? Why is one data file bigger than the other even though both have the same pixels? Show me which pixel has the strongest total signal. Do the continuous and processed versions of this imaging file hold the same spectra?
+setup: {}
+answers:
+  ion_ppm: 10
+  polarity: negative
+  normalization: none
+  snr: 3
+allow: all
+timeout_s: 900
+data:
+  - schramm2012-imzml-pyimzml/Example_Continuous.imzML
+  - schramm2012-imzml-pyimzml/Example_Continuous.ibd
+  - schramm2012-imzml-pyimzml/Example_Processed.imzML
+  - schramm2012-imzml-pyimzml/Example_Processed.ibd
+items:
+  - {key: spectra_per_file, description: "Spectra (pixels) in each file.", value: 9, exact: true}
+  - {key: mz_min, description: "Minimum m/z.", value: 100.083336, tolerance: 0.0001}
+  - {key: mz_max, description: "Maximum m/z.", value: 799.9167, tolerance: 0.0001}
+  - {key: max_pixel_tic, description: "Total ion current of the strongest pixel.", value: 243.5395, tolerance: 0.001}
+  - {key: mean_tic, description: "Mean total ion current per pixel.", value: 161.1444, tolerance: 0.001, in_answer: false}
+  - {key: continuous_ibd_bytes, description: "Size of the continuous ibd file in bytes.", value: 335976, exact: true, in_answer: false}
+  - {key: processed_ibd_bytes, description: "Size of the processed ibd file in bytes.", value: 604744, exact: true, in_answer: false}

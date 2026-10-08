@@ -1,0 +1,43 @@
+adapters: [mne]
+prompt: |
+  I have a brain recording from one person who heard tones in the left ear and saw flashes. The file is the MNE sample data: {data}/gramfort2013-mne-sample/MNE-sample-data/MEG/sample/sample_audvis_filt-0-40_raw.fif . The events on STI 014 have the ids 1 (auditory/left), 2 (auditory/right), 3 (visual/left), 4 (visual/right), 5 (smiley) and 32 (buttonpress). 1. How many events of each kind are in it? 2. Cut the recording around each event and drop the bad stretches the usual way. How many epochs are left, and how many auditory left-ear trials are left? 3. When does the brain response to the left-ear tone peak, about a tenth of a second after the tone, in the gradiometers? How big is it? Write every number in the answer text.
+setup: {}
+answers:
+  bad_channels: "MEG 2443,EEG 053"
+  filter_low: 0.1
+  filter_high: 40
+  notch_freq: none
+  reference: average
+  use_ica: "no"
+  epoch_tmin: -0.2
+  epoch_tmax: 0.5
+  baseline_start: -0.2
+  baseline_end: 0
+  reject_grad: 4000
+  reject_mag: 4000
+  reject_eeg: 150
+  reject_eog: 250
+  peak_ch_type: grad
+  peak_tmin: 0.08
+  peak_tmax: 0.12
+allow: all
+timeout_s: 1800
+data:
+  - gramfort2013-mne-sample/MNE-sample-data/MEG/sample/sample_audvis_filt-0-40_raw.fif
+items:
+  - {key: events_total, description: "Events found on STI 014.", value: 319, exact: true, in_answer: false}
+  - {key: events_id1, description: "Events with id 1 (auditory/left).", value: 72, exact: true}
+  - {key: events_id2, description: "Events with id 2 (auditory/right).", value: 73, exact: true}
+  - {key: events_id3, description: "Events with id 3 (visual/left).", value: 73, exact: true}
+  - {key: events_id4, description: "Events with id 4 (visual/right).", value: 70, exact: true}
+  - {key: events_id5, description: "Events with id 5 (smiley).", value: 15, exact: true}
+  - {key: events_id32, description: "Events with id 32 (buttonpress).", value: 16, exact: true}
+  - {key: epochs_dropped, description: "Epochs dropped by the limits, all six ids.", value: 10, exact: true, in_answer: false}
+  - {key: epochs_kept, description: "Epochs kept, all six ids.", value: 309, exact: true}
+  - {key: auditory_left_kept, description: "Auditory/left epochs kept.", value: 68, exact: true}
+  - {key: n100_latency_gfp, description: "N100 latency (s), global field power of good gradiometers, auditory/left.", value: 0.0932, tolerance: 0.007}
+  - {key: n100_amplitude_gfp, description: "N100 global field power amplitude in gradiometers (fT/cm).", value: 42.1, tolerance: 2.0}
+  - {key: strongest_grad_latency, description: "Latency (s) of the strongest gradiometer channel.", value: 0.0866, tolerance: 0.007}
+  - {key: strongest_grad_amplitude, description: "Amplitude (fT/cm) of the strongest gradiometer channel, absolute value.", value: 199, tolerance: 8, abs: true}
+  - {key: n100_latency_eeg, description: "N100 latency (s), EEG negative peak.", value: 0.0999, tolerance: 0.007, in_answer: false}
+  - {key: n100_amplitude_eeg, description: "N100 amplitude (uV), EEG negative peak.", value: -6.0, tolerance: 0.4, in_answer: false}

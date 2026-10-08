@@ -1,0 +1,23 @@
+adapters: [metaspace]
+prompt: |
+  How many lipid annotations does each public mouse brain dataset support at a controlled false discovery rate, and how does the count change with the database? The datasets are 2022-08-16_10h14m23s and 2022-08-16_12h31m33s on METASPACE.
+setup: {}
+answers:
+  fdr: 0.1
+  database: "LipidMaps 2017-12-12"
+  adducts: all
+  exclude_off_sample: false
+  "*": "Use the recommended value."
+allow: all
+timeout_s: 900
+data:
+  - alexandrov2019-metaspace/2022-08-16_10h14m23s_LipidMaps_fdr10.csv
+  - alexandrov2019-metaspace/2022-08-16_10h14m23s_HMDB_fdr10.csv
+  - alexandrov2019-metaspace/2022-08-16_12h31m33s_LipidMaps_fdr10.csv
+  - alexandrov2019-metaspace/2022-08-16_12h31m33s_HMDB_fdr10.csv
+items:
+  - {key: d1_lipidmaps_fdr10, description: "Dataset 10h14m23s, LipidMaps annotations at FDR 10%.", value: 414, exact: true}
+  - {key: d1_hmdb_fdr10, description: "Dataset 10h14m23s, HMDB annotations at FDR 10%.", value: 263, exact: true}
+  - {key: d2_lipidmaps_fdr10, description: "Dataset 12h31m33s, LipidMaps annotations at FDR 10%.", value: 191, exact: true}
+  - {key: d2_hmdb_fdr10, description: "Dataset 12h31m33s, HMDB annotations at FDR 10%.", value: 123, exact: true}
+  - {key: d1_lipidmaps_fdr5, description: "Dataset 10h14m23s, LipidMaps annotations at FDR 5%.", value: 144, exact: true, in_answer: false}

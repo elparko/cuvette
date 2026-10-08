@@ -1,0 +1,30 @@
+adapters: [scanpy]
+prompt: |
+  I have a folder of 10x output for blood cells from one healthy donor. The folder is {data}/wolf2018-scanpy/filtered_gene_bc_matrices/hg19 . Clean this single-cell data the usual way and group the cells into clusters. Tell me how many cells you kept and how many clusters you found. Then tell me which genes mark each cluster.
+setup: {}
+answers:
+  min_genes_per_cell: 200
+  max_genes_per_cell: 2500
+  max_pct_mito: 5
+  min_cells_per_gene: 3
+  target_sum: 10000
+  n_top_genes: 0
+  regress_out: "total_counts,pct_counts_mt"
+  n_pcs: 40
+  n_neighbors: 10
+  leiden_resolution: 0.7
+  random_seed: 0
+  marker_method: wilcoxon
+allow: all
+timeout_s: 900
+data:
+  - wolf2018-scanpy/filtered_gene_bc_matrices/hg19/matrix.mtx
+  - wolf2018-scanpy/filtered_gene_bc_matrices/hg19/genes.tsv
+  - wolf2018-scanpy/filtered_gene_bc_matrices/hg19/barcodes.tsv
+items:
+  - {key: cells_at_load, description: "Cells at load.", value: 2700, exact: true, in_answer: false}
+  - {key: genes_at_load, description: "Genes at load.", value: 32738, exact: true, in_answer: false}
+  - {key: genes_after_min_cells, description: "Genes after the minimum cells filter.", value: 13714, exact: true, in_answer: false}
+  - {key: cells_after_qc, description: "Cells after quality control.", value: 2638, exact: true}
+  - {key: highly_variable_genes, description: "Highly variable genes, default flavor.", value: 1838, tolerance: 20, in_answer: false}
+  - {key: leiden_clusters, description: "Leiden clusters at resolution 0.7.", value: 7, tolerance: 1}

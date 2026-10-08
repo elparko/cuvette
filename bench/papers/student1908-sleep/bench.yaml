@@ -1,0 +1,20 @@
+adapters: [biostats]
+prompt: |
+  Ten patients each tried two sleeping drugs. The file {data}/student1908-sleep/sleep.csv has the extra hours of sleep (columns extra, group, ID). Is one drug better? Give me the mean difference, a confidence interval and a p-value. Write every number in your final answer text.
+answers:
+  replicate: "subjects, patients or animals (one value per subject)"
+  alpha: 0.05
+  paired: true
+  two_group_test: t
+  equal_variance: false
+  alternative: two-sided
+allow: all
+data: [student1908-sleep/sleep.csv]
+items:
+  - {key: mean_difference, description: "Mean paired difference, group 2 minus group 1", value: 1.58, tolerance: 0.005}
+  - {key: paired_t, description: "Paired t statistic, absolute value", value: 4.0621, tolerance: 0.001, abs: true, in_answer: false}
+  - {key: degrees_of_freedom, description: "Degrees of freedom", value: 9, exact: true, in_answer: false}
+  - {key: paired_p, description: "Paired two-sided p", value: 0.002833, tolerance: 0.0001}
+  - {key: ci_lower, description: "95% CI lower bound", value: 0.700, tolerance: 0.005}
+  - {key: ci_upper, description: "95% CI upper bound", value: 2.460, tolerance: 0.005}
+  - {key: welch_p_trap, description: "Unpaired Welch p (trap result)", value: 0.07939, tolerance: 0.0005, in_answer: false}

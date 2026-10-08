@@ -1,0 +1,23 @@
+adapters: [biostats]
+prompt: |
+  I have a file of 432 men released from prison: {data}/rossi1980-recidivism/rossi.csv. The columns are week (weeks until re-arrest or end of follow-up), arrest (1 if re-arrested, 0 if not), fin (financial aid), age, race, wexp, mar, paro and prio. Does financial aid reduce re-arrest? Give me the effect size with a confidence interval and a p-value, adjusted for all the other background columns. Report how well the model separates early from late arrests, and whether the model assumptions hold. Write every number in your final answer text.
+answers:
+  replicate: "subjects, patients or animals (one value per subject)"
+  alpha: 0.05
+  cox_covariates: "fin,age,race,wexp,mar,paro,prio"
+  ties: efron
+  cox_strata: ""
+allow: all
+data: [rossi1980-recidivism/rossi.csv]
+items:
+  - {key: subjects, description: "Number of subjects", value: 432, exact: true, in_answer: false}
+  - {key: events, description: "Number of events (arrests)", value: 114, exact: true, in_answer: false}
+  - {key: coef_fin, description: "Cox coefficient for fin", value: -0.3794, tolerance: 0.0005, in_answer: false}
+  - {key: coef_age, description: "Cox coefficient for age", value: -0.0574, tolerance: 0.0005, in_answer: false}
+  - {key: coef_prio, description: "Cox coefficient for prio", value: 0.0915, tolerance: 0.0005, in_answer: false}
+  - {key: hazard_ratio_fin, description: "Hazard ratio for fin", value: 0.684, tolerance: 0.002}
+  - {key: p_fin, description: "p for fin", value: 0.0474, tolerance: 0.001}
+  - {key: concordance, description: "Concordance", value: 0.64, tolerance: 0.005}
+  - {key: logrank_chi2_fin, description: "Log-rank chi-square by fin", value: 3.838, tolerance: 0.01, in_answer: false}
+  - {key: logrank_p_fin, description: "Log-rank p by fin", value: 0.0501, tolerance: 0.001, in_answer: false}
+  - {key: ph_test_p_age, description: "Proportional hazards test p for age", value: 0.0007, tolerance: 0.0005}

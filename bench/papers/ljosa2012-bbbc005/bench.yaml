@@ -1,0 +1,34 @@
+adapters: [cellprofiler]
+prompt: |
+  How does image blur change the accuracy of automatic nucleus counting on the BBBC005 synthetic set, compared with the true counts in the file names? The images are in {data}/ljosa2012-bbbc005/sub_w1/BBBC005_v1_images. Use only the nuclei stain images (pattern *_w1.TIF). All of them are blur level F1 (in focus). The true count is the C value in the file name. Use every sixth file of the sorted list (100 images). Count the nuclei and tell me the detected to true count ratio, the mean absolute count error and the R squared.
+answers:
+  question: How does image blur change the accuracy of automatic nucleus counting on BBBC005 compared with the true counts in the file names?
+  replicate: images or fields
+  pixel_size: uncalibrated
+  diameter_min: 15
+  diameter_max: 60
+  threshold_strategy: Global
+  threshold_method: Otsu
+  declump_method: Shape
+  discard_border: false
+  discard_outside: false
+  threshold_correction: 1.0
+  stain_pattern: "*_w1.TIF"
+allow: all
+timeout_s: 1800
+data:
+  - ljosa2012-bbbc005/sub_w1/BBBC005_v1_images
+items:
+  - key: ratio_sample
+    description: Detected to true count ratio on the 100 sampled images, published counts.
+    value: 0.9379
+    tolerance: 0.02
+  - key: mean_abs_error_sample
+    description: Mean absolute count error on the 100 sampled images, published counts.
+    value: 3.11
+    tolerance: 0.1
+  - key: true_total_sample
+    description: Sum of true cell counts over the 100 sampled images.
+    value: 5007
+    exact: true
+    in_answer: false

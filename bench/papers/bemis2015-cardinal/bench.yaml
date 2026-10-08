@@ -1,0 +1,27 @@
+adapters: [cardinal]
+prompt: |
+  Can the tissue regions of a whole-animal section be found without labels, and which ions distinguish each region? The data is a DESI imaging run of a pig fetus cross-section. It is the object pig206 in the file {data}/bemis2015-cardinal/x/CardinalWorkflows/data/pig206.rda. Load it, pick peaks, fit the spatial shrunken centroids models, and tell me how many spectra, m/z values and peaks the data has, how many segments each model has, which model you report, and the top ions of the segments.
+setup: {}
+answers:
+  question: "Can the tissue regions of a whole-animal section be found without labels, and which ions distinguish each region?"
+  replicate: "none (one section, descriptive only)"
+  normalize: tic
+  snr: 3
+  tolerance: 0.5
+  sample_size: 0.1
+  seed: 1
+  r: 2
+  k: 8
+  weights: adaptive
+  sparsity: 32
+  region_labels: "not named (numbers only)"
+allow: all
+timeout_s: 1800
+data:
+  - bemis2015-cardinal/x/CardinalWorkflows/data/pig206.rda
+items:
+  - {key: spectra, description: "Spectra in pig206.", value: 4959, exact: true}
+  - {key: mz_values, description: "m/z values in pig206.", value: 10200, exact: true}
+  - {key: peaks, description: "Peaks after peak processing.", value: 687, tolerance: 10}
+  - {key: segments_s32, description: "Segments in the chosen model (s=32).", value: 6, tolerance: 1}
+  - {key: segments_s64, description: "Segments in the s=64 model.", value: 3, tolerance: 1}

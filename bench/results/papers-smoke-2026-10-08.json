@@ -1,0 +1,274 @@
+{
+ "date": "2026-10-08",
+ "models": [
+  "ollama:qwen3:8b"
+ ],
+ "runsPerCell": 1,
+ "runs": [
+  {
+   "paper": "student1908-sleep",
+   "model": "ollama:qwen3:8b",
+   "run": 1,
+   "status": "answer",
+   "durationS": 36.536,
+   "session": "20261008-135354-1ea5",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/student1908-sleep/run1/home/sessions/20261008-135354-1ea5",
+   "answer": "The paired t-test shows that the second group (drug 2) has a mean difference of 1.58 hours more sleep compared to the first group (drug 1). The 95% confidence interval for the mean difference is between 0.70 and 2.46 hours. The p-value is 0.00283, which is less than the significance level of 0.05, indicating that the difference is statistically significant. The effect size is 1.28, which suggests a large effect. Therefore, drug 2 appears to be more effective than drug 1 in increasing sleep duration.\n\nStep results that the answer does not mention, from the record:\n- n1 inspect_table: 20 rows x 4 columns.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Paired test: true · Test family for two groups: t · Assume equal variances (unpaired t-test): false · Sidedness: two-sided.",
+   "items": [
+    {
+     "key": "mean_difference",
+     "description": "Mean paired difference, group 2 minus group 1",
+     "expected": 1.58,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "computed": {
+      "pass": true,
+      "value": 1.58,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.mean_diff",
+      "entry": 27
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.58,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 32,
+      "text": "The paired t-test shows that the second group (drug 2) has a mean difference of 1.58 hours more sleep compared to the first group (drug 1)."
+     }
+    },
+    {
+     "key": "paired_t",
+     "description": "Paired t statistic, absolute value",
+     "expected": 4.0621,
+     "tolerance": 0.001,
+     "abs": true,
+     "inAnswer": false,
+     "computed": {
+      "pass": true,
+      "value": 4.062127683382037,
+      "diff": 0.000027683382036514104,
+      "node": "n2",
+      "path": "metrics.statistic",
+      "entry": 27
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 32,
+      "text": null
+     }
+    },
+    {
+     "key": "degrees_of_freedom",
+     "description": "Degrees of freedom",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "computed": {
+      "pass": true,
+      "value": 9,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.df",
+      "entry": 27
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 32,
+      "text": null
+     }
+    },
+    {
+     "key": "paired_p",
+     "description": "Paired two-sided p",
+     "expected": 0.002833,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "computed": {
+      "pass": true,
+      "value": 0.0028328901973842724,
+      "diff": 1.0980261572765895e-7,
+      "node": "n2",
+      "path": "metrics.p_value",
+      "entry": 27
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00283,
+      "diff": 0.0000029999999999999645,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 32,
+      "text": "The p-value is 0.00283, which is less than the significance level of 0.05, indicating that the difference is statistically significant."
+     }
+    },
+    {
+     "key": "ci_lower",
+     "description": "95% CI lower bound",
+     "expected": 0.7,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "computed": {
+      "pass": true,
+      "value": 0.7001142367230175,
+      "diff": 0.00011423672301758003,
+      "node": "n2",
+      "path": "metrics.ci_lo",
+      "entry": 27
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.7,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 32,
+      "text": "The 95% confidence interval for the mean difference is between 0.70 and 2.46 hours."
+     }
+    },
+    {
+     "key": "ci_upper",
+     "description": "95% CI upper bound",
+     "expected": 2.46,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "computed": {
+      "pass": true,
+      "value": 2.459885763276983,
+      "diff": 0.00011423672301713594,
+      "node": "n2",
+      "path": "metrics.ci_hi",
+      "entry": 27
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.46,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 32,
+      "text": "The 95% confidence interval for the mean difference is between 0.70 and 2.46 hours."
+     }
+    },
+    {
+     "key": "welch_p_trap",
+     "description": "Unpaired Welch p (trap result)",
+     "expected": 0.07939,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": false,
+     "computed": {
+      "pass": false,
+      "value": 0.05,
+      "diff": 0.02939,
+      "node": "n2",
+      "path": "data.data.alpha",
+      "entry": 27
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 32,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 3,
+    "inputTokens": 15042,
+    "outputTokens": 229,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 2,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings": {
+     "info": 1,
+     "warning": 0,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-smoke-2026-10-08.md",
+  "json": "bench/results/papers-smoke-2026-10-08.json"
+ },
+ "summary": {
+  "cells": {
+   "student1908-sleep": {
+    "ollama:qwen3:8b": {
+     "computed": 6,
+     "computedOf": 7,
+     "reported": 4,
+     "reportedOf": 4,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "ollama:qwen3:8b": {
+    "computed": 6,
+    "computedOf": 7,
+    "reported": 4,
+    "reportedOf": 4,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "ollama:qwen3:8b": {
+    "runs": 1,
+    "durationS": 36.536,
+    "requests": 3,
+    "inputTokens": 15042,
+    "outputTokens": 229,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 2,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings_info": 1,
+    "findings_warning": 0,
+    "findings_error": 0,
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   }
+  },
+  "skipped": []
+ }
+}

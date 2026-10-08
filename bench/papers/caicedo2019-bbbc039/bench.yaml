@@ -1,0 +1,31 @@
+adapters: [cellpose]
+prompt: |
+  Take the 50 test images listed in the metadata folder. Segment the nuclei and report how many I miss compared with the hand annotation. The images are in the folder '{data}/caicedo2019-bbbc039/x/images/images', the hand-drawn masks are in the folder '{data}/caicedo2019-bbbc039/x/masks/masks', and the list of test images is the file '{data}/caicedo2019-bbbc039/x/metadata/metadata/test.txt'.
+answers:
+  model_type: cpsam_v2
+  cell_diameter: 0
+  cellprob_threshold: 0
+  flow_threshold: 0.4
+  min_cell_size: 15
+  exclude_border_cells: false
+  pixel_size: 0.656
+  replication_unit: images or fields
+allow: all
+timeout_s: 1800
+data:
+  - caicedo2019-bbbc039/x/images/images
+  - caicedo2019-bbbc039/x/masks/masks
+  - caicedo2019-bbbc039/x/metadata/metadata/test.txt
+items:
+  - key: true_nuclei_test
+    description: Nuclei in the ground-truth masks of the 50 test images.
+    value: 5720
+    exact: true
+  - key: missed_fraction_advanced
+    description: Fraction of true nuclei missed at IoU 0.7, CellProfiler advanced pipeline.
+    value: 0.155
+    tolerance: 0.05
+  - key: missed_fraction_basic
+    description: Fraction of true nuclei missed at IoU 0.7, CellProfiler basic pipeline.
+    value: 0.201
+    tolerance: 0.05

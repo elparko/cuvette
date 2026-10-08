@@ -1,0 +1,43 @@
+adapters: [bcftools]
+prompt: |
+  The file is {data}/danecek2021-bcftools/g1k_chr20_1000000_1100000.vcf.gz . 1. I have a list of human variants from a 100 kb stretch of chromosome 20 (genome build GRCh38). How many are single-base changes and how many are insertions or deletions? What is the transition to transversion ratio of the single-base changes? 2. How many variants lie between positions 1,000,000 and 1,050,000? 3. Keep only the variants with an allele frequency of at least 5 percent. How many are left?
+setup: &values
+  reference: GRCh38
+  regions: ""
+  min_qual: 0
+  min_depth: 0
+  variant_types: all
+  filter_status: any
+  normalize: "no"
+  split_multiallelic: "no"
+answers: *values
+allow: all
+timeout_s: 900
+data:
+  - danecek2021-bcftools/g1k_chr20_1000000_1100000.vcf.gz
+items:
+  - key: snp_records
+    description: SNP records
+    value: 1955
+    exact: true
+  - key: indel_records
+    description: Indel records
+    value: 248
+    exact: true
+  - key: total_records
+    description: Total records
+    value: 2210
+    exact: true
+    in_answer: false
+  - key: ts_tv_ratio
+    description: Ts/Tv ratio of the SNPs
+    value: 2.20
+    tolerance: 0.01
+  - key: records_in_region
+    description: Records in chr20:1000000-1050000
+    value: 1137
+    exact: true
+  - key: records_af_5pct
+    description: Records with INFO/AF at least 0.05
+    value: 328
+    exact: true

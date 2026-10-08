@@ -1,0 +1,34 @@
+adapters: [bedtools]
+prompt: |
+  I have two lists of intervals on human chromosome 1 (genome build hg18). The exons are in {data}/quinlan2010-bedtools/refseq.chr1.exons.bed and the AluY repeats are in {data}/quinlan2010-bedtools/aluY.chr1.bed . 1. How many exons overlap a repeat, and how many bases overlap in total? 3. Merge the repeats that lie within 100 bases of each other. How many intervals remain?
+setup: &values
+  genome_build: hg18
+  min_fraction_a: 0
+  min_fraction_b: 0
+  reciprocal: false
+  strand: any
+  merge_distance: 100
+answers: *values
+allow: all
+timeout_s: 900
+data:
+  - quinlan2010-bedtools/refseq.chr1.exons.bed
+  - quinlan2010-bedtools/aluY.chr1.bed
+items:
+  - key: exons_with_overlap
+    description: Exons that overlap a repeat
+    value: 126
+    exact: true
+  - key: overlapping_pairs
+    description: Overlapping exon and repeat pairs
+    value: 129
+    exact: true
+    in_answer: false
+  - key: overlap_bases
+    description: Overlap bases, any overlap
+    value: 33713
+    exact: true
+  - key: merged_intervals
+    description: AluY intervals after merge, distance 100
+    value: 11270
+    exact: true

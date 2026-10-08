@@ -1,0 +1,41 @@
+adapters: [pyopenms]
+prompt: |
+  I ran a blood sample spiked with a few standards at two concentrations, three injections each. The first low-concentration file is {data}/rost2016-openms/datasets/2012_02_03_PStd_050_1.mzML . How many features do you see in this file? Use the OpenMS metabolite feature finder and tell me how many spectra the file has.
+setup: {}
+answers:
+  mass_error_ppm: 20
+  noise_threshold_int: 10
+  chrom_fwhm: 8
+  min_trace_length: 3
+  max_trace_length: 600
+  trace_termination: sample_rate
+  width_filtering: "off"
+  polarity: positive
+allow: all
+timeout_s: 1800
+data:
+  - rost2016-openms/datasets/2012_02_03_PStd_050_1.mzML
+items:
+  - key: spectra
+    description: Spectra in PStd_050_1
+    value: 7173
+    exact: true
+  - key: ms1_spectra
+    description: MS1 spectra in PStd_050_1
+    value: 7173
+    exact: true
+    in_answer: false
+  - key: mass_traces
+    description: Mass traces in PStd_050_1 with the paper parameters
+    value: 1880
+    tolerance: 100
+    in_answer: false
+  - key: elution_peaks
+    description: Elution peaks in PStd_050_1
+    value: 2255
+    tolerance: 120
+    in_answer: false
+  - key: features
+    description: Features in PStd_050_1
+    value: 1887
+    tolerance: 100

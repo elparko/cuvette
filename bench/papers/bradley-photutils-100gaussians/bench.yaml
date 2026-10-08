@@ -1,0 +1,29 @@
+adapters: [astropy]
+prompt: |
+  I have a small telescope image, a FITS file with a lot of stars on a flat sky. The file is {data}/bradley-photutils-100gaussians/gaussians_noisy.fits . What is the sky level and how noisy is the sky? How many stars are in it? Find the ones that stand out from the noise. Measure the brightness of the stars at pixel positions (48.70, 200.33), (145.05, 168.52) and (355.56, 252.20). Take out the sky.
+setup: {}
+answers:
+  background_method: global
+  clip_sigma: 3
+  mask_sources: false
+  detect_nsigma: 3
+  min_pixels: 10
+  kernel_fwhm: 3
+  deblend: false
+  aperture_radius: 10
+  local_background: annulus
+  annulus_inner: 15
+  annulus_outer: 20
+  background_estimator: sextractor
+  box_size: 50
+allow: all
+timeout_s: 900
+data:
+  - bradley-photutils-100gaussians/gaussians_noisy.fits
+items:
+  - {key: sky_level, description: "Sky level (clipped median).", value: 5.152, tolerance: 0.01}
+  - {key: sky_noise, description: "Sky noise (clipped standard deviation).", value: 2.094, tolerance: 0.01}
+  - {key: sources_detected, description: "Sources detected.", value: 82, exact: true}
+  - {key: net_flux_48_70_200_33, description: "Net flux at (48.70, 200.33).", value: 895.4, tolerance: 106}
+  - {key: net_flux_145_05_168_52, description: "Net flux at (145.05, 168.52).", value: 734.1, tolerance: 106}
+  - {key: net_flux_355_56_252_20, description: "Net flux at (355.56, 252.20).", value: 873.9, tolerance: 106}

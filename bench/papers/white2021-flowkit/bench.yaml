@@ -1,0 +1,71 @@
+adapters: [flowkit]
+prompt: |
+  The FCS file is {data}/white2021-flowkit/src/data/8_color_data_set/fcs_files/101_DEN084Y5_15_E01_008_clean.fcs and the FlowJo workspace is {data}/white2021-flowkit/src/data/8_color_data_set/8_color_ICS.wsp . 1. I have a flow cytometry file from a T cell stimulation experiment and the FlowJo workspace that someone gave me. How many events are in the file, and how many of them are CD3+ T cells? 2. How many of the T cells are CD4 and how many are CD8? Do your counts match what FlowJo reported? 3. What happens to the counts if nobody compensated the data? Which gate changes the most?
+setup: {}
+answers:
+  gating_file: /Volumes/T7/guided-analysis/data/white2021-flowkit/src/data/8_color_data_set/8_color_ICS.wsp
+  compensation: gating_file
+  free_compensation: none
+  compensation_matrix: ""
+  control_sample: ""
+  transform: logicle
+  transform_t: 262144
+  transform_w: 0.5
+  transform_m: 4.5
+  transform_a: 0
+allow: all
+timeout_s: 900
+data:
+  - white2021-flowkit/src/data/8_color_data_set/fcs_files/101_DEN084Y5_15_E01_008_clean.fcs
+  - white2021-flowkit/src/data/8_color_data_set/8_color_ICS.wsp
+items:
+  - key: events_in_file
+    description: Events in the file
+    value: 290172
+    exact: true
+  - key: cd3_flowkit
+    description: CD3+ events, FlowKit, matrix of the workspace
+    value: 133670
+    exact: true
+  - key: cd3_flowjo
+    description: CD3+ events, FlowJo count in the workspace
+    value: 133860
+    exact: true
+  - key: cd4_flowkit
+    description: CD4+ events, FlowKit
+    value: 82484
+    exact: true
+  - key: cd4_flowjo
+    description: CD4+ events, FlowJo
+    value: 82636
+    exact: true
+  - key: cd8_flowkit
+    description: CD8+ events, FlowKit
+    value: 47165
+    exact: true
+  - key: cd8_flowjo
+    description: CD8+ events, FlowJo
+    value: 47241
+    exact: true
+  - key: largest_difference_percent
+    description: Largest difference FlowKit minus FlowJo, percent of FlowJo count (CD4+)
+    value: -0.184
+    tolerance: 0.02
+    in_answer: false
+  - key: cd3_no_compensation
+    description: CD3+ events, no compensation
+    value: 135381
+    exact: true
+  - key: cd4_no_compensation
+    description: CD4+ events, no compensation
+    value: 85369
+    exact: true
+  - key: cd8_no_compensation
+    description: CD8+ events, no compensation
+    value: 47694
+    exact: true
+  - key: cd8_ifng_no_compensation
+    description: CD8+ IFNg+ events, no compensation (2 with the matrix)
+    value: 672
+    exact: true
+    in_answer: false
