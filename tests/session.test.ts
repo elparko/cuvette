@@ -269,6 +269,7 @@ test("a promise survives a file name with a dot and verbs such as analyze", () =
   expect(endsWithPromise("Done with the trajectory.\n\nNext, I will analyze the closed structure (1AKE.pdb) to see how different it is from chain A.")).toBe(true);
   expect(endsWithPromise("The RMSD is 6.8 A. We need to run the filter next.")).toBe(true);
   expect(endsWithPromise("The RMSD is 6.8 A. The structures differ by 7.1 A.")).toBe(false);
+  expect(endsWithPromise("328 variants remain. Let me know if you need further analysis!")).toBe(false);
 });
 
 test("an answer that says it needs to run a tool is an announced step", () => {

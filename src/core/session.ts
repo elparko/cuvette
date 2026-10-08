@@ -125,7 +125,7 @@ const ACTION = "use|call|run|compute|count|measure|perform|fit|check|merge|filte
 
 export function endsWithPromise(text: string): boolean {
   const last = text.trim().slice(-400).split(/(?<=[.!?:])\s+/).at(-1) ?? "";
-  const intent = /\b(I will|I'll|we will|we'll|Let me|Let's|(?:Next|Now),? (?:I|we)|I am going to|I'm going to|we are going to|we're going to)\b/i;
+  const intent = /\b(I will|I'll|we will|we'll|Let me(?! know)|Let's|(?:Next|Now),? (?:I|we)|I am going to|I'm going to|we are going to|we're going to)\b/i;
   const need = new RegExp(`\\b(?:I|we) (?:need|have|must) to (?:${ACTION})\\b|\\bthe next step is to\\b`, "i");
   return intent.test(last) || need.test(last);
 }
