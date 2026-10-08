@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { loadAdapter, type LoadedAdapter } from "../src/adapters/manifest.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
-import { exportHtml, exportJsonl, exportMarkdown, exportPdf, trail } from "../src/core/trail.ts";
+import { exportHtml, exportJsonl, exportMarkdown, exportPdf, groupTrail, parseRoute, renderMarkdown, shortReason, trail } from "../src/core/trail.ts";
 import type { NodeIn } from "../src/core/types.ts";
 
 const YAML = `
@@ -76,10 +76,13 @@ test("level 1 gives one numbered line per visible entry with icons", () => {
   expect(t.map((x) => x.icon)).toEqual(["setup", "step", "step", "step", "step", "decision", "question", "question", "deviation", "finding", "note"]);
   expect(t[0].line).toMatch(/^Setup: 2 settings/);
   expect(t[1].line).toBe("Opened a.tif");
-  expect(t[2].line).toBe("Ran blur (out of date)");
+  expect(t[2].line).toBe("Ran blur");
   expect(t[2].stale).toBe(true);
+  expect(t[2].badges).toEqual(["out of date"]);
   expect(t[3].line).toBe("Failed: file missing");
-  expect(t[4].line).toBe("Fitted the curve (no manual route)");
+  expect(t[3].failed).toBe(true);
+  expect(t[4].line).toBe("Fitted the curve");
+  expect(t[4].badges).toEqual(["no manual route"]);
   expect(t.at(-1)!.line).toBe("All done. See a.csv.");
   expect(t[1].details).toBeUndefined();
 });
@@ -114,7 +117,9 @@ test("exportHtml writes one self-contained file with details and inlined images"
   expect(html).toContain("20260101-000000-abcd");
   expect(html).toContain("fake-model");
   expect(html).toContain("Blur radius");
-  expect(html.match(/<details class=/g)!.length).toBe(11);
+  expect(html.match(/<article class=/g)!.length).toBe(10);
+  expect(html).toContain('<div class="answer">');
+  expect(html).toContain("<strong>All done.</strong>");
   expect(html).toContain("Technical record");
   expect(html).toContain("data:image/png;base64,");
   expect(html).toContain("prefers-color-scheme:dark");
@@ -126,7 +131,7 @@ test("exportHtml writes one self-contained file with details and inlined images"
 test("exportMarkdown and exportJsonl", () => {
   const md = readFileSync(exportMarkdown(rec, [adapter], join(dir, "t.md")), "utf8");
   expect(md).toContain("1. Setup: 2 settings");
-  expect(md).toContain("3. Ran blur (out of date)");
+  expect(md).toContain("3. Ran blur [out of date]");
   expect(md).toContain("Warning: If you keep the default 1");
   expect(md).toContain("| a | b |");
   expect(md).toContain("![Result image]");
@@ -144,3 +149,51 @@ test("exportPdf writes a file or throws a plain error", () => {
     expect((e as Error).message).toMatch(/PDF/);
   }
 }, 90000);
+
+test("the trail groups steps under each request", () => {
+  const r = new AnalysisRecord(join(dir, "g"), "20260101-000000-gggg");
+  r.append("setup", { values: { question: "Is it blurred?" } });
+  r.append("user", { text: "Blur the image" });
+  const a = r.addNode(nodeIn({ tool: "blur", summary: "Blurred" }));
+  r.append("tool_result", { tool: "blur", adapter: "fake", ok: true, summary: "Blurred" }, { node: a.id });
+  r.append("assistant", { text: "Done.\n\n- one\n- two", final: true });
+  r.append("user", { text: "Now fit it" });
+  r.append("tool_result", { tool: "fit", adapter: "fake", ok: false, error: "Traceback (most recent call last):\n  File \"x\", line 1\nValueError: bad data" });
+  const lines = trail(r, 2);
+  expect(lines.map((l) => l.group)).toEqual([0, 1, 1, 1, 2, 2]);
+  const groups = groupTrail(lines);
+  expect(groups.map((g) => g.request?.line)).toEqual([undefined, "You asked: Blur the image", "You asked: Now fit it"]);
+  expect(groups[1].lines.map((l) => l.icon)).toEqual(["step", "note"]);
+  expect(groups[1].lines[1].answer).toBe(true);
+  expect(groups[2].lines[0].line).toBe("Failed: ValueError: bad data");
+  expect(String(groups[2].lines[0].details?.error)).toContain("Traceback");
+});
+
+test("comparison runs get a badge and stay out of the step count", () => {
+  const r = new AnalysisRecord(join(dir, "c"), "20260101-000000-cccc");
+  const base = r.addNode(nodeIn({ tool: "blur", summary: "Blurred" }));
+  r.append("tool_result", { tool: "blur", adapter: "fake", ok: true, summary: "Blurred" }, { node: base.id });
+  const alt = r.addNode(nodeIn({ tool: "blur", summary: "Blurred alt", sensitivityOf: "sigma" }));
+  r.append("tool_result", { tool: "blur", adapter: "fake", ok: true, sensitivityOf: "sigma" }, { node: alt.id });
+  const child = r.addNode(nodeIn({ tool: "fit", summary: "Fit alt", parents: [alt.id] }));
+  r.append("tool_result", { tool: "fit", adapter: "fake", ok: true, summary: "Fit alt" }, { node: child.id });
+  expect(r.comparisons().get(child.id)).toBe("sigma");
+  const lines = trail(r, 1);
+  expect(lines.map((l) => [l.line, l.badges])).toEqual([["Blurred", []], ["Fit alt", ["comparison run"]]]);
+});
+
+test("shortReason, parseRoute and renderMarkdown", () => {
+  expect(shortReason("Error executing tool x: Error executing tool x: no file")).toBe("no file");
+  expect(shortReason("first\nsecond")).toBe("first");
+  const r = parseRoute("Image > Adjust > Threshold...\n  Select Default\n  Click Auto\nMacro Recorder text:\n  setAutoThreshold(\"Default\");");
+  expect(r).toMatchObject({ menu: "Image > Adjust > Threshold...", steps: ["Select Default", "Click Auto"], macro: ['setAutoThreshold("Default");'] });
+  expect(parseRoute("File > Open...\n1. Type 2 in the box\nWarning: keep it").warnings).toEqual(["Warning: keep it"]);
+  const html = renderMarkdown("# Title\n\nText with **bold** and `code` and <b>.\n\n1. a\n2. b\n\n| x | y |\n| - | - |\n| 1 | 2 |\n\n```\nraw <1>\n```");
+  expect(html).toContain("<h3>Title</h3>");
+  expect(html).toContain("<strong>bold</strong>");
+  expect(html).toContain("<code>code</code>");
+  expect(html).toContain("&lt;b&gt;");
+  expect(html).toContain("<ol><li>a</li><li>b</li></ol>");
+  expect(html).toContain("<th>x</th>");
+  expect(html).toContain("<pre>raw &lt;1&gt;</pre>");
+});

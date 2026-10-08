@@ -6,6 +6,7 @@ import { extname } from "node:path";
 import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import type { BusEvent, Mode, Question } from "../core/types.ts";
+import { parseRoute, shortReason, trail } from "../core/trail.ts";
 import { panelHtml } from "./panel-page.ts";
 import { setWindowUrl } from "./notify.ts";
 import { pageHtml } from "./page.ts";
@@ -59,16 +60,20 @@ const BLOB_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".svg": "image/svg+xml",
+  ".webp": "image/webp",
   ".csv": "text/csv",
   ".txt": "text/plain",
+  ".ijm": "text/plain; charset=utf-8",
+  ".py": "text/plain; charset=utf-8",
+  ".json": "application/json",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
 };
 const MAX_BODY = 64 * 1024;
 
 async function trailLines(session: WindowSession): Promise<unknown[]> {
   try {
-    const spec = "../core/trail.ts";
-    const mod = await import(spec);
-    return mod.trail(session.record, 2);
+    return trail(session.record, 2);
   } catch {
     return session.record.entries(["tool_result"]).map((e, i) => ({
       n: i + 1,
@@ -76,25 +81,115 @@ async function trailLines(session: WindowSession): Promise<unknown[]> {
       icon: "step",
       line: String(e.data.summary || e.data.tool),
       stale: Boolean(e.node && session.record.stale().has(e.node)),
+      group: 0,
+      badges: [],
       details: e.data.manualRoute ? { "Manual route": e.data.manualRoute } : undefined,
     }));
   }
 }
 
+const HARNESS = new Set(["ask_scientist", "load_skill", "find_tools", "note", "plan", "task", "propose_lab_rule", "propose_change", "compare_options", "read_file", "list_dir", "calculate"]);
+const CODE_CAP = 20000;
+const asObj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+
+function codeOf(n: { args: unknown; result: unknown }, effective?: unknown): string {
+  const data = asObj(asObj(n.result).data);
+  const code = data.macro ?? asObj(effective).code ?? asObj(n.args).code ?? asObj(n.args).script ?? "";
+  return String(code).slice(0, CODE_CAP);
+}
+
+function decisionRows(session: WindowSession) {
+  const changes = new Map<string, { was: unknown; by: string; reason: string; count: number }>();
+  const setBy = new Map<string, string>();
+  for (const e of session.record.entries(["setup", "decision"])) {
+    if (e.kind === "setup") {
+      for (const k of Object.keys(asObj(e.data.values))) setBy.set(k, e.data.how ? `setup (${String(e.data.how)})` : "setup");
+    } else {
+      const k = String(e.data.key);
+      const prev = changes.get(k);
+      changes.set(k, { was: prev ? prev.was : e.data.old, by: String(e.data.by ?? "unknown"), reason: String(e.data.reason ?? ""), count: (prev?.count ?? 0) + 1 });
+      setBy.set(k, String(e.data.by ?? "unknown"));
+    }
+  }
+  return session.decisions.fields().map((f) => {
+    const c = changes.get(f.key);
+    return {
+      key: f.key,
+      label: f.label,
+      value: f.value,
+      owner: f.owner,
+      set: f.set,
+      setBy: f.set ? setBy.get(f.key) ?? "setup" : "not set",
+      changed: c ? { was: c.was, by: c.by, reason: c.reason, count: c.count } : undefined,
+    };
+  });
+}
+
+function findingRows(session: WindowSession) {
+  const status = new Map<string, string>();
+  for (const e of session.record.entries(["finding_resolution"])) status.set(String(e.data.fid), String(e.data.action));
+  return session.record.entries(["finding"]).map((e) => ({
+    fid: String(e.data.fid ?? e.id),
+    entry: e.id,
+    severity: String(e.data.severity ?? "info"),
+    check: String(e.data.check ?? ""),
+    message: String(e.data.message ?? ""),
+    nodes: (e.data.nodes as string[] | undefined) ?? [],
+    status: status.get(String(e.data.fid)) ?? String(e.data.status ?? "open"),
+  }));
+}
+
 export async function stateOf(session: WindowSession) {
   const record = session.record;
-  const imagesByNode: Record<string, string[]> = {};
+  const compare = record.comparisons();
+  const stale = record.stale();
+  const questions = session.questions.open();
+  const waitingKeys = new Set(questions.map((q) => q.decisionKey).filter(Boolean));
+  const resultByNode = new Map<string, Record<string, unknown>>();
+  const nodeByCall = new Map<string, string>();
+  const failed: { id: string; entry: number; tool: string; reason: string; error: string }[] = [];
   for (const e of record.entries(["tool_result"])) {
-    if (e.node) imagesByNode[e.node] = (e.data.images as string[] | undefined) ?? [];
+    if (e.node) {
+      resultByNode.set(e.node, e.data);
+      if (e.data.callId) nodeByCall.set(String(e.data.callId), e.node);
+    } else if (e.data.ok === false && !HARNESS.has(String(e.data.tool))) {
+      const error = String(e.data.error ?? e.data.text ?? "");
+      failed.push({ id: `x${e.id}`, entry: e.id, tool: String(e.data.tool ?? ""), reason: shortReason(error), error });
+    }
   }
+  const deviations = new Map<string, unknown[]>();
+  for (const e of record.entries(["deviation"])) {
+    const id = nodeByCall.get(String(e.data.callId));
+    if (id) deviations.set(id, [...(deviations.get(id) ?? []), ...((e.data.deviations as unknown[] | undefined) ?? [])]);
+  }
+  const nodes = record.nodes().map((n) => {
+    const r = resultByNode.get(n.id);
+    const data = asObj(asObj(n.result).data);
+    const { macro: _macro, ...restData } = data;
+    return {
+      ...n,
+      result: n.result && typeof n.result === "object" ? { ...asObj(n.result), data: restData } : n.result,
+      images: (r?.images as string[] | undefined) ?? [],
+      route: parseRoute(n.manualRoute || String(r?.manualRoute ?? "")),
+      code: codeOf(n, r?.effectiveArgs),
+      compare: compare.get(n.id) ?? null,
+      waiting: Object.keys(n.decisions ?? {}).some((k) => waitingKeys.has(k)),
+      deviations: deviations.get(n.id) ?? [],
+    };
+  });
+  const setup = record.entries(["setup"]).at(-1);
   return {
     session: session.id,
-    nodes: record.nodes().map((n) => ({ ...n, images: imagesByNode[n.id] ?? [] })),
+    question: String(asObj(setup?.data.values).question ?? ""),
+    nodes,
     edges: record.edges(),
-    stale: [...record.stale()],
+    stale: [...stale],
+    failed,
     trail: await trailLines(session),
-    questions: session.questions.open(),
-    decisions: session.decisions.fields().map((f) => ({ key: f.key, label: f.label, value: f.value, owner: f.owner, set: f.set })),
+    questions,
+    decisions: decisionRows(session),
+    findings: findingRows(session),
+    busy: session.busy,
   };
 }
 

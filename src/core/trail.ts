@@ -14,8 +14,20 @@ export interface TrailLine {
   icon: TrailIcon;
   line: string;
   stale: boolean;
+  group: number;
+  badges: string[];
+  tool?: string;
+  failed?: boolean;
+  request?: boolean;
+  answer?: boolean;
   details?: Record<string, unknown>;
   technical?: Record<string, unknown>;
+}
+
+export interface TrailGroup {
+  id: number;
+  request?: TrailLine;
+  lines: TrailLine[];
 }
 
 const IMAGE_CAP = 3 * 1024 * 1024;
@@ -38,6 +50,42 @@ function plainText(s: string): string {
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^\s*\|?[-:| ]+\|[-:| ]*$/gm, "")
     .replace(/^\s*[-*]\s+/gm, "");
+}
+
+export function shortReason(error: unknown): string {
+  const lines = show(error).split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return "no reason given";
+  const traceback = lines.some((l) => l.startsWith("Traceback") || /^File "/.test(l));
+  const pick = traceback ? lines[lines.length - 1] : lines[0];
+  return clip(pick.replace(/^(Error executing tool \S+?: )+/, ""), 160);
+}
+
+export interface RouteParts {
+  menu: string;
+  steps: string[];
+  macro: string[];
+  warnings: string[];
+}
+
+export function parseRoute(text: string): RouteParts {
+  const out: RouteParts = { menu: "", steps: [], macro: [], warnings: [] };
+  let inMacro = false;
+  show(text).split("\n").forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line) return;
+    if (!out.menu && i === 0 && !/^\d+\.\s/.test(line)) {
+      out.menu = line;
+      return;
+    }
+    if (/^macro\b.*:$/i.test(line)) {
+      inMacro = true;
+      return;
+    }
+    if (inMacro) out.macro.push(raw.replace(/^ {2}/, ""));
+    else if (/^warning:/i.test(line)) out.warnings.push(line);
+    else out.steps.push(line.replace(/^(\d+\.|-)\s+/, ""));
+  });
+  return out;
 }
 
 function clip(s: string, max = 300): string {
@@ -125,24 +173,32 @@ interface Built {
   icon: TrailIcon;
   line: string;
   stale?: boolean;
+  badges?: string[];
+  tool?: string;
+  failed?: boolean;
+  request?: boolean;
+  answer?: boolean;
   details?: Record<string, unknown>;
   technical?: Record<string, unknown>;
 }
 
-function stepBuilt(record: AnalysisRecord, e: Entry, node: Node | undefined, adapters: LoadedAdapter[] | undefined, stale: Set<string>): Built {
+function stepBuilt(record: AnalysisRecord, e: Entry, node: Node | undefined, adapters: LoadedAdapter[] | undefined, stale: Set<string>, compare: Map<string, string>): Built {
   const d = e.data;
   const tool = show(d.tool ?? node?.tool);
   const adapterName = show(d.adapter ?? node?.adapter);
   const args = asRecord(d.effectiveArgs ?? node?.args);
   const isStale = !!node && stale.has(node.id);
   let line = clip(show(d.summary || node?.summary || `Ran ${tool}`));
-  if (d.ok === false) line = `Failed: ${clip(show(d.error ?? line))}`;
+  const failed = d.ok === false;
+  if (failed) line = `Failed: ${shortReason(d.error ?? d.text ?? line)}`;
 
   const adapter = adapters?.find((a) => a.name === adapterName);
   const me = adapter?.mapEntry(tool, args);
   const fidelity = d.fidelity ?? node?.fidelity ?? me?.fidelity;
-  if (noRoute(fidelity)) line += " (no manual route)";
-  if (isStale) line += " (out of date)";
+  const badges: string[] = [];
+  if (node && compare.has(node.id)) badges.push("comparison run");
+  if (isStale) badges.push("out of date");
+  if (noRoute(fidelity)) badges.push("no manual route");
 
   const given = show(d.manualRoute ?? node?.manualRoute ?? "");
   const manualRoute = given && given !== "none" ? given : me ? routeString(describeRoute(me, args)) : "";
@@ -162,7 +218,8 @@ function stepBuilt(record: AnalysisRecord, e: Entry, node: Node | undefined, ada
   if (result.metrics) details.metrics = result.metrics;
   if (table) details.table = table;
   if (shas.size) details.images = [...shas];
-  if (d.ok === false && d.error) details.error = d.error;
+  if (failed && (d.error || d.text)) details.error = d.error ?? d.text;
+  if (node && compare.has(node.id)) details.comparisonOf = compare.get(node.id);
 
   const technical: Record<string, unknown> = {
     tool,
@@ -178,12 +235,12 @@ function stepBuilt(record: AnalysisRecord, e: Entry, node: Node | undefined, ada
     node: node?.id,
     entry: e.id,
   };
-  return { icon: "step", line, stale: isStale, details, technical };
+  return { icon: "step", line, stale: isStale, badges, failed, tool, details, technical };
 }
 
 const HARNESS_TOOLS = new Set(["ask_scientist", "load_skill", "find_tools", "note", "plan", "task", "propose_lab_rule", "read_file", "list_dir"]);
 
-function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | undefined, stale: Set<string>, joined: Set<string>): Built | undefined {
+function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | undefined, stale: Set<string>, joined: Set<string>, compare: Map<string, string>): Built | undefined {
   const d = e.data;
   const tech = (extra: Record<string, unknown> = {}) => ({ entry: e.id, kind: e.kind, ts: e.ts, ...extra });
   switch (e.kind) {
@@ -195,6 +252,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       return {
         icon: "decision",
         line: `Compared ${opts.length} options for ${show(d.decisionKey)}${said ? `: ${clip(said)}` : ""}`,
+        badges: ["comparison run"],
         details: { table: d.table, options: opts.map((o) => ({ value: o.value, ok: o.ok, metrics: o.metrics, node: o.node })) },
         technical: tech(),
       };
@@ -208,13 +266,13 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       }
       const node = nodeFor(record, e);
       if (node) joined.add(node.id);
-      return stepBuilt(record, e, node, adapters, stale);
+      return stepBuilt(record, e, node, adapters, stale, compare);
     }
     case "node": {
       if (joined.has(e.data.id as string) || e.data.sensitivityOf) return undefined;
       const hasResult = record.entries(["tool_result"]).some((r) => nodeFor(record, r)?.id === e.data.id);
       if (hasResult) return undefined;
-      return stepBuilt(record, e, e.data as unknown as Node, adapters, stale);
+      return stepBuilt(record, e, e.data as unknown as Node, adapters, stale, compare);
     }
     case "decision":
       return { icon: "decision", line: decisionLine(d), details: { reason: d.reason, staleNodes: d.staleNodes }, technical: tech() };
@@ -238,9 +296,9 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
     case "note":
       return { icon: "note", line: clip(show(d.text)), technical: tech() };
     case "user":
-      return { icon: "note", line: `You: ${clip(show(d.text))}`, technical: tech() };
+      return { icon: "note", line: `You asked: ${clip(show(d.text))}`, request: true, details: { text: d.text }, technical: tech() };
     case "assistant":
-      return d.final ? { icon: "note", line: clip(plainText(show(d.text))), details: { text: d.text }, technical: tech() } : undefined;
+      return d.final ? { icon: "note", line: clip(plainText(show(d.text))), answer: true, details: { text: d.text }, technical: tech() } : undefined;
     default:
       return undefined;
   }
@@ -249,16 +307,34 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
 export function trail(record: AnalysisRecord, level: 1 | 2 | 3 = 1, adapters?: LoadedAdapter[]): TrailLine[] {
   const stale = record.stale();
   const joined = new Set<string>();
+  const compare = record.comparisons();
   const out: TrailLine[] = [];
+  let group = 0;
   for (const e of record.entries()) {
-    const b = build(record, e, adapters, stale, joined);
+    const b = build(record, e, adapters, stale, joined, compare);
     if (!b) continue;
-    const t: TrailLine = { n: out.length + 1, entry: e.id, icon: b.icon, line: b.line, stale: !!b.stale };
+    if (b.request) group++;
+    const t: TrailLine = { n: out.length + 1, entry: e.id, icon: b.icon, line: b.line, stale: !!b.stale, group, badges: b.badges ?? [] };
+    if (b.tool) t.tool = b.tool;
+    if (b.failed) t.failed = true;
+    if (b.request) t.request = true;
+    if (b.answer) t.answer = true;
     if (level >= 2 && b.details) t.details = b.details;
     if (level >= 3 && b.technical) t.technical = b.technical;
     out.push(t);
   }
   return out;
+}
+
+export function groupTrail(lines: TrailLine[]): TrailGroup[] {
+  const groups = new Map<number, TrailGroup>();
+  for (const l of lines) {
+    const g = groups.get(l.group) ?? { id: l.group, lines: [] };
+    groups.set(l.group, g);
+    if (l.request) g.request = l;
+    else g.lines.push(l);
+  }
+  return [...groups.values()].filter((g) => g.request || g.lines.length).sort((a, b) => a.id - b.id);
 }
 
 // ---------------------------------------------------------------- shared export helpers
@@ -338,80 +414,229 @@ function htmlDl(obj: Record<string, unknown>): string {
   return `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${htmlValue(v)}</dd>`).join("")}</dl>`;
 }
 
-function htmlDetails(record: AnalysisRecord, d: Record<string, unknown>): string {
+function inlineMd(src: string): string {
+  return esc(src)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[\s(])\*([^*\s][^*]*)\*(?=[\s).,;:]|$)/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
+}
+
+function tableCells(line: string): string[] {
+  return line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+}
+
+export function renderMarkdown(src: string): string {
+  const lines = src.replace(/\r/g, "").split("\n");
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    if (line.trim().startsWith("```")) {
+      const code: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) code.push(lines[i++]);
+      i++;
+      out.push(`<pre>${esc(code.join("\n"))}</pre>`);
+      continue;
+    }
+    const h = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (h) {
+      const level = Math.min(h[1].length + 2, 6);
+      out.push(`<h${level}>${inlineMd(h[2])}</h${level}>`);
+      i++;
+      continue;
+    }
+    if (/^\s*\|/.test(line) && /^\s*\|?[-:| ]+\|[-:| ]*$/.test(lines[i + 1] ?? "")) {
+      const head = tableCells(line);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(tableCells(lines[i++]));
+      out.push(`<div class="scroll"><table><thead><tr>${head.map((c) => `<th>${inlineMd(c)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inlineMd(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`);
+      continue;
+    }
+    const list = /^\s*([-*]|\d+\.)\s+/.exec(line);
+    if (list) {
+      const ordered = /\d/.test(list[1]);
+      const items: string[] = [];
+      while (i < lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, ""));
+      const tag = ordered ? "ol" : "ul";
+      out.push(`<${tag}>${items.map((t) => `<li>${inlineMd(t)}</li>`).join("")}</${tag}>`);
+      continue;
+    }
+    const para: string[] = [];
+    while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|```|\s*([-*]|\d+\.)\s+|\s*\|)/.test(lines[i])) para.push(lines[i++]);
+    if (!para.length) para.push(lines[i++]);
+    out.push(`<p>${inlineMd(para.join(" "))}</p>`);
+  }
+  return out.join("\n");
+}
+
+function imageFigures(record: AnalysisRecord, shas: string[]): string {
+  const shown = [...new Set(shas)].filter((sha) => !/\.tiff?$/i.test(record.blobPath(sha) ?? ""));
+  const figs = shown.slice(0, 6).map((sha) => {
+    const uri = dataUri(record, sha);
+    return uri ? `<img src="${uri}" alt="Result image ${esc(sha.slice(0, 8))}">` : `<p class="muted">Image ${esc(sha.slice(0, 12))} is not embedded.</p>`;
+  });
+  return figs.length ? `<figure>${figs.join("")}</figure>` : "";
+}
+
+function htmlRoute(text: string): string {
+  const r = parseRoute(text);
+  const steps = r.steps.length ? `<ol class="route">${r.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>` : "";
+  const warn = r.warnings.map((w) => `<p class="warn">${esc(w)}</p>`).join("");
+  const macro = r.macro.length ? `<h5>Macro text</h5><pre>${esc(r.macro.join("\n"))}</pre>` : "";
+  return `${r.menu ? `<p class="menu">${esc(r.menu)}</p>` : ""}${steps}${warn}${macro}`;
+}
+
+const DETAIL_ORDER = ["manualRoute", "settings", "decisions", "metrics", "table", "outputs", "error"];
+
+function htmlDetails(d: Record<string, unknown>): string {
   const parts: string[] = [];
-  for (const [k, v] of Object.entries(d)) {
-    if (v === undefined || v === null || v === "") continue;
-    if (k === "manualRoute") parts.push(`<h4>Manual route</h4><pre class="route">${esc(v)}</pre>`);
+  const keys = [...DETAIL_ORDER.filter((k) => k in d), ...Object.keys(d).filter((k) => !DETAIL_ORDER.includes(k))];
+  for (const k of keys) {
+    const v = d[k];
+    if (v === undefined || v === null || v === "" || k === "images" || k === "text") continue;
+    if (k === "settings" && !Object.keys(asRecord(v)).length) continue;
+    if (k === "manualRoute") parts.push(`<h4>Manual route</h4>${htmlRoute(show(v))}`);
     else if (k === "table") parts.push(`<h4>Table</h4>${htmlTable(asRecord(v))}`);
-    else if (k === "images") {
-      const imgs = (v as string[]).map((sha) => {
-        const uri = dataUri(record, sha);
-        return uri ? `<img src="${uri}" alt="Result image ${esc(sha.slice(0, 8))}">` : `<p class="muted">Image ${esc(sha.slice(0, 12))} is not embedded.</p>`;
-      });
-      parts.push(`<h4>Images</h4>${imgs.join("")}`);
-    } else if (k === "outputs") {
+    else if (k === "error") parts.push(`<h4>Full error</h4><pre class="error">${esc(v)}</pre>`);
+    else if (k === "outputs") {
       const rows = (v as { name: string; kind: string; sha?: string }[]).map((o) => `<li>${esc(o.name)} <span class="muted">${esc(o.kind)} ${esc(o.sha ? o.sha.slice(0, 12) : "")}</span></li>`);
       parts.push(`<h4>Outputs</h4><ul>${rows.join("")}</ul>`);
+    } else if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every((x) => x === null || typeof x !== "object")) {
+      parts.push(`<h4>${esc(k[0].toUpperCase() + k.slice(1))}</h4>${htmlDl(v as Record<string, unknown>)}`);
     } else parts.push(`<h4>${esc(k[0].toUpperCase() + k.slice(1))}</h4>${htmlValue(v)}`);
   }
   return parts.join("");
 }
 
+interface SettingRow {
+  key: string;
+  label: string;
+  value: unknown;
+  was?: unknown;
+  by: string;
+}
+
+function settingRows(record: AnalysisRecord, labels: Map<string, string>): SettingRow[] {
+  const rows = new Map<string, SettingRow>();
+  const how = (d: Record<string, unknown>) => (d.how ? `setup (${show(d.how)})` : "setup");
+  for (const e of record.entries(["setup", "decision"])) {
+    if (e.kind === "setup") {
+      for (const [k, v] of Object.entries(asRecord(e.data.values))) rows.set(k, { key: k, label: labels.get(k) ?? k, value: v, by: how(e.data) });
+    } else {
+      const k = show(e.data.key);
+      const prev = rows.get(k);
+      rows.set(k, { key: k, label: labels.get(k) ?? k, value: e.data.new, was: prev && prev.value !== e.data.new ? (prev.was ?? prev.value) : prev?.was, by: show(e.data.by ?? "unknown") });
+    }
+  }
+  return [...rows.values()];
+}
+
 const CSS = `
-:root{--bg:#fff;--fg:#1c1c1e;--muted:#6b6b72;--line:#d8d8de;--card:#f6f6f8;--accent:#4a2e6e;--warn:#9a5b00;--bad:#a12626}
-@media (prefers-color-scheme:dark){:root{--bg:#141416;--fg:#ececf0;--muted:#9a9aa5;--line:#34343b;--card:#1d1d21;--accent:#b79be0;--warn:#e0a84a;--bad:#ee7a7a}}
+:root{--bg:#fff;--fg:#1c1c1e;--muted:#5f5f68;--line:#d8d8de;--card:#f6f6f8;--accent:#4a2e6e;--warn:#9a5b00;--bad:#a12626;--ok:#1d7a45}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--fg:#ececf0;--muted:#a0a0ab;--line:#34343b;--card:#1d1d21;--accent:#b79be0;--warn:#e0a84a;--bad:#ee7a7a;--ok:#5fd28a}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:860px;margin:0 auto;padding:16px}
-h1{font-size:1.5rem;margin:.5rem 0}
-h2{font-size:1.1rem;margin:1.5rem 0 .5rem}
-h4{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:1rem 0 .25rem}
+h1{font-size:1.5rem;margin:.5rem 0 .25rem}
+h2{font-size:1.15rem;margin:2rem 0 .5rem;padding-top:.75rem;border-top:2px solid var(--line)}
+h2 .tag{font-weight:400;font-size:.8rem}
+h3,h4,h5{margin:1rem 0 .25rem}
+h4,h5{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 .meta{color:var(--muted);margin:0 0 1rem;font-size:.9rem}
 .meta b{color:var(--fg);font-weight:600}
+.question{font-size:1.05rem;margin:.25rem 0 1rem}
 table{border-collapse:collapse;width:100%;font-size:.9rem}
 th,td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
 th{background:var(--card)}
+td.changed{border-left:4px solid var(--warn)}
 .scroll{overflow-x:auto}
-details{border:1px solid var(--line);border-radius:8px;margin:6px 0;background:var(--card)}
-details details{background:var(--bg);margin:10px 0 0}
-summary{cursor:pointer;padding:8px 10px;display:flex;gap:8px;align-items:flex-start;list-style:none}
-summary::-webkit-details-marker{display:none}
-summary .n{color:var(--muted);min-width:2ch;text-align:right}
-summary .t{flex:1;overflow-wrap:anywhere}
+article.step{border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:8px;margin:8px 0;padding:8px 12px;background:var(--card);break-inside:avoid}
+article.failed{border-left-color:var(--bad)}
+article.stale{border-left-style:dotted;border-left-color:var(--warn);background:repeating-linear-gradient(135deg,var(--card) 0 8px,var(--bg) 8px 10px)}
+article.comparison{border-style:dashed;border-left-style:dashed}
+article.kind-deviation,article.kind-finding{border-left-color:var(--warn)}
+.head{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.head .n{color:var(--muted);min-width:2ch;text-align:right}
+.head .t{flex:1;min-width:12ch;overflow-wrap:anywhere}
 .ic{width:18px;height:18px;flex:none;margin-top:3px;fill:var(--accent)}
 .ic-deviation,.ic-finding{fill:var(--warn)}
-.stale .t{color:var(--muted)}
-.body{padding:0 12px 10px}
-pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;font-size:.85rem;margin:.25rem 0}
+.failed .ic{fill:var(--bad)}
+.badge{font-size:.72rem;padding:0 6px;border-radius:4px;border:1px solid var(--muted);color:var(--muted);white-space:nowrap}
+.badge.stale{border:1px dotted var(--warn);color:var(--warn)}
+.badge.comparison{border-style:dashed}
+.badge.failed{border-color:var(--bad);color:var(--bad);font-weight:600}
+.reason{margin:.25rem 0 0 2.4rem;color:var(--bad);font-size:.9rem}
+details{margin:6px 0 0 2.4rem}
+details details{margin-left:0}
+summary{cursor:pointer;color:var(--muted);font-size:.85rem}
+.body{padding:4px 0 6px}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;font-size:.82rem;margin:.25rem 0}
+pre.error{border-color:var(--bad)}
+ol.route{margin:.25rem 0;padding-left:1.4rem}
+.menu{font-weight:600;margin:.25rem 0}
+.warn{color:var(--warn);margin:.25rem 0}
 dl{margin:0;display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;font-size:.9rem}
 dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}
-img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px;margin:4px 0;display:block}
+figure{margin:6px 0 0 2.4rem;display:flex;flex-wrap:wrap;gap:8px}
+img{max-width:100%;max-height:320px;height:auto;border:1px solid var(--line);border-radius:6px;display:block}
+.answer{border:2px solid var(--accent);border-radius:8px;padding:4px 14px 8px;margin:12px 0;background:var(--bg)}
+.answer h3,.answer h4,.answer h5{text-transform:none;letter-spacing:0;font-size:1rem;color:var(--fg)}
+.answer>.label{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);margin:.5rem 0 0}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.88em;background:var(--card);padding:0 3px;border-radius:3px}
+pre code{background:none;padding:0}
 .muted{color:var(--muted);font-size:.85rem}
-@media print{:root{--bg:#fff;--fg:#000;--card:#fff;--muted:#444;--line:#999}body{font-size:11pt}details{break-inside:avoid;border-color:#999}summary{display:block}main{max-width:none;padding:0}}
+@media print{:root{--bg:#fff;--fg:#000;--card:#fff;--muted:#444;--line:#999}body{font-size:11pt}main{max-width:none;padding:0}article.step,.answer{break-inside:avoid}h2{break-after:avoid}details::details-content{content-visibility:visible;display:block}img{max-height:220px}}
 `;
+
+function badgeHtml(label: string): string {
+  const cls = label === "out of date" ? "stale" : label === "comparison run" ? "comparison" : label === "failed" ? "failed" : "";
+  return `<span class="badge ${cls}">${esc(label)}</span>`;
+}
+
+function stepHtml(record: AnalysisRecord, t: TrailLine): string {
+  const d = t.details ?? {};
+  const classes = ["step", `kind-${t.icon}`, t.failed ? "failed" : "", t.stale ? "stale" : "", t.badges.includes("comparison run") ? "comparison" : ""].filter(Boolean).join(" ");
+  const badges = [...(t.failed ? ["failed"] : []), ...t.badges].map(badgeHtml).join(" ");
+  const body = htmlDetails(d);
+  const tech = t.technical ? `<details><summary>Technical record</summary><div class="body">${htmlDl(t.technical)}</div></details>` : "";
+  const more = body ? `<details><summary>${t.failed ? "Full error and details" : "Route, settings and details"}</summary><div class="body">${body}</div></details>` : "";
+  return `<article class="${classes}" id="s${t.n}"><div class="head">${iconSvg(t.icon)}<span class="n">${t.n}.</span><span class="t">${esc(t.line)}</span>${badges}</div>${imageFigures(record, (d.images as string[] | undefined) ?? [])}${more}${tech}</article>`;
+}
 
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
   const m = meta(record);
   const labels = new Map<string, string>();
   for (const a of adapters) for (const d of a.manifest.decisions) labels.set(d.key, d.label);
-  const setupRows = Object.entries(m.setup)
-    .map(([k, v]) => `<tr><td>${esc(labels.get(k) ?? k)}</td><td>${esc(v)}</td></tr>`)
+  const lines = trail(record, 3, adapters);
+  const groups = groupTrail(lines);
+  const settings = settingRows(record, labels);
+  const question = show(settings.find((r) => r.key === "question")?.value ?? "");
+  const firstAsk = lines.find((l) => l.request);
+  const title = question && question !== "none" ? question : firstAsk ? show(firstAsk.details?.text) : "";
+  const hasAsks = groups.some((g) => g.request);
+  const settingRowsHtml = settings
+    .filter((r) => r.key !== "question")
+    .map((r) => `<tr><td>${esc(r.label)}</td><td${r.was !== undefined ? ' class="changed"' : ""}>${esc(r.value)}${r.was !== undefined ? ` <span class="muted">(was ${esc(r.was)})</span>` : ""}</td><td>${esc(r.by)}</td></tr>`)
     .join("");
-  const items = trail(record, 3, adapters).map((t) => {
-    const detail = t.details ? htmlDetails(record, t.details) : "";
-    const tech = t.technical ? `<details><summary><span class="t">Technical record</span></summary><div class="body">${htmlDl(t.technical)}</div></details>` : "";
-    return `<details class="${t.stale ? "stale" : ""}" id="s${t.n}"><summary>${iconSvg(t.icon)}<span class="n">${t.n}.</span><span class="t">${esc(t.line)}</span></summary><div class="body">${detail}${tech}</div></details>`;
+  const sections = groups.map((g) => {
+    const heading = g.request ? `You asked: ${show(g.request.details?.text ?? g.request.line)}` : hasAsks ? "Before the first request" : "Steps";
+    const steps = g.lines.filter((l) => !l.answer).map((l) => stepHtml(record, l)).join("\n");
+    const answers = g.lines.filter((l) => l.answer).map((l) => `<div class="answer"><p class="label">Answer</p>${renderMarkdown(show(l.details?.text ?? l.line))}</div>`).join("\n");
+    return `<section id="g${g.id}"><h2>${esc(heading)}</h2>\n${steps}\n${answers}</section>`;
   });
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Analysis trail ${esc(m.id)}</title><style>${CSS}</style></head>
 <body><main>
 <h1>Analysis trail</h1>
+${title ? `<p class="question"><b>Question</b> ${esc(title)}</p>` : ""}
 <p class="meta"><b>Session</b> ${esc(m.id)} &middot; <b>Adapters</b> ${esc(m.adapters)} &middot; <b>Model</b> ${esc(m.model)} &middot; <b>Date</b> ${esc(m.date)}</p>
-${setupRows ? `<h2>Setup values</h2><div class="scroll"><table><thead><tr><th>Decision</th><th>Value</th></tr></thead><tbody>${setupRows}</tbody></table></div>` : ""}
-<h2>Steps</h2>
-${items.join("\n")}
+${settingRowsHtml ? `<h3>Settings</h3><div class="scroll"><table><thead><tr><th>Decision</th><th>Value</th><th>Set by</th></tr></thead><tbody>${settingRowsHtml}</tbody></table></div>` : ""}
+${sections.join("\n")}
 </main></body></html>
 `;
   return writeOut(path, html);
@@ -476,7 +701,7 @@ function markdownText(record: AnalysisRecord, adapters: LoadedAdapter[]): string
   }
   lines.push("## Steps", "");
   for (const t of trail(record, 2, adapters)) {
-    lines.push(`${t.n}. ${t.line.replace(/\n/g, " ")}`);
+    lines.push(`${t.n}. ${t.line.replace(/\n/g, " ")}${t.badges.map((b) => ` [${b}]`).join("")}`);
     if (t.details) lines.push(...mdDetails(record, t.details));
   }
   return lines.join("\n") + "\n";

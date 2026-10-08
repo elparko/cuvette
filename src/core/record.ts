@@ -122,6 +122,15 @@ export class AnalysisRecord {
     return this.nodeList.flatMap((n) => n.parents.map((p): [string, string] => [p, n.id]));
   }
 
+  comparisons(): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const n of this.nodeList) {
+      const key = n.sensitivityOf || n.parents.map((p) => out.get(p)).find(Boolean);
+      if (key) out.set(n.id, key);
+    }
+    return out;
+  }
+
   descendants(id: string): string[] {
     const kids = new Map<string, string[]>();
     for (const [p, c] of this.edges()) kids.set(p, [...(kids.get(p) ?? []), c]);
