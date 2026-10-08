@@ -1,0 +1,5 @@
+{"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:EPSG::26711"}},
+"features":[
+{"type":"Feature","properties":{"id":"A"},"geometry":{"type":"Polygon","coordinates":[[[440720,3751320],[441320,3751320],[441320,3750720],[440720,3750720],[440720,3751320]]]}},
+{"type":"Feature","properties":{"id":"B"},"geometry":{"type":"Polygon","coordinates":[[[440760,3751260],[441160,3751260],[441160,3750860],[440760,3750860],[440760,3751260]]]}}
+]}

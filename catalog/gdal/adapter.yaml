@@ -1,0 +1,491 @@
+adapter:
+  name: gdal
+  title: GDAL and OGR
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Reads, reprojects and measures raster and vector map data with the GDAL and OGR command line
+    programs, and takes zonal statistics with rasterstats. Each tool runs one command that the
+    scientist can repeat in a terminal.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: GDAL
+  version: "3.13.3"
+  homepage: https://gdal.org
+  docs:
+    - https://gdal.org/programs/gdalinfo.html
+    - https://gdal.org/programs/gdalwarp.html
+    - https://gdal.org/programs/gdal_calc.html
+    - https://gdal.org/programs/ogr2ogr.html
+    - https://gdal.org/programs/ogrinfo.html
+    - https://pythonhosted.org/rasterstats/manual.html
+
+connection:
+  kind: cli
+  startup_timeout_s: 60
+  call_timeout_s: 900
+
+locate:
+  env: GA_GDAL
+  paths: ["/opt/homebrew/bin/gdalinfo", "/usr/local/bin/gdalinfo", "/usr/bin/gdalinfo"]
+  which: [gdalinfo]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: 'GDAL (\d+\.\d+\.\d+)'
+
+data_rules:
+  cloud_visibility: all
+  note: Maps of patients or of protected sites can show where a person lives. Set summaries if the data are personal.
+
+decisions:
+  - key: target_crs
+    label: Target coordinate reference system
+    kind: text
+    group: Geometry
+    help: >
+      The coordinate reference system (CRS) of the output, as an EPSG code such as EPSG:4326 or
+      EPSG:32615. It sets the units of the pixel size and of areas and distances. Degrees are
+      not metres, so use a projected CRS for area or distance.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: reproject_raster, arg: target_crs }
+      - { tool: reproject_vector, arg: target_crs }
+
+  - key: resampling
+    label: Resampling method
+    kind: choice
+    choices: [near, bilinear, cubic, cubicspline, lanczos, average, rms, mode, max, min, med, q1, q3, sum]
+    default: near
+    group: Geometry
+    help: >
+      How GDAL computes a new pixel value from the old pixels. near copies the closest value and
+      is the only safe method for classes such as land cover. bilinear, cubic and lanczos blend
+      values and suit continuous data such as elevation. average suits a coarser grid.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: reproject_raster, arg: resampling }
+    sensitivity:
+      options: [near, bilinear, average]
+      tool: reproject_raster
+      compare: [metrics.mean, metrics.stddev, metrics.min, metrics.max]
+      max_runs: 3
+
+  - key: nodata
+    label: Nodata value
+    kind: text
+    default: ""
+    group: Data
+    help: >
+      The number that marks pixels with no data. Statistics and zonal statistics skip these
+      pixels. Empty keeps the value that the file carries. A wrong value counts empty pixels as
+      real data or hides real data.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: reproject_raster, arg: dst_nodata }
+      - { tool: calc_raster, arg: nodata }
+      - { tool: zonal_stats, arg: nodata }
+
+  - key: pixel_size
+    label: Output pixel size
+    kind: text
+    default: ""
+    group: Geometry
+    help: >
+      The width and height of an output pixel, in the units of the target CRS (metres for UTM,
+      degrees for EPSG:4326). Empty lets GDAL pick a size that keeps the pixel count close to the
+      input. A larger size loses detail.
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: reproject_raster, arg: pixel_size }
+
+  - key: partial_pixels
+    label: Pixels that a zone edge cuts
+    kind: choice
+    choices: [centers, all_touched]
+    default: centers
+    group: Zonal statistics
+    help: >
+      centers counts a pixel if the zone holds the pixel center. all_touched counts every pixel
+      that the zone touches. The two give different counts and means for small zones or zones
+      with long edges.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: zonal_stats, arg: pixels }
+    sensitivity:
+      options: [centers, all_touched]
+      tool: zonal_stats
+      compare: [metrics.count, metrics.mean]
+      max_runs: 2
+
+tools:
+  - name: raster_info
+    title: Describe a raster
+    description: >
+      Read the size, the CRS (EPSG code), the pixel size, the nodata value and the exact band
+      statistics (min, max, mean, stddev) of a raster file with gdalinfo -stats.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the raster file. }
+      band: { type: integer, minimum: 1, description: "Band number. Default 1." }
+    required: [path]
+    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "raster_info", "{path}", "--band", "{band}"]
+    parse: json
+
+  - name: vector_info
+    title: Describe a vector file
+    description: >
+      Read the feature count, the CRS (EPSG code), the extent and the field names of a vector file
+      with ogrinfo.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the vector file. }
+      layer: { type: string, description: Layer name. Leave out for the first layer. }
+    required: [path]
+    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "vector_info", "{path}", "--layer", "{layer}"]
+    parse: json
+
+  - name: reproject_raster
+    title: Reproject a raster
+    description: >
+      Warp a raster to a new CRS with gdalwarp. Give the target CRS and the resampling method.
+      The result has the new size, the pixel size and the band statistics. Use result in later steps.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the raster file. }
+      target_crs: { type: string, minLength: 1, description: "Target CRS, such as EPSG:4326 (gdalwarp -t_srs)." }
+      resampling: { type: string, enum: [near, bilinear, cubic, cubicspline, lanczos, average, rms, mode, max, min, med, q1, q3, sum], description: Resampling method (gdalwarp -r). }
+      pixel_size: { type: string, description: Output pixel size in target CRS units (gdalwarp -tr). Leave out or empty to let GDAL choose. }
+      src_nodata: { type: string, description: Nodata value of the input, if the file has none (gdalwarp -srcnodata). }
+      dst_nodata: { type: string, description: Nodata value of the output (gdalwarp -dstnodata). }
+    required: [path, target_crs]
+    outputs:
+      result: { kind: file, ext: .tif, description: The reprojected GeoTIFF. }
+    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "reproject_raster", "{path}", "--target-crs", "{target_crs}", "--resampling", "{resampling}", "--pixel-size", "{pixel_size}", "--src-nodata", "{src_nodata}", "--dst-nodata", "{dst_nodata}"]
+    parse: json
+
+  - name: calc_raster
+    title: Raster algebra
+    description: >
+      Compute a new raster from a numpy expression of one raster with gdal_calc. The band is A.
+      GDAL does the arithmetic in the data type of the band, so a Byte band overflows. Cast first,
+      such as A.astype(numpy.float32)*2.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the raster file (input A). }
+      expression: { type: string, minLength: 1, description: "Numpy expression of A, such as A.astype(numpy.float32)*0.01 (gdal_calc --calc)." }
+      nodata: { type: string, description: Nodata value of the output (gdal_calc --NoDataValue). }
+      type: { type: string, enum: [Byte, Int16, UInt16, Int32, UInt32, Float32, Float64], description: Output data type (gdal_calc --type). Default Float32. }
+    required: [path, expression]
+    outputs:
+      result: { kind: file, ext: .tif, description: The new GeoTIFF. }
+    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "calc_raster", "{path}", "--expression", "{expression}", "--nodata", "{nodata}", "--type", "{type}"]
+    parse: json
+
+  - name: reproject_vector
+    title: Reproject a vector file
+    description: >
+      Transform a vector file to a new CRS with ogr2ogr and write a GeoPackage. The result has the
+      feature count, the new extent and the field names.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the vector file. }
+      target_crs: { type: string, minLength: 1, description: "Target CRS, such as EPSG:4326 (ogr2ogr -t_srs)." }
+    required: [path, target_crs]
+    outputs:
+      result: { kind: file, ext: .gpkg, description: The reprojected GeoPackage. }
+    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "reproject_vector", "{path}", "--target-crs", "{target_crs}"]
+    parse: json
+
+  - name: zonal_stats
+    title: Zonal statistics
+    description: >
+      Count, sum and average the raster pixels inside each polygon of a vector file with rasterstats.
+      Give the original raster, not a reprojected copy, unless the scientist asks for the reprojected one: reprojecting changes pixel values and counts. The polygons and the raster must use the same CRS. The result has one row for each polygon and a
+      CSV file. The metrics are those of the first polygon.
+    params:
+      raster: { type: string, minLength: 1, description: Absolute path of the raster file. }
+      zones: { type: string, minLength: 1, description: Absolute path of the polygon file. }
+      pixels: { type: string, enum: [centers, all_touched], description: "centers counts pixels whose center is inside the polygon. all_touched counts every pixel that the polygon touches." }
+      nodata: { type: string, description: Nodata value. Leave out to use the value in the raster file. }
+      band: { type: integer, minimum: 1, description: Band number. Default 1. }
+      id_field: { type: string, description: Polygon field that names each row. Leave out to number the rows from 1. }
+    required: [raster, zones]
+    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "zonal_stats", "{raster}", "{zones}", "--pixels", "{pixels}", "--nodata", "{nodata}", "--band", "{band}", "--id-field", "{id_field}"]
+    parse: json
+
+  - name: plot_map
+    title: Plot a map
+    description: >
+      Draw a raster with optional polygon outlines and save a PNG file. Polygons in another CRS are
+      reprojected for the drawing only.
+    read_only: true
+    params:
+      raster: { type: string, minLength: 1, description: Absolute path of the raster file. }
+      zones: { type: string, description: Absolute path of a polygon file to draw as outlines. }
+      band: { type: integer, minimum: 1, description: Band number. Default 1. }
+      colormap: { type: string, description: Matplotlib colormap name. Default viridis. }
+      title: { type: string, description: Title of the map. }
+    required: [raster]
+    outputs:
+      result: { kind: image, ext: .png, description: The map. }
+    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "plot_map", "{raster}", "--zones", "{zones}", "--band", "{band}", "--colormap", "{colormap}", "--title", "{title}"]
+    parse: json
+
+map:
+  - tool: raster_info
+    route: "Run: gdalinfo -stats <in>.tif"
+    params:
+      - { arg: path, label: "<in>.tif" }
+      - { arg: band, label: "band", ui_default: 1 }
+    fidelity: exact
+    evidence: { source: docs, test: byte_info, note: "The test uses the GDAL autotest file byte.tif. The numbers match gdalinfo -stats on the command line." }
+    summary: "{metrics.width} x {metrics.height} pixels, EPSG:{metrics.epsg}, mean {metrics.mean}, stddev {metrics.stddev}."
+
+  - tool: vector_info
+    route: "Run: ogrinfo -so -al <in>"
+    params:
+      - { arg: path, label: "<in>" }
+      - { arg: layer, label: "layer", ui_default: "" }
+    fidelity: exact
+    evidence: { source: docs, test: countries_info, note: "The Natural Earth file has 177 features." }
+    summary: "{metrics.n_features} features, EPSG:{metrics.epsg}."
+
+  - tool: reproject_raster
+    route: "Run: gdalwarp -t_srs <crs> -r <method> [-tr <size> <size>] [-dstnodata <value>] <in>.tif <out>.tif"
+    params:
+      - { arg: path, label: "<in>.tif" }
+      - { arg: target_crs, label: "-t_srs" }
+      - { arg: resampling, label: "-r", ui_default: near }
+      - { arg: pixel_size, label: "-tr", ui_default: "" }
+      - { arg: src_nodata, label: "-srcnodata", ui_default: "" }
+      - { arg: dst_nodata, label: "-dstnodata", ui_default: "" }
+    fidelity: exact
+    evidence: { source: docs, test: warp_4326_size, note: "The test runs gdalwarp by hand and checks the size with a second method (pyproj extent)." }
+    summary: "{src_width} x {src_height} became {metrics.width} x {metrics.height} pixels, EPSG:{metrics.epsg}, mean {metrics.mean}."
+
+  - tool: calc_raster
+    route: "Run: gdal_calc -A <in>.tif --outfile <out>.tif --calc '<expression>' [--NoDataValue <value>] --type <type>"
+    params:
+      - { arg: path, label: "-A" }
+      - { arg: expression, label: "--calc" }
+      - { arg: nodata, label: "--NoDataValue", ui_default: "" }
+      - { arg: type, label: "--type", ui_default: Float32 }
+    fidelity: exact
+    evidence: { source: docs, test: calc_double, note: "The mean of A*2 is twice the mean of A." }
+    summary: "Mean {metrics.mean}, min {metrics.min}, max {metrics.max} after the expression {expression}."
+
+  - tool: reproject_vector
+    route: "Run: ogr2ogr -f GPKG -t_srs <crs> <out>.gpkg <in>"
+    params:
+      - { arg: path, label: "<in>" }
+      - { arg: target_crs, label: "-t_srs" }
+    fidelity: exact
+    evidence: { source: docs, test: zones_to_4326, note: "The extent matches pyproj transform_bounds." }
+    summary: "{metrics.n_features} features in EPSG:{metrics.epsg}."
+
+  - tool: zonal_stats
+    route: "QGIS: Processing Toolbox > Raster analysis > Zonal statistics. Code: rasterstats.zonal_stats(zones, raster, stats=[...], all_touched=<bool>)"
+    params:
+      - { arg: raster, label: "Raster layer" }
+      - { arg: zones, label: "Vector layer containing zones" }
+      - { arg: pixels, label: "all_touched", ui_default: centers, note: "QGIS has no switch. It counts a pixel by its center." }
+      - { arg: nodata, label: "nodata", ui_default: "" }
+      - { arg: band, label: "Raster band", ui_default: 1 }
+    fidelity: close
+    difference: "The rasterstats code runs here. The QGIS dialog counts a pixel by its center, which matches centers. The all_touched setting has no switch in that dialog. The route in QGIS is not tested."
+    evidence: { source: docs, test: zonal_aligned, note: "A second method (numpy and shapely) gives the same count and mean." }
+    summary: "{metrics.n_zones} zone(s). First zone: {metrics.count} pixels, mean {metrics.mean}."
+
+  - tool: plot_map
+    route: "QGIS: add the raster layer, add the polygon layer, set the polygon fill to none, then Project > Import/Export > Export Map to Image"
+    params:
+      - { arg: raster, label: "Raster layer" }
+      - { arg: zones, label: "Vector layer", ui_default: "" }
+    fidelity: close
+    difference: "The picture comes from matplotlib, not from QGIS. The colors and the layout differ. The pixel values are the same."
+    evidence: { source: unverified, note: "route not tested" }
+    summary: "Map of {metrics.valid_pixels} valid pixels."
+
+checks:
+  - id: crs_not_stated
+    description: The report gives areas, distances or pixel sizes and does not name the CRS.
+    severity: warning
+    text: The report must name the CRS (EPSG code) of each raster and polygon file that it measures, and the unit of each pixel size, area or distance.
+  - id: resampling_not_stated
+    description: The report uses a reprojected or resampled raster and does not say which resampling method made it.
+    severity: warning
+    text: The report must state the resampling method of each reprojected raster and the reason for it.
+  - id: continuous_resampling_on_classes
+    description: A class raster (land cover, zones, codes) was resampled with a blending method.
+    severity: error
+    text: A class raster must use the resampling method near or mode. Blending methods (bilinear, cubic, cubicspline, lanczos, average) make class codes that do not exist.
+  - id: nodata_not_stated
+    description: The report gives raster statistics and does not say which nodata value it used.
+    severity: warning
+    text: The report must state the nodata value and the number of pixels that the statistics skipped, or say that the raster has no nodata value.
+  - id: partial_pixels_not_stated
+    description: The report gives zonal statistics and does not say how it treated pixels that a polygon edge cuts.
+    severity: warning
+    text: The report must state if zonal statistics counted pixel centers or all touched pixels, and the number of pixels in each zone.
+  - id: target_crs_missing
+    description: A raster was reprojected with no target CRS.
+    severity: error
+    rule:
+      tool: reproject_raster
+      arg: target_crs
+      op: missing
+      message: Ask the scientist for the target CRS.
+
+tests:
+  - id: byte_info
+    description: >
+      The GDAL autotest file byte.tif is 20 x 20 pixels, EPSG:26711, with a 60 m pixel. Its band has
+      min 74, max 255, mean 126.765 and stddev 22.928 (gdalinfo -stats, also in the GDAL autotest).
+    data: [data/byte.tif]
+    manual_route_checked: true
+    calls:
+      - { tool: raster_info, args: { path: "{adapter_dir}/data/byte.tif" } }
+    expect:
+      - { path: metrics.width, equals: 20 }
+      - { path: metrics.height, equals: 20 }
+      - { path: metrics.epsg, equals: 26711 }
+      - { path: metrics.pixel_x, approx: 60, abs: 0.001 }
+      - { path: metrics.min, equals: 74 }
+      - { path: metrics.max, equals: 255 }
+      - { path: metrics.mean, approx: 126.765, abs: 0.001 }
+      - { path: metrics.stddev, approx: 22.928, abs: 0.001 }
+
+  - id: countries_info
+    description: The Natural Earth 1:110m countries file has 177 features in EPSG:4326.
+    data: [data/ne_110m_countries.geojson]
+    calls:
+      - { tool: vector_info, args: { path: "{adapter_dir}/data/ne_110m_countries.geojson" } }
+    expect:
+      - { path: metrics.n_features, equals: 177 }
+      - { path: metrics.epsg, equals: 4326 }
+      - { path: metrics.ymin, approx: -90, abs: 0.001 }
+      - { path: metrics.xmax, approx: 180, abs: 0.001 }
+
+  - id: warp_4326_size
+    description: >
+      byte.tif warped to EPSG:4326 with GDAL's own pixel size is 22 x 18 pixels. A second method
+      (pyproj transform_bounds of the source extent, divided by the pixel size 0.000598 degrees) gives
+      21.8 x 18.2, which rounds to 22 x 18. With a 0.001 degree pixel the same method gives
+      13.06 x 10.89, which rounds to 13 x 11.
+    data: [data/byte.tif]
+    manual_route_checked: true
+    calls:
+      - { tool: reproject_raster, args: { path: "{adapter_dir}/data/byte.tif", target_crs: "EPSG:4326", resampling: near } }
+      - { tool: reproject_raster, args: { path: "{adapter_dir}/data/byte.tif", target_crs: "EPSG:4326", resampling: bilinear, pixel_size: "0.001" } }
+    expect:
+      - { path: metrics.width, equals: 13 }
+      - { path: metrics.height, equals: 11 }
+      - { path: metrics.epsg, equals: 4326 }
+      - { path: metrics.pixel_x, approx: 0.001, abs: 0.0000001 }
+
+  - id: warp_default_size
+    description: byte.tif warped to EPSG:4326 with GDAL's own pixel size is 22 x 18 pixels. The second method is in the test warp_4326_size.
+    data: [data/byte.tif]
+    manual_route_checked: true
+    calls:
+      - { tool: reproject_raster, args: { path: "{adapter_dir}/data/byte.tif", target_crs: "EPSG:4326", resampling: near } }
+    expect:
+      - { path: metrics.width, equals: 22 }
+      - { path: metrics.height, equals: 18 }
+      - { path: metrics.src_width, equals: 20 }
+
+  - id: warp_average_coarser
+    description: >
+      Warp to the same CRS with a 120 m pixel and average resampling. The size is 10 x 10 by
+      construction. The mean of the 2 x 2 block means from numpy is 126.765. GDAL rounds each
+      Byte block value, so its mean is 126.72, within 0.1.
+    data: [data/byte.tif]
+    calls:
+      - { tool: reproject_raster, args: { path: "{adapter_dir}/data/byte.tif", target_crs: "EPSG:26711", resampling: average, pixel_size: "120" } }
+    expect:
+      - { path: metrics.width, equals: 10 }
+      - { path: metrics.height, equals: 10 }
+      - { path: metrics.mean, approx: 126.765, abs: 0.1 }
+      - { path: metrics.pixel_x, approx: 120, abs: 0.001 }
+
+  - id: calc_double
+    description: >
+      The expression A.astype(numpy.float32)*2 doubles every pixel, so the mean is 253.53 and the
+      max is 510. The plain expression A*2 overflows in Byte and gives a different mean (a GDAL trap).
+    data: [data/byte.tif]
+    calls:
+      - { tool: calc_raster, args: { path: "{adapter_dir}/data/byte.tif", expression: "A.astype(numpy.float32)*2" } }
+    expect:
+      - { path: metrics.mean, approx: 253.53, abs: 0.001 }
+      - { path: metrics.max, equals: 510 }
+      - { path: metrics.min, equals: 148 }
+
+  - id: zones_to_4326
+    description: >
+      The two polygons of zones.geojson move from EPSG:26711 to EPSG:4326. The second method
+      (pyproj transform_bounds) gives the extent -117.64205 to -117.63552 degrees east.
+    data: [data/zones.geojson]
+    calls:
+      - { tool: reproject_vector, args: { path: "{adapter_dir}/data/zones.geojson", target_crs: "EPSG:4326" } }
+    expect:
+      - { path: metrics.n_features, equals: 2 }
+      - { path: metrics.epsg, equals: 4326 }
+      - { path: metrics.xmin, approx: -117.64205, abs: 0.00001 }
+      - { path: metrics.xmax, approx: -117.63552, abs: 0.00001 }
+
+  - id: zonal_aligned
+    description: >
+      Zone A covers exactly the top-left 10 x 10 pixels of byte.tif. Numpy and shapely give 100
+      pixels, mean 129.5, min 99, max 197, sum 12950. Both pixel rules agree for this zone.
+    data: [data/byte.tif, data/zones.geojson]
+    calls:
+      - { tool: zonal_stats, args: { raster: "{adapter_dir}/data/byte.tif", zones: "{adapter_dir}/data/zones.geojson", pixels: centers, id_field: id } }
+    expect:
+      - { path: "data.data.zones[0].count", equals: 100 }
+      - { path: "data.data.zones[0].mean", approx: 129.5, abs: 0.0001 }
+      - { path: "data.data.zones[0].min", equals: 99 }
+      - { path: "data.data.zones[0].max", equals: 197 }
+      - { path: "data.data.zones[0].sum", equals: 12950 }
+
+  - id: zonal_partial_pixels
+    description: >
+      Zone B is offset by 40 m from the pixel grid. Numpy and shapely give 42 pixels with mean 135.0
+      by centers, and 56 pixels with mean 134.857 for all touched pixels.
+    data: [data/byte.tif, data/zones.geojson]
+    calls:
+      - { tool: zonal_stats, args: { raster: "{adapter_dir}/data/byte.tif", zones: "{adapter_dir}/data/zones.geojson", pixels: centers, id_field: id }, save_as: c }
+      - { tool: zonal_stats, args: { raster: "{adapter_dir}/data/byte.tif", zones: "{adapter_dir}/data/zones.geojson", pixels: all_touched, id_field: id } }
+    expect:
+      - { path: "saved.c.data.data.zones[1].count", equals: 42 }
+      - { path: "saved.c.data.data.zones[1].mean", approx: 135.0, abs: 0.0001 }
+      - { path: "data.data.zones[1].count", equals: 56 }
+      - { path: "data.data.zones[1].mean", approx: 134.857, abs: 0.001 }
+
+  - id: zonal_crs_mismatch
+    description: Zonal statistics stop when the polygons and the raster use different CRS.
+    data: [data/byte.tif, data/ne_110m_countries.geojson]
+    calls:
+      - { tool: zonal_stats, args: { raster: "{adapter_dir}/data/byte.tif", zones: "{adapter_dir}/data/ne_110m_countries.geojson" } }
+    expect:
+      - { path: ok, equals: false }
+
+  - id: plot_makes_png
+    description: The map tool writes a PNG file and counts all 400 pixels as valid.
+    data: [data/byte.tif, data/zones.geojson]
+    calls:
+      - { tool: plot_map, args: { raster: "{adapter_dir}/data/byte.tif", zones: "{adapter_dir}/data/zones.geojson" } }
+    expect:
+      - { path: metrics.valid_pixels, equals: 400 }
+      - { path: "outputs[0].path", contains: ".png" }

@@ -1,0 +1,31 @@
+tool: gdal
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/rouault-gdal-autotest/byte.tif
+  - /Volumes/T7/guided-analysis/data/rouault-gdal-autotest/zones.geojson
+decisions:
+  target_crs: "EPSG:4326"
+  resampling: near
+  nodata: ""
+  pixel_size: "none (GDAL chooses)"
+  partial_pixels: "centers for question 4; all_touched for question 5"
+expected:
+  - {description: "raster width", value: 20, tolerance: 0, source: "gdalinfo"}
+  - {description: "raster height", value: 20, tolerance: 0, source: "gdalinfo"}
+  - {description: "EPSG code of the raster", value: 26711, tolerance: 0, source: "gdalinfo"}
+  - {description: "pixel size in metres", value: 60, tolerance: 0, source: "gdalinfo"}
+  - {description: "band minimum", value: 74, tolerance: 0, source: "gdalinfo -stats, GDAL autotest"}
+  - {description: "band maximum", value: 255, tolerance: 0, source: "gdalinfo -stats, GDAL autotest"}
+  - {description: "band mean", value: 126.765, tolerance: 0.01, source: "gdalinfo -stats, GDAL autotest"}
+  - {description: "band standard deviation", value: 22.93, tolerance: 0.05, source: "gdalinfo -stats, GDAL autotest"}
+  - {description: "width after warp to EPSG:4326", value: 22, tolerance: 0, source: "gdalwarp; pyproj second method"}
+  - {description: "height after warp to EPSG:4326", value: 18, tolerance: 0, source: "gdalwarp; pyproj second method"}
+  - {description: "zone A pixel count", value: 100, tolerance: 0, source: "numpy and shapely"}
+  - {description: "zone A mean", value: 129.5, tolerance: 0.01, source: "numpy and shapely"}
+  - {description: "zone B pixel count, centers", value: 42, tolerance: 0, source: "numpy and shapely"}
+  - {description: "zone B mean, centers", value: 135.0, tolerance: 0.01, source: "numpy and shapely"}
+  - {description: "zone B pixel count, all touched", value: 56, tolerance: 0, source: "numpy and shapely"}
+  - {description: "zone B mean, all touched", value: 134.857, tolerance: 0.01, source: "numpy and shapely"}
+notes: |
+  The sample standard deviation (n - 1) is 22.986. A model that uses another tool or computes by hand can give it. gdalinfo gives 22.928.
+  Traps: the zone file has the field id, so the rows are named A and B. Zone B changes with the pixel rule. Zones with another CRS stop the tool.
