@@ -17,10 +17,23 @@ allow: all
 timeout_s: 1800
 data: [love2014-deseq2-airway/airway_counts.csv, love2014-deseq2-airway/airway_coldata.csv]
 items:
-  - {key: genes_after_filter, description: "Genes after pre-filter, workflow", value: 16637, tolerance: 600}
-  - {key: padj_01_workflow, description: "Genes with padj < 0.1, workflow", value: 4381, tolerance: 400}
-  - {key: up_padj_01, description: "Up-regulated genes at padj < 0.1, workflow", value: 2362, tolerance: 250}
-  - {key: down_padj_01, description: "Down-regulated genes at padj < 0.1, workflow", value: 2019, tolerance: 250}
-  - {key: padj_005_workflow, description: "Genes with padj < 0.05, workflow", value: 3602, tolerance: 400, in_answer: false}
+  # Source of the values: the rnaseqGene 1.36.0 workflow code (Bioconductor 3.23), run with
+  # DESeq2 1.52.0 and R 4.6.1 on airway_counts.csv: DESeqDataSetFromMatrix(design = ~ cell + dex,
+  # dex reference untrt), keep <- rowSums(counts(dds) >= 10) >= 4, DESeq(dds), results(dds) and
+  # results(dds, alpha = 0.05). Script: check_workflow.R, output: check_workflow.out.
+  # The workflow text prints 16637, 4381 (2362 up, 2019 down) and 3602. Those numbers are for
+  # data(gse) of the airway package (Salmon and tximeta, GENCODE v29, 58294 genes, with average
+  # transcript length offsets). airway_counts.csv is data(airway) (Ensembl GRCh37.75 read counts,
+  # 63677 genes), so the same code gives the values below. The same code on data(gse) gives the
+  # printed workflow numbers exactly.
+  # Tolerance: about 2% of each count, for numerical changes between DESeq2 releases. A different
+  # filter (16596 genes with 3 samples, 15690 with 5), the design ~ dex (3447 genes) or pydeseq2
+  # 0.5.4 (4647 genes, 2481 up, 2166 down) falls outside it.
+  - {key: genes_after_filter, description: "Genes after pre-filter, workflow code on this CSV", value: 16139, tolerance: 100}
+  - {key: padj_01_workflow, description: "Genes with padj < 0.1, workflow code on this CSV", value: 4905, tolerance: 100}
+  - {key: up_padj_01, description: "Up-regulated genes at padj < 0.1, workflow code on this CSV", value: 2607, tolerance: 60}
+  - {key: down_padj_01, description: "Down-regulated genes at padj < 0.1, workflow code on this CSV", value: 2298, tolerance: 60}
+  - {key: padj_005_workflow, description: "Genes with padj < 0.05, workflow code on this CSV", value: 4081, tolerance: 100, in_answer: false}
+  # pydeseq2 0.5.4 on this CSV, same filter and design. A recheck on 2026-10-08 gave 4647 and 3879.
   - {key: padj_01_pydeseq2, description: "Genes with padj < 0.1 on this CSV, pydeseq2 0.5.4", value: 4643, tolerance: 100, in_answer: false, optional: true}
   - {key: padj_005_pydeseq2, description: "Genes with padj < 0.05 on this CSV, pydeseq2 0.5.4", value: 3872, tolerance: 100, in_answer: false, optional: true}

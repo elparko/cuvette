@@ -12,17 +12,20 @@ decisions:
   fold_change_cutoff: "none (lfcThreshold 1 as optional stricter test)"
   exclusions: none
 expected:
-  - {description: "genes after pre-filter, workflow", value: 16637, tolerance: 600, source: "rnaseqGene workflow, section 4.1"}
-  - {description: "genes with padj < 0.1, workflow", value: 4381, tolerance: 400, source: "rnaseqGene workflow, results section"}
-  - {description: "up-regulated at padj < 0.1, workflow", value: 2362, tolerance: 250, source: "rnaseqGene workflow, summary(res)"}
-  - {description: "down-regulated at padj < 0.1, workflow", value: 2019, tolerance: 250, source: "rnaseqGene workflow, summary(res)"}
-  - {description: "genes with padj < 0.05, workflow", value: 3602, tolerance: 400, source: "rnaseqGene workflow, results(alpha=0.05)"}
+  - {description: "genes after pre-filter, workflow code on this CSV", value: 16139, tolerance: 100, source: "rnaseqGene 1.36.0 code, DESeq2 1.52.0, check_workflow.R"}
+  - {description: "genes with padj < 0.1, workflow code on this CSV", value: 4905, tolerance: 100, source: "rnaseqGene 1.36.0 code, DESeq2 1.52.0, check_workflow.R"}
+  - {description: "up-regulated at padj < 0.1, workflow code on this CSV", value: 2607, tolerance: 60, source: "check_workflow.R, summary(res)"}
+  - {description: "down-regulated at padj < 0.1, workflow code on this CSV", value: 2298, tolerance: 60, source: "check_workflow.R, summary(res)"}
+  - {description: "genes with padj < 0.05, workflow code on this CSV", value: 4081, tolerance: 100, source: "check_workflow.R, results(alpha=0.05)"}
   - {description: "genes with padj < 0.1 on this CSV, pydeseq2 0.5.4", value: 4643, tolerance: 100, source: "computed"}
   - {description: "genes with padj < 0.05 on this CSV, pydeseq2 0.5.4", value: 3872, tolerance: 100, source: "computed"}
 notes: |
-  R is not installed. Use pydeseq2 or give the R script as text only.
-  The workflow numbers come from a newer gene annotation than the airway package CSV; a close match to the workflow needs tolerance of several hundred genes.
-  The DESeq2 2014 paper does not report airway counts. Numbers come from the rnaseqGene workflow.
-  Trap: leaving out the cell term in the design changes the result. The scientist owns this choice.
-  Trap: pydeseq2 needs samples as rows, so transpose the CSV.
+  The workflow text prints 16637, 4381 (2362 up, 2019 down) and 3602. Those numbers are for data(gse)
+  of the airway package: Salmon and tximeta, GENCODE v29, 58294 genes, with average transcript length
+  offsets. This CSV is data(airway): Ensembl GRCh37.75 read counts, 63677 genes. The same workflow code
+  with DESeq2 1.52.0 gives 16139, 4905 (2607 up, 2298 down) and 4081 on this CSV, and gives the printed
+  workflow numbers exactly on data(gse). See check_workflow.R and check_workflow.out.
+  The DESeq2 2014 paper does not report airway counts. Numbers come from the rnaseqGene workflow code.
+  Trap: leaving out the cell term in the design changes the result (3447 genes at padj < 0.1). The scientist owns this choice.
+  Trap: pydeseq2 needs samples as rows, so transpose the CSV. pydeseq2 0.5.4 gives about 260 fewer genes than R DESeq2 on this CSV; the cause is not known.
   I did not verify the gene symbol of the top Ensembl id.

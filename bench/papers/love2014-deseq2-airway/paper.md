@@ -12,7 +12,7 @@
 - Cell lines, no patient data.
 
 ## Tool
-- Original: R package DESeq2 (R is not installed here, so give the data and prompts only for this route).
+- Original: R package DESeq2. Checked with DESeq2 1.52.0 on R 4.6.1 and airway 1.32.0 (check_workflow.R).
 - Python route: pydeseq2 0.5.4 (checked). `DeseqDataSet(counts, metadata, design="~cell + dex")`, `DeseqStats(contrast=["dex","trt","untrt"], alpha=0.1)`.
 
 ## Sample design
@@ -26,15 +26,15 @@
 5. Count genes with padj < 0.1. Also `results(dds, alpha = 0.05)` and `results(dds, lfcThreshold = 1)`.
 
 ## Numbers to reproduce
-| Quantity | Workflow value (annotation of the workflow, 58294 genes) | Check run (pydeseq2, this CSV, 63677 genes) |
-|---|---|---|
-| Genes after pre-filter | 16637 | 16139 |
-| padj < 0.1 | 4381 (2362 up, 2019 down) | 4643 (2478 up, 2165 down) |
-| padj < 0.05 (alpha 0.05) | 3602 | 3872 |
-| lfcThreshold = 1, padj < 0.1 | 240 | not run |
-| Top gene | not read | ENSG00000152583, log2FC 4.57, padj 4.4e-159 |
+| Quantity | Workflow text (data(gse), 58294 genes) | Workflow code on this CSV (data(airway), 63677 genes), R DESeq2 1.52.0 | pydeseq2 0.5.4, this CSV |
+|---|---|---|---|
+| Genes after pre-filter | 16637 | 16139 | 16139 |
+| padj < 0.1 | 4381 (2362 up, 2019 down) | 4905 (2607 up, 2298 down) | 4643 (2478 up, 2165 down) |
+| padj < 0.05 (alpha 0.05) | 3602 | 4081 | 3872 |
+| lfcThreshold = 1, padj < 0.1 | 240 | not run | not run |
+| Top gene | not read | not read | ENSG00000152583, log2FC 4.57, padj 4.4e-159 |
 
-The two columns differ because the workflow uses a newer gene annotation and read counting. Allow a wide tolerance.
+The workflow text is rnaseqGene 1.36.0 (Bioconductor 3.23, DESeq2 1.52.0, airway 1.32.0). It runs on `data(gse)`: Salmon quantification summarized with tximeta to GENCODE v29 genes, and DESeq2 uses the average transcript lengths as offsets. This CSV is `data(airway)`: read counts on Ensembl GRCh37.75 genes. check_workflow.R runs the same code on both objects. On `data(gse)` it gives the printed numbers exactly. On this CSV it gives the middle column. The benchmark uses the middle column.
 
 ## Decisions the scientist owns (paper choice)
 - Replication unit: 4 cell lines, each with one untreated and one treated sample.
