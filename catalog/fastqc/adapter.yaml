@@ -1,0 +1,175 @@
+adapter:
+  name: fastqc
+  title: FastQC
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Checks the quality of a sequencing read file with FastQC. The tool runs FastQC on one file and
+    reads the pass, warn and fail status of each module from the report data file. The scientist
+    can repeat the step on the command line.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: FastQC
+  version: "0.13.0"
+  homepage: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/
+  docs:
+    - https://www.bioinformatics.babraham.ac.uk/projects/fastqc/Help/
+    - https://www.bioinformatics.babraham.ac.uk/projects/fastqc/Help/3%20Analysis%20Modules/
+
+connection:
+  kind: cli
+  call_timeout_s: 900
+
+locate:
+  env: FASTQC
+  paths: ["/opt/homebrew/bin/fastqc", "/usr/local/bin/fastqc", "~/.local/bin/fastqc"]
+  which: [fastqc]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "FastQC v(\\S+)"
+
+decisions:
+  - key: encoding
+    label: Quality score encoding
+    kind: choice
+    choices: [auto, phred64]
+    default: auto
+    group: Method
+    help: >
+      auto lets FastQC guess the encoding from the quality characters. Use phred64 for old
+      Illumina 1.3 to 1.7 files. A wrong encoding can change the quality modules from FAIL to PASS.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_fastqc, arg: encoding }
+
+  - key: action_on_fail
+    label: What to do with a file that has a FAIL module
+    kind: choice
+    choices: [decide_later, trim, exclude, keep_and_flag]
+    default: decide_later
+    group: Method
+    help: >
+      FastQC only reports. The scientist decides if a file needs trimming, needs to leave the study
+      or stays with a note. The agent does not trim or exclude a file.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+
+tools:
+  - name: run_fastqc
+    title: Run FastQC on one read file
+    description: >
+      Run FastQC on one sequencing read file (FASTQ, plain or gzip, any extension). The result has
+      the total number of reads, the read length, the percent GC, the status of each module
+      (module_<name> is PASS, WARN or FAIL), the counts n_pass, n_warn and n_fail, and the path of
+      the report data file (data_file).
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the read file. }
+      encoding: { type: string, enum: [auto, phred64], description: "Quality score encoding. auto is the FastQC default." }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/run_fastqc.sh", "{program_path}", "{path}", "{encoding}"]
+    parse: keyvalue
+
+  - name: read_modules
+    title: List module status from a FastQC report
+    description: >
+      Read a fastqc_data.txt file and list each module with its status (PASS, WARN or FAIL).
+      Use data_file from run_fastqc.
+    read_only: true
+    params:
+      data_file: { type: string, minLength: 1, description: Absolute path of fastqc_data.txt. }
+    required: [data_file]
+    command: ["/bin/sh", "{adapter_dir}/scripts/modules.sh", "{data_file}"]
+    parse: csv
+
+map:
+  - tool: run_fastqc
+    route: "Run: fastqc --extract --outdir <folder> [--phred64] <reads file>. In the FastQC window: File > Open..."
+    params:
+      - { arg: path, label: "<reads file>" }
+      - { arg: encoding, label: "--phred64", ui_default: auto, note: "FastQC reads the encoding from the file unless you give --phred64." }
+    fidelity: exact
+    evidence: { source: docs, test: good_file, note: "The command line is the manual route. The test reads fastqc_data.txt, the file that the report is made from." }
+    summary: "{metrics.total_sequences} reads of length {metrics.sequence_length}. {metrics.n_pass} PASS, {metrics.n_warn} WARN, {metrics.n_fail} FAIL."
+
+  - tool: read_modules
+    route: "Open fastqc_data.txt. Each line that starts with >> has a module name and its status."
+    params:
+      - { arg: data_file, label: fastqc_data.txt }
+    fidelity: exact
+    evidence: { source: docs, test: bad_file, note: "The summary list on the left of the FastQC window shows the same statuses." }
+    summary: "{n_rows} modules listed."
+
+checks:
+  - id: encoding_not_stated
+    description: The report does not say which quality encoding FastQC used.
+    severity: warning
+    text: The report must give the encoding line of the FastQC result, and say if it came from auto detection.
+  - id: fail_treated_as_error
+    description: The report treats a WARN or FAIL as proof that the data is bad, or a PASS as proof that it is good.
+    severity: warning
+    text: The report must say that FastQC statuses are rules of thumb. A WARN or FAIL for a module can be normal for some library types, and a PASS does not prove that the data is good.
+  - id: action_chosen_by_agent
+    description: The agent chose to trim or exclude a file.
+    severity: error
+    text: The report must leave the trimming or exclusion of a file to the scientist.
+  - id: subset_report
+    description: The statuses come from a file that is only part of the run.
+    severity: info
+    text: The report must say if the file is a subsample. Module statuses can change with the number of reads.
+
+tests:
+  - id: good_file
+    description: >
+      The first 10000 reads of the FastQC example file good_sequence_short. The numbers are from
+      a FastQC 0.13.0 run on this file (stability test). The full file has 250000 reads, length 40.
+    data: [data/good_sequence_short.fastq.gz]
+    calls:
+      - tool: run_fastqc
+        args: { path: "{adapter_dir}/data/good_sequence_short.fastq.gz" }
+    expect:
+      - { path: metrics.total_sequences, equals: 10000 }
+      - { path: metrics.sequence_length, equals: 40 }
+      - { path: metrics.gc_percent, equals: 45 }
+      - { path: metrics.n_fail, equals: 0 }
+      - { path: metrics.n_warn, equals: 2 }
+      - { path: data.module_per_base_sequence_content, equals: WARN }
+      - { path: data.module_per_sequence_gc_content, equals: WARN }
+
+  - id: bad_file
+    description: >
+      The first 10000 reads of the FastQC example file bad_sequence. The numbers are from a
+      FastQC 0.13.0 run on this file (stability test). The file has one FAIL module with the
+      default encoding.
+    data: [data/bad_sequence.fastq.gz]
+    calls:
+      - tool: run_fastqc
+        args: { path: "{adapter_dir}/data/bad_sequence.fastq.gz" }
+        save_as: run
+      - tool: read_modules
+        args: { data_file: "{saved.run.data.data_file}" }
+    expect:
+      - { path: saved.run.metrics.total_sequences, equals: 10000 }
+      - { path: saved.run.metrics.n_fail, equals: 1 }
+      - { path: saved.run.metrics.n_warn, equals: 3 }
+      - { path: saved.run.data.module_per_tile_sequence_quality, equals: FAIL }
+      - { path: table.n_rows, equals: 11 }
+      - { path: "table.rows[2][1]", equals: FAIL }
+
+  - id: bad_file_phred64
+    description: >
+      The same file with the Illumina 1.5 encoding. The quality characters of this file are
+      Illumina 1.5, so per base sequence quality is FAIL with phred64 and PASS with auto. The full
+      file shows the same change.
+    data: [data/bad_sequence.fastq.gz]
+    calls:
+      - tool: run_fastqc
+        args: { path: "{adapter_dir}/data/bad_sequence.fastq.gz", encoding: phred64 }
+    expect:
+      - { path: data.encoding, equals: "Illumina 1.5" }
+      - { path: data.module_per_base_sequence_quality, equals: FAIL }
+      - { path: metrics.n_fail, equals: 2 }

@@ -1,0 +1,304 @@
+adapter:
+  name: rdkit
+  title: RDKit descriptors, rule of five and solubility model
+  version: 0.1.0
+  description: Reads SMILES from a CSV file, computes descriptors, counts rule of five violations and fits or scores an ESOL solubility equation.
+  authors: [onboarding agent]
+  status: draft
+program:
+  name: RDKit
+  version: "2026.03.6"
+  homepage: https://www.rdkit.org
+  docs:
+    - https://www.rdkit.org/docs/GettingStartedInPython.html
+    - https://www.rdkit.org/docs/source/rdkit.Chem.Descriptors.html
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+locate:
+  env: GA_RDKIT_PYTHON
+  paths: ["~/.guided-analysis/envs/rdkit/bin/python"]
+  version_command: ["{program_path}", "-c", "import rdkit; print(rdkit.__version__)"]
+  version_pattern: "(\\S+)"
+decisions:
+  - key: salt_handling
+    label: Salts and multi-fragment molecules
+    kind: choice
+    choices: [keep, largest_fragment]
+    default: keep
+    owner: human
+    group: Molecules
+    help: keep leaves each molecule as given. largest_fragment keeps only the largest piece, so a salt counter-ion is removed before descriptors.
+    essential: true
+    links:
+      - { tool: load_molecules, arg: salts }
+  - key: invalid_smiles
+    label: SMILES that RDKit cannot parse
+    kind: choice
+    choices: [stop, report_and_drop]
+    default: stop
+    owner: human
+    group: Molecules
+    help: stop ends the load with an error. report_and_drop removes the rows and reports the count and the first row numbers.
+    essential: true
+    links:
+      - { tool: load_molecules, arg: invalid }
+  - key: logp_method
+    label: logP method
+    kind: choice
+    choices: [crippen]
+    default: crippen
+    owner: human
+    group: Descriptors
+    help: crippen is Crippen.MolLogP in RDKit. It is not the Daylight cLogP that the 2004 paper used. Values differ.
+    links:
+      - { tool: compute_descriptors, arg: logp_method }
+  - key: hbd_hba_definition
+    label: Hydrogen bond donor and acceptor definition
+    kind: choice
+    choices: [lipinski, rdmoldescriptors]
+    default: lipinski
+    owner: human
+    group: Descriptors
+    help: lipinski uses Lipinski.NumHDonors and NumHAcceptors. rdmoldescriptors uses CalcNumHBD and CalcNumHBA. The counts differ.
+    essential: true
+    links:
+      - { tool: compute_descriptors, arg: hbd_hba }
+  - key: rule_of_five_cutoffs
+    label: Rule of five cutoffs
+    kind: choice
+    choices: [lipinski_1997]
+    default: lipinski_1997
+    owner: human
+    group: Rule of five
+    help: "lipinski_1997 is molecular weight above 500, logP above 5, donors above 5, acceptors above 10. A violation needs a value above the cutoff."
+    stage: when_needed
+    links:
+      - { tool: rule_of_five, arg: cutoffs }
+  - key: allowed_violations
+    label: Violations allowed for a pass
+    kind: int
+    default: 1
+    lo: 0
+    hi: 4
+    owner: human
+    group: Rule of five
+    help: The usual rule allows one violation. A molecule with more violations fails.
+    essential: true
+    stage: when_needed
+    links:
+      - { tool: rule_of_five, arg: allowed_violations }
+  - key: esol_equation
+    label: Solubility equation
+    kind: choice
+    choices: [published, refit]
+    default: published
+    owner: human
+    group: Solubility model
+    help: "published scores 0.16 - 0.63 logP - 0.0062 MW + 0.066 RB - 0.74 AP on all molecules. refit fits new coefficients by least squares on a training split."
+    essential: true
+    stage: when_needed
+    links:
+      - { tool: fit_solubility_model, arg: equation }
+  - key: test_fraction
+    label: Fraction of molecules held out for testing
+    kind: float
+    default: 0.2
+    lo: 0
+    hi: 0.5
+    owner: human
+    group: Solubility model
+    help: Used by refit only. The model is scored on the held-out molecules. 0 means the model is scored on its training data.
+    essential: true
+    stage: when_needed
+    links:
+      - { tool: fit_solubility_model, arg: test_fraction }
+  - key: split_seed
+    label: Random seed for the train and test split
+    kind: int
+    default: 42
+    lo: 0
+    hi: 1000000
+    owner: human
+    group: Solubility model
+    help: A different seed gives a different split and different refit coefficients.
+    stage: when_needed
+    links:
+      - { tool: fit_solubility_model, arg: seed }
+tools:
+  - name: load_molecules
+    title: Load molecules from a CSV file
+    description: "Read SMILES from a CSV column and parse each one with RDKit. The result has counts and an id in molecules (such as mol1). Pass that id to compute_descriptors."
+    read_only: true
+    function: "ga_rdkit.py:load_molecules"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      smiles_column: { type: string, default: smiles, description: Name of the SMILES column. }
+      id_column: { type: string, description: Name of a column with molecule names. }
+      target_column: { type: string, description: Name of the column with measured log solubility. }
+      salts: { type: string, enum: [keep, largest_fragment] }
+      invalid: { type: string, enum: [stop, report_and_drop] }
+    required: [path]
+  - name: compute_descriptors
+    title: Compute descriptors
+    description: "Compute molecular weight, logP, topological polar surface area, donors, acceptors, rotatable bonds and aromatic proportion for each molecule. Writes descriptors.csv. Pass the text in descriptors (such as desc2) to the next tools."
+    read_only: true
+    function: "ga_rdkit.py:compute_descriptors"
+    params:
+      molecules: { type: string, description: The id in molecules from load_molecules. }
+      logp_method: { type: string, enum: [crippen] }
+      hbd_hba: { type: string, enum: [lipinski, rdmoldescriptors] }
+    required: [molecules]
+  - name: rule_of_five
+    title: Count rule of five violations
+    description: Count the molecules that break the Lipinski rule of five. Counts molecules with zero, one and two or more violations.
+    read_only: true
+    function: "ga_rdkit.py:rule_of_five"
+    params:
+      descriptors: { type: string, description: The id in descriptors from compute_descriptors. }
+      cutoffs: { type: string, enum: [lipinski_1997] }
+      allowed_violations: { type: integer, minimum: 0, maximum: 4 }
+    required: [descriptors]
+  - name: fit_solubility_model
+    title: Fit or score the solubility equation
+    description: "Predict log solubility from logP, molecular weight, rotatable bonds and aromatic proportion. Reports coefficients, R squared, root mean square error and the largest outliers. Needs target_column in load_molecules."
+    read_only: true
+    function: "ga_rdkit.py:fit_solubility_model"
+    params:
+      descriptors: { type: string, description: The id in descriptors from compute_descriptors. }
+      equation: { type: string, enum: [published, refit] }
+      test_fraction: { type: number, minimum: 0, maximum: 0.5 }
+      seed: { type: integer, minimum: 0 }
+      n_outliers: { type: integer, minimum: 1, maximum: 50, default: 10 }
+    required: [descriptors]
+map:
+  - tool: load_molecules
+    route: "In Python: ga_rdkit.load_molecules(path, smiles_column, id_column, target_column, salts, invalid). Each row calls Chem.MolFromSmiles(smiles.strip())."
+    params:
+      - { arg: path, label: CSV file, ui_default: "" }
+      - { arg: smiles_column, label: SMILES column, ui_default: smiles }
+      - { arg: salts, label: Fragment handling, ui_default: keep, note: "largest_fragment calls rdMolStandardize.LargestFragmentChooser." }
+      - { arg: invalid, label: Invalid SMILES, ui_default: stop, note: "Chem.MolFromSmiles returns None for an invalid SMILES." }
+    fidelity: close
+    difference: The route needs the wrapper module ga_rdkit.py in the adapter folder. No person ran the route by hand.
+    evidence: { source: docs, test: mini-load, note: RDKit Getting Started guide. }
+    summary: "{metrics.n_parsed} of {metrics.n_read} SMILES parsed, {metrics.n_invalid} invalid."
+  - tool: compute_descriptors
+    route: "In Python: Descriptors.MolWt(m), Crippen.MolLogP(m), rdMolDescriptors.CalcTPSA(m), Lipinski.NumHDonors(m), Lipinski.NumHAcceptors(m), Lipinski.NumRotatableBonds(m), aromatic heavy atoms / m.GetNumHeavyAtoms()"
+    params:
+      - { arg: logp_method, label: logP function, ui_default: crippen }
+      - { arg: hbd_hba, label: Donor and acceptor functions, ui_default: lipinski }
+    fidelity: exact
+    evidence: { source: docs, test: mini-load, note: The aspirin molecular weight 180.159 is in the RDKit Getting Started guide. }
+    summary: "Descriptors for {metrics.n_molecules} molecules. Mean MW {metrics.mean_mw}, mean logP {metrics.mean_logp}."
+  - tool: rule_of_five
+    route: "In Python: count a violation when MolWt > 500, MolLogP > 5, NumHDonors > 5 or NumHAcceptors > 10."
+    params:
+      - { arg: cutoffs, label: Cutoffs, ui_default: lipinski_1997 }
+      - { arg: allowed_violations, label: Violations allowed, ui_default: 1 }
+    fidelity: close
+    difference: The cutoffs come from Lipinski 1997 as cited in the benchmark notes. The paper was not read. No person ran the route by hand.
+    evidence: { source: docs, test: esol-full, note: Counts are computed with RDKit 2026.03.6. They are not published numbers. }
+    summary: "{metrics.n_zero_violations} molecules with zero violations, {metrics.n_two_or_more_violations} with two or more."
+  - tool: fit_solubility_model
+    route: "In Python: logS = 0.16 - 0.63*logP - 0.0062*MW + 0.066*RB - 0.74*AP, or numpy.linalg.lstsq on a random training split."
+    params:
+      - { arg: equation, label: Equation, ui_default: published }
+      - { arg: test_fraction, label: Test fraction, ui_default: 0.2 }
+      - { arg: seed, label: Random seed, ui_default: 42 }
+    fidelity: close
+    difference: "The published equation comes from a secondary source (a 2018 blog post), not from the ACS text. The 2004 paper used Daylight cLogP and nine descriptors. This tool uses Crippen logP and four descriptors."
+    evidence: { source: docs, test: esol-full, note: Numbers are computed. No person ran the route by hand. }
+    summary: "{equation} equation. Coefficients and scores are in the result."
+checks:
+  - id: invalid_molecules_dropped_silently
+    description: Molecules were dropped for invalid SMILES and the answer does not give the count.
+    severity: error
+    text: "If load_molecules ran with invalid = report_and_drop and n_invalid is above 0, the answer must give the number of dropped molecules. Flag an answer that gives counts for fewer molecules than the file has without saying so."
+  - id: model_scored_on_training_data
+    description: The solubility model is scored on the molecules that it was fitted on.
+    severity: warning
+    rule:
+      tool: fit_solubility_model
+      arg: test_fraction
+      op: "<="
+      value: 0
+      message: With test_fraction 0 a refit model is scored on its own training data. The R squared is too high. Hold out a test set.
+  - id: logp_not_the_paper_logp
+    description: The answer treats Crippen logP as the logP of the 2004 paper.
+    severity: warning
+    text: "The answer must say that logP is the RDKit Crippen value. It must not say that the result reproduces the Daylight cLogP model of Delaney 2004."
+  - id: r_squared_not_defined
+    description: The answer gives an R squared with no definition.
+    severity: warning
+    text: "The answer must say if R squared is 1 minus residual sum of squares over total sum of squares, or the squared correlation. The two values differ for a model that was not fitted to the data."
+  - id: salts_not_reported
+    description: Molecules with more than one fragment were kept and the answer does not say so.
+    severity: info
+    text: "If n_multi_fragment is above 0, the answer must say how salts were handled."
+tests:
+  - id: mini-load
+    description: "Five rows. One SMILES is invalid and one is a salt. Aspirin molecular weight 180.159 is from the RDKit Getting Started guide. The counts are read from the file."
+    data: [data/mini.csv]
+    calls:
+      - tool: load_molecules
+        args: { path: "{adapter_dir}/data/mini.csv", smiles_column: smiles, id_column: name, target_column: logS, salts: keep, invalid: report_and_drop }
+        save_as: mols
+      - tool: compute_descriptors
+        args: { molecules: "{saved.mols.data.molecules}" }
+    expect:
+      - { path: saved.mols.metrics.n_read, equals: 5 }
+      - { path: saved.mols.metrics.n_parsed, equals: 4 }
+      - { path: saved.mols.metrics.n_invalid, equals: 1 }
+      - { path: saved.mols.metrics.n_multi_fragment, equals: 1 }
+      - { path: "table.rows[0][2]", approx: 180.159, abs: 0.001 }
+  - id: mini-invalid-stops
+    description: With invalid = stop the load fails on the invalid SMILES.
+    data: [data/mini.csv]
+    calls:
+      - tool: load_molecules
+        args: { path: "{adapter_dir}/data/mini.csv", smiles_column: smiles, invalid: stop }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "cannot be parsed" }
+  - id: esol-full
+    description: "Full ESOL set of 1128 molecules. The counts and the scores are computed with RDKit 2026.03.6 and are not published numbers. The coefficients are the published ESOL constants."
+    data: [data/delaney-processed.csv]
+    calls:
+      - tool: load_molecules
+        args: { path: "{adapter_dir}/data/delaney-processed.csv", smiles_column: smiles, id_column: Compound ID, target_column: measured log solubility in mols per litre }
+        save_as: mols
+      - tool: compute_descriptors
+        args: { molecules: "{saved.mols.data.molecules}" }
+        save_as: desc
+      - tool: rule_of_five
+        args: { descriptors: "{saved.desc.data.descriptors}" }
+        save_as: ro5
+      - tool: fit_solubility_model
+        args: { descriptors: "{saved.desc.data.descriptors}", equation: published }
+    expect:
+      - { path: saved.mols.metrics.n_parsed, equals: 1128 }
+      - { path: saved.ro5.metrics.n_zero_violations, approx: 1018, abs: 5 }
+      - { path: saved.ro5.metrics.n_two_or_more_violations, approx: 12, abs: 3 }
+      - { path: saved.ro5.metrics.n_logp_over_5, approx: 97, abs: 5 }
+      - { path: metrics.coef_logp, equals: -0.63 }
+      - { path: metrics.all_r_squared_correlation, approx: 0.752, abs: 0.03 }
+      - { path: metrics.all_rmse, approx: 1.10, abs: 0.1 }
+  - id: esol-refit
+    description: "Refit with seed 42 and 20 percent held out. The numbers are from a run of this tool. They show that the tool is stable. They are not published numbers."
+    data: [data/delaney-processed.csv]
+    calls:
+      - tool: load_molecules
+        args: { path: "{adapter_dir}/data/delaney-processed.csv", smiles_column: smiles, id_column: Compound ID, target_column: measured log solubility in mols per litre }
+        save_as: mols
+      - tool: compute_descriptors
+        args: { molecules: "{saved.mols.data.molecules}" }
+        save_as: desc
+      - tool: fit_solubility_model
+        args: { descriptors: "{saved.desc.data.descriptors}", equation: refit, test_fraction: 0.2, seed: 42 }
+    expect:
+      - { path: metrics.train_n, equals: 902 }
+      - { path: metrics.test_n, equals: 226 }
+      - { path: metrics.coef_logp, approx: -0.7274, abs: 0.001 }
+      - { path: metrics.test_r2, approx: 0.7797, abs: 0.001 }
+      - { path: metrics.test_rmse, approx: 0.9976, abs: 0.001 }

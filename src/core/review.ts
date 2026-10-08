@@ -251,8 +251,21 @@ function decisionsMisreported(ctx: ReviewContext): FindingIn[] {
   return out;
 }
 
+function numbersFromComparisons(ctx: ReviewContext): FindingIn[] {
+  const nodes = new Map(ctx.record.nodes().map((n) => [n.id, n]));
+  const hits = ctx.claims.filter((c) => c.node && nodes.get(c.node)?.sensitivityOf);
+  if (!hits.length) return [];
+  return [{
+    check: "number_from_comparison",
+    severity: "error",
+    message: `The answer uses ${hits.map((c) => c.value).join(", ")} from a comparison run of another option (${[...new Set(hits.map((c) => nodes.get(c.node!)!.sensitivityOf))].join(", ")}), not from the setting that was chosen. Use the result of the chosen setting, or say clearly that the number is from the comparison.`,
+    nodes: hits.map((c) => c.node!),
+  }];
+}
+
 export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
   return [
+    ...numbersFromComparisons(ctx),
     ...decisionsMisreported(ctx),
     ...failedNotRepeated(ctx),
     ...deviationsNotMentioned(ctx),

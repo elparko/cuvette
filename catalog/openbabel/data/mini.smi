@@ -1,0 +1,4 @@
+CC(=O)Oc1ccccc1C(=O)O aspirin
+c1ccccc1 benzene
+not_a_smiles broken
+CC(=O)[O-].[Na+] sodium_acetate

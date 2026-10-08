@@ -1,0 +1,307 @@
+adapter:
+  name: samtools
+  title: samtools
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Converts, sorts, indexes and counts aligned sequencing reads with samtools. Each tool runs one
+    samtools command and prints the counts. The scientist can repeat each step on the command line.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: samtools
+  version: "1.24"
+  homepage: https://www.htslib.org
+  docs:
+    - https://www.htslib.org/doc/samtools.html
+    - https://www.htslib.org/doc/samtools-view.html
+    - https://www.htslib.org/doc/samtools-flagstat.html
+    - https://www.htslib.org/doc/samtools-idxstats.html
+
+connection:
+  kind: cli
+  call_timeout_s: 600
+
+locate:
+  env: SAMTOOLS
+  paths: ["/opt/homebrew/bin/samtools", "/usr/local/bin/samtools", "/usr/bin/samtools", "~/.local/bin/samtools"]
+  which: [samtools]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "samtools (\\S+)"
+
+decisions:
+  - key: reference
+    label: Reference FASTA file
+    kind: text
+    group: Data
+    help: >
+      The FASTA file that the reads were aligned to. A SAM file with no header needs it, or
+      samtools stops with "no SQ lines present". samtools also writes a .fai index next to it.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: convert_to_bam, arg: reference }
+
+  - key: min_mapq
+    label: Smallest mapping quality to count
+    kind: int
+    default: 0
+    lo: 0
+    hi: 255
+    group: Filters
+    help: >
+      Reads with a lower mapping quality (MAPQ) are not counted. 0 counts all reads. Many
+      pipelines use 20 or 30 to drop reads that map in more than one place.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_reads, arg: min_mapq }
+    sensitivity:
+      options: [0, 10, 20, 30]
+      tool: count_reads
+      compare: [metrics.count]
+      max_runs: 4
+
+  - key: exclude_flags
+    label: Flags to leave out of a count
+    kind: int
+    default: 0
+    lo: 0
+    hi: 4095
+    group: Filters
+    help: >
+      Sum of the SAM flag bits to remove. 4 is unmapped. 256 is secondary. 1024 is duplicate.
+      2048 is supplementary. 0 removes nothing. 1284 removes unmapped, secondary and duplicate
+      reads. flagstat counts all reads and ignores this value.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_reads, arg: exclude_flags }
+
+  - key: require_flags
+    label: Flags that a counted read must have
+    kind: int
+    default: 0
+    lo: 0
+    hi: 4095
+    group: Filters
+    help: >
+      Sum of the SAM flag bits that each counted read must have. 2 is properly paired. 64 is read 1.
+      0 requires nothing.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_reads, arg: require_flags }
+
+tools:
+  - name: convert_to_bam
+    title: Convert SAM to BAM
+    description: >
+      Convert a SAM file (plain or gzip) to a BAM file. Give the reference FASTA file if the SAM
+      file has no header. The result has the path of the BAM file (bam) and the number of reads.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the SAM, BAM or CRAM file. }
+      reference: { type: string, description: Absolute path of the reference FASTA file. Needed if the input has no header. }
+    required: [path]
+    outputs:
+      bam: { kind: file, ext: .bam, description: The BAM file. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/write_bam.sh", "{program_path}", "{output.bam}", "view", "-b", "-T", "{reference}", "{path}"]
+    parse: keyvalue
+
+  - name: sort_bam
+    title: Sort a BAM file
+    description: Sort a BAM file by position on the reference. The result has the path of the sorted file (bam).
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the BAM file. }
+    required: [path]
+    outputs:
+      bam: { kind: file, ext: .bam, description: The sorted BAM file. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/write_bam.sh", "{program_path}", "{output.bam}", "sort", "{path}"]
+    parse: keyvalue
+
+  - name: index_bam
+    title: Index a sorted BAM file
+    description: >
+      Index a BAM file that is sorted by position. The result has the path of the BAM file
+      (indexed_bam) and the path of its index (index). Use indexed_bam in later steps.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the sorted BAM file. }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/index.sh", "{program_path}", "{path}"]
+    parse: keyvalue
+
+  - name: flagstat
+    title: Count reads by flag
+    description: >
+      Count the reads in a BAM file by SAM flag: total, mapped, properly paired, singletons,
+      duplicates and others. The tool counts all reads.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the BAM file. }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/flagstat.sh", "{program_path}", "{path}"]
+    parse: keyvalue
+
+  - name: idxstats
+    title: Count reads on each reference sequence
+    description: >
+      Count the mapped reads on each reference sequence. The BAM file must be sorted and indexed.
+      Use indexed_bam from index_bam. Keys are mapped_<sequence name>.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the indexed BAM file. }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/idxstats.sh", "{program_path}", "{path}"]
+    parse: keyvalue
+
+  - name: count_reads
+    title: Count reads with filters
+    description: >
+      Count the reads in a BAM file that pass the filters. A region such as seq2:100-200 needs an
+      indexed BAM file. Use indexed_bam from index_bam.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the BAM file. }
+      region: { type: string, description: "Region such as seq2:100-200. Leave out to count the whole file." }
+      min_mapq: { type: integer, minimum: 0, maximum: 255, description: Smallest mapping quality (samtools -q). }
+      require_flags: { type: integer, minimum: 0, maximum: 4095, description: Flag bits that a read must have (samtools -f). }
+      exclude_flags: { type: integer, minimum: 0, maximum: 4095, description: Flag bits that a read must not have (samtools -F). }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/count.sh", "{program_path}", "view", "-c", "-q", "{min_mapq}", "-f", "{require_flags}", "-F", "{exclude_flags}", "{path}", "{region}"]
+    parse: keyvalue
+
+map:
+  - tool: convert_to_bam
+    route: "Run: samtools view -b -T <reference.fa> -o <out>.bam <in>.sam"
+    params:
+      - { arg: path, label: "<in>.sam" }
+      - { arg: reference, label: "-T", ui_default: "" }
+    fidelity: exact
+    evidence: { source: docs, test: convert_counts, note: "The command line is the manual route. The test counts the reads of the converted file." }
+    summary: "Wrote a BAM file with {metrics.n_reads} reads."
+
+  - tool: sort_bam
+    route: "Run: samtools sort -o <out>.bam <in>.bam"
+    params:
+      - { arg: path, label: "<in>.bam" }
+    fidelity: exact
+    evidence: { source: docs, test: pipeline_counts }
+    summary: "Sorted the BAM file. It has {metrics.n_reads} reads."
+
+  - tool: index_bam
+    route: "Run: samtools index <sorted>.bam"
+    params:
+      - { arg: path, label: "<sorted>.bam" }
+    fidelity: exact
+    evidence: { source: docs, test: pipeline_counts, note: "The tool links the BAM file into its own folder first, so samtools writes the index there." }
+    summary: "Indexed the BAM file. Index: {data.index}"
+
+  - tool: flagstat
+    route: "Run: samtools flagstat <in>.bam"
+    params:
+      - { arg: path, label: "<in>.bam" }
+    fidelity: exact
+    evidence: { source: docs, test: pipeline_counts, note: "The tool reads the tab-separated output (-O tsv). The numbers are the same as the text output." }
+    summary: "{metrics.total} reads. {metrics.mapped} mapped. {metrics.properly_paired} properly paired. {metrics.singletons} singletons."
+
+  - tool: idxstats
+    route: "Run: samtools idxstats <indexed>.bam"
+    params:
+      - { arg: path, label: "<indexed>.bam" }
+    fidelity: exact
+    evidence: { source: docs, test: pipeline_counts }
+    summary: "{metrics.mapped_total} reads mapped on {metrics.n_references} reference sequences."
+
+  - tool: count_reads
+    route: "Run: samtools view -c [-q <mapq>] [-f <flags>] [-F <flags>] <in>.bam [<region>]"
+    params:
+      - { arg: path, label: "<in>.bam" }
+      - { arg: region, label: "<region>", ui_default: "" }
+      - { arg: min_mapq, label: "-q", ui_default: 0 }
+      - { arg: require_flags, label: "-f", ui_default: 0 }
+      - { arg: exclude_flags, label: "-F", ui_default: 0 }
+    fidelity: exact
+    evidence: { source: docs, test: pipeline_counts }
+    summary: "{metrics.count} reads pass the filters."
+
+checks:
+  - id: no_header_without_reference
+    description: A SAM file without a header was converted with no reference file.
+    severity: error
+    rule:
+      tool: convert_to_bam
+      arg: reference
+      op: missing
+      message: Give the reference FASTA file. A SAM file without a header needs it.
+  - id: mapq_not_stated
+    description: A count of reads does not say which mapping quality cutoff and which flag filters it used.
+    severity: warning
+    text: The report must state the mapping quality cutoff and the flag filters of each count, or say that it used none.
+  - id: flagstat_with_filters
+    description: The report compares a filtered count with the flagstat total as if both used the same reads.
+    severity: warning
+    text: A filtered count (count_reads with a cutoff or flags) must not be compared with a flagstat number without saying that the filters differ.
+  - id: unsorted_index
+    description: A region count or an idxstats call used a BAM file that is not sorted and indexed.
+    severity: error
+    text: Region counts and idxstats need a sorted and indexed BAM file. The report must show that sort_bam and index_bam ran first.
+
+tests:
+  - id: convert_counts
+    description: The SAM file ex1.sam.gz (samtools example data) has 3307 reads. The count comes from samtools flagstat.
+    data: [data/ex1.sam.gz, data/ex1.fa, data/ex1.fa.fai]
+    calls:
+      - tool: convert_to_bam
+        args: { path: "{adapter_dir}/data/ex1.sam.gz", reference: "{adapter_dir}/data/ex1.fa" }
+    expect:
+      - { path: metrics.n_reads, equals: 3307 }
+
+  - id: header_needed
+    description: The SAM file has no header. The conversion fails if no reference is given.
+    data: [data/ex1.sam.gz]
+    calls:
+      - tool: convert_to_bam
+        args: { path: "{adapter_dir}/data/ex1.sam.gz" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no SQ lines" }
+
+  - id: pipeline_counts
+    description: >
+      Convert, sort, index, then flagstat, idxstats and counts. The numbers come from samtools 1.24
+      on the example data (pinned from a run by hand on the command line).
+    data: [data/ex1.sam.gz, data/ex1.fa, data/ex1.fa.fai]
+    manual_route_checked: true
+    calls:
+      - tool: convert_to_bam
+        args: { path: "{adapter_dir}/data/ex1.sam.gz", reference: "{adapter_dir}/data/ex1.fa" }
+        save_as: bam
+      - tool: sort_bam
+        args: { path: "{saved.bam.data.bam}" }
+        save_as: sorted
+      - tool: index_bam
+        args: { path: "{saved.sorted.data.bam}" }
+        save_as: indexed
+      - tool: flagstat
+        args: { path: "{saved.indexed.data.indexed_bam}" }
+        save_as: fs
+      - tool: idxstats
+        args: { path: "{saved.indexed.data.indexed_bam}" }
+        save_as: ix
+      - tool: count_reads
+        args: { path: "{saved.indexed.data.indexed_bam}", min_mapq: 30 }
+        save_as: q30
+      - tool: count_reads
+        args: { path: "{saved.indexed.data.indexed_bam}", region: "seq2:100-200" }
+    expect:
+      - { path: saved.fs.metrics.total, equals: 3307 }
+      - { path: saved.fs.metrics.mapped, equals: 3271 }
+      - { path: saved.fs.metrics.properly_paired, equals: 3144 }
+      - { path: saved.fs.metrics.singletons, equals: 127 }
+      - { path: saved.ix.metrics.mapped_seq1, equals: 1482 }
+      - { path: saved.ix.metrics.mapped_seq2, equals: 1789 }
+      - { path: saved.q30.metrics.count, equals: 3210 }
+      - { path: metrics.count, equals: 79 }

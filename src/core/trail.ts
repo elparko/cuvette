@@ -178,13 +178,28 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
   switch (e.kind) {
     case "setup":
       return { icon: "setup", line: setupLine(d), details: { values: d.values, profile: d.profile, how: d.how, defaultsAccepted: d.defaultsAccepted }, technical: tech() };
+    case "sensitivity": {
+      const opts = (d.options as { value: unknown; ok: boolean; metrics: Record<string, number>; node?: string }[] | undefined) ?? [];
+      const said = [...((d.depends as string[]) ?? []), ...((d.holds as string[]) ?? [])].join(" ");
+      return {
+        icon: "decision",
+        line: `Compared ${opts.length} options for ${show(d.decisionKey)}${said ? `: ${clip(said)}` : ""}`,
+        details: { table: d.table, options: opts.map((o) => ({ value: o.value, ok: o.ok, metrics: o.metrics, node: o.node })) },
+        technical: tech(),
+      };
+    }
     case "tool_result": {
+      if (d.sensitivityOf) {
+        const node = nodeFor(record, e);
+        if (node) joined.add(node.id);
+        return undefined;
+      }
       const node = nodeFor(record, e);
       if (node) joined.add(node.id);
       return stepBuilt(record, e, node, adapters, stale);
     }
     case "node": {
-      if (joined.has(e.data.id as string)) return undefined;
+      if (joined.has(e.data.id as string) || e.data.sensitivityOf) return undefined;
       const hasResult = record.entries(["tool_result"]).some((r) => nodeFor(record, r)?.id === e.data.id);
       if (hasResult) return undefined;
       return stepBuilt(record, e, e.data as unknown as Node, adapters, stale);

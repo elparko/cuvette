@@ -1,0 +1,6 @@
+name,smiles,logS
+aspirin,CC(=O)Oc1ccccc1C(=O)O,-1.72
+benzene,c1ccccc1,-1.64
+caffeine,Cn1cnc2c1c(=O)n(C)c(=O)n2C,-0.88
+broken,not_a_smiles,-1.0
+sodium acetate,CC(=O)[O-].[Na+],0.1

@@ -1,0 +1,143 @@
+adapter:
+  name: openbabel
+  title: Open Babel format conversion and descriptors
+  version: 0.1.0
+  description: Converts molecule files between formats and writes descriptor values with Open Babel.
+  authors: [onboarding agent]
+  status: draft
+program:
+  name: Open Babel
+  version: "3.2.1"
+  homepage: https://openbabel.org
+  docs:
+    - https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html
+    - https://open-babel.readthedocs.io/en/latest/Descriptors/descriptors.html
+connection:
+  kind: cli
+locate:
+  env: GA_OBABEL
+  which: [obabel]
+  paths: ["/opt/homebrew/bin/obabel", "/usr/local/bin/obabel", "/usr/bin/obabel"]
+  version_command: ["{program_path}", "-V"]
+  version_pattern: "Open Babel (\\S+)"
+decisions:
+  - key: descriptor_set
+    label: Descriptors to append
+    kind: text
+    default: "MW logP TPSA HBD HBA1 rotors"
+    owner: human
+    group: Descriptors
+    help: Names from obabel -L descriptors, separated by spaces. MW is molecular weight, logP is octanol and water, TPSA is polar surface area, HBD and HBA1 count hydrogen bond donors and acceptors, rotors counts rotatable bonds.
+    essential: true
+    links:
+      - { tool: append_descriptors, arg: descriptors }
+  - key: salt_handling
+    label: Salts and multi-fragment molecules
+    kind: choice
+    choices: [keep, largest_fragment]
+    default: keep
+    owner: human
+    group: Molecules
+    help: keep leaves each molecule as given. largest_fragment removes all but the largest piece. Use the tool convert_largest_fragment for largest_fragment.
+    essential: true
+tools:
+  - name: convert_molecules
+    title: Convert molecules to another format
+    description: "Convert a molecule file to another format, for example smi, can (canonical SMILES), inchi, inchikey, sdf or mol2. Keeps every fragment. Writes one output text. Open Babel with -e continues after an invalid molecule and drops it."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the input file. The extension gives the input format. }
+      to: { type: string, enum: [smi, can, inchi, inchikey, sdf, mol2], default: can }
+    required: [path]
+    outputs:
+      result: { kind: text, ext: .txt, description: The converted molecules. }
+    command: ["{program_path}", "{path}", "-o{to}", "-e", "-O{output.result}"]
+  - name: convert_largest_fragment
+    title: Convert and keep the largest fragment
+    description: Convert a molecule file to another format and remove all but the largest fragment of each molecule. This removes salt counter-ions.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the input file. }
+      to: { type: string, enum: [smi, can, inchi, inchikey, sdf, mol2], default: can }
+    required: [path]
+    outputs:
+      result: { kind: text, ext: .txt, description: The converted molecules. }
+    command: ["{program_path}", "{path}", "-o{to}", "-e", "-r", "-O{output.result}"]
+  - name: append_descriptors
+    title: Append descriptors to SMILES
+    description: "Write each molecule as SMILES and name, followed by the values of the descriptors in the order of the list. The output has one line for each molecule."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the input file. }
+      descriptors: { type: string, description: "Descriptor names separated by spaces, such as MW logP TPSA." }
+    required: [path, descriptors]
+    outputs:
+      result: { kind: text, ext: .smi, description: "Lines of SMILES, name and descriptor values." }
+    command: ["{program_path}", "{path}", "-osmi", "-e", "-O{output.result}", "--append", "{descriptors}"]
+map:
+  - tool: convert_molecules
+    route: "Run: obabel <file> -o<format> -e -O<output file>"
+    params:
+      - { arg: path, label: input file, ui_default: "" }
+      - { arg: to, label: output format, ui_default: can }
+    fidelity: exact
+    evidence: { source: docs, test: mini-convert, note: "The route is the command line. A person has not run it by hand." }
+    summary: "Converted {path} to {to}."
+  - tool: convert_largest_fragment
+    route: "Run: obabel <file> -o<format> -e -r -O<output file>"
+    params:
+      - { arg: path, label: input file, ui_default: "" }
+      - { arg: to, label: output format, ui_default: can }
+    fidelity: exact
+    evidence: { source: docs, test: mini-largest-fragment }
+    summary: "Converted {path} to {to} with the largest fragment only."
+  - tool: append_descriptors
+    route: "Run: obabel <file> -osmi -e -O<output file> --append \"<descriptor names>\""
+    params:
+      - { arg: path, label: input file, ui_default: "" }
+      - { arg: descriptors, label: --append names, ui_default: "" }
+    fidelity: exact
+    evidence: { source: docs, test: mini-descriptors }
+    summary: "Descriptors {descriptors} written for {path}."
+checks:
+  - id: molecules_lost_silently
+    description: Open Babel dropped molecules and the answer does not give the counts.
+    severity: error
+    text: "Open Babel prints an error on the error stream for an invalid molecule and still exits with success. Without -e it also drops every molecule after the first invalid one. The answer must compare the number of input molecules with the number of output lines and report each difference."
+  - id: logp_not_comparable
+    description: Open Babel logP is compared with another program logP with no note.
+    severity: warning
+    text: "The answer must say which program computed logP. Values from Open Babel and from RDKit can differ in the last digits."
+  - id: salts_not_reported
+    description: Molecules with more than one fragment were kept and the answer does not say so.
+    severity: info
+    text: "If the output has SMILES with a dot, the answer must say how salts were handled."
+tests:
+  - id: mini-convert
+    description: "Four lines. One SMILES is invalid. With -e the three valid molecules stay. Aspirin InChIKey BSYNRYMUTXBXSQ-UHFFFAOYSA-N is the published key."
+    data: [data/mini.smi]
+    calls:
+      - tool: convert_molecules
+        args: { path: "{adapter_dir}/data/mini.smi", to: inchikey }
+    expect:
+      - { path: text, contains: "BSYNRYMUTXBXSQ-UHFFFAOYSA-N" }
+  - id: mini-largest-fragment
+    description: Sodium acetate becomes the acetate ion [O-]C(=O)C when the largest fragment is kept.
+    data: [data/mini.smi]
+    calls:
+      - tool: convert_molecules
+        args: { path: "{adapter_dir}/data/mini.smi", to: can }
+        save_as: kept
+      - tool: convert_largest_fragment
+        args: { path: "{adapter_dir}/data/mini.smi", to: can }
+    expect:
+      - { path: saved.kept.text, contains: "[Na+]" }
+      - { path: text, contains: "[O-]C(=O)C" }
+  - id: mini-descriptors
+    description: "Aspirin molecular weight 180.157 and logP 1.3101 are read from obabel. The values are from a run of the program, not from a publication."
+    data: [data/mini.smi]
+    calls:
+      - tool: append_descriptors
+        args: { path: "{adapter_dir}/data/mini.smi", descriptors: "MW logP TPSA HBD" }
+    expect:
+      - { path: text, contains: "aspirin 180.157 1.3101 63.6 1" }
