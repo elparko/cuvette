@@ -30,3 +30,5 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx vitest run
+        env:
+          CI: "false"

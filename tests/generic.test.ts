@@ -29,7 +29,7 @@ test("run_command runs without a shell and reports failures", async () => {
   expect(r).toMatchObject({ ok: true, fidelity: "none" });
   expect(r.text).toContain("a;b $(x)");
   expect(r.text).toContain("[stderr]");
-  expect(r.manualRoute).toContain("'a;b $(x)'");
+  expect(r.manualRoute).toContain(process.platform === "win32" ? '"a;b $(x)"' : "'a;b $(x)'");
   const f = await tools.run_command.execute({ argv: [process.execPath, "-e", "process.exit(2)"] }, ctx());
   expect(f).toMatchObject({ ok: false, error: expect.stringMatching(/exited with code 2/) });
   expect((await tools.run_command.execute({ argv: [] }, ctx())).ok).toBe(false);

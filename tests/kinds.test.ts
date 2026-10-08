@@ -372,7 +372,7 @@ test("screen: dry run records actions and gives routes", async () => {
 
 const exampleArgs = (a: Args, dir: string): Args => JSON.parse(JSON.stringify(a).replaceAll("{adapter_dir}", dir.replaceAll("\\", "/")));
 
-test("example wc-text: known answer", async () => {
+test.skipIf(process.platform === "win32")("example wc-text: known answer (uses /usr/bin/wc)", async () => {
   const dir = join("examples", "adapters", "wc-text");
   const { run, rt } = await start(dir);
   expect(rt.programVersion).toBe("");

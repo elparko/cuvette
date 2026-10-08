@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { encodePng } from "./png.ts";
+import { encodePng, decodePng } from "./png.ts";
 
 export const BENCH_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../bench");
 
@@ -134,7 +134,13 @@ function listFiles(dir: string): string[] {
 }
 
 export function hashFiles(dir: string): Record<string, string> {
-  return Object.fromEntries(listFiles(dir).map((n) => [n, createHash("sha256").update(readFileSync(join(dir, n))).digest("hex")]));
+  const content = (n: string): Buffer | Uint8Array => {
+    const buf = readFileSync(join(dir, n));
+    if (!n.endsWith(".png")) return buf;
+    const g = decodePng(buf);
+    return Buffer.concat([Buffer.from(`${g.width}x${g.height}:`), Buffer.from(g.pixels)]);
+  };
+  return Object.fromEntries(listFiles(dir).map((n) => [n, createHash("sha256").update(content(n)).digest("hex")]));
 }
 
 export function dataDir(id: string): string {

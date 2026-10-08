@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, extname, join } from "node:path";
+import { existsSync, readdirSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
+import { basename, extname, join, resolve } from "node:path";
 import type { Args, Fidelity, OutputFile, TablePreview, Tool, ToolOutput } from "../../core/types.ts";
 import { locate } from "../locate.ts";
 import type { AdapterModule, LoadedAdapter, ToolDef } from "../manifest.ts";
@@ -89,14 +89,26 @@ function textFor(def: ToolDef, p: ParsedStdout, files: OutputFile[], stdout: str
   return cap(lines.filter(Boolean).join("\n"), 20000);
 }
 
+function samePath(p: string): string {
+  let r: string;
+  try {
+    r = realpathSync.native(p);
+  } catch {
+    r = resolve(p);
+  }
+  return process.platform === "win32" ? r.toLowerCase() : r;
+}
+
 function outputList(call: CallDir, def: ToolDef, extra: string[], macroFile: string): OutputFile[] {
-  const byPath = new Map(Object.entries(call.outputs).map(([k, p]) => [p, k]));
+  const byPath = new Map(Object.entries(call.outputs).map(([k, p]) => [samePath(p), k]));
   const seen = new Set<string>();
   const out: OutputFile[] = [];
   const add = (path: string, kindHint?: OutputFile["kind"]) => {
-    if (seen.has(path) || path === macroFile || !existsSync(path)) return;
-    seen.add(path);
-    const key = byPath.get(path);
+    if (!existsSync(path)) return;
+    const id = samePath(path);
+    if (seen.has(id) || id === samePath(macroFile)) return;
+    seen.add(id);
+    const key = byPath.get(id);
     const spec = key ? def.outputs[key] : undefined;
     const kind = kindHint ?? (spec && (spec.kind === "image" || spec.kind === "table") ? spec.kind : fileKind(path));
     out.push({ path, kind, name: key ?? basename(path) });

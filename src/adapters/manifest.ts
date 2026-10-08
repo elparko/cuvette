@@ -248,7 +248,7 @@ export interface LoadedAdapter {
 }
 
 function frontmatter(text: string): Record<string, string> {
-  const m = /^---\n([\s\S]*?)\n---/.exec(text);
+  const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
   if (!m) return {};
   const out = parseYaml(m[1]);
   return typeof out === "object" && out ? out : {};

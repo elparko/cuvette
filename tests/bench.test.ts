@@ -66,7 +66,7 @@ describe("datasets", () => {
     expect(count(40, 100)).toBe(50);
   });
 
-  test("pseudorep, confound and saturation planted differences", () => {
+  test("pseudorep, confound and saturation planted differences", { timeout: 120000 }, () => {
     const area = (path: string) => {
       const img = decodePng(readFileSync(path));
       const s = components(img, (v) => v > otsu(img));

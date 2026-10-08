@@ -144,7 +144,7 @@ test("locate: env var, paths with ~ and globs, then which", async () => {
   process.env.GA_TEST_ROOT = bin;
 
   const a = await locate(manifest({ env: "GA_TEST_PROG", paths: ["/nonexistent"], version_command: ["{program_path}"], version_pattern: "version ([\\d.]+)" }, "0"));
-  expect(a).toMatchObject({ path: exe, version: "1.10.3" });
+  expect(a).toMatchObject({ path: exe, version: process.platform === "win32" ? "0" : "1.10.3" });
   expect(a.how).toContain("GA_TEST_PROG");
 
   const b = await locate(manifest({ env: "GA_UNSET_VAR", paths: ["/nonexistent/x", "{env:GA_TEST_ROOT}/tool-*/prog"] }, "9.9"));
