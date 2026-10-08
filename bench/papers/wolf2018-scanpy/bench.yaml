@@ -27,4 +27,4 @@ items:
   - {key: genes_after_min_cells, description: "Genes after the minimum cells filter.", value: 13714, exact: true, in_answer: false}
   - {key: cells_after_qc, description: "Cells after quality control.", value: 2638, exact: true}
   - {key: highly_variable_genes, description: "Highly variable genes, default flavor.", value: 1838, tolerance: 20, in_answer: false}
-  - {key: leiden_clusters, description: "Leiden clusters at resolution 0.7.", value: 7, tolerance: 1}
+  - {key: leiden_clusters, description: "Leiden clusters at resolution 0.7.", value: 7, tolerance: 1, tool: cluster_leiden}
