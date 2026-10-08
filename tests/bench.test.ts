@@ -213,7 +213,7 @@ describe("score", () => {
 
   test("asking: asking at an agent decision lowers precision", () => {
     const sc = loadScenario("illumination");
-    const dir = writeLog([q("q1", "background_subtraction"), q("q2", "threshold_method"), q("q3", "rolling_ball_radius"), final("x")]);
+    const dir = writeLog([q("q1", "background_subtraction"), q("q2", "threshold_method"), q("q3", "exclude_edges"), final("x")]);
     const s = score(dir, sc);
     expect(s.details.asking.precision).toBeCloseTo(2 / 3);
     expect(s.details.asking.recall).toBe(1);
