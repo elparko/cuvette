@@ -311,6 +311,8 @@ export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
   ];
 }
 
+const TABLE_ROWS = 20;
+
 function clip(x: unknown, n = 200): string {
   const s = typeof x === "string" ? x : JSON.stringify(x);
   return s.length > n ? s.slice(0, n - 3) + "..." : s;
@@ -331,9 +333,17 @@ export function logText(record: AnalysisRecord): string {
       const call = calls.get(String(d.callId));
       const n = e.node ? record.node(e.node) : undefined;
       const step = steps.get(String(d.callId));
-      const bits = [d.ok === false ? `FAILED ${clip(d.error ?? "", 200)}` : `ok ${clip(d.summary ?? "", 300)}`];
-      const metrics = n && typeof n.result === "object" && n.result ? (n.result as any).metrics : undefined;
-      if (metrics) bits.push(`metrics ${clip(metrics, 300)}`);
+      const bits = [d.ok === false ? `FAILED ${clip(d.error ?? "", 200)}` : `ok ${clip(d.summary ?? "", 800)}`];
+      const result = n && typeof n.result === "object" && n.result ? (n.result as { metrics?: unknown; table?: { columns?: unknown[]; rows?: unknown[][] } }) : undefined;
+      if (result?.metrics) bits.push(`metrics ${clip(result.metrics, 1200)}`);
+      const table = result?.table;
+      if (table && Array.isArray(table.columns) && Array.isArray(table.rows) && table.rows.length) {
+        const rows = table.rows.slice(0, TABLE_ROWS).map((r) => r.map((v) => (v === null ? "" : typeof v === "number" ? String(Number(v.toPrecision(6))) : String(v))).join(", "));
+        const more = table.rows.length > TABLE_ROWS ? ` (first ${TABLE_ROWS} of ${table.rows.length} rows)` : "";
+        bits.push(`table ${table.columns.join(", ")}${more}: ${clip(rows.join(" | "), 2000)}`);
+      }
+      const files = (n?.outputs ?? []).map((o) => o.name).filter(Boolean);
+      if (files.length) bits.push(`output files ${clip(files.join(", "), 400)}`);
       const route = d.manualRoute ?? n?.manualRoute;
       if (route) bits.push(`manual route: ${clip(route, 200)}`);
       if (d.fidelity) bits.push(`fidelity ${d.fidelity}`);
@@ -363,6 +373,10 @@ Look for:
 - method choices that the scientist did not make or that differ from the setup
 - statistics used on the wrong unit of replication, a p value with no effect size
 - certainty that is stronger than the evidence
+
+In CLAIMS, the label "measured" with a node id (for example "measured n5") means that the claim check found
+the number in the logged result of that node. Do not report such a number as having no source. Other labels
+mean that the claim check found no logged result for the number.
 
 Write your report as JSON lines. One finding for each line, with no other text:
 {"severity": "info" | "warning" | "error", "message": "<one or two plain sentences>", "entries": [<log entry numbers>]}

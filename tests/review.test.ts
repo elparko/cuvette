@@ -154,6 +154,26 @@ describe("referee", () => {
     expect(text).toContain("#6 comparison run for method result of stats: ok AUC 0.6");
   });
 
+  test("the log gives the referee the table rows, the output files and the full summary of a step", () => {
+    const long = `Mixed model current ~ C(lps) * C(time). ${"Intercept 6.238 (se 0.2363); ".repeat(12)}C(lps)[T.1]:C(time)[T.3] -0.9055 (se 0.3188).`;
+    const rows = Array.from({ length: 25 }, (_, i) => [`term${i}`, -1.786 + i, 0.3157, 0.0045, -2.404, -1.167]);
+    const node = { id: "n5", entry: 2, tool: "fit_mixed_model", outputs: [{ name: "mixed_model.csv", path: "/w/mixed_model.csv", kind: "table" }], result: { metrics: { n: 151 }, table: { columns: ["term", "coef", "se", "p", "ci_lo", "ci_hi"], rows } } };
+    const rec = makeRecord(
+      [
+        { kind: "tool_call", data: { callId: "m", tool: "fit_mixed_model", args: {} } },
+        { kind: "tool_result", node: "n5", data: { callId: "m", tool: "fit_mixed_model", ok: true, summary: long } },
+      ],
+      [node],
+    );
+    const { system, text } = refereePrompt(ctx(rec, "x"));
+    expect(long.length).toBeGreaterThan(300);
+    expect(text).toContain("C(lps)[T.1]:C(time)[T.3] -0.9055 (se 0.3188).");
+    expect(text).toContain("table term, coef, se, p, ci_lo, ci_hi (first 20 of 25 rows): term0, -1.786, 0.3157, 0.0045, -2.404, -1.167 | term1,");
+    expect(text).not.toContain("term20,");
+    expect(text).toContain("output files mixed_model.csv");
+    expect(system).toMatch(/"measured n5"\) means that the claim check found\nthe number in the logged result of that node/);
+  });
+
   test("a plain no-findings reply gives no finding", () => {
     expect(parseReferee("No findings.")).toEqual([]);
     expect(parseReferee("none")).toEqual([]);
