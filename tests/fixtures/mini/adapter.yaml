@@ -1,0 +1,8 @@
+adapter: { name: mini }
+program: { name: Mini }
+connection: { kind: cli }
+decisions:
+  - { key: thr, label: Threshold, kind: float, default: 0.5, links: [{ tool: run, arg: cutoff }] }
+map:
+  - { tool: run, route: "A > B" }
+  - { tool: run, match: { step: b }, route: "A > C", fidelity: exact }
