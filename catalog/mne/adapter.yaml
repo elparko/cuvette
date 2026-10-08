@@ -515,7 +515,7 @@ tools:
       ch_type: { type: string, enum: [grad, mag, eeg], description: Channel type. }
       tmin: { type: number, description: Window start in seconds. }
       tmax: { type: number, description: Window end in seconds. }
-      mode: { type: string, enum: [abs, neg, pos], default: abs, description: Sign of the single-channel peak. Use neg for an EEG N100. }
+      mode: { type: string, enum: [abs, neg, pos], default: abs, description: "Sign of the single-channel peak. Keep abs for grad and mag, because the sign of a gradiometer has no meaning. Use neg only for an EEG N100." }
     required: [evoked]
 
   - name: plot_evoked
