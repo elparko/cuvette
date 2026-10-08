@@ -81,6 +81,7 @@ async function headless(prompt: string) {
     }
     if (e.type === "permission") s.respondPermission(e.rid, allow.has("all") || allow.has(e.tool), allow.size ? "" : "headless mode denies by default; pass --allow");
     if (e.type === "instruction") s.followDone(e.step, "", true);
+    if (out !== "stream-json" && e.type === "entry" && (e.entry.kind === "error" || e.entry.kind === "notice")) process.stderr.write(`${e.entry.kind === "error" ? "Error" : "Note"}: ${e.entry.data.message ?? e.entry.data.text}\n`);
     if (out === "text" && e.type === "entry" && e.entry.kind === "tool_result") process.stderr.write(`  ${e.entry.data.ok ? "●" : "✗"} ${e.entry.data.summary ?? e.entry.data.error ?? e.entry.data.tool}\n`);
   });
   s.settings.autoResume = false;
