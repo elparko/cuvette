@@ -65,16 +65,22 @@ items:
       2375 sites.
   sequences:
     source: computed
-    tool: IQ-TREE 3.1.4 input summary (check_iqtree.sh)
+    tool: IQ-TREE 2.0.8 input summary (check_iqtree.sh)
     where: >-
       Not printed as one number. The Figure 1 caption names 54 Sporocadaceae, and the alignment adds the
       outgroup, so it has 55 sequences.
+    independence: independent
+    check: >-
+      IQ-TREE 2.0.8 called directly reads 55 sequences, and the FASTA file has 55 header lines.
   log_likelihood_iqtree3_modelfinder:
     source: computed
     tool: IQ-TREE 3.1.4 with -m MFP (check_iqtree.sh)
     where: >-
       Not in the paper. ModelFinder of IQ-TREE 3 picks TIM2+F+R3, and the tree has a log-likelihood of
       -15891.367. A reference value that shows the effect of the model choice.
+    independence: same path
+    check: >-
+      IQ-TREE 3.1.4 is the program of the adapter too, so this is not an independent check. The value is a reference and does not count.
 data:
   source: figshare item 20530188 version 3, the alignments of Kanetis 2022
   url: https://doi.org/10.6084/m9.figshare.20530188

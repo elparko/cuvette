@@ -96,6 +96,9 @@ items:
     source: computed
     tool: R read.delim on the GEO count file (check_deseq2.R)
     where: Not in the paper. The GEO count file has 59087 genes.
+    independence: independent
+    check: >-
+      R read.delim of the GEO tab file (check_deseq2.R). The adapter reads the converted CSV with read.csv.
   significant_without_pairing:
     source: published
     where: >-

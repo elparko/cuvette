@@ -70,16 +70,25 @@ items:
     source: computed
     tool: Python gzip read of features.tsv.gz (check_qc.py)
     where: Not in the paper. Each matrix has 32286 features.
+    independence: independent
+    check: >-
+      Python gzip read of features.tsv.gz (check_qc.py), not scanpy.
   pulse_cells_human_mito_prefix:
     source: computed
     tool: numpy and scipy (check_qc.py)
     where: >-
       Not in the paper. A trap value: with the human prefix "MT-" no mouse gene counts as mitochondrial, and the
       gene filters alone keep 10392 pulse cells.
+    independence: independent
+    check: >-
+      numpy and scipy count of genes per cell (check_qc.py), not scanpy.
   chase_cells_human_mito_prefix:
     source: computed
     tool: numpy and scipy (check_qc.py)
     where: Not in the paper. The same trap for the chase sample keeps 9859 cells.
+    independence: independent
+    check: >-
+      numpy and scipy count of genes per cell (check_qc.py), not scanpy.
 data:
   source: GEO series GSE253262, samples GSM8017442 (pulse) and GSM8017443 (chase), Cell Ranger filtered matrices
   url: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE253262
