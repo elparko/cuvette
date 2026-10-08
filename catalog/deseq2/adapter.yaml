@@ -1,12 +1,13 @@
 adapter:
   name: deseq2
   title: DESeq2 (RNA-seq differential expression)
-  version: 0.1.0
+  version: 0.2.0
   spec: "1"
   description: >
-    Tests for differential gene expression in an RNA-seq count table with DESeq2 in R. The adapter
-    reads a count table and a sample table, fits the model that the scientist chose, and returns
-    the genes that pass the false discovery rate cutoff.
+    Tests for differential gene expression in RNA-seq data with DESeq2 in R. The adapter reads a
+    gene count matrix, transcript quantification (Salmon, kallisto or RSEM, through tximport), the
+    counts and lengths of a tximport result, or a saved SummarizedExperiment. It fits the model
+    that the scientist chose and returns the genes that pass the false discovery rate cutoff.
   authors: [Parker Smith]
   status: draft
 
@@ -42,7 +43,11 @@ standards: >
   Every script puts the R package library in front of the library path. The library is the first
   folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
   ~/.guided-analysis/R-library. It sets R_LIBS_USER to that folder. The program version in
-  this adapter is the version of the R package DESeq2, not of R.
+  this adapter is the version of the R package DESeq2, not of R. Transcript quantification needs
+  the R package tximport (and rhdf5 for kallisto abundance.h5). tximport runs offline. The adapter
+  does not use tximeta, because tximeta downloads annotation.
+
+module: adapter.ts
 
 data_rules:
   cloud_visibility: all
@@ -57,6 +62,28 @@ decisions:
     essential: true
     owner: human
     stage: setup
+
+  - key: input_type
+    label: Input type
+    kind: choice
+    choices:
+      - count matrix
+      - transcript quantification
+      - counts and lengths
+      - SummarizedExperiment rds
+    group: Input
+    help: >
+      count matrix - whole-number gene counts (featureCounts, HTSeq, summarizeOverlaps).
+      transcript quantification - Salmon, kallisto or RSEM files and a transcript-to-gene table;
+      tximport makes gene counts and average transcript lengths. counts and lengths - the two
+      tables of a tximport result. SummarizedExperiment rds - a saved object, such as tximeta
+      output. With transcript lengths, DESeq2 uses them as offsets for each gene and sample, and
+      the result changes. Do not round Salmon or kallisto counts into a count matrix.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_deseq, arg: input_type }
 
   - key: replicate
     label: What is the unit of replication?
@@ -236,13 +263,22 @@ checks:
       Report the answer if it says that the gene counts match a published workflow, and it gives
       no comparison of the numbers.
 
+  - id: estimated_counts_rounded
+    description: The answer rounded estimated counts from Salmon, kallisto or RSEM into a count matrix.
+    severity: warning
+    text: >
+      Report the answer if it says that estimated counts from Salmon, kallisto or RSEM were rounded
+      and used as a count matrix without the transcript lengths. Such counts must go through tximport
+      (or the counts and lengths tables), so that DESeq2 uses the length offsets.
+
 map:
   - tool: inspect_counts
     route: "counts <- as.matrix(read.csv(\"counts.csv\", row.names=1)); coldata <- read.csv(\"coldata.csv\", row.names=1); dim(counts)"
     steps:
       - "Install R and the Bioconductor package DESeq2."
-      - "Read the count table and the sample table with read.csv()."
+      - "Read the input. A count table: read.csv(). Salmon, kallisto or RSEM files: tximport(). An .rds file: readRDS()."
       - "Run dim(counts) and head(coldata). The column names of the counts must be the row names of the sample table."
+      - "Check that the counts are whole numbers. Estimated counts with decimals need the transcript lengths."
     fidelity: code_only
     difference: DESeq2 has no menu route. The route is the R call.
     evidence:
@@ -264,12 +300,74 @@ map:
       - { arg: lfc_threshold, label: "lfcThreshold of results()", ui_default: 0 }
     fidelity: close
     difference: >
-      The tool calls the same functions as the route. It sorts the genes by padj, and it counts
-      the genes with padj below alpha. Without a lfcThreshold the tool runs results() with
+      The tool calls the same functions as the route. It also reads featureCounts output (the
+      annotation columns are dropped) and a folder of HTSeq files. It stops if the counts are not
+      whole numbers. It sorts the genes by padj, and it counts the genes with padj below alpha. Without a lfcThreshold the tool runs results() with
       altHypothesis greaterAbs and threshold 0, which gives the same p values as the default.
     evidence:
       source: docs
       note: DESeq2 vignette and rnaseqGene workflow. The tool has not been compared with a run by a person.
+
+  - tool: run_deseq
+    match: { input_type: transcript quantification }
+    route: "txi <- tximport(files, type=\"salmon\", tx2gene=tx2gene); dds <- DESeqDataSetFromTximport(txi, coldata, design=~ cell + dex); dds$dex <- relevel(dds$dex, ref=\"untrt\"); dds <- dds[rowSums(counts(dds) >= 10) >= 4, ]; dds <- DESeq(dds); res <- results(dds, contrast=c(\"dex\",\"trt\",\"untrt\"), alpha=0.1)"
+    steps:
+      - "Make a vector of the quant.sf, abundance.h5, abundance.tsv or .results files, one for each sample, named by sample."
+      - "Read the transcript-to-gene table. Run tximport(files, type = \"salmon\" (or \"kallisto\" or \"rsem\"), tx2gene = tx2gene)."
+      - "Run DESeqDataSetFromTximport(txi, colData, design). It rounds the counts and keeps txi$length as the avgTxLength assay."
+      - "Filter, run DESeq() and results() as for a count matrix. DESeq2 uses the lengths as offsets for each gene and sample."
+    params:
+      - { arg: design, label: "design of DESeqDataSetFromTximport()", ui_default: "~ 1" }
+      - { arg: alpha, label: "alpha of results()", ui_default: 0.1 }
+      - { arg: lfc_threshold, label: "lfcThreshold of results()", ui_default: 0 }
+    fidelity: close
+    difference: >
+      The tool finds one quantification file for each sample by the sample name. It sets
+      ignoreTxVersion and ignoreAfterBar of tximport from the ids. A gene length of 0 (RSEM) becomes 1.
+    evidence:
+      source: docs
+      test: salmon_tximport
+      note: tximport vignette and DESeq2 vignette, section on transcript abundance files.
+
+  - tool: run_deseq
+    match: { input_type: counts and lengths }
+    route: "txi <- list(counts=as.matrix(read.csv(\"counts.csv\", row.names=1)), length=as.matrix(read.csv(\"length.csv\", row.names=1)), countsFromAbundance=\"no\"); dds <- DESeqDataSetFromTximport(txi, coldata, design=~ cell + dex)"
+    steps:
+      - "Read the counts and the average transcript lengths of the tximport result."
+      - "Make the list txi with counts, length and countsFromAbundance = \"no\"."
+      - "Run DESeqDataSetFromTximport(txi, colData, design), then filter, DESeq() and results()."
+    params:
+      - { arg: design, label: "design of DESeqDataSetFromTximport()", ui_default: "~ 1" }
+      - { arg: alpha, label: "alpha of results()", ui_default: 0.1 }
+      - { arg: lfc_threshold, label: "lfcThreshold of results()", ui_default: 0 }
+    fidelity: close
+    difference: The tool checks that the two tables have the same genes and samples.
+    evidence:
+      source: docs
+      test: counts_and_lengths
+      note: The airway gse export gives the rnaseqGene workflow numbers (bench love2014-deseq2-airway).
+
+  - tool: run_deseq
+    match: { input_type: SummarizedExperiment rds }
+    route: "se <- readRDS(\"gse.rds\"); dds <- DESeqDataSet(se, design=~ cell + dex)"
+    steps:
+      - "Run readRDS() on the file."
+      - "For tximeta output, DESeqDataSet(se, design) rounds the counts and uses the length assay as offsets."
+      - "Filter, run DESeq() and results() as for a count matrix."
+    params:
+      - { arg: design, label: "design of DESeqDataSet()", ui_default: "~ 1" }
+      - { arg: alpha, label: "alpha of results()", ui_default: 0.1 }
+      - { arg: lfc_threshold, label: "lfcThreshold of results()", ui_default: 0 }
+    fidelity: close
+    difference: >
+      The tool reads the counts assay and the length (or avgTxLength) assay and calls
+      DESeqDataSetFromTximport. For tximeta output this is the same as DESeqDataSet(se). An object
+      with no length assay goes to DESeqDataSetFromMatrix. countsFromAbundance other than no turns
+      the offsets off.
+    evidence:
+      source: docs
+      test: gse_subset_rds
+      note: rnaseqGene workflow. The full data(gse) gives the printed workflow numbers with both routes.
 
   - tool: top_genes
     route: "head(res[order(res$padj), ], 20)"
@@ -305,6 +403,8 @@ tests:
       - { path: saved.fit.metrics.n_down, equals: 216 }
       - { path: "table.rows[0][0]", equals: ENSG00000165995 }
       - { path: "table.rows[0][2]", approx: 3.287, abs: 0.01 }
+      - { path: saved.fit.data.input_type, equals: count matrix }
+      - { path: saved.fit.data.length_offsets, equals: false }
 
   - id: design_without_donor
     description: >
@@ -331,16 +431,194 @@ tests:
       - { path: metrics.n_down, equals: 243 }
       - { path: "table.rows[0][2]", approx: -3.287, abs: 0.01 }
 
+  - id: salmon_tximport
+    description: >
+      Synthetic data (make_fixtures.R): 120 genes, 6 samples, 3 donors, ctrl or trt, with isoform switches in 15 genes. The numbers are from a direct R run of tximport and DESeqDataSetFromTximport in make_fixtures.R. Salmon quant.sf with transcript versions (.1); the tx2gene table has none.
+    data: [data/tx/salmon/s1/quant.sf, data/tx/tx2gene.csv, data/tx/coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/salmon", coldata: "{adapter_dir}/data/tx/coldata.csv", tx2gene: "{adapter_dir}/data/tx/tx2gene.csv", input_type: transcript quantification, design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_genes_tested, equals: 120 }
+      - { path: metrics.n_significant, equals: 30 }
+      - { path: metrics.n_up, equals: 12 }
+      - { path: metrics.n_down, equals: 18 }
+      - { path: data.length_offsets, equals: true }
+      - { path: data.constructor, equals: DESeqDataSetFromTximport }
+      - { path: data.import, contains: "type = \"salmon\"" }
+
+  - id: kallisto_tsv
+    description: >
+      The same synthetic data as kallisto abundance.tsv. The numbers are the same as for Salmon.
+    data: [data/tx/kallisto/s1/abundance.tsv, data/tx/tx2gene.csv, data/tx/coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/kallisto", coldata: "{adapter_dir}/data/tx/coldata.csv", tx2gene: "{adapter_dir}/data/tx/tx2gene.csv", input_type: transcript quantification, design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_genes_tested, equals: 120 }
+      - { path: metrics.n_significant, equals: 30 }
+      - { path: metrics.n_up, equals: 12 }
+      - { path: metrics.n_down, equals: 18 }
+      - { path: data.length_offsets, equals: true }
+      - { path: data.constructor, equals: DESeqDataSetFromTximport }
+      - { path: data.import, contains: kallisto }
+
+  - id: kallisto_h5
+    description: >
+      The same synthetic data as kallisto abundance.h5. Needs the R package rhdf5.
+    data: [data/tx/kallisto_h5/s1/abundance.h5, data/tx/tx2gene.csv, data/tx/coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/kallisto_h5", coldata: "{adapter_dir}/data/tx/coldata.csv", tx2gene: "{adapter_dir}/data/tx/tx2gene.csv", input_type: transcript quantification, design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_genes_tested, equals: 120 }
+      - { path: metrics.n_significant, equals: 30 }
+      - { path: metrics.n_up, equals: 12 }
+      - { path: metrics.n_down, equals: 18 }
+      - { path: data.length_offsets, equals: true }
+      - { path: data.constructor, equals: DESeqDataSetFromTximport }
+      - { path: data.import, contains: kallisto }
+
+  - id: rsem_isoforms
+    description: >
+      The same synthetic data as RSEM isoforms.results files.
+    data: [data/tx/rsem/s1.isoforms.results, data/tx/tx2gene.csv, data/tx/coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/rsem", coldata: "{adapter_dir}/data/tx/coldata.csv", tx2gene: "{adapter_dir}/data/tx/tx2gene.csv", input_type: transcript quantification, design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_genes_tested, equals: 120 }
+      - { path: metrics.n_significant, equals: 30 }
+      - { path: metrics.n_up, equals: 12 }
+      - { path: metrics.n_down, equals: 18 }
+      - { path: data.length_offsets, equals: true }
+      - { path: data.constructor, equals: DESeqDataSetFromTximport }
+      - { path: data.import, contains: rsem }
+
+  - id: rsem_genes
+    description: >
+      The gene-level tximport result as RSEM genes.results files. No tx2gene table is needed.
+    data: [data/tx/rsem_genes/s1.genes.results, data/tx/coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/rsem_genes", coldata: "{adapter_dir}/data/tx/coldata.csv", input_type: transcript quantification, design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_genes_tested, equals: 120 }
+      - { path: metrics.n_significant, equals: 30 }
+      - { path: metrics.n_up, equals: 12 }
+      - { path: metrics.n_down, equals: 18 }
+      - { path: data.length_offsets, equals: true }
+      - { path: data.constructor, equals: DESeqDataSetFromTximport }
+      - { path: data.import, contains: gene results }
+
+  - id: counts_and_lengths
+    description: >
+      The counts and lengths of the Salmon tximport result as two CSV files.
+    data: [data/tx/gene_counts.csv, data/tx/gene_length.csv, data/tx/coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/gene_counts.csv", lengths: "{adapter_dir}/data/tx/gene_length.csv", coldata: "{adapter_dir}/data/tx/coldata.csv", input_type: counts and lengths, design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_genes_tested, equals: 120 }
+      - { path: metrics.n_significant, equals: 30 }
+      - { path: metrics.n_up, equals: 12 }
+      - { path: metrics.n_down, equals: 18 }
+      - { path: data.length_offsets, equals: true }
+      - { path: data.constructor, equals: DESeqDataSetFromTximport }
+
+  - id: rounded_counts_without_lengths
+    description: >
+      The same counts rounded and used as a count matrix, without the lengths. The result changes
+      from 30 to 36 significant genes. This shows that the length offsets change the result.
+    data: [data/tx/gene_counts_rounded.csv, data/tx/coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/gene_counts_rounded.csv", coldata: "{adapter_dir}/data/tx/coldata.csv", input_type: count matrix, design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_significant, equals: 36 }
+      - { path: metrics.n_up, equals: 16 }
+      - { path: metrics.n_down, equals: 20 }
+      - { path: data.length_offsets, equals: false }
+      - { path: data.constructor, equals: DESeqDataSetFromMatrix }
+
+  - id: featurecounts_and_htseq
+    description: >
+      The rounded counts as featureCounts output (sample columns are BAM paths) and as a folder of
+      HTSeq files with __ rows. Both give the numbers of the rounded count matrix. The input type
+      is left out, so the tool detects it.
+    data: [data/tx/featurecounts.txt, data/tx/htseq/s1.counts.txt, data/tx/coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/featurecounts.txt", coldata: "{adapter_dir}/data/tx/coldata.csv", design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+        save_as: fc
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/htseq", coldata: "{adapter_dir}/data/tx/coldata.csv", design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+    expect:
+      - { path: saved.fc.metrics.n_significant, equals: 36 }
+      - { path: saved.fc.data.input_type, equals: count matrix }
+      - { path: metrics.n_significant, equals: 36 }
+      - { path: metrics.n_up, equals: 16 }
+      - { path: data.import, contains: HTSeq }
+
+  - id: estimated_counts_rejected
+    description: >
+      Estimated counts with decimals given as a count matrix. The tool stops and names the
+      tximport routes. It does not round the counts.
+    data: [data/tx/gene_counts.csv, data/tx/coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/tx/gene_counts.csv", coldata: "{adapter_dir}/data/tx/coldata.csv", input_type: count matrix, design: "~ donor + condition", variable: condition, reference_level: ctrl, test_level: trt, min_count: 10, min_samples: 3, alpha: 0.1 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: not whole numbers }
+
+  - id: detect_input_types
+    description: >
+      inspect_counts detects the input type from the files. A Salmon folder is transcript
+      quantification. A table with decimals and no length table is counts and lengths.
+    data: [data/tx/salmon/s1/quant.sf, data/tx/gene_counts.csv, data/tx/tx2gene.csv, data/tx/coldata.csv]
+    calls:
+      - tool: inspect_counts
+        args: { counts: "{adapter_dir}/data/tx/salmon", coldata: "{adapter_dir}/data/tx/coldata.csv", tx2gene: "{adapter_dir}/data/tx/tx2gene.csv" }
+        save_as: salmon
+      - tool: inspect_counts
+        args: { counts: "{adapter_dir}/data/tx/gene_counts.csv", coldata: "{adapter_dir}/data/tx/coldata.csv" }
+    expect:
+      - { path: saved.salmon.data.detected_input_type, equals: transcript quantification }
+      - { path: saved.salmon.data.has_lengths, equals: true }
+      - { path: saved.salmon.metrics.n_genes, equals: 120 }
+      - { path: data.detected_input_type, equals: counts and lengths }
+
+  - id: gse_subset_rds
+    description: >
+      750 genes of data(gse) of the airway package 1.32.0 (tximeta output, Salmon, GENCODE v29),
+      saved as .rds by make_fixtures.R. The numbers are from DESeqDataSet(se) as in the rnaseqGene
+      workflow, in make_fixtures.R. The full data(gse) gives the printed workflow numbers (bench love2014-deseq2-airway).
+    data: [data/gse_subset.rds]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/gse_subset.rds", input_type: SummarizedExperiment rds, design: "~ cell + dex", variable: dex, reference_level: untrt, test_level: trt, min_count: 10, min_samples: 4, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_genes_input, equals: 750 }
+      - { path: metrics.n_genes_tested, equals: 600 }
+      - { path: metrics.n_significant, equals: 180 }
+      - { path: metrics.n_up, equals: 99 }
+      - { path: metrics.n_down, equals: 81 }
+      - { path: data.length_offsets, equals: true }
+
 tools:
   - name: inspect_counts
-    title: Inspect a count table
+    title: Inspect the input
     description: >
-      Read a count table and a sample table. Returns the number of genes and samples, the library
-      sizes, and the columns of the sample table with their levels.
+      Read the input and the sample table. Returns the detected input type and the reason, the
+      number of genes and samples, the library sizes, if transcript lengths are present, and the
+      columns of the sample table with their levels.
     params:
-      counts: { type: string, description: "Path of a CSV file. The first column is the gene id. The other columns are samples." }
-      coldata: { type: string, description: "Path of a CSV file. The first column is the sample name. It must match the column names of the counts." }
-    required: [counts, coldata]
+      counts: { type: string, description: "Path of the input. A count table (CSV or TSV, gene id in the first column; featureCounts output works). A folder of HTSeq count files, one for each sample. A folder of Salmon quant.sf, kallisto abundance.h5 or abundance.tsv, or RSEM .results files, in folders or files named for each sample. An .rds file with a SummarizedExperiment or DESeqDataSet." }
+      coldata: { type: string, description: "Path of a CSV file. The first column is the sample name. Not needed for an .rds file." }
+      lengths: { type: string, description: "For counts and lengths: path of the table of average transcript lengths from tximport." }
+      tx2gene: { type: string, description: "For transcript quantification: path of a CSV or TSV table with a header and two columns, transcript id and gene id." }
+    required: [counts]
     read_only: true
     script: scripts/inspect_counts.R
     parse: json
@@ -348,12 +626,16 @@ tools:
   - name: run_deseq
     title: Test for differential expression
     description: >
-      Filter the low-count genes, fit DESeq2 with the design, and test the test level against the
-      reference level of the variable. Returns the number of tested genes, the number of
-      significant genes (up and down), and a results file with one row for each gene.
+      Read the input, filter the low-count genes, fit DESeq2 with the design, and test the test
+      level against the reference level of the variable. Returns the input path that ran, if
+      transcript length offsets were used, the number of tested genes, the number of significant
+      genes (up and down), and a results file with one row for each gene.
     params:
-      counts: { type: string, description: "Path of the count table (CSV, gene id in the first column)." }
-      coldata: { type: string, description: Path of the sample table (CSV, sample name in the first column). }
+      counts: { type: string, description: "Path of the input. A count table (CSV or TSV, gene id in the first column; featureCounts output works). A folder of HTSeq count files, one for each sample. A folder of Salmon quant.sf, kallisto abundance.h5 or abundance.tsv, or RSEM .results files, in folders or files named for each sample. An .rds file with a SummarizedExperiment or DESeqDataSet." }
+      coldata: { type: string, description: "Path of the sample table (CSV, sample name in the first column). Not needed for an .rds file." }
+      lengths: { type: string, description: "For counts and lengths: path of the table of average transcript lengths from tximport (same genes and samples as the counts)." }
+      tx2gene: { type: string, description: "For transcript quantification (not RSEM gene results): path of a CSV or TSV table with a header and two columns, transcript id and gene id." }
+      input_type: { type: string, enum: [count matrix, transcript quantification, counts and lengths, SummarizedExperiment rds], description: "Leave out. The harness sets it from the decision record. The kind of input." }
       design: { type: string, description: "Leave out. The harness sets it from the decision record. Design formula, such as ~ cell + dex." }
       variable: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the sample table to test." }
       reference_level: { type: string, description: "Leave out. The harness sets it from the decision record. Reference level of the variable." }
@@ -362,7 +644,7 @@ tools:
       min_samples: { type: integer, minimum: 1, maximum: 1000, description: "Leave out. The harness sets it from the decision record. Minimum number of samples with a detected gene." }
       alpha: { type: number, minimum: 0.0001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. False discovery rate cutoff." }
       lfc_threshold: { type: number, minimum: 0, maximum: 10, description: "Leave out. The harness sets it from the decision record. Log2 fold change threshold for the test." }
-    required: [counts, coldata]
+    required: [counts]
     outputs:
       results: { kind: table, ext: .csv, description: "One row for each tested gene, sorted by padj." }
     script: scripts/run_deseq.R

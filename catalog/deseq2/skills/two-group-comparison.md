@@ -5,7 +5,7 @@ description: Steps to find the genes that differ between two conditions in an RN
 
 # Compare two conditions
 
-1. Run inspect_counts. Read the sample table columns and the levels of each column.
+1. Run inspect_counts. Read the detected input type, the sample table columns and the levels of each column.
 2. Ask the scientist for the design, the variable, the reference level and the test level.
 3. Ask the scientist what the replicates are. If one donor has several samples, the design must have a donor term.
 4. Ask the scientist for the filter and the cutoff for padj.

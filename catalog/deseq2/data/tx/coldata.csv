@@ -1,0 +1,7 @@
+"sample","donor","condition"
+"s1","d1","ctrl"
+"s2","d1","trt"
+"s3","d2","ctrl"
+"s4","d2","trt"
+"s5","d3","ctrl"
+"s6","d3","trt"
