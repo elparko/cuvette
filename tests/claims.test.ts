@@ -117,6 +117,39 @@ describe("checkAnswer", () => {
     expect(c[0]).toMatchObject({ label: "measured", node: "n9" });
   });
 
+  test("reads scientific notation in every common form and matches the logged value", () => {
+    const { record } = fake([{ node: "n5", path: "table.rows[4][3]", value: 1.54353e-8 }]);
+    const forms = ["1.54 × 10⁻⁸", "1.54 x 10^-8", "1.54×10-8", "1.54e-8", "1.54E-08", "1.54 × 10^−8", "1.54·10⁻⁸", "1.54 × 10^{-8}", "1.54 x 10^(-8)", "1.54*10^-8"];
+    for (const form of forms) {
+      const c = checkAnswer(`The p-value for the interaction was ${form} in the mixed model.`, record);
+      expect(c.map((x) => [x.value, x.label, x.node]), form).toEqual([[1.54e-8, "measured", "n5"]]);
+    }
+  });
+
+  test("superscript exponents keep their sign and a positive exponent works", () => {
+    const { record } = fake([
+      { node: "n1", path: "metrics.cells", value: 123456 },
+      { node: "n1", path: "metrics.q", value: 0.00042 },
+    ]);
+    const c = checkAnswer("We counted 1.23 × 10⁵ cells. The q-value was 4.2 × 10⁻⁴.", record);
+    expect(c.map((x) => [x.value, x.label, x.node])).toEqual([
+      [123000, "measured", "n1"],
+      [0.00042, "measured", "n1"],
+    ]);
+  });
+
+  test("a times sign before a plain number is not an exponent", () => {
+    const { record } = fake([
+      { node: "n1", path: "metrics.a", value: 3.5 },
+      { node: "n1", path: "metrics.b", value: 100 },
+    ]);
+    const c = checkAnswer("The dilution was 3.5 x 100 in the final mix.", record);
+    expect(c.map((x) => [x.value, x.label])).toEqual([
+      [3.5, "measured"],
+      [100, "measured"],
+    ]);
+  });
+
   test("keeps the minus sign after markdown emphasis and code marks", () => {
     const { record } = fake([{ node: "n1", path: "metrics.log_likelihood", value: -21152.5377 }]);
     for (const text of ["The log-likelihood is **-21152.5377**.", "The log-likelihood is *-21152.5377*.", "The log-likelihood is _−21152.5377_.", "The log-likelihood is `-21152.5377`.", "| lnL |-21152.5377 |"]) {

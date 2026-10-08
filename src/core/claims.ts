@@ -17,7 +17,9 @@ interface Span {
 }
 
 const NUMBER =
-  /(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)(?:\s?[eE]([-+−]?\d+)|\s?[x×]\s?10\^?([-+−]?\d+))?(\s?%|\s(?:per ?cent|percent)\b)?/g;
+  /(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)(?:\s?[eE]([-+−]?\d+)|\s?[x×·⋅*]\s?10(?:\^\(?\{?([-+−]?\d+)\}?\)?|([-+−]\d+)|([⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)))?(\s?%|\s(?:per ?cent|percent)\b)?/g;
+
+const SUPERSCRIPT: Record<string, string> = { "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "⁻": "-", "⁺": "+" };
 
 const MASKS: RegExp[] = [
   /^[ \t]*(?:[-*•][ \t]+)?\d+[.)](?=\s)/gm,
@@ -73,10 +75,11 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
     let end = start + m[0].length;
     const mantissa = m[1].replace(/,/g, "");
     const dec = mantissa.includes(".") ? mantissa.length - mantissa.indexOf(".") - 1 : 0;
-    const exp = Number((m[2] ?? m[3] ?? "0").replace("−", "-"));
-    let value = Number(mantissa) * 10 ** exp;
-    const step = 10 ** (exp - dec);
-    const percent = Boolean(m[4]);
+    const expText = m[2] ?? m[3] ?? m[4] ?? (m[5] ? [...m[5]].map((c) => SUPERSCRIPT[c]).join("") : undefined);
+    const exp = Number((expText ?? "0").replace("−", "-"));
+    let value = Number(`${mantissa}e${exp}`);
+    const step = Number(`1e${exp - dec}`);
+    const percent = Boolean(m[6]);
     const before = masked.slice(0, start);
     const sign = before.match(/(^|[\s(=<>≤≥*_`~[:|])([-−+])$/);
     let from = start;
@@ -84,7 +87,7 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
       from = start - 1;
       if (sign[2] !== "+") value = -value;
     }
-    const plain = dec === 0 && m[2] === undefined && m[3] === undefined && !percent;
+    const plain = dec === 0 && expText === undefined && !percent;
     const attached = /^[A-Za-zµ°]/.test(masked.slice(end));
     const small = plain && Math.abs(value) <= 10 && !attached;
     if (small && !opts.small && !inTableCell(text, start)) continue;
