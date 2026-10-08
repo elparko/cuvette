@@ -1,10 +1,11 @@
-import { extractNumbers } from "../core/claims.ts";
+import { checkAnswer, extractNumbers } from "../core/claims.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import type { Claim, Entry } from "../core/types.ts";
 import type { PaperItem } from "./papers-spec.ts";
 
 export interface ComputedMatch {
   pass: boolean;
+  via?: "main" | "comparison";
   value: number | null;
   diff: number | null;
   node: string | null;
@@ -72,15 +73,20 @@ export function finalClaims(record: Pick<AnalysisRecord, "entries">): { entry: E
 
 export function scoreComputed(item: PaperItem, record: Pick<AnalysisRecord, "numbers" | "nodes" | "node">): ComputedMatch {
   const comparison = new Set(record.nodes().filter((n) => n.sensitivityOf).map((n) => n.id));
-  let best: { n: { node: string; path: string; value: number }; d: number } | undefined;
+  let main: { n: { node: string; path: string; value: number }; d: number } | undefined;
+  let comp: typeof main;
   for (const n of record.numbers()) {
-    if (comparison.has(n.node)) continue;
     const d = gap(item, n.value);
-    if (!best || d < best.d) best = { n, d };
+    if (comparison.has(n.node)) {
+      if (!comp || d < comp.d) comp = { n, d };
+    } else if (!main || d < main.d) main = { n, d };
   }
+  const useComp = comp && within(item, comp.d) && !(main && within(item, main.d));
+  const best = useComp ? comp : main ?? comp;
   if (!best) return { pass: false, value: null, diff: null, node: null, path: null, entry: null };
   return {
     pass: within(item, best.d),
+    via: within(item, best.d) ? (useComp || best === comp ? "comparison" : "main") : undefined,
     value: best.n.value,
     diff: best.d,
     node: best.n.node,
@@ -123,7 +129,7 @@ export function scoreReported(item: PaperItem, found: { entry: Entry; claims: Cl
 
 export function scoreItems(items: PaperItem[], record: Pick<AnalysisRecord, "numbers" | "nodes" | "node" | "entries">): ItemScore[] {
   const claims = finalClaims(record);
-  return items.map((item) => ({
+  return items.filter((item) => !item.trap && !item.optional).map((item) => ({
     key: item.key,
     description: item.description,
     expected: item.value,
@@ -166,4 +172,26 @@ export function processMetrics(record: Pick<AnalysisRecord, "entries" | "nodes">
     overwritten: devs.filter((d) => d.overwritten).length,
     nodes: record.nodes().filter((n) => !n.sensitivityOf).length,
   };
+}
+
+const HARNESS_TAILS = ["\n\nStep results that the answer does not mention", "\n\nSettings used, from the decision record"];
+
+export function modelAnswer(text: string): string {
+  const cut = HARNESS_TAILS.map((t) => text.indexOf(t)).filter((i) => i >= 0);
+  return cut.length ? text.slice(0, Math.min(...cut)) : text;
+}
+
+export function rescoreItems(items: PaperItem[], record: AnalysisRecord): ItemScore[] {
+  const final = finalAnswer(record);
+  const found = final ? { entry: final, claims: checkAnswer(modelAnswer(String(final.data.text ?? "")), { numbers: () => record.numbers(), nodes: () => record.nodes(), stale: () => record.stale(), entries: () => [], append: () => final } as never) } : undefined;
+  return items.filter((item) => !item.trap && !item.optional).map((item) => ({
+    key: item.key,
+    description: item.description,
+    expected: item.value,
+    tolerance: tolerance(item),
+    abs: item.abs,
+    inAnswer: item.in_answer,
+    computed: scoreComputed(item, record),
+    reported: scoreReported(item, found),
+  }));
 }

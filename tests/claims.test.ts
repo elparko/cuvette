@@ -80,6 +80,12 @@ describe("checkAnswer", () => {
     expect(claims.map((c) => c.value)).toEqual([0.81]);
   });
 
+  test("counts small whole numbers in table rows but not in the header row or in prose", () => {
+    const { record } = fake([{ node: "n5", path: "segments", value: 3 }, ...nums]);
+    const text = "| s | segments |\n|---|---|\n| 64 | 3 |\n\nWe ran 3 steps.";
+    expect(checkAnswer(text, record).map((c) => c.value)).toEqual([64, 3]);
+  });
+
   test("ignores version numbers", () => {
     const { record } = fake(nums);
     const claims = checkAnswer("I used vegan 2.7.6 and lmerTest v3.2.1 for AUC 0.81.", record);

@@ -53,6 +53,14 @@ function mask(text: string): string {
   return out;
 }
 
+function inTableCell(text: string, at: number): boolean {
+  const line = text.slice(text.lastIndexOf("\n", at - 1) + 1, (text.indexOf("\n", at) + 1 || text.length + 1) - 1);
+  if (!/^\s*\|.*\|\s*$/.test(line)) return false;
+  const lines = text.split("\n");
+  const i = text.slice(0, at).split("\n").length - 1;
+  return !/^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? "");
+}
+
 export function extractNumbers(text: string): Found[] {
   const masked = mask(text);
   const hasCitation = (s: Span) => CITATION.test(s.text);
@@ -76,7 +84,7 @@ export function extractNumbers(text: string): Found[] {
     }
     const plain = dec === 0 && m[2] === undefined && m[3] === undefined && !percent;
     const attached = /^[A-Za-zµ°]/.test(masked.slice(end));
-    if (plain && Math.abs(value) <= 10 && !attached) continue;
+    if (plain && Math.abs(value) <= 10 && !attached && !inTableCell(text, start)) continue;
     if (LABEL_BEFORE.test(before)) continue;
     if (THRESHOLD_BEFORE.test(before)) continue;
     if (percent && /^\s*(?:confidence|CI\b)/i.test(masked.slice(end))) continue;

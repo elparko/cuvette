@@ -1,10 +1,11 @@
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { adapterDirs, gaHome } from "../adapters/manifest.ts";
 import { applyHeadlessSetup, attachHeadless } from "../core/headless.ts";
 import type { Provider } from "../core/types.ts";
-import { finalAnswer, processMetrics, scoreItems, type ItemScore, type ProcessMetrics } from "./papers-score.ts";
+import { finalAnswer, processMetrics, rescoreItems, scoreItems, type ItemScore, type ProcessMetrics } from "./papers-score.ts";
+import { AnalysisRecord } from "../core/record.ts";
 import { fillPrompt, loadPaper, missingData, paperIds, PAPERS_DIR, readValues, type Paper } from "./papers-spec.ts";
 import { renderPapersReport, summarize } from "./papers-report.ts";
 
@@ -201,4 +202,18 @@ export async function runPapers(opts: PapersOptions): Promise<PapersResult> {
       }
   save();
   return result;
+}
+
+export function rescoreResults(path: string): { runs: number; rescored: number } {
+  const result = JSON.parse(readFileSync(path, "utf8")) as PapersResult;
+  let rescored = 0;
+  for (const r of result.runs) {
+    if (!r.dir || !existsSync(join(r.dir, "log.jsonl"))) continue;
+    const paper = loadPaper(r.paper);
+    r.items = rescoreItems(paper.items, new AnalysisRecord(r.dir, r.session ?? "rescore"));
+    rescored++;
+  }
+  writeFileSync(path, JSON.stringify({ ...result, summary: summarize(result) }, null, 1));
+  writeFileSync(path.replace(/\.json$/, ".md"), renderPapersReport(result));
+  return { runs: result.runs.length, rescored };
 }

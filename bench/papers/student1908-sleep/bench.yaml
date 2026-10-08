@@ -17,4 +17,4 @@ items:
   - {key: paired_p, description: "Paired two-sided p", value: 0.002833, tolerance: 0.0001}
   - {key: ci_lower, description: "95% CI lower bound", value: 0.700, tolerance: 0.005}
   - {key: ci_upper, description: "95% CI upper bound", value: 2.460, tolerance: 0.005}
-  - {key: welch_p_trap, description: "Unpaired Welch p (trap result)", value: 0.07939, tolerance: 0.0005, in_answer: false}
+  - {key: welch_p_trap, description: "Unpaired Welch p (trap result)", value: 0.07939, tolerance: 0.0005, in_answer: false, trap: true}

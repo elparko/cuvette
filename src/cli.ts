@@ -290,6 +290,16 @@ async function main() {
         if (r.paths) console.log(`${r.paths.md}\n${r.paths.json}`);
         return;
       }
+      if (a1 === "rescore") {
+        const results = (str(o.results) ?? "").split(",").filter(Boolean);
+        if (!results.length) return fail("usage: ga bench rescore --results a.json[,b.json]");
+        const { rescoreResults } = await import("./bench/papers.ts");
+        for (const f of results) {
+          const r = rescoreResults(f);
+          console.log(`${f}: rescored ${r.rescored} of ${r.runs} runs`);
+        }
+        return;
+      }
       if (a1 === "site") {
         const results = (str(o.results) ?? "").split(",").filter(Boolean);
         const out = str(o.out);

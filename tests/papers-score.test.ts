@@ -60,11 +60,19 @@ test("abs compares the absolute value", () => {
   expect(scoreItems([item({ key: "t", value: 4.0621, tolerance: 0.001 })], record)[0].computed.pass).toBe(false);
 });
 
-test("comparison runs do not count as computed", () => {
+test("a value from a comparison run passes computed, labelled via comparison; a main step wins", () => {
   const main = node({ count: 40 });
   node({ count: 66 }, { sensitivityOf: main.id });
   const [s] = scoreItems([item({ key: "count", value: 66, exact: true })], record);
-  expect(s.computed.pass).toBe(false);
+  expect(s.computed).toMatchObject({ pass: true, via: "comparison" });
+  const [m] = scoreItems([item({ key: "count", value: 40, exact: true })], record);
+  expect(m.computed).toMatchObject({ pass: true, via: "main" });
+});
+
+test("trap items are left out of the score", () => {
+  node({ p: 0.0794 });
+  const scored = scoreItems([item({ key: "p", value: 0.0794, tolerance: 0.001, trap: true }), item({ key: "q", value: 1, exact: true })], record);
+  expect(scored.map((x) => x.key)).toEqual(["q"]);
 });
 
 test("reported passes when the answer states a measured value in tolerance", () => {
@@ -157,4 +165,10 @@ test("rounding needs at least two significant digits", () => {
   answer("The mean difference is 1.6 hours.");
   const [b] = scoreItems([item({ key: "mean", value: 1.58, tolerance: 0.005 })], record);
   expect(b.reported).toMatchObject({ pass: true, via: "rounding" });
+});
+
+test("modelAnswer drops the harness-written tails", async () => {
+  const { modelAnswer } = await import("../src/bench/papers-score.ts");
+  expect(modelAnswer("There are 47 cells.\n\nStep results that the answer does not mention, from the record:\n- n1\n\nSettings used, from the decision record: x.")).toBe("There are 47 cells.");
+  expect(modelAnswer("Plain answer.")).toBe("Plain answer.");
 });

@@ -22,5 +22,5 @@ items:
   - {key: up_padj_01, description: "Up-regulated genes at padj < 0.1, workflow", value: 2362, tolerance: 250}
   - {key: down_padj_01, description: "Down-regulated genes at padj < 0.1, workflow", value: 2019, tolerance: 250}
   - {key: padj_005_workflow, description: "Genes with padj < 0.05, workflow", value: 3602, tolerance: 400, in_answer: false}
-  - {key: padj_01_pydeseq2, description: "Genes with padj < 0.1 on this CSV, pydeseq2 0.5.4", value: 4643, tolerance: 100, in_answer: false}
-  - {key: padj_005_pydeseq2, description: "Genes with padj < 0.05 on this CSV, pydeseq2 0.5.4", value: 3872, tolerance: 100, in_answer: false}
+  - {key: padj_01_pydeseq2, description: "Genes with padj < 0.1 on this CSV, pydeseq2 0.5.4", value: 4643, tolerance: 100, in_answer: false, optional: true}
+  - {key: padj_005_pydeseq2, description: "Genes with padj < 0.05 on this CSV, pydeseq2 0.5.4", value: 3872, tolerance: 100, in_answer: false, optional: true}
