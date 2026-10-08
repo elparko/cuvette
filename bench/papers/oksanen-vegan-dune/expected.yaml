@@ -1,0 +1,28 @@
+tool: vegan (R)
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/oksanen-vegan-dune/dune.csv
+  - /Volumes/T7/guided-analysis/data/oksanen-vegan-dune/dune_env.csv
+decisions:
+  distance: bray
+  transform: none
+  permutations: 999
+  seed: 1
+  strata: none
+  permanova_terms: Management
+  permanova_by: terms
+  nmds_k: 2
+  replication_unit: "site (20 sites)"
+expected:
+  - {description: "Shannon index of site 1 (natural log)", value: 1.4405, tolerance: 0.001, source: "vegan 2.7.6 diversity(dune)[1], computed"}
+  - {description: "NMDS stress, Bray-Curtis, k=2", value: 0.1183, tolerance: 0.001, source: "vegan intro vignette (recalled, not re-read) and vegan 2.7.6 run"}
+  - {description: "PERMANOVA R2 of Management", value: 0.3416, tolerance: 0.001, source: "vegan 2.7.6 adonis2, computed; does not depend on the seed"}
+  - {description: "PERMANOVA F of Management", value: 2.767, tolerance: 0.01, source: "vegan 2.7.6 adonis2, computed; does not depend on the seed"}
+  - {description: "PERMANOVA p of Management, 999 permutations", value: 0.003, tolerance: 0.003, source: "vegan 2.7.6, seeds 1 and 42 give 0.002 and 0.003"}
+  - {description: "dispersion test F of Management", value: 1.951, tolerance: 0.01, source: "vegan 2.7.6 betadisper and permutest, computed"}
+notes: |
+  The values are computed with vegan 2.7.6. I did not compare the PERMANOVA numbers with a printed vignette.
+  Trap: PERMANOVA p changes in the third decimal with the seed. R2 and F do not.
+  Trap: the dune table holds cover classes, so rarefaction does not apply in a strict sense.
+  Trap: Jaccard on presence data gives R2 0.2896, so the distance choice changes the result.
+  Trap: a significant PERMANOVA needs a dispersion test. Here the dispersion test is not significant.

@@ -1,0 +1,744 @@
+adapter:
+  name: vegan
+  title: vegan (community ecology)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Describes and tests plant or animal communities with vegan in R. The adapter reads a site by
+    species table and a site table, computes diversity, rarefies, ordinates (NMDS and RDA), and
+    tests group differences (PERMANOVA and dispersion) with the distance, permutations and seed
+    that the scientist chose.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: vegan
+  version: "2.7.6"
+  tested_versions: []
+  homepage: https://CRAN.R-project.org/package=vegan
+  docs:
+    - https://vegandevs.github.io/vegan/
+    - https://cran.r-project.org/web/packages/vegan/vignettes/intro-vegan.pdf
+    - https://cran.r-project.org/web/packages/vegan/vignettes/diversity-vegan.pdf
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first
+  folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  ~/.guided-analysis/R-library. The program version in this adapter is the version of the R
+  package vegan, not of R. Each permutation tool calls set.seed with the seed decision before it
+  permutes, so a repeat run gives the same p value.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return site names, species counts, distances and test statistics.
+
+decisions:
+  - key: question
+    label: What question do you ask with these sites?
+    kind: text
+    group: Question
+    help: Example - Does the plant community differ between the four management types?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - sites (one row for each independent site)
+      - repeated visits to the same sites
+      - subsamples inside a site
+    default: sites (one row for each independent site)
+    group: Design
+    help: >
+      The tests treat each row of the table as an independent unit. Repeat visits or subsamples of
+      one site are not independent. Pool them to one row for each site, or restrict the
+      permutations to blocks with the strata decision.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: distance
+    label: Distance measure
+    kind: choice
+    choices: [bray, jaccard, euclidean, manhattan, gower, horn, canberra, chord]
+    default: bray
+    group: Method
+    help: >
+      The distance sets what "different" means. Bray-Curtis uses abundance and ignores joint
+      absences. Euclidean counts joint absences as similarity and suits transformed data. Jaccard
+      in vegan uses abundance unless the transform is presence. Change of the distance changes R2
+      and p.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_nmds, arg: distance }
+      - { tool: run_permanova, arg: distance }
+      - { tool: test_dispersion, arg: distance }
+    sensitivity:
+      options: [bray, jaccard, euclidean]
+      tool: run_permanova
+      compare: [metrics.r2, metrics.f, metrics.p]
+      max_runs: 3
+
+  - key: transform
+    label: Transformation of the abundances
+    kind: choice
+    choices: [none, sqrt, log1p, hellinger, wisconsin, presence]
+    default: none
+    group: Method
+    help: >
+      The transformation runs before the distance. Square root and log1p reduce the weight of
+      the abundant species. Hellinger suits RDA. Presence turns the table into 0 and 1. The tool
+      never transforms by itself. vegan's own metaMDS transforms data with a large range unless
+      this tool turns that off.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_nmds, arg: transform }
+      - { tool: run_permanova, arg: transform }
+      - { tool: test_dispersion, arg: transform }
+      - { tool: run_rda, arg: transform }
+
+  - key: diversity_index
+    label: Diversity index
+    kind: choice
+    choices: [shannon, simpson, invsimpson, richness, evenness]
+    default: shannon
+    group: Diversity
+    help: >
+      Richness counts species. Shannon and Simpson mix richness and evenness in different ways.
+      Inverse Simpson is the effective number of dominant species. Evenness is Pielou J.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: diversity_indices, arg: index }
+
+  - key: shannon_base
+    label: Logarithm base of the Shannon index
+    kind: choice
+    choices: ["e", "2", "10"]
+    default: "e"
+    group: Diversity
+    help: Base e gives nats and is the vegan default. Base 2 gives bits. State the base in the report.
+    owner: agent
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: diversity_indices, arg: base }
+
+  - key: rarefy_size
+    label: Number of individuals to rarefy to
+    kind: int
+    lo: 1
+    hi: 1000000
+    group: Diversity
+    help: >
+      Rarefaction compares sites at the same number of individuals. Sites with fewer individuals
+      drop out. The usual choice is the smallest site total, but this throws away information
+      from larger sites.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: rarefy_richness, arg: sample_size }
+
+  - key: permanova_terms
+    label: Terms of the PERMANOVA model
+    kind: text
+    group: Model
+    help: >
+      The terms after the tilde, such as Management or Management + A1. Terms are tested in the
+      order that you write them. Put a covariate or a block first.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_permanova, arg: formula }
+
+  - key: permanova_by
+    label: How PERMANOVA tests the terms
+    kind: choice
+    choices: [terms, margin]
+    default: terms
+    group: Model
+    help: >
+      Terms tests each term after the terms before it (sequential). Margin tests each term after
+      all other terms. With more than one term, the order matters for terms and does not matter for margin.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_permanova, arg: by }
+
+  - key: dispersion_variable
+    label: Grouping variable for the dispersion test
+    kind: text
+    group: Model
+    help: >
+      PERMANOVA reacts to a difference in spread as well as to a difference in the centre. Test
+      the spread of the same grouping variable.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_dispersion, arg: variable }
+
+  - key: rda_terms
+    label: Terms of the RDA model
+    kind: text
+    group: Model
+    help: The explanatory variables after the tilde, such as Management + A1. RDA is linear and uses Euclidean distance on the transformed table.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_rda, arg: formula }
+
+  - key: rda_scale
+    label: Scale the species to unit variance in RDA
+    kind: bool
+    default: false
+    group: Model
+    help: >
+      With true each species has the same weight, so rare species count as much as common
+      species. With false abundant species dominate.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_rda, arg: scale }
+
+  - key: nmds_k
+    label: Number of NMDS dimensions
+    kind: int
+    default: 2
+    lo: 1
+    hi: 10
+    group: Ordination
+    help: >
+      More dimensions give a lower stress and a harder picture to read. Stress below 0.2 is
+      usable for a 2-D plot. The number is a choice made before the run, not after you see the stress.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_nmds, arg: k }
+    sensitivity:
+      options: [2, 3]
+      tool: run_nmds
+      compare: [metrics.stress]
+      max_runs: 2
+
+  - key: nmds_trymax
+    label: Maximum number of random starts of NMDS
+    kind: int
+    default: 20
+    lo: 1
+    hi: 500
+    group: Ordination
+    help: NMDS can stop in a local minimum. More starts lower the risk. Record the number.
+    owner: agent
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: run_nmds, arg: trymax }
+
+  - key: permutations
+    label: Number of permutations
+    kind: int
+    default: 999
+    lo: 99
+    hi: 99999
+    group: Test
+    help: >
+      The smallest p value is 1 divided by permutations plus 1. With 999 permutations the
+      smallest p is 0.001. Use 9999 for a p value near 0.01 or lower.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_permanova, arg: permutations }
+      - { tool: test_dispersion, arg: permutations }
+      - { tool: run_rda, arg: permutations }
+    sensitivity:
+      options: [99, 999, 9999]
+      tool: run_permanova
+      compare: [metrics.p]
+      max_runs: 3
+
+  - key: seed
+    label: Random seed
+    kind: int
+    default: 1
+    lo: 0
+    hi: 1000000
+    group: Reproducibility
+    help: The seed fixes the random permutations and the NMDS starts. A repeat run with the same seed gives the same p value. Record it.
+    owner: agent
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: run_nmds, arg: seed }
+      - { tool: run_permanova, arg: seed }
+      - { tool: test_dispersion, arg: seed }
+      - { tool: run_rda, arg: seed }
+
+  - key: strata
+    label: Column that restricts the permutations to blocks
+    kind: text
+    default: none
+    group: Test
+    help: >
+      Name a column of the site table, such as a block, a plot or a region. Sites are permuted only
+      inside each level of that column. Use it when sites in a block are more alike than sites
+      in different blocks. Write none for free permutation.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_permanova, arg: strata }
+      - { tool: test_dispersion, arg: strata }
+      - { tool: run_rda, arg: strata }
+
+  - key: exclusions
+    label: Sites or species that you exclude
+    kind: text
+    default: none
+    group: Design
+    help: Name each excluded site or species and the reason. Write none if you exclude nothing.
+    owner: human
+    stage: setup
+
+checks:
+  - id: few_permutations
+    description: The permutation test uses fewer than 999 permutations.
+    severity: warning
+    rule:
+      tool: run_permanova
+      arg: permutations
+      op: "<"
+      value: 999
+      message: Fewer than 999 permutations give a coarse p value. The smallest p is 1 divided by permutations plus 1.
+
+  - id: dispersion_not_tested
+    description: The answer reports a PERMANOVA difference and gives no dispersion test.
+    severity: warning
+    text: >
+      Report the answer if it says that groups differ by PERMANOVA and the log has no call of
+      test_dispersion for the same grouping variable and distance.
+
+  - id: pseudoreplication
+    description: The rows are repeat visits or subsamples, and the permutations are not restricted.
+    severity: error
+    text: >
+      Report the answer if the scientist said that rows are repeat visits or subsamples of the
+      same site and the PERMANOVA ran with strata none.
+
+  - id: stress_overread
+    description: The answer reads an NMDS plot with stress above 0.2 as a reliable picture.
+    severity: warning
+    text: >
+      Report the answer if it interprets distances or clusters in an NMDS plot and the stress in
+      the log is above 0.2.
+
+  - id: seed_not_reported
+    description: The answer gives a p value and does not name the seed and the number of permutations.
+    severity: warning
+    text: >
+      Report the answer if it gives a permutation p value and does not say the number of
+      permutations and the seed.
+
+map:
+  - tool: inspect_community
+    route: "comm <- read.csv(\"community.csv\", row.names=1); env <- read.csv(\"env.csv\", row.names=1); dim(comm); range(comm); rowSums(comm)"
+    steps:
+      - "Install R and the package vegan."
+      - "Read the community table and the site table with read.csv(row.names = 1)."
+      - "Run dim(), range() and rowSums() on the community table."
+    fidelity: code_only
+    difference: vegan has no menu route. The route is the R call.
+    evidence:
+      source: docs
+      note: vegan introduction vignette.
+
+  - tool: diversity_indices
+    route: "diversity(comm, index=\"shannon\"); diversity(comm, \"simpson\"); specnumber(comm)"
+    steps:
+      - "Run diversity(comm, index = \"shannon\", base = exp(1))."
+      - "Run diversity(comm, \"simpson\") and diversity(comm, \"invsimpson\")."
+      - "Run specnumber(comm) for the richness. Divide Shannon by log(richness) for Pielou evenness."
+    params:
+      - { arg: index, label: "index of diversity()", ui_default: shannon }
+      - { arg: base, label: "base of diversity()", ui_default: "exp(1)" }
+    fidelity: close
+    difference: >
+      The tool calls the same functions. It also computes the evenness and the group means. A person
+      has not run the route and compared the numbers.
+    evidence:
+      source: docs
+      test: shannon_dune_site_1
+      note: The diversity vignette of vegan.
+    summary: "{summary}"
+
+  - tool: rarefy_richness
+    route: "rarefy(comm, sample = 10); rarecurve(comm, sample = 10)"
+    steps:
+      - "Check that the table holds whole-number counts."
+      - "Run rarefy(comm, sample = n)."
+      - "Run rarecurve(comm, sample = n) for the curves."
+    params:
+      - { arg: sample_size, label: "sample of rarefy()", ui_default: "none" }
+    fidelity: close
+    difference: >
+      The tool drops the sites with a smaller total than the sample size. rarefy() gives NA with a
+      warning for these sites. The default sample size is the smallest site total.
+    evidence:
+      source: docs
+      test: rarefy_dune_site_1
+      note: vegan help of rarefy.
+
+  - tool: run_nmds
+    route: "set.seed(1); metaMDS(comm, distance=\"bray\", k=2, trymax=20, autotransform=FALSE)"
+    steps:
+      - "Transform the community table if you chose a transformation."
+      - "Run set.seed(seed)."
+      - "Run metaMDS(comm, distance, k, trymax, autotransform = FALSE)."
+      - "Read the stress. Run plot(fit) or scores(fit, display = \"sites\")."
+    params:
+      - { arg: distance, label: "distance of metaMDS()", ui_default: bray }
+      - { arg: k, label: "k of metaMDS()", ui_default: 2 }
+      - { arg: trymax, label: "trymax of metaMDS()", ui_default: 20 }
+      - { arg: transform, label: "autotransform of metaMDS()", ui_default: "on for a large range" }
+    fidelity: close
+    difference: >
+      metaMDS(autotransform = TRUE) applies a square root and a Wisconsin double standardization
+      when the largest value is above 50. The tool turns this off and applies only the transform
+      that the scientist chose. For the dune table (largest value 9) both routes give the same stress.
+    evidence:
+      source: docs
+      test: nmds_dune_stress
+      note: vegan introduction vignette prints the dune stress.
+
+  - tool: run_permanova
+    route: "set.seed(1); adonis2(comm ~ Management, data=env, method=\"bray\", permutations=999, by=\"terms\")"
+    steps:
+      - "Transform the community table if you chose a transformation."
+      - "Run set.seed(seed)."
+      - "Run adonis2(comm ~ terms, data = env, method = distance, permutations = n, by = by)."
+      - "For blocks, give permutations = how(nperm = n, blocks = env$block)."
+    params:
+      - { arg: distance, label: "method of adonis2()", ui_default: bray }
+      - { arg: permutations, label: "permutations of adonis2()", ui_default: 999 }
+      - { arg: by, label: "by of adonis2()", ui_default: terms }
+      - { arg: strata, label: "strata of adonis2()", ui_default: "none" }
+    fidelity: close
+    difference: >
+      The tool computes the distance with vegdist() and gives it to adonis2(). The result is the same
+      as the route with the method argument. A person has not run the route and compared the numbers.
+    evidence:
+      source: docs
+      test: permanova_dune_management
+      note: vegan help of adonis2 uses the dune data.
+
+  - tool: test_dispersion
+    route: "set.seed(1); permutest(betadisper(vegdist(comm, \"bray\"), env$Management), permutations=999)"
+    steps:
+      - "Run betadisper(vegdist(comm, distance), group)."
+      - "Run set.seed(seed)."
+      - "Run permutest(model, permutations = n)."
+      - "Run plot(model) for the picture."
+    params:
+      - { arg: distance, label: "vegdist() method", ui_default: bray }
+      - { arg: permutations, label: "permutations of permutest()", ui_default: 999 }
+    fidelity: close
+    difference: A person has not run the route and compared the numbers.
+    evidence:
+      source: docs
+      test: dispersion_dune_management
+      note: vegan help of betadisper.
+
+  - tool: run_rda
+    route: "set.seed(1); fit <- rda(comm ~ Management + A1, data=env, scale=FALSE); anova(fit, permutations=999); RsquareAdj(fit)"
+    steps:
+      - "Transform the community table if you chose a transformation. Use the Hellinger transform for abundance data."
+      - "Run rda(comm ~ terms, data = env, scale = scale)."
+      - "Run set.seed(seed)."
+      - "Run anova(fit, permutations = n) and anova(fit, by = \"terms\", permutations = n)."
+      - "Run RsquareAdj(fit) for the adjusted R2."
+    params:
+      - { arg: scale, label: "scale of rda()", ui_default: false }
+      - { arg: permutations, label: "permutations of anova.cca()", ui_default: 999 }
+    fidelity: close
+    difference: A person has not run the route and compared the numbers.
+    evidence:
+      source: docs
+      test: rda_dune_hellinger
+      note: vegan help of rda.
+
+tests:
+  - id: shannon_dune_site_1
+    description: >
+      Dune data (20 sites, 30 plant species, cover classes 0 to 9). Shannon index of site 1 is
+      1.4405 and richness of site 1 is 5. The numbers come from diversity() of vegan 2.7.6 on this
+      file. The same call gives the same value by hand.
+    data: [data/dune.csv, data/dune_env.csv]
+    calls:
+      - tool: diversity_indices
+        args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv", group_by: Management, index: shannon }
+    expect:
+      - { path: metrics.first_site_index, approx: 1.440482, abs: 0.0001 }
+      - { path: "table.rows[0][1]", equals: 5 }
+      - { path: "table.rows[0][2]", approx: 1.440482, abs: 0.0001 }
+      - { path: metrics.mean_index, approx: 2.1634, abs: 0.001 }
+      - { path: metrics.n_groups, equals: 4 }
+
+  - id: rarefy_dune_site_1
+    description: >
+      Dune data rarefied to 10 individuals. Site 1 has 18 individuals and 5 species, and the
+      expected richness at 10 is 4.3265. This is a stability value from vegan 2.7.6, not a
+      published value.
+    data: [data/dune.csv]
+    calls:
+      - tool: rarefy_richness
+        args: { community: "{adapter_dir}/data/dune.csv", sample_size: 10 }
+    expect:
+      - { path: metrics.first_site_rarefied, approx: 4.3265, abs: 0.001 }
+      - { path: metrics.n_sites_dropped, equals: 0 }
+      - { path: metrics.min_total, equals: 15 }
+
+  - id: nmds_dune_stress
+    description: >
+      NMDS of the dune data with Bray-Curtis distance in 2 dimensions has a stress of 0.1183. The
+      vegan introduction vignette prints a stress of 0.1183 for this call. The value does not
+      depend on the seed here.
+    data: [data/dune.csv, data/dune_env.csv]
+    calls:
+      - tool: run_nmds
+        args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv", color_by: Management, distance: bray, transform: none, k: 2, trymax: 20, seed: 1 }
+    expect:
+      - { path: metrics.stress, approx: 0.118319, abs: 0.0001 }
+      - { path: metrics.k, equals: 2 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: permanova_dune_management
+    description: >
+      PERMANOVA of the dune data on Management with Bray-Curtis distance. R2 is 0.3416 and F is
+      2.767 with 3 and 16 degrees of freedom. These values do not depend on the seed. The p value
+      is near 0.002 to 0.004 for 999 permutations. The numbers are from vegan 2.7.6 on this file.
+    data: [data/dune.csv, data/dune_env.csv]
+    calls:
+      - tool: run_permanova
+        args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv", formula: Management, distance: bray, transform: none, permutations: 999, seed: 1, by: terms }
+    expect:
+      - { path: metrics.r2, approx: 0.341611, abs: 0.0001 }
+      - { path: metrics.f, approx: 2.76724, abs: 0.001 }
+      - { path: metrics.df, equals: 3 }
+      - { path: metrics.p, approx: 0.003, abs: 0.003 }
+
+  - id: permanova_distance_changes_result
+    description: >
+      The same model with Jaccard distance on presence data gives R2 0.2896 and F 2.174. This
+      shows that the distance choice changes the result.
+    data: [data/dune.csv, data/dune_env.csv]
+    calls:
+      - tool: run_permanova
+        args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv", formula: Management, distance: jaccard, transform: presence, permutations: 999, seed: 1 }
+    expect:
+      - { path: metrics.r2, approx: 0.2896, abs: 0.0005 }
+      - { path: metrics.f, approx: 2.174, abs: 0.002 }
+
+  - id: permanova_strata_changes_p
+    description: >
+      The same model with permutations restricted to the blocks of Use. R2 and F stay the same
+      and the p value changes (0.010 for seed 1). This shows that the strata choice changes the p
+      value and does not change the statistic.
+    data: [data/dune.csv, data/dune_env.csv]
+    calls:
+      - tool: run_permanova
+        args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv", formula: Management, distance: bray, permutations: 999, seed: 1, strata: Use }
+    expect:
+      - { path: metrics.r2, approx: 0.341611, abs: 0.0001 }
+      - { path: metrics.p, approx: 0.010, abs: 0.004 }
+
+  - id: dispersion_dune_management
+    description: >
+      Dispersion test of Management on the dune data with Bray-Curtis distance. F is 1.951 with
+      3 and 16 degrees of freedom. The p value is above 0.1, so no difference in spread is shown.
+      The numbers are from vegan 2.7.6 on this file.
+    data: [data/dune.csv, data/dune_env.csv]
+    calls:
+      - tool: test_dispersion
+        args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv", variable: Management, distance: bray, permutations: 999, seed: 1 }
+    expect:
+      - { path: metrics.f, approx: 1.9506, abs: 0.001 }
+      - { path: metrics.p, min: 0.1 }
+
+  - id: rda_dune_hellinger
+    description: >
+      RDA of Hellinger-transformed dune data on Management and A1. The model holds 38.6 percent
+      of the variance. Adjusted R2 is 0.2218. These are stability values from vegan 2.7.6, not
+      published values.
+    data: [data/dune.csv, data/dune_env.csv]
+    calls:
+      - tool: run_rda
+        args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv", formula: Management + A1, transform: hellinger, scale: false, permutations: 999, seed: 1 }
+    expect:
+      - { path: metrics.constrained_fraction, approx: 0.385632, abs: 0.0001 }
+      - { path: metrics.adj_r2, approx: 0.221801, abs: 0.0001 }
+      - { path: metrics.global_f, approx: 2.35384, abs: 0.001 }
+
+tools:
+  - name: inspect_community
+    title: Inspect a community table
+    description: >
+      Read a site by species table, and optionally a site table. Returns the number of sites and
+      species, the range of values, the site totals, and the columns of the site table with their
+      levels.
+    params:
+      community: { type: string, description: "Path of a CSV file. The first column is the site name. The other columns are species." }
+      environment: { type: string, description: "Optional. Path of a CSV file. The first column is the site name. It must match the sites of the community table." }
+    required: [community]
+    read_only: true
+    script: scripts/inspect_community.R
+    parse: json
+
+  - name: diversity_indices
+    title: Diversity indices for each site
+    description: >
+      Compute richness, Shannon, Simpson, inverse Simpson and Pielou evenness for each site. With
+      a site table and group_by, return the mean of the chosen index for each group and draw a box
+      plot.
+    params:
+      community: { type: string, description: Path of the community table (CSV, site name in the first column). }
+      environment: { type: string, description: "Optional. Path of the site table." }
+      group_by: { type: string, description: "Optional. Column of the site table for the group means and the box plot." }
+      index: { type: string, enum: [shannon, simpson, invsimpson, richness, evenness], description: "Leave out. The harness sets it from the decision record. Index for the group means, the summary and the plot." }
+      base: { type: string, enum: ["e", "2", "10"], description: "Leave out. The harness sets it from the decision record. Logarithm base of the Shannon index." }
+    required: [community]
+    read_only: true
+    outputs:
+      table: { kind: table, ext: .csv, description: One row for each site with all indices. }
+      plot: { kind: image, ext: .png, description: "Box plot by group, or bar plot by site." }
+    script: scripts/diversity_indices.R
+    parse: json
+
+  - name: rarefy_richness
+    title: Rarefy the species richness
+    description: >
+      Compute the expected number of species at a fixed number of individuals for each site. Sites
+      with fewer individuals drop out. The table must hold whole-number counts.
+    params:
+      community: { type: string, description: Path of the community table (CSV). }
+      sample_size: { type: integer, minimum: 1, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Number of individuals. If missing, the tool uses the smallest site total." }
+    required: [community]
+    read_only: true
+    outputs:
+      table: { kind: table, ext: .csv, description: One row for each site with observed and rarefied richness. }
+      plot: { kind: image, ext: .png, description: Rarefaction curves. }
+    script: scripts/rarefy_richness.R
+    parse: json
+
+  - name: run_nmds
+    title: Non-metric multidimensional scaling
+    description: >
+      Transform the table, compute the distance, and run NMDS with random starts. Returns the
+      stress, the site scores and a plot. With environment and color_by, the plot colors the
+      sites by a column.
+    params:
+      community: { type: string, description: Path of the community table (CSV). }
+      environment: { type: string, description: "Optional. Path of the site table, for the colors of the plot." }
+      color_by: { type: string, description: "Optional. Column of the site table for the colors." }
+      distance: { type: string, enum: [bray, jaccard, euclidean, manhattan, gower, horn, canberra, chord], description: "Leave out. The harness sets it from the decision record. Distance measure." }
+      transform: { type: string, enum: [none, sqrt, log1p, hellinger, wisconsin, presence], description: "Leave out. The harness sets it from the decision record. Transformation before the distance." }
+      k: { type: integer, minimum: 1, maximum: 10, description: "Leave out. The harness sets it from the decision record. Number of dimensions." }
+      trymax: { type: integer, minimum: 1, maximum: 500, description: "Leave out. The harness sets it from the decision record. Maximum number of random starts." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed." }
+    required: [community]
+    outputs:
+      scores: { kind: table, ext: .csv, description: Site scores. }
+      plot: { kind: image, ext: .png, description: NMDS plot of the sites. }
+    script: scripts/run_nmds.R
+    parse: json
+
+  - name: run_permanova
+    title: PERMANOVA
+    description: >
+      Test if the centres of groups differ, with a permutation test on a distance matrix
+      (adonis2). Returns R2, F and p for each term. Run test_dispersion for the same grouping
+      variable.
+    params:
+      community: { type: string, description: Path of the community table (CSV). }
+      environment: { type: string, description: Path of the site table (CSV). }
+      formula: { type: string, description: "Leave out. The harness sets it from the decision record. Terms of the model, such as Management or Management + A1." }
+      distance: { type: string, enum: [bray, jaccard, euclidean, manhattan, gower, horn, canberra, chord], description: "Leave out. The harness sets it from the decision record. Distance measure." }
+      transform: { type: string, enum: [none, sqrt, log1p, hellinger, wisconsin, presence], description: "Leave out. The harness sets it from the decision record. Transformation before the distance." }
+      by: { type: string, enum: [terms, margin], description: "Leave out. The harness sets it from the decision record. Sequential or marginal test of the terms." }
+      permutations: { type: integer, minimum: 99, maximum: 99999, description: "Leave out. The harness sets it from the decision record. Number of permutations." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed." }
+      strata: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the site table that defines the blocks. none means free permutation." }
+    required: [community, environment]
+    outputs:
+      table: { kind: table, ext: .csv, description: The PERMANOVA table. }
+    script: scripts/run_permanova.R
+    parse: json
+
+  - name: test_dispersion
+    title: Test the dispersion of groups
+    description: >
+      Test if the groups have the same spread around their centroid (betadisper and permutest). A
+      difference in spread can make PERMANOVA significant without a difference in centre. Returns
+      F, p, the mean distance to the centroid of each group, and a plot.
+    params:
+      community: { type: string, description: Path of the community table (CSV). }
+      environment: { type: string, description: Path of the site table (CSV). }
+      variable: { type: string, description: "Leave out. The harness sets it from the decision record. Grouping column of the site table." }
+      distance: { type: string, enum: [bray, jaccard, euclidean, manhattan, gower, horn, canberra, chord], description: "Leave out. The harness sets it from the decision record. Distance measure." }
+      transform: { type: string, enum: [none, sqrt, log1p, hellinger, wisconsin, presence], description: "Leave out. The harness sets it from the decision record. Transformation before the distance." }
+      permutations: { type: integer, minimum: 99, maximum: 99999, description: "Leave out. The harness sets it from the decision record. Number of permutations." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed." }
+      strata: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the site table that defines the blocks." }
+    required: [community, environment]
+    read_only: true
+    outputs:
+      plot: { kind: image, ext: .png, description: Sites and centroids in the principal coordinate space. }
+    script: scripts/test_dispersion.R
+    parse: json
+
+  - name: run_rda
+    title: Redundancy analysis
+    description: >
+      Fit a constrained ordination (rda) of the transformed table on explanatory variables, and
+      test the model and each term with permutations. Returns the fraction of variance that the
+      model holds, the adjusted R2, F and p, and a plot.
+    params:
+      community: { type: string, description: Path of the community table (CSV). }
+      environment: { type: string, description: Path of the site table (CSV). }
+      formula: { type: string, description: "Leave out. The harness sets it from the decision record. Terms of the model, such as Management + A1." }
+      transform: { type: string, enum: [none, sqrt, log1p, hellinger, wisconsin, presence], description: "Leave out. The harness sets it from the decision record. Transformation of the table." }
+      scale: { type: boolean, description: "Leave out. The harness sets it from the decision record. Scale the species to unit variance." }
+      permutations: { type: integer, minimum: 99, maximum: 99999, description: "Leave out. The harness sets it from the decision record. Number of permutations." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed." }
+      strata: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the site table that defines the blocks." }
+    required: [community, environment]
+    outputs:
+      table: { kind: table, ext: .csv, description: The test of each term. }
+      plot: { kind: image, ext: .png, description: RDA triplot. }
+    script: scripts/run_rda.R
+    parse: json

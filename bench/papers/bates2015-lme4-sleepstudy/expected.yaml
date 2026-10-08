@@ -1,0 +1,26 @@
+tool: lme4 with lmerTest (R)
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/bates2015-lme4-sleepstudy/sleepstudy.csv
+decisions:
+  formula: "Reaction ~ Days + (Days | Subject)"
+  reml: true
+  p_value_method: satterthwaite
+  replication_unit: "subject (18 subjects)"
+  comparison_method: ML
+  reduced_formula: "Reaction ~ 1 + (Days | Subject)"
+expected:
+  - {description: "fixed effect (Intercept)", value: 251.405, tolerance: 0.01, source: "Bates et al. 2015 and lme4 vignette (brief), lme4 2.0.6 run"}
+  - {description: "fixed effect Days", value: 10.467, tolerance: 0.01, source: "Bates et al. 2015 and lme4 vignette (brief), lme4 2.0.6 run"}
+  - {description: "REML criterion", value: 1743.6, tolerance: 0.1, source: "Bates et al. 2015 and lme4 vignette (brief), lme4 2.0.6 run"}
+  - {description: "SD of Subject intercept", value: 24.74, tolerance: 0.05, source: "lme4 2.0.6 run; matches the paper table"}
+  - {description: "SD of Subject Days", value: 5.92, tolerance: 0.05, source: "lme4 2.0.6 run; matches the paper table"}
+  - {description: "residual SD", value: 25.59, tolerance: 0.05, source: "lme4 2.0.6 run; matches the paper table"}
+  - {description: "random intercept and slope correlation", value: 0.066, tolerance: 0.01, source: "lme4 2.0.6 run"}
+  - {description: "likelihood ratio chi-square for Days, ML", value: 23.54, tolerance: 0.1, source: "lme4 2.0.6 run"}
+  - {description: "number of subjects", value: 18, tolerance: 0, source: "data"}
+notes: |
+  I did not re-read the paper in this session. Paper values (251.41, 10.47, 1743.6, SDs 24.74, 5.92, 25.59, correlation 0.07) come from the task brief and memory of the vignette.
+  Trap: a random intercept only gives the same estimates and a standard error of Days of 0.804 instead of 1.546.
+  Trap: the likelihood ratio test needs ML fits. A REML fit of models with different fixed effects is not valid.
+  Trap: the Subject column is a number. The tool must treat it as a grouping factor.

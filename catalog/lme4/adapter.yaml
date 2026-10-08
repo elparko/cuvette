@@ -1,0 +1,447 @@
+adapter:
+  name: lme4
+  title: lme4 (linear mixed models)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Fits linear mixed-effects models with lme4 and lmerTest in R. The adapter reads a data table,
+    fits the formula that the scientist chose, tests fixed effects, compares nested models, and
+    draws residual and fit plots.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: lme4
+  version: "2.0.6"
+  tested_versions: []
+  homepage: https://github.com/lme4/lme4
+  docs:
+    - https://cran.r-project.org/web/packages/lme4/vignettes/lmer.pdf
+    - https://doi.org/10.18637/jss.v067.i01
+    - https://cran.r-project.org/package=lmerTest
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first
+  folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  ~/.guided-analysis/R-library. The program version in this adapter is the version of the R
+  package lme4, not of R. The tools fit with lmer from lmerTest. The fixed effects and the
+  random effects are the same as with lme4. lmerTest adds the p values. A fit uses no random
+  numbers, so no seed is needed.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return the rows of the data table that the scientist gave, the fitted values and the model estimates.
+
+decisions:
+  - key: question
+    label: What question do you ask with these data?
+    kind: text
+    group: Question
+    help: Example - Does reaction time rise with the days of sleep deprivation?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - subjects or sites (several observations for each one)
+      - observations (each row is an independent unit)
+    default: subjects or sites (several observations for each one)
+    group: Design
+    help: >
+      The unit of replication is the independent unit, such as the subject, the animal or the
+      site. Rows from the same subject are not independent. The number of subjects, not the number of rows,
+      sets the power of a test of a between-subject effect.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: formula
+    label: Model formula
+    kind: text
+    group: Model
+    help: >
+      The formula has the response, the fixed effects and the random effects, such as
+      Reaction ~ Days + (Days | Subject). (1 | Subject) gives each subject its own intercept. (Days | Subject)
+      adds an own slope and a correlation. (Days || Subject) removes the correlation. Choose the
+      random effects from the design before you see the fit.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: fit_mixed_model, arg: formula }
+      - { tool: compare_models, arg: formula }
+
+  - key: reml
+    label: Fit by REML or by ML
+    kind: bool
+    default: true
+    group: Model
+    help: >
+      true is restricted maximum likelihood (REML). It gives better estimates of the variances. false is
+      maximum likelihood (ML). Use ML to compare models with different fixed effects.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: fit_mixed_model, arg: reml }
+
+  - key: p_value_method
+    label: Method for the p values of the fixed effects
+    kind: choice
+    choices: [satterthwaite, kenward-roger, none]
+    default: satterthwaite
+    group: Test
+    help: >
+      lme4 gives no p values. Satterthwaite and Kenward-Roger estimate the degrees of freedom of the t
+      test. Kenward-Roger works only for REML fits and is the more careful one for small samples. None
+      gives estimates and t values only.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_mixed_model, arg: p_value_method }
+    sensitivity:
+      options: [satterthwaite, kenward-roger]
+      tool: fit_mixed_model
+      compare: [metrics.estimate_Days, metrics.p_Days]
+      max_runs: 2
+
+  - key: reduced_formula
+    label: Reduced model for the likelihood ratio test
+    kind: text
+    group: Test
+    help: >
+      The reduced model drops the fixed effect that you test and keeps the same random effects,
+      such as Reaction ~ 1 + (Days | Subject). The test asks if the dropped term improves the fit.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_models, arg: formula_reduced }
+
+  - key: comparison_method
+    label: Fit of the compared models
+    kind: choice
+    choices: [ML, REML]
+    default: ML
+    group: Test
+    help: >
+      A likelihood ratio test of fixed effects needs ML fits. REML is valid only when the
+      models have the same fixed effects and differ in the random effects.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_models, arg: comparison_method }
+
+  - key: exclusions
+    label: Subjects or observations that you exclude
+    kind: text
+    default: none
+    group: Design
+    help: Name each excluded subject or observation and the reason. Write none if you exclude nothing.
+    owner: human
+    stage: setup
+
+checks:
+  - id: reml_for_fixed_effect_test
+    description: A likelihood ratio test of the fixed effects uses REML fits.
+    severity: warning
+    rule:
+      tool: compare_models
+      arg: comparison_method
+      op: "=="
+      value: REML
+      message: A likelihood ratio test of fixed effects needs ML fits. Use REML only if the fixed effects are the same in both models.
+
+  - id: singular_fit
+    description: The answer reports a model with a singular fit as a good fit.
+    severity: warning
+    text: >
+      Report the answer if the fit in the log is singular (singular is 1 or a variance is 0 or a
+      correlation is plus or minus 1) and the answer does not say that the random-effects structure is too complex for the data.
+
+  - id: warnings_ignored
+    description: The fit gave a convergence warning and the answer does not mention it.
+    severity: warning
+    text: >
+      Report the answer if the log of fit_mixed_model has warnings and the answer does not name them.
+
+  - id: observation_as_replicate
+    description: The answer treats the number of rows as the sample size.
+    severity: error
+    text: >
+      Report the answer if it gives the number of rows as the sample size for a between-subject
+      effect, or if it says that the formula has no random effect for the subject.
+
+  - id: few_groups
+    description: A random effect has fewer than 5 groups.
+    severity: warning
+    text: >
+      Report the answer if a grouping factor of a random effect has fewer than 5 levels and the
+      answer does not say that its variance is poorly estimated.
+
+map:
+  - tool: inspect_data
+    route: "d <- read.csv(\"data.csv\"); str(d); table(d$Subject)"
+    steps:
+      - "Install R and the packages lme4 and lmerTest."
+      - "Read the table with read.csv()."
+      - "Run str(d) and table() of each grouping column."
+    fidelity: code_only
+    difference: lme4 has no menu route. The route is the R call.
+    evidence:
+      source: docs
+      note: lme4 vignette, sleepstudy data.
+
+  - tool: fit_mixed_model
+    route: "library(lmerTest); fit <- lmer(Reaction ~ Days + (Days | Subject), data = d, REML = TRUE); summary(fit, ddf = \"Satterthwaite\"); VarCorr(fit); isSingular(fit)"
+    steps:
+      - "Run library(lmerTest) to load lme4 with p values."
+      - "Convert the grouping column to a factor."
+      - "Run lmer(formula, data = d, REML = reml)."
+      - "Run summary(fit, ddf = method) for the fixed effects and VarCorr(fit) for the random effects."
+      - "Run isSingular(fit). Read the warnings of the fit."
+    params:
+      - { arg: formula, label: "formula of lmer()", ui_default: "none" }
+      - { arg: reml, label: "REML of lmer()", ui_default: true }
+      - { arg: p_value_method, label: "ddf of summary()", ui_default: Satterthwaite }
+    fidelity: close
+    difference: >
+      The tool calls the same functions as the route. It converts numeric grouping columns to
+      factors. A person has not run the route and compared the numbers.
+    evidence:
+      source: docs
+      test: sleepstudy_fit
+      note: The lme4 paper and vignette print the sleepstudy fit.
+
+  - tool: compare_models
+    route: "m1 <- lmer(Reaction ~ Days + (Days | Subject), data = d, REML = FALSE); m0 <- lmer(Reaction ~ 1 + (Days | Subject), data = d, REML = FALSE); anova(m1, m0, refit = FALSE)"
+    steps:
+      - "Fit the full model and the reduced model with the same data and the same REML setting."
+      - "Run anova(m1, m0, refit = FALSE)."
+      - "Read the chi-square, the degrees of freedom and Pr(>Chisq)."
+    params:
+      - { arg: comparison_method, label: "REML of lmer()", ui_default: true }
+    fidelity: close
+    difference: >
+      The route uses REML = TRUE by default in lmer(). The tool uses ML by default. The anova() call
+      refits with ML by default, and the tool sets refit to FALSE after it fits with the chosen method.
+    evidence:
+      source: docs
+      test: sleepstudy_lrt_days
+      note: lme4 vignette likelihood ratio test.
+
+  - tool: get_random_effects
+    route: "ranef(fit, condVar = TRUE)"
+    steps:
+      - "Run ranef(fit, condVar = TRUE)."
+    fidelity: code_only
+    difference: lme4 has no menu route.
+    evidence:
+      source: docs
+      note: lme4 help of ranef.
+
+  - tool: plot_model
+    route: "plot(fit); qqnorm(resid(fit)); lattice::xyplot(Reaction ~ Days | Subject, data = d, type = c(\"p\", \"r\"))"
+    steps:
+      - "Run plot(fit) for the residuals against the fitted values."
+      - "Run qqnorm(resid(fit)) for the normal plot."
+      - "Run lattice::dotplot(ranef(fit, condVar = TRUE)) for the random effects."
+    fidelity: code_only
+    difference: The tool draws the plots with base graphics. The route uses lattice.
+    evidence:
+      source: docs
+      note: lme4 vignette.
+
+tests:
+  - id: sleepstudy_fit
+    description: >
+      Sleepstudy data (18 subjects, 180 observations). The model Reaction ~ Days + (Days | Subject)
+      fitted by REML. Fixed effects 251.405 and 10.467, REML criterion 1743.6, random-effect
+      standard deviations 24.74 and 5.92, residual 25.59 and correlation 0.07. These are the
+      values in Bates et al. 2015 (Journal of Statistical Software 67(1)) and the lme4 vignette.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: inspect_data
+        args: { data: "{adapter_dir}/data/sleepstudy.csv" }
+      - tool: fit_mixed_model
+        args: { data: "{adapter_dir}/data/sleepstudy.csv", formula: "Reaction ~ Days + (Days | Subject)", reml: true, p_value_method: satterthwaite }
+    expect:
+      - { path: metrics.estimate_Intercept, approx: 251.405, abs: 0.001 }
+      - { path: metrics.estimate_Days, approx: 10.467, abs: 0.001 }
+      - { path: metrics.criterion, approx: 1743.6, abs: 0.05 }
+      - { path: metrics.sd_Subject_Intercept, approx: 24.74, abs: 0.01 }
+      - { path: metrics.sd_Subject_Days, approx: 5.92, abs: 0.01 }
+      - { path: metrics.sd_residual, approx: 25.59, abs: 0.01 }
+      - { path: metrics.corr_Subject, approx: 0.066, abs: 0.005 }
+      - { path: metrics.n_groups_Subject, equals: 18 }
+      - { path: metrics.singular, equals: 0 }
+      - { path: "table.rows[1][3]", approx: 17, abs: 0.1 }
+      - { path: "table.rows[1][5]", max: 0.00001 }
+
+  - id: sleepstudy_uncorrelated_slope
+    description: >
+      The same data with the random slope uncorrelated, (Days || Subject). The REML criterion is
+      1743.7 in the lme4 vignette. The tool gives 1743.669.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: fit_mixed_model
+        args: { data: "{adapter_dir}/data/sleepstudy.csv", formula: "Reaction ~ Days + (Days || Subject)", reml: true }
+    expect:
+      - { path: metrics.criterion, approx: 1743.7, abs: 0.05 }
+      - { path: metrics.estimate_Days, approx: 10.467, abs: 0.001 }
+
+  - id: sleepstudy_intercept_only
+    description: >
+      The same data with a random intercept only, (1 | Subject). The REML criterion is 1786.5 in the
+      lme4 paper. The fixed effects stay at 251.405 and 10.467, and the standard error of Days falls from 1.546 to 0.804 (value from lme4 2.0.6).
+      This shows that the random-effects structure changes the standard error and not the estimate.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: fit_mixed_model
+        args: { data: "{adapter_dir}/data/sleepstudy.csv", formula: "Reaction ~ Days + (1 | Subject)", reml: true }
+    expect:
+      - { path: metrics.criterion, approx: 1786.5, abs: 0.05 }
+      - { path: metrics.estimate_Days, approx: 10.467, abs: 0.001 }
+      - { path: "table.rows[1][2]", approx: 0.804, abs: 0.01 }
+
+  - id: sleepstudy_ml_fit
+    description: >
+      The first model fitted by ML. The log likelihood is -875.97 and the deviance is 1751.9. These
+      values are the ML fit that the lme4 help for sleepstudy prints. The value of the deviance is
+      from lme4 2.0.6 on this file.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: fit_mixed_model
+        args: { data: "{adapter_dir}/data/sleepstudy.csv", formula: "Reaction ~ Days + (Days | Subject)", reml: false }
+    expect:
+      - { path: metrics.logLik, approx: -875.97, abs: 0.01 }
+      - { path: metrics.criterion, approx: 1751.94, abs: 0.01 }
+
+  - id: sleepstudy_lrt_days
+    description: >
+      Likelihood ratio test of Days with ML fits. Chi-square 23.54 on 1 degree of freedom,
+      p 1.2e-06. The values are from lme4 2.0.6 on this file, not published values.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: compare_models
+        args: { data: "{adapter_dir}/data/sleepstudy.csv", formula: "Reaction ~ Days + (Days | Subject)", formula_reduced: "Reaction ~ 1 + (Days | Subject)", comparison_method: ML }
+    expect:
+      - { path: metrics.chisq, approx: 23.537, abs: 0.01 }
+      - { path: metrics.df, equals: 1 }
+      - { path: metrics.p, max: 0.00001 }
+
+  - id: sleepstudy_random_effects_and_plots
+    description: >
+      The conditional modes of subject 308 are 2.2586 for the intercept and 9.1990 for Days. The
+      lme4 vignette prints these values. The test also runs the plot tool from the saved model.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: fit_mixed_model
+        args: { data: "{adapter_dir}/data/sleepstudy.csv", formula: "Reaction ~ Days + (Days | Subject)", reml: true }
+        save_as: fit
+      - tool: get_random_effects
+        args: { model: "{saved.fit.data.model_file}" }
+        save_as: re
+      - tool: plot_model
+        args: { model: "{saved.fit.data.model_file}", kind: residuals }
+    expect:
+      - { path: saved.re.metrics.n_rows, equals: 36 }
+      - { path: "saved.re.table.rows[0][1]", equals: "308" }
+      - { path: "saved.re.table.rows[0][3]", approx: 2.2586, abs: 0.001 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+tools:
+  - name: inspect_data
+    title: Inspect a data table
+    description: >
+      Read a CSV table. Returns the number of rows, the type of each column, and for each factor
+      or whole-number column the number of distinct values and the rows for each value. Use it to
+      find the unit of replication.
+    params:
+      data: { type: string, description: Path of a CSV file with a header row. }
+    required: [data]
+    read_only: true
+    script: scripts/inspect_data.R
+    parse: json
+
+  - name: fit_mixed_model
+    title: Fit a linear mixed model
+    description: >
+      Fit a linear mixed model with lmer. Returns the fixed effects with standard errors, degrees
+      of freedom and p values, the random-effect variances and correlations, the REML criterion
+      or deviance, the singular fit flag and the warnings. Saves the model.
+    params:
+      data: { type: string, description: Path of the data table (CSV with a header row). }
+      formula: { type: string, description: "Leave out. The harness sets it from the decision record. Model formula with random effects, such as Reaction ~ Days + (Days | Subject)." }
+      reml: { type: boolean, description: "Leave out. The harness sets it from the decision record. true for REML, false for ML." }
+      p_value_method: { type: string, enum: [satterthwaite, kenward-roger, none], description: "Leave out. The harness sets it from the decision record. Method for the degrees of freedom of the t tests." }
+    required: [data]
+    outputs:
+      model: { kind: file, ext: .rds, description: The fitted model as an R object. }
+      fixed: { kind: table, ext: .csv, description: The fixed effects. }
+    script: scripts/fit_mixed_model.R
+    parse: json
+
+  - name: compare_models
+    title: Compare two nested models
+    description: >
+      Fit a full model and a reduced model with the same method and run a likelihood ratio test.
+      Returns chi-square, degrees of freedom, p and the AIC of each model. Warns when the fixed
+      effects differ and the fits are REML.
+    params:
+      data: { type: string, description: Path of the data table (CSV). }
+      formula: { type: string, description: "Leave out. The harness sets it from the decision record. Formula of the full model." }
+      formula_reduced: { type: string, description: "Leave out. The harness sets it from the decision record. Formula of the reduced model." }
+      comparison_method: { type: string, enum: [ML, REML], description: "Leave out. The harness sets it from the decision record. Fit method of both models." }
+    required: [data]
+    read_only: true
+    script: scripts/compare_models.R
+    parse: json
+
+  - name: get_random_effects
+    title: List the random effects
+    description: Read a saved model and list the conditional modes of the random effects (the estimate for each subject or group) with their standard deviations.
+    params:
+      model: { type: string, description: The model_file from fit_mixed_model. }
+    required: [model]
+    read_only: true
+    outputs:
+      table: { kind: table, ext: .csv, description: One row for each group level and term. }
+    script: scripts/get_random_effects.R
+    parse: json
+
+  - name: plot_model
+    title: Plot a fitted model
+    description: >
+      Draw a plot of a saved model to a file. Kind residuals shows the residuals against the fitted
+      values and a normal Q-Q plot. Kind fit_by_group shows the data and the fit for each group.
+      Kind random_effects shows the conditional modes with intervals.
+    params:
+      model: { type: string, description: The model_file from fit_mixed_model. }
+      kind: { type: string, enum: [residuals, fit_by_group, random_effects], default: residuals, description: Which plot to draw. }
+    required: [model]
+    read_only: true
+    outputs:
+      plot: { kind: image, ext: .png, description: The plot. }
+    script: scripts/plot_model.R
+    parse: json
