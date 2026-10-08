@@ -29,11 +29,11 @@ items:
   # samples 16081, 4364 (2337 up, 2027 down); no length offsets 4877 (2681 up, 2196 down) and 4108
   # at alpha 0.05; design ~ dex 3076. The down count is close for the filter variants, so its
   # tolerance is 3.
-  - {key: genes_after_filter, description: "Genes after pre-filter, rnaseqGene workflow on data(gse)", value: 16637, tolerance: 10}
-  - {key: padj_01_workflow, description: "Genes with padj < 0.1, rnaseqGene workflow on data(gse)", value: 4381, tolerance: 10}
-  - {key: up_padj_01, description: "Up-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)", value: 2362, tolerance: 10}
-  - {key: down_padj_01, description: "Down-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)", value: 2019, tolerance: 3}
-  - {key: padj_005_workflow, description: "Genes with padj < 0.05 (alpha 0.05), rnaseqGene workflow on data(gse)", value: 3602, tolerance: 10, in_answer: false}
+  - {key: genes_after_filter, description: "Genes after pre-filter, rnaseqGene workflow on data(gse)", value: 16637, tolerance: 10, tool: run_deseq}
+  - {key: padj_01_workflow, description: "Genes with padj < 0.1, rnaseqGene workflow on data(gse)", value: 4381, tolerance: 10, tool: run_deseq}
+  - {key: up_padj_01, description: "Up-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)", value: 2362, tolerance: 10, tool: run_deseq}
+  - {key: down_padj_01, description: "Down-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)", value: 2019, tolerance: 3, tool: run_deseq}
+  - {key: padj_005_workflow, description: "Genes with padj < 0.05 (alpha 0.05), rnaseqGene workflow on data(gse)", value: 3602, tolerance: 10, in_answer: false, tool: run_deseq}
   # Reference items. They do not count. Same experiment, read counts on Ensembl 75 genes:
   # data(airway) (airway_counts.csv, 63677 genes), the same workflow code with DESeq2 1.52.0.
   - {key: csv_genes_after_filter, description: "Same experiment, read counts on Ensembl 75 genes: genes after pre-filter", value: 16139, tolerance: 10, in_answer: false, reference: true}

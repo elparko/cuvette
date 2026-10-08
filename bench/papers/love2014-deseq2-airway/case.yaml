@@ -112,26 +112,50 @@ items:
     where: >-
       Reference only. Same experiment as read counts on Ensembl 75 genes (data(airway), 63677 genes, no length
       offsets).
+    independence: same path
+    check: >-
+      R DESeq2 1.52.0 is the program of the adapter too, so this is not an independent check. The value is a
+      reference and does not count.
   csv_padj_01:
     source: computed
     tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
     where: Reference only. Same experiment, read counts on Ensembl 75 genes.
+    independence: same path
+    check: >-
+      R DESeq2 1.52.0 is the program of the adapter too, so this is not an independent check. The value is a
+      reference and does not count.
   csv_up_padj_01:
     source: computed
     tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
     where: Reference only. Same experiment, read counts on Ensembl 75 genes.
+    independence: same path
+    check: >-
+      R DESeq2 1.52.0 is the program of the adapter too, so this is not an independent check. The value is a
+      reference and does not count.
   csv_down_padj_01:
     source: computed
     tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
     where: Reference only. Same experiment, read counts on Ensembl 75 genes.
+    independence: same path
+    check: >-
+      R DESeq2 1.52.0 is the program of the adapter too, so this is not an independent check. The value is a
+      reference and does not count.
   csv_padj_005:
     source: computed
     tool: the rnaseqGene 1.36.0 workflow code, DESeq2 1.52.0 and R 4.6.1 (check_workflow.R)
     where: Reference only. Same experiment, read counts on Ensembl 75 genes, alpha 0.05.
+    independence: same path
+    check: >-
+      R DESeq2 1.52.0 is the program of the adapter too, so this is not an independent check. The value is a
+      reference and does not count.
   csv_padj_01_pydeseq2:
     source: computed
     tool: pydeseq2 0.5.4
     where: Reference only. pydeseq2 on the Ensembl 75 read counts. Not in the workflow.
+    independence: independent
+    check: >-
+      pydeseq2 0.5.4 is a separate implementation of DESeq2 in Python. On the same CSV it gives 4643 (a recheck
+      gave 4647) and R DESeq2 gives 4905. The cause of the difference is not known.
 data:
   source: >-
     Bioconductor data package airway 1.32.0. The benchmark fetch script writes data(gse) as an .rds file and

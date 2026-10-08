@@ -20,7 +20,6 @@ test("every paper has a case.yaml that covers each answer and each item", () => 
 
 test("every computed value has an independence class, and every independent value names its check", () => {
   for (const id of paperIds()) {
-    if (id === "love2014-deseq2-airway") continue;
     for (const [k, i] of Object.entries(loadCase(id)!.items)) {
       if (i.source !== "computed") continue;
       expect(i.independence, `${id} ${k}`).toBeDefined();
