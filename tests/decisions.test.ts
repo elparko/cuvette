@@ -175,3 +175,13 @@ test("an empty setup value means no fixed value: the model's value stays and no 
   expect(e.deviations).toEqual([]);
   expect(dr.enforce("a", "stats", {}).args).toEqual({});
 });
+
+test("an empty value for a number decision means no limit", async () => {
+  const { DecisionRecord } = await import("../src/core/decisions.ts");
+  const adapter: any = { name: "a", manifest: { decisions: [{ key: "px", label: "Pixel size", kind: "float", owner: "human", stage: "setup", links: [{ tool: "warp", arg: "px" }], choices: [], help: "", group: "Method", essential: false, changes_conclusion: true }] }, linksFor: () => ({ px: "px" }) };
+  const record: any = { append: () => {}, markStale: () => [], entries: () => [] };
+  const dr = new DecisionRecord([adapter], record);
+  dr.applySetup({ px: "" });
+  expect(dr.enforce("a", "warp", { px: 0.001 }).args.px).toBe(0.001);
+  expect(() => dr.applySetup({ px: "abc" })).toThrow(/must be a number/);
+});

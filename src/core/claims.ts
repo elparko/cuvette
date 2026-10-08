@@ -28,6 +28,7 @@ const MASKS: RegExp[] = [
   /\b\d{4}-\d{2}-\d{2}\b/g,
   /(?<![\w.])\d+:\d+(?:;O\d*)?(?![\d.])/g,
   /(?<![\w.])v?\d+\.\d+\.\d+(?:[.-][A-Za-z0-9]+)*/g,
+  /\b(?:WGS|NAD|ETRS|GDA|SIRGAS)\s?\d+|\bEPSG:?\s?\d+|\bUTM zone \d+[NS]?/gi,
   /\bet al\.?,?\s*\(?(?:19|20)\d\d[a-z]?\)?/g,
   /\([A-Z][A-Za-z'-]+(?:\s+et al\.?|\s+(?:and|&)\s+[A-Z][A-Za-z'-]+)?,?\s+(?:19|20)\d\d[a-z]?(?:[;,][^)]*)?\)/g,
 ];

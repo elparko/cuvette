@@ -89,6 +89,7 @@ function same(a: unknown, b: unknown): boolean {
 function coerce(def: Decision, raw: unknown): unknown {
   if (raw === undefined || raw === null) throw new Error(`${def.label} needs a value.`);
   if (def.kind === "float" || def.kind === "int") {
+    if (typeof raw === "string" && raw.trim() === "") return "";
     const n = toNumber(raw);
     if (n === undefined) throw new Error(`${def.label} must be a number.`);
     if (def.kind === "int" && !Number.isInteger(n)) throw new Error(`${def.label} must be a whole number.`);

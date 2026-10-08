@@ -68,6 +68,12 @@ describe("checkAnswer", () => {
     expect(checkAnswer("There are 47 cells.", record)[0]!.node).toBe("n2");
   });
 
+  test("ignores coordinate system names", () => {
+    const { record } = fake(nums);
+    const claims = checkAnswer("The raster is in WGS 84 (EPSG:4326), from UTM zone 11N, with AUC 0.81.", record);
+    expect(claims.map((c) => c.value)).toEqual([0.81]);
+  });
+
   test("ignores version numbers", () => {
     const { record } = fake(nums);
     const claims = checkAnswer("I used vegan 2.7.6 and lmerTest v3.2.1 for AUC 0.81.", record);
