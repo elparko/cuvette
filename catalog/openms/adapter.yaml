@@ -1,0 +1,461 @@
+adapter:
+  name: openms
+  title: OpenMS TOPP tools for peptide data
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Runs four OpenMS TOPP command line tools on proteomics files: FileInfo, FeatureFinderCentroided,
+    PeptideIndexer and FalseDiscoveryRate. Each tool runs one command that the scientist can repeat.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: OpenMS TOPP tools
+  version: "3.5.0"
+  homepage: https://www.openms.de/
+  docs:
+    - https://openms.readthedocs.io/en/latest/
+    - https://www.openms.de/documentation/TOPP_FileInfo.html
+    - https://www.openms.de/documentation/TOPP_FeatureFinderCentroided.html
+    - https://www.openms.de/documentation/TOPP_PeptideIndexer.html
+    - https://www.openms.de/documentation/TOPP_FalseDiscoveryRate.html
+    - https://doi.org/10.1038/nmeth.3959
+
+connection:
+  kind: cli
+  call_timeout_s: 1800
+
+locate:
+  env: OPENMS_FILEINFO
+  paths:
+    - /Volumes/T7/guided-analysis/tools/openms/env/bin/FileInfo
+    - ~/.guided-analysis/openms/env/bin/FileInfo
+    - /opt/homebrew/bin/FileInfo
+    - /usr/local/bin/FileInfo
+    - /usr/bin/FileInfo
+  which: [FileInfo]
+  version_command: ["{program_path}", "--help"]
+  version_pattern: "Version: (\\S+)"
+
+decisions:
+  - key: fasta
+    label: Protein database (FASTA file)
+    kind: text
+    group: Database
+    help: >
+      The FASTA file of protein sequences that the search used. It must be the same file as in the
+      search, with the decoy proteins. A different file gives wrong protein matches. Name the
+      organism, the source and the release date in the report.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: index_peptides, arg: fasta }
+
+  - key: decoy_string
+    label: Decoy tag in protein names
+    kind: text
+    default: DECOY_
+    group: Database
+    help: >
+      The text that marks a decoy protein in the FASTA file, such as DECOY_ or rev_. The FDR
+      (false discovery rate) counts need it. A wrong tag gives zero decoys, and the FDR is then
+      not valid.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: index_peptides, arg: decoy_string }
+
+  - key: decoy_position
+    label: Decoy tag position
+    kind: choice
+    choices: [prefix, suffix]
+    default: prefix
+    group: Database
+    help: Whether the decoy tag is at the start (prefix) or the end (suffix) of the protein name.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: index_peptides, arg: decoy_position }
+
+  - key: enzyme
+    label: Digestion enzyme
+    kind: choice
+    choices: [auto, Trypsin, "Trypsin/P", Arg-C, Lys-C, Chymotrypsin, Asp-N, Glu-C+P, "no cleavage", unspecific cleavage]
+    default: auto
+    group: Database
+    help: >
+      The enzyme that cut the proteins. It must be the enzyme of the search. Auto reads it from the
+      search result file. Trypsin does not cut before proline. Trypsin/P cuts before proline.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: index_peptides, arg: enzyme }
+
+  - key: il_equivalent
+    label: Treat I and L as the same
+    kind: choice
+    choices: ["no", "yes"]
+    default: "no"
+    group: Database
+    help: >
+      Isoleucine and leucine have the same mass. Yes matches a peptide to every protein that has
+      either residue. No keeps them different.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: index_peptides, arg: il_equivalent }
+
+  - key: fdr_threshold
+    label: FDR threshold (PSM level)
+    kind: float
+    default: 0.01
+    lo: 0
+    hi: 1
+    group: Error rate
+    help: >
+      The largest q-value that a peptide-spectrum match (PSM) can have and stay. 0.01 keeps the PSMs
+      at 1% FDR. This tool works at the PSM level only. A peptide level or protein level FDR needs a
+      different step.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: estimate_fdr, arg: fdr_threshold }
+    sensitivity:
+      options: [0.01, 0.02, 0.05]
+      tool: estimate_fdr
+      compare: [metrics.n_psm_pass, metrics.n_peptides_pass]
+      max_runs: 3
+
+  - key: ff_mz_tolerance
+    label: Mass trace m/z tolerance (Da)
+    kind: float
+    default: 0.03
+    lo: 0.0001
+    hi: 1
+    group: Feature finding
+    help: >
+      The largest m/z difference in Da between points of one mass trace. It must be larger than the
+      m/z resolution of the instrument. The OpenMS default is 0.03.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: find_peptide_features, arg: mz_tolerance }
+
+  - key: ff_charge_low
+    label: Lowest charge to search
+    kind: int
+    default: 1
+    lo: 1
+    hi: 10
+    group: Feature finding
+    help: The lowest charge state that the feature finder looks for. The OpenMS default is 1.
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: find_peptide_features, arg: charge_low }
+
+  - key: ff_charge_high
+    label: Highest charge to search
+    kind: int
+    default: 4
+    lo: 1
+    hi: 10
+    group: Feature finding
+    help: The highest charge state that the feature finder looks for. The OpenMS default is 4.
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: find_peptide_features, arg: charge_high }
+
+  - key: ff_min_spectra
+    label: Fewest scans in a mass trace
+    kind: int
+    default: 10
+    lo: 1
+    hi: 1000
+    group: Feature finding
+    help: >
+      The number of scans in which a peak must appear to form a mass trace. A high value drops short
+      peaks. The right value depends on the scan rate of the instrument. The OpenMS default is 10.
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: find_peptide_features, arg: min_spectra }
+
+tools:
+  - name: file_info
+    title: Describe a data file
+    description: >
+      Read an mzML, featureXML or idXML file with FileInfo. Return the number of spectra, the number of
+      spectra of each MS level, the retention time range, or the number of features or identifications.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the mzML, featureXML or idXML file. }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/info.sh", "{program_path}", "{path}"]
+    parse: keyvalue
+
+  - name: find_peptide_features
+    title: Find peptide features
+    description: >
+      Find features in a centroided LC-MS file with FeatureFinderCentroided. A feature is a group of
+      isotope peaks of one peptide ion over retention time. The result has the path of the featureXML
+      file and the number of features. The input must be centroided.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the centroided mzML file. }
+      mz_tolerance: { type: number, minimum: 0.0001, maximum: 1, description: "Mass trace m/z tolerance in Da. Leave it out. The harness sets it from the decision." }
+      min_spectra: { type: integer, minimum: 1, description: "Fewest scans in a mass trace. Leave it out. The harness sets it from the decision." }
+      charge_low: { type: integer, minimum: 1, maximum: 10, description: "Lowest charge to search. Leave it out. The harness sets it from the decision." }
+      charge_high: { type: integer, minimum: 1, maximum: 10, description: "Highest charge to search. Leave it out. The harness sets it from the decision." }
+      isotope_mz_tolerance: { type: number, minimum: 0.0001, maximum: 1, description: "m/z tolerance in Da for the isotope pattern. The OpenMS default is 0.03." }
+      intensity_bins: { type: integer, minimum: 1, maximum: 100, description: "Bins per dimension for the local intensity score. The OpenMS default is 10." }
+      seed_min_score: { type: number, minimum: 0, maximum: 1, description: "Smallest seed score. The OpenMS default is 0.8." }
+      feature_min_score: { type: number, minimum: 0, maximum: 1, description: "Smallest feature score. The OpenMS default is 0.7." }
+    required: [path]
+    outputs:
+      featurexml: { kind: file, ext: .featureXML, description: The features. }
+    command:
+      - /bin/sh
+      - "{adapter_dir}/scripts/features.sh"
+      - "{program_path}"
+      - "{path}"
+      - "{output.featurexml}"
+      - "-algorithm:mass_trace:mz_tolerance"
+      - "{mz_tolerance}"
+      - "-algorithm:mass_trace:min_spectra"
+      - "{min_spectra}"
+      - "-algorithm:isotopic_pattern:charge_low"
+      - "{charge_low}"
+      - "-algorithm:isotopic_pattern:charge_high"
+      - "{charge_high}"
+      - "-algorithm:isotopic_pattern:mz_tolerance"
+      - "{isotope_mz_tolerance}"
+      - "-algorithm:intensity:bins"
+      - "{intensity_bins}"
+      - "-algorithm:seed:min_score"
+      - "{seed_min_score}"
+      - "-algorithm:feature:min_score"
+      - "{feature_min_score}"
+    parse: keyvalue
+
+  - name: index_peptides
+    title: Match peptides to proteins
+    description: >
+      Match each peptide of an idXML file to the proteins of a FASTA file with PeptideIndexer. This marks
+      each hit as target or decoy. The result has the path of the new idXML file, the number of PSMs and
+      the number of decoy PSMs.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the idXML file with the search results. }
+      fasta: { type: string, minLength: 1, description: "Absolute path of the FASTA file with decoys. Leave it out. The harness sets it from the decision." }
+      decoy_string: { type: string, description: "Decoy tag. Leave it out. The harness sets it from the decision." }
+      decoy_position: { type: string, enum: [prefix, suffix], description: "Decoy tag position. Leave it out. The harness sets it from the decision." }
+      enzyme: { type: string, description: "Enzyme name or auto. Leave it out. The harness sets it from the decision." }
+      il_equivalent: { type: string, enum: ["no", "yes"], description: "Treat I and L as the same. Leave it out. The harness sets it from the decision." }
+      missing_decoy_action: { type: string, enum: [error, warn, silent], description: "What to do if no peptide matches a decoy protein. The OpenMS default is error." }
+      unmatched_action: { type: string, enum: [error, warn, remove], description: "What to do with a peptide that matches no protein. The OpenMS default is error." }
+    required: [path, fasta]
+    outputs:
+      idxml: { kind: file, ext: .idXML, description: The idXML file with protein matches. }
+    command:
+      - /bin/sh
+      - "{adapter_dir}/scripts/index.sh"
+      - "{program_path}"
+      - "{path}"
+      - "{output.idxml}"
+      - "{fasta}"
+      - "--il"
+      - "{il_equivalent}"
+      - "-decoy_string"
+      - "{decoy_string}"
+      - "-decoy_string_position"
+      - "{decoy_position}"
+      - "-enzyme:name"
+      - "{enzyme}"
+      - "-missing_decoy_action"
+      - "{missing_decoy_action}"
+      - "-unmatched_action"
+      - "{unmatched_action}"
+    parse: keyvalue
+
+  - name: estimate_fdr
+    title: Estimate the FDR and keep the PSMs under it
+    description: >
+      Compute q-values for the PSMs of an indexed idXML file with FalseDiscoveryRate (PSM level, target-decoy)
+      and keep the target PSMs with a q-value at or under the threshold. The result has the counts before
+      and after, and the number of distinct peptide sequences kept.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the idXML file from index_peptides. }
+      fdr_threshold: { type: number, minimum: 0, maximum: 1, description: "Largest q-value to keep. Leave it out. The harness sets it from the decision." }
+    required: [path]
+    outputs:
+      idxml: { kind: file, ext: .idXML, description: The PSMs that pass. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/fdr.sh", "{program_path}", "{path}", "{output.idxml}", "{fdr_threshold}"]
+    parse: keyvalue
+
+map:
+  - tool: file_info
+    route: "Run: FileInfo -in <file>"
+    params:
+      - { arg: path, label: "-in" }
+    fidelity: exact
+    evidence: { source: docs, test: info_mzml, note: "The tool prints the lines of FileInfo. The test counts the spectra of a small mzML file by hand." }
+    summary: "{metrics.n_spectra} spectra, {metrics.n_psm} PSMs, {metrics.n_features} features."
+
+  - tool: find_peptide_features
+    route: "Run: FeatureFinderCentroided -in <in>.mzML -out <out>.featureXML [-algorithm:mass_trace:mz_tolerance <Da>] [-algorithm:mass_trace:min_spectra <n>] [-algorithm:isotopic_pattern:charge_low <z>] [-algorithm:isotopic_pattern:charge_high <z>]"
+    params:
+      - { arg: path, label: "-in" }
+      - { arg: mz_tolerance, label: "-algorithm:mass_trace:mz_tolerance", ui_default: 0.03 }
+      - { arg: min_spectra, label: "-algorithm:mass_trace:min_spectra", ui_default: 10 }
+      - { arg: charge_low, label: "-algorithm:isotopic_pattern:charge_low", ui_default: 1 }
+      - { arg: charge_high, label: "-algorithm:isotopic_pattern:charge_high", ui_default: 4 }
+      - { arg: isotope_mz_tolerance, label: "-algorithm:isotopic_pattern:mz_tolerance", ui_default: 0.03 }
+      - { arg: intensity_bins, label: "-algorithm:intensity:bins", ui_default: 10 }
+      - { arg: seed_min_score, label: "-algorithm:seed:min_score", ui_default: 0.8 }
+      - { arg: feature_min_score, label: "-algorithm:feature:min_score", ui_default: 0.7 }
+    fidelity: exact
+    evidence: { source: docs, test: features_openms_reference, note: "The test uses the OpenMS test input and the OpenMS test parameters. It gets the 8 features of the OpenMS reference output file." }
+    summary: "{metrics.n_features} features."
+
+  - tool: index_peptides
+    route: "Run: PeptideIndexer -in <in>.idXML -fasta <db>.fasta -out <out>.idXML -decoy_string <tag> -decoy_string_position <prefix|suffix> -enzyme:name <enzyme>"
+    params:
+      - { arg: path, label: "-in" }
+      - { arg: fasta, label: "-fasta" }
+      - { arg: decoy_string, label: "-decoy_string", ui_default: "" }
+      - { arg: decoy_position, label: "-decoy_string_position", ui_default: prefix }
+      - { arg: enzyme, label: "-enzyme:name", ui_default: auto }
+      - { arg: il_equivalent, label: "-IL_equivalent", ui_default: "no" }
+      - { arg: missing_decoy_action, label: "-missing_decoy_action", ui_default: error }
+      - { arg: unmatched_action, label: "-unmatched_action", ui_default: error }
+    fidelity: exact
+    evidence: { source: docs, test: index_standards, note: "The decoy count matches a count of the decoy hits in the Sage result table." }
+    summary: "{metrics.n_psm} PSMs, {metrics.n_decoy_psm} decoy."
+
+  - tool: estimate_fdr
+    route: "Run: FalseDiscoveryRate -in <in>.idXML -out <out>.idXML -protein false -PSM true -FDR:PSM <threshold>"
+    params:
+      - { arg: path, label: "-in" }
+      - { arg: fdr_threshold, label: "-FDR:PSM", ui_default: 1 }
+    fidelity: exact
+    evidence: { source: docs, test: fdr_standards, note: "A Python recount of the decoy to target ratio gives the same PSM and peptide counts at 1%, 2% and 5%." }
+    summary: "{metrics.n_psm_pass} of {metrics.n_psm_in} PSMs pass. {metrics.n_peptides_pass} peptides."
+
+checks:
+  - id: decoys_missing
+    description: The FDR step ran on a file with no decoy hits.
+    severity: error
+    text: The report must not give an FDR if the file has no decoy hits. A target-only search cannot estimate an FDR.
+  - id: database_not_named
+    description: The report does not name the protein database.
+    severity: warning
+    text: The report must name the FASTA file, the organism or source, the release date, the decoy tag and the enzyme.
+  - id: fdr_level_not_stated
+    description: The report gives an identification count but does not say which FDR level and threshold it used.
+    severity: warning
+    text: The report must state the FDR level (PSM, peptide or protein), the threshold, and the method that made the q-values.
+  - id: features_not_ids
+    description: The report calls a feature an identified peptide.
+    severity: warning
+    text: A feature is a signal group in m/z and retention time. It is not an identification until an MS/MS match is mapped to it.
+
+tests:
+  - id: info_mzml
+    description: >
+      The bsa3_ms2.mzML file has 56 MS2 spectra (counted by hand in the file, and by FileInfo on the command line).
+    data: [data/bsa3_ms2.mzML]
+    manual_route_checked: true
+    calls:
+      - { tool: file_info, args: { path: "{adapter_dir}/data/bsa3_ms2.mzML" } }
+    expect:
+      - { path: metrics.n_spectra, equals: 56 }
+      - { path: metrics.n_ms2_spectra, equals: 56 }
+
+  - id: features_openms_reference
+    description: >
+      The OpenMS test input peptide_lcms.mzML has 112 MS1 scans. With the OpenMS test parameters
+      (m/z tolerance 0.02, 14 scans, charge 2 only, 1 intensity bin) FeatureFinderCentroided finds 8 features.
+      The OpenMS reference output file for these parameters has 8 feature elements (counted by hand).
+    data: [data/peptide_lcms.mzML]
+    manual_route_checked: true
+    calls:
+      - { tool: file_info, args: { path: "{adapter_dir}/data/peptide_lcms.mzML" }, save_as: raw }
+      - tool: find_peptide_features
+        args: { path: "{adapter_dir}/data/peptide_lcms.mzML", mz_tolerance: 0.02, min_spectra: 14, charge_low: 2, charge_high: 2, isotope_mz_tolerance: 0.02, intensity_bins: 1 }
+    expect:
+      - { path: saved.raw.metrics.n_ms1_spectra, equals: 112 }
+      - { path: metrics.n_features, equals: 8 }
+
+  - id: features_default
+    description: >
+      With the OpenMS default parameters the same file gives 17 features (pinned from a run by hand with
+      FeatureFinderCentroided 3.5.0 on the command line).
+    data: [data/peptide_lcms.mzML]
+    manual_route_checked: true
+    calls:
+      - { tool: find_peptide_features, args: { path: "{adapter_dir}/data/peptide_lcms.mzML" } }
+    expect:
+      - { path: metrics.n_features, equals: 17 }
+
+  - id: index_standards
+    description: >
+      The Sage result file (Sage 0.14.7, 3 files, 18 standard proteins plus contaminants, reversed decoys)
+      has 225 PSMs. 13 of them are decoy hits (a count of the decoy hits in the file, and the count that
+      PeptideIndexer reports).
+    data: [data/sage_psms.idXML, data/standards_td.fasta]
+    manual_route_checked: true
+    calls:
+      - tool: index_peptides
+        args: { path: "{adapter_dir}/data/sage_psms.idXML", fasta: "{adapter_dir}/data/standards_td.fasta", decoy_string: DECOY_, decoy_position: prefix, enzyme: Trypsin }
+    expect:
+      - { path: metrics.n_psm, equals: 225 }
+      - { path: metrics.n_decoy_psm, equals: 13 }
+
+  - id: fdr_standards
+    description: >
+      Target-decoy recount in Python on the 225 PSMs (decoys 13, q = decoys / targets at each score, kept
+      monotone): 18 target PSMs with 11 peptides at 1%, 52 with 19 peptides at 2%, and 193 with 46 peptides
+      at 5%. FalseDiscoveryRate gives the same counts.
+    data: [data/sage_psms.idXML, data/standards_td.fasta]
+    manual_route_checked: true
+    calls:
+      - tool: index_peptides
+        args: { path: "{adapter_dir}/data/sage_psms.idXML", fasta: "{adapter_dir}/data/standards_td.fasta", decoy_string: DECOY_, decoy_position: prefix, enzyme: Trypsin }
+        save_as: idx
+      - { tool: estimate_fdr, args: { path: "{saved.idx.data.idxml}", fdr_threshold: 0.01 }, save_as: f1 }
+      - { tool: estimate_fdr, args: { path: "{saved.idx.data.idxml}", fdr_threshold: 0.02 }, save_as: f2 }
+      - { tool: estimate_fdr, args: { path: "{saved.idx.data.idxml}", fdr_threshold: 0.05 } }
+    expect:
+      - { path: saved.f1.metrics.n_psm_pass, equals: 18 }
+      - { path: saved.f1.metrics.n_peptides_pass, equals: 11 }
+      - { path: saved.f2.metrics.n_psm_pass, equals: 52 }
+      - { path: saved.f2.metrics.n_peptides_pass, equals: 19 }
+      - { path: metrics.n_psm_pass, equals: 193 }
+      - { path: metrics.n_peptides_pass, equals: 46 }
+      - { path: metrics.n_decoy_in, equals: 13 }
+
+  - id: fdr_needs_decoys
+    description: The FDR step stops on a file that has no decoy hits.
+    data: [data/pi1.idXML]
+    calls:
+      - { tool: estimate_fdr, args: { path: "{adapter_dir}/data/pi1.idXML", fdr_threshold: 0.01 } }
+    expect:
+      - { path: ok, equals: false }
+
+data_rules:
+  cloud_visibility: all

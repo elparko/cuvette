@@ -1,0 +1,608 @@
+adapter:
+  name: sage
+  title: Sage peptide search
+  version: 0.1.1
+  spec: "1"
+  description: >
+    Searches MS2 spectra against a protein database with the Sage search engine, then counts the
+    PSMs and peptides that pass a chosen FDR. Each tool writes a Sage configuration file that the
+    scientist can run by hand.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: Sage
+  version: "0.14.6"
+  homepage: https://github.com/lazear/sage
+  docs:
+    - https://sage-docs.vercel.app/docs
+    - https://github.com/lazear/sage/blob/master/DOCS.md
+    - https://doi.org/10.1021/acs.jproteome.3c00486
+
+connection:
+  kind: cli
+  call_timeout_s: 7200
+
+locate:
+  env: SAGE
+  paths:
+    - /Volumes/T7/guided-analysis/tools/sage/sage-*/sage
+    - ~/.guided-analysis/sage/sage-*/sage
+    - ~/.cargo/bin/sage
+    - /opt/homebrew/bin/sage
+    - /usr/local/bin/sage
+  which: [sage]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "sage (\\S+)"
+
+decisions:
+  - key: fasta
+    label: Protein database (FASTA file)
+    kind: text
+    group: Database
+    help: >
+      The FASTA file of protein sequences to search. Only proteins in this file can be found. Name the
+      organism, the source, the release date and the contaminant list in the report.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: fasta }
+
+  - key: decoys
+    label: Decoy strategy
+    kind: choice
+    choices: [sage_reverse, in_fasta]
+    default: sage_reverse
+    group: Database
+    help: >
+      sage_reverse lets Sage make a reversed decoy for each peptide, so the FASTA file needs no decoys.
+      in_fasta uses decoy proteins that are already in the FASTA file. Then the decoy tag must match
+      the tag in the file. A wrong tag counts the decoys as real hits.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: decoys }
+
+  - key: decoy_tag
+    label: Decoy tag
+    kind: text
+    default: rev_
+    group: Database
+    help: >
+      The start of the protein name that marks a decoy, such as rev_. With sage_reverse, Sage adds it to
+      the decoys that it makes and ignores FASTA proteins that start with it.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: decoy_tag }
+
+  - key: enzyme
+    label: Digestion enzyme
+    kind: choice
+    choices: [trypsin, trypsin_p, lys_c, arg_c, chymotrypsin, asp_n, none]
+    default: trypsin
+    group: Digestion
+    help: >
+      The enzyme that cut the proteins. trypsin cuts after K and R but not before P. trypsin_p also cuts
+      before P. none searches the FASTA entries as whole peptides. A wrong enzyme loses true peptides.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: enzyme }
+
+  - key: missed_cleavages
+    label: Missed cleavages
+    kind: int
+    default: 1
+    lo: 0
+    hi: 5
+    group: Digestion
+    help: >
+      The most cut sites that a peptide can contain. More missed cleavages make a larger search space
+      and more false matches. The Sage default is 1.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: missed_cleavages }
+
+  - key: fixed_mods
+    label: Fixed modifications
+    kind: text
+    group: Modifications
+    help: >
+      Modifications on every residue of one type, as residue and mass, separated by commas. Example:
+      C+57.0215 is carbamidomethyl on cysteine. Use ^ for the peptide N-terminus. Empty means none.
+      A wrong list shifts the mass of every affected peptide.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: fixed_mods }
+
+  - key: variable_mods
+    label: Variable modifications
+    kind: text
+    group: Modifications
+    help: >
+      Modifications that a residue can have or not have, as residue and mass, separated by commas.
+      Example: M+15.9949 is oxidation on methionine. Each one enlarges the search space. Empty means none.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: variable_mods }
+
+  - key: max_variable_mods
+    label: Most variable modifications on one peptide
+    kind: int
+    default: 2
+    lo: 0
+    hi: 5
+    group: Modifications
+    help: The most variable modifications that one peptide can carry. The Sage default is 2.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: max_variable_mods }
+
+  - key: precursor_tol_ppm
+    label: Precursor tolerance (ppm, plus or minus)
+    kind: float
+    lo: 0.1
+    hi: 1000
+    group: Tolerances
+    help: >
+      How far the measured precursor mass can be from the peptide mass, in parts per million. Use the
+      mass accuracy of the instrument. A window that is too narrow loses true matches. A window that is
+      too wide adds false matches.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: precursor_tol_ppm }
+
+  - key: fragment_tol
+    label: Fragment tolerance (plus or minus)
+    kind: float
+    lo: 0.001
+    hi: 1000
+    group: Tolerances
+    help: >
+      How far a measured fragment peak can be from the calculated fragment, in the unit below. Use about
+      10 to 20 ppm for an Orbitrap or time-of-flight scan, and about 0.5 Da for an ion trap scan.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: fragment_tol }
+
+  - key: fragment_tol_unit
+    label: Fragment tolerance unit
+    kind: choice
+    choices: [ppm, da]
+    group: Tolerances
+    help: ppm for high-resolution fragment scans. da for low-resolution (ion trap) fragment scans.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: fragment_tol_unit }
+
+  - key: isotope_min
+    label: Lowest isotope error
+    kind: int
+    default: 0
+    lo: -3
+    hi: 0
+    group: Tolerances
+    help: >
+      How many 13C isotopes below the monoisotopic peak the precursor can be. -1 allows a pick on the
+      peak just below. The Sage default is 0.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: isotope_min }
+
+  - key: isotope_max
+    label: Highest isotope error
+    kind: int
+    default: 0
+    lo: 0
+    hi: 5
+    group: Tolerances
+    help: >
+      How many 13C isotopes above the monoisotopic peak the precursor can be. 3 allows a pick on the third
+      isotope peak. The Sage default is 0.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: isotope_max }
+
+  - key: max_fragment_charge
+    label: Highest fragment charge
+    kind: int
+    lo: 1
+    hi: 6
+    group: Scoring
+    help: >
+      The highest charge of a fragment ion that Sage tries to match. Sage has no limit by default. For
+      low-resolution (ion trap) scans, use 1. Without a limit, long peptides with a high charge match many
+      random peaks and score too high.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: max_fragment_charge }
+
+  - key: min_peaks
+    label: Fewest peaks in a spectrum
+    kind: int
+    default: 15
+    lo: 1
+    hi: 1000
+    group: Scoring
+    help: >
+      Sage skips spectra with fewer peaks than this value. The Sage default is 15. A lower value searches
+      weak spectra, which adds more random matches than true ones.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: search_sage, arg: min_peaks }
+
+  - key: fdr_level
+    label: FDR level
+    kind: choice
+    choices: [psm, peptide, protein]
+    default: psm
+    group: Error rate
+    help: >
+      The unit that the FDR (false discovery rate) controls. psm counts spectra matches. peptide counts
+      distinct peptides. protein counts protein groups. The same data gives fewer hits at the peptide or
+      protein level.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: count_at_fdr, arg: level }
+
+  - key: fdr_threshold
+    label: FDR threshold
+    kind: float
+    default: 0.01
+    lo: 0
+    hi: 1
+    group: Error rate
+    help: >
+      The largest q-value that a hit can have and stay. 0.01 means 1% of the kept hits are expected to be
+      false. A small data set can give zero hits at 1%, because Sage counts (decoys + 1) / targets.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: count_at_fdr, arg: threshold }
+    sensitivity:
+      options: [0.01, 0.05, 0.1]
+      tool: count_at_fdr
+      compare: [metrics.n_psm_pass, metrics.n_peptides_pass]
+      max_runs: 3
+
+tools:
+  - name: search_sage
+    title: Search spectra with Sage
+    description: >
+      Search MS2 spectra in mzML files against a FASTA file with Sage. Writes a Sage configuration file and
+      the result table (one row per PSM, targets and decoys). The result has the number of PSMs, the number of
+      decoy PSMs, and the Sage version. Use results in count_at_fdr.
+    params:
+      mzml_paths: { type: array, items: { type: string }, minItems: 1, description: Absolute paths of the mzML files (or mzML.gz). }
+      fasta: { type: string, minLength: 1, description: "Absolute path of the FASTA file. Leave it out. The harness sets it from the decision." }
+      decoys: { type: string, enum: [sage_reverse, in_fasta], description: "Decoy strategy. Leave it out. The harness sets it from the decision." }
+      decoy_tag: { type: string, description: "Decoy tag. Leave it out. The harness sets it from the decision." }
+      enzyme: { type: string, enum: [trypsin, trypsin_p, lys_c, arg_c, chymotrypsin, asp_n, none], description: "Enzyme. Leave it out. The harness sets it from the decision." }
+      missed_cleavages: { type: integer, minimum: 0, maximum: 5, description: "Missed cleavages. Leave it out. The harness sets it from the decision." }
+      min_len: { type: integer, minimum: 4, maximum: 100, description: Shortest peptide. The Sage default is 5. }
+      max_len: { type: integer, minimum: 4, maximum: 100, description: Longest peptide. The Sage default is 50. }
+      fixed_mods: { type: string, description: "Fixed modifications. Leave it out. The harness sets it from the decision." }
+      variable_mods: { type: string, description: "Variable modifications. Leave it out. The harness sets it from the decision." }
+      max_variable_mods: { type: integer, minimum: 0, maximum: 5, description: "Leave it out. The harness sets it from the decision." }
+      precursor_tol_ppm: { type: number, minimum: 0.1, maximum: 1000, description: "Leave it out. The harness sets it from the decision." }
+      fragment_tol: { type: number, minimum: 0.001, maximum: 1000, description: "Leave it out. The harness sets it from the decision." }
+      fragment_tol_unit: { type: string, enum: [ppm, da], description: "Leave it out. The harness sets it from the decision." }
+      isotope_min: { type: integer, minimum: -3, maximum: 0, description: "Leave it out. The harness sets it from the decision." }
+      isotope_max: { type: integer, minimum: 0, maximum: 5, description: "Leave it out. The harness sets it from the decision." }
+      deisotope: { type: boolean, description: Deisotope and find the charge of fragment peaks. Use it for high-resolution fragment scans. The Sage default is false. }
+      max_fragment_charge: { type: integer, minimum: 1, maximum: 6, description: "Highest fragment charge to match. Leave it out. The harness sets it from the decision." }
+      min_peaks: { type: integer, minimum: 1, maximum: 1000, description: "Skip spectra with fewer peaks. Leave it out. The harness sets it from the decision." }
+      max_peaks: { type: integer, minimum: 10, maximum: 5000, description: Keep this many of the strongest peaks. The Sage default is 150. }
+      min_matched_peaks: { type: integer, minimum: 1, maximum: 100, description: Fewest matched fragment peaks for a reported PSM. The Sage default is 4. }
+      report_psms: { type: integer, minimum: 1, maximum: 10, description: PSMs to report for each spectrum. The Sage default is 1. }
+      predict_rt: { type: boolean, description: Use a retention time model as a feature in the rescoring. The Sage default is true. It needs enough PSMs. }
+      chimera: { type: boolean, description: Search for more than one peptide in one spectrum. The Sage default is false. }
+    required: [mzml_paths, fasta, precursor_tol_ppm, fragment_tol]
+    outputs:
+      results: { kind: table, ext: .tsv, description: The PSM table from Sage (results.sage.tsv). }
+      config: { kind: file, ext: .json, description: The Sage configuration file that was used. }
+    command:
+      - "{node}"
+      - "{adapter_dir}/scripts/sage.mjs"
+      - search
+      - "--sage"
+      - "{program_path}"
+      - "--out"
+      - "{output.results}"
+      - "--config"
+      - "{output.config}"
+      - "--fasta"
+      - "{fasta}"
+      - "--decoys"
+      - "{decoys}"
+      - "--decoy_tag"
+      - "{decoy_tag}"
+      - "--enzyme"
+      - "{enzyme}"
+      - "--missed_cleavages"
+      - "{missed_cleavages}"
+      - "--min_len"
+      - "{min_len}"
+      - "--max_len"
+      - "{max_len}"
+      - "--fixed_mods"
+      - "{fixed_mods}"
+      - "--variable_mods"
+      - "{variable_mods}"
+      - "--max_variable_mods"
+      - "{max_variable_mods}"
+      - "--precursor_tol_ppm"
+      - "{precursor_tol_ppm}"
+      - "--fragment_tol"
+      - "{fragment_tol}"
+      - "--fragment_tol_unit"
+      - "{fragment_tol_unit}"
+      - "--isotope_min"
+      - "{isotope_min}"
+      - "--isotope_max"
+      - "{isotope_max}"
+      - "--deisotope"
+      - "{deisotope}"
+      - "--max_fragment_charge"
+      - "{max_fragment_charge}"
+      - "--min_peaks"
+      - "{min_peaks}"
+      - "--max_peaks"
+      - "{max_peaks}"
+      - "--min_matched_peaks"
+      - "{min_matched_peaks}"
+      - "--report_psms"
+      - "{report_psms}"
+      - "--predict_rt"
+      - "{predict_rt}"
+      - "--chimera"
+      - "{chimera}"
+      - "--"
+      - "{mzml_paths}"
+    parse: keyvalue
+
+  - name: count_at_fdr
+    title: Count hits at an FDR
+    description: >
+      Read the result table from search_sage and count the target hits whose q-value is at or under the
+      threshold, at the PSM, peptide or protein level. The result has the counts of PSMs, distinct peptide
+      sequences and protein groups, the decoys among them, and (PSM level) a recount of the PSMs from the decoy labels.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the result table (results from search_sage). }
+      level: { type: string, enum: [psm, peptide, protein], description: "FDR level. Leave it out. The harness sets it from the decision." }
+      threshold: { type: number, minimum: 0, maximum: 1, description: "Largest q-value to keep. Leave it out. The harness sets it from the decision." }
+    required: [path]
+    command: ["{node}", "{adapter_dir}/scripts/sage.mjs", count, "--path", "{path}", "--level", "{level}", "--threshold", "{threshold}"]
+    parse: keyvalue
+
+map:
+  - tool: search_sage
+    route: "Write the configuration file (the config output of this step), then run: sage config.json --disable-telemetry-i-dont-want-to-improve-sage -o <out dir> <file1>.mzML <file2>.mzML"
+    params:
+      - { arg: mzml_paths, label: "mzml_paths" }
+      - { arg: fasta, label: "database.fasta" }
+      - { arg: decoys, label: "database.generate_decoys", ui_default: sage_reverse }
+      - { arg: decoy_tag, label: "database.decoy_tag", ui_default: rev_ }
+      - { arg: enzyme, label: "database.enzyme.cleave_at, restrict", ui_default: trypsin }
+      - { arg: missed_cleavages, label: "database.enzyme.missed_cleavages", ui_default: 1 }
+      - { arg: min_len, label: "database.enzyme.min_len", ui_default: 5 }
+      - { arg: max_len, label: "database.enzyme.max_len", ui_default: 50 }
+      - { arg: fixed_mods, label: "database.static_mods" }
+      - { arg: variable_mods, label: "database.variable_mods" }
+      - { arg: max_variable_mods, label: "database.max_variable_mods", ui_default: 2 }
+      - { arg: precursor_tol_ppm, label: "precursor_tol.ppm" }
+      - { arg: fragment_tol, label: "fragment_tol" }
+      - { arg: fragment_tol_unit, label: "fragment_tol unit (ppm or da)" }
+      - { arg: isotope_min, label: "isotope_errors[0]", ui_default: 0 }
+      - { arg: isotope_max, label: "isotope_errors[1]", ui_default: 0 }
+      - { arg: deisotope, label: "deisotope", ui_default: false }
+      - { arg: max_fragment_charge, label: "max_fragment_charge" }
+      - { arg: min_peaks, label: "min_peaks", ui_default: 15 }
+      - { arg: max_peaks, label: "max_peaks", ui_default: 150 }
+      - { arg: min_matched_peaks, label: "min_matched_peaks", ui_default: 4 }
+      - { arg: report_psms, label: "report_psms", ui_default: 1 }
+      - { arg: predict_rt, label: "predict_rt", ui_default: true }
+      - { arg: chimera, label: "chimera", ui_default: false }
+    fidelity: exact
+    evidence: { source: docs, test: sage_repo_single_spectrum, note: "The tool writes the Sage JSON configuration and runs the command. A run by hand with the written configuration gave the same 283 PSMs and 203 at 1%." }
+    summary: "{metrics.n_psm} PSMs ({metrics.n_decoy_psm} decoy). Top peptide {data.top_peptide}."
+
+  - tool: count_at_fdr
+    route: "Open results.sage.tsv. Keep rows with label 1 and spectrum_q <= <threshold> (PSM), peptide_q <= <threshold> (peptide) or protein_q <= <threshold> (protein). Count the rows and the distinct peptide values."
+    params:
+      - { arg: path, label: "results.sage.tsv" }
+      - { arg: level, label: "q-value column (spectrum_q, peptide_q, protein_q)", ui_default: spectrum_q }
+      - { arg: threshold, label: "q-value cutoff" }
+    fidelity: exact
+    evidence: { source: docs, test: standards_psm_1pct, note: "A Python filter of the table and a recount of the q-values from the decoy labels give the same 203 PSMs and 43 peptides." }
+    summary: "{metrics.n_psm_pass} PSMs and {metrics.n_peptides_pass} peptides at {fdr_threshold} {level} FDR."
+
+checks:
+  - id: decoys_missing
+    description: The FDR step ran on a search with no decoy hits.
+    severity: error
+    text: The report must not give an FDR for a search that has no decoy hits.
+  - id: database_not_named
+    description: The report does not name the protein database.
+    severity: warning
+    text: The report must name the FASTA file, the organism or source, the release date, the decoy strategy, the enzyme and the missed cleavages.
+  - id: fdr_level_not_stated
+    description: The report gives an identification count but does not say which FDR level and threshold it used.
+    severity: warning
+    text: The report must state the FDR level (PSM, peptide or protein) and the threshold with every count of identifications.
+  - id: tolerances_not_stated
+    description: The report does not give the mass tolerances and the modifications.
+    severity: warning
+    text: The report must give the precursor tolerance, the fragment tolerance with its unit, and the fixed and variable modifications.
+  - id: small_set_fdr
+    description: The report states a 1% FDR from a very small set of PSMs without a warning.
+    severity: warning
+    text: With fewer than 100 target PSMs an FDR estimate has a large random error. The report must say so.
+
+tests:
+  - id: sage_repo_single_spectrum
+    description: >
+      The Sage repository test file holds one spectrum of the peptide LQSRPAAPPAPGPGQLTLR (the file name is
+      the peptide) and a FASTA file of one protein, VAT1_HUMAN, that contains it. Sage must report that peptide
+      as the top hit, on the target protein. The settings follow the repository test configuration.
+    data: [data/LQSRPAAPPAPGPGQLTLR.mzML, data/Q99536.fasta]
+    manual_route_checked: true
+    calls:
+      - tool: search_sage
+        args:
+          mzml_paths: ["{adapter_dir}/data/LQSRPAAPPAPGPGQLTLR.mzML"]
+          fasta: "{adapter_dir}/data/Q99536.fasta"
+          decoys: sage_reverse
+          decoy_tag: rev_
+          enzyme: trypsin
+          missed_cleavages: 1
+          fixed_mods: C+57.0216
+          precursor_tol_ppm: 50
+          fragment_tol: 10
+          fragment_tol_unit: ppm
+          isotope_min: -1
+          isotope_max: 3
+          deisotope: true
+          max_fragment_charge: 1
+          predict_rt: false
+    expect:
+      - { path: data.top_peptide, equals: LQSRPAAPPAPGPGQLTLR }
+      - { path: metrics.n_target_psm, equals: 1 }
+      - { path: metrics.n_decoy_psm, equals: 0 }
+
+  - id: standards_psm_1pct
+    description: >
+      Three ion trap MS2 files (56 to 143 spectra each, from the OpenMS BSA example; the spectra that gave a
+      match to the standards database) searched against 119 standard and contaminant proteins with reversed decoys
+      (trypsin, 1 missed cleavage, peptide length up to 30, C+57.0215, M+15.9949, 10 ppm precursor,
+      0.5 Da fragment, fragment charge 1). Sage 0.14.6 gives 283 PSMs, 41 of them decoy. At 1% PSM FDR it keeps 203 target PSMs with
+      43 distinct peptides. A Python filter of the table, and a recount of the q-values from the decoy labels, give
+      the same numbers. The sample is a known protein mixture, so the passing hits come from the database by construction.
+    data: [data/bsa1.mzML, data/bsa2.mzML, data/bsa3.mzML, data/standards.fasta]
+    manual_route_checked: true
+    calls:
+      - tool: search_sage
+        args:
+          mzml_paths: ["{adapter_dir}/data/bsa1.mzML", "{adapter_dir}/data/bsa2.mzML", "{adapter_dir}/data/bsa3.mzML"]
+          fasta: "{adapter_dir}/data/standards.fasta"
+          decoys: sage_reverse
+          decoy_tag: rev_
+          enzyme: trypsin
+          missed_cleavages: 1
+          max_len: 30
+          fixed_mods: C+57.0215
+          variable_mods: M+15.9949
+          precursor_tol_ppm: 10
+          fragment_tol: 0.5
+          fragment_tol_unit: da
+          isotope_min: 0
+          isotope_max: 0
+          max_fragment_charge: 1
+          min_peaks: 6
+        save_as: srch
+      - { tool: count_at_fdr, args: { path: "{saved.srch.data.results}", level: psm, threshold: 0.01 } }
+    expect:
+      - { path: saved.srch.metrics.n_psm, equals: 283 }
+      - { path: saved.srch.metrics.n_decoy_psm, equals: 41 }
+      - { path: metrics.n_psm_pass, equals: 203 }
+      - { path: metrics.n_peptides_pass, equals: 43 }
+      - { path: metrics.n_decoy_pass, equals: 1 }
+      - { path: metrics.n_recount, equals: 203 }
+      - { path: metrics.recount_agrees, equals: 1 }
+
+  - id: standards_levels
+    description: >
+      The same search read at other levels and thresholds (pinned from a run of Sage 0.14.6; they show that
+      the tool is stable, not that the numbers are right). PSM level at 5%: 228 PSMs. Peptide level at 1%: none,
+      because 43 peptides cannot reach (0 + 1) / 43 below 1%. Peptide level at 5%: 210 PSMs and 42 peptides.
+    data: [data/bsa1.mzML, data/bsa2.mzML, data/bsa3.mzML, data/standards.fasta]
+    calls:
+      - tool: search_sage
+        args:
+          mzml_paths: ["{adapter_dir}/data/bsa1.mzML", "{adapter_dir}/data/bsa2.mzML", "{adapter_dir}/data/bsa3.mzML"]
+          fasta: "{adapter_dir}/data/standards.fasta"
+          decoys: sage_reverse
+          decoy_tag: rev_
+          enzyme: trypsin
+          missed_cleavages: 1
+          max_len: 30
+          fixed_mods: C+57.0215
+          variable_mods: M+15.9949
+          precursor_tol_ppm: 10
+          fragment_tol: 0.5
+          fragment_tol_unit: da
+          isotope_min: 0
+          isotope_max: 0
+          max_fragment_charge: 1
+          min_peaks: 6
+        save_as: srch
+      - { tool: count_at_fdr, args: { path: "{saved.srch.data.results}", level: psm, threshold: 0.05 }, save_as: p5 }
+      - { tool: count_at_fdr, args: { path: "{saved.srch.data.results}", level: peptide, threshold: 0.01 }, save_as: pep1 }
+      - { tool: count_at_fdr, args: { path: "{saved.srch.data.results}", level: peptide, threshold: 0.05 } }
+    expect:
+      - { path: saved.p5.metrics.n_psm_pass, equals: 228 }
+      - { path: saved.pep1.metrics.n_psm_pass, equals: 0 }
+      - { path: metrics.n_psm_pass, equals: 210 }
+      - { path: metrics.n_peptides_pass, equals: 42 }
+
+  - id: count_needs_decoys
+    description: The FDR count stops on a result table with no decoy hits.
+    data: [data/LQSRPAAPPAPGPGQLTLR.mzML, data/Q99536.fasta]
+    calls:
+      - tool: search_sage
+        args:
+          mzml_paths: ["{adapter_dir}/data/LQSRPAAPPAPGPGQLTLR.mzML"]
+          fasta: "{adapter_dir}/data/Q99536.fasta"
+          precursor_tol_ppm: 50
+          fragment_tol: 10
+          fragment_tol_unit: ppm
+          predict_rt: false
+        save_as: srch
+      - { tool: count_at_fdr, args: { path: "{saved.srch.data.results}", level: psm, threshold: 0.01 } }
+    expect:
+      - { path: ok, equals: false }
+
+data_rules:
+  cloud_visibility: all

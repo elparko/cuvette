@@ -1,0 +1,19 @@
+{
+  "fasta": "/Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta",
+  "decoys": "sage_reverse",
+  "decoy_tag": "rev_",
+  "enzyme": "trypsin",
+  "missed_cleavages": 1,
+  "fixed_mods": "C+57.0215",
+  "variable_mods": "M+15.9949",
+  "max_variable_mods": 2,
+  "precursor_tol_ppm": 10,
+  "fragment_tol": 0.5,
+  "fragment_tol_unit": "da",
+  "isotope_min": 0,
+  "isotope_max": 0,
+  "max_fragment_charge": 1,
+  "min_peaks": 6,
+  "fdr_level": "psm",
+  "fdr_threshold": 0.01
+}

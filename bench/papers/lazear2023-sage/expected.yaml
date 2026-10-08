@@ -1,0 +1,33 @@
+tool: Sage
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/lazear2023-sage/BSA1.mzML
+  - /Volumes/T7/guided-analysis/data/lazear2023-sage/BSA2.mzML
+  - /Volumes/T7/guided-analysis/data/lazear2023-sage/BSA3.mzML
+  - /Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta
+decisions:
+  database: "standards.fasta (119 proteins: 18 standards and contaminants)"
+  decoys: "reversed peptides made by Sage, tag rev_"
+  enzyme: "trypsin, no cut before proline"
+  missed_cleavages: 1
+  peptide_length: "5 to 50 (Sage defaults; not a decision in the adapter)"
+  fixed_modifications: "C+57.0215"
+  variable_modifications: "M+15.9949, at most 2 per peptide"
+  precursor_tolerance: "10 ppm"
+  fragment_tolerance: "0.5 Da (ion trap)"
+  isotope_error: "0 to 0"
+  max_fragment_charge: 1
+  min_peaks: 6
+  fdr_level: PSM
+  fdr_threshold: 0.01
+expected:
+  - {description: "PSMs in the result table", value: 303, tolerance: 0, source: "computed, Sage 0.14.6"}
+  - {description: "decoy PSMs in the result table", value: 43, tolerance: 0, source: "computed, Sage 0.14.6"}
+  - {description: "target PSMs at 1% PSM FDR", value: 207, tolerance: 0, source: "computed, Sage 0.14.6; Python recount of q-values agrees"}
+  - {description: "distinct peptides among those PSMs", value: 47, tolerance: 0, source: "computed, Sage 0.14.6"}
+  - {description: "decoy PSMs among the kept PSMs", value: 1, tolerance: 0, source: "computed, Sage 0.14.6"}
+  - {description: "target PSMs at 5% PSM FDR", value: 242, tolerance: 0, source: "computed, Sage 0.14.6; Python recount of q-values agrees"}
+notes: |
+  The paper reports benchmarks on large public data. It has no result for this small data set. All values are computed.
+  Traps: without max_fragment_charge 1, long peptides at charge 4 or 5 score high on this low-resolution data, and no PSM reaches 1% FDR. A fragment tolerance in ppm finds almost nothing. Sage q-values use (decoys + 1) / targets, so a very small set cannot reach 1%.
+  The release binary v0.14.7 prints version 0.14.6.
