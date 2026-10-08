@@ -95,7 +95,7 @@ export async function teachReview(d: TeachDeps, adapterName?: string, args: Args
   steps.forEach((s, i) => {
     const e = d.decisions.enforce(adapter.name, s.tool, s.args, { readOnly: true });
     const label = (key: string) => d.decisions.fields().find((f) => f.key === key)?.label ?? key;
-    const differences = e.deviations.map((v) => `${label(v.key)}: you used ${JSON.stringify(v.used)}, the record says ${JSON.stringify(v.setup)}.`);
+    const differences = e.deviations.map((v) => `${label(v.key)}: you used ${JSON.stringify(v.requested ?? v.used)}, the record says ${JSON.stringify(v.setup)}.`);
     const waiting = e.waiting.map((k) => `${label(k)}: the record has no value yet. The scientist decides it.`);
     const mapped = !!adapter.mapEntry(s.tool, s.args);
     if (!mapped) differences.push(`${s.tool}: this step has no entry in the map of the adapter, so the harness cannot compare it.`);

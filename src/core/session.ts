@@ -545,7 +545,7 @@ export class Session {
     if (pre.decision === "instruct") return this.followStep(tool, eff, callId, signal, pre.applied ?? {});
     const kept = (pre.deviations ?? []).filter((d) => d.overwritten);
     const keptNote = kept.length
-      ? `The harness used the recorded decision${kept.length > 1 ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.used)})`).join("; ")}. The scientist owns ${kept.length > 1 ? "these values" : "this value"}. To change it, ask the scientist with ask_scientist and say why.`
+      ? `The harness used the recorded decision${kept.length > 1 ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.requested)})`).join("; ")}. The scientist owns ${kept.length > 1 ? "these values" : "this value"}. To change it, ask the scientist with ask_scientist and say why.`
       : "";
     const out = await this.execute(tool, eff, callId, signal, { applied: pre.applied ?? {} });
     const post = await this.hooks.post({ event: "PostToolUse", session: this.id, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args: eff, output: out.output, node: out.node });

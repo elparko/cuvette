@@ -89,6 +89,28 @@ test("numbers walks results with dotted paths and skips non-finite values", () =
   expect(big.numbers()).toHaveLength(2000);
 });
 
+test("numbers include the values that a script printed", () => {
+  const r = new AnalysisRecord(tmp(), "s1");
+  const e = r.append("tool_result", { tool: "run_script", text: "n features 11432 AUC range 0.4295703244566881 0.5484182098765432" });
+  r.addNode(nodeIn({ tool: "run_script", entry: e.id, result: { data: { duration_s: 1.5 } } }));
+  r.addNode(nodeIn({ tool: "other", entry: e.id, result: {} }));
+  const got = r.numbers().map((x) => `${x.node}:${x.path}=${x.value}`);
+  expect(got).toEqual(["n1:data.duration_s=1.5", "n1:stdout=11432", "n1:stdout=0.4295703244566881", "n1:stdout=0.5484182098765432"]);
+});
+
+test("numbers include a file that the agent read, from the saved copy of that file", () => {
+  const dir = tmp();
+  const r = new AnalysisRecord(dir, "s1");
+  const csv = join(dir, "table.csv");
+  writeFileSync(csv, "mz,log2_fc\n" + Array.from({ length: 400 }, (_, i) => `${100 + i}.5,${(i / 7).toFixed(4)}`).join("\n"));
+  const sha = r.putBlob(csv, ".csv");
+  r.addNode(nodeIn({ tool: "run_analysis", result: {}, outputs: [{ path: csv, kind: "file", sha }] }));
+  r.append("tool_result", { tool: "read_file", ok: true, text: "mz,log2_fc\n100.5,0.0000", effectiveArgs: { path: csv } });
+  const vals = r.numbers().filter((x) => x.path === `file:${csv}`).map((x) => x.value);
+  expect(vals).toContain(57);
+  expect(vals).toContain(499.5);
+});
+
 test("messages returns messages, or the summary plus later messages after compaction", () => {
   const r = new AnalysisRecord(tmp(), "s1");
   const msg = (t: string) => ({ role: "user" as const, parts: [{ type: "text" as const, text: t }] });

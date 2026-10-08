@@ -83,8 +83,9 @@ function mentions(answer: string, term: string): boolean {
 function deviationsNotMentioned(ctx: ReviewContext): FindingIn[] {
   const out: FindingIn[] = [];
   for (const e of ctx.record.entries(["deviation"])) {
-    const list = (e.data.deviations ?? []) as { arg: string; key: string; setup: unknown; used: unknown }[];
+    const list = (e.data.deviations ?? []) as { arg: string; key: string; setup: unknown; used: unknown; overwritten?: boolean }[];
     for (const d of list) {
+      if (d.overwritten) continue;
       const last = d.arg.split(".").at(-1) ?? d.arg;
       if ([d.key, d.arg, last].some((t) => t && mentions(ctx.answer, t))) continue;
       out.push({

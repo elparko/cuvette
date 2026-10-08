@@ -323,7 +323,7 @@ export class DecisionRecord {
           else if (s.owner === "agent") deviations.push({ arg, key, setup: s.value, used: given });
           else {
             setPath(out, arg, s.value);
-            deviations.push({ arg, key, setup: s.value, used: given, overwritten: true });
+            deviations.push({ arg, key, setup: s.value, requested: given, used: s.value, overwritten: true });
           }
         }
       } else if (s.owner === "human" && s.def.stage === "when_needed") {

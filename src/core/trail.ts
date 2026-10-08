@@ -217,7 +217,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       return { icon: "question", line: `Answer to ${show(d.qid)}: ${clip(show(d.value))}${d.by ? ` (by ${show(d.by)})` : ""}`, details: { note: d.note }, technical: tech() };
     case "deviation": {
       const devs = (d.deviations as Record<string, unknown>[] | undefined) ?? [];
-      const what = devs.map((x) => `${show(x.arg)} used ${show(x.used)}, setup ${show(x.setup)}`).join("; ");
+      const what = devs.map((x) => (x.overwritten ? `${show(x.arg)}: asked for ${show(x.requested ?? x.used)}, ran with the recorded ${show(x.setup)}` : `${show(x.arg)} used ${show(x.used)}, setup ${show(x.setup)}`)).join("; ");
       return { icon: "deviation", line: `Deviation in ${show(d.tool)}: ${clip(what || "values differ from the setup")}`, details: { deviations: devs }, technical: tech({ callId: d.callId }) };
     }
     case "blocked":

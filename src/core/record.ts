@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
+import { extractNumbers } from "./claims.ts";
 import type { Entry, EntryKind, Message, Node, NodeIn } from "./types.ts";
 
 const MAX_NUMBERS_PER_NODE = 2000;
+const MAX_FILE_BYTES = 1_000_000;
 
 export class AnalysisRecord {
   readonly dir: string;
@@ -169,6 +171,27 @@ export class AnalysisRecord {
         }
       };
       walk(n.result, "");
+      const texts: [string, string][] = [];
+      if (n.tool === "run_script") texts.push(["stdout", String(this.log.find((e) => e.id === n.entry)?.data.text ?? "")]);
+      for (const e of this.log) {
+        if (e.kind !== "tool_result" || e.data.tool !== "read_file" || !e.data.ok) continue;
+        const read = (e.data.effectiveArgs as { path?: string } | undefined)?.path;
+        const out = read ? n.outputs.find((o) => o.path === read) : undefined;
+        if (!out) continue;
+        const blob = out.sha ? this.blobPath(out.sha) : undefined;
+        let text = String(e.data.text ?? "");
+        try {
+          if (blob && statSync(blob).size <= MAX_FILE_BYTES) text = readFileSync(blob, "utf8");
+        } catch {}
+        texts.push([`file:${read}`, text]);
+      }
+      for (const [path, text] of texts) {
+        for (const f of extractNumbers(text)) {
+          if (count >= MAX_NUMBERS_PER_NODE) break;
+          out.push({ node: n.id, path, value: f.value });
+          count++;
+        }
+      }
     }
     return out;
   }

@@ -70,13 +70,15 @@ export class Mapper {
       case "tool_result":
         return [this.stepItem(key, d)];
       case "deviation": {
-        const devs = (d.deviations as { arg: string; key?: string; setup: unknown; used: unknown }[] | undefined) ?? [];
+        const devs = (d.deviations as { arg: string; key?: string; setup: unknown; used: unknown; requested?: unknown; overwritten?: boolean }[] | undefined) ?? [];
         return devs.map((v, i) => ({
           key: `${key}.${i}`,
           t: "line" as const,
           sym: "⚠",
           color: "yellow",
-          text: `Deviation: ${(v.key ?? v.arg).replace(/_/g, " ")} ${show(v.used)} (setup says ${show(v.setup)})`,
+          text: v.overwritten
+            ? `Kept the record: ${(v.key ?? v.arg).replace(/_/g, " ")} ${show(v.setup)} (the agent asked for ${show(v.requested ?? v.used)})`
+            : `Deviation: ${(v.key ?? v.arg).replace(/_/g, " ")} ${show(v.used)} (setup says ${show(v.setup)})`,
         }));
       }
       case "blocked":

@@ -111,14 +111,14 @@ describe("enforce", () => {
   test("a scientist-owned value wins over the model value; numeric string equal", () => {
     expect(dr.enforce("x", "run", { params: { tol: "5" } }).deviations).toEqual([]);
     const e = dr.enforce("x", "run", { params: { tol: 8 } });
-    expect(e.deviations).toEqual([{ arg: "params.tol", key: "tol", setup: 5, used: 8, overwritten: true }]);
+    expect(e.deviations).toEqual([{ arg: "params.tol", key: "tol", setup: 5, requested: 8, used: 5, overwritten: true }]);
     expect((e.args.params as any).tol).toBe(5);
   });
 
   test("fixed owner overwrites", () => {
     const e = dr.enforce("x", "run", { method: "b" });
     expect(e.args.method).toBe("a");
-    expect(e.deviations[0]).toMatchObject({ overwritten: true, used: "b", setup: "a" });
+    expect(e.deviations[0]).toMatchObject({ overwritten: true, requested: "b", used: "a", setup: "a" });
   });
 
   test("human when_needed waits; agent records first use", () => {

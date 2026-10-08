@@ -50,6 +50,12 @@ describe("checkAnswer", () => {
     expect(c).toHaveLength(0);
   });
 
+  test("ignores N:N notation such as lipid names and ratios", () => {
+    const { record } = fake(nums);
+    const claims = checkAnswer("The ion is PI 38:4 and sulfatide 42:1;O2, mixed 1:10 with AUC 0.81.", record);
+    expect(claims.map((c) => c.value)).toEqual([0.81]);
+  });
+
   test("skips numbers from the user and setup", () => {
     const { record } = fake(nums, ["use a 25 um window"], { tol: 7.5 });
     const c = checkAnswer("The window of 25 um and tolerance 7.5 were kept.", record);

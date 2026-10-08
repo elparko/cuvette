@@ -177,6 +177,7 @@ export interface Deviation {
   key: string;
   setup: unknown;
   used: unknown;
+  requested?: unknown;
   overwritten?: boolean;
 }
 
