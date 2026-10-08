@@ -1,0 +1,903 @@
+% References for Cuvette: science programs, libraries, datasets and benchmark papers.
+% Key form: first-author family name (lower case) + year + first word of the title.
+% CREDITS.md lists each key. Metadata was checked against Crossref, PubMed,
+% DataCite and the project pages on 2026-10-08.
+
+% ---------------------------------------------------------------------------
+% Cuvette
+% ---------------------------------------------------------------------------
+
+@software{smith2026cuvette,
+  author  = {Smith, Parker},
+  title   = {Cuvette},
+  version = {0.1.0},
+  year    = {2026},
+  license = {AGPL-3.0-only},
+  url     = {https://cuvette.ai},
+  note    = {Source code: https://github.com/elparko/cuvette}
+}
+
+% ---------------------------------------------------------------------------
+% Programs wrapped by adapters
+% ---------------------------------------------------------------------------
+
+@article{danecek2021twelve,
+  author  = {Danecek, Petr and Bonfield, James K. and Liddle, Jennifer and Marshall, John and Ohan, Valeriu and Pollard, Martin O. and Whitwham, Andrew and Keane, Thomas and McCarthy, Shane A. and Davies, Robert M. and Li, Heng},
+  title   = {Twelve years of {SAMtools} and {BCFtools}},
+  journal = {GigaScience},
+  year    = {2021},
+  volume  = {10},
+  number  = {2},
+  pages   = {giab008},
+  doi     = {10.1093/gigascience/giab008}
+}
+
+@article{bonfield2021htslib,
+  author  = {Bonfield, James K. and Marshall, John and Danecek, Petr and Li, Heng and Ohan, Valeriu and Whitwham, Andrew and Keane, Thomas and Davies, Robert M.},
+  title   = {{HTSlib}: {C} library for reading/writing high-throughput sequencing data},
+  journal = {GigaScience},
+  year    = {2021},
+  volume  = {10},
+  number  = {2},
+  pages   = {giab007},
+  doi     = {10.1093/gigascience/giab007}
+}
+
+@article{li2009sequence,
+  author  = {Li, Heng and Handsaker, Bob and Wysoker, Alec and Fennell, Tim and Ruan, Jue and Homer, Nils and Marth, Gabor and Abecasis, Goncalo and Durbin, Richard and {1000 Genome Project Data Processing Subgroup}},
+  title   = {The Sequence Alignment/Map format and {SAMtools}},
+  journal = {Bioinformatics},
+  year    = {2009},
+  volume  = {25},
+  number  = {16},
+  pages   = {2078--2079},
+  doi     = {10.1093/bioinformatics/btp352}
+}
+
+@article{quinlan2010bedtools,
+  author  = {Quinlan, Aaron R. and Hall, Ira M.},
+  title   = {{BEDTools}: a flexible suite of utilities for comparing genomic features},
+  journal = {Bioinformatics},
+  year    = {2010},
+  volume  = {26},
+  number  = {6},
+  pages   = {841--842},
+  doi     = {10.1093/bioinformatics/btq033}
+}
+
+@misc{andrews2010fastqc,
+  author       = {Andrews, Simon},
+  title        = {{FastQC}: A Quality Control Tool for High Throughput Sequence Data},
+  year         = {2010},
+  howpublished = {Babraham Bioinformatics},
+  url          = {https://www.bioinformatics.babraham.ac.uk/projects/fastqc/},
+  note         = {Version 0.13.0. No DOI.}
+}
+
+@article{wong2026iqtree,
+  author  = {Wong, Thomas K. F. and Ly-Trong, Nhan and Ren, Huaiyan and Demotte, Piyumal and Ba{\~n}os, Hector and Roger, Andrew J. and Susko, Edward and Bielow, Chris and De Maio, Nicola and Goldman, Nick and Hahn, Matthew W. and dos Reis, Mario and Vinh, Le Sy and Huttley, Gavin and Lanfear, Robert and Minh, Bui Quang},
+  title   = {{IQ-TREE} 3: phylogenomic inference software using complex evolutionary models},
+  journal = {Molecular Biology and Evolution},
+  year    = {2026},
+  volume  = {43},
+  number  = {5},
+  pages   = {msag117},
+  doi     = {10.1093/molbev/msag117}
+}
+
+@article{minh2020iqtree,
+  author  = {Minh, Bui Quang and Schmidt, Heiko A. and Chernomor, Olga and Schrempf, Dominik and Woodhams, Michael D. and von Haeseler, Arndt and Lanfear, Robert},
+  title   = {{IQ-TREE} 2: New Models and Efficient Methods for Phylogenetic Inference in the Genomic Era},
+  journal = {Molecular Biology and Evolution},
+  year    = {2020},
+  volume  = {37},
+  number  = {5},
+  pages   = {1530--1534},
+  doi     = {10.1093/molbev/msaa015}
+}
+
+@article{katoh2013mafft,
+  author  = {Katoh, Kazutaka and Standley, Daron M.},
+  title   = {{MAFFT} Multiple Sequence Alignment Software Version 7: Improvements in Performance and Usability},
+  journal = {Molecular Biology and Evolution},
+  year    = {2013},
+  volume  = {30},
+  number  = {4},
+  pages   = {772--780},
+  doi     = {10.1093/molbev/mst010}
+}
+
+@article{love2014moderated,
+  author  = {Love, Michael I. and Huber, Wolfgang and Anders, Simon},
+  title   = {Moderated estimation of fold change and dispersion for {RNA-seq} data with {DESeq2}},
+  journal = {Genome Biology},
+  year    = {2014},
+  volume  = {15},
+  number  = {12},
+  pages   = {550},
+  doi     = {10.1186/s13059-014-0550-8}
+}
+
+@article{bates2015fitting,
+  author  = {Bates, Douglas and M{\"a}chler, Martin and Bolker, Ben and Walker, Steve},
+  title   = {Fitting Linear Mixed-Effects Models Using {lme4}},
+  journal = {Journal of Statistical Software},
+  year    = {2015},
+  volume  = {67},
+  number  = {1},
+  pages   = {1--48},
+  doi     = {10.18637/jss.v067.i01}
+}
+
+@article{kuznetsova2017lmertest,
+  author  = {Kuznetsova, Alexandra and Brockhoff, Per B. and Christensen, Rune H. B.},
+  title   = {{lmerTest} Package: Tests in Linear Mixed Effects Models},
+  journal = {Journal of Statistical Software},
+  year    = {2017},
+  volume  = {82},
+  number  = {13},
+  pages   = {1--26},
+  doi     = {10.18637/jss.v082.i13}
+}
+
+@manual{oksanen2026vegan,
+  author = {Oksanen, Jari and Simpson, Gavin L. and Blanchet, F. Guillaume and Kindt, Roeland and Legendre, Pierre and Minchin, Peter R. and O'Hara, R. B. and Solymos, Peter and Stevens, M. Henry H. and Szoecs, Eduard and Wagner, Helene and others},
+  title  = {vegan: Community Ecology Package},
+  year   = {2026},
+  note   = {R package version 2.7-6},
+  doi    = {10.32614/CRAN.package.vegan},
+  url    = {https://CRAN.R-project.org/package=vegan}
+}
+
+@article{bemis2023cardinal,
+  author  = {Bemis, Kylie Ariel and F{\"o}ll, Melanie Christine and Guo, Dan and Lakkimsetty, Sai Srikanth and Vitek, Olga},
+  title   = {{Cardinal} v.3: a versatile open-source software for mass spectrometry imaging analysis},
+  journal = {Nature Methods},
+  year    = {2023},
+  volume  = {20},
+  number  = {12},
+  pages   = {1883--1886},
+  doi     = {10.1038/s41592-023-02070-z}
+}
+
+@article{bemis2015cardinal,
+  author  = {Bemis, Kylie D. and Harry, April and Eberlin, Livia S. and Ferreira, Christina and van de Ven, Stephanie M. and Mallick, Parag and Stolowitz, Mark and Vitek, Olga},
+  title   = {{Cardinal}: an {R} package for statistical analysis of mass spectrometry-based imaging experiments},
+  journal = {Bioinformatics},
+  year    = {2015},
+  volume  = {31},
+  number  = {14},
+  pages   = {2418--2420},
+  doi     = {10.1093/bioinformatics/btv146}
+}
+
+@article{wolf2018scanpy,
+  author  = {Wolf, F. Alexander and Angerer, Philipp and Theis, Fabian J.},
+  title   = {{SCANPY}: large-scale single-cell gene expression data analysis},
+  journal = {Genome Biology},
+  year    = {2018},
+  volume  = {19},
+  number  = {1},
+  pages   = {15},
+  doi     = {10.1186/s13059-017-1382-0}
+}
+
+@article{virshup2023scverse,
+  author  = {Virshup, Isaac and Bredikhin, Danila and Heumos, Lukas and Palla, Giovanni and Sturm, Gregor and Gayoso, Adam and Kats, Ilia and Koutrouli, Mikaela and {Scverse Community} and others},
+  title   = {The scverse project provides a computational ecosystem for single-cell omics data analysis},
+  journal = {Nature Biotechnology},
+  year    = {2023},
+  volume  = {41},
+  number  = {5},
+  pages   = {604--606},
+  doi     = {10.1038/s41587-023-01733-8}
+}
+
+@article{virshup2024anndata,
+  author  = {Virshup, Isaac and Rybakov, Sergei and Theis, Fabian J. and Angerer, Philipp and Wolf, F. Alexander},
+  title   = {anndata: Access and store annotated data matrices},
+  journal = {Journal of Open Source Software},
+  year    = {2024},
+  volume  = {9},
+  number  = {101},
+  pages   = {4371},
+  doi     = {10.21105/joss.04371}
+}
+
+@article{white2021flowkit,
+  author  = {White, Scott and Quinn, John and Enzor, Jennifer and Staats, Janet and Mosier, Sarah M. and Almarode, James and Denny, Thomas N. and Weinhold, Kent J. and Ferrari, Guido and Chan, Cliburn},
+  title   = {{FlowKit}: A Python Toolkit for Integrated Manual and Automated Cytometry Analysis Workflows},
+  journal = {Frontiers in Immunology},
+  year    = {2021},
+  volume  = {12},
+  pages   = {768541},
+  doi     = {10.3389/fimmu.2021.768541}
+}
+
+@article{pfeuffer2024openms,
+  author  = {Pfeuffer, Julianus and Bielow, Chris and Wein, Samuel and Jeong, Kyowon and Netz, Eugen and Walter, Axel and Alka, Oliver and Nilse, Lars and Colaianni, Pasquale Domenico and McCloskey, Douglas and others},
+  title   = {{OpenMS} 3 enables reproducible analysis of large-scale mass spectrometry data},
+  journal = {Nature Methods},
+  year    = {2024},
+  volume  = {21},
+  number  = {3},
+  pages   = {365--367},
+  doi     = {10.1038/s41592-024-02197-7}
+}
+
+@article{rost2016openms,
+  author  = {R{\"o}st, Hannes L. and Sachsenberg, Timo and Aiche, Stephan and Bielow, Chris and Weisser, Hendrik and Aicheler, Fabian and Andreotti, Sandro and Ehrlich, Hans-Christian and Gutenbrunner, Petra and Kenar, Erhan and others},
+  title   = {{OpenMS}: a flexible open-source software platform for mass spectrometry data analysis},
+  journal = {Nature Methods},
+  year    = {2016},
+  volume  = {13},
+  number  = {9},
+  pages   = {741--748},
+  doi     = {10.1038/nmeth.3959}
+}
+
+@article{rost2014pyopenms,
+  author  = {R{\"o}st, Hannes L. and Schmitt, Uwe and Aebersold, Ruedi and Malmstr{\"o}m, Lars},
+  title   = {{pyOpenMS}: A Python-based interface to the {OpenMS} mass-spectrometry algorithm library},
+  journal = {Proteomics},
+  year    = {2014},
+  volume  = {14},
+  number  = {1},
+  pages   = {74--77},
+  doi     = {10.1002/pmic.201300246}
+}
+
+@article{lazear2023sage,
+  author  = {Lazear, Michael R.},
+  title   = {Sage: An Open-Source Tool for Fast Proteomics Searching and Quantification at Scale},
+  journal = {Journal of Proteome Research},
+  year    = {2023},
+  volume  = {22},
+  number  = {11},
+  pages   = {3652--3659},
+  doi     = {10.1021/acs.jproteome.3c00486}
+}
+
+@article{schmid2023integrative,
+  author  = {Schmid, Robin and Heuckeroth, Steffen and Korf, Ansgar and Smirnov, Aleksandr and Myers, Owen and Dyrlund, Thomas S. and Bushuiev, Roman and Murray, Kevin J. and Hoffmann, Nils and Lu, Miaoshan and others and Pluskal, Tom{\'a}{\v{s}}},
+  title   = {Integrative analysis of multimodal mass spectrometry data in {MZmine} 3},
+  journal = {Nature Biotechnology},
+  year    = {2023},
+  volume  = {41},
+  number  = {4},
+  pages   = {447--449},
+  doi     = {10.1038/s41587-023-01690-2}
+}
+
+@article{palmer2017fdr,
+  author  = {Palmer, Andrew and Phapale, Prasad and Chernyavsky, Ilya and Lavigne, Regis and Fay, Dominik and Tarasov, Artem and Kovalev, Vitaly and Fuchser, Jens and Nikolenko, Sergey and Pineau, Charles and Becker, Michael and Alexandrov, Theodore},
+  title   = {{FDR}-controlled metabolite annotation for high-resolution imaging mass spectrometry},
+  journal = {Nature Methods},
+  year    = {2017},
+  volume  = {14},
+  number  = {1},
+  pages   = {57--60},
+  doi     = {10.1038/nmeth.4072}
+}
+
+@misc{alexandrov2019metaspace,
+  author       = {Alexandrov, Theodore and Ovchinnikova, Katja and Palmer, Andrew and Kovalev, Vitaly and Tarasov, Artem and Stuart, Lachlan and Nigmetzianov, Renat and Fay, Dominik and others},
+  title        = {{METASPACE}: A community-populated knowledge base of spatial metabolomes in health and disease},
+  year         = {2019},
+  howpublished = {bioRxiv preprint 539478},
+  doi          = {10.1101/539478}
+}
+
+@article{schramm2012imzml,
+  author  = {Schramm, Thorsten and Hester, Zo{\"e} and Klinkert, Ivo and Both, Jean-Pierre and Heeren, Ron M. A. and Brunelle, Alain and Lapr{\'e}vote, Olivier and Desbenoit, Nicolas and Robbe, Marie-France and Stoeckli, Markus and Spengler, Bernhard and R{\"o}mpp, Andreas},
+  title   = {{imzML} -- A common data format for the flexible exchange and processing of mass spectrometry imaging data},
+  journal = {Journal of Proteomics},
+  year    = {2012},
+  volume  = {75},
+  number  = {16},
+  pages   = {5106--5110},
+  doi     = {10.1016/j.jprot.2012.07.026}
+}
+
+@article{ramoscarreno2024rdata,
+  author  = {Ramos-Carre{\~n}o, Carlos and Rossi, Tuomas},
+  title   = {rdata: A Python library for {R} datasets},
+  journal = {Journal of Open Source Software},
+  year    = {2024},
+  volume  = {9},
+  number  = {104},
+  pages   = {7540},
+  doi     = {10.21105/joss.07540}
+}
+
+@article{schneider2012nih,
+  author  = {Schneider, Caroline A. and Rasband, Wayne S. and Eliceiri, Kevin W.},
+  title   = {{NIH} Image to {ImageJ}: 25 years of image analysis},
+  journal = {Nature Methods},
+  year    = {2012},
+  volume  = {9},
+  number  = {7},
+  pages   = {671--675},
+  doi     = {10.1038/nmeth.2089}
+}
+
+@article{schindelin2012fiji,
+  author  = {Schindelin, Johannes and Arganda-Carreras, Ignacio and Frise, Erwin and Kaynig, Verena and Longair, Mark and Pietzsch, Tobias and Preibisch, Stephan and Rueden, Curtis and Saalfeld, Stephan and Schmid, Benjamin and Tinevez, Jean-Yves and White, Daniel James and Hartenstein, Volker and Eliceiri, Kevin and Tomancak, Pavel and Cardona, Albert},
+  title   = {Fiji: an open-source platform for biological-image analysis},
+  journal = {Nature Methods},
+  year    = {2012},
+  volume  = {9},
+  number  = {7},
+  pages   = {676--682},
+  doi     = {10.1038/nmeth.2019}
+}
+
+@article{bankhead2017qupath,
+  author  = {Bankhead, Peter and Loughrey, Maurice B. and Fern{\'a}ndez, Jos{\'e} A. and Dombrowski, Yvonne and McArt, Darragh G. and Dunne, Philip D. and McQuaid, Stephen and Gray, Ronan T. and Murray, Liam J. and Coleman, Helen G. and James, Jacqueline A. and Salto-Tellez, Manuel and Hamilton, Peter W.},
+  title   = {{QuPath}: Open source software for digital pathology image analysis},
+  journal = {Scientific Reports},
+  year    = {2017},
+  volume  = {7},
+  number  = {1},
+  pages   = {16878},
+  doi     = {10.1038/s41598-017-17204-5}
+}
+
+@article{stirling2021cellprofiler,
+  author  = {Stirling, David R. and Swain-Bowden, Madison J. and Lucas, Alice M. and Carpenter, Anne E. and Cimini, Beth A. and Goodman, Allen},
+  title   = {{CellProfiler} 4: improvements in speed, utility and usability},
+  journal = {BMC Bioinformatics},
+  year    = {2021},
+  volume  = {22},
+  number  = {1},
+  pages   = {433},
+  doi     = {10.1186/s12859-021-04344-9}
+}
+
+@article{pachitariu2025cellpose,
+  author  = {Pachitariu, Marius and Rariden, Michael and Stringer, Carsen},
+  title   = {Cellpose-{SAM}: superhuman generalization for cellular segmentation},
+  journal = {bioRxiv},
+  year    = {2025},
+  doi     = {10.1101/2025.04.28.651001},
+  note    = {Preprint}
+}
+
+@article{stringer2021cellpose,
+  author  = {Stringer, Carsen and Wang, Tim and Michaelos, Michalis and Pachitariu, Marius},
+  title   = {Cellpose: a generalist algorithm for cellular segmentation},
+  journal = {Nature Methods},
+  year    = {2021},
+  volume  = {18},
+  number  = {1},
+  pages   = {100--106},
+  doi     = {10.1038/s41592-020-01018-x}
+}
+
+@article{vanderwalt2014scikitimage,
+  author  = {van der Walt, St{\'e}fan and Sch{\"o}nberger, Johannes L. and Nunez-Iglesias, Juan and Boulogne, Fran{\c{c}}ois and Warner, Joshua D. and Yager, Neil and Gouillart, Emmanuelle and Yu, Tony},
+  title   = {scikit-image: image processing in {Python}},
+  journal = {PeerJ},
+  year    = {2014},
+  volume  = {2},
+  pages   = {e453},
+  doi     = {10.7717/peerj.453}
+}
+
+@article{linkert2010metadata,
+  author  = {Linkert, Melissa and Rueden, Curtis T. and Allan, Chris and Burel, Jean-Marie and Moore, Will and Patterson, Andrew and Loranger, Brian and Moore, Josh and Neves, Carlos and MacDonald, Donald and Tarkowska, Aleksandra and Sticco, Caitlin and Hill, Emma and Rossner, Mike and Eliceiri, Kevin W. and Swedlow, Jason R.},
+  title   = {Metadata matters: access to image data in the real world},
+  journal = {Journal of Cell Biology},
+  year    = {2010},
+  volume  = {189},
+  number  = {5},
+  pages   = {777--782},
+  doi     = {10.1083/jcb.201004104}
+}
+
+@software{gdal2026gdal,
+  author    = {{GDAL/OGR contributors}},
+  title     = {{GDAL/OGR} Geospatial Data Abstraction software Library},
+  version   = {3.13.3},
+  year      = {2026},
+  publisher = {Open Source Geospatial Foundation},
+  doi       = {10.5281/zenodo.5884351},
+  url       = {https://gdal.org},
+  note      = {Zenodo concept DOI. Creators on Zenodo: Rouault, Even and Warmerdam, Frank and Schwehr, Kurt and others.}
+}
+
+@software{qgis2026qgis,
+  author    = {{QGIS.org}},
+  title     = {{QGIS} Geographic Information System},
+  version   = {4.2.3},
+  year      = {2026},
+  publisher = {QGIS Association},
+  doi       = {10.5281/zenodo.6139224},
+  url       = {https://qgis.org}
+}
+
+@article{graser2025qgis,
+  author  = {Graser, Anita and Sutton, Tim and Bernasocchi, Marco},
+  title   = {The {QGIS} project: Spatial without compromise},
+  journal = {Patterns},
+  year    = {2025},
+  volume  = {6},
+  number  = {7},
+  pages   = {101265},
+  doi     = {10.1016/j.patter.2025.101265}
+}
+
+@article{astropy2013astropy,
+  author  = {{Astropy Collaboration} and Robitaille, Thomas P. and Tollerud, Erik J. and Greenfield, Perry and Droettboom, Michael and Bray, Erik and Aldcroft, Tom and Davis, Matt and others},
+  title   = {Astropy: A community {Python} package for astronomy},
+  journal = {Astronomy \& Astrophysics},
+  year    = {2013},
+  volume  = {558},
+  pages   = {A33},
+  doi     = {10.1051/0004-6361/201322068}
+}
+
+@article{astropy2018astropy,
+  author  = {{Astropy Collaboration} and Price-Whelan, Adrian M. and Sip{\H{o}}cz, Brigitta M. and G{\"u}nther, Hans M. and Lim, P. L. and Crawford, Steven M. and Conseil, Simon and Shupe, David L. and others},
+  title   = {The {Astropy} Project: Building an Open-science Project and Status of the v2.0 Core Package},
+  journal = {The Astronomical Journal},
+  year    = {2018},
+  volume  = {156},
+  number  = {3},
+  pages   = {123},
+  doi     = {10.3847/1538-3881/aabc4f}
+}
+
+@article{astropy2022astropy,
+  author  = {{Astropy Collaboration} and Price-Whelan, Adrian M. and Lim, Pey Lian and Earl, Nicholas and Starkman, Nathaniel and Bradley, Larry and Shupe, David L. and Patil, Aarya A. and others},
+  title   = {The {Astropy} Project: Sustaining and Growing a Community-oriented Open-source Project and the Latest Major Release (v5.0) of the Core Package},
+  journal = {The Astrophysical Journal},
+  year    = {2022},
+  volume  = {935},
+  number  = {2},
+  pages   = {167},
+  doi     = {10.3847/1538-4357/ac7c74}
+}
+
+@software{bradley2026photutils,
+  author    = {Bradley, Larry and Sip{\H{o}}cz, Brigitta M. and Robitaille, Thomas P. and Tollerud, Erik J. and Vin{\'i}cius, Z{\'e} and Deil, Christoph and others},
+  title     = {Photutils},
+  version   = {3.0.0},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.596036},
+  note      = {Zenodo concept DOI}
+}
+
+@article{gramfort2013meg,
+  author  = {Gramfort, Alexandre and Luessi, Martin and Larson, Eric and Engemann, Denis A. and Strohmeier, Daniel and Brodbeck, Christian and Goj, Roman and Jas, Mainak and Brooks, Teon and Parkkonen, Lauri and H{\"a}m{\"a}l{\"a}inen, Matti S.},
+  title   = {{MEG} and {EEG} data analysis with {MNE-Python}},
+  journal = {Frontiers in Neuroscience},
+  year    = {2013},
+  volume  = {7},
+  pages   = {267},
+  doi     = {10.3389/fnins.2013.00267}
+}
+
+@article{gramfort2014mne,
+  author  = {Gramfort, Alexandre and Luessi, Martin and Larson, Eric and Engemann, Denis A. and Strohmeier, Daniel and Brodbeck, Christian and Parkkonen, Lauri and H{\"a}m{\"a}l{\"a}inen, Matti S.},
+  title   = {{MNE} software for processing {MEG} and {EEG} data},
+  journal = {NeuroImage},
+  year    = {2014},
+  volume  = {86},
+  pages   = {446--460},
+  doi     = {10.1016/j.neuroimage.2013.10.027}
+}
+
+@article{michaudagrawal2011mdanalysis,
+  author  = {Michaud-Agrawal, Naveen and Denning, Elizabeth J. and Woolf, Thomas B. and Beckstein, Oliver},
+  title   = {{MDAnalysis}: A toolkit for the analysis of molecular dynamics simulations},
+  journal = {Journal of Computational Chemistry},
+  year    = {2011},
+  volume  = {32},
+  number  = {10},
+  pages   = {2319--2327},
+  doi     = {10.1002/jcc.21787}
+}
+
+@inproceedings{gowers2016mdanalysis,
+  author    = {Gowers, Richard J. and Linke, Max and Barnoud, Jonathan and Reddy, Tyler J. E. and Melo, Manuel N. and Seyler, Sean L. and Doma{\'n}ski, Jan and Dotson, David L. and Buchoux, S{\'e}bastien and Kenney, Ian M. and Beckstein, Oliver},
+  title     = {{MDAnalysis}: A Python Package for the Rapid Analysis of Molecular Dynamics Simulations},
+  booktitle = {Proceedings of the 15th Python in Science Conference},
+  year      = {2016},
+  pages     = {98--105},
+  doi       = {10.25080/Majora-629e541a-00e}
+}
+
+@article{cock2009biopython,
+  author  = {Cock, Peter J. A. and Antao, Tiago and Chang, Jeffrey T. and Chapman, Brad A. and Cox, Cymon J. and Dalke, Andrew and Friedberg, Iddo and Hamelryck, Thomas and Kauff, Frank and Wilczynski, Bartek and de Hoon, Michiel J. L.},
+  title   = {Biopython: freely available Python tools for computational molecular biology and bioinformatics},
+  journal = {Bioinformatics},
+  year    = {2009},
+  volume  = {25},
+  number  = {11},
+  pages   = {1422--1423},
+  doi     = {10.1093/bioinformatics/btp163}
+}
+
+@article{hamelryck2003pdb,
+  author  = {Hamelryck, Thomas and Manderick, Bernard},
+  title   = {{PDB} file parser and structure class implemented in Python},
+  journal = {Bioinformatics},
+  year    = {2003},
+  volume  = {19},
+  number  = {17},
+  pages   = {2308--2310},
+  doi     = {10.1093/bioinformatics/btg299}
+}
+
+@software{landrum2026rdkit,
+  author    = {Landrum, Greg and others},
+  title     = {{RDKit}: Open-source cheminformatics},
+  version   = {2026.03.6},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.591637},
+  url       = {https://www.rdkit.org},
+  note      = {Zenodo concept DOI. The project has no official paper.}
+}
+
+@article{oboyle2011open,
+  author  = {O'Boyle, Noel M. and Banck, Michael and James, Craig A. and Morley, Chris and Vandermeersch, Tim and Hutchison, Geoffrey R.},
+  title   = {Open {Babel}: An open chemical toolbox},
+  journal = {Journal of Cheminformatics},
+  year    = {2011},
+  volume  = {3},
+  pages   = {33},
+  doi     = {10.1186/1758-2946-3-33}
+}
+
+@inproceedings{seabold2010statsmodels,
+  author    = {Seabold, Skipper and Perktold, Josef},
+  title     = {Statsmodels: Econometric and Statistical Modeling with {Python}},
+  booktitle = {Proceedings of the 9th Python in Science Conference},
+  year      = {2010},
+  pages     = {92--96},
+  doi       = {10.25080/Majora-92bf1922-011}
+}
+
+@article{vallat2018pingouin,
+  author  = {Vallat, Raphael},
+  title   = {Pingouin: statistics in {Python}},
+  journal = {Journal of Open Source Software},
+  year    = {2018},
+  volume  = {3},
+  number  = {31},
+  pages   = {1026},
+  doi     = {10.21105/joss.01026}
+}
+
+@article{davidsonpilon2019lifelines,
+  author  = {Davidson-Pilon, Cameron},
+  title   = {lifelines: survival analysis in {Python}},
+  journal = {Journal of Open Source Software},
+  year    = {2019},
+  volume  = {4},
+  number  = {40},
+  pages   = {1317},
+  doi     = {10.21105/joss.01317}
+}
+
+% ---------------------------------------------------------------------------
+% Python libraries used by the workers and the figure scripts
+% ---------------------------------------------------------------------------
+
+@article{virtanen2020scipy,
+  author  = {Virtanen, Pauli and Gommers, Ralf and Oliphant, Travis E. and others},
+  title   = {{SciPy} 1.0: fundamental algorithms for scientific computing in {Python}},
+  journal = {Nature Methods},
+  year    = {2020},
+  volume  = {17},
+  number  = {3},
+  pages   = {261--272},
+  doi     = {10.1038/s41592-019-0686-2}
+}
+
+@article{harris2020array,
+  author  = {Harris, Charles R. and Millman, K. Jarrod and van der Walt, St{\'e}fan J. and others},
+  title   = {Array programming with {NumPy}},
+  journal = {Nature},
+  year    = {2020},
+  volume  = {585},
+  number  = {7825},
+  pages   = {357--362},
+  doi     = {10.1038/s41586-020-2649-2}
+}
+
+@inproceedings{mckinney2010data,
+  author    = {McKinney, Wes},
+  title     = {Data Structures for Statistical Computing in {Python}},
+  booktitle = {Proceedings of the 9th Python in Science Conference},
+  year      = {2010},
+  pages     = {56--61},
+  doi       = {10.25080/Majora-92bf1922-00a}
+}
+
+@article{hunter2007matplotlib,
+  author  = {Hunter, John D.},
+  title   = {Matplotlib: A {2D} Graphics Environment},
+  journal = {Computing in Science \& Engineering},
+  year    = {2007},
+  volume  = {9},
+  number  = {3},
+  pages   = {90--95},
+  doi     = {10.1109/MCSE.2007.55}
+}
+
+@article{fleischmann2026geopandas,
+  author  = {Fleischmann, Martin and Van den Bossche, Joris and Jordahl, Kelsey and Richards, Matt J. and McBride, James and Wasserman, Jacob and Ward, Brendan and Wolf, Levi John},
+  title   = {{GeoPandas}: Fundamental data structures for vector spatial data in {Python}},
+  journal = {Computers, Environment and Urban Systems},
+  year    = {2026},
+  volume  = {130},
+  pages   = {102495},
+  doi     = {10.1016/j.compenvurbsys.2026.102495}
+}
+
+@software{gillies2026shapely,
+  author    = {Gillies, Sean and van der Wel, Casper and Van den Bossche, Joris and Taves, Mike W. and Arnott, Joshua and Ward, Brendan C. and others},
+  title     = {Shapely},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.5597138}
+}
+
+@software{snow2026pyproj,
+  author    = {Snow, Alan D. and others},
+  title     = {pyproj},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.2592232}
+}
+
+% ---------------------------------------------------------------------------
+% Benchmark papers that are not program papers
+% ---------------------------------------------------------------------------
+
+@article{caicedo2019evaluation,
+  author  = {Caicedo, Juan C. and Roth, Jonathan and Goodman, Allen and Becker, Tim and Karhohs, Kyle W. and Broisin, Matthieu and Molnar, Csaba and McQuin, Claire and Singh, Shantanu and Theis, Fabian J. and Carpenter, Anne E.},
+  title   = {Evaluation of Deep Learning Strategies for Nucleus Segmentation in Fluorescence Images},
+  journal = {Cytometry Part A},
+  year    = {2019},
+  volume  = {95},
+  number  = {9},
+  pages   = {952--965},
+  doi     = {10.1002/cyto.a.23863}
+}
+
+@article{ljosa2012annotated,
+  author  = {Ljosa, Vebjorn and Sokolnicki, Katherine L. and Carpenter, Anne E.},
+  title   = {Annotated high-throughput microscopy image sets for validation},
+  journal = {Nature Methods},
+  year    = {2012},
+  volume  = {9},
+  number  = {7},
+  pages   = {637},
+  doi     = {10.1038/nmeth.2083}
+}
+
+@article{bray2012workflow,
+  author  = {Bray, Mark-Anthony and Fraser, Adam N. and Hasaka, Thomas P. and Carpenter, Anne E.},
+  title   = {Workflow and Metrics for Image Quality Control in Large-Scale High-Content Screens},
+  journal = {Journal of Biomolecular Screening},
+  year    = {2012},
+  volume  = {17},
+  number  = {2},
+  pages   = {266--274},
+  doi     = {10.1177/1087057111420292}
+}
+
+@article{mahbod2024nuinsseg,
+  author  = {Mahbod, Amirreza and Polak, Christine and Feldmann, Katharina and Khan, Rumsha and Gelles, Katharina and Dorffner, Georg and Woitek, Ramona and Hatamikia, Sepideh and Ellinger, Isabella},
+  title   = {{NuInsSeg}: A fully annotated dataset for nuclei instance segmentation in {H\&E}-stained histological images},
+  journal = {Scientific Data},
+  year    = {2024},
+  volume  = {11},
+  number  = {1},
+  pages   = {295},
+  doi     = {10.1038/s41597-024-03117-2}
+}
+
+@article{delaney2004esol,
+  author  = {Delaney, John S.},
+  title   = {{ESOL}: Estimating Aqueous Solubility Directly from Molecular Structure},
+  journal = {Journal of Chemical Information and Computer Sciences},
+  year    = {2004},
+  volume  = {44},
+  number  = {3},
+  pages   = {1000--1005},
+  doi     = {10.1021/ci034243x}
+}
+
+@article{lipinski1997experimental,
+  author  = {Lipinski, Christopher A. and Lombardo, Franco and Dominy, Beryl W. and Feeney, Paul J.},
+  title   = {Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings},
+  journal = {Advanced Drug Delivery Reviews},
+  year    = {1997},
+  volume  = {23},
+  number  = {1-3},
+  pages   = {3--25},
+  doi     = {10.1016/S0169-409X(96)00423-1}
+}
+
+@article{belenky2003patterns,
+  author  = {Belenky, Gregory and Wesensten, Nancy J. and Thorne, David R. and Thomas, Maria L. and Sing, Helen C. and Redmond, Daniel P. and Russo, Michael B. and Balkin, Thomas J.},
+  title   = {Patterns of performance degradation and restoration during sleep restriction and subsequent recovery: a sleep dose-response study},
+  journal = {Journal of Sleep Research},
+  year    = {2003},
+  volume  = {12},
+  number  = {1},
+  pages   = {1--12},
+  doi     = {10.1046/j.1365-2869.2003.00337.x}
+}
+
+@article{student1908probable,
+  author  = {{Student}},
+  title   = {The Probable Error of a Mean},
+  journal = {Biometrika},
+  year    = {1908},
+  volume  = {6},
+  number  = {1},
+  pages   = {1--25},
+  doi     = {10.2307/2331554}
+}
+
+@article{cushny1905action,
+  author  = {Cushny, Arthur R. and Peebles, A. R.},
+  title   = {The action of optical isomers: {II}. Hyoscines},
+  journal = {The Journal of Physiology},
+  year    = {1905},
+  volume  = {32},
+  number  = {5-6},
+  pages   = {501--510},
+  doi     = {10.1113/jphysiol.1905.sp001097}
+}
+
+@book{rossi1980money,
+  author    = {Rossi, Peter H. and Berk, Richard A. and Lenihan, Kenneth J.},
+  title     = {Money, Work, and Crime: Experimental Evidence},
+  publisher = {Academic Press},
+  address   = {New York},
+  year      = {1980},
+  isbn      = {978-0-12-598240-5}
+}
+
+@book{fox2019r,
+  author    = {Fox, John and Weisberg, Sanford},
+  title     = {An {R} Companion to Applied Regression},
+  edition   = {3},
+  publisher = {Sage},
+  address   = {Thousand Oaks, CA},
+  year      = {2019},
+  note      = {Online appendix: Cox Proportional-Hazards Regression for Survival Data in R, https://www.john-fox.ca/Companion/appendices/Appendix-Cox-Regression.pdf}
+}
+
+@book{jongman1987data,
+  author    = {Jongman, R. H. G. and ter Braak, C. J. F. and van Tongeren, O. F. R.},
+  title     = {Data Analysis in Community and Landscape Ecology},
+  publisher = {Pudoc},
+  address   = {Wageningen},
+  year      = {1987},
+  note      = {Reissued by Cambridge University Press, 1995, doi:10.1017/CBO9780511525575}
+}
+
+@article{himes2014rnaseq,
+  author  = {Himes, Blanca E. and Jiang, Xiaofeng and Wagner, Peter and Hu, Ruoxi and Wang, Qiyu and Klanderman, Barbara and Whitaker, Reid M. and Duan, Qingling and Lasky-Su, Jessica and Nikolos, Christina and Jester, William and Johnson, Martin and Panettieri, Reynold A. and Tantisira, Kelan G. and Weiss, Scott T. and Lu, Quan},
+  title   = {{RNA-Seq} Transcriptome Profiling Identifies {CRISPLD2} as a Glucocorticoid Responsive Gene that Modulates Cytokine Function in Airway Smooth Muscle Cells},
+  journal = {PLoS ONE},
+  year    = {2014},
+  volume  = {9},
+  number  = {6},
+  pages   = {e99625},
+  doi     = {10.1371/journal.pone.0099625}
+}
+
+@article{love2016rnaseq,
+  author  = {Love, Michael I. and Anders, Simon and Kim, Vladislav and Huber, Wolfgang},
+  title   = {{RNA-Seq} workflow: gene-level exploratory analysis and differential expression},
+  journal = {F1000Research},
+  year    = {2016},
+  volume  = {4},
+  pages   = {1070},
+  doi     = {10.12688/f1000research.7035.2},
+  note    = {Version 2}
+}
+
+@article{michael2022mass,
+  author  = {Michael, Jesse A. and Mutuku, Shadrack M. and Ucur, Boris and Sarretto, Tassiani and Maccarone, Alan T. and Niehaus, Marcel and Trevitt, Adam J. and Ellis, Shane R.},
+  title   = {Mass Spectrometry Imaging of Lipids Using {MALDI} Coupled with Plasma-Based Post-Ionization on a Trapped Ion Mobility Mass Spectrometer},
+  journal = {Analytical Chemistry},
+  year    = {2022},
+  volume  = {94},
+  number  = {50},
+  pages   = {17494--17503},
+  doi     = {10.1021/acs.analchem.2c03745}
+}
+
+% ---------------------------------------------------------------------------
+% Datasets
+% ---------------------------------------------------------------------------
+
+@misc{pecot2022whole,
+  author    = {P{\'e}cot, Thierry},
+  title     = {Whole-Slide Image Analysis and Quantitative Pathology with {QuPath}},
+  year      = {2022},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.6390370},
+  note      = {Dataset. CC BY 4.0.}
+}
+
+@misc{mahbod2024nuinssegdata,
+  author    = {Mahbod, Amirreza and Polak, Christine and Feldmann, Katharina and Khan, Rumsha and Gelles, Katharina and Dorffner, Georg and Woitek, Ramona and Hatamikia, Sepideh and Ellinger, Isabella},
+  title     = {{NuInsSeg}: A fully annotated dataset for nuclei instance segmentation in {H\&E}-stained histological images},
+  year      = {2024},
+  version   = {1.0},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.10518968},
+  note      = {Dataset. CC BY 4.0.}
+}
+
+@manual{bemis2026cardinalworkflows,
+  author = {Bemis, Kylie A.},
+  title  = {{CardinalWorkflows}: Datasets and workflows for the {Cardinal} mass spectrometry imaging package},
+  year   = {2026},
+  note   = {R package version 1.44.0},
+  doi    = {10.18129/B9.bioc.CardinalWorkflows}
+}
+
+@manual{love2026airway,
+  author = {Love, Michael},
+  title  = {airway: RangedSummarizedExperiment for {RNA-Seq} in airway smooth muscle cells, by Himes et al {PLoS One} 2014},
+  year   = {2026},
+  note   = {R package version 1.32.0},
+  doi    = {10.18129/B9.bioc.airway}
+}
+
+@article{byrskabishop2022high,
+  author  = {Byrska-Bishop, Marta and Evani, Uday S. and Zhao, Xuefang and Basile, Anna O. and Abel, Haley J. and Regier, Allison A. and Corvelo, Andr{\'e} and Clarke, Wayne E. and Musunuri, Rajeeva and Nagulapalli, Kshithija and others},
+  title   = {High-coverage whole-genome sequencing of the expanded 1000 Genomes Project cohort including 602 trios},
+  journal = {Cell},
+  year    = {2022},
+  volume  = {185},
+  number  = {18},
+  pages   = {3426--3440.e19},
+  doi     = {10.1016/j.cell.2022.08.004}
+}
+
+@article{muller1996adenylate,
+  author  = {M{\"u}ller, C. W. and Schlauderer, G. J. and Reinstein, J. and Schulz, G. E.},
+  title   = {Adenylate kinase motions during catalysis: an energetic counterweight balancing substrate binding},
+  journal = {Structure},
+  year    = {1996},
+  volume  = {4},
+  number  = {2},
+  pages   = {147--156},
+  doi     = {10.1016/S0969-2126(96)00018-4}
+}
+
+@article{berman2003announcing,
+  author  = {Berman, Helen and Henrick, Kim and Nakamura, Haruki},
+  title   = {Announcing the worldwide {Protein Data Bank}},
+  journal = {Nature Structural Biology},
+  year    = {2003},
+  volume  = {10},
+  number  = {12},
+  pages   = {980},
+  doi     = {10.1038/nsb1203-980}
+}
+
+@article{uniprot2025uniprot,
+  author  = {{The UniProt Consortium}},
+  title   = {{UniProt}: the Universal Protein Knowledgebase in 2025},
+  journal = {Nucleic Acids Research},
+  year    = {2025},
+  volume  = {53},
+  number  = {D1},
+  pages   = {D609--D617},
+  doi     = {10.1093/nar/gkae1010}
+}
