@@ -177,3 +177,14 @@ test("significant with no test in the record is an error", async () => {
   const ok = { ...ctx, answer: "The treated cells are larger. No statistical test was run." };
   expect((await run(ok as never)).some((f) => f.check === "significance_without_test")).toBe(false);
 });
+
+test("a choice word in a sentence about something else is not a misreport", async () => {
+  const { runChecks: run } = await import("../src/core/review.ts");
+  const adapter = { name: "x", manifest: { decisions: [{ key: "norm", label: "Normalization", kind: "choice", choices: ["tic", "rms", "none"] }], checks: [] }, module: async () => ({}) };
+  const record = { entries: () => [], nodes: () => [], numbers: () => [], stale: () => new Set() };
+  const base = { record, decisions: { values: () => ({ norm: "none" }) }, adapters: [adapter], claims: [] };
+  const fine = await run({ ...base, answer: "The total ion current (TIC) image is bright at the rim. Normalization: none." } as never);
+  expect(fine.some((f) => f.check === "decision_misreported")).toBe(false);
+  const wrong = await run({ ...base, answer: "We used TIC normalization." } as never);
+  expect(wrong.some((f) => f.check === "decision_misreported")).toBe(true);
+});

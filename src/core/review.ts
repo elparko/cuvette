@@ -235,17 +235,25 @@ async function moduleChecks(ctx: ReviewContext): Promise<FindingIn[]> {
 function decisionsMisreported(ctx: ReviewContext): FindingIn[] {
   const out: FindingIn[] = [];
   const values = ctx.decisions.values();
-  const word = (t: string) => new RegExp(`(^|[^A-Za-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9]|$)`, "i");
+  const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const word = (t: string) => new RegExp(`(^|[^A-Za-z0-9])${esc(t)}([^A-Za-z0-9]|$)`, "i");
+  const STOP = new Set(["what", "which", "with", "from", "that", "this", "unit", "value", "values", "pixels", "none", "used"]);
+  const sentences = ctx.answer.split(/(?<=[.!?\n])\s+/);
   for (const a of ctx.adapters)
     for (const d of a.manifest.decisions ?? []) {
       if (d.kind !== "choice" || !(d.key in values)) continue;
       const actual = String(values[d.key]);
-      const named = d.choices.map(String).filter((c) => c !== actual && c.length > 2 && !/^\d+(\.\d+)?$/.test(c) && word(c).test(ctx.answer));
-      if (named.length && !word(actual).test(ctx.answer))
+      const names = [d.key.replace(/_/g, " "), ...d.label.toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 5 && !STOP.has(w))];
+      const about = sentences.filter((s) => names.some((n) => word(n).test(s)));
+      const named = new Set<string>();
+      for (const s of about)
+        for (const c of d.choices.map(String))
+          if (c !== actual && c.length > 2 && !/^\d+(\.\d+)?$/.test(c) && word(c).test(s) && !word(actual).test(s)) named.add(c);
+      if (named.size)
         out.push({
           check: "decision_misreported",
           severity: "error",
-          message: `The answer names ${named.join(", ")} for "${d.label}", but the decision record says ${actual}. Report the value that was used.`,
+          message: `The answer names ${[...named].join(", ")} for "${d.label}", but the decision record says ${actual}. Report the value that was used.`,
         });
     }
   return out;

@@ -483,8 +483,6 @@ export class Session {
     if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use find_tools to search.`);
     if (!this.active.has(tool.name)) this.active.add(tool.name);
     const args = dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema);
-    const missing = ((tool.inputSchema.required as string[]) ?? []).filter((k) => args[k] === undefined);
-    if (missing.length) return this.fail(call.id, tool.name, `missing required arguments: ${missing.join(", ")}`, tool.adapter);
     const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
     return { type: "tool_result", callId: call.id, name: call.name, text: r.text, images: r.images, isError: r.isError };
   }
@@ -500,6 +498,8 @@ export class Session {
     let eff = (pre.updatedArgs ?? args) as Args;
     if (pre.deviations?.length) this.record.append("deviation", { callId, tool: tool.name, deviations: pre.deviations });
     if (pre.decision === "deny") return error(pre.reason ?? "a hook denied this call");
+    const missing = ((tool.inputSchema.required as string[]) ?? []).filter((k) => eff[k] === undefined && !(pre.waitingOn ?? []).some((w) => this.adapterOf(tool)?.linksFor(tool.remoteName ?? tool.name)[k] === w));
+    if (missing.length) return error(`missing required arguments: ${missing.join(", ")}`);
     if (pre.decision === "block") {
       const answered = await this.blockOn(pre.waitingOn ?? [], tool, eff, callId, signal);
       if (!answered) {
@@ -671,7 +671,14 @@ export class Session {
         const target = this.findTool(sensTool);
         if (link && target) {
           this.record.append("notice", { text: `Comparing the options for "${d.label}" before asking you.` });
-          const base = sensTool === (tool.remoteName ?? tool.name) ? args : {};
+          const base: Args = sensTool === (tool.remoteName ?? tool.name) ? structuredClone(args) : {};
+          const links = this.adapterOf(target)?.linksFor(sensTool) ?? {};
+          for (const [arg, k] of Object.entries(links)) {
+            if (k === key || !keys.includes(k)) continue;
+            const other = this.decisionOf(k)?.decision;
+            if (other?.default !== undefined) setArg(base, arg, other.default);
+            else deleteArg(base, arg);
+          }
           try {
             const res = await runSensitivity(d, sensTool, base, link.arg, async (_t, a, meta) => this.execute(target, a, `${callId}.s${++this.callCount}`, signal, { sensitivityOf: meta.sensitivityOf }), this.record);
             evidence = [res.table, ...res.holds, ...res.depends].join("\n");
@@ -903,6 +910,16 @@ function absolutePaths(v: unknown, cwd: string): unknown {
   if (Array.isArray(v)) return v.map((x) => absolutePaths(x, cwd));
   if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, absolutePaths(x, cwd)]));
   return v;
+}
+
+function deleteArg(args: Args, path: string) {
+  const keys = path.split(".");
+  let cur: unknown = args;
+  for (const k of keys.slice(0, -1)) {
+    if (!cur || typeof cur !== "object") return;
+    cur = (cur as Record<string, unknown>)[k];
+  }
+  if (cur && typeof cur === "object") delete (cur as Record<string, unknown>)[keys.at(-1)!];
 }
 
 function setArg(args: Args, path: string, value: unknown) {

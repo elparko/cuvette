@@ -1,0 +1,405 @@
+adapter:
+  name: pyopenms
+  title: pyOpenMS for LC-MS files and formula masses
+  version: 0.1.3
+  description: Reads mzML files, picks peaks, finds LC-MS features with the OpenMS metabolite feature finder, and calculates monoisotopic masses, adduct m/z values and isotope patterns of a formula.
+program:
+  name: pyOpenMS
+  version: 3.6.0
+  homepage: https://www.openms.org/
+  docs:
+    - https://pyopenms.readthedocs.io/
+    - https://www.openms.de/documentation/
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 3600
+locate:
+  env: PYOPENMS_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/pyopenms/bin/python
+    - ~/.guided-analysis/envs/pyopenms/Scripts/python.exe
+  version_command:
+    - "{program_path}"
+    - -c
+    - "import importlib.metadata as m; print(m.version('pyopenms'))"
+decisions:
+  - key: peak_picker_snr
+    label: Peak picker S/N
+    kind: float
+    default: 0
+    lo: 0
+    hi: 100
+    owner: human
+    group: Peak picking
+    essential: true
+    stage: setup
+    links:
+      - { tool: pick_peaks, arg: snr }
+    help: The signal-to-noise ratio that a profile peak must reach. The OpenMS default is 0, which turns the filter off. Use it only for profile data.
+    sensitivity:
+      tool: pick_peaks
+      options: [0, 1, 3]
+      compare: [metrics.n_peaks_after]
+      max_runs: 3
+  - key: mass_error_ppm
+    label: Mass trace mass error (ppm)
+    kind: float
+    default: 20
+    lo: 1
+    hi: 200
+    owner: human
+    group: Feature finding
+    essential: true
+    stage: when_needed
+    links:
+      - { tool: find_features, arg: mass_error_ppm }
+    help: The m/z window in ppm that joins points of consecutive scans into one mass trace. The OpenMS default is 20. Use the mass accuracy of the instrument. A window that is too wide merges neighbor ions.
+  - key: noise_threshold_int
+    label: Noise threshold (intensity)
+    kind: float
+    default: 10
+    lo: 0
+    hi: 1000000000
+    owner: human
+    group: Feature finding
+    essential: true
+    stage: when_needed
+    links:
+      - { tool: find_features, arg: noise_threshold_int }
+    help: Points below this intensity do not start a mass trace. The pyOpenMS 3.6.0 default is 10. The right value depends on the instrument and its intensity scale.
+    sensitivity:
+      tool: find_features
+      options: [10, 1000, 10000]
+      compare: [metrics.n_mass_traces, metrics.n_features]
+      max_runs: 3
+  - key: chrom_fwhm
+    label: Chromatographic peak width (FWHM, s)
+    kind: float
+    default: 5
+    lo: 0.5
+    hi: 120
+    owner: human
+    group: Feature finding
+    essential: true
+    stage: when_needed
+    links:
+      - { tool: find_features, arg: chrom_fwhm }
+    help: The full width at half maximum of a typical chromatographic peak, in seconds. The OpenMS default is 5. It sets the smoothing of the elution peaks and the retention time window of the feature finder.
+    sensitivity:
+      tool: find_features
+      options: [5, 8, 15]
+      compare: [metrics.n_elution_peaks, metrics.n_features]
+      max_runs: 3
+  - key: min_trace_length
+    label: Minimum mass trace length (s)
+    kind: float
+    default: 5
+    lo: 0
+    hi: 600
+    owner: human
+    group: Feature finding
+    stage: when_needed
+    links:
+      - { tool: find_features, arg: min_trace_length }
+    help: A mass trace shorter than this is dropped. The OpenMS default is 5 seconds.
+  - key: max_trace_length
+    label: Maximum mass trace length (s, -1 = no limit)
+    kind: float
+    default: -1
+    lo: -1
+    hi: 3600
+    owner: human
+    group: Feature finding
+    stage: when_needed
+    links:
+      - { tool: find_features, arg: max_trace_length }
+    help: A mass trace longer than this is dropped. The OpenMS default is -1, which sets no limit.
+  - key: trace_termination
+    label: Mass trace termination criterion
+    kind: choice
+    choices: [outlier, sample_rate]
+    default: outlier
+    owner: human
+    group: Feature finding
+    stage: when_needed
+    links:
+      - { tool: find_features, arg: trace_termination }
+    help: How a mass trace ends. outlier ends it after several points that fall outside the m/z window. sample_rate ends it when the share of scans with a point falls below a minimum. The OpenMS default is outlier.
+  - key: width_filtering
+    label: Elution peak width filter
+    kind: choice
+    choices: [fixed, auto, "off"]
+    default: fixed
+    owner: human
+    group: Feature finding
+    stage: when_needed
+    links:
+      - { tool: find_features, arg: width_filtering }
+    help: How elution peaks are kept by width. fixed keeps widths between 1 and 60 seconds. auto picks the range from the data. off keeps all widths. The OpenMS default is fixed.
+  - key: polarity
+    label: Polarity
+    kind: choice
+    choices: [positive, negative]
+    owner: human
+    group: Acquisition
+    essential: true
+    stage: when_needed
+    links:
+      - { tool: monoisotopic_mass, arg: polarity }
+    help: The ionization polarity of the run. It sets the adduct list. An mzML file often does not state it. Ask the person who ran the instrument.
+map:
+  - tool: load_mzml
+    route: "In Python: exp = MSExperiment(); MzMLFile().load(path, exp); then exp.getNrSpectra(), s.getMSLevel(), s.getType(), s.getRT()"
+    steps:
+      - "Run exp = pyopenms.MSExperiment() and pyopenms.MzMLFile().load(path, exp)."
+      - "Read exp.getNrSpectra(). For each spectrum s read s.getMSLevel(), s.getType() and s.getInstrumentSettings().getPolarity()."
+      - "In TOPPView: File > Open file. The spectrum list shows the levels. View > Spectrum browser shows each spectrum."
+    fidelity: exact
+    evidence:
+      source: code
+      test: load-lcms-synthetic
+      note: The numbers are the counts that the pyOpenMS objects report.
+    summary: "{metrics.n_spectra} spectra, {metrics.n_ms1} at MS1."
+  - tool: pick_peaks
+    route: "In Python: PeakPickerHiRes().pickExperiment(exp), with the parameter signal_to_noise"
+    steps:
+      - "Run picker = pyopenms.PeakPickerHiRes() and set the parameter signal_to_noise."
+      - "Run centroided = picker.pickExperiment(exp)."
+      - "In TOPPView: Tools > Apply TOPP tool..., choose PeakPickerHiRes, set signal_to_noise (algorithm section), press Ok."
+    params:
+      - { arg: snr, label: signal_to_noise, ui_default: 0 }
+    fidelity: close
+    difference: The TOPP tool PeakPickerHiRes runs the same algorithm. The TOPPView route was not run, because the TOPP tools are not installed on this computer.
+    evidence:
+      source: docs
+      test: pick-peaks-synthetic
+      note: The test uses a profile spectrum with three planted peaks.
+    summary: "{metrics.n_points_before} points became {metrics.n_peaks_after} peaks."
+  - tool: find_features
+    route: "In Python: MassTraceDetection.run, ElutionPeakDetection.detectPeaks, FeatureFindingMetabo.run, in this order"
+    steps:
+      - "Run mtd = pyopenms.MassTraceDetection() and set mass_error_ppm, noise_threshold_int, trace_termination_criterion, min_trace_length and max_trace_length. Run traces = mtd.run(exp, 0)."
+      - "Run epd = pyopenms.ElutionPeakDetection() and set chrom_fwhm and width_filtering. Run peaks = epd.detectPeaks(traces)."
+      - "Run ffm = pyopenms.FeatureFindingMetabo() and set chrom_fwhm. Run fmap = pyopenms.FeatureMap() and ffm.run(peaks, fmap)."
+      - "In TOPPView: Tools > Apply TOPP tool..., choose FeatureFinderMetabo. The parameters are algorithm:mtd:mass_error_ppm, algorithm:common:noise_threshold_int, algorithm:common:chrom_fwhm, algorithm:mtd:trace_termination_criterion, algorithm:mtd:min_trace_length, algorithm:mtd:max_trace_length and algorithm:epd:width_filtering."
+    params:
+      - { arg: mass_error_ppm, label: algorithm:mtd:mass_error_ppm, ui_default: 20 }
+      - { arg: noise_threshold_int, label: algorithm:common:noise_threshold_int, note: "The TOPP default was not checked. The pyOpenMS 3.6.0 class default is 10." }
+      - { arg: chrom_fwhm, label: algorithm:common:chrom_fwhm, ui_default: 5 }
+      - { arg: min_trace_length, label: algorithm:mtd:min_trace_length, ui_default: 5 }
+      - { arg: max_trace_length, label: algorithm:mtd:max_trace_length, ui_default: -1 }
+      - { arg: trace_termination, label: algorithm:mtd:trace_termination_criterion, ui_default: outlier }
+      - { arg: width_filtering, label: algorithm:epd:width_filtering, ui_default: fixed }
+    fidelity: close
+    difference: The tool runs the three pyOpenMS classes that the TOPP tool FeatureFinderMetabo runs. The TOPP tool sets other defaults, such as the noise threshold, and may give a slightly different count. The TOPP route was not run.
+    evidence:
+      source: docs
+      test: find-features-synthetic
+      note: The test uses a synthetic file with three planted compounds. The tool also reproduced the counts in the benchmark file for the Rost 2016 tutorial.
+    summary: "{metrics.n_mass_traces} mass traces, {metrics.n_elution_peaks} elution peaks, {metrics.n_features} features."
+  - tool: monoisotopic_mass
+    route: "In Python: EmpiricalFormula('C42H82NO8P').getMonoWeight(), then add the adduct mass and subtract the electron mass"
+    steps:
+      - "Run mass = pyopenms.EmpiricalFormula(formula).getMonoWeight()."
+      - "For [M+H]+: m/z = mass + 1.00782503 - 0.00054858 = mass + 1.00727646."
+      - "For [M-H]-: m/z = mass - 1.00782503 + 0.00054858 = mass - 1.00727646."
+      - "For a lipid in SMILE MSI: Analyze > This slide > Annotation > Annotate lipids shows the adduct m/z that the program uses."
+    params:
+      - { arg: formula, label: Formula }
+      - { arg: polarity, label: Ion mode }
+    fidelity: exact
+    evidence:
+      source: code
+      test: mass-glucose
+      note: The test values are the published exact masses of glucose and of PC 34:1.
+    summary: "{metrics.monoisotopic_mass} Da; main adduct m/z {metrics.mz_main_adduct}."
+  - tool: isotope_pattern
+    route: "In Python: CoarseIsotopePatternGenerator(n).run(EmpiricalFormula(formula)).getContainer()"
+    steps:
+      - "Run gen = pyopenms.CoarseIsotopePatternGenerator(n_peaks)."
+      - "Run iso = gen.run(pyopenms.EmpiricalFormula(formula)). Read iso.getContainer()."
+    fidelity: exact
+    evidence:
+      source: code
+      test: isotope-pc341
+      note: The test compares the M+1 ratio with a hand estimate from the carbon count.
+    summary: "M+1 is {metrics.m1_over_m0} of M."
+checks:
+  - id: mass_error_ppm_wide
+    severity: warning
+    description: The mass trace window is wider than the usual mass accuracy of an LC-MS instrument.
+    rule:
+      tool: find_features
+      arg: mass_error_ppm
+      op: ">"
+      value: 30
+      message: A mass error window above 30 ppm can merge neighbor ions in one mass trace. Say why the instrument needs it.
+  - id: noise_threshold_zero
+    severity: warning
+    description: The noise threshold is zero or negative.
+    rule:
+      tool: find_features
+      arg: noise_threshold_int
+      op: "<="
+      value: 0
+      message: A noise threshold of 0 lets noise points start mass traces. The feature count then counts noise.
+  - id: polarity_not_stated
+    severity: warning
+    description: An adduct or a database match is reported with no ion mode.
+    text: The report must state the ion mode (positive or negative) when it gives an adduct, an m/z of a formula or a database match. The mzML file may not store the ion mode, so say where the value came from.
+  - id: feature_count_as_compound_count
+    severity: warning
+    description: The number of features is reported as the number of compounds.
+    text: The report must not say that the number of features is the number of compounds. Isotopes, adducts and fragments of one compound can each make a feature.
+  - id: tolerance_unit_missing
+    severity: warning
+    description: A tolerance is given with no unit.
+    text: Each m/z tolerance in the report must have its unit, ppm or Da. Each retention time value must have its unit, seconds or minutes.
+tests:
+  - id: load-lcms-synthetic
+    description: "Synthetic file lcms_tiny.mzML, made by data/make_synthetic.py. It has 81 MS1 spectra, one for each second from 0 to 80 s, all centroided, with no polarity stored. The m/z range is 181.0707 (glucose [M+H]+) to 762.5918 (the M+2 peak of PC 34:1). Worked out from the formulas."
+    data: [data/lcms_tiny.mzML]
+    calls:
+      - { tool: load_mzml, args: { path: "{adapter_dir}/data/lcms_tiny.mzML" } }
+    expect:
+      - { path: metrics.n_spectra, equals: 81 }
+      - { path: metrics.n_ms1, equals: 81 }
+      - { path: metrics.rt_max_s, approx: 80, abs: 0.001 }
+      - { path: metrics.mz_min, approx: 181.0707, abs: 0.0001 }
+      - { path: metrics.mz_max, approx: 762.5918, abs: 0.001 }
+      - { path: data.data.spectrum_types.centroid, equals: 81 }
+      - { path: data.warning, contains: polarity }
+  - id: pick-peaks-synthetic
+    description: "Synthetic profile spectrum with three Gaussian peaks (sigma 0.01) at m/z 760.5851, 786.6007 and 734.5694 and heights 1000, 500 and 200. Peak picking gives three peaks at the planted m/z. The table is sorted by intensity."
+    data: [data/profile_tiny.mzML]
+    calls:
+      - { tool: pick_peaks, args: { path: "{adapter_dir}/data/profile_tiny.mzML", snr: 0 } }
+    expect:
+      - { path: metrics.n_peaks_after, equals: 3 }
+      - { path: "table.rows[0][0]", approx: 760.5851, abs: 0.001 }
+      - { path: "table.rows[1][0]", approx: 786.6007, abs: 0.001 }
+      - { path: "table.rows[2][0]", approx: 734.5694, abs: 0.001 }
+      - { path: "table.rows[0][1]", approx: 1000, rel: 0.01 }
+  - id: find-features-synthetic
+    description: "In lcms_tiny.mzML three compounds are planted: glucose at 25 s, PC 34:1 at 40 s and caffeine at 55 s. Each has three isotope traces at a peak height of 100000 and a Gaussian elution with sigma 3 s. With the OpenMS default settings the tool finds 9 mass traces, 9 elution peaks and 3 features at the [M+H]+ m/z and the planted retention times. Worked out from the file design."
+    data: [data/lcms_tiny.mzML]
+    calls:
+      - { tool: find_features, args: { path: "{adapter_dir}/data/lcms_tiny.mzML", mass_error_ppm: 20, noise_threshold_int: 10, chrom_fwhm: 5, min_trace_length: 5, max_trace_length: -1, trace_termination: outlier, width_filtering: fixed } }
+    expect:
+      - { path: metrics.n_mass_traces, equals: 9 }
+      - { path: metrics.n_elution_peaks, equals: 9 }
+      - { path: metrics.n_features, equals: 3 }
+      - { path: "table.rows[0][0]", approx: 181.0707, abs: 0.001 }
+      - { path: "table.rows[0][1]", approx: 25, abs: 0.5 }
+      - { path: "table.rows[1][0]", approx: 195.0877, abs: 0.001 }
+      - { path: "table.rows[1][1]", approx: 55, abs: 0.5 }
+      - { path: "table.rows[2][0]", approx: 760.5851, abs: 0.001 }
+      - { path: "table.rows[2][1]", approx: 40, abs: 0.5 }
+      - { path: "table.rows[0][3]", equals: 1 }
+  - id: find-features-settings-change-count
+    description: "The same file with the settings of the Rost 2016 tutorial (chrom_fwhm 8, trace termination sample_rate, minimum trace length 3, maximum 600, width filter off). The count rises from 3 to 7 features. The four added features have no quantified peak: their intensity is 0. This test checks that the tool is stable. The number 7 comes from a run of this tool, not from the paper."
+    data: [data/lcms_tiny.mzML]
+    calls:
+      - { tool: find_features, args: { path: "{adapter_dir}/data/lcms_tiny.mzML", mass_error_ppm: 20, noise_threshold_int: 10, chrom_fwhm: 8, min_trace_length: 3, max_trace_length: 600, trace_termination: sample_rate, width_filtering: "off" } }
+    expect:
+      - { path: metrics.n_mass_traces, equals: 9 }
+      - { path: metrics.n_features, equals: 7 }
+      - { path: metrics.n_features_charge_known, equals: 3 }
+  - id: mass-glucose
+    description: "Glucose C6H12O6 has the monoisotopic mass 180.0634 and [M+H]+ at 181.0707. The values are the published exact masses (PubChem 180.063388)."
+    calls:
+      - { tool: monoisotopic_mass, args: { formula: C6H12O6, polarity: positive } }
+    expect:
+      - { path: metrics.monoisotopic_mass, approx: 180.0634, abs: 0.0001 }
+      - { path: metrics.mz_main_adduct, approx: 181.0707, abs: 0.0001 }
+      - { path: "table.rows[0][0]", equals: "[M+H]+" }
+  - id: mass-pc341
+    description: "PC 34:1 (C42H82NO8P) has the monoisotopic mass 759.5778, [M+H]+ at 760.5851 and [M+Na]+ at 782.5670. These are the exact masses in the LIPID MAPS entry for PC(16:0/18:1). A measured m/z of 760.5864 is 1.7 ppm above [M+H]+ (worked out by hand: 0.0013 / 760.585 = 1.7 ppm)."
+    calls:
+      - { tool: monoisotopic_mass, args: { formula: C42H82NO8P, polarity: positive, measured_mz: 760.5864 } }
+    expect:
+      - { path: metrics.monoisotopic_mass, approx: 759.5778, abs: 0.0002 }
+      - { path: metrics.mz_main_adduct, approx: 760.5851, abs: 0.0002 }
+      - { path: "table.rows[1][1]", approx: 782.5670, abs: 0.0003 }
+      - { path: metrics.ppm_error_main_adduct, approx: 1.7, abs: 0.1 }
+  - id: mass-pe384-negative
+    description: "PE 38:4 (C43H78NO8P) has the monoisotopic mass 767.5465 and [M-H]- at 766.5392. These are the exact masses in the LIPID MAPS entry for PE(18:0/20:4)."
+    calls:
+      - { tool: monoisotopic_mass, args: { formula: C43H78NO8P, polarity: negative } }
+    expect:
+      - { path: metrics.monoisotopic_mass, approx: 767.5465, abs: 0.0002 }
+      - { path: metrics.mz_main_adduct, approx: 766.5392, abs: 0.0002 }
+      - { path: "table.rows[0][0]", equals: "[M-H]-" }
+  - id: isotope-pc341
+    description: "PC 34:1 has 42 carbons. Each carbon adds 1.07 / 98.93 = 1.08 percent of 13C. The hand estimate of M+1 over M is 42 x 0.0108 + 82 x 0.000115 + 0.0037 = 0.47. The tool must agree within 0.02."
+    calls:
+      - { tool: isotope_pattern, args: { formula: C42H82NO8P, n_peaks: 4 } }
+    expect:
+      - { path: metrics.m1_over_m0, approx: 0.47, abs: 0.02 }
+      - { path: metrics.monoisotopic_mass, approx: 759.5778, abs: 0.0002 }
+      - { path: metrics.n_peaks, equals: 4 }
+data_rules:
+  cloud_visibility: all
+  note: The tools return summaries and tables of at most 10 rows. Full tables stay in the work folder.
+tools:
+  - name: load_mzml
+    title: Read mzML file information
+    description: "Read an mzML file and report the number of spectra, the MS levels, centroid or profile type, polarity, retention time range and m/z range. Use it first on any mzML file."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the .mzML file. }
+    required: [path]
+    function: "openms_tools:load_mzml"
+  - name: pick_peaks
+    title: Pick peaks in profile spectra
+    description: "Turn profile spectra into centroided peaks with the OpenMS high-resolution peak picker. It writes a centroided mzML file. It stops with an error if all spectra are already centroided."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the .mzML file with profile spectra. }
+      snr: { type: number, minimum: 0, description: "Signal-to-noise cutoff. 0 turns the filter off. Leave it out. The harness sets it from the decision peak_picker_snr." }
+      ms_levels: { type: array, items: { type: integer }, description: MS levels to pick. The default is level 1. }
+      name: { type: string, description: File name stem of the output. }
+    required: [path]
+    function: "openms_tools:pick_peaks"
+    outputs:
+      centroided: { kind: file, ext: mzML, description: The centroided spectra. }
+  - name: find_features
+    title: Find LC-MS features
+    description: "Find mass traces, elution peaks and features in a centroided mzML file with the OpenMS metabolite feature finder (MassTraceDetection, ElutionPeakDetection and FeatureFindingMetabo). It writes a CSV and a featureXML file."
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the centroided .mzML file. }
+      mass_error_ppm: { type: number, minimum: 1, maximum: 200, description: "Mass trace window in ppm. Leave it out. The harness sets it from the decision mass_error_ppm." }
+      noise_threshold_int: { type: number, minimum: 0, description: "Intensity below which a point cannot start a trace. Leave it out. The harness sets it from the decision noise_threshold_int." }
+      chrom_fwhm: { type: number, minimum: 0.1, maximum: 600, description: "Chromatographic peak width in seconds. Leave it out. The harness sets it from the decision chrom_fwhm." }
+      min_trace_length: { type: number, minimum: 0, description: "Shortest mass trace in seconds. Leave it out. The harness sets it from the decision min_trace_length." }
+      max_trace_length: { type: number, minimum: -1, description: "Longest mass trace in seconds. -1 sets no limit. Leave it out. The harness sets it from the decision max_trace_length." }
+      trace_termination: { type: string, enum: [outlier, sample_rate], description: "How a mass trace ends. Leave it out. The harness sets it from the decision trace_termination." }
+      width_filtering: { type: string, enum: [fixed, auto, "off"], description: "Elution peak width filter. Leave it out. The harness sets it from the decision width_filtering." }
+      name: { type: string, description: File name stem of the outputs. }
+    required: [path]
+    function: "openms_tools:find_features"
+    outputs:
+      table: { kind: table, ext: csv, description: "All features: m/z, retention time in seconds, intensity, charge, number of mass traces, width." }
+      feature_map: { kind: file, ext: featureXML, description: The OpenMS feature map. }
+  - name: monoisotopic_mass
+    title: Calculate the monoisotopic mass and adduct m/z of a formula
+    description: "Calculate the monoisotopic mass of an elemental formula and the m/z of the adducts of one ion mode. If a measured m/z is given, it reports the error in ppm for each adduct."
+    read_only: true
+    params:
+      formula: { type: string, minLength: 1, description: "Elemental formula, such as C42H82NO8P for PC 34:1. Use element symbols and counts only." }
+      polarity: { type: string, enum: [positive, negative], description: "Ion mode. Leave it out. The harness sets it from the decision polarity." }
+      measured_mz: { type: number, exclusiveMinimum: 0, description: Measured m/z to compare with each adduct. }
+    required: [formula]
+    function: "openms_tools:monoisotopic_mass"
+  - name: isotope_pattern
+    title: Calculate the isotope pattern of a formula
+    description: "Calculate the relative abundance of M, M+1, M+2 and so on for a neutral formula, one peak for each nominal mass."
+    read_only: true
+    params:
+      formula: { type: string, minLength: 1, description: Elemental formula, such as C42H82NO8P. }
+      n_peaks: { type: integer, minimum: 2, maximum: 20, description: Number of isotope peaks. The default is 4. }
+    required: [formula]
+    function: "openms_tools:isotope_pattern"

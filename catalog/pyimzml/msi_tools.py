@@ -163,7 +163,7 @@ def _top_pixels(p, img, n=10):
     return rows
 
 
-def read_file_info(path, max_scan=200):
+def read_file_info(path, max_scan=200, expected_polarity=None):
     p = _parser(path)
     nx, ny = _grid(p)
     n = len(p.coordinates)
@@ -197,14 +197,23 @@ def read_file_info(path, max_scan=200):
         "intensity_precision": str(p.intensityPrecision),
         "mz_range_basis": "all spectra" if scanned == n or storage == "continuous" else "%d evenly spaced spectra" % scanned,
     }
+    warning = ""
+    if expected_polarity:
+        match = (p.polarity or "unknown") == expected_polarity
+        metrics["polarity_matches_decision"] = float(match)
+        if not match:
+            warning = "The file states polarity %s. The decision polarity is %s." % (info["polarity"], expected_polarity)
     rows = [[k, v] for k, v in {**{k: metrics[k] for k in ("n_pixels", "grid_x", "grid_y", "pixel_size_x_um", "mz_min", "mz_max", "points_per_spectrum_max", "ibd_bytes") if k in metrics}, **info}.items()]
-    return {
+    out = {
         "ok": True,
         "summary": "%d pixels (%d x %d), m/z %.4f to %.4f, %s, %s, %s storage, ibd %d bytes" % (n, nx, ny, lo, hi, info["spectrum_mode"], info["polarity"], storage, metrics["ibd_bytes"]),
         "metrics": metrics,
         "data": info,
         "table": {"columns": ["property", "value"], "rows": rows, "n_rows": len(rows)},
     }
+    if warning:
+        out["warning"] = warning
+    return out
 
 
 def _ion_image(p, mz, ppm, norm, reduce):

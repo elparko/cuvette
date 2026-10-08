@@ -1,7 +1,7 @@
 adapter:
   name: pyimzml
   title: pyimzML reader for imzML mass spectrometry imaging files
-  version: 0.1.0
+  version: 0.1.1
   description: Reads any imzML file with pyimzML. It gives file facts, the total ion current image, ion images at an m/z with a ppm window, the mean spectrum and the strongest peaks.
 program:
   name: pyimzML
@@ -35,14 +35,14 @@ decisions:
     owner: human
     group: Acquisition
     essential: true
-    stage: setup
+    stage: when_needed
     links:
       - { tool: get_ion_image, arg: ppm }
     help: The half-width of the m/z window of an ion image, in parts per million. pyimzML itself uses 0.1 Da and has no ppm default. The value 10 is the SMILE MSI default. Use a window that matches the mass accuracy of the instrument.
     sensitivity:
       tool: get_ion_image
       options: [5, 10, 50]
-      compare: [mean_points_in_window, mean_intensity, frac_pixels_above_half_max]
+      compare: [metrics.mean_points_in_window, metrics.mean_intensity, metrics.frac_pixels_above_half_max]
       max_runs: 3
   - key: normalization
     label: Normalization
@@ -61,7 +61,7 @@ decisions:
     sensitivity:
       tool: get_ion_image
       options: [none, tic, rms]
-      compare: [frac_pixels_above_half_max, peak_pixel_x, peak_pixel_y]
+      compare: [metrics.frac_pixels_above_half_max, metrics.peak_pixel_x, metrics.peak_pixel_y]
       max_runs: 3
   - key: reduce
     label: Reduce (m/z window)
@@ -90,7 +90,7 @@ decisions:
     sensitivity:
       tool: find_top_peaks
       options: [3, 5, 10]
-      compare: [n_peaks_found]
+      compare: [metrics.n_peaks_found]
       max_runs: 3
   - key: sample_pixels
     label: Pixels used for the mean spectrum (0 = all)
@@ -109,12 +109,13 @@ decisions:
     label: Polarity
     kind: choice
     choices: [negative, positive]
-    default: negative
     owner: human
     group: Acquisition
     essential: true
     stage: setup
-    help: The ionization polarity of the run. The file states its own polarity. Call read_file_info and compare. Use this value to choose adducts when you name a peak.
+    links:
+      - { tool: read_file_info, arg: expected_polarity }
+    help: The ionization polarity of the run. read_file_info compares it with the file. The file states its own polarity. Call read_file_info and compare. Use this value to choose adducts when you name a peak.
 map:
   - tool: read_file_info
     route: "In Python: p = ImzMLParser(path); then p.polarity, p.spectrum_mode, p.imzmldict, len(p.coordinates), p.mzLengths"
@@ -126,7 +127,9 @@ map:
       - "In SMILE MSI: File > Open imzML..., then Data > Acquisition & matching... shows the settings."
     params:
       - { arg: max_scan, label: Spectra read for the m/z range, ui_default: 200 }
-    fidelity: exact
+      - { arg: expected_polarity, label: Polarity, note: "Not a pyimzML argument. The tool compares it with p.polarity." }
+    fidelity: close
+    difference: For a processed file the m/z range comes from evenly spaced spectra, not from all of them. The tool also reads the file sizes.
     evidence:
       source: code
       test: file-info-continuous
@@ -254,7 +257,7 @@ tests:
     description: The pyimzML example file has 9 pixels in a 3 by 3 grid, 8399 points per spectrum, profile mode, negative polarity, m/z 100.083336 to 799.9167 and a pixel size of 100 um. These numbers come from the pyimzML repository test and the file.
     data: [data/Example_Continuous.imzML, data/Example_Continuous.ibd]
     calls:
-      - { tool: read_file_info, args: { path: "{adapter_dir}/data/Example_Continuous.imzML" } }
+      - { tool: read_file_info, args: { path: "{adapter_dir}/data/Example_Continuous.imzML", expected_polarity: negative } }
     expect:
       - { path: metrics.n_pixels, equals: 9 }
       - { path: metrics.grid_x, equals: 3 }
@@ -264,9 +267,10 @@ tests:
       - { path: metrics.mz_max, approx: 799.9167, abs: 0.0001 }
       - { path: metrics.pixel_size_x_um, equals: 100 }
       - { path: metrics.ibd_bytes, equals: 335976 }
-      - { path: data.polarity, equals: negative }
-      - { path: data.spectrum_mode, equals: profile }
-      - { path: data.storage_mode, equals: continuous }
+      - { path: data.data.polarity, equals: negative }
+      - { path: data.data.spectrum_mode, equals: profile }
+      - { path: data.data.storage_mode, equals: continuous }
+      - { path: metrics.polarity_matches_decision, equals: 1 }
   - id: tic-image-continuous
     description: The mean pixel TIC (sum of intensities) is 161.1444 and the largest is 243.5395 at pixel (3, 3). The numbers were computed from the spectra with numpy. They are not from a paper.
     data: [data/Example_Continuous.imzML, data/Example_Continuous.ibd]
@@ -348,8 +352,8 @@ tests:
       - { path: metrics.n_pixels_different, equals: 0 }
       - { path: metrics.ibd_bytes_a, equals: 592 }
       - { path: metrics.ibd_bytes_b, equals: 240 }
-      - { path: data.storage_a, equals: processed }
-      - { path: data.storage_b, equals: continuous }
+      - { path: data.data.storage_a, equals: processed }
+      - { path: data.data.storage_b, equals: continuous }
 data_rules:
   cloud_visibility: all
   note: The tools return summaries and tables of at most 10 rows. Full images and tables stay in the work folder.
@@ -360,6 +364,7 @@ tools:
     read_only: true
     params:
       path: { type: string, minLength: 1, description: Absolute path of the .imzML file. The .ibd file must sit next to it. }
+      expected_polarity: { type: string, enum: [negative, positive], description: Polarity from the decision polarity. The tool warns if the file states another polarity. }
       max_scan: { type: integer, minimum: 1, maximum: 100000, description: "Number of evenly spaced spectra read for the m/z range of a processed file. A continuous file needs one." }
     required: [path]
     function: "msi_tools:read_file_info"
