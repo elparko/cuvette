@@ -40,6 +40,8 @@ export async function runScenario(id: string, opts: RunOptions): Promise<RunResu
       settings: { guidance: opts.guidance, headless: true } as any,
     });
     session.bus.on((e) => {
+      if (e.type === "permission") return void setTimeout(() => session.respondPermission(e.rid, true, "simulated scientist: allowed (scripts run in the sandbox)"), 0);
+      if (e.type === "instruction") return void session.followDone(e.step, "", true);
       if (e.type !== "question") return;
       const v = e.question.decisionKey ? fitAnswer(e.question, answerFor(sc, e.question)) : answerFor(sc, e.question) ?? "Use your best judgment and state it as an assumption.";
       setTimeout(() => void session.answer(e.question.qid, v ?? "", "simulated scientist").catch(() => {}), 0);
