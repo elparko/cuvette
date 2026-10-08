@@ -30,7 +30,8 @@ node bin/ga.js --adapter imagej --model claude:claude-sonnet-5-5 --referee claud
 The harness checks the key with the API and saves it to `~/.guided-analysis/credentials.json`.
 Only your user can read that file. Inside the app, type `/key` to change it, `/key status` to see
 it masked, and `/key remove` to delete it. `ANTHROPIC_API_KEY` in the shell wins over the saved
-key. `ant auth login` also works.
+key. `ant auth login` also works. A key that belongs to no workspace also needs
+`node bin/ga.js key workspace <id>` (or `ANTHROPIC_WORKSPACE_ID`); a key made inside a workspace does not.
 
 ### With a small local model (Ollama)
 

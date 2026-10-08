@@ -15,7 +15,7 @@ Usage
   ga adapter approve <name|dir> --by <name>
   ga onboard <program> --model <model> [--docs <url>] [--kind cli]
   ga models                            list the models
-  ga key [status|remove]               save, show or remove your Claude API key
+  ga key [status|remove|workspace <id>] save, show or remove your Claude API key
   ga sessions                          list the sessions
   ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow
   ga replay <flow.json> [--input name=path ...] [--session <id>]
@@ -164,10 +164,15 @@ async function main() {
       const cred = await import("./core/credentials.ts");
       if (a1 === "status") {
         const k = cred.claudeKey();
-        return console.log(k.from === "none" ? "No Claude API key is set." : `${cred.maskKey(k.key!)} from ${k.from === "env" ? "ANTHROPIC_API_KEY" : cred.credentialsPath()}`);
+        const ws = cred.claudeWorkspace();
+        return console.log((k.from === "none" ? "No Claude API key is set." : `${cred.maskKey(k.key!)} from ${k.from === "env" ? "ANTHROPIC_API_KEY" : cred.credentialsPath()}`) + (ws ? `\nWorkspace ID: ${ws}` : ""));
       }
       if (a1 === "remove") return console.log(cred.removeClaudeKey() ? `Removed the key from ${cred.credentialsPath()}.` : "No key was saved.");
-      if (a1) return fail("usage: ga key [status|remove]");
+      if (a1 === "workspace") {
+        cred.saveClaudeWorkspace(a2 ?? "");
+        return console.log(a2 ? `Saved the workspace ID ${a2}. Each request now sends it.` : "Removed the workspace ID.");
+      }
+      if (a1) return fail("usage: ga key [status|remove|workspace <id>]");
       const key = (await readSecret("Claude API key: ")).trim();
       const problem = cred.keyProblem(key);
       if (problem) return fail(problem);

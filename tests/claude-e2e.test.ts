@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
-import { saveClaudeKey } from "../src/core/credentials.ts";
+import { saveClaudeKey, saveClaudeWorkspace, WORKSPACE_HELP } from "../src/core/credentials.ts";
 import { checkClaudeKey, ClaudeProvider } from "../src/providers/claude.ts";
 
 type Block =
@@ -286,9 +286,23 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     expect(await checkClaudeKey("sk-ant-bad")).toMatchObject({ ok: false });
   });
 
+  test("a saved workspace ID goes on every request, and the workspace 400 explains the fix", async () => {
+    saveClaudeWorkspace("wrkspc_test123");
+    replies = [{ blocks: [{ type: "text", text: "a" }] }];
+    const p = new ClaudeProvider("claude-opus-5-5");
+    await p.step({ system: "s", messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }], tools: [] });
+    expect(captured[0]!.headers["anthropic-workspace-id"]).toBe("wrkspc_test123");
+    saveClaudeWorkspace("");
+    const msg = "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use.";
+    expect(await stepError({ status: 400, error: { type: "invalid_request_error", message: msg } })).toBe(WORKSPACE_HELP);
+    replies = [{ status: 400, error: { type: "invalid_request_error", message: msg } }];
+    expect(await checkClaudeKey("sk-ant-noworkspace")).toEqual({ ok: false, text: WORKSPACE_HELP });
+    expect(captured.at(-1)!.headers["anthropic-workspace-id"]).toBeUndefined();
+  });
+
   test("401 gives the credentials message", async () => {
     const msg = await stepError({ status: 401, error: { type: "authentication_error", message: "invalid x-api-key" } });
-    expect(msg).toBe("No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`.");
+    expect(msg).toMatch(/^No valid Claude credentials. Type \/key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`. The API said: .*invalid x-api-key/);
   });
 
   test("401 inside a session ends the turn with that message", async () => {
@@ -296,7 +310,8 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     const s = await labSession();
     await s.send("hi");
     const errors = s.record.entries(["error"]).map((e) => String(e.data.message));
-    expect(errors).toEqual(["No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`."]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/^No valid Claude credentials. Type \/key/);
   });
 
   test("429, 500, 529 and 403 are reported in plain words", async () => {

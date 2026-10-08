@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
 import { ProviderError } from "../core/types.ts";
-import { claudeKey, keyVersion } from "../core/credentials.ts";
+import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
 import { ImageBudget } from "./images.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
@@ -17,16 +17,23 @@ export interface ClaudeOpts {
 
 function mapError(e: unknown, model: string): unknown {
   if (e instanceof Anthropic.APIUserAbortError) return e;
-  if (e instanceof Anthropic.AuthenticationError) return new ProviderError(NO_CREDENTIALS);
+  if (e instanceof Anthropic.AuthenticationError) return new ProviderError(`${NO_CREDENTIALS} The API said: ${e.message}`);
   if (e instanceof Anthropic.PermissionDeniedError) return new ProviderError(`This key cannot use ${model}: ${e.message}`);
   if (e instanceof Anthropic.NotFoundError) return new ProviderError(`Unknown Claude model ${model}: ${e.message}`);
   if (e instanceof Anthropic.RateLimitError) return new ProviderError("Claude rate limit reached. Wait a moment and retry.");
+  if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return new ProviderError(WORKSPACE_HELP);
   if (e instanceof Anthropic.BadRequestError) return new ProviderError(`Claude rejected the request: ${e.message}`);
   if (e instanceof Anthropic.APIConnectionError) return new ProviderError("Cannot reach the Claude API. Check the network.");
   if (e instanceof Anthropic.APIError && typeof e.status === "number" && e.status >= 500)
     return new ProviderError(`The Claude API had a server error (${e.status}). Retry in a moment.`);
-  if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(NO_CREDENTIALS);
+  if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(`${NO_CREDENTIALS} Detail: ${e.message}`);
   return e;
+}
+
+function makeClient(key?: string): any {
+  const ws = claudeWorkspace();
+  const headers = ws ? { defaultHeaders: { "anthropic-workspace-id": ws } } : {};
+  return key ? new Anthropic({ apiKey: key, ...headers }) : new Anthropic(headers);
 }
 
 function toolResultContent(text: string, images: { media: string; data: string }[], note: string): unknown {
@@ -57,7 +64,7 @@ export class ClaudeProvider implements Provider {
     if (this.fixedClient) return this.fixedClient;
     if (!this.made || this.made.version !== keyVersion()) {
       const key = this.apiKey ?? claudeKey().key;
-      this.made = { client: key ? new Anthropic({ apiKey: key }) : new Anthropic(), version: keyVersion() };
+      this.made = { client: makeClient(key), version: keyVersion() };
     }
     return this.made.client;
   }
@@ -211,11 +218,12 @@ export class ClaudeProvider implements Provider {
 
 export async function checkClaudeKey(key: string, model = DEFAULT_CLAUDE_MODEL): Promise<{ ok: boolean; text: string }> {
   try {
-    await new Anthropic({ apiKey: key }).models.retrieve(model);
+    await makeClient(key).models.retrieve(model);
     return { ok: true, text: `The key works. It can use ${model}.` };
   } catch (e) {
     if (e instanceof Anthropic.AuthenticationError) return { ok: false, text: "The API rejected this key (HTTP 401). Check it and try again." };
     if (e instanceof Anthropic.NotFoundError || e instanceof Anthropic.PermissionDeniedError) return { ok: true, text: `The key works, but it cannot use ${model}.` };
+    if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return { ok: false, text: WORKSPACE_HELP };
     if (e instanceof Anthropic.APIConnectionError) return { ok: true, text: "Cannot reach the Claude API to check the key. It is saved; the first request will test it." };
     return { ok: true, text: `Cannot check the key: ${(e as Error).message}. It is saved; the first request will test it.` };
   }

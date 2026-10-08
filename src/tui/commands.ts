@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Mode, Owner, Question } from "../core/types.ts";
 import { gaHome } from "../adapters/manifest.ts";
-import { claudeKey, credentialsPath, maskKey, removeClaudeKey } from "../core/credentials.ts";
+import { claudeKey, claudeWorkspace, credentialsPath, maskKey, removeClaudeKey, saveClaudeWorkspace } from "../core/credentials.ts";
 import type { Card } from "./cards.tsx";
 import { show } from "./cards.tsx";
 import type { OutputRef } from "./items.ts";
@@ -318,18 +318,23 @@ export const commands: Command[] = [
   },
   {
     name: "key",
-    args: "[status|remove]",
+    args: "[status|remove|workspace <id>]",
     help: "Add, check or remove your Claude API key.",
     run(args, ctx) {
       const sub = args[0] ?? "";
       if (sub === "status") {
         const k = claudeKey();
-        if (k.from === "env") return ctx.notice(`The key ${maskKey(k.key!)} comes from ANTHROPIC_API_KEY in this shell.`);
-        if (k.from === "file") return ctx.notice(`The key ${maskKey(k.key!)} comes from ${credentialsPath()}.`);
+        const ws = claudeWorkspace() ? ` Workspace ID: ${claudeWorkspace()}.` : "";
+        if (k.from === "env") return ctx.notice(`The key ${maskKey(k.key!)} comes from ANTHROPIC_API_KEY in this shell.${ws}`);
+        if (k.from === "file") return ctx.notice(`The key ${maskKey(k.key!)} comes from ${credentialsPath()}.${ws}`);
         return ctx.notice("No Claude API key is set. Type /key to add one.");
       }
       if (sub === "remove") return ctx.notice(removeClaudeKey() ? `Removed the saved key from ${credentialsPath()}.` : "No key was saved.");
-      if (sub) return ctx.error("Use /key, /key status or /key remove.");
+      if (sub === "workspace") {
+        saveClaudeWorkspace(args[1] ?? "");
+        return ctx.notice(args[1] ? `Saved the workspace ID ${args[1]}. Each request now sends it.` : "Removed the workspace ID.");
+      }
+      if (sub) return ctx.error("Use /key, /key status, /key remove or /key workspace <id>.");
       ctx.openCard({ t: "key" });
     },
   },

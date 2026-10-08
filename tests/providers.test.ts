@@ -191,7 +191,7 @@ describe("claude", () => {
         msgs.push(err.message);
       });
     }
-    expect(msgs[0]).toBe("No valid Claude credentials. Type /key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`.");
+    expect(msgs[0]).toMatch(/^No valid Claude credentials. Type \/key to add your API key, set ANTHROPIC_API_KEY, or run `ant auth login`. The API said:/);
     expect(msgs[1]).toMatch(/rate limit/i);
     expect(msgs[2]).toMatch(/503/);
     expect(msgs[3]).toMatch(/Cannot reach/);

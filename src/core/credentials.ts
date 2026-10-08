@@ -26,15 +26,32 @@ export function claudeKey(env: Record<string, string | undefined> = process.env)
   return k ? { key: k, from: "file" } : { from: "none" };
 }
 
-export function saveClaudeKey(key: string): string {
-  const dir = gaHome();
-  mkdirSync(dir, { recursive: true });
+function write(values: Record<string, string>): string {
+  mkdirSync(gaHome(), { recursive: true });
   const path = credentialsPath();
-  writeFileSync(path, JSON.stringify({ ...readFile(), anthropic_api_key: key }, null, 1) + "\n", { mode: 0o600 });
+  writeFileSync(path, JSON.stringify(values, null, 1) + "\n", { mode: 0o600 });
   chmodSync(path, 0o600);
   version++;
   return path;
 }
+
+export function saveClaudeKey(key: string): string {
+  return write({ ...readFile(), anthropic_api_key: key });
+}
+
+export function claudeWorkspace(env: Record<string, string | undefined> = process.env): string | undefined {
+  return env.ANTHROPIC_WORKSPACE_ID || readFile().anthropic_workspace_id || undefined;
+}
+
+export function saveClaudeWorkspace(id: string): string {
+  const rest = readFile();
+  if (id) rest.anthropic_workspace_id = id;
+  else delete rest.anthropic_workspace_id;
+  return write(rest);
+}
+
+export const WORKSPACE_HELP =
+  "This key belongs to no workspace, so the API needs a workspace ID with each request. Create a key inside a workspace at platform.claude.com, or save the workspace ID with `ga key workspace <id>` (in the app: /key workspace <id>).";
 
 export function removeClaudeKey(): boolean {
   const path = credentialsPath();
