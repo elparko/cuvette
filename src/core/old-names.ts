@@ -5,8 +5,6 @@ import { join } from "node:path";
 const OLD = "GA_";
 const NEW = "CUVETTE_";
 
-export const OLD_PROJECT_DIR = ".ga";
-
 export function readOldEnv(env: NodeJS.ProcessEnv = process.env) {
   for (const [k, v] of Object.entries(env)) {
     const name = NEW + k.slice(OLD.length);
