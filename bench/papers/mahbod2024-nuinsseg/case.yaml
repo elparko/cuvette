@@ -66,17 +66,30 @@ items:
     where: >-
       Not in the paper. The paper reports Dice only for U-Net models (0.766 to 0.814 in Table 3). The benchmark
       authors scored a plain Otsu threshold on the hematoxylin channel over all 665 patches.
+    independence: independent
+    check: >-
+      The benchmark authors repeated the baseline without scikit-image: own color deconvolution with the Ruifrok
+      H-E-DAB vectors in numpy, own 256-bin Otsu, scipy.ndimage labels to drop groups under 30 pixels, Dice
+      against the label masks. Mean over 665 patches: 0.5381. With an H and E only matrix (third vector from the
+      cross product) the result is 0.565, so the value depends on the stain matrix. Script
+      check_dice_and_labels.py.
   image_patches:
     source: published
     where: >-
       Methods, field of view and patch selection, and Table 2. The paper gives 665 patches. The released files
       match this count in every organ folder.
+    check: The check script finds 665 tissue images in the 31 organ folders. Script check_dice_and_labels.py.
   nuclei_label_masks:
     source: computed
     tool: Python count of unique non-zero labels in the released label masks
     where: >-
       Not in the paper. Table 2 gives 30,698 nuclei, but the released masks hold 35,138 labels. The benchmark
       authors did not find the cause.
+    independence: independent
+    check: >-
+      The benchmark authors read the label masks with tifffile and counted distinct non-zero values with numpy
+      bincount. It gives 35138. The value is a direct count of the released files, so it does not depend on the
+      adapter. Script check_dice_and_labels.py.
 data:
   source: NuInsSeg dataset on Zenodo (record 10518968)
   url: https://zenodo.org/records/10518968

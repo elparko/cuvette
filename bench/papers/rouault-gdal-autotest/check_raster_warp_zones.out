@@ -1,0 +1,5 @@
+width 20, height 20, ProjectedCSTypeGeoKey 26711, pixel size 60.0 x 60.0 m
+min 74, max 255, mean 126.7650, population std 22.9285, sample std 22.9572
+warp to EPSG:4326 (GDALSuggestedWarpOutput rule): 22 x 18
+zone A, pixel centers inside: 100 pixels, mean 129.500
+zone B, pixel centers inside: 42 pixels, mean 135.000

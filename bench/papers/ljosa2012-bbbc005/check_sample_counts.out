@@ -1,0 +1,4 @@
+sampled images: 100, not in the published file: 0
+true_total_sample (sum of C in the file names): 5007
+ratio_sample (published detected total / true total): 0.9379
+mean_abs_error_sample (published counts): 3.110

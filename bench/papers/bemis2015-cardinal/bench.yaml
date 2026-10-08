@@ -23,5 +23,5 @@ items:
   - {key: spectra, description: "Spectra in pig206.", value: 4959, exact: true}
   - {key: mz_values, description: "m/z values in pig206.", value: 10200, exact: true}
   - {key: peaks, description: "Peaks after peak processing.", value: 687, tolerance: 10}
-  - {key: segments_s32, description: "Segments in the chosen model (s=32).", value: 6, tolerance: 1}
-  - {key: segments_s64, description: "Segments in the s=64 model.", value: 3, tolerance: 1}
+  - {key: segments_s32, description: "Segments in the chosen model (s=32).", value: 6, tolerance: 1, tool: segment_image}
+  - {key: segments_s64, description: "Segments in the s=64 model.", value: 3, tolerance: 1, tool: segment_image}

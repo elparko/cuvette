@@ -65,12 +65,21 @@ items:
     where: >-
       Not in the paper. No official ImageJ or Fiji tutorial that prints this count was found. The benchmark
       authors ran ImageJ, which gave 64.
+    independence: independent
+    check: >-
+      ImageJ 1.53 is a different program from the scikit-image adapter. A second check with PIL and
+      scipy.ndimage only (range 126 to 255 that ImageJ picked, 8-connected labels) also gives 64. Script
+      check_particles.py.
   particles_edges_excluded:
     source: computed
     tool: ImageJ 1.53 (Default threshold, Analyze Particles with edge exclusion)
     where: >-
       Not in the paper. No official tutorial that prints this count was found. The benchmark authors ran ImageJ,
       which gave 46.
+    independence: independent
+    check: >-
+      ImageJ 1.53 is a different program from the scikit-image adapter. The same scipy.ndimage check, with
+      labels that touch the image border removed, gives 46. Script check_particles.py.
 data:
   source: ImageJ sample image Blobs (blobs.gif)
   url: https://imagej.net/ij/images/blobs.gif

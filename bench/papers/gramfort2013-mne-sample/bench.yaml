@@ -35,9 +35,9 @@ items:
   - {key: epochs_dropped, description: "Epochs dropped by the limits, all six ids.", value: 10, exact: true, in_answer: false}
   - {key: epochs_kept, description: "Epochs kept, all six ids.", value: 309, exact: true}
   - {key: auditory_left_kept, description: "Auditory/left epochs kept.", value: 68, exact: true}
-  - {key: n100_latency_gfp, description: "N100 latency (s), global field power of good gradiometers, auditory/left.", value: 0.0932, tolerance: 0.007}
-  - {key: n100_amplitude_gfp, description: "N100 global field power amplitude in gradiometers (fT/cm).", value: 42.1, tolerance: 2.0}
-  - {key: strongest_grad_latency, description: "Latency (s) of the strongest gradiometer channel.", value: 0.0866, tolerance: 0.007}
-  - {key: strongest_grad_amplitude, description: "Amplitude (fT/cm) of the strongest gradiometer channel, absolute value.", value: 199, tolerance: 8, abs: true}
-  - {key: n100_latency_eeg, description: "N100 latency (s), EEG negative peak.", value: 0.0999, tolerance: 0.007, in_answer: false, optional: true}
-  - {key: n100_amplitude_eeg, description: "N100 amplitude (uV), EEG negative peak.", value: -6.0, tolerance: 0.4, in_answer: false, optional: true}
+  - {key: n100_latency_gfp, description: "N100 latency (s), global field power of good gradiometers, auditory/left.", value: 0.0932, tolerance: 0.007, tool: measure_peak}
+  - {key: n100_amplitude_gfp, description: "N100 global field power amplitude in gradiometers (fT/cm).", value: 42.1, tolerance: 2.0, tool: measure_peak}
+  - {key: strongest_grad_latency, description: "Latency (s) of the strongest gradiometer channel.", value: 0.0866, tolerance: 0.007, tool: measure_peak}
+  - {key: strongest_grad_amplitude, description: "Amplitude (fT/cm) of the strongest gradiometer channel, absolute value.", value: 199, tolerance: 8, abs: true, tool: measure_peak}
+  - {key: n100_latency_eeg, description: "N100 latency (s), EEG negative peak.", value: 0.0999, tolerance: 0.007, in_answer: false, optional: true, tool: measure_peak}
+  - {key: n100_amplitude_eeg, description: "N100 amplitude (uV), EEG negative peak.", value: -6.0, tolerance: 0.4, in_answer: false, optional: true, tool: measure_peak}

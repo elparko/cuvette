@@ -1,0 +1,8 @@
+total_reads 3307
+mapped_reads 3271
+properly_paired 3144
+singletons 127
+reads_seq1 1482
+reads_seq2 1789
+mapq_ge_30 3210
+reads_seq2_100_200 79

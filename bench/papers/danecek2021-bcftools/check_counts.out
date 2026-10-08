@@ -1,0 +1,8 @@
+total_records 2210
+snp_records 1955
+indel_records 248
+other_records 7
+transitions 1344 transversions 611 ts_tv_ratio 2.1997
+records_in_region (POS in chr20:1000000-1050000) 1137
+records_in_region (REF span overlaps the region) 1137
+records_af_5pct (INFO/AF >= 0.05) 328

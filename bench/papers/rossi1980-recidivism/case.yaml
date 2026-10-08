@@ -13,8 +13,16 @@ related:
       lifelines documentation, section on survival regression. It fits a Cox model to these data and prints
       the summary. Source of the subject count, the event count and the concordance.
     url: https://lifelines.readthedocs.io/en/latest/Survival%20Regression.html
-  - text: lifelines documentation, notebook on the proportional hazards assumption. It tests each covariate on these data.
+  - text: >-
+      lifelines documentation, notebook on the proportional hazards assumption. It tests each covariate on
+      these data. Source of the proportional hazards test p-value for age.
     url: https://lifelines.readthedocs.io/en/latest/jupyter_notebooks/Proportional%20hazard%20assumption.html
+  - text: >-
+      Fox J, Weisberg S. Cox Proportional-Hazards Regression for Survival Data in R. Appendix to An R
+      Companion to Applied Regression, 3rd edition, revision of 2023-01-31. Section 3.2 fits the same Cox
+      model with R survival and prints the coefficients to four decimals. Source of the Cox coefficients,
+      the hazard ratio and the p-value for fin.
+    url: https://www.john-fox.ca/Companion/appendices/Appendix-Cox-Regression.pdf
 measured: >-
   The study followed 432 men for one year after their release from Maryland state prisons in the 1970s.
   Half the men got financial aid by random assignment. The study measured the time to the first re-arrest.
@@ -59,42 +67,67 @@ items:
     source: tutorial
     where: Survival regression section, the Cox model summary. The number of events is 114.
   coef_fin:
-    source: computed
-    tool: lifelines 0.30.3 CoxPHFitter
-    where: The documentation gives a rounded value only (-0.38).
+    source: published
+    where: >-
+      Fox J, Weisberg S. Cox Proportional-Hazards Regression for Survival Data in R, an appendix to An R
+      Companion to Applied Regression, 3rd edition (Sage 2019), revision of 2023-01-31, Section 3.2,
+      summary(mod.allison). It prints -0.3794 for finyes. The lifelines documentation gives a rounded value
+      only (-0.38).
+    check: R survival 3.8.6 coxph with Efron ties gives -0.3794 (check_cox.R).
   coef_age:
-    source: computed
-    tool: lifelines 0.30.3 CoxPHFitter
-    where: The documentation gives a rounded value only (-0.06).
+    source: published
+    where: >-
+      Fox and Weisberg, Cox regression appendix (revision of 2023-01-31), Section 3.2, summary(mod.allison).
+      It prints -0.0574 for age.
+    check: R survival 3.8.6 coxph gives -0.0574 (check_cox.R).
   coef_prio:
-    source: computed
-    tool: lifelines 0.30.3 CoxPHFitter
-    where: The documentation gives a rounded value only (0.09).
+    source: published
+    where: >-
+      Fox and Weisberg, Cox regression appendix (revision of 2023-01-31), Section 3.2, summary(mod.allison).
+      It prints 0.0915 for prio.
+    check: R survival 3.8.6 coxph gives 0.0915 (check_cox.R).
   hazard_ratio_fin:
-    source: computed
-    tool: lifelines 0.30.3 CoxPHFitter
-    where: The documentation gives a rounded value only (0.68).
+    source: published
+    where: >-
+      Fox and Weisberg, Cox regression appendix (revision of 2023-01-31), Section 3.2, summary(mod.allison).
+      It prints exp(coef) 0.6843 for finyes, with a 95% interval of 0.470 to 0.996.
+    check: R survival 3.8.6 coxph gives 0.6843 (check_cox.R).
   p_fin:
-    source: computed
-    tool: lifelines 0.30.3 CoxPHFitter
-    where: The documentation gives a rounded value only (0.05).
+    source: published
+    where: >-
+      Fox and Weisberg, Cox regression appendix (revision of 2023-01-31), Section 3.2, summary(mod.allison).
+      It prints Pr(>|z|) 0.0474 for finyes.
+    check: R survival 3.8.6 coxph gives 0.0474 (check_cox.R).
   concordance:
     source: tutorial
-    where: Survival regression section, the Cox model summary. The concordance is 0.64. The benchmark run gives 0.6403.
+    where: >-
+      Survival regression section, the Cox model summary. The concordance is 0.64. The benchmark run gives
+      0.6403.
+    check: R survival 3.8.6 coxph gives 0.6403 (check_cox.R). Fox and Weisberg (Section 3.2) also print 0.64.
   logrank_chi2_fin:
     source: computed
     tool: lifelines 0.30.3 logrank_test
     where: Not in the documentation. The benchmark authors compared the two aid groups with a log-rank test.
+    independence: independent
+    check: R survival 3.8.6 survdiff gives 3.8376 (check_cox.R).
   logrank_p_fin:
     source: computed
     tool: lifelines 0.30.3 logrank_test
     where: Not in the documentation. The p-value is 0.0501, just above 0.05.
+    independence: independent
+    check: R survival 3.8.6 survdiff gives a chi-square of 3.8376 and p 0.0501 (check_cox.R).
   ph_test_p_age:
-    source: computed
-    tool: lifelines 0.30.3 proportional_hazard_test with the rank transform
+    source: tutorial
     where: >-
-      The notebook on the proportional hazards assumption runs the same test and gives a rounded value only
-      (0.001). Age fails the test.
+      lifelines documentation, notebook Testing the proportional hazard assumptions (read on 2026-10-08).
+      check_assumptions on this model prints a rank-transform test statistic of 11.45 for age and the advice
+      text 'p-value is 0.0007'. The standalone proportional_hazard_test with time_transform='rank' prints
+      11.453 and a rounded p of 0.001.
+    check: >-
+      A hand calculation in R of the Grambsch and Therneau (1994) approximation, from the scaled Schoenfeld
+      residuals of survival 3.8.6, gives a chi-square of 11.157 and p 0.00084 (check_cox.R). The cox.zph test
+      of survival 3.x is a different test. It gives p 0.0145 with the km transform and p 0.34 with the rank
+      transform.
 data:
   source: Dataset rossi from the lifelines package (load_rossi). The same data are carData::Rossi in R.
   url: https://raw.githubusercontent.com/CamDavidsonPilon/lifelines/master/lifelines/datasets/rossi.csv

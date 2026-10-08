@@ -1,0 +1,6 @@
+Progress of 'mass trace detection':
+Progress of 'elution peak detection':
+Progress of 'assembling mass traces to features':
+Output features: 1887 (total trace count: 2255)
+FeatureFinderMetabo took 24.04 s (wall), 18.91 s (CPU), 0.48 s (system), 18.43 s (user); Peak Memory Usage: 347 MB.
+features in featureXML: 1783

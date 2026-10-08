@@ -1,0 +1,11 @@
+rows in file: 1128
+molecules parsed: 1128
+zero violations: 1000
+one violation: 115
+two or more violations: 13
+logP above 5: 111
+ESOL squared correlation: 0.7469
+ESOL 1 - SSres/SStot: 0.7295
+ESOL RMSE: 1.0898
+file column 'ESOL predicted' (Delaney, clogP), squared correlation: 0.8231
+file column 'ESOL predicted' (Delaney, clogP), RMSE: 0.9101

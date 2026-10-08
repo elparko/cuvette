@@ -1,0 +1,2 @@
+test images: 50
+true_nuclei_test (skimage.measure.label per color, 8-connected): 5720

@@ -1,0 +1,50 @@
+FlowJo counts stored in the workspace:
+  events: 290172
+  /Time: 290172
+  /Time/Singlets: 239691
+  /Time/Singlets/aAmine-: 164942
+  /Time/Singlets/aAmine-/CD3+: 133860
+  /Time/Singlets/aAmine-/CD3+/CD4+: 82636
+  /Time/Singlets/aAmine-/CD3+/CD4+/CD107a+: 71
+  /Time/Singlets/aAmine-/CD3+/CD4+/IFNg+: 4
+  /Time/Singlets/aAmine-/CD3+/CD4+/IL2+: 6
+  /Time/Singlets/aAmine-/CD3+/CD4+/TNFa+: 21
+  /Time/Singlets/aAmine-/CD3+/CD8+: 47241
+  /Time/Singlets/aAmine-/CD3+/CD8+/CD107a+: 72
+  /Time/Singlets/aAmine-/CD3+/CD8+/IFNg+: 2
+  /Time/Singlets/aAmine-/CD3+/CD8+/IL2+: 11
+  /Time/Singlets/aAmine-/CD3+/CD8+/TNFa+: 8
+events in the FCS file: 290172
+gate counts, compensation from the workspace
+  /Time: 290166
+  /Time/Singlets: 239001
+  /Time/Singlets/aAmine-: 164655
+  /Time/Singlets/aAmine-/CD3+: 133670
+  /Time/Singlets/aAmine-/CD3+/CD4+: 82484
+  /Time/Singlets/aAmine-/CD3+/CD4+/CD107a+: 68
+  /Time/Singlets/aAmine-/CD3+/CD4+/IFNg+: 4
+  /Time/Singlets/aAmine-/CD3+/CD4+/IL2+: 6
+  /Time/Singlets/aAmine-/CD3+/CD4+/TNFa+: 21
+  /Time/Singlets/aAmine-/CD3+/CD8+: 47165
+  /Time/Singlets/aAmine-/CD3+/CD8+/CD107a+: 73
+  /Time/Singlets/aAmine-/CD3+/CD8+/IFNg+: 2
+  /Time/Singlets/aAmine-/CD3+/CD8+/IL2+: 10
+  /Time/Singlets/aAmine-/CD3+/CD8+/TNFa+: 8
+  difference for CD3+, percent of the FlowJo count: -0.142
+  difference for CD3+/CD4+, percent of the FlowJo count: -0.184
+  difference for CD3+/CD8+, percent of the FlowJo count: -0.161
+gate counts, compensation none
+  /Time: 290166
+  /Time/Singlets: 239001
+  /Time/Singlets/aAmine-: 164655
+  /Time/Singlets/aAmine-/CD3+: 135381
+  /Time/Singlets/aAmine-/CD3+/CD4+: 85369
+  /Time/Singlets/aAmine-/CD3+/CD4+/CD107a+: 70
+  /Time/Singlets/aAmine-/CD3+/CD4+/IFNg+: 7
+  /Time/Singlets/aAmine-/CD3+/CD4+/IL2+: 6
+  /Time/Singlets/aAmine-/CD3+/CD4+/TNFa+: 22
+  /Time/Singlets/aAmine-/CD3+/CD8+: 47694
+  /Time/Singlets/aAmine-/CD3+/CD8+/CD107a+: 96
+  /Time/Singlets/aAmine-/CD3+/CD8+/IFNg+: 672
+  /Time/Singlets/aAmine-/CD3+/CD8+/IL2+: 10
+  /Time/Singlets/aAmine-/CD3+/CD8+/TNFa+: 10

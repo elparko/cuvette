@@ -27,5 +27,5 @@ expected:
   - {description: "zone B pixel count, all touched", value: 56, tolerance: 0, source: "numpy and shapely"}
   - {description: "zone B mean, all touched", value: 134.857, tolerance: 0.01, source: "numpy and shapely"}
 notes: |
-  The sample standard deviation (n - 1) is 22.986. A model that uses another tool or computes by hand can give it. gdalinfo gives 22.928.
+  The sample standard deviation (n - 1) is 22.957. A model that uses another tool or computes by hand can give it. It is inside the tolerance of 0.05. gdalinfo gives 22.928.
   Traps: the zone file has the field id, so the rows are named A and B. Zone B changes with the pixel rule. Zones with another CRS stop the tool.

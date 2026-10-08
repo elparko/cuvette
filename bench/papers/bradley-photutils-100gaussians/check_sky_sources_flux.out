@@ -1,0 +1,7 @@
+sky_level (numpy 3-sigma clip, median): 5.1524
+sky_noise (numpy 3-sigma clip, std): 2.0942
+sources_detected (scipy.ndimage, 13x13 Gaussian FWHM 3, > 3 std, 8-connected, >= 10 pixels): 82
+sources_detected (scipy.ndimage, 5x5 Gaussian FWHM 3, > 3 std, 8-connected, >= 10 pixels): 83
+source (48.7, 200.33): injected flux 895.4; numpy aperture r=10 minus clipped-median annulus 15-20: 936.6
+source (145.05, 168.52): injected flux 734.1; numpy aperture r=10 minus clipped-median annulus 15-20: 760.2
+source (355.56, 252.2): injected flux 873.9; numpy aperture r=10 minus clipped-median annulus 15-20: 925.4

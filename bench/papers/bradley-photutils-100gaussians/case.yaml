@@ -97,34 +97,58 @@ items:
     where: >-
       Photutils background guide. sigma_clipped_stats with sigma=3 prints a median of 5.152. The true
       background is 5.
+    check: >-
+      The benchmark authors repeated the 3-sigma clip in plain numpy (median and standard deviation, five
+      iterations). It gives 5.1524. The guide prints 5.15244174. Script check_sky_sources_flux.py.
   sky_noise:
     source: tutorial
     where: >-
       Photutils background guide. The same call prints a standard deviation of 2.094. The true noise is 2.
+    check: >-
+      The same plain numpy clip gives 2.0942. The guide prints 2.09423739. Script check_sky_sources_flux.py.
   sources_detected:
     source: computed
     tool: photutils 3.0.0 with astropy 8.0.1, checked with a second method in SciPy only
     where: >-
       Not in the guide. The segmentation guide uses a 1.5-sigma threshold and a 2D background, and it finds
       86 sources. The benchmark uses 3 sigma and one global background.
+    independence: independent
+    check: >-
+      The benchmark authors repeated the detection with scipy.ndimage only: Gaussian kernel of FWHM 3 over 13 by
+      13 pixels, threshold 3 times the clipped standard deviation, 8-connected labels of 10 pixels or more. It
+      gives 82. With the 5 by 5 kernel of the segmentation guide the same method gives 83. Script
+      check_sky_sources_flux.py.
   net_flux_48_70_200_33:
     source: computed
     tool: photutils 3.0.0, table of the injected sources of make_100gaussians_image
     where: >-
       Not in the guide. The value is the injected flux of this source in the simulation table, not a
       measurement. The tolerance is three times the sky noise in the aperture.
+    independence: independent
+    check: >-
+      The value is the injected flux in 100gaussians_params.ecsv, read as text. An aperture sum in plain numpy
+      (radius 10, 10 by 10 subpixels, clipped-median sky in the 15 to 20 pixel annulus) gives 936.6, inside the
+      tolerance. Script check_sky_sources_flux.py.
   net_flux_145_05_168_52:
     source: computed
     tool: photutils 3.0.0, table of the injected sources of make_100gaussians_image
     where: >-
       Not in the guide. The value is the injected flux of this source in the simulation table, not a
       measurement. The tolerance is three times the sky noise in the aperture.
+    independence: independent
+    check: >-
+      The value is the injected flux in 100gaussians_params.ecsv, read as text. The plain numpy aperture sum
+      gives 760.2, inside the tolerance. Script check_sky_sources_flux.py.
   net_flux_355_56_252_20:
     source: computed
     tool: photutils 3.0.0, table of the injected sources of make_100gaussians_image
     where: >-
       Not in the guide. The value is the injected flux of this source in the simulation table, not a
       measurement. The tolerance is three times the sky noise in the aperture.
+    independence: independent
+    check: >-
+      The value is the injected flux in 100gaussians_params.ecsv, read as text. The plain numpy aperture sum
+      gives 925.4, inside the tolerance. Script check_sky_sources_flux.py.
 data:
   source: >-
     Simulated image from photutils.datasets.make_100gaussians_image, written to a Flexible Image Transport

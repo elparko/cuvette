@@ -74,53 +74,97 @@ items:
     where: >-
       FlowKit tutorial notebook, part 1 (Sample class). It prints this sample with 290172 events. The workspace
       stores the same count.
+    independence: independent
+    check: >-
+      fcsparser 0.2.8 reads 290172 events from the FCS file. The SampleNode count in the workspace XML is also
+      290172 (check_gates.py).
   cd3_flowkit:
     source: tutorial
     where: >-
       FlowKit tutorial notebook, part 3, gating results report. It gates this file with a Gating-ML copy of the same
       gates. The workspace test in the FlowKit test suite checks the same count.
+    independence: independent
+    check: >-
+      Own numpy code (fcsparser 0.2.8 to read the FCS file, inverse of the workspace spillover matrix, own
+      logicle transform after Moore and Parks 2012, matplotlib point-in-polygon) applies the workspace gates and gives
+      133670 (check_gates.py). FlowKit Tutorial Part 6 (Workspace class, FlowKit 1.3.0) also prints 133670 for
+      this sample.
   cd3_flowjo:
     source: computed
     tool: FlowKit 1.3.2, read from the workspace file
     where: Not in the paper or a tutorial. FlowJo stored this count in the workspace file.
+    independence: independent
+    check: >-
+      A direct read of the Population count attribute in the workspace XML with ElementTree gives 133860
+      (check_gates.py). FlowJo 10.6.2 computed this count, not FlowKit.
   cd4_flowkit:
     source: tutorial
     where: FlowKit tutorial notebook, part 3, gating results report, gate CD4-pos.
+    independence: independent
+    check: >-
+      The same numpy gating gives 82484 (check_gates.py). FlowKit Tutorial Part 6 (Workspace class, FlowKit
+      1.3.0) also prints 82484 for this sample.
   cd4_flowjo:
     source: computed
     tool: FlowKit 1.3.2, read from the workspace file
     where: Not in the paper or a tutorial. FlowJo stored this count in the workspace file.
+    independence: independent
+    check: >-
+      A direct read of the workspace XML with ElementTree gives 82636 (check_gates.py).
   cd8_flowkit:
     source: tutorial
     where: FlowKit tutorial notebook, part 3, gating results report, gate CD8-pos.
+    independence: independent
+    check: >-
+      The same numpy gating gives 47165 (check_gates.py).
   cd8_flowjo:
     source: computed
     tool: FlowKit 1.3.2, read from the workspace file
     where: Not in the paper or a tutorial. FlowJo stored this count in the workspace file.
+    independence: independent
+    check: >-
+      A direct read of the workspace XML with ElementTree gives 47241 (check_gates.py).
   largest_difference_percent:
     source: computed
     tool: FlowKit 1.3.2
     where: >-
       Not in a source. The differences for CD3+, CD4+ and CD8+ are -0.142, -0.184 and -0.161 percent of the FlowJo
       count.
+    independence: independent
+    check: >-
+      The numpy gate counts and the XML counts give -0.142, -0.184 and -0.161 percent for CD3+, CD4+ and CD8+
+      (check_gates.py).
   cd3_no_compensation:
     source: computed
     tool: FlowKit 1.3.2
     where: Not in a source. The benchmark authors ran the workspace gates with compensation set to none.
+    independence: independent
+    check: >-
+      The same numpy gating without the spillover matrix gives 135381 (check_gates.py).
   cd4_no_compensation:
     source: computed
     tool: FlowKit 1.3.2
     where: Not in a source. The benchmark authors ran the workspace gates with compensation set to none.
+    independence: independent
+    check: >-
+      The same numpy gating without the spillover matrix gives 85369 (check_gates.py).
   cd8_no_compensation:
     source: computed
     tool: FlowKit 1.3.2
     where: Not in a source. The benchmark authors ran the workspace gates with compensation set to none.
+    independence: independent
+    check: >-
+      The same numpy gating without the spillover matrix gives 47694 (check_gates.py).
   cd8_ifng_no_compensation:
     source: computed
     tool: FlowKit 1.3.2
     where: >-
       Not in a source. Without compensation, the interferon gamma (IFNg) gate under CD8+ grows from 2 to 672 events.
       This is the largest relative change.
+    independence: independent
+    check: >-
+      The same numpy gating without the spillover matrix gives 672 for IFNg+ under CD8+, and 2 with the matrix
+      (check_gates.py).
 data:
   source: FlowKit repository, 8-color data set (one FCS file and the FlowJo workspace), commit f2159043
   url: https://github.com/whitews/FlowKit/tree/f2159043b6a56e527d4baacf97490caf8354618e/data/8_color_data_set

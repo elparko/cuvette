@@ -54,56 +54,85 @@ items:
   width:
     source: tutorial
     where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a raster shape of 20 by 20 pixels.
+    check: tifffile reads a 20 by 20 pixel array without GDAL. Script check_raster_warp_zones.py.
   height:
     source: tutorial
     where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a raster shape of 20 by 20 pixels.
+    check: tifffile reads a 20 by 20 pixel array without GDAL. Script check_raster_warp_zones.py.
   epsg:
     source: tutorial
     where: >-
       GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks the code EPSG:26711 (North American Datum 1927, Universal Transverse Mercator zone 11
       north).
+    check: >-
+      The GeoTIFF key ProjectedCSTypeGeoKey, read with tifffile, is 26711. Script check_raster_warp_zones.py.
   pixel_size_m:
     source: tutorial
     where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The geotransform in the test has a pixel size of 60 m.
+    check: >-
+      The GeoTIFF tag ModelPixelScale, read with tifffile, is 60 by 60 m. Script check_raster_warp_zones.py.
   band_min:
     source: tutorial
     where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a minimum of 74.
+    check: numpy on the pixels read with tifffile gives 74. Script check_raster_warp_zones.py.
   band_max:
     source: tutorial
     where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a maximum of 255.
+    check: numpy on the pixels read with tifffile gives 255. Script check_raster_warp_zones.py.
   band_mean:
     source: tutorial
     where: GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks a mean of 126.765.
+    check: numpy on the pixels read with tifffile gives 126.7650. Script check_raster_warp_zones.py.
   band_std:
     source: tutorial
     where: >-
       GDAL test suite, test_gdalinfo.py, test_gdalinfo_stac_json. The test checks 22.928, the population standard deviation.
-      The sample standard deviation is 22.986.
+      The sample standard deviation is 22.957, which is also inside the tolerance.
+    check: >-
+      numpy on the pixels read with tifffile gives 22.9285 (population) and 22.9572 (sample, n - 1). Script
+      check_raster_warp_zones.py.
   warp_width:
     source: computed
     tool: GDAL 3.13.3 gdalwarp, checked with pyproj
     where: Not in the test suite. The benchmark authors ran the warp with nearest neighbour and the default pixel size.
+    independence: independent
+    check: >-
+      The benchmark authors repeated the GDALSuggestedWarpOutput size rule without GDAL: pyproj transforms 21
+      points on each edge, the pixel size keeps the length of the diagonal, and the size is the extent over the
+      pixel size, rounded. It gives 22. Script check_raster_warp_zones.py.
   warp_height:
     source: computed
     tool: GDAL 3.13.3 gdalwarp, checked with pyproj
     where: Not in the test suite. The benchmark authors ran the warp with nearest neighbour and the default pixel size.
+    independence: independent
+    check: The same pyproj calculation gives 18. Script check_raster_warp_zones.py.
   zone_a_pixels:
     source: computed
     tool: numpy and shapely
     where: Not in a source. Zone A is a square that the benchmark authors drew on the pixel grid.
+    independence: independent
+    check: >-
+      numpy tests each pixel center against the square, with no rasterio or rasterstats. It gives 100. Script
+      check_raster_warp_zones.py.
   zone_a_mean:
     source: computed
     tool: numpy and shapely
     where: Not in a source. Zone A is a square that the benchmark authors drew on the pixel grid.
+    independence: independent
+    check: The same numpy pixel center test gives a mean of 129.500. Script check_raster_warp_zones.py.
   zone_b_pixels_centers:
     source: computed
     tool: numpy and shapely
     where: >-
       Not in a source. Zone B is offset by 40 m from the grid. With all touched pixels the count is 56, not 42.
+    independence: independent
+    check: The same numpy pixel center test gives 42. Script check_raster_warp_zones.py.
   zone_b_mean_centers:
     source: computed
     tool: numpy and shapely
     where: Not in a source. With all touched pixels the mean is 134.857, not 135.0.
+    independence: independent
+    check: The same numpy pixel center test gives a mean of 135.000. Script check_raster_warp_zones.py.
 data:
   source: GDAL test raster byte.tif, plus two square zones that the benchmark authors drew
   url: https://raw.githubusercontent.com/OSGeo/gdal/master/autotest/gcore/data/byte.tif

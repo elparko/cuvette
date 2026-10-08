@@ -64,29 +64,45 @@ items:
     source: computed
     tool: bcftools 1.24 (htslib 1.24), bcftools stats
     where: Not in the paper. The paper has no results for this data.
+    independence: independent
+    check: >-
+      A plain Python reader of the VCF text (gzip module, no bcftools or htslib) counts 1955 SNP records.
+      Script check_counts.py, output check_counts.out.
   indel_records:
     source: computed
     tool: bcftools 1.24 (htslib 1.24), bcftools stats
     where: Not in the paper. The paper has no results for this data.
+    independence: independent
+    check: The plain Python reader in check_counts.py counts 248 indel records.
   total_records:
     source: computed
     tool: bcftools 1.24 (htslib 1.24), bcftools stats
     where: >-
       Not in the paper. The total of 2210 records includes 7 structural variants that are neither SNVs nor
       indels.
+    independence: independent
+    check: The plain Python reader in check_counts.py counts 2210 records, 7 of them symbolic structural variants.
   ts_tv_ratio:
     source: computed
     tool: bcftools 1.24 (htslib 1.24), bcftools stats
     where: Not in the paper. The count is 1344 transitions and 611 transversions.
+    independence: independent
+    check: The plain Python reader in check_counts.py counts 1344 transitions and 611 transversions, a ratio of 2.1997.
   records_in_region:
     source: computed
     tool: bcftools 1.24 (htslib 1.24), bcftools stats -r
     where: >-
       Not in the paper. The region must use the contig name chr20. A region written as 20 gives no records.
+    independence: independent
+    check: >-
+      The plain Python reader in check_counts.py counts 1137 records in chr20:1000000-1050000, both by start
+      position and by overlap of the REF allele.
   records_af_5pct:
     source: computed
     tool: bcftools 1.24 (htslib 1.24), bcftools view -i
     where: Not in the paper. The filter expression is INFO/AF at or above 0.05.
+    independence: independent
+    check: The plain Python reader in check_counts.py parses INFO/AF and counts 328 records at or above 0.05.
 data:
   source: 1000 Genomes Project, high-coverage phased panel (3202 samples), chromosome 20
   url: https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/

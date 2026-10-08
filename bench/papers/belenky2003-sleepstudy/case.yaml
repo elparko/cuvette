@@ -9,7 +9,7 @@ citation:
   year: 2003
   doi: 10.1046/j.1365-2869.2003.00337.x
 related:
-  - text: "Bates D, Maechler M, Bolker B, Walker S. Fitting linear mixed-effects models using lme4. Journal of Statistical Software 67(1):1-48 (2015). The lme4 example that fits the same model to these data."
+  - text: "Bates D, Maechler M, Bolker B, Walker S. Fitting linear mixed-effects models using lme4. Journal of Statistical Software 67(1):1-48 (2015). The lme4 example that fits the same model to these data. Section 5.2 is the source of the fixed effects, the standard error of Days and the variance components."
     doi: 10.18637/jss.v067.i01
 measured: >-
   The study gave volunteers different amounts of time in bed each night and measured how performance fell and
@@ -56,48 +56,58 @@ answers:
       errors allow correlated rows within a subject.
 items:
   days_slope:
-    source: computed
-    tool: statsmodels 0.15.0 mixedlm
+    source: published
     where: >-
-      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same value, 10.467, for the lme4 fit.
+      Not in the 2003 paper. Bates et al. 2015 (J Stat Softw 67(1), doi 10.18637/jss.v067.i01), Section 5.2,
+      fixed-effects table of summary(fm1), print 10.467 for the same model on the same 180 rows.
+    check: lme4 2.0.6 in R 4.6.1 gives 10.4673 (check_mixed_model.R). The adapter uses statsmodels mixedlm.
   intercept:
-    source: computed
-    tool: statsmodels 0.15.0 mixedlm
+    source: published
     where: >-
-      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same value, 251.405.
+      Not in the 2003 paper. Bates et al. 2015 (J Stat Softw 67(1)), Section 5.2, fixed-effects table of
+      summary(fm1), print 251.405.
+    check: lme4 2.0.6 in R 4.6.1 gives 251.4051 (check_mixed_model.R).
   se_days_random_slope:
-    source: computed
-    tool: statsmodels 0.15.0 mixedlm
+    source: published
     where: >-
-      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same standard error, 1.546.
+      Not in the 2003 paper. Bates et al. 2015 (J Stat Softw 67(1)), Section 5.2, fixed-effects table of
+      summary(fm1), print a standard error of 1.546 for Days.
+    check: lme4 2.0.6 in R 4.6.1 gives 1.5458 (check_mixed_model.R).
   se_days_random_intercept_trap:
     source: computed
     tool: statsmodels 0.15.0 mixedlm, random intercept only
     where: >-
       Not in the 2003 paper. This is the result of the wrong model, which leaves out the random slopes. Its
       standard error is too small. The run must not report it as the result.
+    independence: independent
+    check: lme4 2.0.6 in R 4.6.1, with a random intercept only, gives 0.8042 (check_mixed_model.R).
   se_days_ols_trap:
     source: computed
     tool: statsmodels 0.15.0 OLS
     where: >-
       Not in the 2003 paper. This is the result of OLS, which treats the 180 rows as independent. The run must
       not report it as the result.
+    independence: independent
+    check: R 4.6.1 lm gives 1.2382 (check_mixed_model.R).
   intercept_variance:
-    source: computed
-    tool: statsmodels 0.15.0 mixedlm
+    source: published
     where: >-
-      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print 612.09 for the lme4 fit. The difference is
-      in the last digit.
+      Not in the 2003 paper. Bates et al. 2015 (J Stat Softw 67(1)), Section 5.2, random-effects table of
+      summary(fm1), print 612.09. as.data.frame(VarCorr(fm1)) in the same section prints 612.089963. The
+      expected value 612.10 is inside the tolerance of 0.5.
+    check: lme4 2.0.6 in R 4.6.1 gives 612.100 (check_mixed_model.R).
   slope_variance:
-    source: computed
-    tool: statsmodels 0.15.0 mixedlm
+    source: published
     where: >-
-      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same value, 35.07.
+      Not in the 2003 paper. Bates et al. 2015 (J Stat Softw 67(1)), Section 5.2, random-effects table of
+      summary(fm1), print 35.07.
+    check: lme4 2.0.6 in R 4.6.1 gives 35.072 (check_mixed_model.R).
   residual_variance:
-    source: computed
-    tool: statsmodels 0.15.0 mixedlm
+    source: published
     where: >-
-      Not in the 2003 paper. Bates et al. 2015 (Section 5.2) print the same value, 654.94.
+      Not in the 2003 paper. Bates et al. 2015 (J Stat Softw 67(1)), Section 5.2, random-effects table of
+      summary(fm1), print 654.94.
+    check: lme4 2.0.6 in R 4.6.1 gives 654.940 (check_mixed_model.R).
 data:
   source: Data set sleepstudy of the R package lme4, from the Rdatasets collection
   url: https://vincentarelbundock.github.io/Rdatasets/csv/lme4/sleepstudy.csv

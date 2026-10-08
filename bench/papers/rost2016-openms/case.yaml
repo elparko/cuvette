@@ -64,26 +64,50 @@ items:
     source: computed
     tool: pyOpenMS 3.6.0
     where: Not in the paper or the supplement. The benchmark authors counted the spectra in the file.
+    independence: independent
+    check: >-
+      check_spectra.py counts the spectrum elements with the Python XML parser, without OpenMS. It gives 7173,
+      and the count attribute of the spectrum list is also 7173.
   ms1_spectra:
     source: computed
     tool: pyOpenMS 3.6.0
     where: Not in the paper or the supplement. All spectra in the file are level 1 mass spectra (MS1).
+    independence: independent
+    check: >-
+      check_spectra.py reads the ms level term (MS:1000511) of each spectrum with the Python XML parser. All 7173
+      spectra have level 1.
   mass_traces:
     source: computed
     tool: pyOpenMS 3.6.0
     where: >-
       Not in the paper or the supplement. The supplement gives no counts. The value uses the tutorial settings and
       OpenMS defaults for all other parameters.
+    independence: same path
+    check: >-
+      No independent count was found. The TOPP tool FeatureFinderMetabo does not print the number of mass traces.
+      A second run of the pyOpenMS classes gives 1880 (check_features_zero_intensity.py), but this is the same
+      code as the adapter.
   elution_peaks:
     source: computed
     tool: pyOpenMS 3.6.0
     where: Not in the paper or the supplement. Other OpenMS versions can give a slightly different count.
+    independence: independent
+    check: >-
+      The TOPP command line tool FeatureFinderMetabo of OpenMS 3.5.0 (conda build), the tool that the paper
+      workflow uses, reports 2255 input traces with the supplement settings (check_features.sh). The algorithm is
+      the same OpenMS C++ code. Only the build and the tool code differ from the adapter.
   features:
     source: computed
     tool: pyOpenMS 3.6.0
     where: >-
       Not in the paper or the supplement. The paper used OpenMS 2.0 in KNIME, so the tolerance allows for version
       differences.
+    independence: independent
+    check: >-
+      The TOPP tool FeatureFinderMetabo of OpenMS 3.5.0 reports 1887 features from the algorithm
+      (check_features.sh). It writes only 1783 features to its featureXML file, because it drops the 104 features
+      with intensity 0 (check_features_zero_intensity.py). The adapter counts all 1887. A run that counts the
+      TOPP output file gets 1783, which is 104 below the expected value and just outside the tolerance of 100.
 data:
   source: OpenMS tutorial example data, Metabolomics folder, University of Tuebingen archive
   url: https://abibuilder.cs.uni-tuebingen.de/archive/openms/Tutorials/Example_Data/Metabolomics/datasets/2012_02_03_PStd_050_1.mzML

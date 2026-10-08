@@ -104,29 +104,52 @@ items:
     source: computed
     tool: Sage 0.14.6 (release binary v0.14.7)
     where: Not in the paper. The paper has no result for this data.
+    independence: same path
+    check: >-
+      Only Sage makes this table. A new Sage run from check_fdr_config.json gives 303 rows (check_fdr.py). No
+      second search engine gives the same quantity, because each engine scores spectra in its own way.
   decoy_psms:
     source: computed
     tool: Sage 0.14.6 (release binary v0.14.7)
     where: Not in the paper. The paper has no result for this data.
+    independence: same path
+    check: >-
+      Only Sage makes this table. The new Sage run gives 43 decoy rows (check_fdr.py).
   target_psms_fdr1:
     source: computed
     tool: Sage 0.14.6 (release binary v0.14.7)
     where: >-
       Not in the paper. A Python recount of the q-values from the decoy labels gives the same number.
+    independence: independent
+    check: >-
+      check_fdr.py sorts the Sage PSMs by score and computes q-values from the target and decoy labels in plain
+      Python, with (decoys + 1) / targets. It does not read the Sage q-value columns. It gives 207. The PSM scores
+      still come from Sage. Without the + 1 the count is 214.
   distinct_peptides:
     source: computed
     tool: Sage 0.14.6 (release binary v0.14.7)
     where: Not in the paper. The value counts distinct peptide sequences among the PSMs at 1 percent FDR.
+    independence: independent
+    check: >-
+      check_fdr.py gives 47 distinct peptides among the 207 target PSMs, with the modifications as part of the
+      sequence. Without the modifications the count is 45. The PSM scores come from Sage.
   decoy_psms_kept:
     source: computed
     tool: Sage 0.14.6 (release binary v0.14.7)
     where: Not in the paper. One decoy PSM passes the 1 percent threshold.
+    independence: independent
+    check: >-
+      check_fdr.py gives 1 decoy PSM at q 0.01 or less with its own q-values. The PSM scores come from Sage.
   target_psms_fdr5:
     source: computed
     tool: Sage 0.14.6 (release binary v0.14.7)
     where: >-
       Not in the paper. A Python recount of the q-values gives the same number. The run must get it from a
       comparison at 5 percent.
+    independence: independent
+    check: >-
+      check_fdr.py gives 242 with its own q-values, with (decoys + 1) / targets. Without the + 1 the count is 243.
+      The PSM scores come from Sage.
 data:
   source: OpenMS example data (BSA1, BSA2, BSA3) and the protein database of the OpenMS TOPPAS identification example
   url: https://github.com/OpenMS/OpenMS/tree/develop/share/OpenMS/examples

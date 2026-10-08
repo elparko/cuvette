@@ -1,0 +1,2 @@
+good_sequence_short.txt total_sequences 250000 sequence_length [40] gc_percent 45.81
+bad_sequence.txt total_sequences 395288 sequence_length [40] gc_percent 47.29

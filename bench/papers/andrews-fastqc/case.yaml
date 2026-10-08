@@ -41,18 +41,25 @@ items:
   good_total_sequences:
     source: tutorial
     where: Example report for the good file, Basic Statistics table. It gives 250000 sequences.
+    check: >-
+      A plain Python count of the FASTQ records in the benchmark copy of the file gives 250000. Script
+      check_basic_stats.py, output check_basic_stats.out.
   bad_total_sequences:
     source: tutorial
     where: Example report for the bad file, Basic Statistics table. It gives 395288 sequences.
+    check: The plain Python count in check_basic_stats.py gives 395288.
   sequence_length:
     source: tutorial
     where: Basic Statistics table of both example reports. Both give a length of 40.
+    check: The plain Python count in check_basic_stats.py finds only reads of 40 bases in both files.
   good_gc_percent:
     source: tutorial
     where: Example report for the good file, Basic Statistics table. It gives a GC content of 45%.
+    check: The plain Python count in check_basic_stats.py gives 45.81 percent GC. FastQC prints the whole number 45.
   bad_gc_percent:
     source: tutorial
     where: Example report for the bad file, Basic Statistics table. It gives a GC content of 47%.
+    check: The plain Python count in check_basic_stats.py gives 47.29 percent GC.
   good_modules_not_pass:
     source: tutorial
     where: Summary of the example report for the good file. All 11 modules give PASS.

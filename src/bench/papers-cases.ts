@@ -22,7 +22,7 @@ const MAX_OUTPUT = 3000;
 const SHORT_THINKING = 300;
 
 const CaseAnswer = z.object({ decision: z.string(), value: z.unknown(), source: z.string() });
-const CaseItem = z.object({ source: z.enum(["published", "tutorial", "computed"]), tool: z.string().optional(), where: z.string().default("") }).refine((i) => i.source !== "computed" || !!i.tool, { message: "a computed item needs a tool" });
+const CaseItem = z.object({ source: z.enum(["published", "tutorial", "computed"]), tool: z.string().optional(), where: z.string().default(""), independence: z.enum(["independent", "same path", "unknown"]).optional(), check: z.string().optional() }).refine((i) => i.source !== "computed" || !!i.tool, { message: "a computed item needs a tool" });
 
 export const CaseSpec = z.object({
   kind: z.enum(["research paper", "tool tutorial or test suite"]),

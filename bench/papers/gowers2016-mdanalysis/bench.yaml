@@ -40,10 +40,12 @@ items:
     description: Residues in chain A of 4AKE
     value: 214
     exact: true
+    tool: inspect_structure
   - key: residues_chain_b
     description: Residues in chain B of 4AKE
     value: 214
     exact: true
+    tool: inspect_structure
   - key: ca_rmsd_open_closed
     description: CA RMSD after fit of 4AKE chain A on 1AKE chain A, in angstrom
     value: 7.131

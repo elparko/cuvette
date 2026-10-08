@@ -1,0 +1,9 @@
+R version 4.6.1 (2026-06-24) lme4 2.0.6 
+days_slope 10.4673
+intercept 251.4051
+se_days_random_slope 1.5458
+se_days_random_intercept_trap 0.8042
+se_days_ols_trap 1.2382
+intercept_variance 612.100
+slope_variance 35.072
+residual_variance 654.940

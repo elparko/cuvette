@@ -1,0 +1,6 @@
+cells_at_load 2700 genes_at_load 32738
+genes_after_min_cells 13714
+cells_after_qc 2638
+highly_variable_genes 1838
+leiden_clusters seed 0: 7
+leiden_clusters over seeds 0 to 9: {6: 3, 7: 7}

@@ -1,0 +1,6 @@
+R version 4.6.1 (2026-06-24) nlme 3.1.169 
+logLik full -875.9697, reduced -887.7380
+lrt_chi2_days 23.5366
+   Model df      AIC      BIC    logLik   Test  L.Ratio p-value
+m0     1  5 1785.476 1801.441 -887.7380                        
+m1     2  6 1763.939 1783.097 -875.9697 1 vs 2 23.53658  <.0001
