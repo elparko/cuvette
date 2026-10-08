@@ -232,6 +232,8 @@ export interface AdapterModule {
   hooks?: Hook[];
   tools?: Tool[];
   manualRoute?: (tool: string, args: Record<string, unknown>) => string | undefined;
+  openPanel?: (url: string, opts: { sessionDir: string }) => Promise<{ close(): void } | void>;
+  historySteps?: (output: import("../core/types.ts").ToolOutput) => { tool: string; args: Record<string, unknown>; line: string }[];
 }
 
 export interface LoadedAdapter {
