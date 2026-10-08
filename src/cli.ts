@@ -28,6 +28,7 @@ Usage
   ga questions                         open questions in every session
   ga bench [scenario|all] --model <model> [--guidance on|off|both]
   ga bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run]
+  ga bench site --results a.json[,b.json] --out <folder>
   ga mcp                               run the harness as an MCP server on stdio
 
 Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
@@ -59,6 +60,7 @@ const { values: o, positionals: pos } = parseArgs({
     papers: { type: "string" },
     models: { type: "string" },
     runs: { type: "string" },
+    results: { type: "string" },
     out: { type: "string" },
     "dry-run": { type: "boolean" },
     "run-tests": { type: "boolean" },
@@ -286,6 +288,15 @@ async function main() {
         const r = await runPapers({ papers: !papers || papers === "all" ? "all" : papers.split(","), models, runs: str(o.runs) ? Number(str(o.runs)) : 1, out: str(o.out), dryRun: !!o["dry-run"] });
         if (r.problems.length) process.exitCode = 1;
         if (r.paths) console.log(`${r.paths.md}\n${r.paths.json}`);
+        return;
+      }
+      if (a1 === "site") {
+        const results = (str(o.results) ?? "").split(",").filter(Boolean);
+        const out = str(o.out);
+        if (!results.length || !out) return fail("usage: ga bench site --results a.json[,b.json] --out <folder>");
+        const { buildSite } = await import("./bench/papers-site.ts");
+        const info = buildSite({ results, out, log: (l) => console.error(l) });
+        console.log(`${info.index}\n${info.images.length} images, ${info.papers} papers, ${info.runs} runs`);
         return;
       }
       const { runBench } = await import("./bench/run.ts");
