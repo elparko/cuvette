@@ -356,3 +356,30 @@ ga questions
 ga bench [scenario|all] --model ... [--guidance on|off|both]
 ga mcp
 ```
+
+## Changes made during the build (2026-10-08)
+
+- **Permission order.** Rules are checked deny, then ask, then allow; the first match decides
+  (Claude Code's order). A hook decision `defer` means `block`.
+- **Hook order.** The decision hook runs before the mode hook, so Follow mode shows filled
+  values. Plan and teach mode deny a non-read-only tool before any hook runs.
+- **After an answer.** A call that was blocked runs again with the linked arguments set from the
+  decision record, not with the value that the model proposed.
+- **Small models.** Up to 16 adapter tools are visible, chosen by relevance to the request, when
+  an adapter has more than 24 tools. Skills are listed as procedures, not tools. Null optional
+  arguments are removed. A bare handle string such as `"h1"` is read as `{"handle": "h1"}`. An
+  empty reply gets up to two retries; when the model produced tokens, the retry says that the
+  call named a tool that does not exist (Ollama drops such calls without an error).
+- **Paths.** Relative path arguments that exist under the session's working directory become
+  absolute before the hooks run, so the record holds absolute paths.
+- **Review.** New domain-free checks: `decision_misreported` (the answer names a choice that is
+  not the recorded value), `number_from_comparison` (a number from a sensitivity run of another
+  option), and `unsourced_numbers` is now an error. Error findings send the answer back to the
+  agent once before the scientist sees it.
+- **Trail.** The runs of a sensitivity check are one line ("Compared 3 options for ...").
+- **Provider options.** `makeProvider(spec, {effort, numCtx, think, apiKey, client})`.
+- **Session additions.** `pipeline(tool, args, callId, signal)` is public (the MCP server mode
+  uses it); `respondPermission(rid, ok, note, always)`; `followDone(step, note, agentDoes)`;
+  `expireQuestions()` runs every 30 s; the `task` tool runs a read-only helper agent.
+- **Answers.** `src/core/answers.ts` `fitAnswer(question, wanted)` turns an answer that is not
+  one of the options into a valid one (headless mode and the benchmark).
