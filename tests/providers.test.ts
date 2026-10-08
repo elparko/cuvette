@@ -288,6 +288,28 @@ describe("ollama", () => {
     expect(r.usage).toEqual({ inputTokens: 11, outputTokens: 7 });
   });
 
+  test("a reply that repeats the same text is stopped and cut before the repeat", async () => {
+    const para = "The standard error of the estimate is 1.55 milliseconds, which is small. The confidence interval gives a range of plausible values for the true change per day. The mixed model accounts for individual differences in how people react to sleep loss, which matters for the reading of the results. ";
+    const chunks = ["The slope is 10.47 ms per day (se 1.546).\n\n", ...Array.from({ length: 40 }, () => para + "\n\n")];
+    const seen = stubOllama(() => ndjson([...chunks.map((c) => ({ message: { content: c } })), { done: true, done_reason: "length", eval_count: 8192 }]));
+    const p = await makeProvider("ollama:qwen3:8b");
+    const r = await p.step(req([user("fit")]));
+    const text = (r.message.parts.find((x) => x.type === "text") as { text: string }).text;
+    expect(text.startsWith("The slope is 10.47 ms per day (se 1.546).")).toBe(true);
+    expect(text.split("The standard error").length - 1).toBeLessThanOrEqual(2);
+    expect(r.note).toMatch(/repeated the same text/);
+    expect(seen.filter((x) => x.url.endsWith("/api/chat"))).toHaveLength(1);
+  });
+
+  test("a long reply without a repeat is kept whole", async () => {
+    const chunks = Array.from({ length: 60 }, (_, i) => `Line ${i}: the value of item ${i} is ${i * 7.31} units, from step n${i}. `);
+    stubOllama(() => ndjson([...chunks.map((c) => ({ message: { content: c } })), { done: true }]));
+    const p = await makeProvider("ollama:qwen3:8b");
+    const r = await p.step(req([user("x")]));
+    expect((r.message.parts[0] as { text: string }).text).toBe(chunks.join("").trim());
+    expect(r.note).toBeUndefined();
+  });
+
   test("a model without native tools gets prompted tool calls", async () => {
     const seen = stubOllama(
       () =>

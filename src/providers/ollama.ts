@@ -7,6 +7,23 @@ const TIMEOUT_MS = 600_000;
 const DEFAULT_NUM_CTX = 32768;
 const MAX_OUTPUT_TOKENS = 8192;
 
+export function repeatStart(text: string, chunk = 300): number | null {
+  if (text.length < chunk * 4) return null;
+  const tail = text.slice(-chunk);
+  const first = text.indexOf(tail);
+  const second = text.indexOf(tail, first + 1);
+  if (second < 0 || second >= text.length - chunk) return null;
+  return second;
+}
+
+export function cutRepeat(text: string): string {
+  const at = repeatStart(text);
+  if (at === null) return text;
+  const kept = text.slice(0, at);
+  const para = kept.lastIndexOf("\n\n");
+  return (para > kept.length / 2 ? kept.slice(0, para) : kept).trim();
+}
+
 export interface OllamaOpts {
   numCtx?: number;
   think?: boolean;
@@ -196,6 +213,8 @@ export class OllamaProvider implements Provider {
     let inTok = 0;
     let outTok = 0;
     let doneReason = "";
+    let checkAt = 3000;
+    let looped = false;
     const textOut: string[] = [];
     const thinkOut: string[] = [];
     const splitter = new ThinkSplitter((kind, s) => {
@@ -219,6 +238,10 @@ export class OllamaProvider implements Provider {
       if (m?.content) {
         content += m.content;
         splitter.push(m.content);
+        if (content.length >= checkAt) {
+          checkAt = content.length + 1000;
+          if (repeatStart(content) !== null) looped = true;
+        }
       }
       for (const c of m?.tool_calls ?? []) {
         let args = c.function?.arguments ?? {};
@@ -250,8 +273,12 @@ export class OllamaProvider implements Provider {
           handle(buf.slice(0, nl));
           buf = buf.slice(nl + 1);
         }
+        if (looped) {
+          await reader.cancel().catch(() => {});
+          break;
+        }
       }
-      handle(buf + dec.decode());
+      if (!looped) handle(buf + dec.decode());
     } catch (e) {
       if (e instanceof ProviderError) throw e;
       throw this.networkError(e, ollamaHost(), signal);
@@ -259,6 +286,7 @@ export class OllamaProvider implements Provider {
     splitter.end();
 
     let text = textOut.join("").trim();
+    if (looped) text = cutRepeat(text);
     const thinking = [thinkField.trim(), thinkOut.join("").trim()].filter(Boolean).join("\n\n");
     let n = lastCallNumber(req.messages);
     const parts: Part[] = [];
@@ -281,6 +309,7 @@ export class OllamaProvider implements Provider {
       usage: { inputTokens: inTok, outputTokens: outTok },
       stopReason: calls.length ? "tool_use" : doneReason === "length" ? "max_tokens" : "end",
     };
+    if (looped) note = [note, "stopped a reply that repeated the same text; kept the text before the repeat"].filter(Boolean).join("; ");
     if (note) result.note = note;
     return result;
   }
