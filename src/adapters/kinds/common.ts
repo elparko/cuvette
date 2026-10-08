@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { blindArgv } from "../blind.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -618,7 +619,8 @@ export async function killWithChildren(pid: number | undefined): Promise<void> {
   }
 }
 
-export function runProcess(argv: string[], o: RunOpts = {}): Promise<RunResult> {
+export function runProcess(given: string[], o: RunOpts = {}): Promise<RunResult> {
+  const argv = blindArgv(given);
   return new Promise((done) => {
     const max = o.maxBytes ?? 16_000_000;
     let stdout = "";

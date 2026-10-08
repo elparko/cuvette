@@ -1,6 +1,8 @@
+import { randomBytes } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setBlindPolicy } from "../adapters/blind.ts";
 import { adapterDirs, gaHome } from "../adapters/manifest.ts";
 import { applyHeadlessSetup, attachHeadless } from "../core/headless.ts";
 import type { Provider } from "../core/types.ts";
@@ -8,6 +10,7 @@ import { finalAnswer, processMetrics, rescoreItems, scoreItems, type ItemScore, 
 import { AnalysisRecord } from "../core/record.ts";
 import { fillPrompt, loadPaper, missingData, paperIds, PAPERS_DIR, readValues, type Paper } from "./papers-spec.ts";
 import { renderPapersReport, summarize } from "./papers-report.ts";
+import { adapterPaths, blindPolicyFor, leakCheck, type LeakCheck, type RunBlind } from "./papers-blind.ts";
 
 export type RunStatus = "answer" | "error" | "timeout" | "no_answer" | "skipped";
 
@@ -23,6 +26,8 @@ export interface PaperRun {
   answer?: string;
   items: ItemScore[];
   metrics?: ProcessMetrics;
+  blind?: RunBlind;
+  leaks?: LeakCheck;
 }
 
 export interface PapersOptions {
@@ -31,6 +36,7 @@ export interface PapersOptions {
   runs?: number;
   out?: string;
   dryRun?: boolean;
+  blind?: boolean;
   scratch?: string;
   papersDir?: string;
   resultsDir?: string;
@@ -42,6 +48,7 @@ export interface PapersResult {
   date: string;
   models: string[];
   runsPerCell: number;
+  blind?: boolean;
   runs: PaperRun[];
   paths?: { md: string; json: string };
   problems: string[];
@@ -82,12 +89,30 @@ const emptyRecord = {
   entries: () => [],
 };
 
-export async function runPaper(paper: Paper, model: string, run: number, opts: { scratch: string; providerFor?: PapersOptions["providerFor"] }): Promise<PaperRun> {
+function runId(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${randomBytes(2).toString("hex")}`;
+}
+
+type RunOpts = { scratch: string; blind?: boolean; papersDir?: string; resultsDir?: string; providerFor?: PapersOptions["providerFor"] };
+
+export async function runPaper(paper: Paper, model: string, run: number, opts: RunOpts): Promise<PaperRun> {
   const runDir = join(opts.scratch, slug(model), paper.id, `run${run}`);
   const home = join(runDir, "home");
   mkdirSync(home, { recursive: true });
-  const realCredentials = join(gaHome(), "credentials.json");
+  const realHome = gaHome();
+  const realCredentials = join(realHome, "credentials.json");
   if (existsSync(realCredentials)) copyFileSync(realCredentials, join(home, "credentials.json"));
+  const id = runId();
+  const cwd = join(home, "sessions", id, "work");
+  let blind: RunBlind | undefined;
+  if (opts.blind !== false) {
+    mkdirSync(cwd, { recursive: true });
+    const { roots, programs } = await adapterPaths(paper);
+    const policy = setBlindPolicy(blindPolicyFor({ paper, runDir, scratch: opts.scratch, home: realHome, adapterRoots: roots, programs, papersDir: opts.papersDir, resultsDir: opts.resultsDir }))!;
+    blind = { cwd, allow: policy.allow, deny: policy.deny, hide: policy.hide, sandbox: policy.sandbox };
+  }
   const oldHome = process.env.GA_HOME;
   process.env.GA_HOME = home;
   const started = Date.now();
@@ -97,7 +122,7 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: {
   let thrown: string | undefined;
   try {
     const { Session } = await import("../core/session.ts");
-    session = await Session.create({ adapters: paper.adapters, model, provider: opts.providerFor?.(model), settings: { headless: true } });
+    session = await Session.create({ adapters: paper.adapters, model, provider: opts.providerFor?.(model), settings: { headless: true }, ...(blind ? { id, cwd } : {}) });
     const answers = readValues(paper, "answers");
     const setup = readValues(paper, "setup");
     attachHeadless(session, { answers, allow: new Set(paper.allow === "all" ? ["all"] : paper.allow) });
@@ -132,10 +157,13 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: {
     answer: final ? String(final.data.text ?? "") : undefined,
     items: record ? rescoreItems(paper.items, record) : scoreItems(paper.items, emptyRecord),
     metrics: record ? processMetrics(record) : undefined,
+    blind,
+    leaks: record && blind ? leakCheck(record, blind) : undefined,
   };
   try {
     await session?.close();
   } catch {}
+  setBlindPolicy(undefined);
   if (oldHome === undefined) delete process.env.GA_HOME;
   else process.env.GA_HOME = oldHome;
   return result;
@@ -171,7 +199,7 @@ export async function runPapers(opts: PapersOptions): Promise<PapersResult> {
     papers.push(paper);
   }
   const runsPerCell = opts.runs ?? 1;
-  const result: PapersResult = { date, models: opts.models, runsPerCell, runs: [...skipped], problems };
+  const result: PapersResult = { date, models: opts.models, runsPerCell, blind: opts.blind !== false, runs: [...skipped], problems };
   if (opts.dryRun) {
     for (const p of papers) log(`ok ${p.id}: ${p.adapters.join(",")} ${p.items.length} items, timeout ${p.timeout_s}s`);
     for (const p of problems) log(`problem: ${p}`);
@@ -193,10 +221,11 @@ export async function runPapers(opts: PapersOptions): Promise<PapersResult> {
     for (const paper of papers)
       for (let n = 1; n <= runsPerCell; n++) {
         log(`run ${model} ${paper.id} #${n}`);
-        const r = await runPaper(paper, model, n, { scratch, providerFor: opts.providerFor });
+        const r = await runPaper(paper, model, n, { scratch, blind: opts.blind, papersDir: dir, resultsDir, providerFor: opts.providerFor });
         const c = r.items.filter((i) => i.computed.pass).length;
         const rp = r.items.filter((i) => i.reported.pass).length;
-        log(`  ${r.status} ${r.durationS.toFixed(0)}s computed ${c}/${r.items.length} reported ${rp}/${r.items.filter((i) => i.inAnswer).length}${r.error ? ` (${r.error.slice(0, 120)})` : ""}`);
+        const leak = r.leaks ? ` blind: ${r.leaks.outside.length} outside, ${r.leaks.blocked} blocked, ${r.leaks.unsourced} unsourced` : "";
+        log(`  ${r.status} ${r.durationS.toFixed(0)}s computed ${c}/${r.items.length} reported ${rp}/${r.items.filter((i) => i.inAnswer).length}${leak}${r.error ? ` (${r.error.slice(0, 120)})` : ""}`);
         result.runs.push(r);
         save();
       }
@@ -210,7 +239,9 @@ export function rescoreResults(path: string): { runs: number; rescored: number }
   for (const r of result.runs) {
     if (!r.dir || !existsSync(join(r.dir, "log.jsonl"))) continue;
     const paper = loadPaper(r.paper);
-    r.items = rescoreItems(paper.items, new AnalysisRecord(r.dir, r.session ?? "rescore"));
+    const record = new AnalysisRecord(r.dir, r.session ?? "rescore");
+    r.items = rescoreItems(paper.items, record);
+    if (r.blind) r.leaks = leakCheck(record, r.blind);
     rescored++;
   }
   writeFileSync(path, JSON.stringify({ ...result, summary: summarize(result) }, null, 1));

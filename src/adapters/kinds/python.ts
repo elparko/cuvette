@@ -7,6 +7,7 @@ import type { Args, OutputFile, ToolContext, ToolOutput } from "../../core/types
 import type { AdapterRuntime } from "../runtime.ts";
 import { expand, childEnv, collectOutputs, defTool, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, samePath, tail, type CallDir, type KindContext } from "./common.ts";
 import type { ToolDef } from "../manifest.ts";
+import { blindArgv } from "../blind.ts";
 
 const WORKER = join(dirname(fileURLToPath(import.meta.url)), "python_worker.py");
 
@@ -66,7 +67,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   const spawnWorker = (): Promise<void> => {
     log ??= createWriteStream(logPath, { flags: "a" });
     stderrTail = "";
-    const argv = [...interpreter(), "-u", WORKER, c.adapter.root];
+    const argv = blindArgv([...interpreter(), "-u", WORKER, c.adapter.root]);
     const p = spawn(argv[0], argv.slice(1), {
       cwd: c.dirs.workDir,
       env: childEnv(c, { PYTHONIOENCODING: "utf-8", MPLBACKEND: "Agg" }),

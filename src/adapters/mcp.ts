@@ -7,6 +7,7 @@ import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/ty
 import type { LoadedAdapter } from "./manifest.ts";
 import { cap, decorate, expand, inflight, makeRuntime, killWithChildren, makeSummary, outputFile, readFields, safeName, tail, uniqueFile, type KindContext } from "./kinds/common.ts";
 import type { AdapterRuntime } from "./runtime.ts";
+import { blindArgv } from "./blind.ts";
 
 interface McpContent {
   type: string;
@@ -93,7 +94,7 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
       const headers = Object.fromEntries(Object.entries(conn.headers).map(([k, v]) => [k, expand(v, c.ph)]));
       t = new StreamableHTTPClientTransport(new URL(expand(conn.url, c.ph)), { requestInit: { headers } });
     } else {
-      const argv = conn.command.map((a) => expand(a, c.ph));
+      const argv = blindArgv(conn.command.map((a) => expand(a, c.ph)));
       if (!argv.length) throw new Error("connection.command is empty");
       const env: Record<string, string> = {};
       for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;

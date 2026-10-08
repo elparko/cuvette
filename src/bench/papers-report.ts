@@ -2,6 +2,7 @@ import { costUsd } from "../core/spend.ts";
 import { DEFAULT_CLAUDE_MODEL } from "../providers/claude.ts";
 import type { ItemScore, ProcessMetrics } from "./papers-score.ts";
 import type { PapersResult, PaperRun } from "./papers.ts";
+import { BLIND_NOTE } from "./papers-blind.ts";
 
 export interface Cell {
   computed: number;
@@ -125,6 +126,23 @@ export function renderPapersReport(result: PapersResult): string {
       L.push(`- ${m}: $${usd.toFixed(2)} for ${x.runs ?? 0} runs`);
     }
   }
+  const checked = result.runs.filter((r) => r.leaks);
+  L.push("", "## Leak check", "");
+  if (!checked.length) L.push(result.blind === false ? "Blind mode was off for this benchmark. The agent could read the expected values." : "No run has a leak check.");
+  else {
+    L.push(BLIND_NOTE, "");
+    L.push("Paths read: the paths in the tool calls and steps of the agent. Outside: paths not on the allow list. Blocked: reads that blind mode stopped. Unsourced and literature: claims in the final answer that no logged step holds. A number from memory shows up there.", "");
+    L.push("| Paper | Model | Run | Sandbox | Paths read | Outside | Blocked | Unsourced | Literature |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+    for (const r of checked) {
+      const k = r.leaks!;
+      L.push(`| ${r.paper} | ${r.model} | ${r.run} | ${r.blind?.sandbox ?? "-"} | ${k.read.length} | ${k.outside.length} | ${k.blocked} | ${k.unsourced} | ${k.literature} |`);
+    }
+    const flagged = checked.filter((r) => r.leaks!.outside.length);
+    if (flagged.length) {
+      L.push("", "Paths outside the allow list:");
+      for (const r of flagged) L.push(`- ${r.paper} | ${r.model} | run ${r.run}: ${r.leaks!.outside.join(", ")}`);
+    }
+  }
   L.push("", "## Details", "");
   for (const r of result.runs) {
     if (r.status === "skipped") continue;
@@ -132,6 +150,7 @@ export function renderPapersReport(result: PapersResult): string {
     L.push(`### ${r.paper} | ${r.model} | run ${r.run}`, "");
     L.push(`Status: ${r.status}${r.error ? ` (${r.error.slice(0, 200)})` : ""}. ${fixed(r.durationS, 0)} s.${mt ? ` ${mt.requests} requests, ${mt.toolCalls} tool calls (${mt.failedToolCalls} failed), ${mt.nudges} nudges, ${mt.planReminders} plan reminders, ${mt.unsourced} unsourced.` : ""}`);
     if (r.dir) L.push(`Session: ${r.session}. Record: ${r.dir}/log.jsonl`);
+    if (r.leaks) L.push(`Leak check: ${r.leaks.read.length} paths read, ${r.leaks.outside.length} outside the allow list, ${r.leaks.blocked} blocked, ${r.leaks.unsourced} unsourced claims, ${r.leaks.literature} literature claims. Cwd: ${r.blind?.cwd}.`);
     L.push("", "| Item | Expected | Computed | Reported |", "| --- | --- | --- | --- |", ...itemRows(r.items), "");
   }
   return L.join("\n") + "\n";

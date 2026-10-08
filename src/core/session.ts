@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import { BLIND_REASON, blindCheck } from "../adapters/blind.ts";
 import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { makeProvider } from "../providers/index.ts";
@@ -610,6 +611,11 @@ export class Session {
       this.record.append("tool_result", { callId, tool: tool.name, adapter: tool.adapter, ok: false, error: message, text: message });
       return { text: `ERROR: ${message}`, isError: true };
     };
+    const blind = blindCheck(tool, args);
+    if (blind) {
+      this.record.append("blocked", { callId, tool: tool.name, path: blind.path, reason: BLIND_REASON });
+      return error(blind.message);
+    }
     if (tool.source === "generic" && !this.pathAllowed(args)) return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
     if ((this.mode === "plan" || this.mode === "teach") && !tool.readOnly)
       return error(this.mode === "plan" ? "Plan mode: the agent plans and runs only read-only tools. Switch to watch mode to run steps." : "Teach mode: the scientist runs the steps and the agent runs only read-only tools.");

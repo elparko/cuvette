@@ -6,6 +6,7 @@ import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import { gaHome } from "../adapters/manifest.ts";
+import { agentRules, BLIND_REASON, blindPolicy, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { cap, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, type Dirs } from "../adapters/kinds/common.ts";
 
 export function scriptPython(): string {
@@ -121,10 +122,11 @@ function sbString(s: string): string {
 
 function wrap(argv: string[], workDir: string, network: boolean): string[] {
   if (sandbox !== "on") return argv;
+  const blind = blindPolicy();
   if (process.platform === "darwin") {
     const real = realpathSync(workDir);
     const subs = [real, workDir, "/private/var/folders", "/private/tmp", "/dev"].map((p) => `(subpath ${sbString(p)})`).join("");
-    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})`;
+    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${blind ? sandboxReadRules(agentRules(blind)) : ""}`;
     return ["/usr/bin/sandbox-exec", "-p", profile, ...argv];
   }
   if (process.platform === "linux" && !network) return ["unshare", "-rn", ...argv];
@@ -253,6 +255,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
         outputs.push({ path: p, kind, name: basename(p) });
         if (/\.(png|jpe?g)$/i.test(p)) images.push(p);
       }
+      for (const path of sandboxDenials(`${stdout}\n${stderr}`)) ctx.log("blocked", { callId: ctx.callId, tool: "run_script", path, reason: BLIND_REASON, by: "sandbox" });
       const text = cap(stdout, 50_000) + (stderr.trim() ? `\n[stderr]\n${cap(stderr, 50_000)}` : "");
       const base = { text, outputs, images: images.length ? images : undefined, fidelity: "code_only" as const, manualRoute: `Run the Python code in ${script}`, data: { script, duration_s: (Date.now() - started) / 1000 } };
       if (aborted) return { ok: false, error: "the script was cancelled", ...base };
