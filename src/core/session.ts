@@ -356,7 +356,7 @@ export class Session {
         }
         if (!calls.length && nudges < 2) {
           const tail = said.slice(-400);
-          const promise = /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I will|I'll) (now )?(use|call|run|compute|count|measure|perform|fit|check)\b/i.test(tail);
+          const promise = /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I will|I'll) (now )?(use|call|run|compute|count|measure|perform|fit|check)\b/i.test(tail) || /\b(I need to|I have to|I must|the next step is to|next, I need to)\s+(use|call|run|compute|count|measure|perform|fit|check|merge|filter|align|infer)\b/i.test(tail);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
           const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");

@@ -162,3 +162,16 @@ test("shared key and brief", () => {
   expect(text).toMatch(/Fixed by the lab: Method/);
   expect(text).toMatch(/deviation/);
 });
+
+test("an empty setup value means no fixed value: the model's value stays and no deviation is logged", async () => {
+  const { DecisionRecord } = await import("../src/core/decisions.ts");
+  const adapter: any = { name: "a", manifest: { decisions: [{ key: "region", label: "Region", kind: "text", owner: "human", stage: "setup", links: [{ tool: "stats", arg: "region" }], choices: [], help: "", group: "Method", essential: false, changes_conclusion: true }] }, linksFor: () => ({ region: "region" }) };
+  const appended: any[] = [];
+  const record: any = { append: (kind: string, data: any) => appended.push({ kind, data }), markStale: () => [], entries: () => [] };
+  const dr = new DecisionRecord([adapter], record);
+  dr.applySetup({ region: "" });
+  const e = dr.enforce("a", "stats", { region: "chr20:1-100" });
+  expect(e.args.region).toBe("chr20:1-100");
+  expect(e.deviations).toEqual([]);
+  expect(dr.enforce("a", "stats", {}).args).toEqual({});
+});

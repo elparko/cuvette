@@ -313,6 +313,10 @@ export class DecisionRecord {
       if (!s) continue;
       const given = getPath(out, arg);
       const missing = given === undefined || given === null || given === "";
+      if (s.set && (s.value === null || s.value === "")) {
+        if (!missing) applied[key] = given;
+        continue;
+      }
 
       if (missing) {
         if (s.set) setPath(out, arg, s.value);
