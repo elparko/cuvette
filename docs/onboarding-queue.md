@@ -37,8 +37,8 @@ Order: easiest and most useful first. "Verified" means the tool ran one command 
 | 13 | CellProfiler 4.2.8 | cli | Installed and verified (Rosetta) | `/Volumes/T7/guided-analysis/tools/cellprofiler/CellProfiler.app` | `caicedo2019-bbbc039`, `ljosa2012-bbbc005` | Build a `.cppipe` for BBBC005 and run it headless. |
 | 14 | MZmine 4.10.90 | cli (batch) | Installed and verified | `/Volumes/T7/guided-analysis/tools/mzmine/mzmine.app` | none yet (reuse `rost2016-openms` mzML files) | Export a batch XML from the GUI. Run it with `-b`. |
 | 15 | Open Babel 3.2.1 | cli | Installed and verified | `/opt/homebrew/bin/obabel` | none yet (reuse `delaney2004-esol` SMILES) | Write convert and descriptor tools. |
-| 16 | Cardinal (R) | script | Data only. Blocked: R is not installed. | none | `bemis2015-cardinal` | Install R (`brew install r`, 4.6.1) and `BiocManager::install("Cardinal")`. |
-| 17 | DESeq2 (R) | script | Data only. Blocked: R is not installed. | none | `love2014-deseq2-airway` | Install R. The python route is pydeseq2. |
+| 16 | Cardinal 3.14.0 (R 4.6.1) | script | Installed and verified. Adapter `catalog/cardinal`. | `/Volumes/T7/guided-analysis/tools/R-library` | `bemis2015-cardinal` | Compare the ion list with the vignette peaks. Add a test on the full pig206 data. |
+| 17 | DESeq2 1.52.0 (R 4.6.1) | script | Installed and verified. Adapter `catalog/deseq2`. | `/Volumes/T7/guided-analysis/tools/R-library` | `love2014-deseq2-airway` | Find why R DESeq2 gives 4905 genes and the workflow gives 4381. |
 | 18 | OpenMS TOPP tools | cli | Data only. Blocked: no Homebrew formula. | none | `rost2016-openms` | Download the macOS arm64 installer from the OpenMS releases page. |
 | 19 | PSPP | screen and files | Data only. Blocked: no macOS binary. | none | `student1908-sleep` | Use jamovi (open source, macOS arm64) as the screen-control test. |
 | 20 | SMILE MSI | mcp | Exists in the catalog | not in this queue | the synthetic demo slide | none |

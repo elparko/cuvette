@@ -1,0 +1,455 @@
+adapter:
+  name: cardinal
+  title: Cardinal (mass spectrometry imaging)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Reads a mass spectrometry imaging run in R, picks peaks, splits the image into segments with
+    spatial shrunken centroids, and lists the ions of each segment. The adapter runs R scripts
+    with Cardinal from Bioconductor.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: Cardinal
+  version: "3.14.0"
+  tested_versions: []
+  homepage: https://cardinalmsi.org
+  docs:
+    - https://bioconductor.org/packages/release/bioc/html/Cardinal.html
+    - https://bioconductor.org/packages/release/data/experiment/vignettes/CardinalWorkflows/inst/doc/MSI-segmentation.html
+    - https://doi.org/10.1093/bioinformatics/btv146
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first
+  folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  ~/.guided-analysis/R-library. It sets R_LIBS_USER to that folder. The program version in
+  this adapter is the version of the R package Cardinal, not of R.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return counts, peak lists and tables. They do not return spectra.
+
+decisions:
+  - key: question
+    label: What question do you ask with this image?
+    kind: text
+    group: Question
+    help: Example - Which regions of the section have different chemistry, and which ions mark them?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - none (one section, descriptive only)
+      - sections of one animal
+      - biological replicates (animals or patients)
+    default: none (one section, descriptive only)
+    group: Design
+    help: >
+      Pixels in one section are not independent samples. A segment map of one section describes
+      that section. It does not support a test across animals.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: normalize
+    label: Normalization
+    kind: choice
+    choices: [tic, rms, none]
+    default: tic
+    group: Pre-processing
+    help: >
+      tic divides each spectrum by its total ion current. rms divides by the root mean square.
+      The choice changes which ions look different between regions. The package workflow uses tic.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: process_peaks, arg: normalize }
+
+  - key: snr
+    label: Signal-to-noise ratio for peak picking
+    kind: float
+    default: 3
+    lo: 1
+    hi: 50
+    group: Pre-processing
+    help: A higher value keeps fewer peaks. The package workflow uses 3.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: process_peaks, arg: snr }
+    sensitivity:
+      options: [3, 5, 10]
+      tool: process_peaks
+      compare: [metrics.n_peaks]
+      max_runs: 3
+
+  - key: tolerance
+    label: Peak alignment tolerance (m/z)
+    kind: float
+    default: 0.5
+    lo: 0.001
+    hi: 5
+    group: Pre-processing
+    help: Peaks closer than this distance are one peak. The package workflow uses 0.5 m/z.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: process_peaks, arg: tolerance }
+
+  - key: sample_size
+    label: Fraction of spectra used to find peaks
+    kind: float
+    default: 0.1
+    lo: 0.01
+    hi: 1
+    group: Pre-processing
+    help: Cardinal picks peaks in a random sample of the spectra. A larger fraction takes more time.
+    owner: agent
+    stage: when_needed
+    links:
+      - { tool: process_peaks, arg: sample_size }
+
+  - key: seed
+    label: Random seed
+    kind: int
+    default: 1
+    lo: 0
+    hi: 1000000
+    group: Reproducibility
+    help: The seed changes the random sample of spectra and the numbering of the segments. Record it.
+    owner: agent
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: process_peaks, arg: seed }
+      - { tool: segment_image, arg: seed }
+
+  - key: r
+    label: Neighborhood radius for spatial smoothing (pixels)
+    kind: int
+    default: 2
+    lo: 0
+    hi: 10
+    group: Segmentation
+    help: >
+      Each pixel is compared with the pixels inside this radius. A larger radius gives smoother
+      and larger segments.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: segment_image, arg: r }
+
+  - key: k
+    label: Starting number of segments
+    kind: int
+    default: 8
+    lo: 2
+    hi: 30
+    group: Segmentation
+    help: >
+      The maximum number of segments before shrinkage. The final number can be smaller. Choose it
+      larger than the number of regions that you expect.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: segment_image, arg: k }
+
+  - key: weights
+    label: Spatial weights
+    kind: choice
+    choices: [adaptive, gaussian]
+    default: adaptive
+    group: Segmentation
+    help: Adaptive weights keep edges between regions. Gaussian weights smooth across edges.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: segment_image, arg: weights }
+
+  - key: sparsity
+    label: Sparsity (s) of the model to report
+    kind: float
+    default: 32
+    lo: 0
+    hi: 1000
+    group: Segmentation
+    help: >
+      A higher s keeps fewer ions for each segment and gives fewer segments. At a high s a small
+      real region can vanish. The package workflow fits s of 2 to 64 and reports s of 32. Look at
+      the segment maps of several models before you choose.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: top_features, arg: s }
+      - { tool: plot_segments, arg: s }
+    sensitivity:
+      options: [16, 32, 64]
+      tool: plot_segments
+      compare: [metrics.n_segments]
+      max_runs: 3
+
+  - key: region_labels
+    label: How do you name the segments?
+    kind: choice
+    choices:
+      - not named (numbers only)
+      - from the optical image or histology
+      - from known marker ions
+    default: not named (numbers only)
+    group: Interpretation
+    help: >
+      A segment number has no meaning by itself. Name a segment only with an outside source, such
+      as a stained section or a known marker ion.
+    owner: human
+    stage: setup
+
+checks:
+  - id: segments_named_without_source
+    description: The answer names an organ for a segment without an outside source.
+    severity: warning
+    text: >
+      Find each place where the answer names an organ or tissue for a segment. Report it if the
+      answer gives no optical image, histology or known marker ion as the reason.
+
+  - id: one_model_reported
+    description: The answer reports one sparsity and does not say that the number of segments depends on it.
+    severity: warning
+    text: >
+      Report the answer if it gives a number of segments and does not say that the number depends
+      on the sparsity (s) and on k.
+
+  - id: pixels_as_replicates
+    description: The answer uses pixels as independent samples.
+    severity: error
+    text: >
+      Report the answer if it gives a p value or a claim of significance that treats pixels or
+      spectra of one section as independent samples.
+
+  - id: counts_from_other_data
+    description: The answer uses numbers from the paper for a different dataset.
+    severity: warning
+    text: >
+      Report the answer if it says that this run has 11 segments, 298 peaks, or the peak counts of
+      the paper, and the data is one section. The paper numbers come from five sections.
+
+map:
+  - tool: load_image
+    route: "library(Cardinal); x <- readMSIData(\"run.imzML\")  # or load() for a Cardinal data file"
+    steps:
+      - "Install R and the Bioconductor package Cardinal."
+      - "Run library(Cardinal)."
+      - "Read the run with readMSIData() for imzML. For a .rda file, run load() and then as(obj, \"MSImagingExperiment\")."
+      - "Print the object. It shows the number of spectra and features."
+    fidelity: code_only
+    difference: Cardinal has no menu route. The route is the R call.
+    evidence:
+      source: docs
+      note: Cardinal vignette MSI-segmentation, section on data.
+
+  - tool: process_peaks
+    route: "x <- normalize(x, method=\"tic\"); pk <- peakProcess(x, SNR=3, sampleSize=0.1, tolerance=0.5, units=\"mz\")"
+    steps:
+      - "Run set.seed(seed) first. The peak finder uses a random sample of the spectra."
+      - "Run normalize(x, method = ...)."
+      - "Run peakProcess(x, SNR = ..., sampleSize = ..., tolerance = ..., units = \"mz\")."
+    params:
+      - { arg: normalize, label: "method of normalize()", ui_default: tic }
+      - { arg: snr, label: "SNR of peakProcess()", ui_default: 2 }
+      - { arg: sample_size, label: "sampleSize of peakProcess()", ui_default: 0.1 }
+      - { arg: tolerance, label: "tolerance of peakProcess()", ui_default: 0.5 }
+    fidelity: code_only
+    difference: Cardinal has no menu route. The tool runs the same R calls as the route.
+    evidence:
+      source: docs
+      note: Cardinal vignette MSI-segmentation. The vignette gives 687 peaks for the pig206 data.
+
+  - tool: segment_image
+    route: "set.seed(1); fit <- spatialShrunkenCentroids(pk, weights=\"adaptive\", r=2, k=8, s=2^(1:6))"
+    steps:
+      - "Run set.seed(seed) first. The start of the algorithm is random."
+      - "Run spatialShrunkenCentroids(pk, weights = ..., r = ..., k = ..., s = ...). Give s as a list to fit one model for each value."
+      - "Print the result. It lists the number of segments, the AIC and the BIC for each model."
+    params:
+      - { arg: r, label: "r of spatialShrunkenCentroids()", ui_default: 1 }
+      - { arg: k, label: "k of spatialShrunkenCentroids()", ui_default: 3 }
+      - { arg: weights, label: "weights of spatialShrunkenCentroids()", ui_default: gaussian }
+      - { arg: s, label: "s of spatialShrunkenCentroids()", ui_default: 0 }
+    fidelity: code_only
+    difference: Cardinal has no menu route. The tool runs the same R call as the route.
+    evidence:
+      source: docs
+      note: Cardinal vignette MSI-segmentation. The vignette gives 8, 8, 8, 8, 6, 3 segments for s of 2 to 64 on pig206.
+
+  - tool: top_features
+    route: "topFeatures(fit[[5]], n=5)"
+    steps:
+      - "Pick one model from the fit with fit[[i]]."
+      - "Run topFeatures(model, n = ...). It ranks ions by the t statistic of each segment."
+    fidelity: code_only
+    difference: Cardinal has no menu route.
+    evidence:
+      source: docs
+      note: Cardinal vignette MSI-segmentation.
+
+  - tool: plot_segments
+    route: "image(fit[[5]], type=\"class\")"
+    steps:
+      - "Pick one model from the fit with fit[[i]]."
+      - "Run image(model, type = \"class\")."
+    fidelity: code_only
+    difference: Cardinal has no menu route.
+    evidence:
+      source: docs
+      note: Cardinal vignette MSI-segmentation.
+
+tests:
+  - id: load_mini_section
+    description: >
+      The test file is a crop of pig206 (pixels with x up to 45 and y up to 30, m/z 500 to 700).
+      It has 441 spectra and 2401 m/z values. The numbers are from the file (stability test).
+    data: [data/pig206_mini.rds]
+    calls:
+      - tool: load_image
+        args: { path: "{adapter_dir}/data/pig206_mini.rds" }
+    expect:
+      - { path: metrics.n_spectra, equals: 441 }
+      - { path: metrics.n_features, equals: 2401 }
+      - { path: metrics.mz_min, approx: 500, abs: 0.01 }
+      - { path: metrics.n_runs, equals: 1 }
+
+  - id: peaks_and_segments_mini
+    description: >
+      Peak picking and segmentation on the crop with seed 1, TIC, SNR 3, tolerance 0.5, r 2,
+      k 4, s of 2, 8 and 16. The numbers are from Cardinal 3.14.0 on this file (stability test).
+      The model with s 2 has 4 segments. The models with s 8 and 16 have 3 segments.
+    data: [data/pig206_mini.rds]
+    calls:
+      - tool: load_image
+        args: { path: "{adapter_dir}/data/pig206_mini.rds" }
+        save_as: img
+      - tool: process_peaks
+        args: { image: "{saved.img.data.image_file}", normalize: tic, snr: 3, tolerance: 0.5, sample_size: 0.1, seed: 1 }
+        save_as: pk
+      - tool: segment_image
+        args: { peaks: "{saved.pk.data.peaks_file}", r: 2, k: 4, s: [2, 8, 16], weights: adaptive, seed: 1 }
+        save_as: fit
+      - tool: top_features
+        args: { model: "{saved.fit.data.model_file}", s: 8, n: 3 }
+    expect:
+      - { path: saved.pk.metrics.n_peaks, equals: 204 }
+      - { path: saved.fit.metrics.n_segments_s2, equals: 4 }
+      - { path: saved.fit.metrics.n_segments_s8, equals: 3 }
+      - { path: saved.fit.metrics.n_segments_s16, equals: 3 }
+      - { path: metrics.n_segments, equals: 3 }
+      - { path: "table.columns[1]", equals: mz }
+
+tools:
+  - name: load_image
+    title: Load an imaging run
+    description: >
+      Read a mass spectrometry imaging run from an .imzML file, an .rds file of a Cardinal object, or an
+      .rda file. Save it as an R object for the next tools. Returns the number of spectra, the
+      number of m/z values and the m/z range.
+    params:
+      path: { type: string, description: Path of the .imzML, .rds, .rda or .RData file. }
+      object: { type: string, description: "For an .rda file. Name of the object in the file. If absent, the first object." }
+    required: [path]
+    read_only: true
+    outputs:
+      image: { kind: file, ext: .rds, description: The image as an R object. }
+    script: scripts/load_image.R
+    parse: json
+
+  - name: process_peaks
+    title: Normalize and pick peaks
+    description: >
+      Normalize the spectra and pick peaks. Returns the number of peaks and an R object that has
+      one intensity for each peak and pixel. Give the file from load_image as image.
+    params:
+      image: { type: string, description: The image_file from load_image. }
+      normalize: { type: string, enum: [tic, rms, none], description: "Leave out. The harness sets it from the decision record. Normalization method." }
+      snr: { type: number, minimum: 1, maximum: 50, description: "Leave out. The harness sets it from the decision record. Signal-to-noise ratio for peak picking." }
+      tolerance: { type: number, minimum: 0.001, maximum: 5, description: "Leave out. The harness sets it from the decision record. Alignment tolerance in m/z." }
+      sample_size: { type: number, minimum: 0.01, maximum: 1, description: "Leave out. The harness sets it from the decision record. Fraction of spectra used to find peaks." }
+      units: { type: string, enum: [mz, ppm], default: mz, description: Unit of the tolerance. Leave out unless the scientist chose it. }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed." }
+    required: [image]
+    outputs:
+      peaks: { kind: file, ext: .rds, description: The peak-picked image as an R object. }
+    script: scripts/process_peaks.R
+    parse: json
+
+  - name: segment_image
+    title: Segment the image
+    description: >
+      Fit spatial shrunken centroids models. Fits one model for each value in s. Returns the number
+      of segments, the segment sizes, the AIC and the BIC of each model. Give the file from
+      process_peaks as peaks.
+    params:
+      peaks: { type: string, description: The peaks_file from process_peaks. }
+      r: { type: integer, minimum: 0, maximum: 10, description: "Leave out. The harness sets it from the decision record. Neighborhood radius in pixels." }
+      k: { type: integer, minimum: 2, maximum: 30, description: "Leave out. The harness sets it from the decision record. Starting number of segments." }
+      weights: { type: string, enum: [adaptive, gaussian], description: "Leave out. The harness sets it from the decision record. Spatial weights." }
+      s: { type: array, items: { type: number, minimum: 0 }, default: [2, 4, 8, 16, 32, 64], description: "Sparsity values. One model is fitted for each value. If absent, 2, 4, 8, 16, 32 and 64." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed." }
+    required: [peaks]
+    outputs:
+      model: { kind: file, ext: .rds, description: The fitted models as an R object. }
+      models: { kind: table, ext: .csv, description: One row for each model. }
+    script: scripts/segment_image.R
+    parse: json
+
+  - name: top_features
+    title: List the ions of each segment
+    description: >
+      Rank the ions of each segment of one model by the t statistic. Returns a table with the
+      segment, the m/z, the statistic and the mean intensity.
+    params:
+      model: { type: string, description: The model_file from segment_image. }
+      s: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Sparsity of the model to read." }
+      n: { type: integer, minimum: 1, maximum: 50, default: 5, description: Number of ions for each segment. }
+    required: [model]
+    read_only: true
+    outputs:
+      features: { kind: table, ext: .csv, description: The ranked ions. }
+    script: scripts/top_features.R
+    parse: json
+
+  - name: plot_segments
+    title: Draw the segment map
+    description: Draw the segments of one model on the image grid as a PNG file. Returns the segment sizes.
+    params:
+      model: { type: string, description: The model_file from segment_image. }
+      s: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Sparsity of the model to draw." }
+    required: [model]
+    read_only: true
+    outputs:
+      map: { kind: image, ext: .png, description: The segment map. }
+    script: scripts/plot_segments.R
+    parse: json

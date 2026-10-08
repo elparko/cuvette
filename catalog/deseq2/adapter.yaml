@@ -1,0 +1,384 @@
+adapter:
+  name: deseq2
+  title: DESeq2 (RNA-seq differential expression)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Tests for differential gene expression in an RNA-seq count table with DESeq2 in R. The adapter
+    reads a count table and a sample table, fits the model that the scientist chose, and returns
+    the genes that pass the false discovery rate cutoff.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: DESeq2
+  version: "1.52.0"
+  tested_versions: []
+  homepage: https://bioconductor.org/packages/DESeq2
+  docs:
+    - https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html
+    - https://bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html
+    - https://doi.org/10.1186/s13059-014-0550-8
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first
+  folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  ~/.guided-analysis/R-library. It sets R_LIBS_USER to that folder. The program version in
+  this adapter is the version of the R package DESeq2, not of R.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return counts, fold changes and p values of genes. They do not return the raw reads.
+
+decisions:
+  - key: question
+    label: What question do you ask with these samples?
+    kind: text
+    group: Question
+    help: Example - Which genes change when the cells get the drug?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - samples (one library for each sample)
+      - donors or animals (several libraries for each one)
+      - technical repeats only
+    default: donors or animals (several libraries for each one)
+    group: Design
+    help: >
+      The replicates are the biological units, such as donors or cell lines. Two libraries of one
+      donor are not two replicates. Put the donor in the design if each donor has several libraries.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: design
+    label: Design formula
+    kind: text
+    default: "~ cell + dex"
+    group: Design
+    help: >
+      The formula lists the terms of the model. Put the variable of interest last. Put a pairing
+      or batch variable first, such as the donor. If you leave out the donor term of a paired
+      design, the test loses power and the result changes.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_deseq, arg: design }
+
+  - key: variable
+    label: Variable of interest
+    kind: text
+    default: dex
+    group: Design
+    help: The column of the sample table that you test. It must be a term of the design.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_deseq, arg: variable }
+
+  - key: reference_level
+    label: Reference level
+    kind: text
+    default: untrt
+    group: Design
+    help: >
+      The level that the others are compared with, such as the control. A positive log2 fold
+      change means higher in the test level than in the reference level. Without this choice R
+      uses the first level in alphabetical order.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_deseq, arg: reference_level }
+
+  - key: test_level
+    label: Test level
+    kind: text
+    default: trt
+    group: Design
+    help: The level that you compare with the reference level, such as the treated group.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_deseq, arg: test_level }
+
+  - key: min_count
+    label: Minimum count for a gene to count as detected
+    kind: int
+    default: 10
+    lo: 0
+    hi: 1000
+    group: Filter
+    help: A gene is detected in a sample if its count is at least this number.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_deseq, arg: min_count }
+
+  - key: min_samples
+    label: Minimum number of samples with a detected gene
+    kind: int
+    default: 4
+    lo: 1
+    hi: 1000
+    group: Filter
+    help: >
+      The tool keeps a gene if it is detected in at least this many samples. Use the number of
+      samples in the smallest group. The filter changes the number of genes that are tested and
+      the adjusted p values.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_deseq, arg: min_samples }
+    sensitivity:
+      options: [3, 4, 5]
+      tool: run_deseq
+      compare: [metrics.n_genes_tested, metrics.n_significant]
+      max_runs: 3
+
+  - key: alpha
+    label: False discovery rate cutoff (padj)
+    kind: float
+    default: 0.1
+    lo: 0.0001
+    hi: 0.5
+    group: Test
+    help: A gene is significant if its adjusted p value is below this cutoff. DESeq2 uses 0.1 by default.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_deseq, arg: alpha }
+      - { tool: top_genes, arg: alpha }
+    sensitivity:
+      options: [0.05, 0.1]
+      tool: run_deseq
+      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
+      max_runs: 2
+
+  - key: lfc_threshold
+    label: Log2 fold change threshold
+    kind: float
+    default: 0
+    lo: 0
+    hi: 10
+    group: Test
+    help: >
+      With 0 the test asks if the change is not zero. With 1 the test asks if the change is more
+      than a doubling. A threshold above 0 gives fewer genes.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_deseq, arg: lfc_threshold }
+
+  - key: exclusions
+    label: Samples or genes that you exclude
+    kind: text
+    default: none
+    group: Design
+    help: Name each excluded sample and the reason. Write none if you exclude nothing.
+    owner: human
+    stage: setup
+
+checks:
+  - id: pairing_term_missing
+    description: The design has no term for the donor, but the samples come in pairs.
+    severity: warning
+    text: >
+      Report the answer if the scientist said that several samples come from one donor, animal or
+      cell line, and the design formula has no term for it.
+
+  - id: direction_not_stated
+    description: The answer gives up and down genes and does not say which level is the reference.
+    severity: warning
+    text: >
+      Report the answer if it says that genes are up or down and does not name the reference level
+      and the test level.
+
+  - id: fold_change_cutoff_assumed
+    description: The answer says that a gene changed by a set amount, but no fold change threshold was used.
+    severity: warning
+    text: >
+      Report the answer if it describes the genes as strongly changed or as more than a
+      set fold change, and the log2 fold change threshold is 0.
+
+  - id: counts_differ_from_source
+    description: The answer says that the numbers match a published workflow without a check.
+    severity: warning
+    text: >
+      Report the answer if it says that the gene counts match a published workflow, and it gives
+      no comparison of the numbers.
+
+map:
+  - tool: inspect_counts
+    route: "counts <- as.matrix(read.csv(\"counts.csv\", row.names=1)); coldata <- read.csv(\"coldata.csv\", row.names=1); dim(counts)"
+    steps:
+      - "Install R and the Bioconductor package DESeq2."
+      - "Read the count table and the sample table with read.csv()."
+      - "Run dim(counts) and head(coldata). The column names of the counts must be the row names of the sample table."
+    fidelity: code_only
+    difference: DESeq2 has no menu route. The route is the R call.
+    evidence:
+      source: docs
+      note: DESeq2 vignette, count matrix input.
+
+  - tool: run_deseq
+    route: "dds <- DESeqDataSetFromMatrix(counts, coldata, design=~ cell + dex); dds$dex <- relevel(dds$dex, ref=\"untrt\"); dds <- dds[rowSums(counts(dds) >= 10) >= 4, ]; dds <- DESeq(dds); res <- results(dds, contrast=c(\"dex\",\"trt\",\"untrt\"), alpha=0.1)"
+    steps:
+      - "Run DESeqDataSetFromMatrix(countData, colData, design). Convert the variable of interest to a factor."
+      - "Run relevel() to set the reference level."
+      - "Keep the genes with rowSums(counts(dds) >= min_count) >= min_samples."
+      - "Run DESeq(dds)."
+      - "Run results(dds, contrast = c(variable, test_level, reference_level), alpha = alpha)."
+      - "Run summary(res). It shows the number of up and down genes."
+    params:
+      - { arg: design, label: "design of DESeqDataSetFromMatrix()", ui_default: "~ 1" }
+      - { arg: alpha, label: "alpha of results()", ui_default: 0.1 }
+      - { arg: lfc_threshold, label: "lfcThreshold of results()", ui_default: 0 }
+    fidelity: close
+    difference: >
+      The tool calls the same functions as the route. It sorts the genes by padj, and it counts
+      the genes with padj below alpha. Without a lfcThreshold the tool runs results() with
+      altHypothesis greaterAbs and threshold 0, which gives the same p values as the default.
+    evidence:
+      source: docs
+      note: DESeq2 vignette and rnaseqGene workflow. The tool has not been compared with a run by a person.
+
+  - tool: top_genes
+    route: "head(res[order(res$padj), ], 20)"
+    steps:
+      - "Run res[order(res$padj), ]."
+      - "Keep the rows with padj below alpha. Use head() to show the first rows."
+    fidelity: code_only
+    difference: DESeq2 has no menu route.
+    evidence:
+      source: docs
+      note: DESeq2 vignette.
+
+tests:
+  - id: paired_design_subset
+    description: >
+      Airway data (8 samples, 4 donors, dexamethasone or none) with 3003 genes. The genes are a
+      random sample of the 63677 genes plus the 3 genes with the lowest padj. The numbers are
+      from DESeq2 1.52.0 on this file (stability test). The full data gives the numbers of
+      the expected file.
+    data: [data/airway_counts_subset.csv, data/airway_coldata.csv]
+    calls:
+      - tool: inspect_counts
+        args: { counts: "{adapter_dir}/data/airway_counts_subset.csv", coldata: "{adapter_dir}/data/airway_coldata.csv" }
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/airway_counts_subset.csv", coldata: "{adapter_dir}/data/airway_coldata.csv", design: "~ cell + dex", variable: dex, reference_level: untrt, test_level: trt, min_count: 10, min_samples: 4, alpha: 0.1 }
+        save_as: fit
+      - tool: top_genes
+        args: { results: "{saved.fit.data.results_file}", n: 3, alpha: 0.1 }
+    expect:
+      - { path: saved.fit.metrics.n_genes_tested, equals: 1453 }
+      - { path: saved.fit.metrics.n_significant, equals: 459 }
+      - { path: saved.fit.metrics.n_up, equals: 243 }
+      - { path: saved.fit.metrics.n_down, equals: 216 }
+      - { path: "table.rows[0][0]", equals: ENSG00000165995 }
+      - { path: "table.rows[0][2]", approx: 3.287, abs: 0.01 }
+
+  - id: design_without_donor
+    description: >
+      The same data with the design ~ dex. The donor term is missing, so the number of
+      significant genes falls from 459 to 318. This shows that the design changes the result.
+    data: [data/airway_counts_subset.csv, data/airway_coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/airway_counts_subset.csv", coldata: "{adapter_dir}/data/airway_coldata.csv", design: "~ dex", variable: dex, reference_level: untrt, test_level: trt, min_count: 10, min_samples: 4, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_significant, equals: 318 }
+      - { path: metrics.n_up, equals: 182 }
+
+  - id: reference_level_swap
+    description: >
+      The same data with trt as the reference level. The up and down counts swap. This shows that
+      the reference level sets the sign of the fold change.
+    data: [data/airway_counts_subset.csv, data/airway_coldata.csv]
+    calls:
+      - tool: run_deseq
+        args: { counts: "{adapter_dir}/data/airway_counts_subset.csv", coldata: "{adapter_dir}/data/airway_coldata.csv", design: "~ cell + dex", variable: dex, reference_level: trt, test_level: untrt, min_count: 10, min_samples: 4, alpha: 0.1 }
+    expect:
+      - { path: metrics.n_up, equals: 216 }
+      - { path: metrics.n_down, equals: 243 }
+      - { path: "table.rows[0][2]", approx: -3.287, abs: 0.01 }
+
+tools:
+  - name: inspect_counts
+    title: Inspect a count table
+    description: >
+      Read a count table and a sample table. Returns the number of genes and samples, the library
+      sizes, and the columns of the sample table with their levels.
+    params:
+      counts: { type: string, description: "Path of a CSV file. The first column is the gene id. The other columns are samples." }
+      coldata: { type: string, description: "Path of a CSV file. The first column is the sample name. It must match the column names of the counts." }
+    required: [counts, coldata]
+    read_only: true
+    script: scripts/inspect_counts.R
+    parse: json
+
+  - name: run_deseq
+    title: Test for differential expression
+    description: >
+      Filter the low-count genes, fit DESeq2 with the design, and test the test level against the
+      reference level of the variable. Returns the number of tested genes, the number of
+      significant genes (up and down), and a results file with one row for each gene.
+    params:
+      counts: { type: string, description: "Path of the count table (CSV, gene id in the first column)." }
+      coldata: { type: string, description: Path of the sample table (CSV, sample name in the first column). }
+      design: { type: string, description: "Leave out. The harness sets it from the decision record. Design formula, such as ~ cell + dex." }
+      variable: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the sample table to test." }
+      reference_level: { type: string, description: "Leave out. The harness sets it from the decision record. Reference level of the variable." }
+      test_level: { type: string, description: "Leave out. The harness sets it from the decision record. Level that is compared with the reference level." }
+      min_count: { type: integer, minimum: 0, maximum: 1000, description: "Leave out. The harness sets it from the decision record. Minimum count for a gene to count as detected." }
+      min_samples: { type: integer, minimum: 1, maximum: 1000, description: "Leave out. The harness sets it from the decision record. Minimum number of samples with a detected gene." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. False discovery rate cutoff." }
+      lfc_threshold: { type: number, minimum: 0, maximum: 10, description: "Leave out. The harness sets it from the decision record. Log2 fold change threshold for the test." }
+    required: [counts, coldata]
+    outputs:
+      results: { kind: table, ext: .csv, description: "One row for each tested gene, sorted by padj." }
+    script: scripts/run_deseq.R
+    parse: json
+
+  - name: top_genes
+    title: List the top genes
+    description: Read the results file and list the genes with the lowest adjusted p value. Returns a table with the fold change and the adjusted p value.
+    params:
+      results: { type: string, description: The results_file from run_deseq. }
+      n: { type: integer, minimum: 1, maximum: 500, default: 20, description: Number of genes. }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. Adjusted p value cutoff." }
+      direction: { type: string, enum: [both, up, down], default: both, description: Keep the genes that go up, down, or both. }
+    required: [results]
+    read_only: true
+    outputs:
+      top: { kind: table, ext: .csv, description: The top genes. }
+    script: scripts/top_genes.R
+    parse: json
