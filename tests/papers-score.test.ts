@@ -114,6 +114,17 @@ test("a rounded reported number equal to the rounded expected value passes", () 
   expect(s.reported).toMatchObject({ pass: true, via: "rounding" });
 });
 
+test("a small whole number does not count for an item that is not a whole number", () => {
+  node({ rmse: 1.1, allowed: 1 });
+  answer("One violation is allowed, 1 in all. The RMSE is 1.1.");
+  const [low] = scoreItems([item({ key: "rmse", value: 1.04, tolerance: 0.1 })], record);
+  expect(low.reported).toMatchObject({ pass: true, value: 1.1 });
+  node({ allowed: 1 });
+  answer("Only 1 violation is allowed.");
+  const [s] = scoreItems([item({ key: "rmse", value: 1.1, tolerance: 0.1 })], record);
+  expect(s.reported.pass).toBe(false);
+});
+
 test("a wrong rounded number fails", () => {
   node({ p: 0.0029 });
   answer("The two-sided p-value is 0.0029.");

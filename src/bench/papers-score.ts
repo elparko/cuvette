@@ -109,6 +109,7 @@ export function scoreReported(item: PaperItem, found: { entry: Entry; claims: Cl
   for (const c of found.claims) {
     if (c.label !== "measured" || c.value === null) continue;
     for (const r of reportedSteps(c)) {
+      if (Number.isInteger(r.value) && Math.abs(r.value) <= 10 && !Number.isInteger(item.value)) continue;
       const d = gap(item, r.value);
       let via: ReportedMatch["via"] = within(item, d) ? "tolerance" : null;
       if (!via && !item.exact && r.step > 0 && r.value !== 0 && r.step <= Math.abs(item.value) / 10) {
