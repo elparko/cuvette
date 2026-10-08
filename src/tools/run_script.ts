@@ -5,6 +5,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
+import { addOldEnv } from "../core/old-names.ts";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
@@ -198,7 +199,7 @@ function scriptEnv(dirs: Dirs, project: string): Record<string, string> {
   const folders = { PROJECT_DIR: project, WORK_DIR: dirs.workDir, SESSION_DIR: dirs.sessionDir, OUTPUT_DIR: dirs.outputDir ?? dirs.workDir };
   for (const [k, v] of Object.entries(folders)) env[k] = env[`CUVETTE_${k}`] = v;
   if (dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = dirs.figureFormats;
-  return { ...env, MPLBACKEND: "Agg", MPLCONFIGDIR: join(tmpdir(), "cuvette-mpl"), PYTHONIOENCODING: "utf-8" };
+  return addOldEnv({ ...env, MPLBACKEND: "Agg", MPLCONFIGDIR: join(tmpdir(), "cuvette-mpl"), PYTHONIOENCODING: "utf-8" });
 }
 
 export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {

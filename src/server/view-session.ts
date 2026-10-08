@@ -4,11 +4,13 @@ import { join } from "node:path";
 import { loadAdapter } from "../adapters/manifest.ts";
 import { Bus } from "../core/bus.ts";
 import { DecisionRecord } from "../core/decisions.ts";
+import { readOldEnv } from "../core/old-names.ts";
 import { AnalysisRecord } from "../core/record.ts";
 import { findPlace, inProject } from "../core/places.ts";
 import { QuestionQueue } from "../core/questions.ts";
 import { startWindow, type WindowSession } from "./window.ts";
 
+readOldEnv();
 const args = process.argv.slice(2);
 const id = args.find((a) => !a.startsWith("--"));
 if (!id) {

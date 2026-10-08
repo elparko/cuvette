@@ -4,7 +4,14 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { adapterDirs, cuvetteHome, loadAdapter } from "./adapters/manifest.ts";
 import { applyHeadlessSetup, attachHeadless } from "./core/headless.ts";
+import { moveOldHome, readOldEnv } from "./core/old-names.ts";
 import type { Mode } from "./core/types.ts";
+
+readOldEnv();
+if (!process.env.CUVETTE_HOME) {
+  const moved = moveOldHome();
+  if (moved) console.error(moved);
+}
 
 const HELP = `cuvette - a guided analysis agent for science programs
 

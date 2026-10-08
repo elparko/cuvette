@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { addOldEnv } from "../core/old-names.ts";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import type { LoadedAdapter } from "./manifest.ts";
 import { cap, decorate, expand, failSummary, inflight, makeRuntime, killWithChildren, makeSummary, outputFile, readFields, safeName, tail, uniqueFile, type KindContext } from "./kinds/common.ts";
@@ -100,6 +101,7 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
       for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
       for (const [k, v] of Object.entries(conn.env)) env[k] = expand(v, c.ph);
       Object.assign(env, { CUVETTE_WORK_DIR: c.dirs.workDir, CUVETTE_SESSION_DIR: c.dirs.sessionDir, CUVETTE_ADAPTER_DIR: c.adapter.root, CUVETTE_PROGRAM_PATH: c.programPath ?? "" });
+      addOldEnv(env);
       t = new StdioClientTransport({ command: argv[0], args: argv.slice(1), env, cwd: conn.cwd ? expand(conn.cwd, c.ph) : c.adapter.root, stderr: "pipe" });
       log ??= createWriteStream(logPath, { flags: "a" });
       t.stderr?.on("data", (d: Buffer) => {

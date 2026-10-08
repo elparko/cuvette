@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSyn
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { crc32, deflateSync } from "node:zlib";
+import { addOldEnv } from "../../core/old-names.ts";
 import type { Args, Fidelity, OutputFile, TablePreview, Tool, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { LoadedAdapter, MapEntry, ToolDef } from "../manifest.ts";
 import type { AdapterRuntime } from "../runtime.ts";
@@ -78,7 +79,7 @@ export function childEnv(c: KindContext, extra: Record<string, string> = {}): Re
   env.CUVETTE_PROGRAM_PATH = c.programPath ?? "";
   if (c.dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = c.dirs.figureFormats;
   if (c.dirs.outputDir) env.CUVETTE_OUTPUT_DIR = c.dirs.outputDir;
-  return { ...env, ...extra };
+  return addOldEnv({ ...env, ...extra });
 }
 
 export function expand(s: string, ph: Record<string, string>): string {
