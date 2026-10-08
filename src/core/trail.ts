@@ -172,6 +172,8 @@ function stepBuilt(record: AnalysisRecord, e: Entry, node: Node | undefined, ada
   return { icon: "step", line, stale: isStale, details, technical };
 }
 
+const HARNESS_TOOLS = new Set(["ask_scientist", "load_skill", "find_tools", "note", "plan", "task", "propose_lab_rule", "read_file", "list_dir"]);
+
 function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | undefined, stale: Set<string>, joined: Set<string>): Built | undefined {
   const d = e.data;
   const tech = (extra: Record<string, unknown> = {}) => ({ entry: e.id, kind: e.kind, ts: e.ts, ...extra });
@@ -189,6 +191,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       };
     }
     case "tool_result": {
+      if (!d.adapter && HARNESS_TOOLS.has(String(d.tool))) return undefined;
       if (d.sensitivityOf) {
         const node = nodeFor(record, e);
         if (node) joined.add(node.id);
