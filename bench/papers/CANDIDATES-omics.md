@@ -2,7 +2,7 @@
 
 Rules: peer-reviewed research paper from 2018 or later with a DOI. Public input data with an open license. The paper prints the target numbers. An independent check reproduces them. One run takes about 15 minutes or less on a Mac.
 
-Status: shortlist. The results of the builds are in the section "Outcome" at the end.
+Status: built and checked. The results are in the section "Outcome" at the end.
 
 ## Shortlist
 
@@ -49,8 +49,17 @@ Status: shortlist. The results of the builds are in the section "Outcome" at the
 - Odermatt 2018 Sci Rep, DOI 10.1038/s41598-018-32340-2, GEO GSE111193: 464 up and 679 down at FDR 1% and a fold change above 2.
 - Adapter: deseq2. Problem: the adapter has no fold change cutoff after the test and no baseMean filter. lfcThreshold is a different test.
 
-### 7. Phylogenetics (IQ-TREE): search in progress
-- Target: a small public alignment (Dryad, Zenodo, TreeBASE, CC0 or CC BY) with a printed log-likelihood or best-fit model.
+### 7. Kanetis 2022, IQ-TREE, Sporocadaceae from grapevine
+- Citation: Kanetis LI, Taliadoros D, Makris G, Christoforou M. A Novel Seimatosporium and Other Sporocadaceae Species Associated with Grapevine Trunk Diseases in Cyprus. Plants 11(20):2733 (2022).
+- DOI: 10.3390/plants11202733
+- Data: figshare 10.6084/m9.figshare.20530188 (CC BY 4.0), five FASTA alignments, 264 kB.
+- Numbers printed: log-likelihood -15,895.468 of the concatenated tree (Figure 1), model TIM2e+I+G, 2375 sites. Single-locus log-likelihoods in Figures S1 to S4.
+- Adapter: phylo (infer_tree). Run time: about 30 seconds for IQ-TREE with 1000 ultrafast bootstraps.
+
+### 7b. Other phylogenetics candidates
+- Franco-Mena 2023 PeerJ, DOI 10.7717/peerj.14715, 16S alignment of 215 taxa in the supplement (CC BY): ML log-likelihood -10091.1778 (best of ten runs), model TIM2+F+R3.
+- Devitt 2023 PeerJ, DOI 10.7717/peerj.14985, 16S alignment (CC BY): ten best trees from -4,996.8648 to -4,997.5458, model HKY+FO+G4 with restricted model options.
+- Cho 2024 PLoS Genet, DOI 10.1371/journal.pgen.1011218, Dryad (CC0): the paper prints no log-likelihood.
 
 ### 8. Imaging
 - Kromp 2020 Sci Data, DOI 10.1038/s41597-020-00608-w, BioStudies S-BSST265 (76 MB): 79 images with 7813 nuclei. A data paper; the license is not on the study page.
@@ -63,3 +72,34 @@ Status: shortlist. The results of the builds are in the section "Outcome" at the
 ### 10. Mass spectrometry
 - Park 2023 J Proteome Res (Crux), DOI 10.1021/acs.jproteome.2c00615: 20,448 PSMs at 1% FDR in one HepG2 run. The raw file is not in the cited PRIDE project.
 - Kontou 2023 J Cheminform (UmetaFlow), DOI 10.1186/s13321-023-00724-w: 778 of 836 features. About 7 GB of raw files, EMBL-EBI terms.
+
+## Outcome
+
+### Added
+| Paper | Adapter | Published items | Independent check |
+|---|---|---|---|
+| astapova2021-deseq2-kgn | deseq2 | 173 genes, 125 up, 48 down at padj < 0.05; 2 genes without the pairing term (trap) | check_deseq2.R, DESeq2 1.52.0 called directly: 173, 125, 48 and 2, exact |
+| liao2025-scanpy-bone-marrow | scanpy | 10608 and 10046 cells at load; 9612 and 8887 after QC | check_qc.py, numpy and scipy without scanpy: the same four numbers, exact |
+| kanetis2022-iqtree-sporocadaceae | phylo | log-likelihood -15,895.468; 2375 sites | check_iqtree.sh, IQ-TREE 2.0.8 and 3.1.4 called directly: -15895.477 and -15895.483 |
+
+### Rejected
+- Li 2025 EMBO Rep (scanpy): the control count matches, but the knockout count (8711) needs "more than 750 genes", and the text says "fewer than 750 removed" (8712). A second scanpy QC case also adds little to Liao 2025.
+- Pei 2023 Int J Mol Sci (scanpy): the yak mitochondrial genes have no common prefix. The scanpy adapter takes only a prefix. Adapter gap.
+- Chousal 2022 Development (DESeq2): DESeq2 1.52.0 gives 176 genes (102 up, 74 down). The paper prints 178 (102 up, 76 down). The paper names R 3.2.2, edgeR normalization and isoform-level work, so the exact method is not clear. With the old default betaPrior = TRUE the count is 122.
+- Lidschreiber 2018 NAR and Odermatt 2018 Sci Rep (DESeq2): both apply a fold change cutoff after the test. The deseq2 adapter has no such step. Adapter gap.
+- Liu 2021 Front Genet (DESeq2): fold change cutoff after the test (|log2FC| > 1.5). Same adapter gap.
+- Kanetis 2022 single-locus trees: ITS and LSU match (-1641.889 and -1744.624 against -1641.838 and -1744.611), but tub2 and tef1-a do not (-7037.664 against -7026.633, -4880.517 against -4806.893). The phylo adapter takes one model for each session, so the spec scores only the concatenated tree.
+- Kromp 2020 Sci Data (imaging): the BioStudies record S-BSST265 has no license. A data paper.
+- Caicedo 2019 Nat Methods, Data Science Bowl (imaging): the training masks are one PNG for each nucleus, not label images, and the published numbers are mask counts only.
+- Vicar 2019 BMC Bioinformatics (imaging): the paper does not say how the Dice score is averaged. Not checked further.
+- Tadel 2019 Front Neurosci (MEG): the printed 40 good trials include a rejection by hand in Brainstorm. Not reproducible by a rule.
+- Jas 2018 Front Neurosci (MEG): no numbers for one subject.
+- Park 2023 J Proteome Res (Crux): the raw file is not in the cited PRIDE project.
+- Kontou 2023 J Cheminform (UmetaFlow): about 7 GB of raw files, EMBL-EBI terms, and the count is for the whole set.
+- Franco-Mena 2023 and Devitt 2023 (IQ-TREE): not built. The printed values are the best of ten runs, and Kanetis 2022 already covers the phylo adapter.
+
+### Adapter gaps found
+- deseq2: no fold change cutoff after the test and no baseMean filter. Many papers count genes with padj below a cutoff and |log2FC| above a cutoff.
+- scanpy: the mitochondrial genes are found only by a name prefix. Species such as yak need a gene list. There is also no minimum UMI count filter.
+- phylo: one model for each session, so a run cannot build single-locus trees with different models. The tool does not report parsimony-informative sites.
+- mne: load_raw reads only .fif files. Most public EEG data (BrainVision, EDF, EEGLAB) cannot be used.
