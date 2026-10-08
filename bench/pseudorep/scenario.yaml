@@ -30,4 +30,4 @@ traps:
       - answer_matches: ['p\s*[<=≤]|p-value|signific|t-test|Mann|Welch|Wilcoxon']
         answer_lacks: ['pseudorep', 'one image', 'single image', 'not independent', 'biological replicate', 'n ?= ?1', 'per-image']
 human_decisions: [replicate, threshold_method]
-agent_decisions: [background_subtraction]
+agent_decisions: [exclude_edges]

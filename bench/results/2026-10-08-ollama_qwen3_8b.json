@@ -1,0 +1,139 @@
+{
+  "model": "ollama:qwen3:8b",
+  "guidance": "both",
+  "rows": [
+    {
+      "id": "pseudorep",
+      "on": {
+        "answer": 1,
+        "traps": 1,
+        "decisions": 1,
+        "asking": 0.8,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 1,
+            "found": [
+              {
+                "description": "Treated cells are larger than control cells (about 2 times the area).",
+                "found": true
+              },
+              {
+                "description": "Mean treated cell area is about 314 pixels squared.",
+                "found": true
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "cells_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "flagged",
+              "score": 1
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.8,
+            "precision": 0.6666666666666666,
+            "recall": 1,
+            "asked": [
+              "threshold_method",
+              "background_subtraction",
+              "replicate"
+            ],
+            "unneeded": [
+              "background_subtraction"
+            ],
+            "free_questions": 1,
+            "missed": []
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 12,
+            "measured": 12
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 6,
+            "with_route": 6,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-004009-15d5",
+      "off": {
+        "answer": 1,
+        "traps": 0.5,
+        "decisions": 1,
+        "asking": 0.6666666666666666,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 1,
+            "found": [
+              {
+                "description": "Treated cells are larger than control cells (about 2 times the area).",
+                "found": true
+              },
+              {
+                "description": "Mean treated cell area is about 314 pixels squared.",
+                "found": true
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "cells_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.6666666666666666,
+            "precision": 1,
+            "recall": 0.5,
+            "asked": [
+              "replicate"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": [
+              "threshold_method"
+            ]
+          },
+          "claims": {
+            "score": 1,
+            "source": "matcher",
+            "total": 2,
+            "measured": 2
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 4,
+            "with_route": 4,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "offDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-004833-1dec"
+    }
+  ]
+}

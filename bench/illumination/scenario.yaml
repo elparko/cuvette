@@ -39,4 +39,4 @@ traps:
         answer_numbers: [[0, 46.9], [53.1, 100000]]
         not_asked: [threshold_method]
 human_decisions: [background_subtraction, threshold_method]
-agent_decisions: [background_subtraction]
+agent_decisions: [exclude_edges]
