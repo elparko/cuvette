@@ -116,6 +116,24 @@ describe("checkAnswer", () => {
     const c = checkAnswer("The q-value was 2e-5.", record);
     expect(c[0]).toMatchObject({ label: "measured", node: "n9" });
   });
+
+  test("keeps the minus sign after markdown emphasis and code marks", () => {
+    const { record } = fake([{ node: "n1", path: "metrics.log_likelihood", value: -21152.5377 }]);
+    for (const text of ["The log-likelihood is **-21152.5377**.", "The log-likelihood is *-21152.5377*.", "The log-likelihood is _−21152.5377_.", "The log-likelihood is `-21152.5377`.", "| lnL |-21152.5377 |"]) {
+      const c = checkAnswer(text, record);
+      expect(c.map((x) => [x.value, x.label, x.node])).toEqual([[-21152.5377, "measured", "n1"]]);
+    }
+  });
+
+  test("a hyphen between a word or a number and a digit is not a sign", () => {
+    const { record } = fake([
+      { node: "n1", path: "metrics.a", value: 20 },
+      { node: "n1", path: "metrics.b", value: 30 },
+    ]);
+    const c = checkAnswer("The window was 20-30 bases wide. The substitution model was HKY-85.", record);
+    expect(c.every((x) => (x.value ?? 0) >= 0)).toBe(true);
+    expect(c.filter((x) => x.label === "measured").map((x) => x.value)).toEqual([20, 30]);
+  });
 });
 
 describe("annotate", () => {

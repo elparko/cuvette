@@ -78,7 +78,7 @@ export function extractNumbers(text: string, opts: { small?: boolean } = {}): Fo
     const step = 10 ** (exp - dec);
     const percent = Boolean(m[4]);
     const before = masked.slice(0, start);
-    const sign = before.match(/(^|[\s(=<>≤≥])([-−+])$/);
+    const sign = before.match(/(^|[\s(=<>≤≥*_`~[:|])([-−+])$/);
     let from = start;
     if (sign) {
       from = start - 1;
