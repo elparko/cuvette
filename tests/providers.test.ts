@@ -301,6 +301,14 @@ describe("ollama", () => {
     expect(seen.filter((x) => x.url.endsWith("/api/chat"))).toHaveLength(1);
   });
 
+  test("a review reply that repeats itself is stopped as well", async () => {
+    const finding = '{"check": "referee", "message": "The answer does not report the Leiden resolution (0.7) in the cluster count statement, and it does not report the number of neighbors (10)."},\n';
+    stubOllama(() => ndjson([{ message: { content: "[\n" } }, ...Array.from({ length: 40 }, () => ({ message: { content: finding } })), { done: true }]));
+    const p = await makeProvider("ollama:qwen3:8b");
+    const out = await p.complete("SYS", "review");
+    expect(out.split("Leiden resolution").length - 1).toBeLessThanOrEqual(3);
+  });
+
   test("a long reply without a repeat is kept whole", async () => {
     const chunks = Array.from({ length: 60 }, (_, i) => `Line ${i}: the value of item ${i} is ${i * 7.31} units, from step n${i}. `);
     stubOllama(() => ndjson([...chunks.map((c) => ({ message: { content: c } })), { done: true }]));

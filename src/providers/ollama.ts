@@ -344,7 +344,13 @@ export class OllamaProvider implements Provider {
         }
         if (j.error) throw new ProviderError(`Ollama error: ${String(j.error).slice(0, 300)}`);
         content += j.message?.content ?? "";
+        if (content.length >= checkAt) {
+          checkAt = content.length + 1000;
+          if (repeatStart(content) !== null) looped = true;
+        }
       };
+      let checkAt = 3000;
+      let looped = false;
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -354,8 +360,13 @@ export class OllamaProvider implements Provider {
           take(buf.slice(0, nl));
           buf = buf.slice(nl + 1);
         }
+        if (looped) {
+          await reader.cancel().catch(() => {});
+          content = cutRepeat(content);
+          break;
+        }
       }
-      take(buf + dec.decode());
+      if (!looped) take(buf + dec.decode());
     } catch (e) {
       if (e instanceof ProviderError) throw e;
       throw this.networkError(e, ollamaHost(), sig);

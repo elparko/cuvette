@@ -453,6 +453,14 @@ export class Session {
       const msg = e instanceof ProviderError ? e.message : signal.aborted ? "Stopped." : `${(e as Error).name}: ${(e as Error).message}`;
       this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg } : { message: msg });
       this.closeOpenCalls();
+      if (this.draft) {
+        const { answer } = this.draft;
+        this.draft = undefined;
+        this.record.append("notice", { text: "The turn stopped during the revision. The first answer is kept, with the problems that the review found." });
+        this.record.append("assistant", { text: answer, final: true });
+        this.lastAnswer = answer;
+        return answer;
+      }
       return "";
     } finally {
       this.busy = false;

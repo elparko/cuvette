@@ -130,6 +130,22 @@ test("three identical calls in a row end in a forced final answer", async () => 
   expect(provider.requests.at(-1)!.tools.length).toBe(0);
 });
 
+test("a turn that stops during the revision keeps the first answer", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }] }, { text: "The fold change was 3.7 in group B." }]);
+  const step = provider.step.bind(provider);
+  provider.step = async (req) => {
+    if (provider.requests.length < 2) return step(req);
+    session!.interrupt();
+    throw new Error("aborted");
+  };
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { headless: true, referee: "none" } });
+  const answer = await session.send("go");
+  expect(answer).toBe("The fold change was 3.7 in group B.");
+  const final = session.record.entries(["assistant"]).filter((e) => e.data.final === true);
+  expect(final.map((e) => e.data.text)).toEqual(["The fold change was 3.7 in group B."]);
+  expect(session.record.entries(["notice"]).some((e) => /stopped during the revision/.test(String(e.data.text)))).toBe(true);
+});
+
 test("after a forced final answer the harness does not ask for a tool call", async () => {
   const same = { calls: [{ name: "note", args: { text: "x" } }] };
   const provider = new FakeProvider([same, same, same, { text: "The count is 64. I will now give the final answer." }, { text: "other" }]);
