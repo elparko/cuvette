@@ -585,3 +585,13 @@ ga replay <session> --input old=new ...
 ga bench <scenario|all> --model ... [--guidance on|off|both]
 ga questions
 ```
+
+## Notes added during the build
+
+- `MapEntry.match`: a map entry can apply only when the call args match, for example
+  `match = {step_id = "discriminating"}` for SMILE MSI `run_analysis`. Use
+  `manifest.map_entry(tool, args)`; it picks the most specific entry.
+- `DecisionLink.arg` can be a dotted path into a nested dict argument, for example
+  `params.tol_ppm`.
+- `Connection.history_tool`: an adapter tool that returns the actions the scientist did in the
+  program since the last call (for Teach back).

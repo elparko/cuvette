@@ -101,6 +101,7 @@ class Evidence(_Model):
 
 class MapEntry(_Model):
     tool: str
+    match: dict[str, Any] = Field(default_factory=dict)
     route: str
     steps: list[str] = Field(default_factory=list)
     params: list[ParamMapEntry] = Field(default_factory=list)
@@ -212,7 +213,6 @@ class Manifest(_Model):
     @model_validator(mode="after")
     def _unique_keys(self):
         for label, items, attr in (("decision", self.decisions, "key"),
-                                   ("map entry", self.map, "tool"),
                                    ("check", self.checks, "id"),
                                    ("test", self.tests, "id"),
                                    ("tool", self.tools, "name")):
@@ -222,13 +222,20 @@ class Manifest(_Model):
                 if v in seen:
                     raise ValueError(f"duplicate {label} {v!r}")
                 seen.add(v)
+        keys = [(m.tool, tuple(sorted((k, str(v)) for k, v in m.match.items()))) for m in self.map]
+        if len(keys) != len(set(keys)):
+            raise ValueError("duplicate map entry (same tool and match)")
         return self
 
     def decision(self, key: str) -> Decision | None:
         return next((d for d in self.decisions if d.key == key), None)
 
-    def map_entry(self, tool: str) -> MapEntry | None:
-        return next((m for m in self.map if m.tool == tool), None)
+    def map_entry(self, tool: str, args: dict | None = None) -> MapEntry | None:
+        args = args or {}
+        fits = [m for m in self.map if m.tool == tool
+                and all(str(args.get(k)) == str(v) for k, v in m.match.items())]
+        fits.sort(key=lambda m: -len(m.match))
+        return fits[0] if fits else None
 
     def links_for(self, tool: str) -> dict[str, str]:
         return {ln.arg: d.key for d in self.decisions for ln in d.links if ln.tool == tool}
