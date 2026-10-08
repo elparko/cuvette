@@ -1,0 +1,23 @@
+tool: FastQC
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/andrews-fastqc/good_sequence_short.txt
+  - /Volumes/T7/guided-analysis/data/andrews-fastqc/bad_sequence.txt
+decisions:
+  parameters: "FastQC defaults"
+  action_on_fail: "scientist decides on trimming or exclusion"
+expected:
+  - {description: "good file total sequences", value: 250000, tolerance: 0, source: "official example report, Basic Statistics"}
+  - {description: "bad file total sequences", value: 395288, tolerance: 0, source: "official example report, Basic Statistics"}
+  - {description: "sequence length, both files", value: 40, tolerance: 0, source: "official example reports"}
+  - {description: "good file %GC", value: 45, tolerance: 1, source: "official example report"}
+  - {description: "bad file %GC", value: 47, tolerance: 1, source: "official example report"}
+  - {description: "bad file per base sequence quality", value: FAIL, tolerance: 0, source: "official example report summary"}
+  - {description: "good file modules not PASS", value: 0, tolerance: 0, source: "official example report summary"}
+  - {description: "bad file modules with WARNING", value: 4, tolerance: 0, source: "official example report summary: base content, GC, duplication, overrepresented"}
+notes: |
+  Read from the published example reports, not from a local FastQC run (FastQC and Java are not installed).
+  The local FASTQ record count (grep of lines that start with @) gave 250000 and 395288, matching the reports; this grep is approximate because quality lines can start with @.
+  No DOI exists for FastQC.
+  Trap: files have a .txt extension. The agent must still pass them as FASTQ (FastQC detects format by content).
+  Bad file has 2 FAIL (per base sequence quality, per tile sequence quality) and 4 WARNING.

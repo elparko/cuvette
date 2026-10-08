@@ -1,0 +1,38 @@
+tool: qupath
+adapter_kind: macro
+data:
+  - /Volumes/T7/guided-analysis/data/bankhead2017-qupath-workshop/prostate_1.ome.tif
+  - /Volumes/T7/guided-analysis/data/bankhead2017-qupath-workshop/prostate_2.ome.tif
+  - /Volumes/T7/guided-analysis/data/bankhead2017-qupath-workshop/prostate_3.ome.tif
+  - /Volumes/T7/guided-analysis/data/bankhead2017-qupath-workshop/ki678_lymphoma.ndpi
+decisions:
+  stain_vectors: default H&E / H-DAB, or estimated (paper uses color deconvolution)
+  detection_channel: hematoxylin (paper)
+  positivity_rule: single threshold on maximum DAB optical density in cell area (paper, p53 and Ki-67 style)
+  threshold_value: not read from paper
+  cell_size_range: not read from paper
+  scale_um_per_px: 0.4537 (lymphoma ndpi, from XResolution); not in prostate files
+  replication_unit: slide
+expected:
+  - description: lymphoma slide level 0 width in pixels
+    value: 28800
+    tolerance: 0
+    source: computed with tifffile
+  - description: lymphoma slide level 0 height in pixels
+    value: 34816
+    tolerance: 0
+    source: computed with tifffile
+  - description: lymphoma pixel size in um
+    value: 0.4537
+    tolerance: 0.001
+    source: computed from TIFF XResolution 22042 per cm
+  - description: prostate slide size in pixels (each of three)
+    value: 10000 x 10000
+    tolerance: 0
+    source: computed with tifffile
+notes: |
+  The Bankhead 2017 paper uses patient slides that are not open. This entry uses the QuPath workshop images (CC BY 4.0) with the tool paper as the method source.
+  No paper number is reproduced. Positive-cell fraction, cell counts and H-score for these images have no reference value.
+  QuPath is not installed here. No QuPath output was checked.
+  Numeric parameters of the paper methods were not extracted. A later reader must read them in the paper before scoring.
+  Ethics origin of the tissue is not stated in the Zenodo record.

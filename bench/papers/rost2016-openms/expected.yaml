@@ -1,0 +1,37 @@
+tool: OpenMS TOPP tools (FeatureFinderMetabo, MapAlignerPoseClustering, FeatureLinkerUnlabeledQT, AccurateMassSearch)
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/datasets/2012_02_03_PStd_050_1.mzML
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/datasets/2012_02_03_PStd_050_2.mzML
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/datasets/2012_02_03_PStd_050_3.mzML
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/datasets/2012_02_03_PStd_10_1.mzML
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/datasets/2012_02_03_PStd_10_2.mzML
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/datasets/2012_02_03_PStd_10_3.mzML
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/databases/HMDBMappingFile.tsv
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/databases/HMDB2StructMapping.tsv
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/databases/PositiveAdducts.tsv
+  - /Volumes/T7/guided-analysis/data/rost2016-openms/databases/NegativeAdducts.tsv
+decisions:
+  feature_finder: "FeatureFinderMetabo: chrom_fwhm 8.0, trace_termination_criterion sample_rate, min_trace_length 3.0, max_trace_length 600.0, width_filtering off"
+  alignment: "MapAlignerPoseClustering: mz_pair_max_distance 0.005, num_used_points 10000, RT max_difference 20.0, m/z max_difference 20 ppm"
+  linking: "FeatureLinkerUnlabeledQT: RT max_difference 40.0, m/z max_difference 20 ppm"
+  identification_database: "HMDB via AccurateMassSearch, default parameters"
+  replication_unit: "injection; 3 per spike-in level"
+  comparison: "0.5 mg/l vs 10.0 mg/l"
+expected:
+  - {description: "spectra in PStd_050_1", value: 7173, tolerance: 0, source: "computed with pyOpenMS 3.6.0"}
+  - {description: "MS1 spectra in PStd_050_1", value: 7173, tolerance: 0, source: "computed with pyOpenMS 3.6.0"}
+  - {description: "mass traces in PStd_050_1 with paper parameters", value: 1880, tolerance: 100, source: "computed with pyOpenMS 3.6.0, other parameters default"}
+  - {description: "elution peaks in PStd_050_1", value: 2255, tolerance: 120, source: "computed with pyOpenMS 3.6.0"}
+  - {description: "features in PStd_050_1", value: 1887, tolerance: 100, source: "computed with pyOpenMS 3.6.0; TOPP tool may differ slightly"}
+  - {description: "number of differential spike-in compounds to detect", value: 7, tolerance: 0, source: "supplement section 5.1"}
+  - {description: "number of spike-in levels", value: 2, tolerance: 0, source: "supplement section 5.1 (0.5 and 10.0 mg/l)"}
+notes: |
+  The paper has no results table for this workflow. Reported numbers are the tutorial design (7 spike-ins, 2 levels, triplicates) and values computed here.
+  The computed feature counts are for one file with one OpenMS version. Not run for all six files or through the full linker.
+  The names of the seven spike-in compounds are not in the supplement text I read.
+  The statistical test for differential features (section 5.5) is not described in the part I read.
+  Data license is not stated; check before redistributing.
+  The files are 200+ MB each. Processing six files can take several minutes.
+  Trap: m/z tolerance in ppm versus Da; the alignment uses ppm for m/z distance but a Da value (0.005) for mz_pair_max_distance.
+  Trap: AccurateMassSearch needs the ion mode set to match the data (positive adduct list or negative adduct list). The supplement does not state the polarity of these files.

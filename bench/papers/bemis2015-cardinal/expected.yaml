@@ -1,0 +1,31 @@
+tool: Cardinal (R, Bioconductor)
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/bemis2015-cardinal/CardinalWorkflows_1.44.0.tar.gz
+decisions:
+  dataset: "pig206 (single DESI section)"
+  normalization: "TIC"
+  peak_picking: "SNR=3, sampleSize=0.1, tolerance=0.5 m/z (vignette)"
+  segmentation: "spatialShrunkenCentroids, weights=adaptive, r=2, k=8, s=2^(1:6)"
+  chosen_sparsity: "s=32 (vignette picks the highest s that keeps the heart)"
+  region_labels: "from the optical image"
+  replication_unit: "none; one section"
+expected:
+  - {description: "pig206 spectra", value: 4959, tolerance: 0, source: "vignette MSI-segmentation (not checked against the .rda file)"}
+  - {description: "pig206 m/z values", value: 10200, tolerance: 0, source: "vignette and paper Fig 1 (10,200 features)"}
+  - {description: "peaks after peakProcess", value: 687, tolerance: 10, source: "vignette; depends on Cardinal version and random 10% sample"}
+  - {description: "segments in chosen model (s=32)", value: 6, tolerance: 1, source: "vignette"}
+  - {description: "segments in s=64 model", value: 3, tolerance: 1, source: "vignette"}
+  - {description: "paper: segments on five-section pig fetus", value: 11, tolerance: null, source: "paper main text; different data, do not require on pig206"}
+  - {description: "paper: liver segment peaks enriched", value: 92, tolerance: null, source: "paper main text; five-section data"}
+  - {description: "paper: liver segment peaks absent", value: 153, tolerance: null, source: "paper main text; five-section data"}
+  - {description: "paper: heart segment peaks enriched", value: 23, tolerance: null, source: "paper main text; five-section data"}
+notes: |
+  R is not installed. This entry is for prompts and data only until R and Cardinal exist.
+  Paper numbers (11 segments, 92/153/23) come from five adjacent sections. The package ships one section. The vignette numbers are the ones to match.
+  I could not read the .rda file in python (rdata package failed on the S4 object). Spectrum and peak counts come from the vignette text, not from the data.
+  The paper gives no numeric parameters (no ppm, bin width, r, k, s). Parameters come from the vignette, which is not the paper.
+  The paper reports no classification accuracy.
+  Trap: higher s removes the heart segment; the choice of s changes the answer.
+  Trap: Cardinal 3.x differs from the 2015 API. Random start (set.seed) changes segment numbering.
+  The rcc dataset (human tissue, de-identified) is in the same tarball and was not used.

@@ -1,0 +1,30 @@
+tool: pyimzML
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Continuous.imzML
+  - /Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Continuous.ibd
+  - /Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Processed.imzML
+  - /Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Processed.ibd
+decisions:
+  ion_image_tolerance: "scientist chooses (no value in the source)"
+  pixel_summary: "total ion current (sum of intensities)"
+  coordinates: "1-based as in imzML"
+expected:
+  - {description: "spectra per file", value: 9, tolerance: 0, source: "computed with pyimzml 1.5.5; repository test asserts 9"}
+  - {description: "pixel grid", value: "3 x 3", tolerance: 0, source: "computed (max count of pixels x, y)"}
+  - {description: "pixel size um", value: 100, tolerance: 0, source: "computed from imzML metadata"}
+  - {description: "polarity", value: negative, tolerance: 0, source: "computed"}
+  - {description: "spectrum mode", value: profile, tolerance: 0, source: "computed"}
+  - {description: "points per spectrum", value: 8399, tolerance: 0, source: "computed; repository test asserts 8399"}
+  - {description: "m/z minimum", value: 100.083336, tolerance: 0.0001, source: "computed"}
+  - {description: "m/z maximum", value: 799.9167, tolerance: 0.0001, source: "computed"}
+  - {description: "continuous ibd bytes", value: 335976, tolerance: 0, source: "file size"}
+  - {description: "processed ibd bytes", value: 604744, tolerance: 0, source: "file size"}
+  - {description: "mean TIC (sum of intensities per pixel)", value: 161.1444, tolerance: 0.001, source: "computed, float32 sums"}
+  - {description: "max pixel TIC", value: 243.5395, tolerance: 0.001, source: "computed"}
+notes: |
+  The imzML paper was not read. No expected value comes from the paper. All values come from the files and the pyimzML test suite.
+  Data is tiny test data (9 pixels), not a lipid experiment. Use it for adapter checks.
+  Both files give identical spectra. The ibd sizes differ because processed mode stores an m/z array per spectrum.
+  Trap: ibd files are binary; the imzML file alone has no intensities.
+  Trap: pyimzML 1.5.x getionimage needs a tolerance; no default value is given by the source.

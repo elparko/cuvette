@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { makeProvider } from "../providers/index.ts";
@@ -450,7 +450,7 @@ export class Session {
     const args = (call.args && typeof call.args === "object" ? call.args : {}) as Args;
     const missing = ((tool.inputSchema.required as string[]) ?? []).filter((k) => args[k] === undefined);
     if (missing.length) return this.fail(call.id, tool.name, `missing required arguments: ${missing.join(", ")}`, tool.adapter);
-    const r = await this.pipeline(tool, args, call.id, signal);
+    const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
     return { type: "tool_result", callId: call.id, name: call.name, text: r.text, images: r.images, isError: r.isError };
   }
 
@@ -845,6 +845,17 @@ export class Session {
     this.interrupt();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
   }
+}
+
+function absolutePaths(v: unknown, cwd: string): unknown {
+  if (typeof v === "string") {
+    if (!v || v.length > 1024 || isAbsolute(v) || /^[a-z]+:\/\//i.test(v) || !/[\\/.]/.test(v)) return v;
+    const p = resolve(cwd, v.replace(/^~(?=\/)/, process.env.HOME ?? "~"));
+    return existsSync(p) ? p : v;
+  }
+  if (Array.isArray(v)) return v.map((x) => absolutePaths(x, cwd));
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, absolutePaths(x, cwd)]));
+  return v;
 }
 
 function setArg(args: Args, path: string, value: unknown) {

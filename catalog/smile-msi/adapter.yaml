@@ -1325,3 +1325,11 @@ tests:
 data_rules:
   cloud_visibility: all
   note: The tools return summaries and tables of at most 12 rows. Full tables stay in the work folder.
+
+# Tools that run code: the scientist approves each call.
+tools:
+  - { name: run_script, description: "Run Python code in the SMILE MSI engine. Read scripting_guide first.", approval: true }
+  - { name: create_tool, description: "Save a new user tool in SMILE MSI.", approval: true }
+  - { name: edit_tool, description: "Change a user tool in SMILE MSI.", approval: true }
+  - { name: delete_tool, description: "Delete a user tool in SMILE MSI.", approval: true }
+  - { name: run_user_tool, description: "Run a saved user tool.", approval: true }

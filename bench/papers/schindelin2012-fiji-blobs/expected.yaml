@@ -1,0 +1,29 @@
+tool: fiji
+adapter_kind: macro
+data:
+  - /Volumes/T7/guided-analysis/data/schindelin2012-fiji-blobs/blobs.gif
+decisions:
+  threshold_method: Default
+  threshold_polarity: image has inverting LUT; setAutoThreshold("Default") selects 126-255
+  size_range_px2: 0-Infinity
+  exclude_edge_particles: both counts are valid answers (64 with, 46 without)
+  watershed: none
+  scale: pixels (no calibration in file)
+expected:
+  - description: particles, edges included
+    value: 64
+    tolerance: 0
+    source: computed with ImageJ 1.53 (ij.jar), setAutoThreshold("Default"), Analyze Particles
+  - description: particles, edge particles excluded
+    value: 46
+    tolerance: 0
+    source: computed with ImageJ 1.53
+  - description: threshold range selected by Default
+    value: [126, 255]
+    tolerance: 0
+    source: computed with ImageJ 1.53
+notes: |
+  The Fiji paper reports no count for this image. Values are from a local run of ImageJ 1.53, not from a paper.
+  The file license was not found. NIH ImageJ sample image.
+  Headless Java mode failed for the macro open command. Run without -Djava.awt.headless=true.
+  Fiji itself was not installed. Only ij.jar from /Applications/ImageJ.app was used.

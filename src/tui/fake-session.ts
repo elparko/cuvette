@@ -214,8 +214,9 @@ export class FakeSession implements SessionLike {
     this.status("waiting");
     const rid = `r${Date.now()}`;
     const code = "import numpy as np\nscores = auc(spectra, labels)\nprint(scores.shape)";
+    const permReply = this.waitFor(rid);
     this.bus.emit({ type: "permission", rid, tool: "run_script", args: { purpose: "AUC per feature" }, code, touches: "a Python process in the session work folder" });
-    const perm = await this.waitFor(rid);
+    const perm = await permReply;
     if (this.aborted) return this.stopped();
     this.record.append("permission", { rid, tool: "run_script", decision: perm.ok ? "allowed" : "denied", by: "human", note: perm.value });
     if (!perm.ok) {
@@ -243,16 +244,18 @@ export class FakeSession implements SessionLike {
     this.record.append("sensitivity", { decisionKey: "min_auc", table: q.evidence, holds: ["4 features pass at every cutoff"], depends: ["10 features depend on the cutoff"] });
     this.record.append("blocked", { callId: "c3", tool: "find_features", reason: "min AUC is not set", qid: q.qid });
     this.record.append("question", q as unknown as Record<string, unknown>);
+    const answerReply = this.waitFor(q.qid);
     this.bus.emit({ type: "question", question: q });
     this.status("waiting");
-    const ans = await this.waitFor(q.qid);
+    const ans = await answerReply;
     if (this.aborted) return this.stopped();
 
     const step = this.record.entries(["tool_result"]).length + 1;
     if (this.mode === "follow") {
       this.status("waiting");
+      const stepReply = this.waitFor(`step${step}`);
       this.bus.emit({ type: "instruction", step, tool: "find_features", text: `Analyze > Discriminating features. Group A = endo. Group B = epi. Tolerance 5 ppm. Minimum AUC ${String(ans.value)}.` });
-      await this.waitFor(`step${step}`);
+      await stepReply;
       if (this.aborted) return this.stopped();
     }
 

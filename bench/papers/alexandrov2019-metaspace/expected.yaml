@@ -1,0 +1,33 @@
+tool: METASPACE (metaspace2020 python client)
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_10h14m23s_HMDB_fdr10.csv
+  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_10h14m23s_LipidMaps_fdr10.csv
+  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_12h31m33s_HMDB_fdr10.csv
+  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_12h31m33s_LipidMaps_fdr10.csv
+  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_10h14m23s_meta.json
+  - /Volumes/T7/guided-analysis/data/alexandrov2019-metaspace/2022-08-16_12h31m33s_meta.json
+decisions:
+  fdr_level: 0.1
+  database: "LIPID MAPS (2017-12-12) for lipids; HMDB v4 as comparison"
+  adducts: "+H (dataset configuration)"
+  mz_tolerance_ppm: "6 (dataset configuration); paper uses 3 for image extraction"
+  annotation_level: "molecular formula, not structure"
+  replication_unit: "dataset (one section)"
+expected:
+  - {description: "10h14m23s LipidMaps annotations at FDR 10%", value: 414, tolerance: 0, source: "computed from METASPACE on 2026-10-07; can change if the dataset is reprocessed"}
+  - {description: "10h14m23s HMDB annotations at FDR 10%", value: 263, tolerance: 0, source: "computed from METASPACE on 2026-10-07"}
+  - {description: "12h31m33s LipidMaps annotations at FDR 10%", value: 191, tolerance: 0, source: "computed from METASPACE on 2026-10-07"}
+  - {description: "12h31m33s HMDB annotations at FDR 10%", value: 123, tolerance: 0, source: "computed from METASPACE on 2026-10-07"}
+  - {description: "10h14m23s LipidMaps at FDR 5%", value: 144, tolerance: 0, source: "computed on 2026-10-07"}
+  - {description: "10h14m23s LipidMaps at FDR 50%", value: 1934, tolerance: 0, source: "computed on 2026-10-07"}
+  - {description: "paper: glutathione annotations at FDR 10%", value: 519, tolerance: null, source: "paper results; January 2019 database, not reproducible today"}
+  - {description: "paper: FDR level used for browsing", value: 0.1, tolerance: 0, source: "paper results"}
+notes: |
+  The datasets are from Michael et al. 2022, not from the 2019 paper. The 2019 paper numbers (3000+ datasets, 519 glutathione) describe the 2019 database and cannot be checked.
+  Computed numbers can change if METASPACE reprocesses the datasets or updates its databases. Re-run fetch.sh to refresh.
+  I did not read the paper's methods and data availability sections.
+  Dataset license field was not returned by the API. METASPACE policy for public datasets is CC BY 4.0; verify before redistributing.
+  Trap: count depends strongly on FDR level (14 vs 263 vs 2069 for HMDB in one dataset) and on database (263 HMDB vs 414 LipidMaps).
+  Trap: METASPACE FDR levels are discrete steps (5, 10, 20, 50). An FDR of 0.1 means "at most 10%".
+  Trap: annotations are sum formulas; one formula can match several lipids (isomers, isobars).

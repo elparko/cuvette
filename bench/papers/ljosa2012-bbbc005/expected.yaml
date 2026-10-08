@@ -1,0 +1,48 @@
+tool: cellprofiler
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/BBBC005_v1_images.zip
+  - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/sub/BBBC005_v1_images
+  - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/synthetic_2_ground_truth
+  - /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/BBBC005_results_bray.csv
+decisions:
+  segmentation_channel: w2 (nuclei stain)
+  truth_source: C value in file name
+  blur_levels: F1 to F48 for the trend; F1 only for the base accuracy
+  threshold_method: not given in sources
+  declump_method: not given in sources
+  object_size_range: not given in sources
+  replication_unit: image
+  scale_um_per_px: not applicable (synthetic)
+expected:
+  - description: images in the published results file
+    value: 9600
+    tolerance: 0
+    source: BBBC005_results_bray.csv row count
+  - description: R^2 of detected against true count, all images, published CellProfiler counts
+    value: 0.834
+    tolerance: 0.01
+    source: computed from BBBC005_results_bray.csv
+  - description: detected / true count ratio, blur size 1, published counts
+    value: 0.934
+    tolerance: 0.02
+    source: computed from BBBC005_results_bray.csv
+  - description: detected / true count ratio, blur size 48, published counts
+    value: 0.634
+    tolerance: 0.02
+    source: computed from BBBC005_results_bray.csv
+  - description: mean absolute count error, blur size 1, published counts
+    value: 3.36
+    tolerance: 0.1
+    source: computed from BBBC005_results_bray.csv
+  - description: sum of true cell counts over 100 sampled in-focus w2 images (every sixth sorted file name)
+    value: 5007
+    tolerance: 0
+    source: computed from file names
+notes: |
+  No number from the text of Ljosa 2012 or Bray 2012 was read. All values come from the data files.
+  The CellProfiler version and pipeline behind the CSV were not found.
+  A plain Otsu threshold with connected-component labeling counted 1,293 objects for 5,007 true cells on the 100-image sample. Clumps merge.
+  Binary ground-truth masks merge touching cells. Do not count mask components as the truth.
+  The 100-image sample is sorted(glob("*_w2.TIF"))[::6] of the extracted sub/ folder.
+  A fresh run needs rows to be matched by file name between this CSV (w2 column Image_FileName_Nuclei) and sub/.

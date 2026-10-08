@@ -687,6 +687,17 @@ export function decorate(c: KindContext, def: Pick<ToolDef, "read_only" | "appro
   return t;
 }
 
+function handleStrings(schema: Record<string, unknown>, raw: Args): Args {
+  const props = (schema.properties ?? {}) as Record<string, { type?: unknown }>;
+  const out: Args = { ...raw };
+  for (const [k, v] of Object.entries(raw)) {
+    const t = props[k]?.type;
+    const types = Array.isArray(t) ? t : [t];
+    if (typeof v === "string" && /^h\d+$/.test(v) && types.includes("object") && !types.includes("string")) out[k] = { handle: v };
+  }
+  return out;
+}
+
 export function defTool(c: KindContext, def: ToolDef, run: (a: { args: Args; ctx: ToolContext; call: CallDir }) => Promise<ToolOutput>): Tool {
   const schema = schemaFor(def);
   return decorate(c, def, {
@@ -695,7 +706,7 @@ export function defTool(c: KindContext, def: ToolDef, run: (a: { args: Args; ctx
     description: def.description,
     inputSchema: schema,
     async execute(raw, ctx) {
-      const v = validateArgs(schema, raw);
+      const v = validateArgs(schema, handleStrings(schema, raw));
       if (v.error) return { ok: false, error: v.error };
       try {
         return await run({ args: v.args, ctx, call: prepareCall(c.dirs, def) });

@@ -1,0 +1,54 @@
+tool: cellprofiler
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/caicedo2019-bbbc039/x/images/images
+  - /Volumes/T7/guided-analysis/data/caicedo2019-bbbc039/x/masks/masks
+  - /Volumes/T7/guided-analysis/data/caicedo2019-bbbc039/x/metadata/metadata/segmentation_cp3.cppipe
+  - /Volumes/T7/guided-analysis/data/caicedo2019-bbbc039/x/metadata/metadata/test.txt
+decisions:
+  segmentation_channel: Hoechst DNA (only channel)
+  threshold_method: Otsu, global, two classes (pipeline file also lists Minimum cross entropy; unresolved)
+  object_diameter_px: [20, 80]
+  declump: shape, smoothing 15, min distance 10
+  background_step: opening disk 45 on half-size image, then subtract
+  discard_border_objects: false
+  replication_unit: field of view (one per compound)
+  scale_um_per_px: 0.656
+  split_for_reporting: test (50 images)
+  iou_match_threshold: 0.7 for error counts
+expected:
+  - description: nuclei in ground-truth masks, test split (50 images)
+    value: 5720
+    tolerance: 0
+    source: paper Fig 3/4 caption; verified by scikit-image label on mask channel 0
+  - description: nuclei in ground-truth masks, training split (100 images)
+    value: 11999
+    tolerance: 0
+    source: computed from masks
+  - description: nuclei in ground-truth masks, validation split (50 images)
+    value: 5896
+    tolerance: 0
+    source: computed from masks
+  - description: average F1 over IoU thresholds, CellProfiler advanced
+    value: 0.811
+    tolerance: 0.05
+    source: paper Results, Fig 2a and Fig S1
+  - description: average F1 over IoU thresholds, CellProfiler basic
+    value: 0.790
+    tolerance: 0.05
+    source: paper Results, Fig 2a and Fig S1
+  - description: fraction of true nuclei missed at IoU 0.7, CellProfiler advanced
+    value: 0.155
+    tolerance: 0.05
+    source: paper Results, Fig S2
+  - description: fraction of true nuclei missed at IoU 0.7, CellProfiler basic
+    value: 0.201
+    tolerance: 0.05
+    source: paper Results, Fig S2
+notes: |
+  The abstract says 23,165 annotated nuclei. The masks give 23,615 in total. Digits are probably transposed in the abstract.
+  The paper does not say if segmentation_cp3.cppipe is the basic or the advanced pipeline.
+  The tolerance values are guesses for a re-run on CellProfiler 4. They are not from the paper.
+  The paper CellProfiler F1 values were not re-run. The IoU threshold list for the average F1 was not read in the text.
+  Cellpose or scikit-image can use the same data. Cellpose has no published number on this set in this paper.
+  Mask decoding: skimage.measure.label on channel 0 of the RGBA PNG.

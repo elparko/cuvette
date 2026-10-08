@@ -1,0 +1,853 @@
+adapter:
+  name: imagej
+  title: ImageJ
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Counts and measures objects in microscope images with ImageJ. Each tool opens its input file,
+    does one step, saves the result as a TIFF file and a PNG preview, and prints metrics. The next
+    step takes the path of the file that the last step saved. The scientist can repeat each step
+    in the ImageJ menus.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: ImageJ
+  version: ""
+  tested_versions: ["1.53k"]
+  homepage: https://imagej.net
+  docs:
+    - https://imagej.net/ij/docs/guide/146.html
+    - https://imagej.net/ij/developer/macro/macros.html
+    - https://imagej.net/ij/developer/macro/functions.html
+
+connection:
+  kind: macro
+  interpreter: ["java", "-Dapple.awt.UIElement=true", "-jar", "{program_path}", "-batch", "{macro_file}"]
+  macro_ext: ".ijm"
+  state_tool: image_info
+  call_timeout_s: 120
+
+locate:
+  env: IMAGEJ_JAR
+  paths:
+    - /Applications/ImageJ.app/Contents/Java/ij.jar
+    - /Applications/Fiji.app/jars/ij-*.jar
+    - ~/Applications/Fiji.app/jars/ij-*.jar
+    - ~/Fiji.app/jars/ij-*.jar
+    - ~/ImageJ/ij.jar
+    - /opt/imagej/ij.jar
+    - /opt/Fiji.app/jars/ij-*.jar
+    - /usr/share/java/ij.jar
+    - C:\Program Files\ImageJ\ij.jar
+    - C:\ImageJ\ij.jar
+    - C:\Fiji.app\jars\ij-*.jar
+    - C:\Program Files\Fiji.app\jars\ij-*.jar
+
+module: adapter.ts
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and small PNG previews. It never sees the original image files.
+
+decisions:
+  - key: question
+    label: What question do you ask with these images?
+    kind: text
+    group: Question
+    help: Example - Does drug X change the number of nuclei per field?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - cells or particles (exploratory)
+      - images or fields
+      - biological replicates (animals, patients, cultures)
+    default: images or fields
+    group: Design
+    help: >
+      Cells in one image are not independent samples. Use images or biological replicates for a
+      test. Use cells or particles only to explore.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: pixel_size
+    label: Pixel size of the images
+    kind: text
+    default: uncalibrated
+    group: Design
+    help: Write the size and the unit, such as "0.65 um/pixel". Write "uncalibrated" if you do not know it.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+
+  - key: alpha
+    label: Significance level (alpha)
+    kind: float
+    default: 0.05
+    lo: 0.0001
+    hi: 0.2
+    group: Statistics
+    help: The p-value below which you call a difference significant.
+    owner: human
+    stage: setup
+    changes_conclusion: false
+
+  - key: threshold_method
+    label: Threshold method
+    kind: choice
+    choices: [Default, Otsu, Triangle, Huang, Li, IsoData, Mean, MaxEntropy]
+    default: Default
+    group: Segmentation
+    help: >
+      The threshold decides which pixels are objects. Different methods can give different
+      counts. The agent runs the main methods and shows you the counts before you choose.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: threshold, arg: method }
+      - { tool: threshold_and_count, arg: method }
+      - { tool: count_folder, arg: method }
+    sensitivity:
+      options: [Default, Otsu, Triangle, Li]
+      tool: threshold_and_count
+      compare: [metrics.count, metrics.mean_area]
+      max_runs: 4
+
+  - key: background_subtraction
+    label: Background subtraction (rolling ball radius in pixels, 0 = none)
+    kind: choice
+    choices: [0, 10, 25, 50, 100]
+    default: 0
+    group: Segmentation
+    help: >
+      Use a radius larger than the largest object. Use 0 if the background is flat. An uneven
+      background can change the count.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: subtract_background, arg: rolling_radius }
+      - { tool: threshold_and_count, arg: rolling_radius }
+      - { tool: count_folder, arg: rolling_radius }
+
+  - key: particle_size_min
+    label: Smallest object to count (in calibrated area units)
+    kind: float
+    default: 0
+    lo: 0
+    group: Segmentation
+    help: Objects smaller than this are noise. Use 0 to count all objects.
+    owner: human
+    stage: setup
+    links:
+      - { tool: analyze_particles, arg: min_size }
+      - { tool: threshold_and_count, arg: min_size }
+      - { tool: count_folder, arg: min_size }
+
+  - key: exclude_edges
+    label: Exclude objects that touch the image edge
+    kind: bool
+    default: true
+    group: Segmentation
+    help: Objects cut by the image edge have a wrong size. The agent excludes them and records the reason.
+    owner: agent
+    stage: setup
+    links:
+      - { tool: analyze_particles, arg: exclude_edges }
+      - { tool: threshold_and_count, arg: exclude_edges }
+      - { tool: count_folder, arg: exclude_edges }
+
+map:
+  - tool: open_image
+    route: File > Open...
+    steps:
+      - Select the file {path}
+      - Image > Show Info... shows the size, the bit depth and the scale
+      - Analyze > Measure shows the mean, the minimum and the maximum
+    params:
+      - { arg: path, label: File to open }
+    fidelity: exact
+    evidence: { source: program_definitions, test: blobs_info, note: The saturation and background numbers come from the tool and have no menu command. }
+    summary: "Opened the image: {metrics.width} by {metrics.height} pixels, {metrics.bit_depth} bit."
+
+  - tool: image_info
+    route: Image > Show Info...
+    steps:
+      - Open the file {path} with File > Open...
+    params:
+      - { arg: path, label: File to open }
+    fidelity: exact
+    evidence: { source: program_definitions, test: blobs_info }
+    summary: "Read the image: {metrics.width} by {metrics.height} pixels, {metrics.bit_depth} bit."
+
+  - tool: set_scale
+    route: Analyze > Set Scale...
+    steps:
+      - Distance in pixels = {distance_px}
+      - Known distance = {known_distance}
+      - Pixel aspect ratio = 1
+      - Unit of length = {unit}
+      - Click OK
+    params:
+      - { arg: distance_px, label: Distance in pixels, ui_default: 0 }
+      - { arg: known_distance, label: Known distance, ui_default: 0 }
+      - { arg: unit, label: Unit of length, ui_default: pixel }
+    fidelity: exact
+    evidence: { source: macro_recorder, test: discs_calibrated }
+    summary: "Set the scale: {metrics.pixel_width} {data.values.pixel_unit} for each pixel."
+
+  - tool: subtract_background
+    route: Process > Subtract Background...
+    steps:
+      - Rolling ball radius = {rolling_radius}
+      - Light background = {light_background}
+      - Create background (don't subtract) = off
+      - Sliding paraboloid = off
+      - Disable smoothing = off
+      - Click OK
+    params:
+      - { arg: rolling_radius, label: Rolling ball radius, ui_default: 50 }
+      - { arg: light_background, label: Light background, ui_default: false }
+    fidelity: exact
+    evidence: { source: macro_recorder, test: discs_gradient_subtracted }
+    summary: "Subtracted the background with a rolling ball of radius {rolling_radius} pixels."
+
+  - tool: gaussian_blur
+    route: Process > Filters > Gaussian Blur...
+    steps:
+      - Sigma (Radius) = {sigma}
+      - Scaled Units = off
+      - Click OK
+    params:
+      - { arg: sigma, label: Sigma (Radius), ui_default: 2 }
+    fidelity: exact
+    evidence: { source: macro_recorder, test: discs_noisy_blurred }
+    summary: "Blurred the image with sigma {sigma} pixels."
+
+  - tool: threshold
+    route: Image > Adjust > Threshold...
+    steps:
+      - If the image is in color, run Image > Type > 8-bit first
+      - Process > Binary > Options... clear Black background
+      - Select the method {method} in the first list
+      - Dark background = {dark_background}
+      - Click Auto, then close the window without Apply
+      - Process > Binary > Convert to Mask
+    params:
+      - { arg: method, label: Method, ui_default: Default }
+      - { arg: dark_background, label: Dark background, ui_default: false }
+    fidelity: exact
+    evidence: { source: macro_recorder, test: blobs_threshold_steps }
+    summary: "Applied the {method} threshold. {metrics.foreground_fraction} of the pixels are objects."
+
+  - tool: watershed
+    route: Process > Binary > Watershed
+    steps:
+      - Process > Binary > Options... clear Black background
+    params: []
+    fidelity: exact
+    evidence: { source: macro_recorder, test: discs_touching_watershed }
+    summary: "Split touching objects with the watershed."
+
+  - tool: analyze_particles
+    route: Analyze > Analyze Particles...
+    steps:
+      - Process > Binary > Options... clear Black background
+      - Analyze > Set Measurements... select Area, Mean gray value, Standard deviation, Min and max gray value, Centroid, Perimeter, Shape descriptors, Integrated density, Median
+      - Redirect to = {measure_image}
+      - Size = {min_size}-{max_size}
+      - Circularity = {min_circularity}-1.00
+      - Show = Outlines
+      - Display results = on
+      - Clear results = on
+      - Exclude on edges = {exclude_edges}
+      - Click OK
+    params:
+      - { arg: min_size, label: Size (minimum), ui_default: 0 }
+      - { arg: max_size, label: Size (maximum), ui_default: Infinity, note: The tool uses 0 for Infinity. }
+      - { arg: min_circularity, label: Circularity (minimum), ui_default: 0 }
+      - { arg: exclude_edges, label: Exclude on edges, ui_default: false }
+      - { arg: measure_image, label: Redirect to, ui_default: None }
+    fidelity: exact
+    evidence: { source: macro_recorder, test: blobs_count_default }
+    summary: "Counted {metrics.count} particles. Mean area {metrics.mean_area}, total area {metrics.total_area} {data.values.area_unit}."
+
+  - tool: measure
+    route: Analyze > Measure
+    steps:
+      - Analyze > Set Measurements... select Area, Mean gray value, Standard deviation, Min and max gray value, Integrated density
+      - Edit > Selection > Specify... Width, Height, X, Y = {roi}
+      - Analyze > Measure
+    params:
+      - { arg: roi, label: "Selection (x, y, width, height)", ui_default: whole image }
+    fidelity: exact
+    evidence: { source: macro_recorder, test: discs_measure }
+    summary: "Measured the image. Mean {metrics.mean}, standard deviation {metrics.std}."
+
+  - tool: threshold_and_count
+    route: Analyze > Analyze Particles...
+    steps:
+      - If the rolling ball radius is above 0, run Process > Subtract Background... with the radius {rolling_radius}
+      - If sigma is above 0, run Process > Filters > Gaussian Blur... with sigma {sigma}
+      - Run Image > Adjust > Threshold... with the method {method}, then Process > Binary > Convert to Mask
+      - If watershed is on, run Process > Binary > Watershed
+      - Run Analyze > Analyze Particles... with size {min_size}-{max_size} and Exclude on edges = {exclude_edges}
+    params:
+      - { arg: method, label: Method, ui_default: Default }
+      - { arg: dark_background, label: Dark background, ui_default: false }
+      - { arg: rolling_radius, label: Rolling ball radius, ui_default: 50 }
+      - { arg: sigma, label: Sigma (Radius), ui_default: 2 }
+      - { arg: min_size, label: Size (minimum), ui_default: 0 }
+      - { arg: exclude_edges, label: Exclude on edges, ui_default: false }
+    fidelity: exact
+    evidence: { source: macro_recorder, test: blobs_count_default }
+    summary: "Counted {metrics.count} particles with the {method} threshold. Mean area {metrics.mean_area} {data.values.area_unit}."
+
+  - tool: count_folder
+    route: Analyze > Analyze Particles...
+    steps:
+      - Repeat the steps of threshold_and_count for each image in the folder
+      - The folder is {folder}. The files match {pattern}
+    params:
+      - { arg: method, label: Method, ui_default: Default }
+      - { arg: min_size, label: Size (minimum), ui_default: 0 }
+      - { arg: exclude_edges, label: Exclude on edges, ui_default: false }
+    fidelity: exact
+    evidence: { source: macro_recorder, test: folder_counts }
+    summary: "Counted {metrics.n_images} images. Total {metrics.total_count} particles, mean {metrics.mean_count} for each image."
+
+  - tool: run_command
+    route: Menu command
+    steps:
+      - Open the file {input}
+      - Run the command {command} with the options {options}
+    params:
+      - { arg: command, label: Menu command }
+      - { arg: options, label: Dialog fields, note: The same text that the Macro Recorder writes. }
+    fidelity: exact
+    evidence: { source: program_definitions, test: discs_run_command }
+    summary: "Ran the menu command {command}."
+
+  - tool: run_macro
+    route: Plugins > New > Macro
+    steps:
+      - Paste the macro text and click Run in the macro editor
+    params:
+      - { arg: code, label: Macro text }
+    fidelity: code_only
+    evidence: { source: code }
+    summary: "Ran the macro."
+
+  - tool: list_commands
+    route: Plugins > Utilities > Find Commands...
+    steps:
+      - Type {query} in the search field
+    params:
+      - { arg: query, label: Search field }
+    fidelity: exact
+    evidence: { source: program_definitions }
+    summary: "Found {metrics.n_found} menu commands for {query}."
+
+checks:
+  - id: pseudoreplication
+    description: Statistics over cells or particles from too few images, shown with p-values.
+    severity: error
+  - id: uncalibrated_units
+    description: The answer gives sizes in micrometers but the image has no scale.
+    severity: error
+  - id: saturation
+    description: A measured image has saturated pixels.
+    severity: warning
+  - id: jpeg_quantification
+    description: A JPEG file was measured.
+    severity: warning
+  - id: threshold_not_checked
+    description: The threshold method was not compared with other methods, or the count depends on the method.
+    severity: warning
+  - id: background_not_handled
+    description: The image background differs across the field but the steps do not subtract it.
+    severity: warning
+
+tests:
+  - id: blobs_info
+    description: The sample image blobs.gif is 256 by 254 pixels, 8 bit, with an inverting LUT.
+    data: [data/blobs.gif]
+    calls:
+      - tool: open_image
+        args: { path: "{adapter_dir}/data/blobs.gif" }
+    expect:
+      - { path: metrics.width, equals: 256 }
+      - { path: metrics.height, equals: 254 }
+      - { path: metrics.bit_depth, equals: 8 }
+      - { path: metrics.inverting_lut, equals: 1 }
+      - { path: metrics.min_value, equals: 8 }
+      - { path: metrics.max_value, equals: 248 }
+
+  - id: blobs_count_default
+    description: The classic result. The Default threshold finds 64 particles in blobs.gif. Edges are not excluded.
+    data: [data/blobs.gif]
+    manual_route_checked: true
+    calls:
+      - tool: threshold
+        args: { input: "{adapter_dir}/data/blobs.gif", method: Default, dark_background: false }
+        save_as: thr
+      - tool: analyze_particles
+        args: { mask: "{saved.thr.data.files.mask}", exclude_edges: false }
+    expect:
+      - { path: metrics.count, equals: 64 }
+
+  - id: blobs_threshold_steps
+    description: The threshold step on blobs.gif gives the limits 126 and 255.
+    data: [data/blobs.gif]
+    calls:
+      - tool: threshold
+        args: { input: "{adapter_dir}/data/blobs.gif", method: Default, dark_background: false }
+    expect:
+      - { path: metrics.threshold_low, equals: 126 }
+      - { path: metrics.threshold_high, equals: 255 }
+
+  - id: blobs_exclude_edges
+    description: With Exclude on edges, fewer particles remain.
+    data: [data/blobs.gif]
+    calls:
+      - tool: threshold_and_count
+        args: { input: "{adapter_dir}/data/blobs.gif", method: Default, dark_background: false, rolling_radius: 0, sigma: 0, exclude_edges: true }
+    expect:
+      - { path: metrics.count, equals: 0 }
+
+  - id: discs_count
+    description: Twelve discs of radius 10 on a dark background.
+    data: [data/discs.png]
+    calls:
+      - tool: threshold_and_count
+        args: { input: "{adapter_dir}/data/discs.png", method: Default, dark_background: true, rolling_radius: 0, sigma: 0 }
+    expect:
+      - { path: metrics.count, equals: 12 }
+
+  - id: discs_touching_watershed
+    description: Six pairs of touching discs.
+    data: [data/discs_touching.png]
+    calls:
+      - tool: threshold_and_count
+        args: { input: "{adapter_dir}/data/discs_touching.png", method: Default, dark_background: true, rolling_radius: 0, sigma: 0, watershed: false }
+    expect:
+      - { path: metrics.count, equals: 6 }
+
+  - id: discs_gradient_subtracted
+    description: Twelve discs on a background with a gradient.
+    data: [data/discs_gradient.png]
+    calls:
+      - tool: threshold_and_count
+        args: { input: "{adapter_dir}/data/discs_gradient.png", method: Default, dark_background: true, rolling_radius: 25, sigma: 0 }
+    expect:
+      - { path: metrics.count, equals: 12 }
+
+  - id: discs_noisy_blurred
+    description: Twelve discs with noise.
+    data: [data/discs_noisy.png]
+    calls:
+      - tool: threshold_and_count
+        args: { input: "{adapter_dir}/data/discs_noisy.png", method: Default, dark_background: true, rolling_radius: 0, sigma: 2 }
+    expect:
+      - { path: metrics.count, equals: 12 }
+
+  - id: discs_calibrated
+    description: A scale of 0.5 micrometer for each pixel makes each area one quarter.
+    data: [data/discs.png]
+    calls:
+      - tool: set_scale
+        args: { input: "{adapter_dir}/data/discs.png", distance_px: 100, known_distance: 50, unit: um }
+        save_as: scaled
+      - tool: threshold_and_count
+        args: { input: "{saved.scaled.data.files.image}", method: Default, dark_background: true, rolling_radius: 0, sigma: 0 }
+    expect:
+      - { path: metrics.count, equals: 12 }
+      - { path: data.values.area_unit, equals: um }
+
+  - id: discs_measure
+    description: The mean of the whole synthetic image.
+    data: [data/discs.png]
+    calls:
+      - tool: measure
+        args: { input: "{adapter_dir}/data/discs.png" }
+    expect:
+      - { path: metrics.area, min: 1 }
+
+  - id: discs_saturated
+    description: The saturated version has more than 1 percent of pixels at 255.
+    data: [data/discs_saturated.png]
+    calls:
+      - tool: open_image
+        args: { path: "{adapter_dir}/data/discs_saturated.png" }
+    expect:
+      - { path: metrics.saturated_fraction, min: 0.01 }
+
+  - id: discs_run_command
+    description: A generic menu command gives the same pixels as the named tool.
+    data: [data/discs.png]
+    calls:
+      - tool: run_command
+        args: { input: "{adapter_dir}/data/discs.png", command: Gaussian Blur..., options: sigma=2 }
+    expect:
+      - { path: ok, equals: true }
+
+  - id: folder_counts
+    description: Counts for each image in the data folder.
+    data: [data/discs.png, data/discs_touching.png]
+    calls:
+      - tool: count_folder
+        args: { folder: "{adapter_dir}/data", pattern: "discs*.png", method: Default, dark_background: true }
+    expect:
+      - { path: metrics.n_images, min: 2 }
+
+tools:
+  - name: open_image
+    title: Open an image
+    description: >
+      Open an image file and report its size, bit depth, scale, intensity range, saturated
+      fraction and background variation. Saves a PNG preview. Use this first for each new image.
+    params:
+      path: { type: string, description: Full path of the image file. }
+    required: [path]
+    outputs:
+      preview: { kind: image, ext: .png, description: PNG preview of the image. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{path}");
+      printInfo("{path}");
+      savePreview("{output.preview}");
+
+  - name: image_info
+    title: Read image information
+    description: Report the size, bit depth, scale and intensity range of an image file. Changes nothing.
+    params:
+      path: { type: string, description: Full path of the image file. }
+    required: [path]
+    read_only: true
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{path}");
+      printInfo("{path}");
+
+  - name: set_scale
+    title: Set the scale
+    description: >
+      Save a copy of the image with a known scale. Use it when you know the length of a feature
+      in pixels, such as a scale bar. After this step sizes use real units.
+    params:
+      input: { type: string, description: Path of the input image. }
+      distance_px: { type: number, exclusiveMinimum: 0, description: Distance in pixels. }
+      known_distance: { type: number, exclusiveMinimum: 0, description: The real length of that distance. }
+      unit: { type: string, default: um, description: "Unit of length, such as um, mm or nm." }
+    required: [input, distance_px, known_distance]
+    outputs:
+      image: { kind: file, ext: .tif, description: Image with the scale. }
+      preview: { kind: image, ext: .png, description: PNG preview. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{input}");
+      run("Set Scale...", "distance={distance_px} known={known_distance} pixel=1 unit={unit}");
+      getPixelSize(u, pw, ph);
+      print("pixel_width=" + d2s(pw, 6));
+      print("pixel_unit=" + asciiUnit(u));
+      savePair("{output.image}", "{output.preview}");
+
+  - name: subtract_background
+    title: Subtract the background
+    description: >
+      Remove an uneven background with the rolling ball method. Use a radius larger than the
+      largest object. Use it when open_image reports that the background differs across the image.
+    params:
+      input: { type: string, description: Path of the input image. }
+      rolling_radius: { type: number, minimum: 1, default: 50, description: Radius of the rolling ball in pixels. }
+      light_background: { type: boolean, default: false, description: True if the objects are dark on a light background. }
+    required: [input]
+    outputs:
+      image: { kind: file, ext: .tif, description: Image without the background. }
+      preview: { kind: image, ext: .png, description: PNG preview. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{input}");
+      opt = "rolling={rolling_radius}";
+      if ({light_background}) opt = opt + " light";
+      run("Subtract Background...", opt);
+      savePair("{output.image}", "{output.preview}");
+
+  - name: gaussian_blur
+    title: Blur the image
+    description: >
+      Smooth the image with a Gaussian filter. Use it to lower noise before a threshold. Sigma is
+      in pixels.
+    params:
+      input: { type: string, description: Path of the input image. }
+      sigma: { type: number, exclusiveMinimum: 0, default: 2, description: Sigma (radius) in pixels. }
+    required: [input]
+    outputs:
+      image: { kind: file, ext: .tif, description: Blurred image. }
+      preview: { kind: image, ext: .png, description: PNG preview. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{input}");
+      run("Gaussian Blur...", "sigma={sigma}");
+      savePair("{output.image}", "{output.preview}");
+
+  - name: threshold
+    title: Make a binary mask
+    description: >
+      Select the objects with an automatic threshold and save a binary mask. Set dark_background to
+      true if the objects are bright on a dark background, as displayed. Use the same method for
+      all images that you compare.
+    params:
+      input: { type: string, description: Path of the input image. }
+      method:
+        type: string
+        enum: [Default, Otsu, Triangle, Huang, Li, IsoData, Mean, MaxEntropy]
+        description: Automatic threshold method.
+      dark_background: { type: boolean, default: false, description: True if the objects are bright on a dark background. }
+    required: [input, method]
+    outputs:
+      mask: { kind: file, ext: .tif, description: Binary mask. The objects have the value 255. }
+      preview: { kind: image, ext: .png, description: PNG preview of the mask. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{input}");
+      runThreshold("{method}", {dark_background});
+      savePair("{output.mask}", "{output.preview}");
+
+  - name: watershed
+    title: Split touching objects
+    description: Split objects that touch in a binary mask. Use it when open_image or the preview shows merged objects.
+    params:
+      mask: { type: string, description: Path of the binary mask from threshold. }
+    required: [mask]
+    outputs:
+      mask: { kind: file, ext: .tif, description: Binary mask with split objects. }
+      preview: { kind: image, ext: .png, description: PNG preview of the mask. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{mask}");
+      needMask();
+      setOption("BlackBackground", false);
+      run("Watershed");
+      savePair("{output.mask}", "{output.preview}");
+
+  - name: analyze_particles
+    title: Count and measure particles
+    description: >
+      Count the objects in a binary mask and measure each one. Sizes use the image scale. Gives
+      count, mean area, median area, total area and area fraction. Saves a table with one row for
+      each object and a PNG with the outlines.
+    params:
+      mask: { type: string, description: Path of the binary mask from threshold or watershed. }
+      min_size: { type: number, minimum: 0, default: 0, description: Smallest area to count, in calibrated units. }
+      max_size: { type: number, minimum: 0, default: 0, description: Largest area to count. 0 means no limit. }
+      min_circularity: { type: number, minimum: 0, maximum: 1, default: 0, description: Smallest circularity to count. }
+      exclude_edges: { type: boolean, default: false, description: True to leave out objects that touch the image edge. }
+      measure_image: { type: string, default: "", description: "Optional path of a gray image. Mean, minimum and maximum then come from this image." }
+    required: [mask]
+    outputs:
+      particles: { kind: table, ext: .csv, description: One row for each object. }
+      outlines: { kind: image, ext: .png, description: PNG with the outline of each object. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      redirect = "None";
+      if ("{measure_image}" != "") {
+        openImage("{measure_image}");
+        redirect = "[" + getTitle() + "]";
+      }
+      openImage("{mask}");
+      needMask();
+      analyze({min_size}, {max_size}, {min_circularity}, {exclude_edges}, redirect, "{output.outlines}", "{output.particles}");
+      printCounts();
+
+  - name: measure
+    title: Measure the intensity
+    description: >
+      Measure the area, mean, standard deviation, minimum, maximum and integrated density of the
+      whole image or of one rectangle.
+    params:
+      input: { type: string, description: Path of the input image. }
+      roi:
+        type: string
+        default: ""
+        pattern: '^(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*)?$'
+        description: "Optional rectangle as x,y,width,height in pixels. Empty means the whole image."
+    required: [input]
+    outputs:
+      measurements: { kind: table, ext: .csv, description: The measurement row. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{input}");
+      roi = "{roi}";
+      if (roi != "") {
+        p = split(roi, ",");
+        makeRectangle(parseInt(p[0]), parseInt(p[1]), parseInt(p[2]), parseInt(p[3]));
+      }
+      run("Set Measurements...", "area mean standard min integrated redirect=None decimal=3");
+      run("Measure");
+      print("area=" + getResult("Area", 0));
+      print("mean=" + getResult("Mean", 0));
+      print("std=" + getResult("StdDev", 0));
+      print("min=" + getResult("Min", 0));
+      print("max=" + getResult("Max", 0));
+      print("integrated_density=" + getResult("IntDen", 0));
+      saveAs("Results", "{output.measurements}");
+
+  - name: threshold_and_count
+    title: Threshold and count in one step
+    description: >
+      Run the whole count on one image: optional background subtraction, optional blur, threshold,
+      optional watershed, then count. Use it to compare settings. Saves the mask, a table and an
+      outline PNG.
+    params:
+      input: { type: string, description: Path of the input image. }
+      method:
+        type: string
+        enum: [Default, Otsu, Triangle, Huang, Li, IsoData, Mean, MaxEntropy]
+        default: Default
+        description: Automatic threshold method.
+      dark_background: { type: boolean, default: false, description: True if the objects are bright on a dark background. }
+      rolling_radius: { type: number, minimum: 0, default: 0, description: Rolling ball radius in pixels. 0 means no background subtraction. }
+      light_background: { type: boolean, default: false, description: True for the rolling ball if the background is light. }
+      sigma: { type: number, minimum: 0, default: 0, description: Gaussian blur sigma in pixels. 0 means no blur. }
+      watershed: { type: boolean, default: false, description: True to split touching objects. }
+      min_size: { type: number, minimum: 0, default: 0, description: Smallest area to count, in calibrated units. }
+      max_size: { type: number, minimum: 0, default: 0, description: Largest area to count. 0 means no limit. }
+      min_circularity: { type: number, minimum: 0, maximum: 1, default: 0, description: Smallest circularity to count. }
+      exclude_edges: { type: boolean, default: false, description: True to leave out objects that touch the image edge. }
+    required: [input]
+    outputs:
+      mask: { kind: file, ext: .tif, description: Binary mask. }
+      particles: { kind: table, ext: .csv, description: One row for each object. }
+      outlines: { kind: image, ext: .png, description: PNG with the outline of each object. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{input}");
+      pipeline({rolling_radius}, {light_background}, {sigma}, "{method}", {dark_background}, {watershed});
+      saveAs("Tiff", "{output.mask}");
+      analyze({min_size}, {max_size}, {min_circularity}, {exclude_edges}, "None", "{output.outlines}", "{output.particles}");
+      printCounts();
+
+  - name: count_folder
+    title: Count in all images of a folder
+    description: >
+      Repeat the same count for each image in a folder. Gives a table with one row for each image.
+      Use the same settings for all images. Compare images or animals, not single cells.
+    params:
+      folder: { type: string, description: Full path of the folder. }
+      pattern: { type: string, default: "*.tif", description: "File name pattern with * and ? wildcards, such as *.tif." }
+      method:
+        type: string
+        enum: [Default, Otsu, Triangle, Huang, Li, IsoData, Mean, MaxEntropy]
+        default: Default
+        description: Automatic threshold method.
+      dark_background: { type: boolean, default: false, description: True if the objects are bright on a dark background. }
+      rolling_radius: { type: number, minimum: 0, default: 0, description: Rolling ball radius in pixels. 0 means no background subtraction. }
+      light_background: { type: boolean, default: false, description: True for the rolling ball if the background is light. }
+      sigma: { type: number, minimum: 0, default: 0, description: Gaussian blur sigma in pixels. 0 means no blur. }
+      watershed: { type: boolean, default: false, description: True to split touching objects. }
+      min_size: { type: number, minimum: 0, default: 0, description: Smallest area to count, in calibrated units. }
+      max_size: { type: number, minimum: 0, default: 0, description: Largest area to count. 0 means no limit. }
+      min_circularity: { type: number, minimum: 0, maximum: 1, default: 0, description: Smallest circularity to count. }
+      exclude_edges: { type: boolean, default: false, description: True to leave out objects that touch the image edge. }
+    required: [folder]
+    outputs:
+      per_image: { kind: table, ext: .csv, description: One row for each image. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      quiet = true;
+      folder = "{folder}";
+      if (!File.isDirectory(folder)) fail("Folder not found: " + folder);
+      if (!endsWith(folder, File.separator)) folder = folder + File.separator;
+      rx = globToRegex(toLowerCase("{pattern}"));
+      list = getFileList(folder);
+      callDir = "{call_dir}" + File.separator;
+      File.makeDirectory(callDir + "outlines");
+      File.makeDirectory(callDir + "particles");
+      csv = "file,count,mean_area,median_area,total_area,area_fraction\n";
+      counts = newArray(list.length);
+      n = 0;
+      for (i = 0; i < list.length; i++) {
+        name = list[i];
+        if (endsWith(name, "/") || endsWith(name, "\\")) continue;
+        if (!matches(toLowerCase(name), rx)) continue;
+        open(folder + name);
+        if (nImages == 0) {
+          print("warning=Skipped " + name);
+          continue;
+        }
+        pipeline({rolling_radius}, {light_background}, {sigma}, "{method}", {dark_background}, {watershed});
+        analyze({min_size}, {max_size}, {min_circularity}, {exclude_edges}, "None", callDir + "outlines" + File.separator + name + ".png", callDir + "particles" + File.separator + name + ".csv");
+        csv = csv + "\"" + name + "\"," + cCount + "," + d2s(cMean, 4) + "," + d2s(cMedian, 4) + "," + d2s(cTotal, 4) + "," + d2s(cFraction, 5) + "\n";
+        counts[n] = cCount;
+        n++;
+        close("*");
+      }
+      if (n == 0) fail("No image in the folder matches the pattern: {pattern}");
+      File.saveString(csv, "{output.per_image}");
+      used = Array.trim(counts, n);
+      Array.getStatistics(used, cmin, cmax, cmean, csd);
+      print("n_images=" + n);
+      print("total_count=" + (cmean * n));
+      print("mean_count=" + d2s(cmean, 3));
+      print("sd_count=" + d2s(csd, 3));
+      print("min_count=" + cmin);
+      print("max_count=" + cmax);
+      print("area_unit=" + cUnit);
+
+  - name: run_command
+    title: Run any menu command
+    description: >
+      Run one ImageJ menu command on an image and save the result. Use it only when no other tool
+      fits. Give the exact command name, such as "Median...". Give every dialog field in options,
+      in the form that the Macro Recorder writes, such as "radius=2". Use list_commands to find names.
+    params:
+      input: { type: string, description: Path of the input image. }
+      command: { type: string, description: Exact menu command name, such as "Median...". }
+      options: { type: string, default: "", description: "Dialog fields, such as radius=2." }
+    required: [input, command]
+    outputs:
+      image: { kind: file, ext: .tif, description: The image after the command. }
+      preview: { kind: image, ext: .png, description: PNG preview. }
+    parse: keyvalue
+    macro: |
+      {include:lib.ijm}
+      openImage("{input}");
+      List.setCommands;
+      if (List.get("{command}") == "") fail("Unknown menu command: {command}. Use list_commands to find the exact name.");
+      run("{command}", "{options}");
+      if (nImages == 0) fail("The command closed the image.");
+      savePair("{output.image}", "{output.preview}");
+
+  - name: run_macro
+    title: Run macro code
+    description: >
+      Run ImageJ macro code. Use it only when no other tool fits. A macro error can stop the
+      program until the time limit. Print results as key=value lines. The variable callDir holds a
+      folder where the macro can save files.
+    params:
+      code: { type: string, description: ImageJ macro code. }
+    required: [code]
+    approval: true
+    parse: keyvalue
+    macro: |
+      callDir = "{call_dir}";
+      {raw:code}

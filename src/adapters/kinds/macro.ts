@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import type { Args, Fidelity, OutputFile, TablePreview, Tool, ToolOutput } from "../../core/types.ts";
 import { locate } from "../locate.ts";
@@ -106,6 +106,7 @@ function outputList(call: CallDir, def: ToolDef, extra: string[], macroFile: str
   };
   for (const p of Object.values(call.outputs)) add(p);
   for (const p of extra) add(p);
+  for (const e of readdirSync(call.dir, { withFileTypes: true })) if (e.isFile() && !e.name.startsWith(".")) add(join(call.dir, e.name));
   return out;
 }
 

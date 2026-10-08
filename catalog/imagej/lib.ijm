@@ -5,6 +5,7 @@ var cTotal = 0;
 var cFraction = 0;
 var cCirc = 0;
 var cUnit = "pixels";
+var quiet = false;
 
 function fail(msg) {
   print("error=" + msg);
@@ -91,7 +92,7 @@ function printInfo(path) {
   print("bit_depth=" + bitDepth());
   print("inverting_lut=" + is("Inverting LUT"));
   u = asciiUnit(unit);
-  calibrated = (u != "pixels" && u != "pixel" && u != "" && pw != 1);
+  calibrated = (u != "pixels" && u != "pixel" && u != "");
   print("calibrated=" + calibrated);
   print("pixel_width=" + d2s(pw, 6));
   print("pixel_height=" + d2s(ph, 6));
@@ -125,16 +126,18 @@ function runThreshold(method, dark) {
   setOption("BlackBackground", false);
   if (bitDepth() == 24) {
     run("8-bit");
-    print("note=The color image was converted to 8-bit gray.");
+    if (!quiet) print("note=The color image was converted to 8-bit gray.");
   }
   if (dark) setAutoThreshold(method + " dark");
   else setAutoThreshold(method);
   getThreshold(lo, hi);
-  print("threshold_low=" + d2s(lo, 3));
-  print("threshold_high=" + d2s(hi, 3));
   run("Convert to Mask");
   getHistogram(v, c, 256);
-  print("foreground_fraction=" + d2s(c[255] / (getWidth() * getHeight()), 5));
+  if (!quiet) {
+    print("threshold_low=" + d2s(lo, 3));
+    print("threshold_high=" + d2s(hi, 3));
+    print("foreground_fraction=" + d2s(c[255] / (getWidth() * getHeight()), 5));
+  }
 }
 
 function analyze(minSize, maxSize, minCirc, excl, redirect, outlinePng, csv) {

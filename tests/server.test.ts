@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { FakeSession } from "../src/tui/fake-session.ts";
 import { ntfyNotifier, setWindowUrl } from "../src/server/notify.ts";
 import { startWindow } from "../src/server/window.ts";
-import { createServer } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
 
 const closers: (() => void)[] = [];
@@ -30,7 +30,7 @@ async function runToQuestion(s: FakeSession) {
     });
   });
   while (s.questions.open().length === 0) await new Promise((r) => setTimeout(r, 10));
-  return run;
+  return { run };
 }
 
 describe("window server", () => {
@@ -49,14 +49,20 @@ describe("window server", () => {
 
   test("rejects a foreign Host header", async () => {
     const { base, token } = await open();
-    const res = await fetch(`${base}/api/state?t=${token}`, { headers: { host: "evil.example" } }).catch(() => undefined);
-    expect(res === undefined || res.status === 403).toBe(true);
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = httpRequest(`${base}/api/state?t=${token}`, { headers: { host: "evil.example" } }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on("error", reject);
+      req.end();
+    });
+    expect(status).toBe(403);
   });
 
   test("state holds nodes, edges, stale marks, trail, questions and decisions", async () => {
     const { s, base, token } = await open();
-    const run = runToQuestion(s);
-    await run.catch(() => {});
+    await runToQuestion(s);
     const q = s.questions.open()[0]!;
     const state = await (await fetch(`${base}/api/state?t=${token}`)).json();
     expect(state.nodes.map((n: { id: string }) => n.id)).toEqual(["n1", "n2"]);
