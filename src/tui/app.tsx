@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Box, Static, Text, render, useApp, useInput, useStdout } from "ink";
 import TextInput from "ink-text-input";
 import type { BusEvent, Mode } from "../core/types.ts";
-import { FindingsCard, InstructionCard, KeyCard, PermissionCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
-import { claudeKey, credentialsPath, keyProblem, maskKey, saveClaudeKey } from "../core/credentials.ts";
+import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
+import { claudeKey, credentialsPath, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from "./commands.ts";
 import { imageProtocol, inlineImage } from "./image.ts";
@@ -352,6 +352,19 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         />
       ) : null}
       {card?.t === "findings" ? <FindingsCard key="findings" card={card} session={session} onClose={popCard} /> : null}
+      {card?.t === "eln" ? (
+        <ElnCard
+          key="eln"
+          path={credentialsPath()}
+          onCancel={popCard}
+          onSubmit={(url, key) => {
+            const problem = elabftwProblem(url, key);
+            if (problem) return line("✗", problem, "red");
+            popCard();
+            line("✓", `Saved the eLabFTW address and key ${maskKey(key)} to ${saveElabftw(url, key)}.`, "green");
+          }}
+        />
+      ) : null}
       {card?.t === "key" ? <KeyCard key="key" card={card} path={credentialsPath()} onSubmit={(k) => void submitKey(k)} onCancel={popCard} /> : null}
       <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
         <Text color="cyan">{"> "}</Text>

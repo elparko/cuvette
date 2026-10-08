@@ -64,6 +64,38 @@ export function removeClaudeKey(): boolean {
   return true;
 }
 
+export function elabftwConfig(): { url: string; key: string } | undefined {
+  const f = readFile();
+  return f.elabftw_url && f.elabftw_api_key ? { url: f.elabftw_url, key: f.elabftw_api_key } : undefined;
+}
+
+export function saveElabftw(url: string, key: string): string {
+  return write({ ...readFile(), elabftw_url: url, elabftw_api_key: key });
+}
+
+export function removeElabftw(): boolean {
+  const rest = readFile();
+  if (!rest.elabftw_url && !rest.elabftw_api_key) return false;
+  delete rest.elabftw_url;
+  delete rest.elabftw_api_key;
+  write(rest);
+  return true;
+}
+
+export function elabftwProblem(url: string, key: string): string | undefined {
+  if (!key.trim()) return "The API key is empty.";
+  if (/\s/.test(key.trim())) return "The API key has a space in it.";
+  let u: URL;
+  try {
+    u = new URL(url.trim());
+  } catch {
+    return "The URL is not valid. Use the form https://elab.example.org.";
+  }
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+  if (u.protocol !== "https:" && !(u.protocol === "http:" && local)) return "The URL must start with https://. Plain http is allowed only for localhost.";
+  return undefined;
+}
+
 export function keyVersion(): number {
   return version;
 }

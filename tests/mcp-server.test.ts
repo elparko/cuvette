@@ -101,6 +101,23 @@ test("setup, a blocked call, an answer, a good call, the trail and the export", 
   expect(transportErrors).toEqual([]);
 });
 
+test("ga_eln_push refuses because the MCP client cannot approve, and ga_export offers eln", async () => {
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(join(home, "credentials.json"), JSON.stringify({ elabftw_url: "http://127.0.0.1:9", elabftw_api_key: "k-secret" }), { mode: 0o600 });
+  const c = await connect(lab);
+  const { tools } = await c.listTools();
+  expect(tools.map((t) => t.name)).toContain("ga_eln_push");
+  expect((tools.find((t) => t.name === "ga_export")!.inputSchema.properties as any).format.enum).toContain("eln");
+  await call("ga_setup", { values: { question: "q" } });
+  const r = await call("ga_eln_push");
+  expect(r.isError).toBe(true);
+  expect(r.text).toMatch(/did not approve/);
+  expect(r.text).not.toMatch(/k-secret/);
+  const eln = await call("ga_export", { format: "eln" });
+  expect(eln.isError).toBe(false);
+  expect(eln.text.trim().endsWith(".eln")).toBe(true);
+});
+
 test("stdout carries only protocol lines", async () => {
   const child = spawn("node", [ga, "mcp", "--adapter", lab], { env: { ...process.env, GA_HOME: home }, stdio: ["pipe", "pipe", "pipe"] });
   let out = "";

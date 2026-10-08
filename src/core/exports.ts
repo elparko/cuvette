@@ -9,7 +9,7 @@ import type { RouteText } from "./trail.ts";
 
 const REPLAY_PATH = fileURLToPath(new URL("./replay.ts", import.meta.url));
 
-function mainNodes(record: AnalysisRecord): Node[] {
+export function mainNodes(record: AnalysisRecord): Node[] {
   return record.nodes().filter((n) => !n.sensitivityOf);
 }
 
@@ -54,7 +54,7 @@ function group(nodes: Node[]): Group[] {
   return out;
 }
 
-function setupValues(record: AnalysisRecord): Record<string, unknown> {
+export function setupValues(record: AnalysisRecord): Record<string, unknown> {
   const s = record.entries(["setup"]);
   const v = s[s.length - 1]?.data.values;
   return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
@@ -85,7 +85,7 @@ function stepRoute(adapters: LoadedAdapter[], n: Node): RouteText | undefined {
 
 // ---------------------------------------------------------------- protocol
 
-function stepLines(adapters: LoadedAdapter[], n: Node): string[] {
+export function stepLines(adapters: LoadedAdapter[], n: Node): string[] {
   const r = stepRoute(adapters, n);
   const out: string[] = [];
   const codeOnly = r ? r.fidelity === "code_only" : n.fidelity === "code_only" || n.fidelity === "none";

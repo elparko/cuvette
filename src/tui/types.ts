@@ -50,6 +50,8 @@ export interface SessionLike {
   review(): Promise<Finding[]>;
   compact(): Promise<void>;
   exportAs(fmt: any): Promise<string>;
+  elnPush?(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }>;
+  elnLink?(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }>;
   close(): Promise<void>;
 }
 

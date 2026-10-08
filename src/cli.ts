@@ -16,8 +16,12 @@ Usage
   ga onboard <program> --model <model> [--docs <url>] [--kind cli]
   ga models                            list the models
   ga key [status|remove|workspace <id>] save, show or remove your Claude API key
+  ga eln setup [--url <address>]       save your eLabFTW address and API key
+  ga eln status|remove                 show or remove the saved eLabFTW key
+  ga eln push <session>                send a session to eLabFTW after you approve the list
+  ga eln link <session> <id>           read an eLabFTW experiment and propose setup values
   ga sessions                          list the sessions
-  ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow
+  ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln
   ga replay <flow.json> [--input name=path ...] [--session <id>]
   ga run-step <adapter> <tool> '<json args>'
   ga questions                         open questions in every session
@@ -48,6 +52,7 @@ const { values: o, positionals: pos } = parseArgs({
     by: { type: "string" },
     docs: { type: "string", multiple: true },
     kind: { type: "string" },
+    url: { type: "string" },
     guidance: { type: "string" },
     "run-tests": { type: "boolean" },
     generic: { type: "boolean" },
@@ -182,6 +187,49 @@ async function main() {
       console.log(`${r.text} Saved to ${cred.saveClaudeKey(key)}.`);
       return;
     }
+    case "eln": {
+      const cred = await import("./core/credentials.ts");
+      if (a1 === "status") {
+        const c = cred.elabftwConfig();
+        return console.log(c ? `${c.url}\nKey ${cred.maskKey(c.key)} in ${cred.credentialsPath()}` : "eLabFTW is not set up.");
+      }
+      if (a1 === "remove") return console.log(cred.removeElabftw() ? "Removed the eLabFTW address and key." : "No eLabFTW key was saved.");
+      if (a1 === "setup") {
+        const url = (str(o.url) ?? (await ask("eLabFTW address (https://...): "))).trim();
+        const key = (await readSecret("eLabFTW API key: ")).trim();
+        const problem = cred.elabftwProblem(url, key);
+        if (problem) return fail(problem);
+        return console.log(`Saved the address and key ${cred.maskKey(key)} to ${cred.saveElabftw(url, key)}.`);
+      }
+      if (a1 !== "push" && a1 !== "link") return fail("usage: ga eln setup|status|remove|push <session>|link <session> <id>");
+      if (!a2) return fail(`usage: ga eln ${a1} <session>${a1 === "link" ? " <id>" : ""}`);
+      if (a1 === "link" && !/^\d+$/.test(a3 ?? "")) return fail("usage: ga eln link <session> <experiment id>");
+      const { Session } = await import("./core/session.ts");
+      const s = await Session.resume(a2, { model: "fake:" });
+      try {
+        if (a1 === "push") {
+          s.bus.on((e) => {
+            if (e.type !== "permission") return;
+            const lines = Object.entries(e.args).map(([k, v]) => `  ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`);
+            console.log(`This will be sent:\n${lines.join("\n")}\n${e.touches}`);
+            void ask("Send it? [y/N] ").then((x) => s.respondPermission(e.rid, /^y(es)?$/i.test(x.trim()), "answered in the terminal"));
+          });
+          const r = await s.elnPush();
+          console.log(`${r.created ? "Created" : "Updated"} experiment ${r.experiment} (version ${r.version}): ${r.url}`);
+        } else {
+          const r = await s.elnLink(Number(a3));
+          console.log(r.text);
+          if (r.proposals.length && /^y(es)?$/i.test((await ask("Apply these values to the setup? [y/N] ")).trim())) {
+            s.decisions.applySetup(Object.fromEntries(r.proposals.map((p) => [p.key, p.value])), { how: `from eLabFTW experiment ${a3}, confirmed in the terminal` });
+            console.log("Applied.");
+          }
+        }
+      } catch (e) {
+        process.exitCode = 1;
+        console.error((e as Error).message);
+      }
+      return s.close();
+    }
     case "models": {
       const { listModels } = await import("./providers/index.ts");
       for (const m of await listModels()) console.log(`${m.spec.padEnd(32)} ${m.local ? "local" : "cloud"} tools:${m.tools ? "yes" : "no"} context:${m.contextWindow}  ${m.label}`);
@@ -244,13 +292,26 @@ async function main() {
 
 main().catch((e) => fail(`ga: ${(e as Error).message}`));
 
+let lines: string[] | undefined;
+
+async function ask(prompt: string): Promise<string> {
+  process.stderr.write(prompt);
+  if (!lines) {
+    let all = "";
+    if (process.stdin.isTTY) {
+      const { createInterface } = await import("node:readline");
+      const rl = createInterface({ input: process.stdin, terminal: false });
+      return new Promise((resolve) => rl.once("line", (l) => (rl.close(), resolve(l))));
+    }
+    for await (const c of process.stdin) all += c;
+    lines = all.split("\n");
+  }
+  return lines.shift() ?? "";
+}
+
 async function readSecret(prompt: string): Promise<string> {
   const input = process.stdin;
-  if (!input.isTTY) {
-    let all = "";
-    for await (const c of input) all += c;
-    return all;
-  }
+  if (!input.isTTY) return ask(prompt);
   process.stderr.write(prompt);
   input.setRawMode(true);
   input.resume();

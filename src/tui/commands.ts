@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Mode, Owner, Question } from "../core/types.ts";
 import { gaHome } from "../adapters/manifest.ts";
-import { claudeKey, claudeWorkspace, credentialsPath, maskKey, removeClaudeKey, saveClaudeWorkspace } from "../core/credentials.ts";
+import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
 import type { Card } from "./cards.tsx";
 import { show } from "./cards.tsx";
 import type { OutputRef } from "./items.ts";
@@ -33,7 +33,7 @@ export interface Command {
 
 const MODES: Mode[] = ["watch", "follow", "teach", "plan"];
 const OWNERS: Owner[] = ["human", "agent", "fixed"];
-const FORMATS = ["html", "md", "jsonl", "pdf", "protocol", "script", "notebook", "flow"];
+const FORMATS = ["html", "md", "jsonl", "pdf", "protocol", "script", "notebook", "flow", "eln"];
 
 async function lazy<T = any>(spec: string): Promise<T | undefined> {
   try {
@@ -154,8 +154,8 @@ async function loadProfiles(): Promise<{ name: string; version: number }[]> {
   }
 }
 
-export async function openSetup(ctx: CommandCtx): Promise<void> {
-  ctx.openCard({ t: "setup", profiles: await loadProfiles() });
+export async function openSetup(ctx: CommandCtx, proposed?: Record<string, unknown>, proposedFrom?: string): Promise<void> {
+  ctx.openCard({ t: "setup", profiles: await loadProfiles(), proposed, proposedFrom });
 }
 
 async function allOpen(): Promise<Question[] | undefined> {
@@ -336,6 +336,43 @@ export const commands: Command[] = [
       }
       if (sub) return ctx.error("Use /key, /key status, /key remove or /key workspace <id>.");
       ctx.openCard({ t: "key" });
+    },
+  },
+  {
+    name: "eln",
+    args: "<setup|status|remove|push|link <id>>",
+    help: "Use the eLabFTW notebook: save the key, push this session, or read an experiment.",
+    async run([sub, id], ctx) {
+      const s = ctx.session;
+      if (sub === "setup") return ctx.openCard({ t: "eln" });
+      if (sub === "status") {
+        const c = elabftwConfig();
+        return ctx.notice(c ? `eLabFTW: ${c.url}, key ${maskKey(c.key)}, saved in ${credentialsPath()}.` : "eLabFTW is not set up. Type /eln setup.");
+      }
+      if (sub === "remove") return ctx.notice(removeElabftw() ? "Removed the eLabFTW address and key." : "No eLabFTW key was saved.");
+      if (sub === "push") {
+        if (!s.elnPush) return unavailable(ctx);
+        try {
+          const r = await s.elnPush();
+          ctx.notice(`${r.created ? "Created" : "Updated"} experiment ${r.experiment} (version ${r.version}): ${r.url}`);
+        } catch (e) {
+          ctx.error((e as Error).message);
+        }
+        return;
+      }
+      if (sub === "link") {
+        if (!s.elnLink) return unavailable(ctx);
+        if (!/^\d+$/.test(id ?? "")) return ctx.error("Use: /eln link <experiment id>");
+        try {
+          const r = await s.elnLink(Number(id));
+          ctx.print(r.text, "eLabFTW experiment");
+          if (r.proposals.length) await openSetup(ctx, Object.fromEntries(r.proposals.map((p) => [p.key, p.value])), `experiment ${id}`);
+        } catch (e) {
+          ctx.error((e as Error).message);
+        }
+        return;
+      }
+      ctx.error("Use: /eln setup, /eln status, /eln remove, /eln push or /eln link <id>");
     },
   },
   {

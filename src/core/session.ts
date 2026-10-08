@@ -37,7 +37,7 @@ import {
   type ToolOutput,
 } from "./types.ts";
 
-export type ExportFormat = "html" | "md" | "jsonl" | "pdf" | "protocol" | "script" | "notebook" | "flow";
+export type ExportFormat = "html" | "md" | "jsonl" | "pdf" | "protocol" | "script" | "notebook" | "flow" | "eln";
 
 export interface SessionOptions {
   adapters: string[];
@@ -869,11 +869,11 @@ export class Session {
 
   // ------------------------------------------------------------- permissions and follow mode
 
-  private async requestPermission(tool: Tool, args: Args, signal: AbortSignal): Promise<{ ok: boolean; note: string; always: boolean }> {
+  private async requestPermission(tool: Tool, args: Args, signal: AbortSignal, outward?: string): Promise<{ ok: boolean; note: string; always: boolean }> {
     const rid = `r${++this.permCount}`;
     const code = typeof args.code === "string" ? args.code : undefined;
-    let touches = tool.adapter ? `Runs ${tool.remoteName ?? tool.name} in ${this.adapterInfo.find((a) => a.name === tool.adapter)?.title}. It writes only to the session folder.` : "Runs on this computer with your user permissions.";
-    if (tool.name === "run_script") {
+    let touches = outward ?? ( tool.adapter ? `Runs ${tool.remoteName ?? tool.name} in ${this.adapterInfo.find((a) => a.name === tool.adapter)?.title}. It writes only to the session folder.` : "Runs on this computer with your user permissions.");
+    if (!outward && tool.name === "run_script") {
       try {
         const { describeLimits } = await import("../tools/run_script.ts");
         touches = describeLimits(this.settings.networkForScripts);
@@ -1051,7 +1051,53 @@ export class Session {
       case "script": return ex.exportScript(this.record, a, join(out, "replay.ts"));
       case "notebook": return ex.exportNotebook(this.record, a, join(out, "analysis.ipynb"));
       case "flow": return ex.exportFlow(this.record, a, join(out, "flow.json"));
+      case "eln": {
+        const eln = await import("../eln/export.ts");
+        return eln.exportEln(this, join(out, `${this.id}.eln`));
+      }
     }
+  }
+
+  async elnPush(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }> {
+    const { elabftwConfig } = await import("./credentials.ts");
+    const cfg = elabftwConfig();
+    if (!cfg) throw new Error("eLabFTW is not set up. Run `ga eln setup` or /eln setup.");
+    const { elabftw } = await import("../eln/elabftw.ts");
+    const sync = await import("../eln/sync.ts");
+    const plan = sync.planPush(this, cfg.url);
+    const tool: Tool = { name: "eln_push", title: "Send to eLabFTW", description: "Send this session to the eLabFTW notebook.", inputSchema: {}, source: "harness", execute: async () => ({ ok: true }) };
+    const res = await this.requestPermission(tool, plan.display, new AbortController().signal, `Sends the listed data to ${plan.server}. It leaves this computer.`);
+    if (!res.ok) throw new Error(`The scientist did not approve the push${res.note ? `: ${res.note}` : "."}`);
+    const client = elabftw(cfg);
+    const done = await sync.runPush(plan, client);
+    const url = client.experimentUrl(done.experiment);
+    this.record.append("eln_push", { experiment: done.experiment, url, server: plan.server, hash: plan.hash, version: plan.version, created: done.created, attachments: { ...this.lastSent(plan.server), ...done.attachments } });
+    return { experiment: done.experiment, url, version: plan.version, hash: plan.hash, created: done.created };
+  }
+
+  private lastSent(server: string): Record<string, string> {
+    const last = this.record.entries(["eln_push"]).filter((e) => e.data.server === server).at(-1);
+    return (last?.data.attachments as Record<string, string> | undefined) ?? {};
+  }
+
+  async elnLink(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }> {
+    const { elabftwConfig } = await import("./credentials.ts");
+    const cfg = elabftwConfig();
+    if (!cfg) throw new Error("eLabFTW is not set up. Run `ga eln setup` or /eln setup.");
+    const { elabftw, baseUrl } = await import("../eln/elabftw.ts");
+    const sync = await import("../eln/sync.ts");
+    const client = elabftw(cfg);
+    const { experiment, items } = await sync.readLink(client, id);
+    const proposals = sync.proposeSetup(this.decisions.fields(), [{ entity: experiment, label: `experiment ${experiment.id}` }, ...items.map((i) => ({ entity: i, label: `item ${i.id}` }))]);
+    this.record.append("eln_link", {
+      experiment: id,
+      server: baseUrl(cfg.url),
+      url: client.experimentUrl(id),
+      title: experiment.title,
+      items: items.map((i) => ({ id: i.id, title: i.title })),
+      proposed: Object.fromEntries(proposals.map((p) => [p.key, p.value])),
+    });
+    return { text: sync.describeLink(experiment, items, proposals), proposals };
   }
 
   async close(): Promise<void> {

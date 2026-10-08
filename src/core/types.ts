@@ -12,7 +12,7 @@ export type EntryKind =
   | "question" | "answer" | "sensitivity"
   | "finding" | "finding_resolution" | "claim_check"
   | "mode" | "follow_step" | "lab_memory"
-  | "note" | "notice" | "error" | "usage" | "compaction" | "correction";
+  | "eln_push" | "eln_link" | "note" | "notice" | "error" | "usage" | "compaction" | "correction";
 
 export interface Entry {
   id: number;

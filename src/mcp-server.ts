@@ -66,8 +66,21 @@ export async function runMcpServer(opts: { adapters: string[] }) {
     {
       name: "ga_export",
       description: "Export the trail, the protocol, a script, a notebook or a flow. Returns the file path.",
-      inputSchema: obj({ format: { type: "string", enum: ["html", "md", "jsonl", "protocol", "script", "notebook", "flow"] } }, ["format"]),
+      inputSchema: obj({ format: { type: "string", enum: ["html", "md", "jsonl", "protocol", "script", "notebook", "flow", "eln"] } }, ["format"]),
       run: async (a) => ({ text: await session.exportAs(a.format as never) }),
+    },
+    {
+      name: "ga_eln_push",
+      description: "Send this session to the scientist's eLabFTW notebook. The scientist must approve the list of data in the ga terminal. This client cannot approve, so the call refuses until the scientist runs `ga eln push <session>`.",
+      inputSchema: obj({}),
+      run: async () => {
+        try {
+          const r = await session.elnPush();
+          return { text: json(r) };
+        } catch (e) {
+          return { text: (e as Error).message, isError: true };
+        }
+      },
     },
   );
   const server = new Server(

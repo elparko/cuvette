@@ -5,7 +5,8 @@ import type { Finding, Question } from "../core/types.ts";
 import type { DecisionFieldLike, SessionLike } from "./types.ts";
 
 export type Card =
-  | { t: "setup"; profiles: { name: string; version: number }[] }
+  | { t: "setup"; profiles: { name: string; version: number }[]; proposed?: Record<string, unknown>; proposedFrom?: string }
+  | { t: "eln" }
   | { t: "permission"; rid: string; tool: string; args: Record<string, unknown>; code?: string; touches: string }
   | { t: "question"; q: Question }
   | { t: "instruction"; step: number; tool: string; text: string }
@@ -54,7 +55,7 @@ export function PermissionCard(props: {
   useInput(
     (input, key) => {
       if (input === "y") props.onAllow();
-      else if (input === "a") props.onAlways();
+      else if (input === "a" && card.tool !== "eln_push") props.onAlways();
       else if (input === "n") setAsking(true);
       else if (key.escape) props.onInterrupt();
     },
@@ -90,8 +91,8 @@ export function PermissionCard(props: {
         />
       ) : (
         <Text>
-          <Text color="green">y</Text> allow · <Text color="red">n</Text> deny · <Text color="cyan">a</Text> always allow {card.tool} in
-          this session
+          <Text color="green">y</Text> allow · <Text color="red">n</Text> deny
+          {card.tool === "eln_push" ? "" : ` · a always allow ${card.tool} in this session`}
         </Text>
       )}
     </Frame>
@@ -251,7 +252,7 @@ export function SetupCard(props: {
 }) {
   const { fields } = props;
   const [values, setValues] = useState<Record<string, unknown>>(() =>
-    Object.fromEntries(fields.map((f) => [f.key, f.set ? f.value : (f.value ?? f.default)])),
+    Object.fromEntries(fields.map((f) => [f.key, f.key in (props.card.proposed ?? {}) ? props.card.proposed![f.key] : f.set ? f.value : (f.value ?? f.default)])),
   );
   const [more, setMore] = useState(false);
   const [cursor, setCursor] = useState(0);
@@ -341,6 +342,7 @@ export function SetupCard(props: {
             <Box key={f.key} flexDirection="column">
               <Text color={on ? "green" : undefined}>
                 {mark} {f.label}: <Text bold>{show(values[f.key])}</Text>
+                {f.key in (props.card.proposed ?? {}) ? <Text color="cyan"> (from {props.card.proposedFrom ?? "eLabFTW"}, not saved yet)</Text> : null}
                 {f.owner === "fixed" ? <Text dimColor> (fixed)</Text> : null}
                 {f.owner === "agent" ? <Text dimColor> (agent decides)</Text> : null}
               </Text>
@@ -383,6 +385,32 @@ export function SetupCard(props: {
       })}
       {error ? <Text color="red">{error}</Text> : null}
       <Text dimColor>Arrows move. Enter edits a field. Esc closes the card.</Text>
+    </Frame>
+  );
+}
+
+export function ElnCard(props: { path: string; onSubmit: (url: string, key: string) => void; onCancel: () => void }) {
+  const [url, setUrl] = useState("");
+  const [key, setKey] = useState("");
+  const [step, setStep] = useState<"url" | "key">("url");
+  useInput((_, k) => {
+    if (k.escape) props.onCancel();
+  });
+  return (
+    <Frame title="eLabFTW notebook" color="cyan">
+      <Text>Type the address of your eLabFTW server and an API key with write access.</Text>
+      <Text dimColor>The harness saves both to {props.path}. Only your user can read that file. The screen shows the key masked.</Text>
+      <Box marginTop={1}>
+        <Text>URL: </Text>
+        {step === "url" ? <TextInput value={url} onChange={setUrl} onSubmit={() => url.trim() && setStep("key")} /> : <Text>{url}</Text>}
+      </Box>
+      {step === "key" ? (
+        <Box>
+          <Text>Key: </Text>
+          <TextInput value={key} onChange={setKey} onSubmit={(k) => props.onSubmit(url.trim(), k.trim())} mask="*" />
+        </Box>
+      ) : null}
+      <Text dimColor>Enter continues · Esc cancels</Text>
     </Frame>
   );
 }
