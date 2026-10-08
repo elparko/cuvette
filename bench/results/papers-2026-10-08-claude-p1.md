@@ -5,13 +5,13 @@ Each cell: computed passes / reported passes. Computed: a logged number is withi
 
 | Model | Computed | Reported | Runs | Not answered |
 | --- | --- | --- | --- | --- |
-| claude | 15/15 | 10/11 | 4 | 0 |
+| claude | 15/15 | 11/11 | 4 | 0 |
 
 ## Matrix
 
 | Paper | claude |
 | --- | --- |
-| love2014-deseq2-airway | 5/5 / 3/4 |
+| love2014-deseq2-airway | 5/5 / 4/4 |
 | mahbod2024-nuinsseg | 3/3 / 1/1 |
 | minh2020-iqtree2 | 1/1 / 1/1 |
 | oksanen-vegan-dune | 6/6 / 5/5 |
@@ -37,11 +37,11 @@ Session: 20261008-153325-c674. Record: /Volumes/T7/guided-analysis/tools/bench-r
 
 | Item | Expected | Computed | Reported |
 | --- | --- | --- | --- |
-| genes_after_filter | 16637 ±600 | pass 16139 (n7 metrics.n_genes_tested, entry 60) | pass 16139 via tolerance (n7, claim check 141) |
-| padj_01_workflow | 4381 ±400 | pass 4081 (n5 metrics.n_significant, entry 48) | FAIL 4905 (n9, claim check 141) |
-| up_padj_01 | 2362 ±250 | pass 2343.573 (n7 table.rows[4][1], entry 60) | pass 2343.6 via tolerance (n8, claim check 141) |
-| down_padj_01 | 2019 ±250 | pass 2059.028 (n8 table.rows[19][1], entry 68) | pass 2059 via tolerance (n8, claim check 141) |
-| padj_005_workflow | 3602 ±400 | pass 3659.696 (n7 table.rows[8][1], entry 60) | not asked |
+| genes_after_filter | 16139 ±100 | pass 16139 (n7 metrics.n_genes_tested, entry 60) | pass 16139 via tolerance (n7, claim check 141) |
+| padj_01_workflow | 4905 ±100 | pass 4905 (n7 metrics.n_significant, entry 60) | pass 4905 via tolerance (n9, claim check 141) |
+| up_padj_01 | 2607 ±60 | pass 2607 (n7 metrics.n_up, entry 60) | pass 2607 via tolerance (n7, claim check 141) |
+| down_padj_01 | 2298 ±60 | pass 2298 (n7 metrics.n_down, entry 60) | pass 2298 via tolerance (n7, claim check 141) |
+| padj_005_workflow | 4081 ±100 | pass 4081 (n5 metrics.n_significant, entry 48) | not asked |
 
 ### mahbod2024-nuinsseg | claude | run 1
 

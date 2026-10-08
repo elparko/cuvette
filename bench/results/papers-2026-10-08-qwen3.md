@@ -5,7 +5,7 @@ Each cell: computed passes / reported passes. Computed: a logged number is withi
 
 | Model | Computed | Reported | Runs | Not answered |
 | --- | --- | --- | --- | --- |
-| ollama:qwen3:8b | 144/169 | 67/119 | 28 | 1 error |
+| ollama:qwen3:8b | 144/169 | 69/119 | 28 | 1 error |
 
 ## Matrix
 
@@ -25,9 +25,9 @@ Each cell: computed passes / reported passes. Computed: a logged number is withi
 | lazear2023-sage | 5/6 / 2/3 | - | - |
 | li2009-samtools | 5/7 / 3/3 | - | - |
 | ljosa2012-bbbc005 | 1/3 / 1/2 | - | - |
-| love2014-deseq2-airway | 5/5 / 3/4 | - | - |
+| love2014-deseq2-airway | 5/5 / 4/4 | - | - |
 | mahbod2024-nuinsseg | 3/3 / 1/1 | - | - |
-| minh2020-iqtree2 | 1/1 / 0/1 | - | - |
+| minh2020-iqtree2 | 1/1 / 1/1 | - | - |
 | oksanen-vegan-dune | 6/6 / 5/5 | - | - |
 | palmer2017-metaspace-fdr | 0/0 / 0/0 | - | - |
 | quinlan2010-bedtools | 4/4 / 3/3 | - | - |
@@ -259,11 +259,11 @@ Session: 20261008-150813-6fdf. Record: /Volumes/T7/guided-analysis/tools/bench-r
 
 | Item | Expected | Computed | Reported |
 | --- | --- | --- | --- |
-| genes_after_filter | 16637 ±600 | pass 16139 (n7 metrics.n_genes_tested, entry 41) | pass 16139 via tolerance (n7, claim check 54) |
-| padj_01_workflow | 4381 ±400 | pass 4081 (n5 metrics.n_significant, entry 29) | FAIL 4905 (n7, claim check 54) |
-| up_padj_01 | 2362 ±250 | pass 2343.573 (n7 table.rows[4][1], entry 41) | pass 2343.573 via tolerance (n8, claim check 54) |
-| down_padj_01 | 2019 ±250 | pass 2059.028 (n8 table.rows[19][1], entry 47) | pass 2059.028 via tolerance (n8, claim check 54) |
-| padj_005_workflow | 3602 ±400 | pass 3659.696 (n7 table.rows[8][1], entry 41) | not asked |
+| genes_after_filter | 16139 ±100 | pass 16139 (n7 metrics.n_genes_tested, entry 41) | pass 16139 via tolerance (n7, claim check 54) |
+| padj_01_workflow | 4905 ±100 | pass 4905 (n7 metrics.n_significant, entry 41) | pass 4905 via tolerance (n7, claim check 54) |
+| up_padj_01 | 2607 ±60 | pass 2607 (n7 metrics.n_up, entry 41) | pass 2607 via tolerance (n7, claim check 54) |
+| down_padj_01 | 2298 ±60 | pass 2298 (n7 metrics.n_down, entry 41) | pass 2298 via tolerance (n7, claim check 54) |
+| padj_005_workflow | 4081 ±100 | pass 4081 (n5 metrics.n_significant, entry 29) | not asked |
 
 ### mahbod2024-nuinsseg | ollama:qwen3:8b | run 1
 
@@ -283,7 +283,7 @@ Session: 20261008-152353-06e1. Record: /Volumes/T7/guided-analysis/tools/bench-r
 
 | Item | Expected | Computed | Reported |
 | --- | --- | --- | --- |
-| log_likelihood | -21152.54 ±1 | pass -21152.54 (n1 metrics.log_likelihood, entry 31) | FAIL - |
+| log_likelihood | -21152.54 ±1 | pass -21152.54 (n1 metrics.log_likelihood, entry 31) | pass -21152.54 via tolerance (n1, claim check 45) |
 
 ### oksanen-vegan-dune | ollama:qwen3:8b | run 1
 
