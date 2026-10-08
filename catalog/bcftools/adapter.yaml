@@ -1,0 +1,375 @@
+adapter:
+  name: bcftools
+  title: bcftools
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Counts, filters and normalizes variants in a VCF file with bcftools. Each tool runs one
+    bcftools command and prints the counts. The scientist can repeat each step on the command line.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: bcftools
+  version: "1.24"
+  homepage: https://samtools.github.io/bcftools/
+  docs:
+    - https://samtools.github.io/bcftools/bcftools.html
+    - https://samtools.github.io/bcftools/howtos/filtering.html
+    - https://doi.org/10.1093/gigascience/giab008
+
+connection:
+  kind: cli
+  call_timeout_s: 600
+
+locate:
+  env: BCFTOOLS
+  paths: ["/opt/homebrew/bin/bcftools", "/usr/local/bin/bcftools", "/usr/bin/bcftools", "~/.local/bin/bcftools"]
+  which: [bcftools]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "bcftools (\\S+)"
+
+decisions:
+  - key: reference
+    label: Reference genome FASTA file
+    kind: text
+    group: Data
+    help: >
+      The FASTA file of the reference genome build that the variants were called against, such as
+      GRCh38. Normalization needs it. A different build gives wrong left-aligned positions. The
+      contig names (chr1 or 1) must match the VCF file.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+    links:
+      - { tool: normalize_variants, arg: reference }
+
+  - key: min_qual
+    label: Smallest variant quality (QUAL)
+    kind: float
+    default: 0
+    lo: 0
+    hi: 10000
+    group: Filters
+    help: >
+      Sites with a lower QUAL are removed. 0 sets no cutoff. A site with a missing QUAL is also
+      removed when a value above 0 is set. Typical values are 20 to 30 for a single sample.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: filter_variants, arg: min_qual }
+    sensitivity:
+      options: [0, 20, 30, 50]
+      tool: filter_variants
+      compare: [metrics.n_after, metrics.ts_tv]
+      max_runs: 4
+
+  - key: min_depth
+    label: Smallest read depth (INFO/DP)
+    kind: int
+    default: 0
+    lo: 0
+    hi: 100000
+    group: Filters
+    help: >
+      Sites with a lower total depth (the INFO/DP field) are removed. 0 sets no cutoff. The file
+      must have an INFO/DP field. Depth that is too low gives false calls. Depth that is too high
+      can mean a repeat region.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: filter_variants, arg: min_depth }
+    sensitivity:
+      options: [0, 10, 20, 30]
+      tool: filter_variants
+      compare: [metrics.n_after, metrics.ts_tv]
+      max_runs: 4
+
+  - key: variant_types
+    label: Variant types to keep
+    kind: choice
+    choices: [all, snps, indels, mnps, other]
+    default: all
+    group: Filters
+    help: >
+      snps keeps single-base changes. indels keeps insertions and deletions. all keeps every site.
+      A Ts/Tv ratio is only meaningful for snps.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_variants, arg: variant_types }
+
+  - key: filter_status
+    label: Use the FILTER column
+    kind: choice
+    choices: [any, PASS]
+    default: any
+    group: Filters
+    help: >
+      PASS keeps only the sites that the caller marked PASS (or "."). any ignores the FILTER
+      column. Many files carry caller filters that remove real sites. Say which setting you used.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_variants, arg: filter_status }
+
+  - key: regions
+    label: Regions to include
+    kind: text
+    group: Data
+    help: >
+      One or more regions such as chr20:1000000-1050000 or chr1,chr2. Positions start at 1 and
+      include both ends. Empty means the whole file. The contig names must match the VCF file. It sets the region of
+      filter_variants. vcf_stats takes its region from the question.
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: filter_variants, arg: region }
+
+  - key: normalize
+    label: Normalize the variants
+    kind: choice
+    choices: [no, yes]
+    default: "no"
+    group: Method
+    help: >
+      Normalization left-aligns indels against the reference. It makes the same event have the
+      same position in two files. Run it before you compare or merge files from different callers.
+      Normalization needs the reference FASTA file.
+    owner: human
+    stage: setup
+    changes_conclusion: true
+
+  - key: split_multiallelic
+    label: Split multiallelic sites
+    kind: choice
+    choices: [no, any, snps, indels]
+    default: "no"
+    group: Method
+    help: >
+      A multiallelic site has two or more alternate alleles in one record. no keeps it as one
+      record. any makes one record for each alternate allele. snps or indels splits only that type.
+      Splitting raises the number of records, so counts of records and counts of variants differ.
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: normalize_variants, arg: split_multiallelic }
+
+tools:
+  - name: vcf_stats
+    title: Count variants by type
+    description: >
+      Count the records in a VCF file by type with bcftools stats: SNPs, indels, multiallelic sites,
+      and the transitions to transversions (Ts/Tv) ratio. Give a region to count one part of the file.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the VCF or BCF file. }
+      region: { type: string, description: "Region such as chr20:1000000-1050000. Leave out for the whole file." }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/stats.sh", "{program_path}", "{path}", "{region}"]
+    parse: keyvalue
+
+  - name: filter_variants
+    title: Filter variants
+    description: >
+      Keep the sites that pass the filters and write them to a new VCF file. The result has the path
+      of the new file (vcf), the number of records before and after (n_before, n_after) and the counts
+      by type of the new file. Use vcf in later steps.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the VCF or BCF file. }
+      min_qual: { type: number, minimum: 0, description: Smallest QUAL to keep (QUAL>=value). }
+      min_depth: { type: integer, minimum: 0, description: Smallest INFO/DP to keep (INFO/DP>=value). }
+      variant_types: { type: string, enum: [all, snps, indels, mnps, other], description: Variant type to keep (bcftools view -v). }
+      filter_status: { type: string, enum: [any, PASS], description: "PASS keeps only sites with FILTER PASS or . (bcftools view -f)." }
+      region: { type: string, description: "Region such as chr1:1-35. Leave out for the whole file." }
+      expression: { type: string, description: "Extra bcftools include expression, such as INFO/AF>=0.05." }
+    required: [path]
+    outputs:
+      vcf: { kind: file, ext: .vcf.gz, description: The filtered VCF file. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/filter.sh", "{program_path}", "{output.vcf}", "{path}", "--qual", "{min_qual}", "--depth", "{min_depth}", "--types", "{variant_types}", "--status", "{filter_status}", "--region", "{region}", "--expression", "{expression}"]
+    parse: keyvalue
+
+  - name: normalize_variants
+    title: Normalize variants
+    description: >
+      Left-align indels against the reference and optionally split multiallelic sites into one record
+      for each alternate allele. The result has the path of the new file (vcf), the number of records
+      before and after, and the number of split and realigned records.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the VCF or BCF file. }
+      reference: { type: string, description: Absolute path of the reference FASTA file. }
+      split_multiallelic: { type: string, enum: [no, any, snps, indels], description: "Split multiallelic sites (bcftools norm -m -any, -snps or -indels)." }
+    required: [path, reference]
+    outputs:
+      vcf: { kind: file, ext: .vcf.gz, description: The normalized VCF file. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/norm.sh", "{program_path}", "{output.vcf}", "{path}", "--reference", "{reference}", "--split", "{split_multiallelic}"]
+    parse: keyvalue
+
+map:
+  - tool: vcf_stats
+    route: "Run: bcftools stats [-r <region>] <in>.vcf.gz"
+    params:
+      - { arg: path, label: "<in>.vcf.gz" }
+      - { arg: region, label: "-r", ui_default: "" }
+    fidelity: exact
+    evidence: { source: docs, test: toy_stats, note: "The counts come from the SN and TSTV lines of bcftools stats. A region needs an indexed file. The tool indexes a copy." }
+    summary: "{metrics.n_records} records. {metrics.n_snps} SNPs. {metrics.n_indels} indels. Ts/Tv {metrics.ts_tv}."
+
+  - tool: filter_variants
+    route: "Run: bcftools view [-i 'QUAL>=<q> && INFO/DP>=<d>'] [-v <types>] [-f PASS] [-r <region>] -Oz -o <out>.vcf.gz <in>.vcf.gz"
+    params:
+      - { arg: path, label: "<in>.vcf.gz" }
+      - { arg: min_qual, label: "QUAL>=", ui_default: "" }
+      - { arg: min_depth, label: "INFO/DP>=", ui_default: "" }
+      - { arg: variant_types, label: "-v", ui_default: "" }
+      - { arg: filter_status, label: "-f", ui_default: "" }
+      - { arg: region, label: "-r", ui_default: "" }
+      - { arg: expression, label: "-i", ui_default: "" }
+    fidelity: exact
+    evidence: { source: docs, test: toy_filter, note: "The test counts sites by hand and by bcftools view on the command line." }
+    summary: "{metrics.n_after} of {metrics.n_before} records pass. Filter: {data.expression}."
+
+  - tool: normalize_variants
+    route: "Run: bcftools norm -f <ref>.fa [-m -any] -Oz -o <out>.vcf.gz <in>.vcf.gz"
+    params:
+      - { arg: path, label: "<in>.vcf.gz" }
+      - { arg: reference, label: "-f" }
+      - { arg: split_multiallelic, label: "-m", ui_default: "" }
+    fidelity: exact
+    evidence: { source: docs, test: toy_normalize, note: "The toy file has one multiallelic site and one indel that moves when left-aligned." }
+    summary: "{metrics.n_after} records after normalization ({metrics.n_split} split, {metrics.n_realigned} realigned)."
+
+checks:
+  - id: reference_missing
+    description: Normalization ran with no reference file.
+    severity: error
+    rule:
+      tool: normalize_variants
+      arg: reference
+      op: missing
+      message: Give the reference FASTA file of the genome build that the VCF file uses.
+  - id: filters_not_stated
+    description: The report gives variant counts but does not say which quality, depth, type and FILTER settings it used.
+    severity: warning
+    text: The report must state the QUAL cutoff, the depth cutoff, the variant type and the FILTER setting of each count, or say that it used none.
+  - id: build_not_stated
+    description: The report does not name the reference genome build.
+    severity: warning
+    text: The report must name the reference genome build (for example GRCh38) of the VCF file, or say that the build is not known.
+  - id: record_vs_variant
+    description: The report calls a record count a variant count after a multiallelic site was split, or before it was split.
+    severity: warning
+    text: A multiallelic record holds more than one variant. The report must say if its counts are records or alleles, and say if it split multiallelic sites.
+  - id: tstv_small_count
+    description: The report gives a Ts/Tv ratio from a small number of SNPs as a quality measure.
+    severity: warning
+    text: A Ts/Tv ratio from fewer than 1000 SNPs has a large random error. The report must give the SNP count with the ratio and must not call the ratio good or bad.
+
+tests:
+  - id: toy_stats
+    description: >
+      The toy VCF file has 11 records counted by hand: 8 SNP records (one multiallelic), 3 indels,
+      6 transitions and 3 transversions. A region count of chr1:1-35 has 6 records.
+    data: [data/toy.vcf]
+    calls:
+      - { tool: vcf_stats, args: { path: "{adapter_dir}/data/toy.vcf" }, save_as: all }
+      - { tool: vcf_stats, args: { path: "{adapter_dir}/data/toy.vcf", region: "chr1:1-35" } }
+    expect:
+      - { path: saved.all.metrics.n_records, equals: 11 }
+      - { path: saved.all.metrics.n_snps, equals: 8 }
+      - { path: saved.all.metrics.n_indels, equals: 3 }
+      - { path: saved.all.metrics.n_multiallelic_sites, equals: 1 }
+      - { path: saved.all.metrics.ts, equals: 6 }
+      - { path: saved.all.metrics.tv, equals: 3 }
+      - { path: saved.all.metrics.ts_tv, approx: 2.0, abs: 0.001 }
+      - { path: metrics.n_records, equals: 6 }
+
+  - id: toy_filter
+    description: >
+      QUAL>=30 and INFO/DP>=10 keep 8 of 11 toy records (counted by hand). With FILTER PASS the
+      LowQual site at chr1:20 also goes, so 7 remain. With snps only, 5 remain.
+    data: [data/toy.vcf]
+    manual_route_checked: true
+    calls:
+      - { tool: filter_variants, args: { path: "{adapter_dir}/data/toy.vcf", min_qual: 30, min_depth: 10 }, save_as: q }
+      - { tool: filter_variants, args: { path: "{adapter_dir}/data/toy.vcf", min_qual: 30, min_depth: 10, filter_status: PASS }, save_as: p }
+      - { tool: filter_variants, args: { path: "{adapter_dir}/data/toy.vcf", min_qual: 30, min_depth: 10, filter_status: PASS, variant_types: snps } }
+    expect:
+      - { path: saved.q.metrics.n_before, equals: 11 }
+      - { path: saved.q.metrics.n_after, equals: 8 }
+      - { path: saved.p.metrics.n_after, equals: 7 }
+      - { path: metrics.n_after, equals: 5 }
+      - { path: metrics.n_indels, equals: 0 }
+
+  - id: toy_normalize
+    description: >
+      Splitting the multiallelic site at chr1:60 gives 12 records from 11. The deletion GAAAC to GAAC
+      at chr1:70 moves to GA to G, so one record is realigned.
+    data: [data/toy.vcf, data/toy.fa]
+    manual_route_checked: true
+    calls:
+      - { tool: normalize_variants, args: { path: "{adapter_dir}/data/toy.vcf", reference: "{adapter_dir}/data/toy.fa", split_multiallelic: any } }
+    expect:
+      - { path: metrics.n_before, equals: 11 }
+      - { path: metrics.n_after, equals: 12 }
+      - { path: metrics.n_split, equals: 1 }
+      - { path: metrics.n_realigned, equals: 1 }
+      - { path: metrics.n_multiallelic_sites, equals: 0 }
+
+  - id: normalize_needs_reference
+    description: Normalization fails with no reference file.
+    data: [data/toy.vcf]
+    calls:
+      - { tool: normalize_variants, args: { path: "{adapter_dir}/data/toy.vcf" } }
+    expect:
+      - { path: ok, equals: false }
+
+  - id: g1k_region_stats
+    description: >
+      The 1000 Genomes high-coverage phased panel (chr20:1000000-1100000, GRCh38, sites only) has 2210
+      records. The numbers come from bcftools stats 1.24 on the command line (pinned from a run by hand).
+      The region chr20:1000000-1050000 has 1137 records.
+    data: [data/g1k_chr20_1000000_1100000.vcf.gz, data/g1k_chr20_1000000_1100000.vcf.gz.tbi]
+    manual_route_checked: true
+    calls:
+      - { tool: vcf_stats, args: { path: "{adapter_dir}/data/g1k_chr20_1000000_1100000.vcf.gz" }, save_as: all }
+      - { tool: vcf_stats, args: { path: "{adapter_dir}/data/g1k_chr20_1000000_1100000.vcf.gz", region: "chr20:1000000-1050000" } }
+    expect:
+      - { path: saved.all.metrics.n_records, equals: 2210 }
+      - { path: saved.all.metrics.n_snps, equals: 1955 }
+      - { path: saved.all.metrics.n_indels, equals: 248 }
+      - { path: saved.all.metrics.n_others, equals: 7 }
+      - { path: saved.all.metrics.ts, equals: 1344 }
+      - { path: saved.all.metrics.tv, equals: 611 }
+      - { path: saved.all.metrics.ts_tv, approx: 2.20, abs: 0.005 }
+      - { path: metrics.n_records, equals: 1137 }
+      - { path: metrics.n_snps, equals: 1021 }
+      - { path: metrics.ts_tv, approx: 2.27, abs: 0.005 }
+
+  - id: g1k_af_filter
+    description: >
+      The expression INFO/AF>=0.05 keeps 328 of 2210 records, and 279 of them are SNPs (bcftools view
+      on the command line).
+    data: [data/g1k_chr20_1000000_1100000.vcf.gz, data/g1k_chr20_1000000_1100000.vcf.gz.tbi]
+    manual_route_checked: true
+    calls:
+      - { tool: filter_variants, args: { path: "{adapter_dir}/data/g1k_chr20_1000000_1100000.vcf.gz", expression: "INFO/AF>=0.05" } }
+    expect:
+      - { path: metrics.n_before, equals: 2210 }
+      - { path: metrics.n_after, equals: 328 }
+      - { path: metrics.n_snps, equals: 279 }
+
+  - id: g1k_default_settings
+    description: The default decision values (0, all, any) set no filter. All 2210 records stay, and the file has no INFO/DP field.
+    data: [data/g1k_chr20_1000000_1100000.vcf.gz, data/g1k_chr20_1000000_1100000.vcf.gz.tbi]
+    calls:
+      - { tool: filter_variants, args: { path: "{adapter_dir}/data/g1k_chr20_1000000_1100000.vcf.gz", min_qual: 0, min_depth: 0, variant_types: all, filter_status: any } }
+    expect:
+      - { path: metrics.n_after, equals: 2210 }

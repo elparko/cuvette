@@ -1,0 +1,20 @@
+tool: bcftools
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/danecek2021-bcftools/g1k_chr20_1000000_1100000.vcf.gz
+decisions:
+  reference_build: GRCh38
+  quality_and_depth_filter: "none (the panel has no QUAL or DP)"
+  region: "chr20:1000000-1050000 for question 2; whole file otherwise"
+  allele_frequency_filter: "INFO/AF >= 0.05"
+  normalize_and_split: "not needed (no multiallelic sites)"
+expected:
+  - {description: "SNP records", value: 1955, tolerance: 0, source: "computed, bcftools stats 1.24"}
+  - {description: "indel records", value: 248, tolerance: 0, source: "computed, bcftools stats 1.24"}
+  - {description: "total records", value: 2210, tolerance: 0, source: "computed, bcftools stats 1.24"}
+  - {description: "Ts/Tv ratio", value: 2.20, tolerance: 0.01, source: "computed, bcftools stats 1.24"}
+  - {description: "records in chr20:1000000-1050000", value: 1137, tolerance: 0, source: "computed, bcftools stats -r"}
+  - {description: "records with INFO/AF >= 0.05", value: 328, tolerance: 0, source: "computed, bcftools view -i"}
+notes: |
+  The paper has no numeric results for this data. All values are computed.
+  Traps: contig names have the chr prefix, so a region written as 20:1000000-1050000 gives no records. Question 3 needs the expression INFO/AF>=0.05, because the panel has no QUAL or DP.

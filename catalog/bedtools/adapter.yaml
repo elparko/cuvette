@@ -1,0 +1,354 @@
+adapter:
+  name: bedtools
+  title: bedtools
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Finds overlaps between genome intervals, merges intervals and measures coverage with bedtools.
+    Each tool runs one bedtools command and prints the counts. The scientist can repeat each step on
+    the command line.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: bedtools
+  version: "2.31.1"
+  homepage: https://bedtools.readthedocs.io
+  docs:
+    - https://bedtools.readthedocs.io/en/latest/content/tools/intersect.html
+    - https://bedtools.readthedocs.io/en/latest/content/tools/merge.html
+    - https://bedtools.readthedocs.io/en/latest/content/tools/coverage.html
+    - https://doi.org/10.1093/bioinformatics/btq033
+
+connection:
+  kind: cli
+  call_timeout_s: 600
+
+locate:
+  env: BEDTOOLS
+  paths: ["/opt/homebrew/bin/bedtools", "/usr/local/bin/bedtools", "/usr/bin/bedtools", "~/.local/bin/bedtools"]
+  which: [bedtools]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "bedtools v(\\S+)"
+
+decisions:
+  - key: genome_build
+    label: Reference genome build
+    kind: text
+    group: Data
+    help: >
+      The genome build of both interval files, such as GRCh38 or hg19. Two files from different
+      builds give wrong overlaps with no error. Chromosome names (chr1 or 1) must also match.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: true
+
+  - key: min_fraction_a
+    label: Smallest overlap as a fraction of A
+    kind: float
+    default: 0
+    lo: 0
+    hi: 1
+    group: Overlap rule
+    help: >
+      An A interval counts as overlapping only if at least this fraction of its length is covered by
+      one B interval. 0 means 1 base is enough (bedtools -f default 1e-9). 0.5 means half of A.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: intersect_intervals, arg: min_fraction_a }
+    sensitivity:
+      options: [0, 0.1, 0.5, 0.9]
+      tool: intersect_intervals
+      compare: [metrics.n_result, metrics.overlap_bases]
+      max_runs: 4
+
+  - key: min_fraction_b
+    label: Smallest overlap as a fraction of B
+    kind: float
+    default: 0
+    lo: 0
+    hi: 1
+    group: Overlap rule
+    help: >
+      A pair counts only if at least this fraction of the B interval is covered by the A interval.
+      0 means 1 base is enough (bedtools -F default 1e-9). Both fractions must hold if both are set.
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: intersect_intervals, arg: min_fraction_b }
+
+  - key: reciprocal
+    label: Require the same fraction for A and for B
+    kind: bool
+    default: false
+    group: Overlap rule
+    help: >
+      If true, the fraction in min_fraction_a must hold for A and for B. This removes pairs where a
+      short interval sits inside a long one. It needs min_fraction_a above 0.
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: intersect_intervals, arg: reciprocal }
+
+  - key: strand
+    label: Strand rule
+    kind: choice
+    choices: [any, same, opposite]
+    default: any
+    group: Overlap rule
+    help: >
+      any ignores the strand. same keeps only pairs on the same strand. opposite keeps only pairs on
+      opposite strands. Both files must have a strand column (column 6) for same or opposite.
+      For gene and read data the strand rule can change the count a lot.
+    essential: true
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: intersect_intervals, arg: strand }
+      - { tool: coverage_intervals, arg: strand }
+      - { tool: merge_intervals, arg: strand }
+
+  - key: merge_distance
+    label: Largest gap to merge across
+    kind: int
+    default: 0
+    lo: 0
+    hi: 1000000000
+    group: Merge
+    help: >
+      Intervals that overlap or touch always merge. Intervals with a gap of this many bases or less
+      also merge. 0 merges only intervals that overlap or touch. A larger value gives fewer, longer
+      intervals.
+    owner: human
+    stage: when_needed
+    changes_conclusion: true
+    links:
+      - { tool: merge_intervals, arg: distance }
+    sensitivity:
+      options: [0, 10, 100, 1000]
+      tool: merge_intervals
+      compare: [metrics.n_merged, metrics.merged_bases]
+      max_runs: 4
+
+tools:
+  - name: intersect_intervals
+    title: Intersect two interval files
+    description: >
+      Find the overlaps between the intervals of file A and file B with bedtools intersect. Give the
+      overlap rule with min_fraction_a, min_fraction_b, reciprocal and strand. The result has the
+      output file (bed), n_result, and for pairs the overlap in bases (overlap_bases) and the number
+      of A intervals with an overlap (n_a_with_overlap).
+    read_only: true
+    params:
+      a: { type: string, minLength: 1, description: Absolute path of the BED file A. }
+      b: { type: string, minLength: 1, description: Absolute path of the BED file B. }
+      min_fraction_a: { type: number, minimum: 0, maximum: 1, description: Smallest overlap as a fraction of A (bedtools -f). }
+      min_fraction_b: { type: number, minimum: 0, maximum: 1, description: Smallest overlap as a fraction of B (bedtools -F). }
+      reciprocal: { type: boolean, description: Require the fraction for A and for B (bedtools -r). }
+      strand: { type: string, enum: [any, same, opposite], description: "Strand rule (bedtools -s or -S)." }
+      report: { type: string, enum: [pairs, count, unique_a, no_overlap], description: "pairs (-wo): each pair and its overlap in bases. count (-c): overlaps for each A interval. unique_a (-u): A intervals with an overlap, once each. no_overlap (-v): A intervals with none. Default pairs." }
+    required: [a, b]
+    outputs:
+      bed: { kind: file, ext: .bed, description: The overlaps. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/intersect.sh", "{program_path}", "{output.bed}", "{a}", "{b}", "--fa", "{min_fraction_a}", "--fb", "{min_fraction_b}", "--reciprocal", "{reciprocal}", "--strand", "{strand}", "--report", "{report}"]
+    parse: keyvalue
+
+  - name: merge_intervals
+    title: Merge overlapping intervals
+    description: >
+      Merge the intervals of one BED file that overlap, touch, or lie within a set distance, with
+      bedtools merge. The tool sorts the file first. The result has the output file (bed), n_input,
+      n_merged and merged_bases.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the BED file. }
+      distance: { type: integer, minimum: 0, description: Largest gap in bases to merge across (bedtools -d). }
+      strand: { type: string, enum: [any, same], description: "same merges only intervals on the same strand (bedtools -s)." }
+    required: [path]
+    outputs:
+      bed: { kind: file, ext: .bed, description: The merged intervals. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/merge.sh", "{program_path}", "{output.bed}", "{path}", "--distance", "{distance}", "--strand", "{strand}"]
+    parse: keyvalue
+
+  - name: coverage_intervals
+    title: Measure coverage of A by B
+    description: >
+      For each interval of file A, count the B intervals that overlap it and the bases of A that B
+      covers, with bedtools coverage. The result has n_features, n_covered (A intervals with at least
+      one overlap), total_overlaps, covered_bases, feature_bases and covered_fraction.
+    read_only: true
+    params:
+      a: { type: string, minLength: 1, description: Absolute path of the BED file A. }
+      b: { type: string, minLength: 1, description: Absolute path of the BED file B. }
+      strand: { type: string, enum: [any, same, opposite], description: "Strand rule (bedtools -s or -S)." }
+    required: [a, b]
+    outputs:
+      bed: { kind: file, ext: .bed, description: The coverage of each A interval. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/coverage.sh", "{program_path}", "{output.bed}", "{a}", "{b}", "--strand", "{strand}"]
+    parse: keyvalue
+
+map:
+  - tool: intersect_intervals
+    route: "Run: bedtools intersect -a <A>.bed -b <B>.bed [-f <frac>] [-F <frac>] [-r] [-s | -S] [-wo | -c | -u | -v]"
+    params:
+      - { arg: a, label: "-a" }
+      - { arg: b, label: "-b" }
+      - { arg: min_fraction_a, label: "-f", ui_default: 1e-9 }
+      - { arg: min_fraction_b, label: "-F", ui_default: 1e-9 }
+      - { arg: reciprocal, label: "-r", ui_default: false }
+      - { arg: strand, label: "-s / -S", ui_default: any }
+      - { arg: report, label: "-wo / -c / -u / -v", ui_default: "" }
+    fidelity: exact
+    evidence: { source: docs, test: toy_overlap_rules, note: "The test counts the toy pairs by hand and checks each rule against bedtools intersect on the command line." }
+    summary: "{metrics.n_result} lines. {metrics.n_a_with_overlap} A intervals overlap."
+
+  - tool: merge_intervals
+    route: "Run: sort -k1,1 -k2,2n <in>.bed | bedtools merge -i - [-d <gap>] [-s]"
+    params:
+      - { arg: path, label: "-i" }
+      - { arg: distance, label: "-d", ui_default: 0 }
+      - { arg: strand, label: "-s", ui_default: any }
+    fidelity: exact
+    evidence: { source: docs, test: toy_merge }
+    summary: "{metrics.n_input} intervals merged into {metrics.n_merged} ({metrics.merged_bases} bases)."
+
+  - tool: coverage_intervals
+    route: "Run: bedtools coverage -a <A>.bed -b <B>.bed [-s | -S]"
+    params:
+      - { arg: a, label: "-a" }
+      - { arg: b, label: "-b" }
+      - { arg: strand, label: "-s / -S", ui_default: any }
+    fidelity: exact
+    evidence: { source: docs, test: toy_coverage }
+    summary: "{metrics.n_covered} of {metrics.n_features} A intervals covered. {metrics.covered_bases} of {metrics.feature_bases} bases."
+
+checks:
+  - id: rule_not_stated
+    description: The report gives an overlap count but does not say the fraction rule, the strand rule and the report type.
+    severity: warning
+    text: The report must state the minimum fraction for A and for B, whether it was reciprocal, the strand rule and the report type of each overlap count, or say that it used the defaults.
+  - id: build_not_stated
+    description: The report does not name the genome build of the interval files.
+    severity: warning
+    text: The report must name the genome build of both files, or say that the build is not known. Files from two builds must not be intersected.
+  - id: pairs_vs_intervals
+    description: The report calls a count of pairs a count of intervals.
+    severity: warning
+    text: One A interval can overlap many B intervals. The report must say if a number counts pairs, A intervals or bases.
+  - id: strand_without_column
+    description: A strand rule was used on a file that has no strand column.
+    severity: error
+    text: A same or opposite strand rule needs a strand column (column 6) in both files. The report must show that both files have it.
+  - id: bed_coordinates
+    description: The report mixes zero-based BED coordinates with one-based VCF or region coordinates.
+    severity: warning
+    text: BED start positions are zero-based and the end is not included. A region such as chr1:101-200 is the BED interval chr1 100 200. The report must convert before it compares them.
+
+tests:
+  - id: toy_overlap_rules
+    description: >
+      The toy files have 5 A intervals and 6 B intervals. The pairs, the overlap bases and the effect
+      of each rule were counted by hand and agree with bedtools intersect 2.31.1. Any overlap: 6 pairs
+      and 210 bases. Fraction of A 0.5: 2 pairs and 150 bases. Fraction of B 0.5: 3 pairs and 160 bases.
+      Same strand: 4 pairs and 100 bases. Opposite strand: 2 pairs and 110 bases.
+    data: [data/a.bed, data/b.bed]
+    manual_route_checked: true
+    calls:
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed" }, save_as: any }
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed", min_fraction_a: 0.5 }, save_as: fa }
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed", min_fraction_b: 0.5 }, save_as: fb }
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed", strand: same }, save_as: same }
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed", strand: opposite } }
+    expect:
+      - { path: saved.any.metrics.n_result, equals: 6 }
+      - { path: saved.any.metrics.overlap_bases, equals: 210 }
+      - { path: saved.any.metrics.n_a_with_overlap, equals: 4 }
+      - { path: saved.fa.metrics.n_result, equals: 2 }
+      - { path: saved.fa.metrics.overlap_bases, equals: 150 }
+      - { path: saved.fb.metrics.n_result, equals: 3 }
+      - { path: saved.fb.metrics.overlap_bases, equals: 160 }
+      - { path: saved.same.metrics.n_result, equals: 4 }
+      - { path: saved.same.metrics.overlap_bases, equals: 100 }
+      - { path: metrics.n_result, equals: 2 }
+      - { path: metrics.overlap_bases, equals: 110 }
+
+  - id: toy_report_types
+    description: >
+      Toy report types: count gives a total of 6 overlaps and 4 A intervals with an overlap. unique_a
+      gives 4 lines. no_overlap gives 1 line (a5 on chr2).
+    data: [data/a.bed, data/b.bed]
+    calls:
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed", report: count }, save_as: c }
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed", report: unique_a }, save_as: u }
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed", report: no_overlap } }
+    expect:
+      - { path: saved.c.metrics.total_overlaps, equals: 6 }
+      - { path: saved.c.metrics.n_a_with_overlap, equals: 4 }
+      - { path: saved.u.metrics.n_result, equals: 4 }
+      - { path: metrics.n_result, equals: 1 }
+
+  - id: toy_reciprocal
+    description: >
+      Fraction 0.5 with reciprocal on A and B keeps a1-b1 and a4-b5, so 2 pairs and 150 bases.
+      Fraction 0.5 on A only also gives 2 pairs here.
+    data: [data/a.bed, data/b.bed]
+    calls:
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed", min_fraction_a: 0.5, reciprocal: true } }
+    expect:
+      - { path: metrics.n_result, equals: 2 }
+      - { path: metrics.overlap_bases, equals: 150 }
+
+  - id: toy_merge
+    description: >
+      The 6 B intervals merge into 5 at distance 0 (449 bases) and into 4 at distance 30 (479 bases).
+      The gap between b2 and b3 is 30 bases (counted by hand).
+    data: [data/b.bed]
+    manual_route_checked: true
+    calls:
+      - { tool: merge_intervals, args: { path: "{adapter_dir}/data/b.bed" }, save_as: d0 }
+      - { tool: merge_intervals, args: { path: "{adapter_dir}/data/b.bed", distance: 30 } }
+    expect:
+      - { path: saved.d0.metrics.n_merged, equals: 5 }
+      - { path: saved.d0.metrics.merged_bases, equals: 449 }
+      - { path: metrics.n_merged, equals: 4 }
+      - { path: metrics.merged_bases, equals: 479 }
+
+  - id: toy_coverage
+    description: >
+      B covers 50, 30, 20, 100 and 0 bases of the five A intervals. That is 200 of 500 bases (0.4)
+      and 4 covered intervals (counted by hand).
+    data: [data/a.bed, data/b.bed]
+    manual_route_checked: true
+    calls:
+      - { tool: coverage_intervals, args: { a: "{adapter_dir}/data/a.bed", b: "{adapter_dir}/data/b.bed" } }
+    expect:
+      - { path: metrics.n_features, equals: 5 }
+      - { path: metrics.n_covered, equals: 4 }
+      - { path: metrics.covered_bases, equals: 200 }
+      - { path: metrics.feature_bases, equals: 500 }
+      - { path: metrics.covered_fraction, approx: 0.4, abs: 0.000001 }
+
+  - id: exons_alu_overlap
+    description: >
+      RefSeq chr1 exons (hg18, first 10 Mb, 2798 exons) against AluY repeats (682). Numbers pinned from
+      bedtools 2.31.1 on the command line and checked with awk: 8 pairs and 1270 bases, 8 exons with an
+      overlap. With fraction of A 0.5, 2 pairs and 227 bases. Same strand: 4 exons.
+    data: [data/exons.chr1_0_10Mb.bed, data/aluY.chr1_0_10Mb.bed]
+    manual_route_checked: true
+    calls:
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/exons.chr1_0_10Mb.bed", b: "{adapter_dir}/data/aluY.chr1_0_10Mb.bed" }, save_as: any }
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/exons.chr1_0_10Mb.bed", b: "{adapter_dir}/data/aluY.chr1_0_10Mb.bed", min_fraction_a: 0.5 }, save_as: half }
+      - { tool: intersect_intervals, args: { a: "{adapter_dir}/data/exons.chr1_0_10Mb.bed", b: "{adapter_dir}/data/aluY.chr1_0_10Mb.bed", strand: same, report: unique_a } }
+    expect:
+      - { path: saved.any.metrics.n_result, equals: 8 }
+      - { path: saved.any.metrics.overlap_bases, equals: 1270 }
+      - { path: saved.half.metrics.n_result, equals: 2 }
+      - { path: saved.half.metrics.overlap_bases, equals: 227 }
+      - { path: metrics.n_result, equals: 4 }

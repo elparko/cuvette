@@ -1,0 +1,19 @@
+tool: bedtools
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/quinlan2010-bedtools/refseq.chr1.exons.bed
+  - /Volumes/T7/guided-analysis/data/quinlan2010-bedtools/aluY.chr1.bed
+decisions:
+  genome_build: hg18
+  overlap_rule: "any overlap (1 base) for question 1; fraction of exon 0.5 for question 2"
+  strand_rule: "any"
+  merge_distance: 100
+expected:
+  - {description: "exons with an overlap (-u)", value: 126, tolerance: 0, source: "computed, bedtools intersect -u 2.31.1"}
+  - {description: "overlapping pairs", value: 129, tolerance: 0, source: "computed, bedtools intersect -wo"}
+  - {description: "overlap bases, any overlap", value: 33713, tolerance: 0, source: "computed, sum of -wo last column"}
+  - {description: "pairs with fraction of exon >= 0.5", value: 9, tolerance: 0, source: "computed, bedtools intersect -f 0.5"}
+  - {description: "AluY intervals after merge, distance 100", value: 11270, tolerance: 0, source: "computed, bedtools merge -d 100"}
+notes: |
+  The paper has no numeric results for this data. All values are computed.
+  Traps: the answer to question 1 is 126 exons but 129 pairs, because one exon can overlap more than one repeat. Question 2 needs -f (fraction of A) with the exons as file A. Merge needs sorted input; the tool sorts it.
