@@ -113,3 +113,11 @@ test("generic file tools stay inside the folders of the analysis", async () => {
   expect(results[0].text).toMatch(/outside the folders/);
   expect(results[1].isError).toBeFalsy();
 });
+
+test("three identical calls in a row end in a forced final answer", async () => {
+  const same = { calls: [{ name: "note", args: { text: "x" } }] };
+  const provider = new FakeProvider([same, same, same, { text: "Final." }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false } });
+  expect(await session.send("go")).toBe("Final.");
+  expect(provider.requests.at(-1)!.tools.length).toBe(0);
+});

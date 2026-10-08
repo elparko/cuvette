@@ -120,6 +120,8 @@ function printInfo(path) {
   if (sl * fr > 1) print("warning=This file has more than one plane. The tools work on the first plane.");
   if (bitDepth() == 24) print("warning=This is a color image. Threshold converts it to 8-bit gray.");
   if (!calibrated) print("warning=The image has no scale. Sizes are in pixels.");
+  if (bitDepth() != 24 && !is("Inverting LUT") && mean < mn + (mx - mn) * 0.35) print("warning=Most pixels are dark, so the objects are probably bright on a dark background. Use dark_background=true for threshold and counting.");
+  if (bitDepth() != 24 && !is("Inverting LUT") && mean > mn + (mx - mn) * 0.65) print("warning=Most pixels are bright, so the objects are probably dark on a light background. Use dark_background=false.");
 }
 
 function runThreshold(method, dark) {

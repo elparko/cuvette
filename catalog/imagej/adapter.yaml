@@ -640,7 +640,7 @@ tools:
       largest object. Use it when open_image reports that the background differs across the image.
     params:
       input: { type: string, description: Path of the input image. }
-      rolling_radius: { type: number, minimum: 1, default: 50, description: Radius of the rolling ball in pixels. }
+      rolling_radius: { type: number, minimum: 0, default: 50, description: Radius of the rolling ball in pixels. 0 means no subtraction; the image is passed on unchanged. }
       light_background: { type: boolean, default: false, description: True if the objects are dark on a light background. }
     required: [input]
     outputs:
@@ -650,9 +650,13 @@ tools:
     macro: |
       {include:lib.ijm}
       openImage("{input}");
-      opt = "rolling={rolling_radius}";
-      if ({light_background}) opt = opt + " light";
-      run("Subtract Background...", opt);
+      if ({rolling_radius} > 0) {
+        opt = "rolling={rolling_radius}";
+        if ({light_background}) opt = opt + " light";
+        run("Subtract Background...", opt);
+      } else {
+        print("note=The radius is 0, so no background was subtracted. The image is unchanged.");
+      }
       savePair("{output.image}", "{output.preview}");
 
   - name: gaussian_blur

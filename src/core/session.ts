@@ -313,6 +313,9 @@ export class Session {
     const signal = this.abort.signal;
     let revised = false;
     let nudges = 0;
+    let lastSig = "";
+    let repeats = 0;
+    let forceAnswer = false;
     try {
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
@@ -327,7 +330,7 @@ export class Session {
         const res = await this.provider.step({
           system: this.system,
           messages: this.history,
-          tools: this.activeSchemas(),
+          tools: forceAnswer ? [] : this.activeSchemas(),
           signal,
           onDelta: (d) => this.bus.emit({ type: "delta", kind: d.type, text: d.text }),
         });
@@ -380,6 +383,15 @@ export class Session {
         for (const call of calls) {
           if (signal.aborted) {
             results.push({ type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist stopped the turn.", isError: true });
+            continue;
+          }
+          const sig = `${call.name}:${JSON.stringify(call.args)}`;
+          repeats = sig === lastSig ? repeats + 1 : 0;
+          lastSig = sig;
+          if (repeats >= 2) {
+            forceAnswer = true;
+            this.record.append("notice", { text: `The agent called ${call.name} with the same input three times. The harness asks for the final answer.` });
+            results.push({ type: "tool_result", callId: call.id, name: call.name, text: `ERROR: you called ${call.name} with the same input three times in a row. Stop. Give your final answer now, from the results you have.`, isError: true });
             continue;
           }
           results.push(await this.runCall(call, signal));
