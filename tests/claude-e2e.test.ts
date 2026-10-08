@@ -196,6 +196,10 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     expect(results[0].is_error).toBeUndefined();
     expect(JSON.stringify(results[0].content)).toMatch(/66/);
     expect(results[1].is_error).toBe(true);
+    expect(results.at(-1).cache_control).toEqual({ type: "ephemeral" });
+    expect(results[0].cache_control).toBeUndefined();
+    expect(JSON.stringify(msgs.slice(0, -1))).not.toContain("cache_control");
+    expect(r1.body.messages.at(-1).content.at(-1).cache_control).toEqual({ type: "ephemeral" });
     expect(JSON.stringify(results[1].content)).toMatch(/no_such_tool|unknown|No tool/i);
     expect(JSON.stringify(msgs)).not.toContain('"type":"image"');
     expect(deltas.filter((d) => d.startsWith("text:")).join("").replaceAll("text:", "")).toContain("Counting now.");

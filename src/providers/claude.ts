@@ -30,6 +30,16 @@ function mapError(e: unknown, model: string): unknown {
   return e;
 }
 
+function cacheLast(messages: any[]): any[] {
+  const last = messages.at(-1);
+  if (!last || last.role !== "user") return messages;
+  const content = typeof last.content === "string" ? [{ type: "text", text: last.content }] : [...last.content];
+  const end = content.length - 1;
+  if (end < 0) return messages;
+  content[end] = { ...content[end], cache_control: { type: "ephemeral" } };
+  return [...messages.slice(0, -1), { ...last, content }];
+}
+
 function makeClient(key?: string): any {
   const ws = claudeWorkspace();
   const headers = ws ? { defaultHeaders: { "anthropic-workspace-id": ws } } : {};
@@ -121,7 +131,7 @@ export class ClaudeProvider implements Provider {
       model: this.model,
       max_tokens: MAX_TOKENS,
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-      messages: this.toNative(messages),
+      messages: cacheLast(this.toNative(messages)),
       thinking: { type: "adaptive", display: "summarized" },
       output_config: { effort: this.effort },
     };
