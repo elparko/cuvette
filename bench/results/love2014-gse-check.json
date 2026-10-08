@@ -1,0 +1,363 @@
+{
+ "date": "2026-10-08",
+ "models": [
+  "ollama:qwen3:8b"
+ ],
+ "runsPerCell": 1,
+ "runs": [
+  {
+   "paper": "love2014-deseq2-airway",
+   "model": "ollama:qwen3:8b",
+   "run": 1,
+   "status": "answer",
+   "durationS": 848.301,
+   "session": "20261008-174945-c7c7",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/love2014-deseq2-airway/run1/home/sessions/20261008-174945-c7c7",
+   "answer": "### Summary of Results\n\n- **Total genes tested**: 16,637 out of 58,294 genes.\n- **Significant genes (padj < 0.1)**: 4,381 genes.\n  - **Upregulated genes (log2FoldChange > 0)**: 2,362 genes.\n  - **Downregulated genes (log2FoldChange < 0)**: 2,019 genes.\n- **Top 20 genes with the lowest adjusted p-value**:\n  - These genes show significant changes in expression with dexamethasone treatment compared to the untreated condition.\n\n### Top 20 Genes with Fold Change and Significance\nHere are the top 20 genes with the lowest adjusted p-value (padj < 0.1) and their fold change:\n\n| Gene ID         | Base Mean | Log2 Fold Change | P-value             | Adjusted P-value     |\n|-----------------|-----------|------------------|---------------------|----------------------|\n| ENSG00000189221.9 | 2371.27   | 3.39             | 2.48e-138           | 3.96e-134            |\n| ENSG00000120129.5 | 3417.26   | 2.97             | 3.44e-133           | 2.75e-129            |\n| ENSG00000101347.9 | 14106.72  | 3.75             | 1.67e-127           | 8.90e-124            |\n| ENSG00000152583.12 | 973.48    | 4.50             | 2.26e-115           | 9.04e-112            |\n| ENSG00000196136.17 | 2708.31   | 3.24             | 1.23e-112           | 3.94e-109            |\n| ENSG00000211445.11 | 12502.89  | 3.77             | 2.53e-111           | 6.73e-108            |\n| ENSG00000157214.13 | 3029.85   | 2.01             | 5.35e-102           | 1.22e-98             |\n| ENSG00000162614.18 | 5507.40   | 2.01             | 1.70e-99            | 3.40e-96             |\n| ENSG00000109906.13 | 437.50    | 6.37             | 6.62e-94            | 1.18e-90             |\n| ENSG00000125148.6 | 3688.29   | 2.23             | 1.18e-91            | 1.88e-88             |\n| ENSG00000154734.14 | 29578.83  | 2.24             | 2.77e-89            | 4.02e-86             |\n| ENSG00000134243.11 | 5538.57   | 2.20             | 6.89e-85            | 9.18e-82             |\n| ENSG00000127954.12 | 492.99    | 4.74             | 3.52e-83            | 4.33e-80             |\n| ENSG00000139132.14 | 1214.03   | 2.15             | 8.11e-83            | 9.26e-80             |\n| ENSG00000178695.5 | 2648.60   | -2.54            | 2.82e-76            | 3.01e-73             |\n| ENSG00000162692.11 | 505.56    | -3.68            | 2.01e-74            | 2.01e-71             |\n| ENSG00000106484.15 | 943.51    | -2.04            | 1.68e-73            | 1.58e-70             |\n| ENSG00000163884.3 | 565.54    | 4.51             | 1.93e-68            | 1.71e-65             |\n| ENSG00000166741.7 | 7487.63   | 2.24             | 2.29e-68            | 1.93e-65             |\n| ENSG00000179094.15 | 772.45    | 3.13             | 1.51e-67            | 1.21e-64             |\n\n### Notes\n- The results are based on the recorded decision values: alpha = 0.1 (False Discovery Rate cutoff), lfc_threshold = 0 (Log2 Fold Change threshold).\n- The analysis was performed using the SummarizedExperiment rds file with transcript length offsets.\n- If you want results for different values, you can call `compare_options`. To change the recorded decision values, use `propose_change`.\n\nSettings used, from the decision record: Input type: SummarizedExperiment rds · Design formula: ~ cell + dex · Variable of interest: dex · Reference level: untrt · Test level: trt · Minimum count for a gene to count as detected: 10 · Minimum number of samples with a detected gene: 4 · False discovery rate cutoff (padj): 0.1 · Log2 fold change threshold: 0.",
+   "items": [
+    {
+     "key": "genes_after_filter",
+     "description": "Genes after pre-filter, rnaseqGene workflow on data(gse)",
+     "expected": 16637,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16637,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_genes_tested",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 16637,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 58,
+      "text": "- **Total genes tested**: 16,637 out of 58,294 genes."
+     }
+    },
+    {
+     "key": "padj_01_workflow",
+     "description": "Genes with padj < 0.1, rnaseqGene workflow on data(gse)",
+     "expected": 4381,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4381,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_significant",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 4381,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 58,
+      "text": "- **Significant genes (padj < 0.1)**: 4,381 genes."
+     }
+    },
+    {
+     "key": "up_padj_01",
+     "description": "Up-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)",
+     "expected": 2362,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2362,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_up",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 2362,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 58,
+      "text": "- **Upregulated genes (log2FoldChange > 0)**: 2,362 genes."
+     }
+    },
+    {
+     "key": "down_padj_01",
+     "description": "Down-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)",
+     "expected": 2019,
+     "tolerance": 3,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2019,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_down",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 2019,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 58,
+      "text": "- **Downregulated genes (log2FoldChange < 0)**: 2,019 genes."
+     }
+    },
+    {
+     "key": "padj_005_workflow",
+     "description": "Genes with padj < 0.05 (alpha 0.05), rnaseqGene workflow on data(gse)",
+     "expected": 3602,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": 3688.29415225271,
+      "diff": 86.29415225270986,
+      "node": "n2",
+      "path": "table.rows[9][1]",
+      "entry": 45
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 58,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_genes_after_filter",
+     "description": "Same experiment, read counts on Ensembl 75 genes: genes after pre-filter",
+     "expected": 16139,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 16637,
+      "diff": 498,
+      "node": "n2",
+      "path": "metrics.n_genes_tested",
+      "entry": 45
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 58,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_padj_01",
+     "description": "Same experiment, read counts on Ensembl 75 genes: genes with padj < 0.1",
+     "expected": 4905,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 4381,
+      "diff": 524,
+      "node": "n2",
+      "path": "metrics.n_significant",
+      "entry": 45
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 58,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_up_padj_01",
+     "description": "Same experiment, read counts on Ensembl 75 genes: up at padj < 0.1",
+     "expected": 2607,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 2648.60453890391,
+      "diff": 41.60453890391,
+      "node": "n3",
+      "path": "table.rows[14][1]",
+      "entry": 51
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 58,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_down_padj_01",
+     "description": "Same experiment, read counts on Ensembl 75 genes: down at padj < 0.1",
+     "expected": 2298,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 2362,
+      "diff": 64,
+      "node": "n2",
+      "path": "metrics.n_up",
+      "entry": 45
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 58,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_padj_005",
+     "description": "Same experiment, read counts on Ensembl 75 genes: genes with padj < 0.05 (alpha 0.05)",
+     "expected": 4081,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 4381,
+      "diff": 300,
+      "node": "n2",
+      "path": "metrics.n_significant",
+      "entry": 45
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 58,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 36980,
+    "outputTokens": 2032,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 4,
+    "failedToolCalls": 6,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings": {
+     "info": 1,
+     "warning": 0,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 3
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/love2014-gse-check.md",
+  "json": "bench/results/love2014-gse-check.json"
+ },
+ "summary": {
+  "cells": {
+   "love2014-deseq2-airway": {
+    "ollama:qwen3:8b": {
+     "computed": 4,
+     "computedOf": 5,
+     "reported": 4,
+     "reportedOf": 4,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "ollama:qwen3:8b": {
+    "computed": 4,
+    "computedOf": 5,
+    "reported": 4,
+    "reportedOf": 4,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "ollama:qwen3:8b": {
+    "runs": 1,
+    "durationS": 848.301,
+    "requests": 5,
+    "inputTokens": 36980,
+    "outputTokens": 2032,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 4,
+    "failedToolCalls": 6,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings_info": 1,
+    "findings_warning": 0,
+    "findings_error": 0,
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 3
+   }
+  },
+  "skipped": []
+ }
+}

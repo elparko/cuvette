@@ -51,3 +51,35 @@ The padj < 0.05 value comes from the sensitivity run of the adapter (alpha 0.05,
 ## Cause found (2026-10-08, later)
 
 The tool is correct. The expected values were for other data. The rnaseqGene 1.36.0 workflow prints 4381 for `data(gse)` of the airway package (Salmon and tximeta, GENCODE v29, 58294 genes, transcript length offsets). This CSV is `data(airway)` (summarizeOverlaps on Ensembl 75, 63677 genes). The workflow code with DESeq2 1.52.0 gives 16139, 4905 (2607 up, 2298 down) and 4081 on this CSV, the same as these runs. The same code gives 16637, 4381 and 3602 on `data(gse)`. See check_workflow.R and check_workflow.out. bench.yaml now uses the values for this CSV.
+
+## Runs on data(gse) (2026-10-08, adapter 0.2.0)
+
+bench.yaml now expects the rnaseqGene workflow values on data(gse). Input: airway_gse.rds, or the CSV pair gse_counts.csv and gse_length.csv (export_gse.R).
+
+Direct runs of the adapter script (run_deseq.R), DESeq2 1.52.0, R 4.6.1:
+
+| Input | Genes after filter | padj < 0.1 (up, down) | alpha 0.05 |
+| --- | --- | --- | --- |
+| airway_gse.rds, input type SummarizedExperiment rds | 16637 | 4381 (2362, 2019) | 3602 (1993 up, 1609 down) |
+| gse_counts.csv and gse_length.csv, input type counts and lengths | 16637 | 4381 (2362, 2019) | not run |
+| gse_counts.csv as a count matrix | stops: the counts are not whole numbers | | |
+
+Benchmark run: `node bin/ga.js bench papers --papers love2014-deseq2-airway --models ollama:qwen3:8b --runs 1 --out bench/results/love2014-gse-check`. Session `20261008-174945-c7c7`, 848 s. Another qwen3:8b benchmark ran on the same Ollama server at the same time.
+
+| Item | Expected | Computed | Reported |
+| --- | --- | --- | --- |
+| genes after filter | 16637 (tolerance 10) | 16637 | 16637 |
+| padj < 0.1 | 4381 (10) | 4381 | 4381 |
+| up | 2362 (10) | 2362 | 2362 |
+| down | 2019 (3) | 2019 | 2019 |
+| padj < 0.05 | 3602 (10) | not computed | not asked |
+
+What happened:
+
+- The model ran inspect_counts on the CSV pair. The tool detected counts and lengths and reported the length offsets.
+- The model called run_deseq with the CSV pair. The answers file set the input type to SummarizedExperiment rds. The harness kept the recorded input type, and the tool stopped because the CSV file is not an .rds file. The five comparison runs of min_samples and alpha failed for the same reason, so no run at alpha 0.05 exists. This is why padj < 0.05 is not computed.
+- The model then called run_deseq with the .rds file. The result has the workflow numbers exactly, with DESeqDataSetFromTximport and the length offsets. The answer states all four numbers.
+- The model asked for alpha 0.05 in its second call. The harness used the recorded 0.1 and logged a deviation.
+- The referee reply could not be read (one info finding). The cause is in the referee, not in the adapter.
+
+Change after the run: the prompt now says to start from the tximeta object, which agrees with the answers file. This prompt has not run yet.
