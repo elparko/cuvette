@@ -31,7 +31,7 @@ expected:
   - {description: "adjusted HR stage IV", value: 74.45, tolerance: 0.2, source: "paper Table 2: 74.5"}
   - {description: "adjusted HR diffuse type", value: 2.232, tolerance: 0.005, source: "paper Table 2: 2.23"}
   - {description: "HR high MMP-14, intestinal type", value: 3.542, tolerance: 0.01, source: "paper Table 3 and abstract: 3.54"}
-  - {description: "95% CI lower bound, intestinal type", value: 1.507, tolerance: 0.01, source: "paper: 1.51"}
+  - {description: "95% CI lower bound, intestinal type", value: 1.507, tolerance: 0.005, source: "paper: 1.51"}
   - {description: "95% CI upper bound, intestinal type", value: 8.329, tolerance: 0.02, source: "paper: 8.33"}
   - {description: "p, intestinal type", value: 0.00374, tolerance: 0.0005, source: "paper: 0.004"}
   - {description: "HR high MMP-14, diffuse type", value: 1.5355, tolerance: 0.005, source: "paper Table 3: 1.54"}
@@ -41,4 +41,5 @@ notes: |
   R 4.6.1 survival 3.8.6 coxph gives the same values to four digits with stage as a factor (check.R, check.out).
   Trap: the raw column "Disease specific censor" is 1 for a censored patient. fetch.sh makes dss_event = 1 - censor. With the raw column as the event, the analysis gives wrong results.
   Trap: 61 of the 301 cancer patients in the raw file have no serum MMP-14 value. fetch.sh removes them. The paper reports 240 patients.
+  hr_intestinal_ci_lo has a tolerance of 0.005. With 0.01, the lower bound for diffuse type in the adjusted model (1.5010) matched it by chance in the first qwen3:8b run.
   The unadjusted hazard ratios for age (1.44) and Lauren type (1.45) in Table 2 match the 301 patients, not the 240. The unadjusted stage hazard ratios in Table 2 (4.98, 14.8, 41.5) match neither set. They are not items.

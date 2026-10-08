@@ -214,6 +214,11 @@ export class DecisionRecord {
     return this.states.get(key)?.set ?? false;
   }
 
+  hasValue(key: string): boolean {
+    const s = this.states.get(key);
+    return Boolean(s?.set) && s?.value !== null && s?.value !== "";
+  }
+
   owner(key: string): Owner {
     return this.state(key).owner;
   }

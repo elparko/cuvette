@@ -34,7 +34,7 @@ items:
   - {key: hr_stage4, description: "Adjusted hazard ratio, stage IV", value: 74.45, tolerance: 0.2, in_answer: false, tool: fit_cox}
   - {key: hr_diffuse, description: "Adjusted hazard ratio, diffuse type", value: 2.232, tolerance: 0.005, in_answer: false, tool: fit_cox}
   - {key: hr_intestinal, description: "Hazard ratio, high MMP-14, intestinal type", value: 3.542, tolerance: 0.01, tool: fit_cox}
-  - {key: hr_intestinal_ci_lo, description: "95% CI lower bound, intestinal type", value: 1.507, tolerance: 0.01, tool: fit_cox}
+  - {key: hr_intestinal_ci_lo, description: "95% CI lower bound, intestinal type", value: 1.507, tolerance: 0.005, tool: fit_cox}
   - {key: hr_intestinal_ci_hi, description: "95% CI upper bound, intestinal type", value: 8.329, tolerance: 0.02, tool: fit_cox}
   - {key: p_intestinal, description: "p for high MMP-14, intestinal type", value: 0.00374, tolerance: 0.0005, tool: fit_cox}
   - {key: hr_diffuse_type, description: "Hazard ratio, high MMP-14, diffuse type", value: 1.5355, tolerance: 0.005, tool: fit_cox}

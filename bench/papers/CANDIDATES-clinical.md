@@ -49,6 +49,7 @@ These limit which clinical papers can enter the benchmark. No adapter change was
 - `fit_cox` reads numeric columns only. It does not expand a categorical covariate into indicator columns. fetch.sh must add them.
 - `fit_cox` and `kaplan_meier` cannot select rows. A subgroup analysis needs its own CSV file.
 - The harness applies one value of a decision to every call. A paper with an unadjusted and an adjusted Cox model needs `cox_covariates` left empty, so the scientist does not fix the covariates.
+- Fixed: an empty answer replaced the agent's argument in the held call and in the comparison runs (`src/core/session.ts`). The first qwen3:8b run of the MMP-14 paper hit this. An empty covariate list in `fit_cox` now gives a clear error.
 - `fit_mixed_model` stops with a patsy error ("factor contains missing values") if the outcome column has a blank cell. The error is a traceback, not a tool error message.
 - `compare_two_groups` reads one outcome column. A change from baseline must exist as a column in the CSV file.
 - The adapter reads CSV files only.

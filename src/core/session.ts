@@ -637,7 +637,7 @@ export class Session {
       const adapter = this.adapterOf(tool);
       const links = adapter?.linksFor(tool.remoteName ?? tool.name) ?? {};
       const next = structuredClone(args);
-      for (const [arg, key] of Object.entries(links)) if ((pre.waitingOn ?? []).includes(key)) setArg(next, arg, this.decisions.value(key));
+      for (const [arg, key] of Object.entries(links)) if ((pre.waitingOn ?? []).includes(key) && this.decisions.hasValue(key)) setArg(next, arg, this.decisions.value(key));
       return this.pipeline(tool, next, callId, signal, depth + 1);
     }
     let perm = this.sessionAllow.has(tool.name) ? "allow" : this.permissions.check(tool, eff);
@@ -832,12 +832,15 @@ export class Session {
           const same = sensTool === (tool.remoteName ?? tool.name);
           const lastRun = same ? undefined : this.record.nodes().filter((n) => n.tool === sensTool && !n.sensitivityOf).at(-1);
           const base: Args = same ? structuredClone(args) : lastRun ? structuredClone(lastRun.args) : {};
+          const proposedArgs = structuredClone(base);
           const links = this.adapterOf(target)?.linksFor(sensTool) ?? {};
           const unknown: { arg: string; key: string }[] = [];
           for (const [arg, k] of Object.entries(links)) {
             if (k === key || !keys.includes(k)) continue;
             const other = this.decisionOf(k)?.decision;
-            if (this.decisions.isSet(k)) setArg(base, arg, this.decisions.value(k));
+            if (this.decisions.isSet(k)) {
+              if (this.decisions.hasValue(k)) setArg(base, arg, this.decisions.value(k));
+            }
             else if (other?.default !== undefined) setArg(base, arg, other.default);
             else {
               deleteArg(base, arg);
@@ -852,11 +855,12 @@ export class Session {
             try {
               await abortable(this.questions.wait(q.qid), signal);
             } catch {}
-            if (this.decisions.isSet(u.key)) setArg(base, u.arg, this.decisions.value(u.key));
+            if (this.decisions.hasValue(u.key)) setArg(base, u.arg, this.decisions.value(u.key));
+            else if (this.decisions.isSet(u.key) && getArg(proposedArgs, u.arg) !== undefined) setArg(base, u.arg, getArg(proposedArgs, u.arg));
           }
           const required = (target.inputSchema.required as string[] | undefined) ?? [];
           const missing = [
-            ...unknown.filter((u) => !this.decisions.isSet(u.key)).map((u) => `${u.arg} (${this.decisionOf(u.key)?.decision.label ?? u.key})`),
+            ...unknown.filter((u) => [undefined, null, ""].includes(getArg(base, u.arg) as never)).map((u) => `${u.arg} (${this.decisionOf(u.key)?.decision.label ?? u.key})`),
             ...required.filter((a) => [undefined, null, ""].includes(getArg(base, a) as never) && !unknown.some((u) => u.arg === a)),
           ];
           if (missing.length) {

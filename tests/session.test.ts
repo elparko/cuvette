@@ -392,3 +392,22 @@ test("without a wait for answers, the comparison names the missing argument and 
   const q = session.record.entries(["question"]).find((e) => e.data.decisionKey === "perms")!;
   expect(String(q.data.evidence)).toMatch(/No comparison yet: the comparison runs of fit need a value for terms \(Model terms\)/);
 });
+
+test("an empty answer keeps the agent's argument in the comparison runs and in the held call", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "fit", args: { data: "/data/x.csv", terms: "A + B", perms: 999 } }] }, { text: "done" }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/model")], provider, cwd: tmpdir() });
+  session.bus.on((e) => {
+    if (e.type !== "question") return;
+    setTimeout(() => session!.answer(e.question.qid, e.question.decisionKey === "terms" ? "" : 999), 0);
+  });
+  session.decisions.applySetup({ question: "Does A change the outcome?" });
+  await session.send("Fit the model");
+
+  expect(session.decisions.isSet("terms")).toBe(true);
+  expect(session.decisions.hasValue("terms")).toBe(false);
+  expect(session.record.entries(["tool_result"]).filter((e) => e.data.ok === false)).toHaveLength(0);
+  const comps = session.record.nodes().filter((n) => n.sensitivityOf === "perms");
+  expect(comps.map((n) => n.args.terms)).toEqual(["A + B", "A + B"]);
+  const main = session.record.nodes().filter((n) => !n.sensitivityOf);
+  expect(main.map((n) => [n.args.terms, n.args.perms])).toEqual([["A + B", 999]]);
+});

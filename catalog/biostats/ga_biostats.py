@@ -332,6 +332,8 @@ def fit_cox(path, duration, event, covariates, ties="efron", strata=None, alpha=
     frame = _read(path)
     covs = [c.strip() for c in (covariates.split(",") if isinstance(covariates, str) else covariates) if c.strip()]
     strata_cols = [s.strip() for s in (strata.split(",") if isinstance(strata, str) else (strata or [])) if s.strip()]
+    if not covs:
+        return _fail("The covariate list is empty. fit_cox needs at least one covariate column, for example the group column whose hazard ratio you want.")
     problem = _need(frame, [duration, event] + covs + strata_cols)
     if problem:
         return _fail(problem)
