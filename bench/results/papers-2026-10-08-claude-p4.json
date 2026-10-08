@@ -1,0 +1,837 @@
+{
+ "date": "2026-10-08",
+ "models": [
+  "claude"
+ ],
+ "runsPerCell": 1,
+ "runs": [
+  {
+   "paper": "student1908-sleep",
+   "model": "claude",
+   "run": 1,
+   "status": "answer",
+   "durationS": 59.204,
+   "session": "20261008-153325-d563",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/claude/student1908-sleep/run1/home/sessions/20261008-153325-d563",
+   "answer": "Yes. Drug 2 gave more extra sleep than drug 1: on average 1.58 more hours per patient (95% CI 0.70 to 2.46, p = 0.0028). This is significant at alpha 0.05. It comes from the paired t-test, which is the test you chose.\n\n**Data (inspect_table):** 20 rows and 4 columns. There are 10 patients and each took both drugs, so a replicate is one patient and n = 10 pairs, not 20 subjects.\n\n**Main result (compare_two_groups, paired t-test, two-sided, alpha 0.05):**\n- Mean extra sleep: drug 1 = 0.75 h, drug 2 = 2.33 h.\n- **Mean difference (drug 2 minus drug 1): 1.58 h.**\n- **95% confidence interval: 0.70 to 2.46 h.**\n- t = 4.062, df = 9, **p = 0.002833.**\n- Effect size: Cohen's d_z = 1.28, which is a large effect.\n\n**Check only, not the result (compare_options, paired Wilcoxon signed-rank test, two-sided):** This was a comparison run with a test family you didn't choose. The record still says t-test. It gave statistic = 0 and p = 0.003906. A statistic of 0 means no patient's difference favoured drug 1. This test asks about the median of the paired differences, not the mean. It only shows that the t-test conclusion doesn't depend on assuming a normal distribution.\n\n**Note:** My first try at the rank test went through compare_two_groups. The harness kept the recorded test family, so that call just repeated the t-test with the same numbers. I then ran the rank test with compare_options, which leaves the record unchanged.\n\n**Summary**\n- **What I did:** Inspected the file, ran the paired t-test with the recorded decisions (paired, t-test, two-sided, alpha 0.05), and ran a Wilcoxon signed-rank test as a comparison check.\n- **What I found:** Drug 2 adds 1.58 h of sleep compared with drug 1 (95% CI 0.70 to 2.46, p = 0.002833, d_z = 1.28). The rank-test comparison run agrees with this, with p = 0.003906 from that run only.\n- **What is uncertain:**\n  - There are only 10 patients, so the interval is wide. The true advantage could be anywhere from about 0.7 h to about 2.5 h.\n  - The t-test assumes the paired differences are roughly normal.\n  - The data don't say whether the order of the drugs was randomized or whether there was a washout period.\n- **What waits for you:** Nothing. All decisions came from the record and none were changed.\n\n**To repeat by hand:** `ga_biostats.compare_two_groups(path=\"/Volumes/T7/guided-analysis/data/student1908-sleep/sleep.csv\", outcome=\"extra\", group=\"group\", test=\"t\", paired=True, id_column=\"ID\", alternative=\"two-sided\", alpha=0.05)`\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Paired test: true · Test family for two groups: t · Assume equal variances (unpaired t-test): false · Sidedness: two-sided.",
+   "items": [
+    {
+     "key": "mean_difference",
+     "description": "Mean paired difference, group 2 minus group 1",
+     "expected": 1.58,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.58,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.mean_diff",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.58,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 66,
+      "text": "Drug 2 gave more extra sleep than drug 1: on average 1.58 more hours per patient (95% CI 0.70 to 2.46, p = 0.0028)."
+     }
+    },
+    {
+     "key": "paired_t",
+     "description": "Paired t statistic, absolute value",
+     "expected": 4.0621,
+     "tolerance": 0.001,
+     "abs": true,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.062127683382037,
+      "diff": 0.000027683382036514104,
+      "node": "n2",
+      "path": "metrics.statistic",
+      "entry": 32
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 66,
+      "text": null
+     }
+    },
+    {
+     "key": "degrees_of_freedom",
+     "description": "Degrees of freedom",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.df",
+      "entry": 32
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 66,
+      "text": null
+     }
+    },
+    {
+     "key": "paired_p",
+     "description": "Paired two-sided p",
+     "expected": 0.002833,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0028328901973842724,
+      "diff": 1.0980261572765895e-7,
+      "node": "n2",
+      "path": "metrics.p_value",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.002833,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 66,
+      "text": "- t = 4.062, df = 9, **p = 0.002833.**"
+     }
+    },
+    {
+     "key": "ci_lower",
+     "description": "95% CI lower bound",
+     "expected": 0.7,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.7001142367230175,
+      "diff": 0.00011423672301758003,
+      "node": "n2",
+      "path": "metrics.ci_lo",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.7,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 66,
+      "text": "Drug 2 gave more extra sleep than drug 1: on average 1.58 more hours per patient (95% CI 0.70 to 2.46, p = 0.0028)."
+     }
+    },
+    {
+     "key": "ci_upper",
+     "description": "95% CI upper bound",
+     "expected": 2.46,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.459885763276983,
+      "diff": 0.00011423672301713594,
+      "node": "n2",
+      "path": "metrics.ci_hi",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.46,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 66,
+      "text": "Drug 2 gave more extra sleep than drug 1: on average 1.58 more hours per patient (95% CI 0.70 to 2.46, p = 0.0028)."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 3044,
+    "cacheRead": 48085,
+    "cacheWrite": 12305,
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 0,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 3
+   }
+  },
+  {
+   "paper": "white2021-flowkit",
+   "model": "claude",
+   "run": 1,
+   "status": "answer",
+   "durationS": 410.998,
+   "session": "20261008-153424-1d81",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/claude/white2021-flowkit/run1/home/sessions/20261008-153424-1d81",
+   "answer": "The file has **290,172 events**. FlowKit puts **133,670 of them in the CD3+ gate**. Of those, **82,484 are CD4+ (61.7%)** and **47,165 are CD8+ (35.3%)**. FlowKit's counts come out slightly below FlowJo's stored counts, but not identical (0.14–0.29% lower for the main gates). Without compensation, CD4+ gains the most events. The CD8+ IFNg+ gate changes the most in relative terms: it jumps from 2 events to 672.\n\n## Compensation used\n- **Compensation for gating = `gating_file`.** This is the matrix in the workspace `8_color_ICS.wsp`, which list_gates labels \"Acquisition-defined\": the spill matrix stored in the FCS file. Every result in sections 1 and 2 used it (count_gates, plot_gate), and it is the baseline in section 3. For the uncompensated plot I asked for, the harness kept `gating_file`.\n- **Compensation for the other tools = `none`.** No tool that uses this setting was run. inspect_fcs takes no compensation option.\n- **\"No compensation\" appears only as a comparison.** To answer question 3, compare_compensation ran a second, comparison-only pass with no compensation. It didn't change the recorded decision, and its counts aren't results.\n\n## 1. The file and CD3+ T cells\n**inspect_fcs:**\n- **Events:** 290,172 in `101_DEN084Y5_15_E01_008_clean.fcs`.\n- **Channels:** 15 in total: 6 scatter (FSC-A/H/W, SSC-A/H/W), 1 Time, and 8 fluorescence.\n- **Fluorescence channels:** TNFa FITC, CD8 PerCP-Cy55, IL2 BV421, Aqua Amine (viability), IFNg APC, CD3 APC-H7, CD107a PE, CD4 PE-Cy7.\n- **Spill matrix:** yes, the file contains one.\n\n**list_gates:**\n- The workspace holds 14 gates for this sample and one compensation matrix.\n- Gate tree: Time → Singlets → aAmine- (live cells) → CD3+ → CD4+ or CD8+ → CD107a+, IFNg+, IL2+, TNFa+ under each.\n\n**count_gates** (compensation `gating_file`) counts:\n\n| Gate | Parent | FlowKit count | % of parent | FlowJo stored | Difference |\n|---|---|---|---|---|---|\n| Time | (all events) | 290,166 | 99.998% | 290,172 | −6 |\n| Singlets | Time | 239,001 | 82.37% | 239,691 | −690 |\n| aAmine- | Singlets | 164,655 | 68.89% | 164,942 | −287 |\n| **CD3+** | aAmine- | **133,670** | **81.18%** | 133,860 | −190 |\n\nCD3+ is 46.1% of all events (calculate). The CD3+ gate comes after the doublet and dead-cell gates, so these are single live CD3+ events. They are still events, not a verified cell count. Plot: `gate_CD3.png`.\n\n## 2. CD4 and CD8, and agreement with FlowJo\n| Gate | Parent | FlowKit | % of CD3+ | FlowJo stored | FlowJo % of CD3+ (calculate) | Difference |\n|---|---|---|---|---|---|---|\n| CD4+ | CD3+ | 82,484 | 61.71% | 82,636 | 61.73% | −152 |\n| CD8+ | CD3+ | 47,165 | 35.28% | 47,241 | 35.29% | −76 |\n\n- **CD4:CD8 ratio (calculate):** 1.749 from FlowKit, 1.749 from FlowJo.\n- **Events in neither gate:** 4,021 CD3+ events are in neither CD4+ nor CD8+ (calculate).\n- **Do they match?** Closely, but not exactly:\n  - FlowKit gives slightly fewer events at every main gate.\n  - The largest absolute gap is at Singlets: 690 events, 0.29%.\n  - The percentages of parent agree to about 0.03 percentage points.\n  - In the cytokine gates the gaps are 0 to 3 events. The largest relative gap is IL2+ under CD8+: 10 vs 11 events, 9.1%.\n- **Likely cause (my inference, not tested):** the two programs treat events on gate edges differently. The Time gate missing 6 events that FlowJo kept points that way.\n- Plot: `gate_CD4.png`.\n\n## 3. Without compensation (compare_compensation: `gating_file` vs a no-compensation comparison)\n| Gate (parent path) | `gating_file` | No compensation | Change |\n|---|---|---|---|\n| Time, Singlets, aAmine- | — | — | 0 |\n| CD3+ | 133,670 | 135,381 | +1,711 (+1.3%) |\n| **CD4+** (…/CD3+) | 82,484 | 85,369 | **+2,885 (+3.5%) – largest change in events** |\n| CD8+ (…/CD3+) | 47,165 | 47,694 | +529 (+1.1%) |\n| CD107a+ (…/CD8+) | 73 | 96 | +23 (+31.5%) |\n| **IFNg+ (…/CD3+/CD8+)** | **2** | **672** | **+670 (+33,500%) – largest relative change** |\n| IFNg+ (…/CD4+) | 4 | 7 | +3 |\n| TNFa+ (…/CD8+) | 8 | 10 | +2 |\n| CD107a+ (…/CD4+), TNFa+ (…/CD4+) | 68, 21 | 70, 22 | +2, +1 |\n| IL2+ (both) | 6, 10 | 6, 10 | 0 |\n\n- **The upstream gates don't change.** Time and Singlets use only time and scatter, which are never compensated. aAmine- uses the compensated Aqua Amine channel, yet its count still didn't move.\n- **The CD4/CD8 split shifts only a little:** CD4+ goes to 63.1% of CD3+ and CD8+ to 35.2% (calculate).\n- **CD8+ IFNg+ is the big change.** It goes from 0.004% of CD8+ to 1.41% (calculate). Without compensation, that would look like a real IFNg response. It is most likely spillover from another channel into the IFNg APC channel. I haven't confirmed which channel, and I couldn't draw the uncompensated plot.\n- **These counts aren't valid results.** FlowJo's gates were drawn on compensated data, so uncompensated counts can't be compared to FlowJo's.\n\n## What is uncertain\n- **Small cytokine gates have large counting error.** With 2 events the error from counting alone is about 71%, and with 4 events it is 50% (calculate). Treat those counts as roughly zero rather than as precise frequencies.\n- **One sample.** This is one FCS file from one sample. Nothing here compares stimulated with unstimulated, and no control sample was given, so I treated no sample as a control.\n- **Why FlowKit and FlowJo differ.** The gate-edge explanation is a guess.\n\n## What waits for you\n- Nothing is blocked.\n- If you want to know whether the stimulation produced cytokine responses, name a control sample, such as the unstimulated well. The workspace lists 3 samples. I can then show its counts next to this one.\n\n**Files:**\n- Count tables: `count_gates-1/gate_counts.csv`, `compare_compensation-1/compensation_comparison.csv`\n- Plots: `gate_CD3.png`, `gate_CD4.png`, `gate_IFNg.png` (CD8+ IFNg+, `gating_file`)\n\nSettings used, from the decision record: Gating file or FlowJo workspace: /Volumes/T7/guided-analysis/data/white2021-flowkit/src/data/8_color_data_set/8_color_ICS.wsp · Compensation for gating: gating_file.",
+   "items": [
+    {
+     "key": "events_in_file",
+     "description": "Events in the file",
+     "expected": 290172,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 290172,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_events",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 290172,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 98,
+      "text": "The file has **290,172 events**."
+     }
+    },
+    {
+     "key": "cd3_flowkit",
+     "description": "CD3+ events, FlowKit, matrix of the workspace",
+     "expected": 133670,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 133670,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.count_CD3",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 133670,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 98,
+      "text": "FlowKit puts **133,670 of them in the CD3+ gate**."
+     }
+    },
+    {
+     "key": "cd3_flowjo",
+     "description": "CD3+ events, FlowJo count in the workspace",
+     "expected": 133860,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 133860,
+      "diff": 0,
+      "node": "n3",
+      "path": "table.rows[3][6]",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 133860,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 98,
+      "text": "| **CD3+** | aAmine- | **133,670** | **81.18%** | 133,860 | −190 |"
+     }
+    },
+    {
+     "key": "cd4_flowkit",
+     "description": "CD4+ events, FlowKit",
+     "expected": 82484,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 82484,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.count_CD4",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 82484,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 98,
+      "text": "Of those, **82,484 are CD4+ (61.7%)** and **47,165 are CD8+ (35.3%)**."
+     }
+    },
+    {
+     "key": "cd4_flowjo",
+     "description": "CD4+ events, FlowJo",
+     "expected": 82636,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 82636,
+      "diff": 0,
+      "node": "n3",
+      "path": "table.rows[4][6]",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 82636,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 98,
+      "text": "| CD4+ | CD3+ | 82,484 | 61.71% | 82,636 | 61.73% | −152 |"
+     }
+    },
+    {
+     "key": "cd8_flowkit",
+     "description": "CD8+ events, FlowKit",
+     "expected": 47165,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 47165,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.count_CD8",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 47165,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 98,
+      "text": "Of those, **82,484 are CD4+ (61.7%)** and **47,165 are CD8+ (35.3%)**."
+     }
+    },
+    {
+     "key": "cd8_flowjo",
+     "description": "CD8+ events, FlowJo",
+     "expected": 47241,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 47241,
+      "diff": 0,
+      "node": "n3",
+      "path": "table.rows[5][6]",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 47241,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 98,
+      "text": "| CD8+ | CD3+ | 47,165 | 35.28% | 47,241 | 35.29% | −76 |"
+     }
+    },
+    {
+     "key": "largest_difference_percent",
+     "description": "Largest difference FlowKit minus FlowJo, percent of FlowJo count (CD4+)",
+     "expected": -0.184,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -0.1839392032528196,
+      "diff": 0.00006079674718040273,
+      "node": "n3",
+      "path": "table.rows[4][8]",
+      "entry": 35
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 98,
+      "text": null
+     }
+    },
+    {
+     "key": "cd3_no_compensation",
+     "description": "CD3+ events, no compensation",
+     "expected": 135381,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 135381,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.count_CD3_none",
+      "entry": 38
+     },
+     "reported": {
+      "pass": true,
+      "value": 135381,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 98,
+      "text": "| CD3+ | 133,670 | 135,381 | +1,711 (+1.3%) |"
+     }
+    },
+    {
+     "key": "cd4_no_compensation",
+     "description": "CD4+ events, no compensation",
+     "expected": 85369,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 85369,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.count_CD4_none",
+      "entry": 38
+     },
+     "reported": {
+      "pass": true,
+      "value": 85369,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 98,
+      "text": "| **CD4+** (…/CD3+) | 82,484 | 85,369 | **+2,885 (+3.5%) – largest change in events** |"
+     }
+    },
+    {
+     "key": "cd8_no_compensation",
+     "description": "CD8+ events, no compensation",
+     "expected": 47694,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 47694,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.count_CD8_none",
+      "entry": 38
+     },
+     "reported": {
+      "pass": true,
+      "value": 47694,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 98,
+      "text": "| CD8+ (…/CD3+) | 47,165 | 47,694 | +529 (+1.1%) |"
+     }
+    },
+    {
+     "key": "cd8_ifng_no_compensation",
+     "description": "CD8+ IFNg+ events, no compensation (2 with the matrix)",
+     "expected": 672,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 672,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.count_Time_Singlets_aAmine_CD3_CD8_IFNg_none",
+      "entry": 38
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 98,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 8,
+    "inputTokens": 20,
+    "outputTokens": 9573,
+    "cacheRead": 125603,
+    "cacheWrite": 27070,
+    "toolCalls": 16,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 7,
+     "warning": 0,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 9
+   }
+  },
+  {
+   "paper": "wolf2018-scanpy",
+   "model": "claude",
+   "run": 1,
+   "status": "answer",
+   "durationS": 285.737,
+   "session": "20261008-154115-3525",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/claude/wolf2018-scanpy/run1/home/sessions/20261008-154115-3525",
+   "answer": "I kept **2638 of 2700 cells** and found **7 clusters** at your recorded settings. The 7 is not fixed: depending on the resolution I tried, I got 5 to 14 clusters. Each cluster has a clear set of marker genes, listed below. One note on the data: they come from one donor and one sample, so this describes cell types only. There are no replicates and no comparison between conditions.\n\n## Cleaning (the cutoffs are the ones in your record)\n- **Loading:** 2700 cells × 32738 genes, and the matrix holds raw counts.\n- **Gene filter:** keeping genes detected in at least 3 cells left 13714 genes, so 19024 were removed.\n- **Cell quality:** median 816 genes per cell (range 212 to 3400) and median 2.03 % mitochondrial counts (maximum 22.57 %). I worked these out from the quality table. My helper could not open the violin plot image, so please look at `qc_violin.png` yourself.\n- **Cell filter:** cutoffs of at least 200 genes, fewer than 2500 genes and under 5 % mitochondrial counts. This kept 2638 of 2700 cells. 0 were removed for too few genes, 5 for too many genes and 57 for high mitochondrial counts. Genes stayed at 13714.\n\n## Steps up to the clusters\n- **Normalizing:** each cell scaled to 10000 total counts, then log-transformed.\n- **Variable genes:** 1838 genes, using scanpy's standard mean and spread cutoffs.\n- **Scaling:** removed the effect of total counts and % mitochondrial counts, then capped values at 10.\n- **PCA:** 50 components. The first 10 explain 6.4 % of the variance. The curve falls steeply up to PC4 and is flat after about PC10.\n- **Neighbor graph and UMAP:** 10 neighbors, 40 components and random seed 0 for everything.\n- **Clustering:** at resolution 0.7, **7 clusters** with sizes 1174, 486, 438, 341, 150, 36 and 13 cells.\n\n**How the count changes with resolution** (10 neighbors, 40 components, seed 0; these were comparison runs and the record stays at 0.7):\n\n| Resolution | Clusters | Smallest | Largest |\n|---|---|---|---|\n| 0.3 | 5 | 13 | 1239 |\n| 0.7 | 7 | 13 | 1174 |\n| 1.0 | 8 | 13 | 1138 |\n| 1.5 | 14 | 13 | 429 |\n\n## Marker genes\nI used the Wilcoxon test, comparing each cluster with all other cells. The p-values are adjusted, but they are only descriptive: the clusters were built from the same cells the test ranks, so they are not evidence of real differences. Fold changes are log2 (\"LFC\"). For each cell-type name, \"evidence\" means the lab's standard blood markers seen in the dot plot (`plot_genes-3/genes_dotplot.png`). I wrote \"putative\" where only one or two genes support a name.\n\n| Cluster (cells) | Top genes from the test (LFC, adjusted p) | Evidence for the name | Name |\n|---|---|---|---|\n| 0 (1174) | RPS12 (1.06, 2.7e-226), LDHB (2.72, 2.1e-223), CD3D (3.24, 1.9e-171) | CD3D, IL7R; CCR7 weak; CD8A and CD8B low | putative CD4 T cells, probably more than one subset |\n| 1 (486) | CD74 (4.08, 3.4e-179), CD79A (7.75, 1.2e-166), MS4A1 (6.43, 1.4e-137) | MS4A1, CD79A, CD79B | B cells |\n| 2 (438) | LYZ (6.24, 1.4e-248), S100A9 (7.35, 2.5e-244), S100A8 (7.58, 4.3e-235) | LYZ, CD14, CST3 | CD14 monocytes |\n| 3 (341) | NKG7 (7.06, 8.5e-213), CST7 (6.41, 4.5e-170), GZMA (6.09, 2.0e-159) | NKG7, GNLY (5.06, 5.6e-51), plus some CD3D, CD8A and CD8B | NK cells mixed with CD8 T cells |\n| 4 (150) | LST1 (5.18, 7.8e-81), FCER1G (4.79, 1.2e-77), FCGR3A (5.57, 6.9e-73) | FCGR3A, MS4A7 (4.99, 1.2e-48), CST3 | FCGR3A monocytes |\n| 5 (36) | HLA-DPA1 (4.28, 5.2e-17), HLA-DRA (4.61, 6.0e-16), FCER1A (8.77, 2.1e-14) | FCER1A, CST3 | putative dendritic cells |\n| 6 (13) | PPBP (13.04, 7.7e-07), PF4 (12.91, 7.7e-07), GNG11 (12.43, 7.7e-07) | PPBP only, from the lab list | putative megakaryocytes / platelets |\n\n## What is uncertain\n- **The cluster count** depends on the resolution, so 7 belongs to resolution 0.7 only. The 13-cell cluster is the only thing that stays the same size in every run I tried.\n- **Clusters 0 and 3 look mixed** at 0.7. Their names will probably change at a higher resolution, which matches the jump from 8 to 14 clusters between 1.0 and 1.5.\n- **Cluster 0's top genes are mostly ribosomal (RPS genes)**, so its markers say more about which genes are low there than about a specific cell type.\n- **The number of components (40) is untested.** My comparison run only rebuilt the neighbor graph and did not recluster, so I don't know whether 10 or 20 components would give different clusters.\n- **Clusters 5 and 6 are small** (36 and 13 cells), so their p-values are much weaker than the others'.\n\n## What waits for you\n- You answered that resolution 0.7 stays as the result while you look at higher resolutions. If you want to split clusters 0 and 3, the next step is to change the resolution or sub-cluster those two, then run the marker test again.\n- Please look at `qc_violin.png`, `pca_variance.png` and `umap_leiden.png` yourself; my helper could not open images.\n\nThe final file is `find_markers-1/markers.h5ad`, and the marker table is in `markers.csv` in the same folder.\n\nSettings used, from the decision record: Minimum genes per cell: 200 · Maximum genes per cell: 2500 · Maximum percent mitochondrial counts: 5 · Minimum cells per gene: 3 · Counts per cell after normalization: 10000 · Number of top highly variable genes (0 = use the mean and dispersion cutoffs): 0 · Variables to regress out: total_counts,pct_counts_mt · Number of principal components for the neighbor graph: 40 · Number of neighbors: 10 · Leiden resolution: 0.7 · Random seed: 0 · Marker gene test: wilcoxon.",
+   "items": [
+    {
+     "key": "cells_at_load",
+     "description": "Cells at load.",
+     "expected": 2700,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2700,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_cells",
+      "entry": 22
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 281,
+      "text": null
+     }
+    },
+    {
+     "key": "genes_at_load",
+     "description": "Genes at load.",
+     "expected": 32738,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 32738,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_genes",
+      "entry": 22
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 281,
+      "text": null
+     }
+    },
+    {
+     "key": "genes_after_min_cells",
+     "description": "Genes after the minimum cells filter.",
+     "expected": 13714,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 13714,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_genes_after",
+      "entry": 32
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 281,
+      "text": null
+     }
+    },
+    {
+     "key": "cells_after_qc",
+     "description": "Cells after quality control.",
+     "expected": 2638,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2638,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_cells_after",
+      "entry": 77
+     },
+     "reported": {
+      "pass": true,
+      "value": 2638,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n17",
+      "claimEntry": 281,
+      "text": "I kept **2638 of 2700 cells** and found **7 clusters** at your recorded settings."
+     }
+    },
+    {
+     "key": "highly_variable_genes",
+     "description": "Highly variable genes, default flavor.",
+     "expected": 1838,
+     "tolerance": 20,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1838,
+      "diff": 0,
+      "node": "n8",
+      "path": "metrics.n_highly_variable",
+      "entry": 99
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 281,
+      "text": null
+     }
+    },
+    {
+     "key": "leiden_clusters",
+     "description": "Leiden clusters at resolution 0.7.",
+     "expected": 7,
+     "tolerance": 1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 7,
+      "diff": 0,
+      "node": "n10",
+      "path": "table.rows[6][0]",
+      "entry": 119
+     },
+     "reported": {
+      "pass": true,
+      "value": 7,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n25",
+      "claimEntry": 281,
+      "text": "I kept **2638 of 2700 cells** and found **7 clusters** at your recorded settings."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 25,
+    "inputTokens": 54,
+    "outputTokens": 12328,
+    "cacheRead": 441587,
+    "cacheWrite": 33141,
+    "toolCalls": 30,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 3,
+     "error": 2
+    },
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 19
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-08-claude-p4.md",
+  "json": "bench/results/papers-2026-10-08-claude-p4.json"
+ },
+ "summary": {
+  "cells": {
+   "student1908-sleep": {
+    "claude": {
+     "computed": 6,
+     "computedOf": 6,
+     "reported": 4,
+     "reportedOf": 4,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "white2021-flowkit": {
+    "claude": {
+     "computed": 12,
+     "computedOf": 12,
+     "reported": 10,
+     "reportedOf": 10,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "wolf2018-scanpy": {
+    "claude": {
+     "computed": 6,
+     "computedOf": 6,
+     "reported": 2,
+     "reportedOf": 2,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude": {
+    "computed": 24,
+    "computedOf": 24,
+    "reported": 16,
+    "reportedOf": 16,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude": {
+    "runs": 3,
+    "durationS": 755.9390000000001,
+    "requests": 39,
+    "inputTokens": 90,
+    "outputTokens": 24945,
+    "cacheRead": 615275,
+    "cacheWrite": 72516,
+    "toolCalls": 51,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 3,
+    "findings_info": 14,
+    "findings_warning": 3,
+    "findings_error": 5,
+    "unsourced": 1,
+    "deviations": 2,
+    "overwritten": 2,
+    "nodes": 31
+   }
+  },
+  "skipped": []
+ }
+}

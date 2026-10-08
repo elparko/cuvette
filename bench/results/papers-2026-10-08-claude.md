@@ -5,7 +5,7 @@ Each cell: computed passes / reported passes. Computed: a logged number is withi
 
 | Model | Computed | Reported | Runs | Not answered |
 | --- | --- | --- | --- | --- |
-| claude | 90/90 | 66/66 | 14 | 0 |
+| claude | 88/88 | 64/64 | 14 | 0 |
 
 ## Matrix
 
@@ -17,7 +17,7 @@ Each cell: computed passes / reported passes. Computed: a logged number is withi
 | belenky2003-sleepstudy | 6/6 / 2/2 |
 | bemis2015-cardinal | 5/5 / 5/5 |
 | bradley-photutils-100gaussians | 6/6 / 6/6 |
-| caicedo2019-bbbc039 | 3/3 / 3/3 |
+| caicedo2019-bbbc039 | 1/1 / 1/1 |
 | danecek2021-bcftools | 6/6 / 5/5 |
 | delaney2004-esol | 6/6 / 4/4 |
 | gowers2016-mdanalysis | 7/7 / 7/7 |
@@ -134,8 +134,8 @@ Session: 20261008-150134-fe43. Record: /Volumes/T7/guided-analysis/tools/bench-r
 | Item | Expected | Computed | Reported |
 | --- | --- | --- | --- |
 | true_nuclei_test | 5720 exact | pass 5720 (n10 stdout, entry 80) | pass 5720 via tolerance (n14, claim check 153) |
-| missed_fraction_advanced | 0.155 ±0.05 | pass 0.1452 (n14 stdout, entry 114) | pass 0.14 via tolerance (n14, claim check 153) |
-| missed_fraction_basic | 0.201 ±0.05 | pass 0.2017 (n14 stdout, entry 114) | pass 0.2017 via tolerance (n14, claim check 153) |
+| missed_fraction_advanced (reference) | 0.155 ±0.05 | match 0.1452 (n14 stdout, entry 114) | match 0.14 via tolerance (n14, claim check 153) |
+| missed_fraction_basic (reference) | 0.201 ±0.05 | match 0.2017 (n14 stdout, entry 114) | match 0.2017 via tolerance (n14, claim check 153) |
 
 ### danecek2021-bcftools | claude | run 1
 

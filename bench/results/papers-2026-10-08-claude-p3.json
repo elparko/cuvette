@@ -1,0 +1,783 @@
+{
+ "date": "2026-10-08",
+ "models": [
+  "claude"
+ ],
+ "runsPerCell": 1,
+ "runs": [
+  {
+   "paper": "rouault-gdal-autotest",
+   "model": "claude",
+   "run": 1,
+   "status": "answer",
+   "durationS": 80.333,
+   "session": "20261008-153325-49fe",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/claude/rouault-gdal-autotest/run1/home/sessions/20261008-153325-49fe",
+   "answer": "I ran all five steps. Pixels are 60 m × 60 m in EPSG:26711. The new latitude/longitude image is 22 × 18 pixels. The first square holds 100 pixels with an average of 129.5. Counting only pixels whose centres are inside, the second square holds 42 pixels with an average of 135.0.\n\n**1. Size, projection, pixel size** (`raster_info`, i.e. `gdalinfo -stats`)\n- 20 pixels wide and 20 pixels high, one band, Byte type.\n- The projection is EPSG:26711 (NAD27 / UTM zone 11N), measured in metres.\n- One pixel is 60 m × 60 m on the ground.\n- The image runs from corner (440720, 3751320) to (441920, 3750120). That covers 1,200 m east–west and 1,200 m north–south (worked out from those corners with `calculate`).\n\n**2. Pixel values** (same `gdalinfo -stats` run)\n- Lowest 74, highest 255, average 126.765, standard deviation 22.928.\n- The file has no nodata value, so all 400 pixels are in these numbers.\n\n**3. Converted to latitude/longitude** (`reproject_raster`: `gdalwarp -t_srs EPSG:4326 -r near`)\n- The new image is **22 pixels wide and 18 high** (the original was 20 × 20).\n- I used nearest-neighbour resampling. GDAL chose the pixel size: 0.000598 degrees on each side. That is in degrees, so I haven't turned it into a ground size.\n- The converted image's statistics are slightly different: average 126.551 and standard deviation 21.882, while lowest and highest are still 74 and 255. Resampling causes this, so use the original image's numbers from step 2.\n\n**4. First square, \"A\"** (`zonal_stats` with rasterstats on the original raster, pixel centres, no nodata; values from its CSV)\n- **Average 129.5 over 100 pixels.** Lowest 99, highest 197, total 12,950.\n- The squares are in the same projection as the image (EPSG:26711), so I didn't need to convert either one.\n- Square A sits exactly on pixel edges. Counting every pixel it touches gives the same answer: 100 pixels, average 129.5. Which counting rule you use doesn't matter for A.\n\n**5. Second square, \"B\", counting only pixels whose centre is inside** (same `zonal_stats` run; I read row B from its output file `zonal_stats.csv`)\n- **42 pixels, average 135.0.** Lowest 99, highest 173, total 5,670.\n\n**Map check** (`plot_map`): both outlines sit on the image. A lines up with the pixel grid. B lies inside A and its edges cut through pixels.\n\n**What is uncertain**\n- B's answer depends on the counting rule. My comparison with the \"count every touched pixel\" rule only reported square A, so I don't know B's count or average under that rule.\n- B covers only 42 pixels. Its average and A's average are single measurements with no repeats, so the difference between them hasn't been tested.\n\n**Waiting for you:** nothing is blocked. If you want B under the \"count every touched pixel\" rule, that changes your recorded choice, so you would need to approve it. All numbers so far use the pixel-centre rule you set.\n\nSettings used, from the decision record: Target coordinate reference system: EPSG:4326 · Resampling method: near · Pixels that a zone edge cuts: centers.",
+   "items": [
+    {
+     "key": "width",
+     "description": "Raster width in pixels",
+     "expected": 20,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.width",
+      "entry": 10
+     },
+     "reported": {
+      "pass": true,
+      "value": 20,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 67,
+      "text": "- 20 pixels wide and 20 pixels high, one band, Byte type."
+     }
+    },
+    {
+     "key": "height",
+     "description": "Raster height in pixels",
+     "expected": 20,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.width",
+      "entry": 10
+     },
+     "reported": {
+      "pass": true,
+      "value": 20,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 67,
+      "text": "- 20 pixels wide and 20 pixels high, one band, Byte type."
+     }
+    },
+    {
+     "key": "epsg",
+     "description": "EPSG code of the raster",
+     "expected": 26711,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 26711,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.epsg",
+      "entry": 10
+     },
+     "reported": {
+      "pass": true,
+      "value": 26711,
+      "diff": 0,
+      "via": "code",
+      "node": null,
+      "claimEntry": 67,
+      "text": null
+     }
+    },
+    {
+     "key": "pixel_size_m",
+     "description": "Pixel size in metres",
+     "expected": 60,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 60,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.pixel_x",
+      "entry": 10
+     },
+     "reported": {
+      "pass": true,
+      "value": 60,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 67,
+      "text": "Pixels are 60 m × 60 m in EPSG:26711."
+     }
+    },
+    {
+     "key": "band_min",
+     "description": "Band minimum",
+     "expected": 74,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 74,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.min",
+      "entry": 10
+     },
+     "reported": {
+      "pass": true,
+      "value": 74,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 67,
+      "text": "- Lowest 74, highest 255, average 126.765, standard deviation 22.928."
+     }
+    },
+    {
+     "key": "band_max",
+     "description": "Band maximum",
+     "expected": 255,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 255,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.max",
+      "entry": 10
+     },
+     "reported": {
+      "pass": true,
+      "value": 255,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 67,
+      "text": "- Lowest 74, highest 255, average 126.765, standard deviation 22.928."
+     }
+    },
+    {
+     "key": "band_mean",
+     "description": "Band mean",
+     "expected": 126.765,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 126.765,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mean",
+      "entry": 10
+     },
+     "reported": {
+      "pass": true,
+      "value": 126.765,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 67,
+      "text": "- Lowest 74, highest 255, average 126.765, standard deviation 22.928."
+     }
+    },
+    {
+     "key": "band_std",
+     "description": "Band standard deviation",
+     "expected": 22.93,
+     "tolerance": 0.05,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22.928,
+      "diff": 0.0019999999999988916,
+      "node": "n1",
+      "path": "metrics.stddev",
+      "entry": 10
+     },
+     "reported": {
+      "pass": true,
+      "value": 22.928,
+      "diff": 0.0019999999999988916,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 67,
+      "text": "- Lowest 74, highest 255, average 126.765, standard deviation 22.928."
+     }
+    },
+    {
+     "key": "warp_width",
+     "description": "Width after warp to EPSG:4326",
+     "expected": 22,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.width",
+      "entry": 22
+     },
+     "reported": {
+      "pass": true,
+      "value": 22,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 67,
+      "text": "The new latitude/longitude image is 22 × 18 pixels."
+     }
+    },
+    {
+     "key": "warp_height",
+     "description": "Height after warp to EPSG:4326",
+     "expected": 18,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 18,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.height",
+      "entry": 22
+     },
+     "reported": {
+      "pass": true,
+      "value": 18,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 67,
+      "text": "The new latitude/longitude image is 22 × 18 pixels."
+     }
+    },
+    {
+     "key": "zone_a_pixels",
+     "description": "Zone A pixel count",
+     "expected": 100,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.count",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 100,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 67,
+      "text": "The first square holds 100 pixels with an average of 129.5."
+     }
+    },
+    {
+     "key": "zone_a_mean",
+     "description": "Zone A mean",
+     "expected": 129.5,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 129.5,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.mean",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 129.5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 67,
+      "text": "The first square holds 100 pixels with an average of 129.5."
+     }
+    },
+    {
+     "key": "zone_b_pixels_centers",
+     "description": "Zone B pixel count, pixel centers",
+     "expected": 42,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42,
+      "diff": 0,
+      "node": "n4",
+      "path": "table.rows[1][1]",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 42,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 67,
+      "text": "Counting only pixels whose centres are inside, the second square holds 42 pixels with an average of 135.0."
+     }
+    },
+    {
+     "key": "zone_b_mean_centers",
+     "description": "Zone B mean, pixel centers",
+     "expected": 135,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 135,
+      "diff": 0,
+      "node": "n4",
+      "path": "table.rows[1][4]",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 135,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 67,
+      "text": "Counting only pixels whose centres are inside, the second square holds 42 pixels with an average of 135.0."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 4167,
+    "cacheRead": 60653,
+    "cacheWrite": 17478,
+    "toolCalls": 9,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 2,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 6
+   }
+  },
+  {
+   "paper": "schindelin2012-fiji-blobs",
+   "model": "claude",
+   "run": 1,
+   "status": "answer",
+   "durationS": 115.538,
+   "session": "20261008-153445-d16e",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/claude/schindelin2012-fiji-blobs/run1/home/sessions/20261008-153445-d16e",
+   "answer": "The image has **64 blobs** (isodata threshold, which is the method on record).\n\n**What I did**\n1. **inspect_image:** 256 × 254 px, 1 channel, 8-bit, values 8 to 248. No saturated pixels and no JPEG warning.\n2. **count_objects** with these settings: scikit-image 0.26, gray channel, **isodata** threshold (cutoff 124.7), bright objects, no size filter (0 px, your choice), objects touching the border kept, no watershed split, uncalibrated.\n3. **compare_options** on the threshold method and on the smallest object size, as checks only. The record did not change.\n4. I looked at the outline PNG and the smallest objects in the per-object table.\n\n**What I found (measured)**\n- **Count:** 64 objects (count_objects). Mean area 347.5 px², median area 355.5 px². The blobs cover 34.2% of the image.\n- **Outlines:** the red outlines sit on the bright blobs, so \"bright\" is the right polarity for this file.\n- **Threshold methods (compare_options):** Otsu 64, isodata 64, Li 65, Yen 67, triangle 119.\n  - Otsu, isodata, Li and Yen give 64 to 67, so the count of about 64 holds for those four.\n  - Triangle nearly doubles the count, so a count near 119 would depend on that one method.\n  - The comparison did not return results for \"mean\" and \"minimum\".\n- **Size filter (compare_options):** 0 px gives 64, 10 px gives 62, 25 px gives 60, 50 px gives 58.\n  - The two smallest objects are 1 px² and 3 px² specks near the bottom edge. A 10 px floor would remove only these.\n  - The 25 and 50 px floors start removing blobs cut off at the image edge.\n\n**What is uncertain (inference)**\n- **Settings mismatch:** when I proposed Otsu, the tool said the record already held \"otsu\". The count then ran with isodata, and the comparison says the record holds \"isodata\". I logged this in the trail. It doesn't change the count, because Otsu also gives 64.\n- **Partial blobs:** about 5 objects in the table are partial blobs cut by the image border (1 to 69 px², centred at x ≈ 0 or 253, or y ≈ 251). They are counted because border objects are kept.\n- **Touching blobs:** no watershed split was used, so blobs that touch count as one object. The outline image shows a few elongated shapes that may be two blobs, so 64 may undercount slightly.\n- **Triangle:** I didn't find out why it gives 119. When I tried to rerun it, the run used isodata instead.\n- **Replication:** this is one image (n = 1 image). Blobs within it are not independent samples, so no statistics apply.\n\n**What waits for you**\n- Confirm that isodata is the method you intend (Otsu gives the same count).\n- Decide whether to remove the 1 px² and 3 px² specks with a small size floor (10 px gives 62), to exclude border objects, or to turn on the watershed split.\n\nTo repeat this by hand: `skimage_tools.count_objects(path=\"…/blobs.gif\", stain_channel=\"gray\", threshold_method=\"isodata\", object_polarity=\"bright\", min_object_size=0, exclude_border_objects=False, split_touching=False)`. In Fiji, use Image > Adjust > Threshold, then Analyze > Analyze Particles.\n\nSettings used, from the decision record: Pixel size in micrometers (0 = uncalibrated): 0 · Image channel to segment: gray · Are the objects bright or dark in that channel?: bright · Threshold method: isodata · Smallest object to count (pixels): 0 · Remove objects that touch the image border: false · Split touching objects with a watershed: false.",
+   "items": [
+    {
+     "key": "particles_edges_included",
+     "description": "Particles, edge particles included.",
+     "expected": 64,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 64,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_objects",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 64,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n17",
+      "claimEntry": 116,
+      "text": "The image has **64 blobs** (isodata threshold, which is the method on record)."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 7,
+    "inputTokens": 18,
+    "outputTokens": 5635,
+    "cacheRead": 54271,
+    "cacheWrite": 13858,
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 6,
+     "error": 3
+    },
+    "unsourced": 3,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 4
+   }
+  },
+  {
+   "paper": "schramm2012-imzml-pyimzml",
+   "model": "claude",
+   "run": 1,
+   "status": "answer",
+   "durationS": 87.028,
+   "session": "20261008-153641-c2b6",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/claude/schramm2012-imzml-pyimzml/run1/home/sessions/20261008-153641-c2b6",
+   "answer": "Both files have 9 pixels covering m/z 100.083 to 799.917, and they hold the same spectra. The processed file is bigger only because it stores a separate m/z array for every pixel. The pixel with the strongest total signal is (3, 3).\n\n## Pixels and m/z range (`read_file_info`)\n| | Example_Continuous.imzML | Example_Processed.imzML |\n|---|---|---|\n| Pixels / grid | 9, 3 × 3, 100 µm pixels | 9, 3 × 3, 100 µm pixels |\n| m/z range | 100.0833 – 799.9167 | 100.0833 – 799.9167 (read from all 9 spectra) |\n| Points per spectrum | 8399 | 8399 |\n| Mode / polarity | profile, negative | profile, negative |\n| Storage | continuous | processed |\n| m/z and intensity precision | \"f\" (4-byte float) | \"f\" (4-byte float) |\n| .ibd size | 335,976 bytes | 604,744 bytes |\n\nThe negative polarity in both files matches your polarity setting.\n\n## Why one file is bigger (`read_file_info` sizes, checked with `calculate`)\n- **Continuous file:** all pixels share one m/z axis, so the .ibd holds 1 m/z array plus 9 intensity arrays. Each array has 8399 points of 4 bytes.\n- **Processed file:** each pixel carries its own m/z array, so the .ibd holds 9 m/z arrays plus 9 intensity arrays.\n- **What is left over:** I subtracted those arrays from each measured .ibd size. Both files have the same small remainder, 16 bytes. I think this is the fixed file header that imzML requires, but no tool read it directly.\n- **The difference:** the processed .ibd is 268,768 bytes larger, about 1.80 times the size. That equals exactly 8 extra copies of the m/z array (8 × 8399 × 4 bytes), with no extra data. The small .imzML index files are almost the same size (23,898 vs 23,929 bytes).\n\n## Strongest total signal (`get_tic_image`, all 9 pixels, both files)\n- The highest TIC is at **pixel (3, 3), TIC 243.54**. Coordinates are 1-based (x, y). It is the yellow bottom-right pixel in the TIC images.\n- That is 1.51 times the mean TIC (161.14) and 2.25 times the lowest pixel, (3, 2) at 108.40.\n- The full ranking is in `tic_continuous_top_pixels.csv`. Both files gave the same TIC values for every pixel.\n\n## Same spectra? (`compare_files`, every pixel)\n**Yes.** All 9 pixels were compared, with no sampling:\n- 0 pixels differ.\n- Pixel coordinates are equal in both files, and every spectrum has the same length.\n- The largest m/z difference is 0 and the largest intensity difference is 0.\n\nThe two files are the same data, stored in two different layouts.\n\n## What is uncertain\n- These are tiny 3 × 3 example files. The TIC hot spot at (3, 3) is a fact about the file, not a biological finding. Pixels are not replicates, so I make no statistical claim.\n- I made no ion images or peak lists, so the tolerance (ion_ppm), the reducer and the pixel sample size were not used.\n\n## What waits for you\nNothing for these questions. If you want ion images next, you'll need to set the ion image tolerance (ion_ppm).\n\nTo repeat by hand in pyimzML: open each file with `ImzMLParser(path)` and read `p.coordinates`, `p.polarity` and `p.spectrum_mode`. Sum `p.getspectrum(i)[1]` for each pixel to get the TIC, and compare the arrays from `getspectrum` between the two files with `numpy.array_equal`.\n\nSettings used, from the decision record: Polarity: negative.",
+   "items": [
+    {
+     "key": "spectra_per_file",
+     "description": "Spectra (pixels) in each file.",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_pixels",
+      "entry": 20
+     },
+     "reported": {
+      "pass": true,
+      "value": 9,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 72,
+      "text": "Both files have 9 pixels covering m/z 100.083 to 799.917, and they hold the same spectra."
+     }
+    },
+    {
+     "key": "mz_min",
+     "description": "Minimum m/z.",
+     "expected": 100.083336,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100.08333587646484,
+      "diff": 1.2353515899121703e-7,
+      "node": "n1",
+      "path": "metrics.mz_min",
+      "entry": 20
+     },
+     "reported": {
+      "pass": true,
+      "value": 100.0833,
+      "diff": 0.00003600000000858472,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 72,
+      "text": "| m/z range | 100.0833 – 799.9167 | 100.0833 – 799.9167 (read from all 9 spectra) |"
+     }
+    },
+    {
+     "key": "mz_max",
+     "description": "Maximum m/z.",
+     "expected": 799.9167,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 799.9166870117188,
+      "diff": 0.000012988281241632649,
+      "node": "n1",
+      "path": "metrics.mz_max",
+      "entry": 20
+     },
+     "reported": {
+      "pass": true,
+      "value": 799.9167,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 72,
+      "text": "| m/z range | 100.0833 – 799.9167 | 100.0833 – 799.9167 (read from all 9 spectra) |"
+     }
+    },
+    {
+     "key": "max_pixel_tic",
+     "description": "Total ion current of the strongest pixel.",
+     "expected": 243.5395,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 243.53950660310795,
+      "diff": 0.0000066031079484218935,
+      "node": "n3",
+      "path": "metrics.tic_max",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 243.54,
+      "diff": 0.0004999999999881766,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 72,
+      "text": "- The highest TIC is at **pixel (3, 3), TIC 243.54**."
+     }
+    },
+    {
+     "key": "mean_tic",
+     "description": "Mean total ion current per pixel.",
+     "expected": 161.1444,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 161.1443790255365,
+      "diff": 0.00002097446349580423,
+      "node": "n3",
+      "path": "metrics.tic_mean",
+      "entry": 31
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 72,
+      "text": null
+     }
+    },
+    {
+     "key": "continuous_ibd_bytes",
+     "description": "Size of the continuous ibd file in bytes.",
+     "expected": 335976,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 335976,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.ibd_bytes",
+      "entry": 20
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 72,
+      "text": null
+     }
+    },
+    {
+     "key": "processed_ibd_bytes",
+     "description": "Size of the processed ibd file in bytes.",
+     "expected": 604744,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 604744,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.ibd_bytes",
+      "entry": 23
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 72,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 8,
+    "inputTokens": 20,
+    "outputTokens": 5013,
+    "cacheRead": 112606,
+    "cacheWrite": 23710,
+    "toolCalls": 11,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 1,
+     "warning": 1,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 7
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-08-claude-p3.md",
+  "json": "bench/results/papers-2026-10-08-claude-p3.json"
+ },
+ "summary": {
+  "cells": {
+   "rouault-gdal-autotest": {
+    "claude": {
+     "computed": 14,
+     "computedOf": 14,
+     "reported": 14,
+     "reportedOf": 14,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "schindelin2012-fiji-blobs": {
+    "claude": {
+     "computed": 1,
+     "computedOf": 1,
+     "reported": 1,
+     "reportedOf": 1,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "schramm2012-imzml-pyimzml": {
+    "claude": {
+     "computed": 7,
+     "computedOf": 7,
+     "reported": 4,
+     "reportedOf": 4,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude": {
+    "computed": 22,
+    "computedOf": 22,
+    "reported": 19,
+    "reportedOf": 19,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude": {
+    "runs": 3,
+    "durationS": 282.899,
+    "requests": 21,
+    "inputTokens": 54,
+    "outputTokens": 14815,
+    "cacheRead": 227530,
+    "cacheWrite": 55046,
+    "toolCalls": 30,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 3,
+    "findings_info": 8,
+    "findings_warning": 9,
+    "findings_error": 4,
+    "unsourced": 3,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 17
+   }
+  },
+  "skipped": []
+ }
+}
