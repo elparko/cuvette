@@ -899,7 +899,8 @@ export class Session {
     }
     const plan = { ...d, sensitivity: { options: values, tool: last.tool, args: {}, compare: d.sensitivity?.compare ?? [], max_runs: values.length } };
     const res = await runSensitivity(plan, last.tool, structuredClone(last.args), link.arg, async (_t, a, meta) => this.execute(target, a, `cmp${++this.callCount}`, signal, { sensitivityOf: meta.sensitivityOf }), this.record);
-    const summary = `Compared ${values.length} values of ${d.label} as comparison runs. The record still says ${JSON.stringify(this.decisions.value(d.key))}.`;
+    const ran = Object.entries(last.args).filter(([k, v]) => k !== link.arg && (typeof v === "number" || typeof v === "boolean" || (typeof v === "string" && v.length <= 60))).map(([k, v]) => `${k}=${v}`);
+    const summary = `Compared ${values.length} values of ${d.label} as comparison runs of the last step, ${last.tool}${ran.length ? ` (${ran.join(", ")})` : ""}. Only that step was repeated. To compare another step, run it again first. The record still says ${JSON.stringify(this.decisions.value(d.key))}.`;
     return {
       ok: true,
       summary,

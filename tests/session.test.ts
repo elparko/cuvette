@@ -175,6 +175,7 @@ test("compare_options reruns the last step with other values as comparison runs 
   expect(session.decisions.value("method")).toBe("Default");
   expect(session.record.entries(["deviation"])).toHaveLength(0);
   expect(results.at(-1)!.text).toMatch(/The record still says "Default"/);
+  expect(results.at(-1)!.text).toMatch(/of the last step, count \(.*input=\/data\/a\.tif.*\)\. Only that step was repeated/);
 });
 
 test("a step that uses the output of a comparison run is also a comparison run", async () => {
