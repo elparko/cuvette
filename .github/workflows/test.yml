@@ -32,3 +32,44 @@ jobs:
       - run: npx vitest run
         env:
           CI: "false"
+
+  imagej-live:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+      - name: Download ImageJ 1.53v
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/imagej"
+          curl -sSfL -o "$RUNNER_TEMP/imagej/ij.jar" https://wsr.imagej.net/jars/ij153v.jar
+          echo "IMAGEJ_JAR=$RUNNER_TEMP/imagej/ij.jar" >> "$GITHUB_ENV"
+      - name: ImageJ live tests (Linux, virtual display)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y xvfb
+          xvfb-run -a npx vitest run tests/imagej.test.ts tests/macro.test.ts
+          xvfb-run -a node bin/ga.js adapter check imagej --run-tests
+        env:
+          GA_LIVE: "1"
+          CI: "false"
+      - name: ImageJ live tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          npx vitest run tests/imagej.test.ts tests/macro.test.ts
+          node bin/ga.js adapter check imagej --run-tests
+        env:
+          GA_LIVE: "1"
+          CI: "false"
