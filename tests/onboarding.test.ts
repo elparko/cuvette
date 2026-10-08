@@ -168,7 +168,7 @@ describe("known-answer runner", () => {
         manual_route_checked: false,
         calls: [
           { tool: "summarize", args: { column: "a" }, save_as: "first" },
-          { tool: "summarize", args: { column: "{saved.first.outputs[0].path}", dir: "{adapter_dir}/data", n: "{saved.first.metrics.mean}", label: "m={saved.first.metrics.mean}" } },
+          { tool: "summarize", args: { column: "{saved.first.outputs[0].path}", dir: "{adapter_dir}/data", n: "{saved.first.metrics.mean}", label: "m={saved.first.metrics.mean}" }, save_as: "" },
         ],
         expect: [
           { path: "data.column", equals: "/x.csv", rel: 1e-6, abs: 0 },
