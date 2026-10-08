@@ -11,7 +11,7 @@
 - File name: `SIMCEPImages_<well>_C<cells>_F<blur>_s<sample>_w<stain>.TIF`. `w1` is the cell body stain, `w2` is the nuclei stain. `C` is the true cell count (1 to 100, 24 distinct values). `F` is focus blur (F1 is in focus, up to F48).
 - Ground truth: 1,200 binary masks for F1 images only (600 for w1, 600 for w2), `synthetic_2_ground_truth/`.
 - Published results: `BBBC005_results_bray.csv`, 9,600 rows (CellProfiler nucleus counts for the nuclei images), column `Image_Count_DetectedNuclei` against `Image_Metadata_ActualCellCount` and `Image_Metadata_BlurFilterSize`.
-- Local download: ground truth zip (12 MB), full images zip (1.88 GB, kept), results CSV (2.4 MB), and an extracted subset of 600 in-focus nuclei images (`sub/`). Total about 3.8 GB on disk.
+- Local download: ground truth zip (12 MB), full images zip (1.88 GB, kept), results CSV (2.4 MB), and an extracted subset of 600 in-focus nuclei images (`sub/`). Total about 2.6 GB on disk.
 - Local path: /Volumes/T7/guided-analysis/data/ljosa2012-bbbc005/
 
 ## Tool

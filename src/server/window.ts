@@ -96,6 +96,7 @@ export async function startWindow(
     const host = req.headers.host ?? "";
     if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) return send(res, 403, '{"error":"bad host"}');
     const url = new URL(req.url ?? "/", `http://${host}`);
+    if (url.pathname === "/favicon.ico") return send(res, 204, "");
     const given = url.searchParams.get("t") ?? req.headers["x-token"];
     if (given !== token) return send(res, 401, '{"error":"missing or wrong token"}');
     try {

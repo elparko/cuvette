@@ -51,7 +51,7 @@ export function systemPrompt(opts: {
     if (standards) lines.push(`## Standards\n${small ? standards.slice(0, 2500) : standards}`);
     if (instructions && !small) lines.push(`## Notes from the program\n${instructions}`);
     const skills = adapter.skills();
-    if (skills.length) lines.push("## Skills (load with load_skill)\n" + skills.map((s) => `- ${s.name}: ${s.description}`).join("\n"));
+    if (skills.length) lines.push("## Skills (procedures, not tools: read one with load_skill)\n" + skills.map((s) => `- ${s.name}: ${s.description}`).join("\n"));
     parts.push(lines.join("\n\n"));
   }
   if (opts.lab) parts.push(`# Lab rules\n${opts.lab}`);

@@ -73,22 +73,19 @@ export function parseStdout(stdout: string): ParsedStdout {
   return p;
 }
 
-function textFor(def: ToolDef, p: ParsedStdout, outputs: Record<string, string>, stdout: string): string {
+function textFor(def: ToolDef, p: ParsedStdout, files: OutputFile[], stdout: string): string {
   const lines: string[] = [];
-  const have = Object.entries(outputs).filter(([, path]) => existsSync(path));
-  if (have.length) {
+  if (files.length) {
     lines.push("Files:");
-    for (const [k, path] of have) lines.push(`  ${k}: ${path}`);
+    for (const f of files) lines.push(`  ${f.name}: ${f.path}`);
   }
-  const extra = [...p.outputs, ...p.tables].filter((x) => !have.some(([, path]) => path === x));
-  for (const path of extra) lines.push(`  file: ${path}`);
   const vals = Object.entries(p.values);
   if (vals.length) {
     lines.push("Values:");
     for (const [k, v] of vals) lines.push(`  ${k}=${typeof v === "number" ? fmtNumber(v) : v}`);
   }
   for (const w of p.warnings) lines.push(`Warning: ${w}`);
-  if (def.parse === "text" || (!vals.length && !have.length)) lines.push(stdout.trim());
+  if (def.parse === "text" || (!vals.length && !files.length)) lines.push(stdout.trim());
   return cap(lines.filter(Boolean).join("\n"), 20000);
 }
 
@@ -147,7 +144,7 @@ async function runMacroTool(c: KindContext, def: ToolDef, args: Args, call: Call
   const data = { ...base.data, values: p.values, files: Object.fromEntries(Object.entries(call.outputs).filter(([, f]) => existsSync(f))), warnings: p.warnings };
   const out: ToolOutput = {
     ok: true,
-    text: textFor(def, p, call.outputs, r.stdout),
+    text: textFor(def, p, outputs, r.stdout),
     data,
     outputs,
     manualRoute: manual,

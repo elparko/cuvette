@@ -4,7 +4,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { makeProvider } from "../providers/index.ts";
-import { coreTools } from "../tools/core.ts";
+import { coreTools, searchTools } from "../tools/core.ts";
 import { taskTool } from "../tools/task.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer } from "./claims.ts";
@@ -266,15 +266,25 @@ export class Session {
     }
   }
 
-  private chooseActiveTools() {
+  private chooseActiveTools(request = "") {
     const all = [...this.tools.values()];
     const adapterTools = all.filter((t) => t.source === "adapter");
-    const deferred = this.settings.toolExposure === "search" || (this.settings.toolExposure === "auto" && this.provider.info.small && adapterTools.length > 10);
-    this.active = new Set(all.filter((t) => !deferred || t.source !== "adapter" || !t.deferred).map((t) => t.name));
-    if (deferred) {
-      const keep = new Set(adapterTools.filter((t) => !t.deferred).slice(0, 8).map((t) => t.name));
-      for (const t of adapterTools) if (!keep.has(t.name)) this.active.delete(t.name);
-    } else this.active.delete("find_tools");
+    const deferred = this.settings.toolExposure === "search" || (this.settings.toolExposure === "auto" && this.provider.info.small && adapterTools.length > 24);
+    if (!this.active.size) this.active = new Set(all.filter((t) => t.source !== "adapter" || !deferred).map((t) => t.name));
+    if (!deferred) {
+      this.active.delete("find_tools");
+      return;
+    }
+    const states = new Set(this.adapters.map((a) => a.manifest.connection.state_tool).filter(Boolean));
+    const keep = [
+      ...adapterTools.filter((t) => states.has(t.remoteName ?? t.name)),
+      ...(request ? searchTools(adapterTools, request, 10) : []),
+      ...adapterTools.filter((t) => !t.deferred),
+    ];
+    for (const t of keep) {
+      if ([...this.active].filter((n) => this.tools.get(n)?.source === "adapter").length >= 16) break;
+      this.active.add(t.name);
+    }
   }
 
   private findTool(name: string): Tool | undefined {
@@ -301,10 +311,12 @@ export class Session {
     this.abort = new AbortController();
     const signal = this.abort.signal;
     let revised = false;
+    let nudges = 0;
     try {
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode]);
+      this.chooseActiveTools(text);
       this.record.append("user", { text });
       const notes = this.drainNotes();
       this.push({ role: "user", parts: [{ type: "text", text: notes ? `${notes}\n\n${text}` : text }] });
@@ -325,6 +337,15 @@ export class Session {
         if (thinking) this.record.append("thinking", { text: thinking });
         const said = res.message.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n").trim();
         const calls = res.message.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
+        if (!calls.length && !said && nudges < 2) {
+          nudges++;
+          const names = this.activeSchemas().map((t) => t.name).join(", ");
+          const why = res.usage.outputTokens > 20
+            ? `Your last reply was lost. It was probably a call to a tool that does not exist, so nothing ran. Use only these tools: ${names}. Skills are procedures, not tools: read one with load_skill.${this.active.has("find_tools") ? " To find more tools, call find_tools." : ""}`
+            : "Your last reply was empty. Do the next step with a tool, or give your answer to the scientist.";
+          this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
+          continue;
+        }
         if (!calls.length) {
           const out = await this.finishAnswer(said, revised, signal);
           if (out.revise) {
@@ -447,7 +468,7 @@ export class Session {
     if (call.parseError) return this.fail(call.id, call.name, `the arguments are not valid JSON: ${call.parseError}`);
     if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use find_tools to search.`);
     if (!this.active.has(tool.name)) this.active.add(tool.name);
-    const args = (call.args && typeof call.args === "object" ? call.args : {}) as Args;
+    const args = dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema);
     const missing = ((tool.inputSchema.required as string[]) ?? []).filter((k) => args[k] === undefined);
     if (missing.length) return this.fail(call.id, tool.name, `missing required arguments: ${missing.join(", ")}`, tool.adapter);
     const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
@@ -845,6 +866,18 @@ export class Session {
     this.interrupt();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
   }
+}
+
+function dropNulls(args: Args, schema: Record<string, unknown>): Args {
+  const props = (schema.properties ?? {}) as Record<string, { type?: unknown }>;
+  const out: Args = {};
+  for (const [k, v] of Object.entries(args)) {
+    const t = props[k]?.type;
+    const nullable = t === "null" || (Array.isArray(t) && t.includes("null"));
+    if ((v === null || v === "") && !nullable && !((schema.required as string[] | undefined) ?? []).includes(k)) continue;
+    out[k] = v;
+  }
+  return out;
 }
 
 function absolutePaths(v: unknown, cwd: string): unknown {

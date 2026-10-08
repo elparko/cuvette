@@ -226,7 +226,7 @@ function drawQuestions() {
       const rec = q.recommendation && JSON.stringify(q.recommendation.value) === JSON.stringify(o.value);
       card.append(h("button", { class: rec ? "primary" : "", onclick: () => answer(q.qid, o.value) }, (i + 1) + ". " + o.label + (rec ? " (recommended)" : "")));
     });
-    const input = h("input", { type: "text", placeholder: "Other answer", "data-qid": q.qid, "aria-label": "Other answer" });
+    const input = h("input", { type: "text", placeholder: "Other answer", "data-qid": q.qid, name: "other-" + q.qid, "aria-label": "Other answer" });
     const send = () => input.value.trim() && answer(q.qid, input.value.trim());
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
     card.append(input, h("button", { onclick: send }, "Send"));

@@ -389,6 +389,7 @@ tests:
       - { path: metrics.inverting_lut, equals: 1 }
       - { path: metrics.min_value, equals: 8 }
       - { path: metrics.max_value, equals: 248 }
+      - { path: metrics.saturated_fraction, equals: 0 }
 
   - id: blobs_count_default
     description: The classic result. The Default threshold finds 64 particles in blobs.gif. Edges are not excluded.
@@ -402,6 +403,9 @@ tests:
         args: { mask: "{saved.thr.data.files.mask}", exclude_edges: false }
     expect:
       - { path: metrics.count, equals: 64 }
+      - { path: metrics.total_area, equals: 22243 }
+      - { path: metrics.mean_area, approx: 347.547, rel: 0.00001 }
+      - { path: metrics.area_fraction, approx: 0.34207, rel: 0.0001 }
 
   - id: blobs_threshold_steps
     description: The threshold step on blobs.gif gives the limits 126 and 255.
@@ -412,63 +416,106 @@ tests:
     expect:
       - { path: metrics.threshold_low, equals: 126 }
       - { path: metrics.threshold_high, equals: 255 }
+      - { path: metrics.foreground_fraction, approx: 0.34207, rel: 0.0001 }
 
   - id: blobs_exclude_edges
-    description: With Exclude on edges, fewer particles remain.
+    description: With Exclude on edges, 46 of the 64 particles remain.
     data: [data/blobs.gif]
     calls:
       - tool: threshold_and_count
-        args: { input: "{adapter_dir}/data/blobs.gif", method: Default, dark_background: false, rolling_radius: 0, sigma: 0, exclude_edges: true }
+        args: { input: "{adapter_dir}/data/blobs.gif", method: Default, dark_background: false, exclude_edges: true }
     expect:
-      - { path: metrics.count, equals: 0 }
+      - { path: metrics.count, equals: 46 }
+      - { path: metrics.mean_area, approx: 384.478, rel: 0.00001 }
+
+  - id: blobs_triangle
+    description: The Triangle threshold gives a very different count than Default. The count depends on the method.
+    data: [data/blobs.gif]
+    calls:
+      - tool: threshold_and_count
+        args: { input: "{adapter_dir}/data/blobs.gif", method: Triangle, dark_background: false }
+    expect:
+      - { path: metrics.count, equals: 119 }
 
   - id: discs_count
-    description: Twelve discs of radius 10 on a dark background.
+    description: Twelve discs of radius 10 on a dark background. Each disc has 317 pixels.
     data: [data/discs.png]
     calls:
       - tool: threshold_and_count
-        args: { input: "{adapter_dir}/data/discs.png", method: Default, dark_background: true, rolling_radius: 0, sigma: 0 }
+        args: { input: "{adapter_dir}/data/discs.png", method: Default, dark_background: true }
     expect:
       - { path: metrics.count, equals: 12 }
+      - { path: metrics.mean_area, equals: 317 }
+      - { path: metrics.total_area, equals: 3804 }
+      - { path: metrics.area_fraction, approx: 0.05804, rel: 0.0001 }
 
-  - id: discs_touching_watershed
-    description: Six pairs of touching discs.
+  - id: discs_touching
+    description: Six pairs of touching discs. Without the watershed, each pair counts as one object.
     data: [data/discs_touching.png]
     calls:
       - tool: threshold_and_count
-        args: { input: "{adapter_dir}/data/discs_touching.png", method: Default, dark_background: true, rolling_radius: 0, sigma: 0, watershed: false }
+        args: { input: "{adapter_dir}/data/discs_touching.png", method: Default, dark_background: true }
     expect:
       - { path: metrics.count, equals: 6 }
+      - { path: metrics.mean_area, equals: 573 }
 
-  - id: discs_gradient_subtracted
-    description: Twelve discs on a background with a gradient.
+  - id: discs_touching_watershed
+    description: The watershed splits the six pairs into twelve objects.
+    data: [data/discs_touching.png]
+    calls:
+      - tool: threshold_and_count
+        args: { input: "{adapter_dir}/data/discs_touching.png", method: Default, dark_background: true, watershed: true }
+    expect:
+      - { path: metrics.count, equals: 12 }
+      - { path: metrics.mean_area, equals: 279 }
+
+  - id: discs_gradient_raw
+    description: Twelve discs on a background with a gradient. Without background subtraction the count is wrong.
     data: [data/discs_gradient.png]
     calls:
       - tool: threshold_and_count
-        args: { input: "{adapter_dir}/data/discs_gradient.png", method: Default, dark_background: true, rolling_radius: 25, sigma: 0 }
+        args: { input: "{adapter_dir}/data/discs_gradient.png", method: Default, dark_background: true }
+    expect:
+      - { path: metrics.count, equals: 116 }
+
+  - id: discs_gradient_subtracted
+    description: A rolling ball with radius 25 removes the gradient and the count is 12.
+    data: [data/discs_gradient.png]
+    calls:
+      - tool: subtract_background
+        args: { input: "{adapter_dir}/data/discs_gradient.png", rolling_radius: 25 }
+        save_as: flat
+      - tool: threshold_and_count
+        args: { input: "{saved.flat.data.files.image}", method: Default, dark_background: true }
     expect:
       - { path: metrics.count, equals: 12 }
+      - { path: metrics.mean_area, equals: 317 }
 
   - id: discs_noisy_blurred
-    description: Twelve discs with noise.
+    description: Twelve discs with noise. A blur with sigma 2 gives 12 objects.
     data: [data/discs_noisy.png]
     calls:
+      - tool: gaussian_blur
+        args: { input: "{adapter_dir}/data/discs_noisy.png", sigma: 2 }
+        save_as: smooth
       - tool: threshold_and_count
-        args: { input: "{adapter_dir}/data/discs_noisy.png", method: Default, dark_background: true, rolling_radius: 0, sigma: 2 }
+        args: { input: "{saved.smooth.data.files.image}", method: Default, dark_background: true }
     expect:
       - { path: metrics.count, equals: 12 }
+      - { path: metrics.mean_area, approx: 331.917, rel: 0.0001 }
 
   - id: discs_calibrated
-    description: A scale of 0.5 micrometer for each pixel makes each area one quarter.
+    description: A scale of 0.5 micrometer for each pixel makes each area 79.25 square micrometers.
     data: [data/discs.png]
     calls:
       - tool: set_scale
         args: { input: "{adapter_dir}/data/discs.png", distance_px: 100, known_distance: 50, unit: um }
         save_as: scaled
       - tool: threshold_and_count
-        args: { input: "{saved.scaled.data.files.image}", method: Default, dark_background: true, rolling_radius: 0, sigma: 0 }
+        args: { input: "{saved.scaled.data.files.image}", method: Default, dark_background: true }
     expect:
       - { path: metrics.count, equals: 12 }
+      - { path: metrics.mean_area, equals: 79.25 }
       - { path: data.values.area_unit, equals: um }
 
   - id: discs_measure
@@ -478,16 +525,27 @@ tests:
       - tool: measure
         args: { input: "{adapter_dir}/data/discs.png" }
     expect:
-      - { path: metrics.area, min: 1 }
+      - { path: metrics.area, equals: 65536 }
+      - { path: metrics.mean, approx: 30.448, rel: 0.0001 }
+      - { path: metrics.max, equals: 200 }
 
   - id: discs_saturated
-    description: The saturated version has more than 1 percent of pixels at 255.
+    description: The saturated version has 5.8 percent of pixels at 255.
     data: [data/discs_saturated.png]
     calls:
       - tool: open_image
         args: { path: "{adapter_dir}/data/discs_saturated.png" }
     expect:
-      - { path: metrics.saturated_fraction, min: 0.01 }
+      - { path: metrics.saturated_fraction, approx: 0.05804, rel: 0.001 }
+
+  - id: discs_gradient_info
+    description: open_image flags the uneven background.
+    data: [data/discs_gradient.png]
+    calls:
+      - tool: open_image
+        args: { path: "{adapter_dir}/data/discs_gradient.png" }
+    expect:
+      - { path: metrics.background_variation, min: 0.3 }
 
   - id: discs_run_command
     description: A generic menu command gives the same pixels as the named tool.
@@ -495,17 +553,30 @@ tests:
     calls:
       - tool: run_command
         args: { input: "{adapter_dir}/data/discs.png", command: Gaussian Blur..., options: sigma=2 }
+        save_as: viacommand
+      - tool: gaussian_blur
+        args: { input: "{adapter_dir}/data/discs.png", sigma: 2 }
+        save_as: named
+      - tool: measure
+        args: { input: "{saved.viacommand.data.files.image}" }
+        save_as: m1
+      - tool: measure
+        args: { input: "{saved.named.data.files.image}" }
     expect:
-      - { path: ok, equals: true }
+      - { path: saved.m1.metrics.integrated_density, equals: 1994960 }
+      - { path: metrics.integrated_density, equals: 1994960 }
 
   - id: folder_counts
     description: Counts for each image in the data folder.
-    data: [data/discs.png, data/discs_touching.png]
+    data: [data/discs.png, data/discs_touching.png, data/discs_gradient.png, data/discs_noisy.png, data/discs_saturated.png]
     calls:
       - tool: count_folder
-        args: { folder: "{adapter_dir}/data", pattern: "discs*.png", method: Default, dark_background: true }
+        args: { folder: "{adapter_dir}/data", pattern: "discs*.png", method: Default, dark_background: true, sigma: 2 }
     expect:
-      - { path: metrics.n_images, min: 2 }
+      - { path: metrics.n_images, equals: 5 }
+      - { path: metrics.total_count, equals: 49 }
+      - { path: metrics.min_count, equals: 6 }
+      - { path: metrics.max_count, equals: 12 }
 
 tools:
   - name: open_image

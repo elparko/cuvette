@@ -1,0 +1,48 @@
+tool: scikit-image
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/mahbod2024-nuinsseg/x
+  - /Volumes/T7/guided-analysis/data/mahbod2024-nuinsseg/NuInsSeg.zip
+decisions:
+  stain_channel: hematoxylin (RGB input in paper models)
+  segmentation_method: U-Net variants (paper)
+  vague_areas: provided as separate masks; scoring rule not read
+  object_size_range: none stated
+  replication_unit: image patch grouped by organ; five-fold cross-validation, 133 images per fold
+  scale_um_per_px: not stated (40x/0.75 objective)
+expected:
+  - description: image patches in dataset
+    value: 665
+    tolerance: 0
+    source: paper Table 2; matches released files
+  - description: nuclei in dataset, paper table
+    value: 30698
+    tolerance: 0
+    source: paper Table 2 (does not match released label masks)
+  - description: nuclei in released label masks (unique non-zero labels)
+    value: 35138
+    tolerance: 0
+    source: computed from label masks
+  - description: mean Dice, shallow U-Net, five-fold cross-validation
+    value: 0.788
+    tolerance: 0.03
+    source: paper Table 3
+  - description: mean Dice, residual attention U-Net (best Dice)
+    value: 0.814
+    tolerance: 0.03
+    source: paper Table 3
+  - description: mean PQ, dual decoder U-Net (best PQ)
+    value: 0.513
+    tolerance: 0.03
+    source: paper Table 3
+  - description: mean pixel Dice, plain Otsu on hematoxylin channel (baseline, not a target)
+    value: 0.538
+    tolerance: 0.02
+    source: computed with scikit-image 0.26.0
+notes: |
+  Label masks give 35,138 nuclei and ROI files give 33,098. Paper Table 2 says 30,698. The cause was not found.
+  Image counts per organ match Table 2.
+  Tolerances on Table 3 values are guesses, not from the paper.
+  The paper does not give um per pixel in the text read.
+  Folder-to-table organ mapping (brain = cerebrum, rectum vs colon) is an inference.
+  The full extract is 14 GB; fetch.sh extracts only four folders.
