@@ -260,14 +260,60 @@ def _q_counts(path, args):
     return out
 
 
+TOP_N = 5
+
+
+def _putative(mzs, slide):
+    try:
+        mode = getattr(slide.ds, "polarity", None) or "negative"
+        df = slide.api.annotate(features=[float(m) for m in mzs], mode=str(mode), match_ppm=5.0)
+        return {round(float(r["mz"]), 4): str(r["lipid"]) for _, r in df.iterrows() if str(r["lipid"]).strip()}
+    except Exception:
+        return {}
+
+
+def _top_features(args, path):
+    import pandas as pd
+
+    df = pd.read_csv(path)
+    step = args["step_id"]
+    if step == "roi_comparison" and {"mz", "mean_A", "mean_B", "AUC", "log2_fc"} <= set(df.columns):
+        a, b = args.get("a") or "A", args.get("b") or "B"
+        df = df.assign(side=[a if x > y else b for x, y in zip(df["mean_A"], df["mean_B"])])
+        df = df[df["q_value"] <= float(((args.get("params") or {}).get("max_q", Q_LIMIT)))] if "q_value" in df else df
+        sides = [a, b]
+    elif step == "discriminating_features" and {"region", "mz", "mean_in", "mean_out", "AUC", "log2_fc"} <= set(df.columns):
+        df = df[df["mean_in"] > df["mean_out"]].assign(side=lambda d: d["region"])
+        sides = list(dict.fromkeys(df["side"]))
+    else:
+        return None
+    df = df.assign(strength=(df["AUC"] - 0.5).abs(), fc=df["log2_fc"].abs())
+    seen = df.groupby("side")["mz"].apply(list).to_dict()
+    df = df[[not any(abs(mz - k * 1.00335 - o) < 0.01 for k in (1, 2) for o in seen[side])
+             for mz, side in zip(df["mz"], df["side"])]]
+    parts = []
+    picks = {}
+    for side in sides:
+        picks[side] = df[df["side"] == side].sort_values(["strength", "fc"], ascending=False).head(TOP_N)
+    names = _putative([m for p in picks.values() for m in p["mz"]], mcpserver._slide())
+    for side, p in picks.items():
+        items = []
+        for _, r in p.iterrows():
+            lipid = names.get(round(float(r["mz"]), 4))
+            who = f"putatively {lipid}, " if lipid else ""
+            items.append(f"m/z {r['mz']:.2f} ({who}AUC {max(r['AUC'], 1 - r['AUC']):.2f}, log2FC {r['fc']:.1f})")
+        parts.append(f"Top {len(items)} higher in {side}: " + ("; ".join(items) or "none"))
+    return ". ".join(parts) + ". Isotope peaks (M+1, M+2) are left out of this list. Full table: " + path
+
+
 def _summary(name, args, out, m):
     if name == "run_analysis":
         a, b = args.get("a"), args.get("b")
         if args["step_id"] == "roi_comparison" and "n_q_pass" in m:
             who = f"{a} and {b}" if a and b else "the two groups"
             q = (args.get("params") or {}).get("max_q", Q_LIMIT)
-            return f"Found {m['n_q_pass']} features different between {who} (q <= {q})."
-        return f"{out['name']}: {out.get('summary') or 'done'}"
+            return f"Found {m['n_q_pass']} features different between {who} (q <= {q}). {out.get('top_features', '')}".strip()
+        return f"{out['name']}: {out.get('summary') or 'done'}. {out.get('top_features', '')}".strip()
     if name == "history":
         return f"Read {len(out['steps'])} steps from the saved session."
     if name == "find_peaks":
@@ -309,6 +355,13 @@ def _decorate(name, args, out):
         out["table"] = {"columns": t["columns"], "n_rows": t["n_rows"], "path": t["csv"],
                         "rows": [[r.get(c) for c in t["columns"]] for r in t["preview"]]}
         outputs.append({"path": t["csv"], "kind": "table"})
+        if name == "run_analysis":
+            try:
+                top = _top_features(args, t["csv"])
+            except Exception:
+                top = None
+            if top:
+                out["top_features"] = top
     for p in [out.get("png"), *(out.get("images") or [])]:
         if isinstance(p, str):
             outputs.append({"path": p, "kind": "image"})

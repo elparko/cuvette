@@ -1367,6 +1367,9 @@ tests:
       - { path: saved.made.data.regions.2.n_pixels, equals: 255 }
       - { path: saved.made.data.regions.3.n_pixels, equals: 41 }
       - { path: metrics.n_q_pass, equals: 31 }
+      - { path: summary, contains: "Top 3 higher in rim: m/z" }
+      - { path: summary, contains: "Top 5 higher in core: m/z" }
+      - { path: summary, contains: "putatively" }
 data_rules:
   cloud_visibility: all
   note: The tools return summaries and tables of at most 12 rows. Full tables stay in the work folder.

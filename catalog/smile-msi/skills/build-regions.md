@@ -14,7 +14,8 @@ Use this procedure when the question needs a region that the slide does not have
 5. For the rim and the core, call `run_analysis` with `step_id` `roi_comparison`, `a` `rim` and `b` `core`.
 6. For a lesion, call `run_analysis` with `step_id` `roi_comparison`, `a` `lesion` and `b` `core`.
 7. Do not use the names Group A and Group B for these questions.
-8. Call `annotate` for the top features. State each identity as putative.
+8. Read `summary` of the comparison. It lists the top features that are higher in each region, with a putative lipid name. Name those lipids in your answer and say which region is higher.
+9. Call `annotate` for the top features. State each identity as putative.
 
 To change the rim width, call `make_regions` again with `rim_fraction`. The value must be from 0.05 to 0.45. The default is 0.3.
 
