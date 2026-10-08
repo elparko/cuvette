@@ -34,17 +34,27 @@ Order: easiest and most useful first. "Verified" means the tool ran one command 
 | 10 | Bio-Formats bftools 8.5.0 | cli | Installed and verified | `/Volumes/T7/guided-analysis/tools/bftools/bftools` | none yet (use on `bankhead2017-qupath-workshop` images) | Write `showinf` and `bfconvert` tools. |
 | 11 | Fiji/ImageJ 1.53k | macro | Installed and verified (headless) | `/Applications/ImageJ.app` | `schindelin2012-fiji-blobs`, `ljosa2012-bbbc005` | Record a macro for the blobs task. Build the tool-to-UI map from the recorder. |
 | 12 | QuPath 0.7.0 | macro | Installed and verified | `/Volumes/T7/guided-analysis/tools/qupath/expanded/.../QuPath-0.7.0-arm64.app` | `bankhead2017-qupath-workshop` (no reference numbers) | Run a Groovy script on one image through `QuPath script`. |
-| 13 | CellProfiler 4.2.8 | cli | Installed and verified (Rosetta) | `/Volumes/T7/guided-analysis/tools/cellprofiler/CellProfiler.app` | `caicedo2019-bbbc039`, `ljosa2012-bbbc005` | Build a `.cppipe` for BBBC005 and run it headless. |
+| 13 | CellProfiler 4.2.8 | cli | Installed and verified (Rosetta). Adapter `catalog/cellprofiler`. Paper test passes on the 100-image sample. | `/Volumes/T7/guided-analysis/tools/cellprofiler/CellProfiler.app` | `caicedo2019-bbbc039`, `ljosa2012-bbbc005` | Build a `.cppipe` for BBBC005 and run it headless. |
 | 14 | MZmine 4.10.90 | cli (batch) | Installed and verified | `/Volumes/T7/guided-analysis/tools/mzmine/mzmine.app` | none yet (reuse `rost2016-openms` mzML files) | Export a batch XML from the GUI. Run it with `-b`. |
 | 15 | Open Babel 3.2.1 | cli | Installed and verified | `/opt/homebrew/bin/obabel` | none yet (reuse `delaney2004-esol` SMILES) | Write convert and descriptor tools. |
 | 16 | Cardinal 3.14.0 (R 4.6.1) | script | Installed and verified. Adapter `catalog/cardinal`. | `/Volumes/T7/guided-analysis/tools/R-library` | `bemis2015-cardinal` | Compare the ion list with the vignette peaks. Add a test on the full pig206 data. |
 | 17 | DESeq2 1.52.0 (R 4.6.1) | script | Installed and verified. Adapter `catalog/deseq2`. | `/Volumes/T7/guided-analysis/tools/R-library` | `love2014-deseq2-airway` | Find why R DESeq2 gives 4905 genes and the workflow gives 4381. |
-| 18 | OpenMS TOPP tools | cli | Data only. Blocked: no Homebrew formula. | none | `rost2016-openms` | Download the macOS arm64 installer from the OpenMS releases page. |
+| 18 | OpenMS TOPP tools 3.5.0 | cli | Installed (bioconda through micromamba) and verified. Adapter `catalog/openms`. | `/Volumes/T7/guided-analysis/tools/openms/env/bin` | `rost2016-openms` | Add the metabolomics TOPP chain and peptide-level and protein-level FDR. |
 | 19 | PSPP | screen and files | Data only. Blocked: no macOS binary. | none | `student1908-sleep` | Use jamovi (open source, macOS arm64) as the screen-control test. |
 | 20 | SMILE MSI | mcp | Exists in the catalog | not in this queue | the synthetic demo slide | none |
+| 21 | statsmodels 0.15, pingouin 0.7, lifelines 0.30 | python | Adapter `catalog/biostats`. 11 tests pass. qwen3:8b passes all 3 papers. | `~/.guided-analysis/envs/biostats` | `student1908-sleep`, `rossi1980-recidivism`, `belenky2003-sleepstudy` | Run the stratified Cox model. |
+| 22 | MAFFT 7.526, IQ-TREE 3.1.4 | cli | Adapter `catalog/phylo`. 5 tests pass. qwen3:8b failed 2 of 2 (never reached the tree tools). | `/opt/homebrew/bin` | `minh2020-iqtree2` | Rerun with the plan reminder. |
+| 23 | bcftools 1.24, bedtools 2.31.1 | cli | Adapters `catalog/bcftools`, `catalog/bedtools`. 7 and 6 tests pass. qwen3:8b 5 of 6 and 4 of 5 items. | `/opt/homebrew/bin` | `danecek2021-bcftools`, `quinlan2010-bedtools` | Rerun after the empty-value and nudge fixes. |
+| 24 | MNE-Python 1.13.2 | python | Adapter `catalog/mne`. 6 tests pass. qwen3:8b: counts and N100 pass, one channel peak fails. | `~/.guided-analysis/envs/mne`; sample data on T7 | `gramfort2013-mne-sample` | Make the peak sign a decision. Add an ICA test. |
+| 25 | MDAnalysis 2.10, Biopython 1.88 | python | Adapter `catalog/mdanalysis`. 10 tests pass. qwen3:8b 6 of 8 values. | `~/.guided-analysis/envs/mdanalysis` | `gowers2016-mdanalysis` | Add a decision for atom names in distances. |
+| 26 | vegan 2.7.6, lme4 2.0.6 (R) | script | Adapters `catalog/vegan`, `catalog/lme4`. 8 and 6 tests pass. qwen3:8b 6 of 6 and 9 of 9. | `/Volumes/T7/guided-analysis/tools/R-library` | `oksanen-vegan-dune`, `bates2015-lme4-sleepstudy` | Compare with the printed vignettes. |
+| 27 | astropy 8.0.1, photutils 3.0.0 | python | Adapter `catalog/astropy`. 9 tests pass. qwen3:8b passes the main numbers. | `~/.guided-analysis/envs/astropy` | `bradley-photutils-100gaussians` | Add a real telescope FITS case. |
+| 28 | GDAL 3.13.3 | cli | Adapter `catalog/gdal`. 11 tests pass. qwen3:8b passes in run 3. | `/opt/homebrew/bin`; `~/.guided-analysis/envs/gdal` | `rouault-gdal-autotest` | Run the all-touched variant. |
+| 29 | QGIS 4.2.3 (`qgis_process`) | cli | Adapter `catalog/qgis`. 5 tests pass. No model run. | `/Volumes/T7/guided-analysis/tools/qgis/` | reuses `rouault-gdal-autotest` | Run one emulation. |
+| 30 | Sage 0.14.6 | cli | Adapter `catalog/sage`. 4 tests pass. qwen3:8b 1 pass, 1 partial. | `/Volumes/T7/guided-analysis/tools/sage/` | `lazear2023-sage` | Add a tool that lists peptides. |
 
 Kinds covered by the queue: mcp (SMILE MSI), cli (samtools, FastQC, bftools, CellProfiler, MZmine,
-Open Babel), python (scikit-image, scanpy, pyimzML, pyOpenMS, RDKit, Cellpose), script (Cardinal,
+Open Babel, MAFFT, IQ-TREE, bcftools, bedtools, GDAL, QGIS, Sage, OpenMS), python (scikit-image, scanpy, pyimzML, pyOpenMS, RDKit, Cellpose), script (Cardinal,
 DESeq2), http (METASPACE), macro (Fiji, QuPath), files (PSPP exports, any table), screen (jamovi
 or the ImageJ GUI, as a fallback test).
 
