@@ -351,12 +351,17 @@ export class Session {
           const tail = said.slice(-400);
           const promise = /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I will|I'll) (now )?(use|call|run|compute|count|measure|perform|fit|check)\b/i.test(tail);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
-          if (promise || asksLeave) {
+          const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
+          const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf);
+          const noWork = this.settings.headless && this.adapters.length > 0 && !ranStep;
+          if (promise || asksLeave || noWork) {
             nudges++;
             this.record.append("assistant", { text: said, final: false });
             const why = asksLeave
               ? "The scientist is not here to answer. Go on with your recommendation."
-              : "You said what you will do next, but you did not call a tool. Do it now with a tool call, or give your final answer.";
+              : promise
+                ? "You said what you will do next, but you did not call a tool. Do it now with a tool call, or give your final answer."
+                : "No program step has run in this turn, so the request is not answered yet. Run the next step now with a tool. If a tool failed, fix the input and try again.";
             this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
             continue;
           }

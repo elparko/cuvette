@@ -1,0 +1,982 @@
+{
+  "model": "ollama:qwen3:8b",
+  "guidance": "both",
+  "rows": [
+    {
+      "id": "confound",
+      "on": {
+        "answer": 0,
+        "traps": 1,
+        "decisions": 1,
+        "asking": 0.5,
+        "claims": 1,
+        "manual_route": 0.5,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "Treated cells have higher mean intensity than control cells.",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "treatment_equals_batch",
+              "kind": "confounder",
+              "outcome": "flagged",
+              "score": 1
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.5,
+            "precision": 1,
+            "recall": 0.3333333333333333,
+            "asked": [
+              "replicate"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": [
+              "batch_handling",
+              "threshold_method"
+            ]
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 0.5,
+            "steps": 0,
+            "with_route": 0,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-014611-8ab8",
+      "off": {
+        "answer": 1,
+        "traps": 0.5,
+        "decisions": 1,
+        "asking": 0.5,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 1,
+            "found": [
+              {
+                "description": "Treated cells have higher mean intensity than control cells.",
+                "found": true
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "treatment_equals_batch",
+              "kind": "confounder",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.5,
+            "precision": 1,
+            "recall": 0.3333333333333333,
+            "asked": [
+              "replicate"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": [
+              "batch_handling",
+              "threshold_method"
+            ]
+          },
+          "claims": {
+            "score": 1,
+            "source": "matcher",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 6,
+            "with_route": 6,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "offDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-014709-f366"
+    },
+    {
+      "id": "illumination",
+      "on": {
+        "answer": 0,
+        "traps": 0.75,
+        "decisions": 1,
+        "asking": 0.6666666666666666,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "The field holds 50 cells.",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "uneven_background",
+              "kind": "background_signal",
+              "outcome": "flagged",
+              "score": 1
+            },
+            {
+              "id": "global_threshold",
+              "kind": "threshold_dependence",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.6666666666666666,
+            "precision": 1,
+            "recall": 0.5,
+            "asked": [
+              "background_subtraction"
+            ],
+            "unneeded": [],
+            "free_questions": 19,
+            "missed": [
+              "threshold_method"
+            ]
+          },
+          "claims": {
+            "score": 1,
+            "source": "matcher",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 1,
+            "with_route": 1,
+            "protocol": true
+          },
+          "has_answer": false
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-014923-8d1e",
+      "off": {
+        "answer": 0,
+        "traps": 0.5,
+        "decisions": 1,
+        "asking": 0,
+        "claims": 0.75,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "The field holds 50 cells.",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "uneven_background",
+              "kind": "background_signal",
+              "outcome": "flagged",
+              "score": 1
+            },
+            {
+              "id": "global_threshold",
+              "kind": "threshold_dependence",
+              "outcome": "fell_in",
+              "score": 0
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0,
+            "precision": 1,
+            "recall": 0,
+            "asked": [],
+            "unneeded": [],
+            "free_questions": 1,
+            "missed": [
+              "background_subtraction",
+              "threshold_method"
+            ]
+          },
+          "claims": {
+            "score": 0.75,
+            "source": "matcher",
+            "total": 8,
+            "measured": 6
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 4,
+            "with_route": 4,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "offDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-015202-4022"
+    },
+    {
+      "id": "msi-lesion",
+      "on": {
+        "answer": 0,
+        "traps": 0.3333333333333333,
+        "decisions": 1,
+        "asking": 1,
+        "claims": 1,
+        "manual_route": 0.8333333333333333,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "A small focal region (lesion) is found inside the tissue.",
+                "found": false
+              },
+              {
+                "description": "LPA 18:1 is higher in the lesion.",
+                "found": false
+              },
+              {
+                "description": "FA 18:1 and FA 22:6 are higher in the lesion.",
+                "found": false
+              },
+              {
+                "description": "LPA 18:1 is about 4 times higher in the lesion than in the core (TIC normalized).",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "pixels_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "fell_in",
+              "score": 0
+            },
+            {
+              "id": "isotope_peaks",
+              "kind": "adduct_or_isotope",
+              "outcome": "neither",
+              "score": 0.5
+            },
+            {
+              "id": "ubiquitous_lipid_normalization",
+              "kind": "normalization_artifact",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 1,
+            "precision": 1,
+            "recall": 1,
+            "asked": [
+              "replicate",
+              "norm"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": []
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 0.8333333333333333,
+            "steps": 6,
+            "with_route": 4,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-015345-37bc",
+      "off": {
+        "answer": 0,
+        "traps": 0.5,
+        "decisions": 1,
+        "asking": 1,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "A small focal region (lesion) is found inside the tissue.",
+                "found": false
+              },
+              {
+                "description": "LPA 18:1 is higher in the lesion.",
+                "found": false
+              },
+              {
+                "description": "FA 18:1 and FA 22:6 are higher in the lesion.",
+                "found": false
+              },
+              {
+                "description": "LPA 18:1 is about 4 times higher in the lesion than in the core (TIC normalized).",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "pixels_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "neither",
+              "score": 0.5
+            },
+            {
+              "id": "isotope_peaks",
+              "kind": "adduct_or_isotope",
+              "outcome": "neither",
+              "score": 0.5
+            },
+            {
+              "id": "ubiquitous_lipid_normalization",
+              "kind": "normalization_artifact",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 1,
+            "precision": 1,
+            "recall": 1,
+            "asked": [
+              "replicate",
+              "norm"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": []
+          },
+          "claims": {
+            "score": 1,
+            "source": "matcher",
+            "total": 4,
+            "measured": 4
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 6,
+            "with_route": 6,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "offDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-015735-1477"
+    },
+    {
+      "id": "msi-rim-vs-core",
+      "on": {
+        "answer": 0,
+        "traps": 0.3333333333333333,
+        "decisions": 1,
+        "asking": 1,
+        "claims": 1,
+        "manual_route": 0.8333333333333333,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "Sulfatide 42:2;O3 (m/z 904.62) is higher in the rim.",
+                "found": false
+              },
+              {
+                "description": "HexCer 42:2;O3 (m/z 824.66) is higher in the rim.",
+                "found": false
+              },
+              {
+                "description": "PS 40:6, PE 38:4 or PI 38:4 is higher in the core.",
+                "found": false
+              },
+              {
+                "description": "Sulfatide 42:2;O3 is about 7 times higher in the rim (TIC normalized).",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "pixels_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "fell_in",
+              "score": 0
+            },
+            {
+              "id": "isotope_peaks",
+              "kind": "adduct_or_isotope",
+              "outcome": "neither",
+              "score": 0.5
+            },
+            {
+              "id": "ubiquitous_lipid_normalization",
+              "kind": "normalization_artifact",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 1,
+            "precision": 1,
+            "recall": 1,
+            "asked": [
+              "replicate",
+              "norm"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": []
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 4,
+            "measured": 4
+          },
+          "manual_route": {
+            "score": 0.8333333333333333,
+            "steps": 6,
+            "with_route": 4,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-015925-d8fd",
+      "off": {
+        "answer": 0,
+        "traps": 0.3333333333333333,
+        "decisions": 1,
+        "asking": 1,
+        "claims": 1,
+        "manual_route": 0.9166666666666667,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "Sulfatide 42:2;O3 (m/z 904.62) is higher in the rim.",
+                "found": false
+              },
+              {
+                "description": "HexCer 42:2;O3 (m/z 824.66) is higher in the rim.",
+                "found": false
+              },
+              {
+                "description": "PS 40:6, PE 38:4 or PI 38:4 is higher in the core.",
+                "found": false
+              },
+              {
+                "description": "Sulfatide 42:2;O3 is about 7 times higher in the rim (TIC normalized).",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "pixels_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "fell_in",
+              "score": 0
+            },
+            {
+              "id": "isotope_peaks",
+              "kind": "adduct_or_isotope",
+              "outcome": "neither",
+              "score": 0.5
+            },
+            {
+              "id": "ubiquitous_lipid_normalization",
+              "kind": "normalization_artifact",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 1,
+            "precision": 1,
+            "recall": 1,
+            "asked": [
+              "replicate",
+              "norm"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": []
+          },
+          "claims": {
+            "score": 1,
+            "source": "matcher",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 0.9166666666666667,
+            "steps": 6,
+            "with_route": 5,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "offDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-020321-e1da"
+    },
+    {
+      "id": "pseudorep",
+      "on": {
+        "answer": 0,
+        "traps": 0.5,
+        "decisions": 1,
+        "asking": 1,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "Treated cells are larger than control cells (about 2 times the area).",
+                "found": false
+              },
+              {
+                "description": "Mean treated cell area is about 314 pixels squared.",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "cells_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 1,
+            "precision": 1,
+            "recall": 1,
+            "asked": [
+              "threshold_method",
+              "background_subtraction",
+              "replicate"
+            ],
+            "unneeded": [],
+            "free_questions": 1,
+            "missed": []
+          },
+          "claims": {
+            "score": 1,
+            "source": "matcher",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 6,
+            "with_route": 6,
+            "protocol": true
+          },
+          "has_answer": false
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-020718-bad8",
+      "off": {
+        "answer": 0,
+        "traps": 0.5,
+        "decisions": 1,
+        "asking": 0.6666666666666666,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "Treated cells are larger than control cells (about 2 times the area).",
+                "found": false
+              },
+              {
+                "description": "Mean treated cell area is about 314 pixels squared.",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "cells_as_replicates",
+              "kind": "pseudoreplication",
+              "outcome": "neither",
+              "score": 0.5
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.6666666666666666,
+            "precision": 1,
+            "recall": 0.5,
+            "asked": [
+              "replicate"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": [
+              "threshold_method"
+            ]
+          },
+          "claims": {
+            "score": 1,
+            "source": "matcher",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 1,
+            "with_route": 1,
+            "protocol": true
+          },
+          "has_answer": false
+        }
+      },
+      "offDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-022218-8b9e"
+    },
+    {
+      "id": "saturation",
+      "on": {
+        "answer": 0,
+        "traps": 0,
+        "decisions": 1,
+        "asking": 0.5,
+        "claims": 1,
+        "manual_route": 0.5,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "Treated cells are brighter than control cells.",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "clipped_image",
+              "kind": "saturation",
+              "outcome": "fell_in",
+              "score": 0
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.5,
+            "precision": 1,
+            "recall": 0.3333333333333333,
+            "asked": [
+              "replicate"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": [
+              "exclusion",
+              "threshold_method"
+            ]
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 0,
+            "measured": 0
+          },
+          "manual_route": {
+            "score": 0.5,
+            "steps": 0,
+            "with_route": 0,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-022855-bb42",
+      "off": {
+        "answer": 1,
+        "traps": 0,
+        "decisions": 1,
+        "asking": 0.5,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 1,
+            "found": [
+              {
+                "description": "Treated cells are brighter than control cells.",
+                "found": true
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "clipped_image",
+              "kind": "saturation",
+              "outcome": "fell_in",
+              "score": 0
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.5,
+            "precision": 1,
+            "recall": 0.3333333333333333,
+            "asked": [
+              "replicate"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": [
+              "exclusion",
+              "threshold_method"
+            ]
+          },
+          "claims": {
+            "score": 1,
+            "source": "matcher",
+            "total": 12,
+            "measured": 12
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 1,
+            "with_route": 1,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "offDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-023028-8f17"
+    },
+    {
+      "id": "threshold",
+      "on": {
+        "answer": 1,
+        "traps": 1,
+        "decisions": 1,
+        "asking": 1,
+        "claims": 1,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 1,
+            "found": [
+              {
+                "description": "The image holds 50 cells (40 bright, 10 dim).",
+                "found": true
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "count_depends_on_settings",
+              "kind": "threshold_dependence",
+              "outcome": "flagged",
+              "score": 1
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 1,
+            "precision": 1,
+            "recall": 1,
+            "asked": [
+              "threshold_method",
+              "background_subtraction",
+              "particle_size_min"
+            ],
+            "unneeded": [],
+            "free_questions": 1,
+            "missed": []
+          },
+          "claims": {
+            "score": 1,
+            "source": "claim_check",
+            "total": 8,
+            "measured": 8
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 2,
+            "with_route": 2,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "onDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-023208-08b5",
+      "off": {
+        "answer": 0,
+        "traps": 0,
+        "decisions": 1,
+        "asking": 0.6666666666666666,
+        "claims": 0.8571428571428571,
+        "manual_route": 1,
+        "details": {
+          "answer": {
+            "score": 0,
+            "found": [
+              {
+                "description": "The image holds 50 cells (40 bright, 10 dim).",
+                "found": false
+              }
+            ]
+          },
+          "traps": [
+            {
+              "id": "count_depends_on_settings",
+              "kind": "threshold_dependence",
+              "outcome": "fell_in",
+              "score": 0
+            }
+          ],
+          "decisions": {
+            "score": 1,
+            "checked": 0,
+            "unlogged": [],
+            "unexplained": []
+          },
+          "asking": {
+            "score": 0.6666666666666666,
+            "precision": 1,
+            "recall": 0.5,
+            "asked": [
+              "particle_size_min"
+            ],
+            "unneeded": [],
+            "free_questions": 0,
+            "missed": [
+              "threshold_method"
+            ]
+          },
+          "claims": {
+            "score": 0.8571428571428571,
+            "source": "matcher",
+            "total": 7,
+            "measured": 6
+          },
+          "manual_route": {
+            "score": 1,
+            "steps": 1,
+            "with_route": 1,
+            "protocol": true
+          },
+          "has_answer": true
+        }
+      },
+      "offDir": "/Users/parker/Code/guided-analysis/bench/results/home/sessions/20261008-023606-d728"
+    }
+  ]
+}
