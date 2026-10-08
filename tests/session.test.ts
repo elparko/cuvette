@@ -94,3 +94,11 @@ test("resume rebuilds the history from the log", async () => {
   session = await Session.resume(id, { provider: new FakeProvider([{ text: "again" }]), cwd: tmpdir() });
   expect(session.history.length).toBe(2);
 });
+
+test("a promise of an action with no tool call gets one nudge", async () => {
+  const provider = new FakeProvider([{ text: "I will now count the particles." }, { calls: [{ name: "state", args: {} }] }, { text: "The program is open." }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false, headless: true } });
+  const answer = await session.send("go");
+  expect(answer).toBe("The program is open.");
+  expect(provider.requests.length).toBe(3);
+});

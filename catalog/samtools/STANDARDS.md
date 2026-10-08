@@ -7,6 +7,8 @@ Follow these rules in each answer. The review checks look for the same errors.
 - Use the named tools. Each tool runs one samtools command.
 - Pass the path that the last step gave. Use bam from sort_bam. Use indexed_bam from index_bam.
 - A SAM file with no header needs the reference FASTA file at the conversion step.
+- Answer each question in the request. If a question needs a tool call, make the call before you write the answer. Do not write "I will use" and stop.
+- For a question about a region, call count_reads with the region.
 
 ## Counts
 

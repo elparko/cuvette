@@ -37,7 +37,7 @@ export async function runScenario(id: string, opts: RunOptions): Promise<RunResu
       model: opts.model,
       mode: "watch",
       cwd,
-      settings: { guidance: opts.guidance } as any,
+      settings: { guidance: opts.guidance, headless: true } as any,
     });
     session.bus.on((e) => {
       if (e.type !== "question") return;

@@ -1,7 +1,7 @@
 adapter:
   name: samtools
   title: samtools
-  version: 0.1.1
+  version: 0.1.2
   spec: "1"
   description: >
     Converts, sorts, indexes and counts aligned sequencing reads with samtools. Each tool runs one

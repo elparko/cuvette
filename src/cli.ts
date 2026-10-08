@@ -67,7 +67,7 @@ async function headless(prompt: string) {
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = str(o.output) ?? "text";
-  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic });
+  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: { headless: true } });
   s.bus.on((e) => {
     if (out === "stream-json") process.stdout.write(JSON.stringify(e) + "\n");
     if (e.type === "question") {
@@ -82,8 +82,11 @@ async function headless(prompt: string) {
     if (out === "text" && e.type === "entry" && e.entry.kind === "tool_result") process.stderr.write(`  ${e.entry.data.ok ? "●" : "✗"} ${e.entry.data.summary ?? e.entry.data.error ?? e.entry.data.tool}\n`);
   });
   s.settings.autoResume = false;
-  const setup = readJson(str(o.setup));
-  if (setup || s.setupNeeded()) s.decisions.applySetup(setup ?? {}, { how: setup ? "from the setup file" : "defaults accepted (headless)" });
+  const setup = readJson(str(o.setup)) as Record<string, unknown> | undefined;
+  const setupKeys = new Set(s.decisions.fields().filter((f) => f.stage === "setup").map((f) => f.key));
+  const fromAnswers = Object.fromEntries(Object.entries(answers).filter(([k]) => setupKeys.has(k)));
+  if (setup || Object.keys(fromAnswers).length || s.setupNeeded())
+    s.decisions.applySetup({ ...fromAnswers, ...(setup ?? {}) }, { how: setup || Object.keys(fromAnswers).length ? "from the setup and answers files" : "defaults accepted (headless)" });
   const answer = await s.send(prompt);
   if (out === "json") console.log(JSON.stringify({ session: s.id, dir: s.dir, answer, findings: s.findings.list() }, null, 1));
   else if (out === "text") console.log(`${answer}\n\nSession: ${s.id}\nRecord: ${join(s.dir, "log.jsonl")}`);

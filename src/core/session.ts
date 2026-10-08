@@ -346,6 +346,20 @@ export class Session {
           this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
           continue;
         }
+        if (!calls.length && nudges < 2) {
+          const tail = said.slice(-400);
+          const promise = /\b(I will|I'll|Let me|Let's|Next,? I|Now,? I|I am going to|I'm going to)\b[^.?!]*(\.|:|$)\s*$/i.test(tail) || /\b(I will|I'll) (now )?(use|call|run|compute|count|measure|perform|fit|check)\b/i.test(tail);
+          const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
+          if (promise || asksLeave) {
+            nudges++;
+            this.record.append("assistant", { text: said, final: false });
+            const why = asksLeave
+              ? "The scientist is not here to answer. Go on with your recommendation."
+              : "You said what you will do next, but you did not call a tool. Do it now with a tool call, or give your final answer.";
+            this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
+            continue;
+          }
+        }
         if (!calls.length) {
           const out = await this.finishAnswer(said, revised, signal);
           if (out.revise) {

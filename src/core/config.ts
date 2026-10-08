@@ -18,6 +18,7 @@ export interface Settings {
   toolExposure: "all" | "search" | "auto";
   networkForScripts: boolean;
   askWaits: boolean;
+  headless: boolean;
   permissions: Record<string, "allow" | "ask" | "deny">;
   hooks: Partial<Record<HookEvent, { matcher?: string; command: string[] }[]>>;
   notify: { ntfy?: string };
@@ -38,6 +39,7 @@ export const DEFAULTS: Settings = {
   toolExposure: "auto",
   networkForScripts: false,
   askWaits: true,
+  headless: false,
   permissions: {},
   hooks: {},
   notify: {},
