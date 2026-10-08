@@ -1,0 +1,68 @@
+kind: tool tutorial or test suite
+short: Minh 2020
+field: Phylogenetics
+program: IQ-TREE 3.1.4 and MAFFT (command line), through the phylo adapter
+citation:
+  authors: Minh BQ, Schmidt HA, Chernomor O, Schrempf D, Woodhams MD, von Haeseler A, Lanfear R
+  title: "IQ-TREE 2: New models and efficient methods for phylogenetic inference in the genomic era"
+  venue: Molecular Biology and Evolution 37(5):1530-1534
+  year: 2020
+  doi: 10.1093/molbev/msaa015
+related:
+  - text: IQ-TREE beginner tutorial. It uses the file example.phy and names the best-fit model for it.
+    url: https://iqtree.github.io/doc/Tutorial
+measured: >-
+  The IQ-TREE 2 paper describes a program that builds maximum-likelihood (ML) trees from sequence alignments.
+  The paper has no numbers for the example file. The beginner tutorial uses example.phy, an alignment of
+  mitochondrial DNA from 17 animals. The tutorial lets ModelFinder choose the substitution model. It then
+  builds the tree and gives branch support with the ultrafast bootstrap.
+instruction: >-
+  I have an alignment of mitochondrial DNA from 17 animals. Find the best-fit substitution model and build
+  the maximum-likelihood tree with branch support. Let the data choose the model. Report the log-likelihood
+  of the tree.
+instruction_basis: >-
+  The tutorial sections on the first run, on the choice of the substitution model, and on branch support with
+  the ultrafast bootstrap.
+answers:
+  algorithm:
+    decision: MAFFT alignment method
+    value: automatic
+    source: Not used. The file example.phy is already aligned. The phylo adapter uses MAFFT --auto by default.
+  trim:
+    decision: Trim the alignment
+    value: false
+    source: Not in the tutorial. The tutorial uses the alignment as it is.
+  model:
+    decision: Substitution model
+    value: MFP (ModelFinder chooses the model)
+    source: >-
+      Tutorial section on the substitution model. ModelFinder picks the model with the lowest Bayesian
+      information criterion (BIC). MFP is the default from version 1.5.4.
+  bootstrap_type:
+    decision: Type of branch support
+    value: ultrafast bootstrap
+    source: Tutorial section on the ultrafast bootstrap. The tutorial notes that these values do not mean the same as standard bootstrap values.
+  replicates:
+    decision: Bootstrap replicates
+    value: 1000
+    source: Tutorial section on the ultrafast bootstrap. The tutorial calls 1000 the minimum number it recommends.
+  outgroup:
+    decision: Outgroup
+    value: none (the tree is unrooted)
+    source: >-
+      Tutorial, first run. IQ-TREE draws the lungfish at the root only because it is the first sequence. The
+      tree stays unrooted.
+items:
+  log_likelihood:
+    source: computed
+    tool: IQ-TREE 3.1.4 (iqtree3), seed 1
+    where: >-
+      Not in the paper or the tutorial. The tutorial names the model TIM2+I+G4 but prints no log-likelihood.
+      The benchmark authors ran -m MFP -B 1000 and got -21152.5377.
+data:
+  source: File example.phy from the example folder of the IQ-TREE 2 source repository
+  url: https://raw.githubusercontent.com/iqtree/iqtree2/master/example/example.phy
+  license: >-
+    The repository is GPL-2.0. The file holds published mitochondrial DNA sequences of animals and has no
+    personal data.
+  size: 34 KB, 17 sequences by 1998 sites

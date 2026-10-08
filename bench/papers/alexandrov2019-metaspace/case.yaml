@@ -1,0 +1,90 @@
+kind: research paper
+short: Alexandrov 2019
+field: Mass spectrometry and proteomics
+program: METASPACE (metaspace2020 Python client), through the metaspace adapter
+citation:
+  authors: Alexandrov T, Ovchinnikova K, Palmer A, et al.
+  title: "METASPACE: a community-populated knowledge base of spatial metabolomes in health and disease"
+  venue: bioRxiv preprint
+  year: 2019
+  doi: 10.1101/539478
+related:
+  - text: "Palmer A, et al. FDR-controlled metabolite annotation for high-resolution imaging mass spectrometry. Nature Methods 14:57-60 (2017). The annotation engine that METASPACE uses."
+    doi: 10.1038/nmeth.4072
+measured: >-
+  METASPACE is a public platform for imaging mass spectrometry. It annotates each dataset with molecular
+  formulas from public databases and controls the false discovery rate (FDR) with decoy formulas. The paper
+  describes the platform and the counts of its 2019 database. Those counts describe a database that changed
+  since then, so the benchmark cannot check them. The benchmark uses two public mouse brain datasets from 2022
+  and counts the lipid annotations that METASPACE reports for them. The count depends on the FDR level and on
+  the database.
+instruction: >-
+  Look at the two public mouse brain datasets 2022-08-16_10h14m23s and 2022-08-16_12h31m33s on METASPACE.
+  How many lipid annotations does each dataset support at a controlled false discovery rate? How does the
+  count change with the database?
+instruction_basis: >-
+  The results section of the paper. Users browse and count annotations at an FDR of 10%, and they choose one
+  of several databases. The two dataset ids are not in the paper.
+answers:
+  fdr:
+    decision: False discovery rate (FDR) level
+    value: 10%
+    source: Results. The paper browses and counts annotations at an FDR of 10%.
+  database:
+    decision: Molecular database
+    value: LIPID MAPS, release 2017-12-12
+    source: >-
+      Results. The paper lists LIPID MAPS among the databases for lipids. It names no release. The release is
+      the one that METASPACE used for these datasets. HMDB (Human Metabolome Database) is the comparison.
+  adducts:
+    decision: Adducts to count
+    value: all adducts in the dataset
+    source: >-
+      Not in the paper for these datasets. The configuration of both datasets lists the protonated adduct (+H)
+      only, so "all" and "+H" give the same count.
+  exclude_off_sample:
+    decision: Remove off-sample annotations
+    value: false
+    source: Not in the paper. The benchmark uses the adapter default.
+  "*":
+    decision: All other decisions
+    value: the recommended value of the adapter
+    source: Not in the paper. The benchmark gives the adapter default for each other decision.
+items:
+  d1_lipidmaps_fdr10:
+    source: computed
+    tool: METASPACE, queried with metaspace2020 2.0.9 on 2026-10-07
+    where: >-
+      Not in the paper. The paper does not use this dataset. The count can change if METASPACE processes the
+      dataset again.
+  d1_hmdb_fdr10:
+    source: computed
+    tool: METASPACE, queried with metaspace2020 2.0.9 on 2026-10-07
+    where: >-
+      Not in the paper. HMDB is the comparison database, so the run must find this value in a comparison run.
+  d2_lipidmaps_fdr10:
+    source: computed
+    tool: METASPACE, queried with metaspace2020 2.0.9 on 2026-10-07
+    where: Not in the paper. The paper does not use this dataset.
+  d2_hmdb_fdr10:
+    source: computed
+    tool: METASPACE, queried with metaspace2020 2.0.9 on 2026-10-07
+    where: >-
+      Not in the paper. HMDB is the comparison database, so the run must find this value in a comparison run.
+  d1_lipidmaps_fdr5:
+    source: computed
+    tool: METASPACE, queried with metaspace2020 2.0.9 on 2026-10-07
+    where: >-
+      Not in the paper. It shows how the count falls at the stricter FDR level of 5%.
+data:
+  source: >-
+    Two public METASPACE datasets from the project AP-MALDI-PPI Mouse Brain. The method is atmospheric pressure
+    matrix-assisted laser desorption ionization (AP-MALDI) with plasma post-ionization, in positive mode. The annotation tables and the dataset configuration come from the
+    METASPACE application programming interface (API).
+  url: https://metaspace2020.org/
+  license: >-
+    METASPACE policy makes public datasets CC BY 4.0 (Creative Commons Attribution). The API did not return a
+    license field for these two datasets. Mouse tissue, no human data.
+  size: >-
+    2.9 MB: four annotation tables (CSV) at FDR 10% with 414, 263, 191 and 123 rows, and two configuration
+    files (JSON).

@@ -1,0 +1,110 @@
+kind: tool tutorial or test suite
+short: Wolf 2018
+field: Genomics and transcriptomics
+program: scanpy (Python), through the scanpy adapter
+citation:
+  authors: Wolf FA, Angerer P, Theis FJ
+  title: "SCANPY: large-scale single-cell gene expression data analysis"
+  venue: Genome Biology 19:15
+  year: 2018
+  doi: 10.1186/s13059-017-1382-0
+related:
+  - text: "Scanpy tutorial on the preprocessing and clustering of 3k peripheral blood mononuclear cells (PBMCs). Source of the steps and of the cell and gene counts."
+    url: https://scanpy.readthedocs.io/en/stable/tutorials/basics/clustering-2017.html
+measured: >-
+  The paper describes scanpy, a Python toolkit for single-cell gene expression data. The tutorial applies it to
+  about 2700 peripheral blood mononuclear cells (PBMCs) from one healthy donor. It removes poor-quality cells and
+  rare genes, normalizes the counts and builds a neighbor graph. It then finds clusters with the Leiden method and
+  names cell types from marker genes. The quality filters decide how many cells stay, and the clustering settings
+  decide how many groups appear.
+instruction: >-
+  I have the 10x filtered matrix for blood cells from one healthy donor. Clean the data the usual way and cluster
+  the cells. How many cells did you keep, and how many clusters did you find? Which genes mark each cluster?
+instruction_basis: >-
+  The scanpy 3k PBMC tutorial, from the quality control step to the marker genes. The tutorial copies the Seurat
+  guided clustering tutorial on the same data.
+answers:
+  min_genes_per_cell:
+    decision: Minimum genes per cell
+    value: 200
+    source: Tutorial, basic filtering step. The tutorial notes that this filter removes no cell in this data set.
+  max_genes_per_cell:
+    decision: Maximum genes per cell
+    value: 2500
+    source: Tutorial, filter step after the quality metrics. Cells with many genes can be doublets.
+  max_pct_mito:
+    decision: Maximum percent of mitochondrial counts
+    value: 5
+    source: Tutorial, filter step after the quality metrics.
+  min_cells_per_gene:
+    decision: Minimum cells per gene
+    value: 3
+    source: Tutorial, basic filtering step.
+  target_sum:
+    decision: Counts per cell after normalization
+    value: 10000
+    source: Tutorial, normalization step, followed by a log transform.
+  n_top_genes:
+    decision: Number of highly variable genes
+    value: 0 (use the mean and dispersion cutoffs)
+    source: >-
+      The current tutorial asks for 2000 genes with the seurat_v3 method. The benchmark uses the older default
+      method with the cutoffs in the tutorial (mean 0.0125 to 3, dispersion above 0.5).
+  regress_out:
+    decision: Variables to regress out
+    value: total counts and percent mitochondrial counts
+    source: Tutorial, step before scaling.
+  n_pcs:
+    decision: Principal components for the neighbor graph
+    value: 40
+    source: Tutorial, neighbor graph step.
+  n_neighbors:
+    decision: Number of neighbors
+    value: 10
+    source: Tutorial, neighbor graph step.
+  leiden_resolution:
+    decision: Leiden resolution
+    value: 0.7
+    source: Tutorial, clustering step.
+  random_seed:
+    decision: Random seed
+    value: 0
+    source: Tutorial, clustering step.
+  marker_method:
+    decision: Test for marker genes
+    value: Wilcoxon rank-sum test
+    source: >-
+      Tutorial, marker gene step. The tutorial shows a t-test, the Wilcoxon test and logistic regression. It
+      recommends the Wilcoxon test for publications.
+items:
+  cells_at_load:
+    source: tutorial
+    where: Tutorial, read step. The printed data object has 2700 cells.
+  genes_at_load:
+    source: tutorial
+    where: Tutorial, read step. The printed data object has 32738 genes.
+  genes_after_min_cells:
+    source: tutorial
+    where: Tutorial, basic filtering step. The log says that the filter removes 19024 genes, which leaves 13714.
+  cells_after_qc:
+    source: tutorial
+    where: Tutorial, filter step after the quality metrics. The printed data object has 2638 cells.
+  highly_variable_genes:
+    source: computed
+    tool: scanpy 1.12.4
+    where: >-
+      Not in the current tutorial, which uses another method and prints no count. The value uses the older default
+      method with the tutorial cutoffs.
+  leiden_clusters:
+    source: computed
+    tool: scanpy 1.12.4
+    where: >-
+      The current tutorial reports 8 clusters with its own gene selection. The benchmark run gives 7. The tolerance
+      of 1 accepts both.
+data:
+  source: 10x Genomics public data set, 3k PBMCs from a healthy donor, filtered gene-barcode matrices (hg19)
+  url: https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz
+  license: >-
+    Not stated on the 10x Genomics data page. 10x Genomics offers the file for open download. The donor is healthy
+    and the files hold no identifiers.
+  size: 7.6 MB archive, 2700 cells by 32738 genes

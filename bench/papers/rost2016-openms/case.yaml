@@ -1,0 +1,93 @@
+kind: tool tutorial or test suite
+short: Röst 2016
+field: Mass spectrometry and proteomics
+program: pyOpenMS (Python interface to OpenMS), through the pyopenms adapter
+citation:
+  authors: Röst HL, Sachsenberg T, Aiche S, Bielow C, Weisser H, et al.
+  title: "OpenMS: a flexible open-source software platform for mass spectrometry data analysis"
+  venue: Nature Methods 13(9):741-748
+  year: 2016
+  doi: 10.1038/nmeth.3959
+related:
+  - text: "OpenMS tutorial example data, folder Metabolomics. The supplement of the paper uses these files in its metabolomics tutorial (section 5)."
+    url: https://abibuilder.cs.uni-tuebingen.de/archive/openms/Tutorials/Example_Data/Metabolomics/
+measured: >-
+  The paper describes OpenMS, an open-source set of tools for mass spectrometry data. The main text has no
+  results table. The supplement has a metabolomics tutorial with six liquid chromatography-mass spectrometry
+  (LC-MS) runs of blood. Seven labelled standards are spiked in at two concentrations, with three injections
+  each. The first step finds features, which are the signals of single compound ions over retention time. Later
+  steps align the runs, link the features and look for the spiked compounds.
+instruction: >-
+  I ran a blood sample spiked with a few standards at two concentrations, with three injections each. Take the
+  first injection at the low concentration. Run the OpenMS metabolite feature finder on it. How many features do
+  you find, and how many spectra does the file have?
+instruction_basis: >-
+  Supplement section 5, the metabolomics tutorial. The request takes only the feature finding step and applies
+  it to one of the six files.
+answers:
+  mass_error_ppm:
+    decision: Mass error for mass traces
+    value: 20 parts per million (ppm)
+    source: Not in the supplement. The benchmark uses the OpenMS default.
+  noise_threshold_int:
+    decision: Noise threshold (intensity)
+    value: 10
+    source: Not in the supplement. The benchmark uses the OpenMS default.
+  chrom_fwhm:
+    decision: Expected chromatographic peak width (full width at half maximum)
+    value: 8 seconds
+    source: Supplement section 5. The tutorial sets this value for the feature finder.
+  min_trace_length:
+    decision: Shortest mass trace
+    value: 3 seconds
+    source: Supplement section 5, feature finder settings.
+  max_trace_length:
+    decision: Longest mass trace
+    value: 600 seconds
+    source: Supplement section 5, feature finder settings.
+  trace_termination:
+    decision: Rule that ends a mass trace
+    value: sample rate
+    source: Supplement section 5, feature finder settings.
+  width_filtering:
+    decision: Filter on elution peak width
+    value: "off"
+    source: Supplement section 5, feature finder settings.
+  polarity:
+    decision: Ion polarity
+    value: positive
+    source: >-
+      Not in the supplement, and the file metadata does not give it. The benchmark uses positive. It matters for
+      the adduct lists in the identification step, which this request does not ask for.
+items:
+  spectra:
+    source: computed
+    tool: pyOpenMS 3.6.0
+    where: Not in the paper or the supplement. The benchmark authors counted the spectra in the file.
+  ms1_spectra:
+    source: computed
+    tool: pyOpenMS 3.6.0
+    where: Not in the paper or the supplement. All spectra in the file are level 1 mass spectra (MS1).
+  mass_traces:
+    source: computed
+    tool: pyOpenMS 3.6.0
+    where: >-
+      Not in the paper or the supplement. The supplement gives no counts. The value uses the tutorial settings and
+      OpenMS defaults for all other parameters.
+  elution_peaks:
+    source: computed
+    tool: pyOpenMS 3.6.0
+    where: Not in the paper or the supplement. Other OpenMS versions can give a slightly different count.
+  features:
+    source: computed
+    tool: pyOpenMS 3.6.0
+    where: >-
+      Not in the paper or the supplement. The paper used OpenMS 2.0 in KNIME, so the tolerance allows for version
+      differences.
+data:
+  source: OpenMS tutorial example data, Metabolomics folder, University of Tuebingen archive
+  url: https://abibuilder.cs.uni-tuebingen.de/archive/openms/Tutorials/Example_Data/Metabolomics/datasets/2012_02_03_PStd_050_1.mzML
+  license: >-
+    Not stated on the archive. OpenMS software is BSD 3-clause. Treat the files as OpenMS tutorial data and check
+    before redistribution.
+  size: 221 MB, 7173 spectra. This is one of six files, which are 1.3 GB in total.

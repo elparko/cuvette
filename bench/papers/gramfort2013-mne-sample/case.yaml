@@ -1,0 +1,179 @@
+kind: tool tutorial or test suite
+short: Gramfort 2013
+field: Neuroscience
+program: MNE-Python, through the mne adapter
+citation:
+  authors: Gramfort A, Luessi M, Larson E, Engemann DA, Strohmeier D, Brodbeck C, Goj R, Jas M, Brooks T, Parkkonen L, Hamalainen M
+  title: MEG and EEG data analysis with MNE-Python
+  venue: Frontiers in Neuroscience 7:267
+  year: 2013
+  doi: 10.3389/fnins.2013.00267
+related:
+  - text: "Gramfort A et al. MNE software for processing MEG and EEG data. NeuroImage 86:446-460 (2014)."
+    doi: 10.1016/j.neuroimage.2013.10.027
+  - text: "MNE-Python tutorial, Overview of MEG/EEG analysis with MNE-Python. Source of the printed event and epoch counts."
+    url: https://mne.tools/stable/auto_tutorials/intro/10_overview.html
+measured: >-
+  The paper describes MNE-Python, a library for magnetoencephalography (MEG) and electroencephalography (EEG)
+  data. It covers the usual steps from the raw recording to epochs and averaged responses. The MNE sample
+  recording is the standard example. One subject heard tones in the left or right ear and saw checkerboards in
+  the left or right visual field. The benchmark asks for the event counts, the epochs that pass the rejection
+  limits, and the auditory N100 response to the left-ear tone.
+instruction: >-
+  This is the MNE sample recording of one subject who heard tones and saw flashes. The trigger channel has
+  ids for left and right tones, left and right flashes, smiley faces and button presses. How many events of
+  each kind are there? Cut the recording around each event and drop the bad epochs the usual way. How many
+  epochs are left, and how many left-ear tone trials? In the gradiometers, when does the response to the
+  left-ear tone peak, about a tenth of a second after the tone? How large is it?
+instruction_basis: >-
+  The MNE overview tutorial finds the events, makes epochs from -0.2 to 0.5 s with peak-to-peak rejection
+  limits, and averages the auditory epochs. The peak latency and amplitude are an addition of the benchmark.
+answers:
+  bad_channels:
+    decision: Bad channels
+    value: MEG 2443 and EEG 053
+    source: The sample file marks these two channels as bad. The tutorial reads the file with these marks.
+  filter_low:
+    decision: High-pass filter cut-off
+    value: 0.1 Hz
+    source: The tutorial reads a file that is already filtered. The benchmark does not filter again.
+  filter_high:
+    decision: Low-pass filter cut-off
+    value: 40 Hz
+    source: The tutorial reads a file that is already filtered to 40 Hz. The benchmark does not filter again.
+  notch_freq:
+    decision: Notch filter for line noise
+    value: none
+    source: Not in the tutorial. The 40 Hz low-pass filter already removes the line frequency.
+  reference:
+    decision: EEG reference
+    value: average reference
+    source: The file holds an average EEG reference projection. The tutorial applies it when it makes the epochs.
+  use_ica:
+    decision: Use independent component analysis (ICA)
+    value: "no"
+    source: >-
+      The tutorial fits ICA and removes two components before the epochs. The benchmark does not use ICA. Its
+      run without ICA also drops 10 epochs.
+  epoch_tmin:
+    decision: Epoch start
+    value: -0.2 s
+    source: The tutorial makes epochs that start 0.2 s before each event.
+  epoch_tmax:
+    decision: Epoch end
+    value: 0.5 s
+    source: The tutorial makes epochs that end 0.5 s after each event.
+  baseline_start:
+    decision: Baseline start
+    value: -0.2 s
+    source: The tutorial uses the default baseline, from the start of the epoch to the event.
+  baseline_end:
+    decision: Baseline end
+    value: 0 s
+    source: The tutorial uses the default baseline, from the start of the epoch to the event.
+  reject_grad:
+    decision: Rejection limit for gradiometers
+    value: 4000 fT/cm peak to peak
+    source: The rejection limits of the tutorial.
+  reject_mag:
+    decision: Rejection limit for magnetometers
+    value: 4000 fT peak to peak
+    source: The rejection limits of the tutorial.
+  reject_eeg:
+    decision: Rejection limit for EEG
+    value: 150 uV peak to peak
+    source: The rejection limits of the tutorial.
+  reject_eog:
+    decision: Rejection limit for the electrooculogram (EOG)
+    value: 250 uV peak to peak
+    source: The rejection limits of the tutorial.
+  peak_ch_type:
+    decision: Channel type for the peak
+    value: gradiometers
+    source: Not in the tutorial. The request asks for the gradiometer response.
+  peak_tmin:
+    decision: Start of the peak search window
+    value: 0.08 s
+    source: Not in the tutorial. The benchmark authors chose a window around the N100.
+  peak_tmax:
+    decision: End of the peak search window
+    value: 0.12 s
+    source: Not in the tutorial. The benchmark authors chose a window around the N100.
+items:
+  events_total:
+    source: tutorial
+    where: The overview tutorial prints 319 events found on the trigger channel STI 014.
+  events_id1:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+  events_id2:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+  events_id3:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+  events_id4:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+  events_id5:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+  events_id32:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial or the paper. The tutorial lists the six ids but not a count for each id.
+  epochs_dropped:
+    source: tutorial
+    where: >-
+      The overview tutorial prints 10 bad epochs dropped. The tutorial removes two ICA components first. The
+      benchmark run without ICA drops the same 10 epochs.
+  epochs_kept:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: The tutorial does not print this number. It is 319 events minus 10 dropped epochs.
+  auditory_left_kept:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial. The tutorial prints only the pooled auditory counts after it equalizes the conditions.
+  n100_latency_gfp:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: >-
+      Not in the tutorial or the paper. The value is the peak of the global field power of the good
+      gradiometers. The tolerance is one sample (6.7 ms).
+  n100_amplitude_gfp:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial or the paper.
+  strongest_grad_latency:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: >-
+      Not in the tutorial or the paper. If the bad channel MEG 2443 stays in, it becomes the strongest channel
+      and the answer changes.
+  strongest_grad_amplitude:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial or the paper. The sign of one gradiometer depends on the sensor, so the score uses the absolute value.
+  n100_latency_eeg:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: >-
+      Not in the tutorial text. A joint plot of both auditory conditions in the tutorial marks 0.093 s, but it
+      does not call that time the N100.
+  n100_amplitude_eeg:
+    source: computed
+    tool: MNE-Python 1.13.2
+    where: Not in the tutorial or the paper.
+data:
+  source: MNE sample dataset (mne.datasets.sample), recorded at the Martinos Center with MEG and EEG at the same time
+  url: https://mne.tools/stable/documentation/datasets.html
+  license: >-
+    The MNE project gives these data to learn the software. The benchmark notes record BSD-style terms. The MNE
+    datasets page does not name a license. The files have no personal identifiers.
+  size: 1.6 GB download. The benchmark uses one 66 MB file with 306 MEG channels, 60 EEG channels and 319 events.

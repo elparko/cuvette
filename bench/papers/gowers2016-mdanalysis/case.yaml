@@ -1,0 +1,110 @@
+kind: tool tutorial or test suite
+short: Gowers 2016
+field: Structural biology
+program: MDAnalysis and Bio.PDB (Python), through the mdanalysis adapter
+citation:
+  authors: Gowers RJ, Linke M, Barnoud J, Reddy TJE, Melo MN, Seyler SL, Domanski J, Dotson DL, Buchoux S, Kenney IM, Beckstein O
+  title: "MDAnalysis: a Python package for the rapid analysis of molecular dynamics simulations"
+  venue: Proceedings of the 15th Python in Science Conference, pages 98-105
+  year: 2016
+  doi: 10.25080/Majora-629e541a-00e
+related:
+  - text: "Michaud-Agrawal N, Denning EJ, Woolf TB, Beckstein O. MDAnalysis: a toolkit for the analysis of molecular dynamics simulations. Journal of Computational Chemistry 32:2319-2327 (2011)."
+    doi: 10.1002/jcc.21787
+  - text: "MDAnalysis user guide, quickstart. It loads the same adenylate kinase trajectory and prints the atom and frame counts."
+    url: https://userguide.mdanalysis.org/stable/examples/quickstart.html
+measured: >-
+  The paper describes MDAnalysis, a Python library that reads molecular dynamics trajectories and measures
+  them. It has no numeric result for this trajectory. The MDAnalysis tutorials use a trajectory of adenylate
+  kinase (AdK) as the standard example. In this trajectory the enzyme moves from a closed form to an open form.
+  The benchmark asks for the root mean square deviation (RMSD) of the backbone and the radius of gyration. It
+  also compares the open and closed crystal structures 4AKE and 1AKE.
+instruction: >-
+  I have a molecular dynamics run of adenylate kinase, with its topology and its trajectory. I also have the
+  open crystal structure 4AKE and the closed one 1AKE. How many atoms and frames does the run have? How far
+  does the backbone move from the first frame to the last frame? What is the radius of gyration at the start
+  and at the end? How many residues does each chain of the open structure have? How different are the open
+  and closed structures, if you compare chain A of each?
+instruction_basis: >-
+  The MDAnalysis quickstart loads this trajectory, aligns it on the backbone, computes the backbone RMSD and
+  computes the radius of gyration for each frame. The comparison of the two crystal structures is an addition
+  of the benchmark.
+answers:
+  replicate:
+    decision: Unit of replication
+    value: frames of one trajectory, for description only
+    source: >-
+      Not in the paper or the quickstart. One trajectory gives no independent replicates. The numbers describe
+      this run only.
+  fit_select:
+    decision: Atoms for the fit
+    value: backbone
+    source: The quickstart aligns the trajectory on the backbone atoms.
+  fit_before_rmsd:
+    decision: Fit each frame before the RMSD
+    value: true
+    source: The quickstart RMSD analysis fits each frame on the reference before it measures the RMSD.
+  reference_frame:
+    decision: Reference frame
+    value: frame 0, the first frame
+    source: The quickstart uses the default reference, which is the first frame.
+  rmsd_select:
+    decision: Atoms for the RMSD
+    value: backbone
+    source: The quickstart measures the RMSD on the backbone atoms.
+  frame_stride:
+    decision: Frame stride
+    value: 1, every frame
+    source: >-
+      The quickstart uses every frame. A stride of 10 stops at frame 90 and gives a different last value.
+  rmsf_select:
+    decision: Atoms for the root mean square fluctuation (RMSF)
+    value: protein alpha carbons
+    source: Not used by the questions. The benchmark uses the adapter default.
+  rg_select:
+    decision: Atoms for the radius of gyration
+    value: protein
+    source: >-
+      The quickstart uses all atoms. The files hold the protein only, so the two selections are the same.
+  pdb_fit_atoms:
+    decision: Atoms to superpose the two crystal structures
+    value: alpha carbons (CA)
+    source: Not in the paper or the quickstart. The benchmark authors chose the 214 alpha carbons of chain A.
+items:
+  atoms:
+    source: tutorial
+    where: The MDAnalysis quickstart prints a universe with 3341 atoms for these files.
+  frames:
+    source: tutorial
+    where: The MDAnalysis quickstart prints a trajectory length of 98 frames.
+  backbone_rmsd_last_frame:
+    source: computed
+    tool: MDAnalysis 2.10.0, rms.RMSD
+    where: >-
+      Not in the paper. The quickstart shows only the first five frames of this analysis. It also prints 6.853
+      angstrom for the first and last frames without a fit. The benchmark value uses a backbone fit.
+  rg_last_frame:
+    source: computed
+    tool: MDAnalysis 2.10.0
+    where: >-
+      Not in the paper. The quickstart prints the radius of gyration for frames 0 to 19 only. Its value for
+      frame 0, 16.669 angstrom, agrees with the benchmark run.
+  residues_chain_a:
+    source: computed
+    tool: Bio.PDB (Biopython 1.88)
+    where: Not in the paper. The benchmark authors counted the residues of chain A of PDB entry 4AKE.
+  residues_chain_b:
+    source: computed
+    tool: Bio.PDB (Biopython 1.88)
+    where: Not in the paper. The benchmark authors counted the residues of chain B of PDB entry 4AKE.
+  ca_rmsd_open_closed:
+    source: computed
+    tool: Bio.PDB (Biopython 1.88), Superimposer
+    where: Not in the paper or the quickstart. The value is the RMSD after a fit of 4AKE chain A on 1AKE chain A.
+data:
+  source: MDAnalysis test data (adk.psf, adk_dims.dcd) and PDB entries 4AKE and 1AKE
+  url: https://github.com/MDAnalysis/mdanalysis/tree/develop/testsuite/MDAnalysisTests/data
+  license: >-
+    The MDAnalysisTests package has the GNU General Public License (GPL), version 2 or later. PDB entries are
+    public domain (CC0).
+  size: 5.5 MB, 3341 atoms and 98 frames, plus two crystal structures with 214 residues in each chain

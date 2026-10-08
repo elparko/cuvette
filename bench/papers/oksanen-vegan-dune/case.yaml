@@ -1,0 +1,125 @@
+kind: tool tutorial or test suite
+short: Oksanen 2026
+field: Ecology
+program: vegan (R), through the vegan adapter
+citation:
+  authors: Oksanen J, Simpson GL, Blanchet FG, Kindt R, Legendre P, Minchin PR, O'Hara RB, Solymos P, Stevens MHH, Szoecs E, Wagner H, et al.
+  title: "vegan: Community Ecology Package, version 2.7-6"
+  venue: R package on CRAN
+  year: 2026
+  doi: 10.32614/CRAN.package.vegan
+related:
+  - text: >-
+      Oksanen J. Vegan: an introduction to ordination. Package vignette, vegan 2.7-6. Source of the NMDS
+      stress value.
+    url: https://cran.r-project.org/web/packages/vegan/vignettes/intro-vegan.pdf
+measured: >-
+  The dune data come from 20 Dutch dune meadow sites, first published by Jongman, ter Braak and van Tongeren
+  in 1987. Each site has cover classes for 30 plant species and a management type. The vegan vignettes and help pages use these data to show diversity
+  indices, non-metric multidimensional scaling (NMDS) and group tests. A permutational multivariate analysis
+  of variance (PERMANOVA) asks if the community differs between management types. A dispersion test asks
+  if that difference is only a difference in spread.
+instruction: >-
+  I surveyed plants at 20 dune meadow sites under four types of management. Does the plant community differ
+  between the management types? Is that a difference in composition and not only in spread? Give me the
+  Shannon diversity of site 1, the PERMANOVA R2, F and p for management, and the p of the dispersion test.
+  Draw an NMDS map and tell me the stress.
+instruction_basis: >-
+  The vignette sections on diversity and on NMDS, and the help pages of adonis2 and betadisper. The help page
+  example for adonis2 uses the dune data with Management as a term.
+answers:
+  question:
+    decision: Research question
+    value: Does the plant community differ between the four management types?
+    source: The help page example for adonis2 tests the dune community against Management.
+  replicate:
+    decision: Unit of replication
+    value: the site, one row for each of the 20 sites
+    source: The dune table has one row for each site. The help pages treat each site as one sample.
+  distance:
+    decision: Dissimilarity measure
+    value: Bray-Curtis
+    source: The NMDS output in the introduction vignette and the adonis2 default both use Bray-Curtis.
+  transform:
+    decision: Transformation of the species table
+    value: none
+    source: >-
+      Not stated as a choice. The values are cover classes below 50, so the automatic transformation of
+      metaMDS does nothing.
+  diversity_index:
+    decision: Diversity index
+    value: Shannon
+    source: Diversity vignette. Shannon is the default index of the diversity function.
+  shannon_base:
+    decision: Base of the logarithm for Shannon
+    value: e (natural logarithm)
+    source: Diversity vignette. The default is the natural logarithm.
+  permanova_terms:
+    decision: Terms in the PERMANOVA model
+    value: Management
+    source: >-
+      Help page of adonis2. The example uses Management and the A1 soil horizon. The benchmark keeps
+      Management only.
+  permanova_by:
+    decision: How PERMANOVA tests the terms
+    value: each term in sequence
+    source: Help page of adonis2. The argument by = "terms" tests the terms in order. With one term, it gives the same result as an overall test.
+  dispersion_variable:
+    decision: Grouping for the dispersion test
+    value: Management
+    source: Not in a dune example. The help page of betadisper uses another dataset. The benchmark tests the same grouping as PERMANOVA.
+  nmds_k:
+    decision: NMDS dimensions
+    value: 2
+    source: Introduction vignette, section 1.2. The NMDS output shows two dimensions.
+  nmds_trymax:
+    decision: Maximum number of NMDS random starts
+    value: 20
+    source: Introduction vignette, section 1.2. The output reports 20 tries.
+  permutations:
+    decision: Number of permutations
+    value: 999
+    source: Help page of adonis2. The default is 999 permutations.
+  seed:
+    decision: Random seed
+    value: 1
+    source: Not in the vignette. The benchmark fixes the seed so that a permutation p-value can be repeated.
+  strata:
+    decision: Restrict permutations within groups
+    value: none
+    source: The adonis2 example uses no strata.
+  exclusions:
+    decision: Sites or species to remove
+    value: none
+    source: Not in the vignette. The examples use all 20 sites and 30 species.
+items:
+  shannon_site1:
+    source: computed
+    tool: vegan 2.7.6
+    where: Not printed in the vignettes for the dune data. The benchmark authors ran diversity on the dune table.
+  nmds_stress:
+    source: tutorial
+    where: Introduction vignette, section 1.2. The metaMDS output for the dune data shows a stress of 0.1183186.
+  permanova_r2:
+    source: computed
+    tool: vegan 2.7.6 adonis2
+    where: Not in the help page. The help example uses another model, Management with A1 and their interaction.
+  permanova_f:
+    source: computed
+    tool: vegan 2.7.6 adonis2
+    where: Not in the help page. The help example uses another model. The F value does not depend on the seed.
+  permanova_p:
+    source: computed
+    tool: vegan 2.7.6 adonis2, 999 permutations
+    where: >-
+      Not in the help page. The p-value changes in the third decimal with the seed. Seeds 1 and 42 give 0.002
+      and 0.003.
+  dispersion_f:
+    source: computed
+    tool: vegan 2.7.6 betadisper and permutest
+    where: Not in the vignettes or help pages for the dune data. The test is not significant (p above 0.1).
+data:
+  source: Datasets dune and dune.env in the R package vegan, written to CSV by the benchmark fetch script
+  url: https://CRAN.R-project.org/package=vegan
+  license: GPL-2 (package license). A field survey of meadow plants, with no personal data.
+  size: Two CSV files, 1.6 KB and 0.7 KB. 20 sites by 30 species, and 20 sites by 5 site variables.

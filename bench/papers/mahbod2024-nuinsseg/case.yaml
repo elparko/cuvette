@@ -1,0 +1,86 @@
+kind: research paper
+short: Mahbod 2024
+field: Imaging
+program: scikit-image (Python), through the scikit-image adapter
+citation:
+  authors: Mahbod A, Polak C, Feldmann K, Khan R, Gelles K, Dorffner G, Woitek R, Hatamikia S, Ellinger I
+  title: "NuInsSeg: A fully annotated dataset for nuclei instance segmentation in H&E-stained histological images"
+  venue: Scientific Data 11:295
+  year: 2024
+  doi: 10.1038/s41597-024-03117-2
+related:
+  - text: Mahbod A et al. NuInsSeg dataset, Zenodo record 10518968. Source of the images and the hand-drawn masks.
+    doi: 10.5281/zenodo.10518968
+measured: >-
+  The paper releases 665 image patches of hematoxylin and eosin (H&E) stained tissue from 31 human and mouse
+  organs. The authors outlined every nucleus by hand in ImageJ. They also marked vague areas where a precise
+  outline is not possible. The paper trains six U-Net models with five-fold cross-validation. It reports the
+  Dice score, the aggregated Jaccard index and the panoptic quality as baselines for other methods.
+instruction: >-
+  Here are H&E patches from many organs, with hand-drawn nucleus masks for each patch. Outline the nuclei
+  automatically in all the organ folders. Tell me how close the automatic outlines are to the hand-drawn ones.
+instruction_basis: >-
+  The Technical Validation section of the paper. The paper compares automatic nucleus segmentation with the
+  hand-drawn masks. The benchmark asks for a classical threshold method, not a U-Net.
+answers:
+  stain_channel:
+    decision: Image channel for the nuclei
+    value: the hematoxylin channel after color deconvolution
+    source: >-
+      Not in the paper. The paper trains its models on the RGB images. Hematoxylin stains the nuclei, so the
+      benchmark uses that channel.
+  object_polarity:
+    decision: Are the objects bright or dark in the channel
+    value: bright
+    source: Not in the paper. Nuclei have high values in the hematoxylin channel after color deconvolution.
+  threshold_method:
+    decision: Threshold method
+    value: Otsu
+    source: Not in the paper. The paper uses deep learning. The benchmark uses a global Otsu threshold as a simple baseline.
+  min_object_size:
+    decision: Smallest object to keep
+    value: 30 pixels
+    source: Not in the paper. The paper states no size range. The benchmark removes objects under 30 pixels.
+  exclude_border_objects:
+    decision: Remove objects that touch the image edge
+    value: false
+    source: Not in the paper. The benchmark keeps the objects at the patch edge.
+  split_touching:
+    decision: Split touching nuclei
+    value: false
+    source: Not in the paper for a threshold method. The benchmark baseline does no declumping.
+  pixel_size:
+    decision: Pixel size
+    value: not set (results in pixels)
+    source: >-
+      Not in the paper text. The paper names a 40x objective with numerical aperture 0.75 but gives no
+      micrometers per pixel.
+  replication_unit:
+    decision: Unit of replication
+    value: the image patch
+    source: Technical Validation section. The paper splits the patches into five folds of 133 images each.
+items:
+  mean_dice_otsu:
+    source: computed
+    tool: scikit-image 0.26.0
+    where: >-
+      Not in the paper. The paper reports Dice only for U-Net models (0.766 to 0.814 in Table 3). The benchmark
+      authors scored a plain Otsu threshold on the hematoxylin channel over all 665 patches.
+  image_patches:
+    source: published
+    where: >-
+      Methods, field of view and patch selection, and Table 2. The paper gives 665 patches. The released files
+      match this count in every organ folder.
+  nuclei_label_masks:
+    source: computed
+    tool: Python count of unique non-zero labels in the released label masks
+    where: >-
+      Not in the paper. Table 2 gives 30,698 nuclei, but the released masks hold 35,138 labels. The benchmark
+      authors did not find the cause.
+data:
+  source: NuInsSeg dataset on Zenodo (record 10518968)
+  url: https://zenodo.org/records/10518968
+  license: CC BY 4.0 (Zenodo record). Human and mouse tissue patches with no patient identifiers.
+  size: >-
+    1.63 GB zip. The benchmark keeps 1.6 GB of images and masks: 665 RGB patches of 512 x 512 pixels, 31 organ
+    folders.

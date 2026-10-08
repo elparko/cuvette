@@ -1,0 +1,111 @@
+kind: research paper
+short: Ljosa 2012
+field: Imaging
+program: CellProfiler (headless), through the cellprofiler adapter
+citation:
+  authors: Ljosa V, Sokolnicki KL, Carpenter AE
+  title: Annotated high-throughput microscopy image sets for validation
+  venue: Nature Methods 9(7):637
+  year: 2012
+  doi: 10.1038/nmeth.2083
+related:
+  - text: "Bray MA, Fraser AN, Hasaka TP, Carpenter AE. Workflow and metrics for image quality control in large-scale high-content screens. Journal of Biomolecular Screening 17(2):266-274 (2012). Source of the published CellProfiler counts."
+    doi: 10.1177/1087057111420292
+  - text: "Broad Bioimage Benchmark Collection (BBBC), image set BBBC005."
+    url: https://bbbc.broadinstitute.org/BBBC005
+measured: >-
+  The paper describes the Broad Bioimage Benchmark Collection (BBBC), a public set of microscopy images with
+  known answers. Methods can be tested against these answers. Image set BBBC005 holds synthetic cell images
+  with a known cell count and a known level of focus blur. Bray and colleagues counted the nuclei in these
+  images with CellProfiler and published the counts. The benchmark compares a new count on 100 in-focus images
+  with the true counts and with those published counts.
+instruction: >-
+  I want to know how image blur changes the accuracy of automatic nucleus counting on the BBBC005 synthetic set.
+  Start with the in-focus nuclei images. The true count is the C value in each file name. Use every sixth file
+  of the sorted list, 100 images in all. Count the nuclei. Give me the ratio of detected to true counts, the
+  mean absolute count error and the R squared.
+instruction_basis: >-
+  The BBBC005 page gives the true count in each file name and the published counts of Bray and colleagues. The
+  100-image sample and the choice of the in-focus images come from the benchmark authors.
+answers:
+  question:
+    decision: Question for the images
+    value: how blur changes the accuracy of automatic nucleus counting, compared with the true counts in the file names
+    source: The request of the benchmark. The BBBC005 page gives blur levels and true counts for this type of test.
+  replicate:
+    decision: Unit of replication
+    value: one image (one field)
+    source: Not in the paper or on the BBBC005 page. Each image is a separate synthetic field.
+  pixel_size:
+    decision: Pixel size
+    value: uncalibrated
+    source: The images are synthetic. The BBBC005 page gives no scale.
+  diameter_min:
+    decision: Smallest typical nucleus diameter
+    value: 15 pixels
+    source: >-
+      Not in the paper or on the BBBC005 page. The benchmark authors chose it. The nuclei in these images are
+      about 31 pixels across.
+  diameter_max:
+    decision: Largest typical nucleus diameter
+    value: 60 pixels
+    source: Not in the paper or on the BBBC005 page. The benchmark authors chose it.
+  threshold_strategy:
+    decision: Threshold strategy
+    value: global
+    source: Not in the paper or on the BBBC005 page. The benchmark authors chose it.
+  threshold_method:
+    decision: Threshold method
+    value: Otsu
+    source: Not in the paper or on the BBBC005 page. The benchmark authors chose it.
+  declump_method:
+    decision: Method to separate clumped nuclei
+    value: shape
+    source: >-
+      Not in the paper or on the BBBC005 page. The benchmark authors chose it. Without declumping, touching
+      nuclei merge and the count falls.
+  discard_border:
+    decision: Discard nuclei that touch the image border
+    value: "no"
+    source: Not in the paper or on the BBBC005 page. The benchmark authors chose to keep these nuclei.
+  discard_outside:
+    decision: Discard objects outside the diameter range
+    value: "no"
+    source: >-
+      Not in the paper or on the BBBC005 page. Merged clumps are larger than one nucleus. If the run discards
+      them, the count falls.
+  threshold_correction:
+    decision: Threshold correction factor
+    value: 1.0, no correction
+    source: Not in the paper or on the BBBC005 page. The benchmark uses no correction.
+  stain_pattern:
+    decision: Image files that show the nuclei
+    value: files that end in _w1.TIF
+    source: >-
+      The BBBC005 page calls w1 the cell body stain and w2 the nuclei stain. In the images, w1 shows small round
+      nuclei and w2 shows large touching cell bodies. The benchmark authors chose w1. A person must confirm this
+      choice.
+items:
+  ratio_sample:
+    source: computed
+    tool: pandas, on the published CellProfiler counts in BBBC005_results_bray.csv
+    where: >-
+      Not in the paper or on the BBBC005 page. The benchmark authors took the published counts for the same 100
+      images and divided the detected total by the true total. The published counts come from the w2 files.
+  mean_abs_error_sample:
+    source: computed
+    tool: pandas, on the published CellProfiler counts in BBBC005_results_bray.csv
+    where: >-
+      Not in the paper or on the BBBC005 page. The benchmark authors computed the mean absolute error of the
+      published counts for the same 100 images.
+  true_total_sample:
+    source: computed
+    tool: Python, from the C values in the file names
+    where: Not in the paper. The value is the sum of the true counts in the names of the 100 sampled files.
+data:
+  source: Broad Bioimage Benchmark Collection, image set BBBC005 version 1, made with the SIMCEP simulator
+  url: https://bbbc.broadinstitute.org/BBBC005
+  license: CC0 1.0 public domain dedication, as the BBBC005 page states. The images are synthetic.
+  size: >-
+    1.88 GB image archive with 19,200 images of 696 by 520 pixels, plus a 2.4 MB results file with 9,600 rows.
+    The benchmark uses 100 of the 600 in-focus w1 images.

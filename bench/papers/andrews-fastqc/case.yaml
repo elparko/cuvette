@@ -1,0 +1,72 @@
+kind: tool tutorial or test suite
+short: Andrews 2010
+field: Genomics and transcriptomics
+program: FastQC (Java command line), through the fastqc adapter
+citation:
+  authors: Andrews S
+  title: "FastQC: a quality control tool for high throughput sequence data"
+  venue: Babraham Bioinformatics, software documentation
+  year: 2010
+  url: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/
+related:
+  - text: "FastQC example report for the bad example file. The source of the numbers for that file."
+    url: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/bad_sequence_fastqc.html
+  - text: "FastQC example report for the good example file. The source of the numbers for that file."
+    url: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/good_sequence_short_fastqc.html
+measured: >-
+  FastQC checks raw reads from a high-throughput sequencing run before any analysis. It runs 11 modules, and
+  each module gives PASS, WARNING or FAIL. The project page gives two example files from an Illumina run, a
+  good one and a bad one, with the report for each. The reports show what a clean file and a problem file look
+  like. FastQC has no journal paper, so the example reports are the reference.
+instruction: >-
+  Here are two sequencing read files. Check their quality and tell me if either has a problem. How many reads
+  does each file have, and what is the read length? Which file would you not trust, and why?
+instruction_basis: >-
+  The example reports on the FastQC project page. Each report is the FastQC output for one of the two example
+  files.
+answers:
+  encoding:
+    decision: Quality score encoding
+    value: Phred+64 (Illumina 1.5)
+    source: >-
+      Both example reports give the encoding as Illumina 1.5. That encoding uses Phred quality scores with an
+      offset of 64. FastQC finds the encoding from the file.
+  action_on_fail:
+    decision: What to do with a module that fails
+    value: decide later
+    source: >-
+      Not in the documentation. FastQC only reports. Trimming or exclusion of reads is a separate decision for
+      the scientist.
+items:
+  good_total_sequences:
+    source: tutorial
+    where: Example report for the good file, Basic Statistics table. It gives 250000 sequences.
+  bad_total_sequences:
+    source: tutorial
+    where: Example report for the bad file, Basic Statistics table. It gives 395288 sequences.
+  sequence_length:
+    source: tutorial
+    where: Basic Statistics table of both example reports. Both give a length of 40.
+  good_gc_percent:
+    source: tutorial
+    where: Example report for the good file, Basic Statistics table. It gives a GC content of 45%.
+  bad_gc_percent:
+    source: tutorial
+    where: Example report for the bad file, Basic Statistics table. It gives a GC content of 47%.
+  good_modules_not_pass:
+    source: tutorial
+    where: Summary of the example report for the good file. All 11 modules give PASS.
+  bad_modules_warning:
+    source: tutorial
+    where: >-
+      Summary of the example report for the bad file. Four modules give WARNING: per base sequence content,
+      per sequence GC content, sequence duplication levels and overrepresented sequences. Two modules give FAIL.
+data:
+  source: FastQC project page, the two example read files
+  url: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/
+  license: >-
+    FastQC is GPL v3 or later (GNU General Public License). The page states no license for the example files.
+    The page states no human identifiers.
+  size: >-
+    102.7 MB in two FASTQ files with a .txt extension: 39.5 MB with 250,000 reads and 63.2 MB with 395,288
+    reads.

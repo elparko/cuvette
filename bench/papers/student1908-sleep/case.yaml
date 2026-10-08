@@ -1,0 +1,97 @@
+kind: research paper
+short: Student 1908
+field: Statistics
+program: SciPy (Python), through the biostats adapter
+citation:
+  authors: Student (William Sealy Gosset)
+  title: The probable error of a mean
+  venue: Biometrika 6(1):1-25
+  year: 1908
+  doi: 10.2307/2331554
+related:
+  - text: "Cushny AR, Peebles AR. The action of optical isomers II: hyoscines. Journal of Physiology 32:501-510 (1905). Source of the sleep data."
+    doi: 10.1113/jphysiol.1905.sp001097
+measured: >-
+  Ten patients each took two forms of the drug hyoscyamine on different nights. The table gives the hours of
+  sleep that each drug added, for each patient. Student used these data to show his method for a small sample.
+  He took the difference between the two drugs for each patient and asked if the mean difference is greater
+  than zero. The paired difference removes the variation between patients, so the test is much more sensitive
+  than a comparison of the two groups as independent samples.
+instruction: >-
+  Ten patients each took both sleeping drugs. For each patient, compare the extra sleep on drug 2 with the
+  extra sleep on drug 1. Is drug 2 better? Give me the mean difference, a 95% confidence interval and a
+  two-sided p-value.
+instruction_basis: >-
+  Illustration I of the paper. Student subtracts the result of drug 1 from the result of drug 2 for each
+  patient and tests the mean of these differences.
+answers:
+  replicate:
+    decision: Unit of replication
+    value: one value for each patient
+    source: Illustration I. Each of the ten patients gives one result for each drug.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: >-
+      Not in the paper. Student gives odds, not a fixed level. The benchmark uses the usual 0.05.
+  paired:
+    decision: Paired or unpaired test
+    value: true
+    source: >-
+      Illustration I. Student makes a new series of differences, drug 2 minus drug 1, for each patient. He
+      notes that the same patient reacts in a similar way to both drugs.
+  two_group_test:
+    decision: Test family for two groups
+    value: t-test
+    source: Illustration I. Student uses his own distribution for the mean of a small sample. A rank test is not in the paper.
+  equal_variance:
+    decision: Equal variances for an unpaired test
+    value: false
+    source: >-
+      Not used. A paired test has one series of differences. The value only applies to an unpaired test.
+  alternative:
+    decision: Sidedness
+    value: two-sided
+    source: >-
+      The modern convention. Student gives the probability that drug 2 is better, which is one direction.
+items:
+  mean_difference:
+    source: published
+    where: Illustration I, the table of the ten patients. The mean of the differences is +1.58 hours.
+  paired_t:
+    source: computed
+    tool: SciPy 1.x ttest_rel
+    where: >-
+      Not in this form in the paper. Student gives the mean as 1.35 times the standard deviation, with n as
+      the divisor. The modern t statistic uses n - 1.
+  degrees_of_freedom:
+    source: computed
+    tool: SciPy 1.x ttest_rel
+    where: Not in the paper. Student indexes his table by the number of experiments (10).
+  paired_p:
+    source: computed
+    tool: SciPy 1.x ttest_rel
+    where: >-
+      Not in the paper. Student gives a probability of 0.9985 (odds of about 666 to 1) that drug 2 is better,
+      from his own table.
+  ci_lower:
+    source: computed
+    tool: SciPy 1.x
+    where: Not in the paper. Student does not give a confidence interval.
+  ci_upper:
+    source: computed
+    tool: SciPy 1.x
+    where: Not in the paper. Student does not give a confidence interval.
+  welch_p_trap:
+    source: computed
+    tool: SciPy 1.x ttest_ind with equal_var=False
+    where: >-
+      Not in the paper. This is the result of the wrong test: an unpaired test on paired data. The run must
+      not report it as the result.
+data:
+  source: R dataset sleep, from the Rdatasets collection
+  url: https://vincentarelbundock.github.io/Rdatasets/csv/datasets/sleep.csv
+  license: >-
+    The 1905 measurements are historic published data. The Rdatasets collection is GPL-3. The file has no
+    patient identifiers.
+  size: 238 bytes, 20 rows

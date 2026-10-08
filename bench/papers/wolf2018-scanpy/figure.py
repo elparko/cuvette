@@ -26,6 +26,7 @@ class Ctx:
         self.expected = expected
         self.results = []
         self.calls = {}
+        self.cmp_dirs = set()
         log = self.session / "log.jsonl"
         if log.exists():
             for line in log.read_text(errors="replace").splitlines():
@@ -36,7 +37,9 @@ class Ctx:
                 d = e.get("data") or {}
                 if e.get("kind") == "tool_call":
                     self.calls[d.get("callId")] = d.get("args") or {}
-                if e.get("kind") == "tool_result":
+                if e.get("kind") == "node" and d.get("sensitivityOf"):
+                    self.cmp_dirs |= {str(Path(o.get("path", "")).parent) for o in d.get("outputs") or []}
+                if e.get("kind") == "tool_result" and not d.get("sensitivityOf"):
                     r = dict(d)
                     r["entry"] = e.get("id")
                     r["args"] = self.calls.get(d.get("callId"), {})
@@ -55,7 +58,7 @@ class Ctx:
         if base.exists():
             for d in base.iterdir():
                 m = re.fullmatch(re.escape(tool) + r"-(\d+)", d.name)
-                if m and d.is_dir():
+                if m and d.is_dir() and str(d) not in self.cmp_dirs:
                     dirs.append((int(m.group(1)), d))
         found = []
         for _, d in sorted(dirs, reverse=True):

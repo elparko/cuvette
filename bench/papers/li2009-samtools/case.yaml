@@ -1,0 +1,87 @@
+kind: tool tutorial or test suite
+short: Li 2009
+field: Genomics and transcriptomics
+program: samtools (command line), through the samtools adapter
+citation:
+  authors: Li H, Handsaker B, Wysoker A, Fennell T, Ruan J, Homer N, Marth G, Abecasis G, Durbin R, 1000 Genome Project Data Processing Subgroup
+  title: The Sequence Alignment/Map format and SAMtools
+  venue: Bioinformatics 25(16):2078-2079
+  year: 2009
+  doi: 10.1093/bioinformatics/btp352
+related:
+  - text: "samtools examples folder. Its README gives the example commands for ex1.fa and ex1.sam.gz."
+    url: https://github.com/samtools/samtools/tree/develop/examples
+measured: >-
+  The paper defines the Sequence Alignment/Map (SAM) format and its binary form (BAM). It also describes
+  SAMtools, the programs that sort, index and view these files. It is a two-page note with no result for the
+  example data. The samtools repository gives a small example of paired reads on two short reference
+  sequences. The benchmark asks for the standard first summaries of an alignment file and a count in a region.
+instruction: >-
+  I have a small set of aligned sequencing reads and the reference they were aligned to. How many reads mapped,
+  and how many are properly paired? Sort and index my alignments so I can open them in a viewer. How many reads
+  fall on the second reference sequence between positions 100 and 200?
+instruction_basis: >-
+  The README of the samtools examples folder indexes the reference, converts the headerless SAM file to BAM,
+  indexes it and views a region. The benchmark adds the sort step, the read counts and the region from 100 to
+  200 on seq2.
+answers:
+  reference:
+    decision: Reference sequence file
+    value: ex1.fa, the reference of the example
+    source: >-
+      The README converts the SAM file with the reference index, because the SAM file has no header. Without
+      the reference, the conversion fails.
+  min_mapq:
+    decision: Smallest mapping quality to count
+    value: 0, no filter
+    source: Not in the paper or the README. The benchmark counts all reads, as flagstat does.
+  exclude_flags:
+    decision: Flags to leave out of a count
+    value: none
+    source: Not in the paper or the README. The benchmark uses the program default.
+  require_flags:
+    decision: Flags that a counted read must have
+    value: none
+    source: Not in the paper or the README. The benchmark uses the program default.
+items:
+  total_reads:
+    source: computed
+    tool: samtools 1.24 through pysam 0.24.1, flagstat
+    where: Not in the paper or the README. The paper has no results for this data.
+  mapped_reads:
+    source: computed
+    tool: samtools 1.24 through pysam 0.24.1, flagstat
+    where: Not in the paper or the README. The value is 98.91 percent of all reads.
+  properly_paired:
+    source: computed
+    tool: samtools 1.24 through pysam 0.24.1, flagstat
+    where: Not in the paper or the README. The value is 95.07 percent of all reads.
+  singletons:
+    source: computed
+    tool: samtools 1.24 through pysam 0.24.1, flagstat
+    where: Not in the paper or the README. A singleton is a mapped read with an unmapped mate.
+  reads_seq1:
+    source: computed
+    tool: samtools 1.24 through pysam 0.24.1, idxstats
+    where: Not in the paper or the README. The request does not ask for this count.
+  reads_seq2:
+    source: computed
+    tool: samtools 1.24 through pysam 0.24.1, idxstats
+    where: Not in the paper or the README. The request does not ask for this count.
+  mapq_ge_30:
+    source: computed
+    tool: samtools 1.24 through pysam 0.24.1, view -c -q 30
+    where: Not in the paper or the README. The request does not ask for a mapping quality filter.
+  reads_seq2_100_200:
+    source: computed
+    tool: samtools 1.24 through pysam 0.24.1, view -c
+    where: >-
+      Not in the paper or the README. The README views a different region, seq2 from 450 to 550, and prints no
+      count.
+data:
+  source: samtools repository, examples folder (ex1.fa and ex1.sam.gz)
+  url: https://github.com/samtools/samtools/tree/develop/examples
+  license: >-
+    samtools has the MIT/Expat license, and the example files come with it. The reads are public alignments of
+    the HapMap sample NA18507 on two short pieces of human build 36. They have no personal identifiers.
+  size: 118 KB, 3307 paired reads of 36 bases on two reference sequences of 1575 and 1584 bases

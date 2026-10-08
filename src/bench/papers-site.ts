@@ -74,7 +74,7 @@ function question(paper: Paper | undefined, dir: string): string {
   return short(raw.replace(/\s+/g, " ").trim(), 420);
 }
 
-function figureFor(run: PaperRun, paperDir: string, imgDir: string, python: string, log: (s: string) => void): string | undefined {
+export function figureFor(run: PaperRun, paperDir: string, imgDir: string, python: string, log: (s: string) => void): string | undefined {
   const key = createHash("sha1").update(run.dir ?? run.session ?? `${run.paper}${run.model}${run.run}`).digest("hex").slice(0, 8);
   const name = `${run.paper}-${slug(run.model)}-run${run.run}-${key}.png`;
   const out = join(imgDir, name);

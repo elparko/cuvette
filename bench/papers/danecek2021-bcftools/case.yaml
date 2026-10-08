@@ -1,0 +1,96 @@
+kind: tool tutorial or test suite
+short: Danecek 2021
+field: Genomics and transcriptomics
+program: bcftools (command line), through the bcftools adapter
+citation:
+  authors: Danecek P, Bonfield JK, Liddle J, Marshall J, Ohan V, Pollard MO, Whitwham A, Keane T, McCarthy SA, Davies RM, Li H
+  title: Twelve years of SAMtools and BCFtools
+  venue: GigaScience 10(2):giab008
+  year: 2021
+  doi: 10.1093/gigascience/giab008
+related:
+  - text: "1000 Genomes Project high-coverage phased panel of 3202 samples on GRCh38. Source of the variant data."
+    url: https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/
+measured: >-
+  The paper describes the history and the features of SAMtools and BCFtools. It gives no numeric result for
+  a specific data set. The benchmark uses bcftools on a 100 kilobase (kb) slice of chromosome 20 from the 1000
+  Genomes high-coverage panel. It asks for the usual first checks on a variant file. These checks are the
+  counts of single-nucleotide variants (SNVs) and indels, the transition to transversion (Ts/Tv) ratio, a count
+  in a region, and a filter on allele frequency. The Ts/Tv ratio is a common quality check of SNV calls.
+instruction: >-
+  Here is a list of human variants from a 100 kb stretch of chromosome 20, on genome build GRCh38. How many
+  are single-base changes and how many are insertions or deletions? What is the transition to transversion
+  ratio of the single-base changes? How many variants lie between positions 1,000,000 and 1,050,000? Keep
+  only the variants with an allele frequency of 5 percent or more. How many are left?
+instruction_basis: >-
+  The paper lists the bcftools commands for statistics, region queries and filter expressions. It has no worked
+  example with numbers. The benchmark authors wrote these three questions.
+answers:
+  reference:
+    decision: Reference genome build
+    value: GRCh38
+    source: The 1000 Genomes high-coverage panel uses GRCh38. The contig names have the chr prefix.
+  regions:
+    decision: Regions to include
+    value: the whole file; the second question gives its own region
+    source: >-
+      Not in the paper. The request names the region chr20 from 1,000,000 to 1,050,000 for question 2 only.
+  min_qual:
+    decision: Smallest variant quality (QUAL)
+    value: 0, no filter
+    source: Not in the paper. The panel has no QUAL values, so a quality filter cannot apply.
+  min_depth:
+    decision: Smallest read depth (INFO/DP)
+    value: 0, no filter
+    source: Not in the paper. The panel has no INFO/DP field, so a depth filter cannot apply.
+  variant_types:
+    decision: Variant types to keep
+    value: all types
+    source: Not in the paper. The request asks for counts of each type, so the benchmark keeps all of them.
+  filter_status:
+    decision: Use of the FILTER column
+    value: any value is kept
+    source: Not in the paper. The benchmark uses the program default.
+  normalize:
+    decision: Normalize the variants
+    value: "no"
+    source: Not in the paper. The panel is already biallelic. The counts do not need this step.
+  split_multiallelic:
+    decision: Split multiallelic sites
+    value: "no"
+    source: Not in the paper. The slice has no multiallelic sites.
+items:
+  snp_records:
+    source: computed
+    tool: bcftools 1.24 (htslib 1.24), bcftools stats
+    where: Not in the paper. The paper has no results for this data.
+  indel_records:
+    source: computed
+    tool: bcftools 1.24 (htslib 1.24), bcftools stats
+    where: Not in the paper. The paper has no results for this data.
+  total_records:
+    source: computed
+    tool: bcftools 1.24 (htslib 1.24), bcftools stats
+    where: >-
+      Not in the paper. The total of 2210 records includes 7 structural variants that are neither SNVs nor
+      indels.
+  ts_tv_ratio:
+    source: computed
+    tool: bcftools 1.24 (htslib 1.24), bcftools stats
+    where: Not in the paper. The count is 1344 transitions and 611 transversions.
+  records_in_region:
+    source: computed
+    tool: bcftools 1.24 (htslib 1.24), bcftools stats -r
+    where: >-
+      Not in the paper. The region must use the contig name chr20. A region written as 20 gives no records.
+  records_af_5pct:
+    source: computed
+    tool: bcftools 1.24 (htslib 1.24), bcftools view -i
+    where: Not in the paper. The filter expression is INFO/AF at or above 0.05.
+data:
+  source: 1000 Genomes Project, high-coverage phased panel (3202 samples), chromosome 20
+  url: https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/
+  license: >-
+    1000 Genomes data are open, with no limit on use. The benchmark keeps the sites only and removes all
+    genotypes. The file has no personal identifiers.
+  size: 223 KB, 2210 variant records (chr20 from 1,000,000 to 1,100,000)
