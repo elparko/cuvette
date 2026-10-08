@@ -1,0 +1,156 @@
+kind: research paper
+short: Andreasson 2019
+field: Statistics
+program: statsmodels and SciPy (Python), through the biostats adapter
+citation:
+  authors: Andreasson A, Karshikoff B, Lidberg L, Åkerstedt T, Ingvar M, Olgart Höglund C, Axelsson J, Lekander M
+  title: >-
+    The effect of a transient immune activation on subjective health perception in two placebo controlled
+    randomised experiments
+  venue: PLOS ONE 14(3):e0212313
+  year: 2019
+  doi: 10.1371/journal.pone.0212313
+related:
+  - text: "Data: Lekander M et al. Data from: The effect of a transient immune activation on subjective health perception. Dryad (2019), CC0. The benchmark downloads the copy on Zenodo, record 4987396."
+    doi: 10.5061/dryad.sh00j9s
+  - text: "ClinicalTrials.gov NCT03551080 and NCT03551184."
+measured: >-
+  Experiment 2 of the paper randomized 52 healthy adults to an intravenous injection of endotoxin
+  (lipopolysaccharide, LPS, 0.6 ng/kg, 31 subjects) or saline (21 subjects). The subjects rated their current
+  health on a 7-point scale before the injection, at 90 minutes and at 270 minutes, and their general health on
+  a 5-point scale at 90 minutes. The paper fits a mixed model of current health with condition, time and their
+  interaction, and compares general health between the groups with the Mann-Whitney test.
+instruction: >-
+  Did LPS make current health worse than placebo at 90 and at 270 minutes? Fit a model with condition, time and
+  their interaction, and give each coefficient. Is general health at 90 minutes worse after LPS than after
+  placebo? Give the p-value.
+instruction_basis: >-
+  The Statistical analysis section, Table 2 (row "Current health (Experiment 2)") and the first paragraph of
+  the Results. Experiment 1 (8 subjects, cross-over) and the path model are left out.
+answers:
+  replicate:
+    decision: Unit of replication
+    value: the subject, with up to 3 current health ratings each
+    source: >-
+      Statistical analysis section. "Repeated measures ... were analysed using a mixed effect regression
+      analysis." Each subject gives one general health rating.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: Statistical analysis section. "An α-level of 0.05 was set for all statistical tests."
+  model_formula:
+    decision: Model formula
+    value: current ~ C(lps) * C(time)
+    source: >-
+      Table 2. The model has condition, time 1.5 h against baseline, time at the end against baseline, and the
+      two interactions of condition and time. The intercept is the placebo group at baseline.
+  random_effects:
+    decision: Random effects of the mixed model
+    value: one random intercept for each subject
+    source: >-
+      Not stated in the paper. A random intercept for each subject reproduces every coefficient in Table 2.
+      Three time points are too few for a random slope.
+  reml:
+    decision: Fit by REML
+    value: false (ML)
+    source: >-
+      Not stated in the paper. The paper used Stata 15, whose mixed command fits by ML by default. ML and REML
+      give the same coefficients to three digits.
+  paired:
+    decision: Paired or unpaired test
+    value: false
+    source: Statistical analysis section. General health is compared between the LPS group (n = 28) and the placebo group (n = 20).
+  two_group_test:
+    decision: Test family for two groups
+    value: rank test (Mann-Whitney)
+    source: >-
+      Statistical analysis section. "Mann-Whitney rank sum test as general health was only assessed once in
+      Experiment 2." The rating is a 5-point ordinal scale.
+  equal_variance:
+    decision: Equal variances for an unpaired t-test
+    value: false
+    source: Not used. The rank test does not use this value.
+  alternative:
+    decision: Sidedness
+    value: two-sided
+    source: Not stated in the paper. Stata ranksum gives a two-sided p-value.
+items:
+  n_ratings:
+    source: computed
+    tool: statsmodels 0.15.0 MixedLM
+    where: >-
+      Not printed as a number. The Statistical analysis section lists 4 missing current health ratings in
+      Experiment 2. The data have 5 blank current health values (156 - 5 = 151).
+    independence: independent
+    check: R 4.6.1 lme4 2.0.6 uses 151 rows (check.R).
+  n_subjects:
+    source: published
+    where: Table 1 and Study protocol section. 52 subjects (31 LPS, 21 placebo).
+    check: R 4.6.1 lme4 2.0.6 gives 52 groups (check.R).
+  intercept:
+    source: published
+    where: Table 2, current health (Experiment 2), intercept. 6.24.
+    check: R 4.6.1 lme4 2.0.6 gives 6.23810 (check.R).
+  coef_lps:
+    source: published
+    where: Table 2, condition (LPS). 0.02.
+    check: R 4.6.1 lme4 2.0.6 gives 0.01997 (check.R).
+  coef_time2:
+    source: published
+    where: Table 2, time 1 (1.5 h against pre injection). -0.62.
+    check: R 4.6.1 lme4 2.0.6 gives -0.61905 (check.R).
+  coef_time3:
+    source: published
+    where: >-
+      Table 2, time 2. -0.22. Table 2 calls this time point 5 h for Experiment 2. Table 1 and the data file
+      give 270 minutes (4.5 h).
+    check: R 4.6.1 lme4 2.0.6 gives -0.21811 (check.R).
+  coef_lps_time2:
+    source: published
+    where: Abstract and Table 2, condition by time 1. -1.79.
+    check: R 4.6.1 lme4 2.0.6 gives -1.78570 (check.R).
+  coef_lps_time3:
+    source: published
+    where: Table 2, condition by time 2. -0.91.
+    check: R 4.6.1 lme4 2.0.6 gives -0.90554 (check.R).
+  se_lps_time2:
+    source: computed
+    tool: statsmodels 0.15.0 MixedLM, ML
+    where: >-
+      Not in the paper. Table 2 gives bootstrap confidence intervals (2000 repetitions), which a new run cannot
+      reproduce exactly. The model-based interval is -2.40 to -1.17. The paper prints -2.47 to -1.10.
+    independence: independent
+    check: R 4.6.1 lme4 2.0.6 with REML = FALSE gives 0.31568 (check.R).
+  se_lps_time2_ols_trap:
+    source: computed
+    tool: statsmodels 0.15.0 OLS
+    where: >-
+      Not in the paper. This is the result of a wrong method: a linear model that treats the 151 ratings as
+      independent. The run must not report it as the result.
+    independence: independent
+    check: R 4.6.1 lm gives 0.44565 (check.R).
+  mannwhitney_p:
+    source: published
+    where: Results, first paragraph. p = 0.004, Mann-Whitney U-test.
+    check: >-
+      R 4.6.1 wilcox.test gives 0.00416 with the normal approximation and continuity correction, 0.00402
+      without the correction (the Stata ranksum method) and 0.00383 with the exact method (check.R).
+  t_p_general_trap:
+    source: computed
+    tool: SciPy 1.18.1 ttest_ind with equal_var=False
+    where: >-
+      Not in the paper. This is the result of a wrong method: a t-test on a 5-point ordinal rating. The run
+      must not report it as the result.
+    independence: independent
+    check: R 4.6.1 t.test gives 0.00109 (check.R).
+data:
+  source: >-
+    Dryad dataset 10.5061/dryad.sh00j9s, copied on Zenodo record 4987396. fetch.sh converts the Experiment 2
+    sheet to CSV with short column names (endotoxin_exp2.csv, 156 rows). endotoxin_exp2_current.csv removes
+    the 5 rows with a blank current health value, because fit_mixed_model stops on a blank outcome.
+    endotoxin_exp2_general.csv keeps the 48 rows at 90 minutes with a general health value.
+  url: https://zenodo.org/records/4987396
+  license: >-
+    CC0 1.0 public domain dedication, from the Dryad and Zenodo records. The file has a study number and sex
+    for each subject, and no names. The paper is CC BY 4.0.
+  size: 17 KB Excel file with two sheets. The current health CSV has 151 rows, the general health CSV 48 rows.

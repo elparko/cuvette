@@ -1,0 +1,32 @@
+tool: statsmodels (MixedLM, ML), SciPy (mannwhitneyu)
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/andreasson2019-endotoxin-health/endotoxin_exp2_current.csv
+  - /Volumes/T7/guided-analysis/data/andreasson2019-endotoxin-health/endotoxin_exp2_general.csv
+decisions:
+  formula: "current ~ C(lps) * C(time)"
+  random_effects: "random intercept for each subject"
+  reml: false
+  general_health_test: "Mann-Whitney, two-sided"
+  alpha: 0.05
+  replication_unit: "subject (52 subjects, up to 3 ratings each)"
+expected:
+  - {description: "ratings in the model", value: 151, tolerance: 0, source: "paper: 156 ratings minus 5 missing"}
+  - {description: "subjects", value: 52, tolerance: 0, source: "paper Table 1"}
+  - {description: "intercept", value: 6.238, tolerance: 0.005, source: "paper Table 2: 6.24"}
+  - {description: "LPS", value: 0.020, tolerance: 0.005, source: "paper Table 2: 0.02"}
+  - {description: "time 90 minutes", value: -0.619, tolerance: 0.005, source: "paper Table 2: -0.62"}
+  - {description: "time 270 minutes", value: -0.218, tolerance: 0.005, source: "paper Table 2: -0.22"}
+  - {description: "LPS by 90 minutes", value: -1.786, tolerance: 0.005, source: "paper Table 2 and abstract: -1.79"}
+  - {description: "LPS by 270 minutes", value: -0.906, tolerance: 0.005, source: "paper Table 2: -0.91"}
+  - {description: "SE LPS by 90 minutes, ML", value: 0.3157, tolerance: 0.001, source: "computed"}
+  - {description: "SE LPS by 90 minutes, OLS (trap)", value: 0.4456, tolerance: 0.001, source: "computed"}
+  - {description: "Mann-Whitney p, general health", value: 0.00416, tolerance: 0.0005, source: "paper Results: p = 0.004"}
+  - {description: "Welch t-test p, general health (trap)", value: 0.00109, tolerance: 0.0002, source: "computed"}
+notes: |
+  The paper used Stata 15. Stata mixed fits by ML by default. ML and REML give the same coefficients to three digits. The standard errors differ (0.3157 ML, 0.3222 REML).
+  R 4.6.1 lme4 2.0.6 gives the same coefficients and ML standard errors (check.R, check.out).
+  The confidence intervals in Table 2 come from 2000 bootstrap repetitions. They are not items. The model-based interval for LPS by 90 minutes is -2.40 to -1.17. The paper prints -2.47 to -1.10.
+  The Mann-Whitney p depends on the method: 0.00416 (normal, continuity correction, SciPy), 0.00402 (normal, no correction, Stata ranksum), 0.00383 (exact with ties, R default). The tolerance accepts all three.
+  Trap: an OLS model that treats the 151 ratings as independent gives a standard error of 0.4456 for LPS by 90 minutes, not 0.3157.
+  Trap: a t-test on the 5-point general health rating gives p 0.00109. The paper uses the Mann-Whitney test because the scale is ordinal.

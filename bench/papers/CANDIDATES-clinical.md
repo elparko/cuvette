@@ -11,6 +11,7 @@ Checks used Python (lifelines 0.30.3, statsmodels 0.15.0, SciPy 1.18.1) and R 4.
 |---|---|---|---|---|
 | `kasurinen2018-mmp14-gastric` | Kasurinen A et al. High serum MMP-14 predicts worse survival in gastric cancer. PLOS ONE 2018. DOI 10.1371/journal.pone.0208800 | Dryad 10.5061/dryad.hb62394, CC0. Zenodo 4945997 | Kaplan-Meier, log-rank, Cox | All MMP-14 numbers in the abstract, Table 2 (adjusted) and Table 3 reproduce. |
 | `sriphoosanaphan2021-vitd-hcv` | Sriphoosanaphan S et al. Vitamin D after antiviral treatment of chronic hepatitis C, randomized trial. PeerJ 2021. DOI 10.7717/peerj.10709 | Dryad 10.5061/dryad.573n5tb4h, CC0. Zenodo 4404285 | Student t-test on the change from baseline | All numbers in Table 3 reproduce. |
+| `andreasson2019-endotoxin-health` | Andreasson A et al. The effect of a transient immune activation on subjective health perception in two placebo controlled randomised experiments. PLOS ONE 2019. DOI 10.1371/journal.pone.0212313 | Dryad 10.5061/dryad.sh00j9s, CC0. Zenodo 4987396 | Linear mixed model, Mann-Whitney | All six Experiment 2 coefficients for current health in Table 2 and the Mann-Whitney p reproduce. |
 
 Notes:
 - MMP-14: the raw column "Disease specific censor" is 1 for a censored patient. The event is 1 minus this value.
@@ -18,18 +19,9 @@ Notes:
 - Vitamin D: the readme does not name the arms. Group A is vitamin D. The group sizes, sex counts and means match Tables 2 and 3.
 - Vitamin D: the Welch test gives 26.5 for the 25(OH)D upper bound. The paper prints 26.4, so the paper used the Student test (the Stata default).
 - Vitamin D: Table 3 prints the ALT interval as -7.5 to 15. The computed upper bound is 1.57.
-
-## Checked, ready to build
-
-Andreasson A et al. The effect of a transient immune activation on subjective health perception in two placebo controlled randomised experiments. PLOS ONE 2019. DOI 10.1371/journal.pone.0212313.
-- Data: Dryad 10.5061/dryad.sh00j9s, CC0. Zenodo 4987396. One Excel file with one sheet for each experiment, in long format.
-- Experiment 2, current health (52 subjects, 3 time points): a mixed model `current ~ C(lps) * C(time)` with a random intercept for each subject reproduces all six coefficients in Table 2. Intercept 6.238, LPS 0.020, time 1.5 h -0.619, time 5 h -0.218, LPS by 1.5 h -1.786, LPS by 5 h -0.906. ML and REML give the same coefficients. R lme4 agrees.
-- The main effect of time at 1.5 h has p 0.010. The paper prints p = 0.01.
-- Table 2 gives bootstrap confidence intervals (2000 repetitions). The model-based interval for LPS by 1.5 h is -2.40 to -1.17. The paper prints -2.47 to -1.10. Use the coefficients as items. Give the intervals as reference items only.
-- Experiment 2, general health at 1.5 h: the Mann-Whitney test gives p 0.0042 (20 placebo, 28 LPS). The paper prints p = 0.004.
-- Experiment 1 (8 subjects, cross-over): the coefficients reproduce. The general health column is coded 1 = very good, opposite to its header. The paper reverses the scale, so its signs are opposite to the raw data.
-- The logistic regression in the paper cannot run in the adapter. The path model needs Mplus.
-- Preprocessing for fetch.sh: write one CSV for each experiment, and one CSV for each outcome without the blank rows, because `fit_mixed_model` fails on a blank outcome.
+- Endotoxin: Table 2 gives bootstrap confidence intervals (2000 repetitions). They are not items. The model-based interval for LPS by 90 minutes is -2.40 to -1.17. The paper prints -2.47 to -1.10.
+- Endotoxin: the Mann-Whitney p is 0.00416 (SciPy), 0.00402 (Stata ranksum method) or 0.00383 (R exact). All round to the printed 0.004.
+- Endotoxin: Experiment 1 (8 subjects, cross-over) also reproduces, but its general health column is coded opposite to its header. It is not in the benchmark. The logistic regression and the path model (Mplus) cannot run in the adapter.
 
 ## Rejected
 

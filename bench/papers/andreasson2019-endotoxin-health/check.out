@@ -1,0 +1,29 @@
+rows 151 subjects 52 
+ML 
+                               coef      se
+(Intercept)                 6.23810 0.23631
+factor(lps)1                0.01997 0.30606
+factor(time)2              -0.61905 0.24152
+factor(time)3              -0.21811 0.24549
+factor(lps)1:factor(time)2 -1.78570 0.31568
+factor(lps)1:factor(time)3 -0.90554 0.31872
+REML 
+                               coef      se
+(Intercept)                 6.23810 0.24110
+factor(lps)1                0.01997 0.31226
+factor(time)2              -0.61905 0.24652
+factor(time)3              -0.21809 0.25057
+factor(lps)1:factor(time)2 -1.78569 0.32222
+factor(lps)1:factor(time)3 -0.90558 0.32532
+OLS, rows as independent (wrong method)
+                           Estimate Std. Error
+(Intercept)                 6.23810    0.24163
+factor(lps)1                0.01997    0.31295
+factor(time)2              -0.61905    0.34172
+factor(time)3              -0.18810    0.34596
+factor(lps)1:factor(time)2 -1.77695    0.44565
+factor(lps)1:factor(time)3 -0.96652    0.44891
+general health at 90 minutes: placebo 20 LPS 28 
+Mann-Whitney p: normal with continuity correction 0.00416 (SciPy default), normal without correction 0.00402 (Stata ranksum), exact with ties 0.00383 (R default)
+Welch t-test p (wrong method for an ordinal scale) 0.00109
+lme4 2.0.6 
