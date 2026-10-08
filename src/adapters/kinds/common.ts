@@ -457,9 +457,9 @@ export function fmtNumber(n: number): string {
   return String(Number(n.toPrecision(6)));
 }
 
-export function makeSummary(entry: MapEntry | undefined, title: string, args: Args, extra: { metrics?: Record<string, number>; data?: unknown; table?: TablePreview }): string {
+export function makeSummary(entry: MapEntry | undefined, title: string, args: Args, extra: { metrics?: Record<string, number>; data?: unknown; table?: TablePreview; summary?: string }): string {
   if (entry?.summary) {
-    const scope = { ...args, metrics: extra.metrics ?? {}, data: extra.data, n_rows: extra.table?.n_rows };
+    const scope = { ...args, metrics: extra.metrics ?? {}, data: extra.data, n_rows: extra.table?.n_rows, summary: extra.summary };
     let missing = false;
     const text = entry.summary.replace(NAME, (all, name: string) => {
       const v = lookup(scope, name);
@@ -541,7 +541,7 @@ export function buildOutput(a: {
   if (metrics) out.metrics = metrics;
   if (table) out.table = table;
   if (outputs.size) out.outputs = [...outputs.values()];
-  out.summary = entry?.summary ? makeSummary(entry, a.def.title || a.def.name, a.args, { metrics, data: out.data, table }) : f.summary ?? makeSummary(entry, a.def.title || a.def.name, a.args, { metrics, data: out.data, table });
+  out.summary = entry?.summary ? makeSummary(entry, a.def.title || a.def.name, a.args, { metrics, data: out.data, table, summary: f.summary }) : f.summary ?? makeSummary(entry, a.def.title || a.def.name, a.args, { metrics, data: out.data, table });
   return out;
 }
 

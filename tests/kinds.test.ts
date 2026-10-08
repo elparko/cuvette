@@ -415,3 +415,10 @@ test.skipIf(!hasPandoc)("example pandoc-md: known answer", async () => {
   expect(r.manualRoute).toContain("--to=html5");
   expect(r.summary).toMatch(/to html5\.$/);
 });
+
+test("a map summary can include the tool's own summary", async () => {
+  const { makeSummary } = await import("../src/adapters/kinds/common.ts");
+  const entry = { summary: "{summary} Route checked." } as never;
+  expect(makeSummary(entry, "T", {}, { summary: "Fitted the model." })).toBe("Fitted the model. Route checked.");
+  expect(makeSummary(entry, "T", {}, { metrics: { n: 3 } })).toBe("T finished. n=3.");
+});
