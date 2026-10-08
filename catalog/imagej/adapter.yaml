@@ -853,9 +853,11 @@ tools:
       callDir = "{call_dir}" + File.separator;
       File.makeDirectory(callDir + "outlines");
       File.makeDirectory(callDir + "particles");
-      csv = "file,count,mean_area,median_area,total_area,area_fraction\n";
+      csv = "file,count,mean_area,median_area,total_area,area_fraction,raw_mean_intensity,saturated_fraction\n";
       counts = newArray(list.length);
       n = 0;
+      nSat = 0;
+      satNames = "";
       for (i = 0; i < list.length; i++) {
         name = list[i];
         if (endsWith(name, "/") || endsWith(name, "\\")) continue;
@@ -865,9 +867,12 @@ tools:
           print("warning=Skipped " + name);
           continue;
         }
+        getStatistics(rawArea, rawMean);
+        rawSat = saturatedFraction();
+        if (rawSat > 0.01) { nSat++; satNames = satNames + " " + name; }
         pipeline({rolling_radius}, {light_background}, {sigma}, "{method}", {dark_background}, {watershed});
         analyze({min_size}, {max_size}, {min_circularity}, {exclude_edges}, "None", callDir + "outlines" + File.separator + name + ".png", callDir + "particles" + File.separator + name + ".csv");
-        csv = csv + "\"" + name + "\"," + cCount + "," + d2s(cMean, 4) + "," + d2s(cMedian, 4) + "," + d2s(cTotal, 4) + "," + d2s(cFraction, 5) + "\n";
+        csv = csv + "\"" + name + "\"," + cCount + "," + d2s(cMean, 4) + "," + d2s(cMedian, 4) + "," + d2s(cTotal, 4) + "," + d2s(cFraction, 5) + "," + d2s(rawMean, 4) + "," + d2s(rawSat, 5) + "\n";
         counts[n] = cCount;
         n++;
         close("*");
@@ -883,6 +888,8 @@ tools:
       print("min_count=" + cmin);
       print("max_count=" + cmax);
       print("area_unit=" + cUnit);
+      print("n_saturated_images=" + nSat);
+      if (nSat > 0) print("warning=" + nSat + " image(s) have more than 1 percent of pixels at the maximum value:" + satNames + ". Intensity values from these images are not reliable.");
 
   - name: run_command
     title: Run any menu command

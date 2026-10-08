@@ -343,14 +343,17 @@ function uncalibratedUnits(ctx: AdapterCheckContext): FindingIn[] {
 }
 
 function saturation(ctx: AdapterCheckContext): FindingIn[] {
-  const opened = okNodes(ctx).filter((n) => (n.tool === "open_image" || n.tool === "image_info") && (metricsOf(n).saturated_fraction ?? 0) > 0.01);
+  const opened = okNodes(ctx).filter(
+    (n) => ((n.tool === "open_image" || n.tool === "image_info") && (metricsOf(n).saturated_fraction ?? 0) > 0.01) || (metricsOf(n).n_saturated_images ?? 0) > 0,
+  );
   if (!opened.length || !okNodes(ctx).some((n) => MEASURING.has(n.tool))) return [];
-  const worst = Math.max(...opened.map((n) => metricsOf(n).saturated_fraction ?? 0));
+  const mentioned = /saturat|clipp|overexpos|maximum value/i.test(ctx.answer);
+  const aboutIntensity = /intensit|bright|fluoresc|signal|expression/i.test(ctx.answer);
   return [
     {
       check: "saturation",
-      severity: "warning",
-      message: `${(worst * 100).toFixed(1)} percent of the pixels in a measured image are at the maximum value. Intensities from saturated pixels are too low, and objects can merge. Image again with less exposure.`,
+      severity: aboutIntensity && !mentioned ? "error" : "warning",
+      message: "A measured image has more than 1 percent of its pixels at the maximum value. Intensities from saturated pixels are too low, and objects can merge. Name the saturated images in the answer, and do not compare intensities from them. Image again with less exposure.",
       nodes: opened.map((n) => n.id),
     },
   ];
