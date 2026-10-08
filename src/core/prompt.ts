@@ -17,6 +17,7 @@ How to work
 How to report
 - Separate what you measured from what you infer. Give effect sizes and the test, not only p-values. Say what one replicate is.
 - Name the step that produced each number.
+- Put every number that the request asks for in your final answer. Numbers that you gave in a message between steps do not count. Repeat them in the final answer.
 - End with: what you did, what you found, what is uncertain, and what waits for the scientist.`;
 
 const SMALL_RULES = `You are a guided analysis agent for science programs. The scientist owns the method decisions.
@@ -25,6 +26,7 @@ const SMALL_RULES = `You are a guided analysis agent for science programs. The s
 - If a result says BLOCKED, do not guess. Continue other work or stop and summarize.
 - If ok is false, the step failed. Say so.
 - Use find_tools to find a tool that is not in your list. Use load_skill to read a procedure.
+- Put every number that the request asks for in your final answer. Numbers in a message between steps do not count.
 - End with what you did, what you found, and what is uncertain.`;
 
 const MODES: Record<Mode, string> = {
