@@ -54,3 +54,36 @@ Verdict: PASS for the trajectory numbers and the superposition RMSD. FAIL for tw
 - The AdK frames are already aligned, so a fit does not change the RMSD (6.820 with and without a fit). The emulation does not show the effect of the fit.
 - The model did not call rmsf_per_residue, count_contacts or find_hydrogen_bonds. The known-answer tests cover them.
 - The stride trap (stride 10 stops at frame 90 and gives 6.854) was not tested in a run.
+
+## Rerun after harness fixes (2026-10-08)
+
+Model: `ollama:qwen3:8b`. Harness commit 7fd2e86. Fresh `GA_HOME` for each run under `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/<run>/home`. Prompt, setup and answers files are in `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/`. Each run ended with exit code 0. No run crashed.
+
+Scoring rules for the tables below:
+
+- Pass: the correct number is in the final answer text.
+- Tool only: the correct number is in a tool result in `log.jsonl`, but not in the final answer. This counts as fail in the strict count.
+- The earlier column repeats the earlier result from this file.
+
+Command: same as above. Prompt and answers files are the ones in `/Volumes/T7/guided-analysis/tools/mdanalysis/scratch/` (prompt.txt, prompt2.txt, answers.json). Two runs, as before. Run 1 (trajectory numbers and structure comparison), session `20261008-132856-2391`. Run 2 (structure part), session `20261008-133033-babf`.
+
+| Item | Expected | Earlier result | Rerun result | Pass |
+| --- | --- | --- | --- | --- |
+| atoms | 3341 | 3341 | in tool result id 8 only. The final answer has no number. | tool only |
+| frames | 98 | 98 | in tool result id 8 only | tool only |
+| backbone RMSD, last frame | 6.8203 (+/- 0.01) | 6.820 | 6.820 in id 18 only | tool only |
+| radius of gyration, last frame | 19.592 (+/- 0.02) | 19.592 | 19.592 in id 32 only | tool only |
+| residues, chain A of 4AKE | 214 | 214 | 214 in run 2 id 8 only | tool only |
+| residues, chain B of 4AKE | 214 | not in the answer | 214 in run 2 id 8 only | tool only |
+| CA RMSD, 4AKE A on 1AKE A | 7.131 (+/- 0.02) | 7.131 | 7.13 (run 2 answer) | pass |
+| distance CA(1) to CA(214), chain A | 10.101 (+/- 0.01) | 10.710 (N atoms) | 9.921 (N to C atoms, run 2 id 18); not in the answer | fail |
+
+Result: 6 of 8 before, 1 of 8 strict after, 7 of 8 with tool results.
+
+Failure causes:
+
+- Harness fault, run 1. The model wrote the right numbers in its turn texts (ids 13, 23, 35). The harness gave only two nudges for "Next, I will ..." replies (ids 14 and 24). It took the third such reply (id 35) as the final answer. The claim check read the digits of "4AKE.pdb" and "1AKE.pdb" as numbers 4 and 1 that have no source (ids 37 and 39). The review asked for a revision. The revised answer (id 44) is a plan sentence with no result. All trajectory numbers are lost. The code limit is `nudges < 2` in `src/core/session.ts`.
+- Harness fault, run 2. The final answer is the text of the last turn only. The chain A count (id 13) and the distance (id 23) were in earlier turn texts. The review (id 39) asked for a revision. The model pasted the review text into the answer (id 46), for example "The atoms ... were backbone ... not CA".
+- Model called the tool with wrong atoms. `measure_distance` got N and C (id 17), not CA.
+- Misreport in run 2: the answer says "fitting the backbone atoms". The tool used CA (id 32). The rule check `decision_misreported` flagged it (id 43). The shipped answer still has it.
+- The model never asked for chain B.

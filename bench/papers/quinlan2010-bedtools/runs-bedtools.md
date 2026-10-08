@@ -36,3 +36,31 @@ Verdict: fail. Four of five items pass. The merge question has no answer.
   11270 on the command line.
 - Run 1 answer: the review tool marked "chr1:101 [no source]-200 [no source]" in the answer text. The model
   wrote a coordinate example that no tool result gave. The numbers 129, 33713 and 126 are correct.
+
+## Rerun after harness fixes (2026-10-08)
+
+Model: `ollama:qwen3:8b`. Harness commit 7fd2e86. Fresh `GA_HOME` for each run under `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/<run>/home`. Prompt, setup and answers files are in `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/`. Each run ended with exit code 0. No run crashed.
+
+Scoring rules for the tables below:
+
+- Pass: the correct number is in the final answer text.
+- Tool only: the correct number is in a tool result in `log.jsonl`, but not in the final answer. This counts as fail in the strict count.
+- The earlier column repeats the earlier result from this file.
+
+Command: same as above. The prompts name the two files and ask question 3 (merge) in both runs. Two runs, as before, because one setup cannot hold both overlap rules. Run 1 (questions 1 and 3), session `20261008-132622-70d9`. Run 2 (questions 2 and 3), session `20261008-132653-28be`.
+
+| Item | Expected | Earlier result | Rerun result | Pass |
+| --- | --- | --- | --- | --- |
+| exons with an overlap | 126 | 126 | 126 (run 1 answer) | pass |
+| overlapping pairs | 129 | 129 | 129 in tool result id 8, not in the answer | tool only |
+| overlap bases, any overlap | 33713 | 33713 | 33,713 (run 1 answer) | pass |
+| pairs with fraction of exon >= 0.5 | 9 | 9 | 9 (run 2 answer) | pass |
+| AluY intervals after merge, distance 100 | 11270 | no number | 11,270 in both answers (merge_intervals ids 13, 14 in both runs) | pass |
+
+Result: 4 of 5 before, 4 of 5 strict after (5 of 5 with tool results).
+
+Failure causes:
+
+- Model left out a number that the tool returned. Question 1 asks for exons and bases. The answer has 126 and 33,713, not the 129 pairs (id 8 has it). The question does not ask for pairs.
+- The merge question is now answered in both runs. The model called `merge_intervals` in both runs after it called `intersect_intervals`.
+- Minor: the summary of `merge_intervals` reads "3258790 bases" while the metric is 3258788 (ids 14 and 15). Run 2 reports 3,258,788.

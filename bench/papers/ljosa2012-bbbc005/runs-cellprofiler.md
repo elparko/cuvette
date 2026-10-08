@@ -108,3 +108,31 @@ Same command as run 1. The prompt names `sub_w1/BBBC005_v1_images` and the patte
 - Per image, the adapter's counts differ from the published counts in 64 of 100 images. The totals are equal (4696). The adapter does not read the published file.
 - Run 5 still misreported two settings: it said the discard defaults were used, but both were off.
 - All 5 scripts in run 5 failed with `No module named 'pandas'`. `run_script` now uses a science Python (`~/.guided-analysis/envs/science`) with numpy, pandas and scipy.
+
+## Rerun after harness fixes (2026-10-08)
+
+Model: `ollama:qwen3:8b`. Harness commit 7fd2e86. Fresh `GA_HOME` for each run under `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/<run>/home`. Prompt, setup and answers files are in `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/`. Each run ended with exit code 0. No run crashed.
+
+Scoring rules for the tables below:
+
+- Pass: the correct number is in the final answer text.
+- Tool only: the correct number is in a tool result in `log.jsonl`, but not in the final answer. This counts as fail in the strict count.
+- The earlier column repeats the earlier result from this file.
+
+Command: same as runs 4 and 5 (prompt, answers file and `--answers` copied from `/Volumes/T7/guided-analysis/tools/cellprofiler/scratch/emu5/`). Judged against the 100-image sample values of `expected.yaml`. One run. Session `20261008-133828-12b8`. Run time about 5 minutes.
+
+| Item | Expected (100-image sample) | Earlier result (run 5) | Rerun result | Pass |
+| --- | --- | --- | --- | --- |
+| detected to true ratio | 0.9379 (+/- 0.02) | 0.9379 | 0.9399 (answer) | pass |
+| mean absolute error | 3.11 (+/- 0.1) | 3.11 | 3.01 (answer). The difference is 0.10, at the edge of the tolerance. | pass |
+| true cell total, 100 images | 5007 | not recorded | 5007 in id 89 only | tool only |
+
+Result: 2 of 2 recorded items before, 2 of 3 strict after, 3 of 3 with tool results. The ratio and the error come from one `count_nuclei` call (id 89) with 4706 nuclei. Run 5 had 4696 nuclei. The settings differ: dividing_lines Intensity here.
+
+Failure causes:
+
+- Model misreported settings. The answer says diameter 10 to 40 pixels, discard border True and discard outside True. The tool used 15 to 60, False and False (deviations, id 88). The settings line at the end of the answer shows the right values. The referee flagged it (ids 101 and 102). The shipped answer was not corrected.
+- Model invented a result. The answer says the count varied by less than 20 percent across thresholding and declumping methods. All 9 comparison runs failed (ids 12 to 14, 19 to 21, 25 to 27). The referee flagged it (id 103).
+- Model passed `dividing_lines` "None" in every call. The tool rejects it (ids 12, 48, 63, 74). Only the call at id 87 with Intensity worked. The log has 4 `count_nuclei` calls (ids 7, 61, 72, 87) and 3 `propose_change` calls. Two `propose_change` calls named keys that are not decisions: pattern and dividing_lines (ids 53 and 79).
+- Harness fault: the comparison runs for diameter, threshold method and declump method reuse the model arguments, including the invalid `dividing_lines` None. All 9 comparison runs failed (sensitivity records ids 15, 22, 28). This is the issue under "Harness notes" above and it is still open.
+- Harness fault: the review ran one revision only. The answer shipped with three errors that the referee had flagged.

@@ -44,3 +44,33 @@ Verdict: pass for the Plain questions. Fail for the 5% part of the Guided questi
 - The single-spectrum file of the Sage repository gives the peptide LQSRPAAPPAPGPGQLTLR as top hit (test `sage_repo_single_spectrum`).
 - A search of the whole database (9439 proteins, with the background organism) gives 731 PSMs with 318 decoys and no hit at 1%. The standards database is the right one for a standard mix; a larger database needs more spectra.
 - OpenMS SageAdapter on the same files gives 18 PSMs at 1%, because it scores by hyperscore without Sage rescoring and FalseDiscoveryRate does not use the +1 correction. See `runs-openms.md` in rost2016-openms.
+
+## Rerun after harness fixes (2026-10-08)
+
+Model: `ollama:qwen3:8b`. Harness commit 7fd2e86. Fresh `GA_HOME` for each run under `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/<run>/home`. Prompt, setup and answers files are in `/Volumes/T7/guided-analysis/tools/rerun-2026-10-08/<paper-id>/`. Each run ended with exit code 0. No run crashed.
+
+Scoring rules for the tables below:
+
+- Pass: the correct number is in the final answer text.
+- Tool only: the correct number is in a tool result in `log.jsonl`, but not in the final answer. This counts as fail in the strict count.
+- The earlier column repeats the earlier result from this file.
+
+Command: same as above, with the Guided prompt and the paths of BSA1, BSA2, BSA3 and standards.fasta. The setup file is `setup.json` of this folder. One run. Session `20261008-133633-3d1a`.
+
+| Item | Expected | Earlier result (run 2) | Rerun result | Pass |
+| --- | --- | --- | --- | --- |
+| PSMs in the table | 303 | 303 (answer) | 303 in the first draft (id 24), not in the final answer | tool only |
+| decoy PSMs | 43 | 43 (answer) | 43 in the first draft, not in the final answer | tool only |
+| target PSMs at 1% | 207 | 207 | 207 (answer) | pass |
+| distinct peptides at 1% | 47 | 47 | 47 (answer) | pass |
+| decoys among kept | 1 | 1 | 1 in id 14 only | tool only |
+| target PSMs at 5% | 242 | no number | 207, stated as the 5% count | fail |
+
+Result: 5 of 6 before, 2 of 6 strict after, 5 of 6 with tool results.
+
+Failure causes:
+
+- Model misreported the 5% count. It called `count_at_fdr` with threshold 0.05 (id 19). The harness used the setup value 0.01 (deviation, id 20). The tool result shows fdr_threshold=0.01 and carries the note "To change it, call propose_change. To check other values without a change, call compare_options." The model used neither tool. It wrote that 207 PSMs pass at 5% and "the FDR threshold was already met" (ids 24 and 39).
+- Harness fault: one review round. The first draft had 303 and 43 (id 24). The review flagged the 5 as unsourced and the revision (id 39) dropped the PSM totals. The final answer still has the wrong 5% claim, flagged by the referee (ids 33, 34, 38).
+- No peptide list. The model asked for none and the adapter has no tool for it. The final answer says the number of peptides "is not clear from the data", while it gives 47.
+- The model did not use `propose_change` or `compare_options` (zero calls).
