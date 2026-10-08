@@ -232,8 +232,28 @@ async function moduleChecks(ctx: ReviewContext): Promise<FindingIn[]> {
   return out;
 }
 
+function decisionsMisreported(ctx: ReviewContext): FindingIn[] {
+  const out: FindingIn[] = [];
+  const values = ctx.decisions.values();
+  const word = (t: string) => new RegExp(`(^|[^A-Za-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9]|$)`, "i");
+  for (const a of ctx.adapters)
+    for (const d of a.manifest.decisions ?? []) {
+      if (d.kind !== "choice" || !(d.key in values)) continue;
+      const actual = String(values[d.key]);
+      const named = d.choices.map(String).filter((c) => c !== actual && c.length > 2 && !/^\d+(\.\d+)?$/.test(c) && word(c).test(ctx.answer));
+      if (named.length && !word(actual).test(ctx.answer))
+        out.push({
+          check: "decision_misreported",
+          severity: "error",
+          message: `The answer names ${named.join(", ")} for "${d.label}", but the decision record says ${actual}. Report the value that was used.`,
+        });
+    }
+  return out;
+}
+
 export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
   return [
+    ...decisionsMisreported(ctx),
     ...failedNotRepeated(ctx),
     ...deviationsNotMentioned(ctx),
     ...pWithoutEffect(ctx),

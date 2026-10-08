@@ -71,7 +71,9 @@ async function headless(prompt: string) {
     if (out === "stream-json") process.stdout.write(JSON.stringify(e) + "\n");
     if (e.type === "question") {
       const q = e.question;
-      const v = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : "*" in answers ? answers["*"] : q.recommendation?.value;
+      let v = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : "*" in answers ? answers["*"] : q.recommendation?.value;
+      const fits = (x: unknown) => !q.options.length || q.options.some((op) => String(op.value) === String(x) || op.label === String(x));
+      if (v === undefined || !fits(v)) v = [q.recommendation?.value, q.default, q.options[0]?.value].find((x) => x !== undefined && fits(x));
       if (v === undefined) return;
       setTimeout(() => s.answer(q.qid, v, "answered from the answers file").catch((err) => console.error(String(err))), 0);
     }

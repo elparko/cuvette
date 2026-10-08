@@ -160,3 +160,11 @@ describe("referee", () => {
     expect(out[0].message).toContain("I think it is fine overall.");
   });
 });
+
+test("an answer that names the wrong choice of a decision is an error", async () => {
+  const { runChecks: run } = await import("../src/core/review.ts");
+  const adapter = { name: "x", manifest: { decisions: [{ key: "m", label: "Threshold method", kind: "choice", choices: ["Default", "Otsu"] }], checks: [] }, module: async () => ({}) };
+  const ctx = { record: { entries: () => [], nodes: () => [], stale: () => new Set() }, decisions: { values: () => ({ m: "Default" }) }, adapters: [adapter], answer: "We used the Otsu method.", claims: [] };
+  const found = await run(ctx as never);
+  expect(found.find((f) => f.check === "decision_misreported")?.severity).toBe("error");
+});
