@@ -82,4 +82,26 @@ What happened:
 - The model asked for alpha 0.05 in its second call. The harness used the recorded 0.1 and logged a deviation.
 - The referee reply could not be read (one info finding). The cause is in the referee, not in the adapter.
 
-Change after the run: the prompt now says to start from the tximeta object, which agrees with the answers file. This prompt has not run yet.
+Change after the run: the prompt now says to start from the tximeta object. This agrees with the answers file.
+
+## Blind run with the new prompt (2026-10-08, main a7d7964)
+
+Before this run, I ran the 14 adapter tests under the blind policy of this paper (sandbox on). All 14 tests passed. In the same sandbox:
+
+- tximport 1.40.0 and rhdf5 2.56.1 load from /Volumes/T7/guided-analysis/tools/R-library.
+- airway_gse.rds reads with 58294 genes, 8 samples and the assays counts, abundance and length.
+- A read of a repository file stops with "Operation not permitted".
+
+Benchmark run: `node bin/ga.js bench papers --papers love2014-deseq2-airway --models ollama:qwen3:8b --runs 1 --out bench/results/love2014-gse-blind`. Blind mode was on. Session `20261008-181512-817e`, 358 s. No other benchmark used Ollama at the same time.
+
+| Item | Expected | Computed | Reported |
+| --- | --- | --- | --- |
+| genes after filter | 16637 (tolerance 10) | 16637 | 16637 |
+| padj < 0.1 | 4381 (10) | 4381 | 4381 |
+| up | 2362 (10) | 2362 | 2362 |
+| down | 2019 (3) | 2019 | 2019 |
+| padj < 0.05 | 3602 (10) | 3602 | not asked |
+
+- The model gave airway_gse.rds to inspect_counts and run_deseq. The tool detected the input type SummarizedExperiment rds. No call failed.
+- The comparison runs for the filter and alpha gave 17213 and 4406 (3 samples), 16081 and 4364 (5 samples), and 3602 at alpha 0.05 (1993 up, 1609 down). All the runs used DESeqDataSetFromTximport with the length offsets.
+- Leak check: 4 paths read, 0 outside the allow list, 0 blocked, 0 unsourced claims, 0 literature claims.

@@ -1,0 +1,430 @@
+{
+ "date": "2026-10-08",
+ "models": [
+  "ollama:qwen3:8b"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "love2014-deseq2-airway",
+   "model": "ollama:qwen3:8b",
+   "run": 1,
+   "status": "answer",
+   "durationS": 357.908,
+   "session": "20261008-181512-817e",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/love2014-deseq2-airway/run1/home/sessions/20261008-181512-817e",
+   "answer": "### Summary of Results\n\n- **Total Genes Tested**: 16,637\n- **Significant Genes (padj < 0.1)**: 4,381\n  - **Upregulated Genes**: 2,362\n  - **Downregulated Genes**: 2,019\n\n### Top 20 Genes with Fold Change and Significance\n\n| Gene ID              | Base Mean | Log2 Fold Change | p-value (adj)              |\n|----------------------|-----------|-------------------|----------------------------|\n| ENSG00000189221.9    | 2371.27   | 3.39              | 3.96e-134                 |\n| ENSG00000120129.5    | 3417.26   | 2.97              | 2.75e-129                 |\n| ENSG00000101347.9    | 14106.72  | 3.75              | 8.90e-124                 |\n| ENSG00000152583.12   | 973.48    | 4.50              | 9.04e-112                 |\n| ENSG00000196136.17   | 2708.31   | 3.24              | 3.94e-109                 |\n| ENSG00000211445.11   | 12502.89  | 3.77              | 6.73e-108                 |\n| ENSG00000157214.13   | 3029.85   | 2.01              | 1.22e-98                  |\n| ENSG00000162614.18   | 5507.40   | 2.01              | 3.40e-96                  |\n| ENSG00000109906.13   | 437.50    | 6.37              | 1.18e-90                  |\n| ENSG00000125148.6    | 3688.29   | 2.23              | 1.88e-88                  |\n| ENSG00000154734.14   | 29578.83  | 2.24              | 4.02e-86                  |\n| ENSG00000134243.11   | 5538.57   | 2.20              | 9.18e-82                  |\n| ENSG00000127954.12   | 492.99    | 4.74              | 4.33e-80                  |\n| ENSG00000139132.14   | 1214.03   | 2.15              | 9.26e-80                  |\n| ENSG00000178695.5    | 2648.60   | -2.54             | 3.01e-73                  |\n| ENSG00000162692.11   | 505.56    | -3.68             | 2.01e-71                  |\n| ENSG00000106484.15   | 943.51    | -2.04             | 1.58e-70                  |\n| ENSG00000163884.3    | 565.54    | 4.51              | 1.71e-65                  |\n| ENSG00000166741.7    | 7487.63   | 2.24              | 1.93e-65                  |\n| ENSG00000179094.15   | 772.45    | 3.13              | 1.21e-64                  |\n\n### Uncertainty and Notes\n\n- The results are based on the provided input and the design formula `~ cell + dex`.\n- The significant genes include both upregulated and downregulated genes.\n- The top 20 genes are listed with their fold change and adjusted p-values. These genes show the most significant changes in gene expression due to dexamethasone treatment.\n\nStep results that the answer does not mention, from the record:\n- n1 inspect_counts: Detected input type: SummarizedExperiment rds (the file is a saved R object (.rds)). 58294 genes, 8 samples, 4 coldata columns, 22709 zero-count genes. Transcript lengths are present, so run_deseq uses them as offsets.\n\nSettings used, from the decision record: Input type: SummarizedExperiment rds · Design formula: ~ cell + dex · Variable of interest: dex · Reference level: untrt · Test level: trt · Minimum count for a gene to count as detected: 10 · Minimum number of samples with a detected gene: 4 · False discovery rate cutoff (padj): 0.1 · Log2 fold change threshold: 0.",
+   "items": [
+    {
+     "key": "genes_after_filter",
+     "description": "Genes after pre-filter, rnaseqGene workflow on data(gse)",
+     "expected": 16637,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16637,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_genes_tested",
+      "entry": 44
+     },
+     "reported": {
+      "pass": true,
+      "value": 16637,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 67,
+      "text": "- **Total Genes Tested**: 16,637"
+     }
+    },
+    {
+     "key": "padj_01_workflow",
+     "description": "Genes with padj < 0.1, rnaseqGene workflow on data(gse)",
+     "expected": 4381,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4381,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_significant",
+      "entry": 44
+     },
+     "reported": {
+      "pass": true,
+      "value": 4381,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 67,
+      "text": "- **Significant Genes (padj < 0.1)**: 4,381"
+     }
+    },
+    {
+     "key": "up_padj_01",
+     "description": "Up-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)",
+     "expected": 2362,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2362,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_up",
+      "entry": 44
+     },
+     "reported": {
+      "pass": true,
+      "value": 2362,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 67,
+      "text": "- **Upregulated Genes**: 2,362"
+     }
+    },
+    {
+     "key": "down_padj_01",
+     "description": "Down-regulated genes at padj < 0.1, rnaseqGene workflow on data(gse)",
+     "expected": 2019,
+     "tolerance": 3,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2019,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_down",
+      "entry": 44
+     },
+     "reported": {
+      "pass": true,
+      "value": 2019,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 67,
+      "text": "- **Downregulated Genes**: 2,019"
+     }
+    },
+    {
+     "key": "padj_005_workflow",
+     "description": "Genes with padj < 0.05 (alpha 0.05), rnaseqGene workflow on data(gse)",
+     "expected": 3602,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "comparison",
+      "value": 3602,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.n_significant",
+      "entry": 35
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 67,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_genes_after_filter",
+     "description": "Same experiment, read counts on Ensembl 75 genes: genes after pre-filter",
+     "expected": 16139,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 16637,
+      "diff": 498,
+      "node": "n7",
+      "path": "metrics.n_genes_tested",
+      "entry": 44
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 67,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_padj_01",
+     "description": "Same experiment, read counts on Ensembl 75 genes: genes with padj < 0.1",
+     "expected": 4905,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 4381,
+      "diff": 524,
+      "node": "n7",
+      "path": "metrics.n_significant",
+      "entry": 44
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 67,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_up_padj_01",
+     "description": "Same experiment, read counts on Ensembl 75 genes: up at padj < 0.1",
+     "expected": 2607,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 2648.60453890391,
+      "diff": 41.60453890391,
+      "node": "n8",
+      "path": "table.rows[14][1]",
+      "entry": 50
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 67,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_down_padj_01",
+     "description": "Same experiment, read counts on Ensembl 75 genes: down at padj < 0.1",
+     "expected": 2298,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 2362,
+      "diff": 64,
+      "node": "n7",
+      "path": "metrics.n_up",
+      "entry": 44
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 67,
+      "text": null
+     }
+    },
+    {
+     "key": "csv_padj_005",
+     "description": "Same experiment, read counts on Ensembl 75 genes: genes with padj < 0.05 (alpha 0.05)",
+     "expected": 4081,
+     "tolerance": 10,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 4381,
+      "diff": 300,
+      "node": "n7",
+      "path": "metrics.n_significant",
+      "entry": 44
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 67,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 44535,
+    "outputTokens": 2661,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 0,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/love2014-deseq2-airway/run1/home/sessions/20261008-181512-817e/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/love2014-deseq2-airway",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/love2014-deseq2-airway/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-ae5223a886c109e54/catalog/deseq2",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-ae5223a886c109e54/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-ae5223a886c109e54/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-ae5223a886c109e54/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-ae5223a886c109e54/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-ae5223a886c109e54",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-ae5223a886c109e54/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-ae5223a886c109e54/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-ae5223a886c109e54/catalog/deseq2"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/love2014-deseq2-airway/airway_gse.rds",
+     "/Volumes/T7/guided-analysis/data/love2014-deseq2-airway/gse_coldata.csv",
+     "/Volumes/T7/guided-analysis/data/love2014-deseq2-airway/gse_length.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-08/ollama_qwen3_8b/love2014-deseq2-airway/run1/home/sessions/20261008-181512-817e/work/run_deseq-6/results.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/love2014-gse-blind.md",
+  "json": "bench/results/love2014-gse-blind.json"
+ },
+ "summary": {
+  "cells": {
+   "love2014-deseq2-airway": {
+    "ollama:qwen3:8b": {
+     "computed": 5,
+     "computedOf": 5,
+     "reported": 4,
+     "reportedOf": 4,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "ollama:qwen3:8b": {
+    "computed": 5,
+    "computedOf": 5,
+    "reported": 4,
+    "reportedOf": 4,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "ollama:qwen3:8b": {
+    "runs": 1,
+    "durationS": 357.908,
+    "requests": 5,
+    "inputTokens": 44535,
+    "outputTokens": 2661,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings_info": 5,
+    "findings_warning": 0,
+    "findings_error": 1,
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   }
+  },
+  "skipped": []
+ }
+}
