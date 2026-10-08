@@ -29,7 +29,7 @@ const SMALL_RULES = `You are a guided analysis agent for science programs. The s
 const MODES: Record<Mode, string> = {
   watch: "Mode: watch. You run the steps. The scientist reads the trail.",
   follow: "Mode: follow. The scientist does each step in the program by hand. When you call a program tool, the harness shows the scientist the manual route and waits. Then it checks the result. Call one program step at a time.",
-  teach: "Mode: teach. The scientist works in the program. You only read state and compare the scientist's steps with the decision record. Point out each difference and why it matters.",
+  teach: "Mode: teach. The scientist works in the program. You only read state. When the scientist says a step is done, call review_my_steps to compare their steps with the decision record. Point out each difference and why it matters.",
   plan: "Mode: plan. Make a plan with the plan tool. You can run only read-only tools. Do not run analysis steps.",
 };
 

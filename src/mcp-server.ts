@@ -91,5 +91,14 @@ export async function runMcpServer(opts: { adapters: string[] }) {
       return { content: [{ type: "text", text: (e as Error).message }], isError: true };
     }
   });
+  const stop = () => {
+    const force = setTimeout(() => process.exit(0), 3000);
+    force.unref();
+    session.close().finally(() => process.exit(0));
+  };
+  process.stdin.on("end", stop);
+  process.stdin.on("close", stop);
+  process.on("SIGTERM", stop);
+  process.on("SIGINT", stop);
   await server.connect(new StdioServerTransport());
 }

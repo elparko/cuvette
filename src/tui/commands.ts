@@ -20,6 +20,7 @@ export interface CommandCtx {
   quit(): void;
   outputs(): OutputRef[];
   startWindow(): Promise<string>;
+  startPanel(): Promise<{ url: string; opened: string[]; failed: string[] }>;
 }
 
 export interface Command {
@@ -375,6 +376,20 @@ export const commands: Command[] = [
         ctx.notice(`Window: ${await ctx.startWindow()}`);
       } catch (e) {
         ctx.error(`The window did not start: ${(e as Error).message}`);
+      }
+    },
+  },
+  {
+    name: "panel",
+    help: "Open the agent panel inside the connected program.",
+    async run(_, ctx) {
+      try {
+        const { url, opened, failed } = await ctx.startPanel();
+        for (const f of failed) ctx.error(f);
+        if (opened.length) ctx.notice(`Panel opened in ${opened.join(", ")}.`);
+        else ctx.notice(`No connected program has a panel. Open this page in a browser or a web view: ${url}`);
+      } catch (e) {
+        ctx.error(`The panel did not start: ${(e as Error).message}`);
       }
     },
   },

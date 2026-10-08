@@ -1,4 +1,7 @@
-import { dirname } from "node:path";
+import { spawn } from "node:child_process";
+import { closeSync, existsSync, openSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadAdapter } from "../../src/adapters/manifest.ts";
 import type { AdapterCheckContext, AdapterModule, LoadedAdapter } from "../../src/adapters/manifest.ts";
@@ -173,7 +176,30 @@ function dotted(args: Record<string, unknown>, path: string): unknown {
   return cur;
 }
 
+function smilePython(): string | undefined {
+  const env = process.env.SMILE_MSI_PYTHON;
+  if (env && existsSync(env)) return env;
+  const rel = [".venv/bin/python", ".venv/Scripts/python.exe"];
+  for (const root of ["Code", "code"]) {
+    for (const r of rel) {
+      const p = join(homedir(), root, "SMILE-MSI", r);
+      if (existsSync(p)) return p;
+    }
+  }
+  return undefined;
+}
+
 const mod: AdapterModule = {
+  async openPanel(url, { sessionDir }) {
+    const python = smilePython();
+    if (!python) throw new Error("SMILE MSI was not found. Set SMILE_MSI_PYTHON to its Python.");
+    const log = openSync(join(sessionDir, "panel-smile-msi.log"), "a");
+    const child = spawn(python, [join(here, "panel", "panel.py"), url], { detached: true, stdio: ["ignore", log, log] });
+    closeSync(log);
+    child.on("error", () => {});
+    child.unref();
+    return { close: () => void child.kill() };
+  },
   checks: {
     pixel_replication: pixelReplication,
     failed_result_ignored: failedIgnored,

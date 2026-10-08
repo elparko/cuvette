@@ -5,7 +5,7 @@ import os
 if os.environ.get("GA_WORK_DIR"):
     os.environ["SMILE_MSI_MCP_OUT"] = os.environ["GA_WORK_DIR"]
 
-from smile_msi import mcpserver, profiles, registry
+from smile_msi import headless, mcpserver, profiles, registry
 
 ROUTES = {
     "list_slides": "File > Open analysis... shows the saved slides.",
@@ -23,12 +23,15 @@ ROUTES = {
     "annotate": "Analyze > This slide > Annotation > Annotate lipids > Run.",
     "export_feature_table": "File > Export... (Export hub) > feature table.",
     "close_slide": "Open another slide, or close the program.",
+    "history": "File > Analyses... > History lists the runs on a slide. Data > Acquisition & matching... shows the extraction settings.",
     "apply_settings": "Data > Acquisition & matching... and the Display panel: Extraction tolerance (ppm), "
                       "Reduce (m/z window), Normalization. TIC amplification cap: Data > Analysis profiles... "
                       "> Apply to current sample.",
 }
 NO_ROUTE = "No manual route. This tool exists only in the agent and MCP interface."
 CHECKED = ("ppm", "norm", "reduce", "tic_max_amp")
+SETTING_ARGS = ("ppm", "norm", "reduce")
+PEAK_PARAMS = {"find_peaks": ("snr", "max_peaks"), "find_spatial_features": ("snr", "min_morans", "max_candidates")}
 Q_LIMIT, AUC_LIMIT = 0.05, 0.7
 
 
@@ -68,6 +71,48 @@ def apply_settings(ppm: float | None = None, norm: str | None = None, reduce: st
     now = {"ppm": api.ppm, "norm": api.norm, "reduce": api.reduce,
            "tic_max_amp": float(getattr(ds, "tic_max_amp", 3.0))}
     return {"was": was, "now": now, "changed": [k for k in CHECKED if was[k] != now[k]]}
+
+
+def _run_line(step_id, params):
+    step = registry.REGISTRY.get(step_id)
+    if step is None:
+        return f"{step_id} {params}"
+    fields = [f"{p.label} = {params[p.name]}" for p in step.params if p.name in params]
+    return f"Analyze > This slide > {step.category} > {step.name}. " + ("Settings: " + "; ".join(fields) + "." if fields else "")
+
+
+def _history_step(run):
+    params = dict(run.params or {})
+    line = _run_line(run.step_id, params).strip()
+    if run.step_id in PEAK_PARAMS:
+        args = {k: params[k] for k in PEAK_PARAMS[run.step_id] if k in params}
+        if run.step_id == "find_spatial_features":
+            args["spatial"] = True
+        return {"tool": "find_peaks", "args": args, "line": line}
+    return {"tool": "run_analysis", "args": {"step_id": run.step_id, "params": params}, "line": line}
+
+
+def history(ref: str = "") -> dict:
+    """The steps the scientist ran in the SMILE MSI app on a slide: the extraction settings
+    that differ from the analysis profile, then every finished analysis run, oldest first. ref
+    is a slide from list_slides; leave it empty for the open slide. Reads the saved session
+    only and changes nothing."""
+    ref = ref or mcpserver._open["ref"] or ""
+    if not ref or str(ref).lower() in mcpserver._DEMO_REFS:
+        return {"steps": [], "note": "The demo slide and an empty ref have no saved session."}
+    path = headless.resolve_session_ref(ref)
+    data = headless.read_session(path)
+    steps = []
+    settings = data.get("settings") or {}
+    changed = {k: v[1] for k, v in (settings.get("profile_deviations") or {}).items() if k in SETTING_ARGS}
+    if changed:
+        was = {k: v[0] for k, v in settings["profile_deviations"].items() if k in changed}
+        line = "Data > Acquisition & matching... and the Display panel: " + "; ".join(f"{k} {was[k]} -> {changed[k]}" for k in changed) + "."
+        steps.append({"tool": "apply_settings", "args": changed, "line": line})
+    runs = [r for r in headless.run_store(path).list_runs() if r.status == "done"]
+    for run in sorted(runs, key=lambda r: r.created):
+        steps.append(_history_step(run))
+    return {"ref": os.path.basename(path).removesuffix(".json"), "n_runs": len(runs), "steps": steps}
 
 
 def state() -> dict:
@@ -167,6 +212,8 @@ def _summary(name, args, out, m):
             q = (args.get("params") or {}).get("max_q", Q_LIMIT)
             return f"Found {m['n_q_pass']} features different between {who} (q <= {q})."
         return f"{out['name']}: {out.get('summary') or 'done'}"
+    if name == "history":
+        return f"Read {len(out['steps'])} steps from the saved session."
     if name == "find_peaks":
         kind = "spatial features" if args.get("spatial") else "peaks"
         return f"Found {out['n_features']} {kind} ({out['n_detected']} detected before any cap)."
@@ -232,7 +279,7 @@ def _wrap(fn):
 def build_server():
     own = {"open_slide": open_slide, "state": state}
     tools = tuple((own.get(f.__name__, f), title, ro) for f, title, ro in mcpserver.TOOLS)
-    tools += ((apply_settings, "Apply settings to the open slide", False),)
+    tools += ((apply_settings, "Apply settings to the open slide", False), (history, "Steps the scientist ran in the app", True))
     mcpserver.TOOLS = tuple((_wrap(f), title, ro) for f, title, ro in tools)
     guard = mcpserver._guarded
     mcpserver._guarded = lambda fn: guard(fn if hasattr(fn, "__signature__") else _wrap(fn))

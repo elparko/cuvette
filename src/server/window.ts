@@ -5,7 +5,8 @@ import type { AddressInfo } from "node:net";
 import { extname } from "node:path";
 import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
-import type { Question } from "../core/types.ts";
+import type { BusEvent, Mode, Question } from "../core/types.ts";
+import { panelHtml } from "./panel-page.ts";
 import { setWindowUrl } from "./notify.ts";
 import { pageHtml } from "./page.ts";
 
@@ -16,6 +17,40 @@ export interface WindowSession {
   decisions: { fields(): { key: string; label: string; value: unknown; owner: string; set: boolean }[] };
   questions: { open(): Question[] };
   answer(qid: string, value: unknown, note?: string): Promise<void>;
+  busy: boolean;
+  mode: Mode;
+  send(text: string): Promise<string>;
+  interrupt(): void;
+  respondPermission(rid: string, ok: boolean, note?: string, always?: boolean): void;
+  followDone(step: number, note?: string, agentDoes?: boolean): Promise<void>;
+  setMode(mode: Mode): void;
+}
+
+const MODES = new Set(["watch", "follow", "teach", "plan"]);
+const FEED_KINDS = new Set(["user", "assistant", "tool_result", "question", "answer", "notice", "error", "follow_step", "permission"]);
+
+function feedEntry(e: { id: number; kind: string; data: Record<string, unknown> }) {
+  const d = e.data;
+  const base = { id: e.id, kind: e.kind };
+  switch (e.kind) {
+    case "user":
+    case "notice":
+    case "error":
+      return { ...base, text: String(d.text ?? d.message ?? "") };
+    case "assistant":
+      return d.final ? { ...base, text: String(d.text ?? "") } : undefined;
+    case "tool_result":
+      return { ...base, tool: String(d.tool ?? ""), ok: d.ok !== false, text: String(d.summary ?? d.tool ?? ""), route: d.manualRoute ? String(d.manualRoute) : undefined };
+    case "question":
+      return { ...base, qid: d.qid, title: d.title, text: d.text };
+    case "answer":
+      return { ...base, qid: d.qid, text: `${JSON.stringify(d.value)}${d.note ? ` (${d.note})` : ""}`, by: d.by };
+    case "follow_step":
+      return { ...base, step: d.step, tool: d.tool, status: d.status, text: String(d.instruction ?? "") };
+    case "permission":
+      return { ...base, rid: d.rid, tool: d.tool, text: `${d.tool}: ${d.decision}` };
+  }
+  return undefined;
 }
 
 const BLOB_TYPES: Record<string, string> = {
@@ -90,6 +125,8 @@ export async function startWindow(
 ): Promise<{ url: string; close(): void }> {
   const token = randomBytes(18).toString("base64url");
   const clients = new Set<ServerResponse>();
+  const permissions = new Map<string, Extract<BusEvent, { type: "permission" }>>();
+  const instructions = new Map<number, Extract<BusEvent, { type: "instruction" }>>();
 
   const server = createServer(async (req, res) => {
     const { port } = server.address() as AddressInfo;
@@ -101,6 +138,53 @@ export async function startWindow(
     if (given !== token) return send(res, 401, '{"error":"missing or wrong token"}');
     try {
       if (req.method === "GET" && url.pathname === "/") return send(res, 200, pageHtml(token), "text/html; charset=utf-8");
+      if (req.method === "GET" && url.pathname === "/panel") return send(res, 200, panelHtml(token), "text/html; charset=utf-8");
+      if (req.method === "GET" && url.pathname === "/api/feed") {
+        const since = Number(url.searchParams.get("since") ?? 0) || 0;
+        const all = session.record.entries();
+        const entries = all.filter((e) => e.id > since && FEED_KINDS.has(e.kind) && !(e.kind === "tool_result" && (e.data.sensitivityOf || (!e.data.adapter && e.data.ok)))).map(feedEntry).filter(Boolean);
+        return send(res, 200, JSON.stringify({
+          entries,
+          next: all.reduce((m, e) => Math.max(m, e.id), since),
+          busy: session.busy,
+          mode: session.mode,
+          openQuestions: session.questions.open(),
+          pendingPermissions: [...permissions.values()].map((p) => ({ rid: p.rid, tool: p.tool, code: p.code, touches: p.touches })),
+          pendingFollow: [...instructions.values()].map((i) => ({ step: i.step, tool: i.tool, text: i.text })),
+        }));
+      }
+      if (req.method === "POST" && url.pathname === "/api/send") {
+        const body = JSON.parse(await readBody(req)) as { text?: string };
+        const text = typeof body.text === "string" ? body.text.trim() : "";
+        if (!text) return send(res, 400, '{"error":"text is empty"}');
+        if (session.busy) return send(res, 409, '{"error":"the agent is busy"}');
+        session.send(text).catch(() => {});
+        return send(res, 200, '{"ok":true}');
+      }
+      if (req.method === "POST" && url.pathname === "/api/permission") {
+        const body = JSON.parse(await readBody(req)) as { rid?: string; ok?: boolean; note?: string; always?: boolean };
+        if (typeof body.rid !== "string" || !permissions.has(body.rid)) return send(res, 404, '{"error":"no such permission request"}');
+        session.respondPermission(body.rid, Boolean(body.ok), body.note ?? "", Boolean(body.always));
+        permissions.delete(body.rid);
+        return send(res, 200, '{"ok":true}');
+      }
+      if (req.method === "POST" && url.pathname === "/api/follow") {
+        const body = JSON.parse(await readBody(req)) as { step?: number; note?: string; agentDoes?: boolean };
+        if (typeof body.step !== "number" || !instructions.has(body.step)) return send(res, 404, '{"error":"no such step"}');
+        instructions.delete(body.step);
+        await session.followDone(body.step, body.note ?? "", Boolean(body.agentDoes));
+        return send(res, 200, '{"ok":true}');
+      }
+      if (req.method === "POST" && url.pathname === "/api/mode") {
+        const body = JSON.parse(await readBody(req)) as { mode?: string };
+        if (!body.mode || !MODES.has(body.mode)) return send(res, 400, '{"error":"unknown mode"}');
+        session.setMode(body.mode as Mode);
+        return send(res, 200, '{"ok":true}');
+      }
+      if (req.method === "POST" && url.pathname === "/api/stop") {
+        session.interrupt();
+        return send(res, 200, '{"ok":true}');
+      }
       if (req.method === "GET" && url.pathname === "/api/state") return send(res, 200, JSON.stringify(await stateOf(session)));
       if (req.method === "GET" && url.pathname.startsWith("/api/blob/")) {
         const sha = url.pathname.slice("/api/blob/".length);
@@ -132,6 +216,10 @@ export async function startWindow(
   });
 
   const off = session.bus.on((e) => {
+    if (e.type === "permission") permissions.set(e.rid, e);
+    else if (e.type === "instruction") instructions.set(e.step, e);
+    else if (e.type === "entry" && e.entry.kind === "permission") permissions.delete(String(e.entry.data.rid));
+    else if (e.type === "entry" && e.entry.kind === "follow_step" && e.entry.data.status !== "waiting") instructions.delete(Number(e.entry.data.step));
     const data = `data: ${JSON.stringify(e)}\n\n`;
     for (const c of clients) c.write(data);
   });

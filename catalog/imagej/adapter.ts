@@ -270,6 +270,124 @@ const listCommands: Tool = {
   },
 };
 
+// ---------------------------------------------------------------- Macro Recorder files
+
+function optionWords(options: string): Record<string, string | true> {
+  const out: Record<string, string | true> = {};
+  for (const m of options.matchAll(/(\w[\w-]*)=(\[[^\]]*\]|\S+)/g)) out[m[1]] = m[2].replace(/^\[|\]$/g, "");
+  for (const w of options.replace(/(\w[\w-]*)=(\[[^\]]*\]|\S+)/g, " ").split(/\s+/).filter(Boolean)) out[w] = true;
+  return out;
+}
+
+function numberOf(v: string | true | undefined): number | undefined {
+  const n = typeof v === "string" ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function stringArg(raw: string): string {
+  return raw.replace(/\\(["\\])/g, "$1");
+}
+
+function firstTwoStrings(call: string): [string, string] | undefined {
+  const m = /^run\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,\s*"((?:[^"\\]|\\.)*)")?\s*\)\s*;?$/.exec(call);
+  return m ? [stringArg(m[1]), stringArg(m[2] ?? "")] : undefined;
+}
+
+export function recordingSteps(text: string): { tool: string; args: Args; line: string }[] {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith("//") && l !== "{" && l !== "}");
+  const steps: { tool: string; args: Args; line: string }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const open = /^open\(\s*"((?:[^"\\]|\\.)*)"[^)]*\)\s*;?$/.exec(line);
+    if (open) {
+      steps.push({ tool: "open_image", args: { path: stringArg(open[1]) }, line });
+      continue;
+    }
+    const thr = /^setAutoThreshold\(\s*"([^"]*)"\s*\)\s*;?$/.exec(line);
+    if (thr) {
+      const words = thr[1].split(/\s+/).filter(Boolean);
+      const args = { method: words[0] ?? "Default", dark_background: words.includes("dark") };
+      const next = lines[i + 1] ? firstTwoStrings(lines[i + 1]) : undefined;
+      if (next?.[0] === "Convert to Mask") {
+        steps.push({ tool: "threshold", args, line: `${line} ${lines[i + 1]}` });
+        i++;
+      } else steps.push({ tool: "threshold", args, line });
+      continue;
+    }
+    const rect = /^makeRectangle\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)\s*;?$/.exec(line);
+    if (rect && lines[i + 1] && firstTwoStrings(lines[i + 1])?.[0] === "Measure") {
+      steps.push({ tool: "measure", args: { roi: rect.slice(1, 5).join(",") }, line: `${line} ${lines[i + 1]}` });
+      i++;
+      continue;
+    }
+    const call = firstTwoStrings(line);
+    if (!call) {
+      steps.push({ tool: "run_command", args: { command: line.replace(/;$/, ""), options: "" }, line });
+      continue;
+    }
+    const [command, options] = call;
+    const o = optionWords(options);
+    switch (command) {
+      case "Gaussian Blur...":
+        steps.push({ tool: "gaussian_blur", args: { sigma: numberOf(o.sigma) ?? numberOf(o.radius) ?? 2 }, line });
+        break;
+      case "Subtract Background...":
+        steps.push({ tool: "subtract_background", args: { rolling_radius: numberOf(o.rolling) ?? 50, light_background: o.light === true }, line });
+        break;
+      case "Analyze Particles...": {
+        const [lo, hi] = String(o.size ?? "0-Infinity").split("-");
+        const circ = String(o.circularity ?? "0.00-1.00").split("-")[0];
+        steps.push({
+          tool: "analyze_particles",
+          args: { min_size: numberOf(lo) ?? 0, max_size: numberOf(hi) ?? 0, min_circularity: numberOf(circ) ?? 0, exclude_edges: o.exclude === true },
+          line,
+        });
+        break;
+      }
+      case "Set Scale...":
+        steps.push({ tool: "set_scale", args: { distance_px: numberOf(o.distance) ?? 0, known_distance: numberOf(o.known) ?? 0, unit: typeof o.unit === "string" ? o.unit : "um" }, line });
+        break;
+      case "Watershed":
+        steps.push({ tool: "watershed", args: {}, line });
+        break;
+      case "Measure":
+        steps.push({ tool: "measure", args: {}, line });
+        break;
+      default:
+        steps.push({ tool: "run_command", args: { command, options }, line });
+    }
+  }
+  return steps;
+}
+
+const readRecording: Tool = {
+  name: "read_recording",
+  title: "Read a saved Macro Recorder file",
+  description: "Read a macro file that the Macro Recorder saved (Plugins > Macros > Record..., then Create, then save). Gives the steps that the scientist did in the ImageJ menus, each as a tool name and arguments. Changes nothing.",
+  inputSchema: {
+    type: "object",
+    properties: { path: { type: "string", description: "Full path of the saved .ijm or .txt macro file." } },
+    required: ["path"],
+    additionalProperties: false,
+  },
+  source: "adapter",
+  adapter: "imagej",
+  remoteName: "read_recording",
+  readOnly: true,
+  async execute(args): Promise<ToolOutput> {
+    const path = String(args.path ?? "");
+    if (!path || !existsSync(path) || !statSync(path).isFile()) return { ok: false, error: `No file at ${path || "(empty path)"}. Ask the scientist for the path of the saved macro.` };
+    const steps = recordingSteps(readFileSync(path, "utf8"));
+    return {
+      ok: true,
+      summary: `Read ${steps.length} recorded steps.`,
+      text: steps.map((s, i) => `${i + 1}. ${s.tool} ${JSON.stringify(s.args)}   [${s.line}]`).join("\n") || "The file has no recorded steps.",
+      metrics: { n_steps: steps.length },
+      data: { steps },
+    };
+  },
+};
+
 // ---------------------------------------------------------------- checks
 
 const MEASURING = new Set(["analyze_particles", "threshold_and_count", "count_folder", "measure"]);
@@ -465,7 +583,8 @@ const mod: AdapterModule & { fidelity: typeof fidelity } = {
     background_not_handled: backgroundNotHandled,
   },
   hooks: [afterOpen],
-  tools: [listCommands],
+  tools: [listCommands, readRecording],
+  historySteps: (output) => ((output.data as { steps?: { tool: string; args: Args; line: string }[] } | undefined)?.steps ?? []),
   manualRoute,
   fidelity,
 };

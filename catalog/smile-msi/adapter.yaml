@@ -16,6 +16,7 @@ connection:
     - "{program_path}"
     - "{adapter_dir}/wrapper.py"
   state_tool: state
+  history_tool: history
   startup_timeout_s: 120
   call_timeout_s: 1800
 locate:
@@ -225,6 +226,15 @@ map:
       test: ""
       note: Read-only tool.
     summary: Listed {n_rows} slides.
+  - tool: history
+    route: File > Analyses... > History lists the runs on a slide. Data > Acquisition & matching... shows the extraction settings.
+    fidelity: code_only
+    difference: The tool only reads information. No result to repeat.
+    evidence:
+      source: program_definitions
+      test: ""
+      note: Read-only tool. It reads the saved session and the run store of the slide.
+    summary: "Read {data.n_runs} runs from the saved session."
   - tool: slide_state
     route: No step. The Analyses... tab (File menu) shows the runs on a slide.
     fidelity: code_only

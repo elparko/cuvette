@@ -144,6 +144,28 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         }
         return windowHandle.current.url;
       },
+      startPanel: async () => {
+        if (!windowHandle.current) {
+          const { startWindow } = await import("../server/window.ts");
+          windowHandle.current = await startWindow(session, { port: 0 });
+        }
+        const u = new URL(windowHandle.current.url);
+        u.pathname = "/panel";
+        const url = u.toString();
+        const opened: string[] = [];
+        const failed: string[] = [];
+        for (const a of (session as unknown as { adapters?: { name: string; module(): Promise<{ openPanel?: (url: string, o: { sessionDir: string }) => Promise<unknown> }> }[] }).adapters ?? []) {
+          try {
+            const mod = await a.module();
+            if (!mod.openPanel) continue;
+            await mod.openPanel(url, { sessionDir: session.dir });
+            opened.push(a.name);
+          } catch (e) {
+            failed.push(`${a.name}: ${(e as Error).message}`);
+          }
+        }
+        return { url, opened, failed };
+      },
     }),
     [session, cards, addCard, refresh, quit, opts],
   );

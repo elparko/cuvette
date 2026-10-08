@@ -26,6 +26,7 @@ connection:
   interpreter: ["java", "-Dapple.awt.UIElement=true", "-jar", "{program_path}", "-batch", "{macro_file}"]
   macro_ext: ".ijm"
   state_tool: image_info
+  history_tool: read_recording
   call_timeout_s: 120
 
 locate:
@@ -354,6 +355,17 @@ map:
     fidelity: exact
     evidence: { source: program_definitions }
     summary: "Found {metrics.n_found} menu commands for {query}."
+
+  - tool: read_recording
+    route: Plugins > Macros > Record...
+    steps:
+      - Do the steps in the ImageJ menus
+      - Click Create in the recorder window, then save the macro with File > Save As...
+    params:
+      - { arg: path, label: Saved macro file }
+    fidelity: exact
+    evidence: { source: macro_recorder }
+    summary: "Read {metrics.n_steps} recorded steps."
 
 checks:
   - id: pseudoreplication

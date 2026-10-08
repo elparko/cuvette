@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { makeProvider } from "../providers/index.ts";
@@ -13,7 +13,7 @@ import { loadSettings, type Settings } from "./config.ts";
 import { decisionHook, DecisionRecord } from "./decisions.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
-import { compareNote, instruction } from "./modes.ts";
+import { compareNote, instruction, teachReview, type TeachSummary } from "./modes.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
 import { QuestionQueue } from "./questions.ts";
@@ -59,7 +59,7 @@ interface Pending<T> {
 const MODE_NOTE: Record<Mode, string> = {
   watch: "Mode is now watch: you run the steps.",
   follow: "Mode is now follow: the scientist does each program step by hand; the harness shows the manual route, waits, and checks the result. Call one program step at a time.",
-  teach: "Mode is now teach: the scientist works in the program. Run only read-only tools and compare the scientist's steps with the decision record.",
+  teach: "Mode is now teach: the scientist works in the program. Run only read-only tools. When the scientist says a step is finished, call review_my_steps. It reads the steps that the scientist did and compares them with the decision record. Then explain each difference and why it matters.",
   plan: "Mode is now plan: write a plan with the plan tool. Run only read-only tools.",
 };
 
@@ -228,6 +228,7 @@ export class Session {
         log: (kind, data) => this.record.append(kind, data),
       }),
     );
+    if (this.adapters.some((a) => a.manifest.connection.history_tool)) extra.push(this.reviewTool());
     if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.pipeline(t, a, id, sig) }));
     for (const t of extra) if (!this.tools.has(t.name)) this.tools.set(t.name, t);
     this.chooseActiveTools();
@@ -677,7 +678,10 @@ export class Session {
     const roots = [this.cwd, this.dir, gaHome(), ...this.adapters.map((a) => a.root), ...named, ...named.map((n) => join(n, ".."))];
     const nodeFiles = this.record.nodes().flatMap((n) => n.outputs.map((o) => join(o.path, "..")));
     roots.push(...nodeFiles);
-    return paths.every((p) => roots.some((r) => p === r || p.startsWith(r.endsWith("/") ? r : r + "/")));
+    return paths.every((p) => roots.some((r) => {
+      const rel = relative(r, p);
+      return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+    }));
   }
 
   private decisionOf(key: string) {
@@ -852,6 +856,46 @@ export class Session {
 
   pendingFollowSteps(): number[] {
     return [...this.followWaits.keys()];
+  }
+
+  private reviewTool(): Tool {
+    return {
+      name: "review_my_steps",
+      description: "Teach mode. Read the steps that the scientist did in the program, and compare each step with the decision record. Gives the differences, the decisions that the record does not cover yet, and the steps that the adapter map does not know. Call it when the scientist says that a step is finished. Give args only if the history tool needs them, such as the path of a saved recording.",
+      inputSchema: {
+        type: "object",
+        properties: { adapter: { type: "string", description: "Adapter name. Optional if one adapter has a history tool." }, args: { type: "object", description: "Arguments for the history tool of the adapter, such as {\"path\": \"/data/recording.ijm\"}." } },
+        required: [],
+      },
+      source: "harness",
+      readOnly: true,
+      permission: "allow",
+      execute: async (a) => {
+        const r = await this.teachReview(typeof a.adapter === "string" ? a.adapter : undefined, (a.args && typeof a.args === "object" ? a.args : {}) as Args);
+        return { ok: r.ok, error: r.error, text: r.text, summary: r.ok ? `${r.n_match} of ${r.n_steps} steps match the record.` : r.error, data: r };
+      },
+    };
+  }
+
+  async teachReview(adapterName?: string, args: Args = {}): Promise<TeachSummary> {
+    return teachReview(
+      {
+        adapters: this.adapters,
+        decisions: this.decisions,
+        record: this.record,
+        runHistory: async (adapter, name, a) => {
+          const tool = [...this.tools.values()].find((t) => t.adapter === adapter.name && (t.remoteName ?? t.name) === name);
+          if (!tool) return { ok: false, error: `${adapter.name} has no tool named ${name}.` };
+          if (!tool.readOnly) return { ok: false, error: `${name} is not read-only, so teach mode does not run it.` };
+          const callId = `teach${++this.callCount}`;
+          this.record.append("tool_call", { callId, tool: tool.name, adapter: tool.adapter, args: a });
+          const r = await this.pipeline(tool, absolutePaths(a, this.cwd) as Args, callId, this.abort?.signal ?? new AbortController().signal);
+          return r.output ?? { ok: false, error: r.text };
+        },
+      },
+      adapterName,
+      args,
+    );
   }
 
   // ------------------------------------------------------------- scientist actions

@@ -70,13 +70,10 @@ export class QuestionQueue {
     this.questions.set(q.qid, q);
     this.record.append("question", { ...q });
     upsert(q);
-    if (this.opts.notify) {
-      try {
-        await this.opts.notify(q);
-      } catch (err) {
+    if (this.opts.notify)
+      void this.opts.notify(q).catch((err) => {
         this.record.append("notice", { text: `Could not send the notice for question ${q.qid}: ${(err as Error).message}` });
-      }
-    }
+      });
     return q;
   }
 

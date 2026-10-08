@@ -2,13 +2,15 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, test } from "vitest";
-import mod, { fidelity, manualRoute, menuFromProps, menuIndex, readZipEntry } from "../catalog/imagej/adapter.ts";
+import mod, { fidelity, manualRoute, menuFromProps, menuIndex, readZipEntry, recordingSteps } from "../catalog/imagej/adapter.ts";
 import { locate } from "../src/adapters/locate.ts";
 import { loadAdapter } from "../src/adapters/manifest.ts";
 import { renderMacro, startMacro } from "../src/adapters/kinds/macro.ts";
 import { runProcess } from "../src/adapters/kinds/common.ts";
 import { checkAdapter } from "../src/onboarding/checker.ts";
 import { runTests } from "../src/onboarding/kat.ts";
+import { Session } from "../src/core/session.ts";
+import { FakeProvider } from "../src/providers/fake.ts";
 import type { AdapterCheckContext } from "../src/adapters/manifest.ts";
 import type { Entry, FindingIn, Node, ToolContext } from "../src/core/types.ts";
 
@@ -55,7 +57,7 @@ describe("adapter files", () => {
 
   test("the skills have a name and a description", () => {
     const skills = adapter.skills();
-    expect(skills.map((s) => s.name).sort()).toEqual(["batch-folder", "compare-conditions", "count-cells", "follow-mode"]);
+    expect(skills.map((s) => s.name).sort()).toEqual(["batch-folder", "compare-conditions", "count-cells", "follow-mode", "teach-mode"]);
     for (const s of skills) expect(s.description.length).toBeGreaterThan(10);
     expect(adapter.standardsText()).toContain("unit of replication".replace("unit of replication", "Unit of replication"));
   });
@@ -306,4 +308,74 @@ describe.skipIf(!live)("live ImageJ", () => {
     expect(b.error).toContain("Unknown menu command");
     await rt.close();
   });
+});
+
+describe("recorded steps", () => {
+  const file = join(ROOT, "data/recording-blobs.ijm");
+
+  test("a saved recording gives the known steps", () => {
+    const steps = recordingSteps(readFileSync(file, "utf8"));
+    expect(steps.map((s) => [s.tool, s.args])).toEqual([
+      ["open_image", { path: "/Users/lab/data/blobs.gif" }],
+      ["subtract_background", { rolling_radius: 50, light_background: true }],
+      ["gaussian_blur", { sigma: 2 }],
+      ["threshold", { method: "Otsu", dark_background: true }],
+      ["watershed", {}],
+      ["set_scale", { distance_px: 100, known_distance: 50, unit: "um" }],
+      ["analyze_particles", { min_size: 50, max_size: 0, min_circularity: 0, exclude_edges: true }],
+      ["run_command", { command: "Median...", options: "radius=2" }],
+    ]);
+    expect(steps[3].line).toBe('setAutoThreshold("Otsu dark"); run("Convert to Mask");');
+  });
+
+  test("a rectangle before Measure becomes the region, other lines become run_command", () => {
+    const steps = recordingSteps('makeRectangle(10, 20, 30, 40);\nrun("Measure");\nselectWindow("a.tif");\nrun("Convert to Mask");\nsetAutoThreshold("Default");');
+    expect(steps.map((s) => [s.tool, s.args])).toEqual([
+      ["measure", { roi: "10,20,30,40" }],
+      ["run_command", { command: 'selectWindow("a.tif")', options: "" }],
+      ["run_command", { command: "Convert to Mask", options: "" }],
+      ["threshold", { method: "Default", dark_background: false }],
+    ]);
+  });
+
+  test("read_recording gives the steps and fails on a missing file", async () => {
+    const tool = mod.tools!.find((t) => t.name === "read_recording")!;
+    const ctx = {} as ToolContext;
+    const ok = await tool.execute({ path: file }, ctx);
+    expect(ok.ok).toBe(true);
+    expect(ok.metrics?.n_steps).toBe(8);
+    expect(mod.historySteps!(ok)).toHaveLength(8);
+    expect((await tool.execute({ path: "/nope.ijm" }, ctx)).ok).toBe(false);
+    expect(tool.readOnly).toBe(true);
+    expect(adapter.manifest.connection.history_tool).toBe("read_recording");
+  });
+});
+
+describe.skipIf(!live)("live teach review", () => {
+  test("ImageJ runs the recorded macro, and teach mode compares its steps with the record", async () => {
+    const work = mkdtempSync(join(tmpdir(), "ga-teach-live-"));
+    process.env.GA_HOME = join(work, "home");
+    const file = join(work, "recording.ijm");
+    const text = readFileSync(join(ROOT, "data/recording-blobs.ijm"), "utf8").replace("/Users/lab/data/blobs.gif", join(ROOT, "data/blobs.gif"));
+    writeFileSync(file, text);
+    const jar = (await locate(adapter.manifest)).path!;
+    const ran = await runProcess(["java", "-Dapple.awt.UIElement=true", "-jar", jar, "-batch", file], { timeoutMs: 120000 });
+    expect(ran.code).toBe(0);
+
+    const session = await Session.create({ adapters: [ROOT], provider: new FakeProvider([{ text: "ok" }]), cwd: work, mode: "teach" });
+    try {
+      session.decisions.applySetup({});
+      session.decisions.change("threshold_method", "Triangle");
+      session.decisions.change("background_subtraction", 25);
+      const r = await session.teachReview("imagej", { path: file });
+      expect(r.ok).toBe(true);
+      expect(r.steps.map((x) => x.tool)).toEqual(["open_image", "subtract_background", "gaussian_blur", "threshold", "watershed", "set_scale", "analyze_particles", "run_command"]);
+      expect(r.steps[1].differences).toEqual(["Background subtraction (rolling ball radius in pixels, 0 = none): you used 50, the record says 25."]);
+      expect(r.steps[3].differences).toEqual(['Threshold method: you used "Otsu", the record says "Triangle".']);
+      expect(r.steps[6].differences).toEqual(["Smallest object to count (in calibrated area units): you used 50, the record says 0."]);
+      expect(session.record.entries(["follow_step"])).toHaveLength(8);
+    } finally {
+      await session.close();
+    }
+  }, 180000);
 });

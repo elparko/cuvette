@@ -301,7 +301,7 @@ export class DecisionRecord {
     s.owner = owner;
   }
 
-  enforce(adapter: string, tool: string, args: Args): Enforcement {
+  enforce(adapter: string, tool: string, args: Args, opts: { readOnly?: boolean } = {}): Enforcement {
     const out: Args = structuredClone(args ?? {});
     const deviations: Deviation[] = [];
     const waiting: string[] = [];
@@ -319,7 +319,8 @@ export class DecisionRecord {
         else if (s.owner === "human" && s.def.stage === "when_needed" && !waiting.includes(key)) waiting.push(key);
       } else if (s.set) {
         if (!same(s.value, given)) {
-          if (s.owner === "agent") this.change(key, given, { by: "agent", reason: "the agent changed its own choice" });
+          if (s.owner === "agent" && !opts.readOnly) this.change(key, given, { by: "agent", reason: "the agent changed its own choice" });
+          else if (s.owner === "agent") deviations.push({ arg, key, setup: s.value, used: given });
           else {
             setPath(out, arg, s.value);
             deviations.push({ arg, key, setup: s.value, used: given, overwritten: true });
@@ -327,7 +328,7 @@ export class DecisionRecord {
         }
       } else if (s.owner === "human" && s.def.stage === "when_needed") {
         if (!waiting.includes(key)) waiting.push(key);
-      } else if (s.owner === "agent") {
+      } else if (s.owner === "agent" && !opts.readOnly) {
         this.change(key, given, { by: "agent", reason: "chosen by the agent at first use" });
       }
 

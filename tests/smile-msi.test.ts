@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -13,7 +14,7 @@ const DIR = resolve("catalog/smile-msi");
 const adapter = loadAdapter(DIR);
 
 const TOOL_ARGS: Record<string, string[]> = {
-  list_slides: [], slide_state: ["ref"], analysis_catalog: ["category"], scripting_guide: [],
+  list_slides: [], history: ["ref"], slide_state: ["ref"], analysis_catalog: ["category"], scripting_guide: [],
   run_result: ["ref", "run_id"], open_slide: ["ref", "stride", "ppm", "norm", "reduce", "tic_max_amp"], state: [],
   find_peaks: ["snr", "max_peaks", "spatial", "min_morans", "region", "max_candidates"],
   run_analysis: ["step_id", "params", "features", "a", "b", "region", "groups", "mask", "target_mz"],
@@ -43,11 +44,12 @@ describe("smile-msi manifest", () => {
     expect(m.connection.kind).toBe("mcp");
     expect(m.connection.command).toEqual(["{program_path}", "{adapter_dir}/wrapper.py"]);
     expect(m.connection.state_tool).toBe("state");
+    expect(m.connection.history_tool).toBe("history");
     expect(m.locate.env).toBe("SMILE_MSI_PYTHON");
     expect(m.locate.paths).toContain("~/Code/SMILE-MSI/.venv/Scripts/python.exe");
     expect(m.module).toBe("adapter.ts");
     expect(adapter.standardsText()).toContain("putative");
-    expect(adapter.skills().map((s) => s.name).sort()).toEqual(["compare-regions", "explore-slide", "follow-mode", "identify-lipids"]);
+    expect(adapter.skills().map((s) => s.name).sort()).toEqual(["compare-regions", "explore-slide", "follow-mode", "identify-lipids", "teach-mode"]);
     for (const s of adapter.skills()) expect(s.description.length).toBeGreaterThan(10);
   });
 
@@ -188,6 +190,46 @@ describe("smile-msi checks", () => {
 const PYTHON = [process.env.SMILE_MSI_PYTHON, join(homedir(), "Code/SMILE-MSI/.venv/bin/python"), join(homedir(), "code/SMILE-MSI/.venv/bin/python")]
   .filter((p): p is string => !!p)
   .find((p) => existsSync(p));
+
+const MAKE_SESSION = `
+import json, os, sys, tempfile
+sys.path.insert(0, ${JSON.stringify(DIR)})
+from smile_msi import runs, session
+import wrapper
+d = tempfile.mkdtemp(prefix="ga-smile-hist-")
+path = os.path.join(d, "slide__test.json")
+settings = {"ppm": 5.0, "norm": "rms", "reduce": "sum", "snr": 1.5,
+            "profile_deviations": {"norm": ["tic", "rms"], "ppm": [10.0, 5.0], "snr": [3.0, 1.5]}}
+session.save_session(path, session.build_session(source="/nonexistent/slide.imzML", settings=settings, peaks=[]))
+store = runs.RunStore(session.runs_dir_path(path))
+def add(step, params, now, status="done"):
+    r = runs.new_run(step, title=step, params=params, now=now)
+    r.status = status
+    store.save(r)
+add("find_peaks", {"snr": 3.0, "min_rel_intensity": 0.002, "prominence": 1.0, "max_peaks": 500}, "2026-01-01T10:00:00+00:00")
+add("roi_comparison", {"method": "mwu", "max_q": 0.05, "tol_ppm": 5.0, "norm": "rms"}, "2026-01-01T10:05:00+00:00")
+add("pca", {"n_components": 3}, "2026-01-01T10:06:00+00:00", "error")
+add("find_spatial_features", {"snr": 3.0, "min_morans": 0.05, "max_candidates": 2000, "tol_ppm": 5.0, "norm": "rms"}, "2026-01-01T09:00:00+00:00")
+print(json.dumps(wrapper.history(path)))
+print(json.dumps(wrapper.history("demo")))
+`;
+
+describe.skipIf(!PYTHON)("smile-msi history on a temporary session", () => {
+  test("the steps are the settings the scientist changed, then the finished runs oldest first", () => {
+    const out = execFileSync(PYTHON!, ["-I", "-c", MAKE_SESSION], { encoding: "utf8", timeout: 120000 }).trim().split("\n");
+    const h = JSON.parse(out[0]);
+    expect(h.n_runs).toBe(3);
+    expect(h.steps.map((s: { tool: string; args: unknown }) => [s.tool, s.args])).toEqual([
+      ["apply_settings", { norm: "rms", ppm: 5 }],
+      ["find_peaks", { snr: 3, min_morans: 0.05, max_candidates: 2000, spatial: true }],
+      ["find_peaks", { snr: 3, max_peaks: 500 }],
+      ["run_analysis", { step_id: "roi_comparison", params: { method: "mwu", max_q: 0.05, tol_ppm: 5, norm: "rms" } }],
+    ]);
+    expect(h.steps[3].line).toContain("Analyze > This slide > Statistics > Region comparison (A vs B)");
+    expect(h.steps[3].line).toContain("Normalization = rms");
+    expect(JSON.parse(out[1]).steps).toEqual([]);
+  });
+});
 
 describe.skipIf(!process.env.GA_LIVE || !PYTHON)("smile-msi live", () => {
   const workDir = mkdtempSync(join(tmpdir(), "ga-smile-"));
