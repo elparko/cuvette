@@ -154,7 +154,7 @@ test("locate: env var, paths with ~ and globs, then which", async () => {
   expect(home.path).toBeUndefined();
 
   const c = await locate(manifest({ which: ["nope-not-a-program", "sh"] }, "2"));
-  expect(c.path).toMatch(/sh$/);
+  expect(c.path).toMatch(/sh(\.exe)?$/i);
   expect(c.version).toBe("2");
 
   const d = await locate(manifest({ which: ["nope-not-a-program"], version_command: ["{program_path}", "-v"] }, "fallback"));
