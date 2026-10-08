@@ -136,6 +136,8 @@ npx tsc --noEmit
 
 ## Documents
 
+- [docs/status-2026-10-08.md](docs/status-2026-10-08.md): what was built and tested overnight, and
+  the known limits. Start here.
 - [docs/design.md](docs/design.md): the goals and all intended features.
 - [docs/architecture.md](docs/architecture.md): the modules and their contracts.
 - [docs/harness-survey.md](docs/harness-survey.md): how Claude Code and OpenCode work, and what
