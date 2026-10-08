@@ -66,7 +66,7 @@ def calls(log, tool, ok=True):
         if e.get("kind") == "tool_call" and d.get("tool") == tool:
             args[d.get("callId")] = d.get("args") or {}
         elif e.get("kind") == "tool_result" and d.get("tool") == tool:
-            if ok and not d.get("ok"):
+            if (ok and not d.get("ok")) or d.get("sensitivityOf"):
                 continue
             try:
                 res = json.loads(d.get("text") or "")

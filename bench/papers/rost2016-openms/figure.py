@@ -164,7 +164,8 @@ class NoOutput(Exception):
 def draw(ax, session, run, log):
     import pandas as pd
 
-    files = find_files(session, "work/find_features-*/features.csv")
+    main = [o.get("path", "") for e in log if e.get("kind") == "node" and (e.get("data") or {}).get("tool") == "find_features" and not e["data"].get("sensitivityOf") for o in e["data"].get("outputs") or []]
+    files = [Path(p) for p in main if p.endswith(".csv") and Path(p).is_file()] or find_files(session, "work/find_features-*/features.csv")
     if not files:
         raise NoOutput("no feature table in the session; the run did not call find_features")
     df = pd.read_csv(files[-1])
