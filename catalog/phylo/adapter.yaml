@@ -1,0 +1,457 @@
+adapter:
+  name: phylo
+  title: MAFFT and IQ-TREE
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Aligns DNA or protein sequences with MAFFT and builds maximum-likelihood trees with IQ-TREE.
+    Each tool runs one command. The scientist can repeat each step on the command line.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: IQ-TREE
+  version: "3.1.4"
+  homepage: http://www.iqtree.org
+  docs:
+    - http://www.iqtree.org/doc/Tutorial
+    - http://www.iqtree.org/doc/Command-Reference
+    - https://mafft.cbrc.jp/alignment/software/manual/manual.html
+
+connection:
+  kind: cli
+  call_timeout_s: 1800
+
+locate:
+  env: IQTREE
+  paths: ["/opt/homebrew/bin/iqtree3", "/usr/local/bin/iqtree3", "/opt/homebrew/bin/iqtree2", "/usr/local/bin/iqtree2", "~/.local/bin/iqtree3"]
+  which: [iqtree3, iqtree2]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "IQ-TREE (?:\\S+ )*version (\\S+)"
+
+decisions:
+  - key: algorithm
+    label: Alignment method (MAFFT)
+    kind: choice
+    choices: [auto, linsi, ginsi, einsi, fftns2]
+    default: auto
+    group: Alignment
+    help: >
+      auto lets MAFFT choose from the data size. linsi (L-INS-i) is the most accurate method for
+      sequences with local similarity and gaps. ginsi (G-INS-i) suits sequences that align over
+      their whole length. einsi (E-INS-i) suits sequences with long unalignable regions. fftns2
+      (FFT-NS-2) is fast and less accurate. Large sets can take a long time with the iterative methods.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: align_sequences, arg: algorithm }
+    sensitivity:
+      options: [auto, linsi, fftns2]
+      tool: align_sequences
+      compare: [metrics.alignment_length, metrics.constant_columns, metrics.mean_pairwise_identity]
+      max_runs: 3
+
+  - key: trim
+    label: Trim the alignment
+    kind: bool
+    default: false
+    group: Alignment
+    help: >
+      Trimming removes alignment columns that have many gaps. It can remove noise. It can also remove
+      real signal and change the tree. Say yes only if you want it. No means the tree uses every column.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: max_gap_fraction
+    label: Largest gap fraction of a kept column
+    kind: float
+    default: 0.5
+    lo: 0
+    hi: 1
+    group: Alignment
+    help: >
+      Used only if you trim. The tool removes each column where more than this fraction of the
+      sequences have a gap. 0 keeps only columns with no gap. 1 keeps every column.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: trim_alignment, arg: max_gap_fraction }
+    sensitivity:
+      options: [0.2, 0.5, 0.8]
+      tool: trim_alignment
+      compare: [metrics.alignment_length, metrics.columns_removed]
+      max_runs: 3
+
+  - key: model
+    label: Substitution model
+    kind: text
+    default: MFP
+    group: Tree
+    help: >
+      MFP lets ModelFinder choose the best model by BIC and then builds the tree with it. Or give a
+      model name such as HKY, GTR+G or LG+F+G4. A fixed model skips model selection. A wrong fixed
+      model can bias the tree.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: infer_tree, arg: model }
+
+  - key: bootstrap_type
+    label: Bootstrap type
+    kind: choice
+    choices: [none, ufboot, standard]
+    default: ufboot
+    group: Tree
+    help: >
+      ufboot is the ultrafast bootstrap. It is fast. Its values are often higher than standard
+      bootstrap values. Read 95 or more as well supported. standard is the nonparametric bootstrap.
+      It is slow. Read 70 or more as supported. none gives a tree with no support values.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: infer_tree, arg: bootstrap_type }
+
+  - key: replicates
+    label: Number of bootstrap replicates
+    kind: int
+    default: 1000
+    lo: 100
+    hi: 10000
+    group: Tree
+    help: >
+      The number of bootstrap trees. IQ-TREE needs at least 1000 for the ultrafast bootstrap. More
+      replicates make support values more stable and the run longer.
+    owner: human
+    stage: setup
+    links:
+      - { tool: infer_tree, arg: replicates }
+
+  - key: outgroup
+    label: Outgroup
+    kind: text
+    group: Tree
+    help: >
+      The name of one sequence, or names separated by commas, that IQ-TREE uses to root the tree.
+      The name must match the sequence name in the alignment. Leave it empty for an unrooted tree.
+      A wrong outgroup gives a wrong root.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: infer_tree, arg: outgroup }
+
+  - key: seed
+    label: Random seed
+    kind: int
+    default: 1
+    lo: 1
+    hi: 2147483647
+    group: Tree
+    help: The seed of the random number generator. A fixed seed makes a run repeat.
+    owner: fixed
+    stage: setup
+    changes_conclusion: false
+    links:
+      - { tool: infer_tree, arg: seed }
+
+tools:
+  - name: align_sequences
+    title: Align sequences with MAFFT
+    description: >
+      Align unaligned DNA or protein sequences from a FASTA file with MAFFT. Do not use this tool on a file that is already aligned, such as a PHYLIP file. Give an aligned file straight to infer_tree. The result has the path of the
+      alignment (alignment), the number of sequences, the alignment length, the gap fraction, the number of
+      constant columns and the mean pairwise identity. sequences_intact is 1 if removing the gaps gives back
+      the input sequences. Use the alignment path in later steps.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the FASTA file with unaligned sequences. }
+      algorithm: { type: string, enum: [auto, linsi, ginsi, einsi, fftns2], description: MAFFT method. }
+    required: [path]
+    outputs:
+      aln: { kind: file, ext: .fasta, description: The aligned sequences in FASTA format. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/align.sh", "{algorithm}", "{path}", "{output.aln}"]
+    parse: keyvalue
+
+  - name: alignment_stats
+    title: Describe an alignment
+    description: >
+      Read an aligned FASTA file and report the number of sequences, the alignment length, the gap fraction,
+      the number of constant columns and the mean pairwise identity. The tool changes nothing.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the aligned FASTA file. }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/py.sh", "fasta_stats.py", "{path}"]
+    parse: keyvalue
+
+  - name: trim_alignment
+    title: Remove gappy columns
+    description: >
+      Remove each alignment column where more than max_gap_fraction of the sequences have a gap. The result
+      has the path of the trimmed alignment (alignment) and the number of columns removed. Call this tool
+      only if the scientist chose to trim.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the aligned FASTA file. }
+      max_gap_fraction: { type: number, minimum: 0, maximum: 1, description: Largest gap fraction of a column that stays. }
+    required: [path, max_gap_fraction]
+    outputs:
+      aln: { kind: file, ext: .fasta, description: The trimmed alignment in FASTA format. }
+    command: ["/bin/sh", "{adapter_dir}/scripts/py.sh", "trim.py", "{path}", "{output.aln}", "{max_gap_fraction}"]
+    parse: keyvalue
+
+  - name: select_model
+    title: Choose a substitution model with ModelFinder
+    description: >
+      Run IQ-TREE ModelFinder on an alignment (IQ-TREE option -m MF). It tests many substitution models and
+      reports the best model by BIC and by AIC. It does not report a final tree. Use infer_tree with model MFP
+      to choose a model and build the tree in one run.
+    read_only: true
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the alignment. FASTA, PHYLIP or NEXUS format. }
+      seed: { type: integer, minimum: 1, description: Random seed. }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/iqtree.sh", "{program_path}", "select", "--alignment", "{path}", "--seed", "{seed}"]
+    parse: keyvalue
+
+  - name: infer_tree
+    title: Build a maximum-likelihood tree with IQ-TREE
+    description: >
+      Build a maximum-likelihood tree from an alignment with IQ-TREE. The model MFP chooses the model with
+      ModelFinder first. The result has the model, the log-likelihood, the tree length, the path of the tree
+      (treefile) and the path of the report. With a bootstrap, treefile has the support values on the
+      maximum-likelihood tree.
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the alignment. FASTA, PHYLIP or NEXUS format. }
+      model: { type: string, description: "Substitution model name, or MFP to let ModelFinder choose." }
+      bootstrap_type: { type: string, enum: [none, ufboot, standard], description: Bootstrap type. }
+      replicates: { type: integer, minimum: 100, maximum: 10000, description: Number of bootstrap replicates. }
+      outgroup: { type: string, description: Sequence name or names (comma separated) used to root the tree. }
+      seed: { type: integer, minimum: 1, description: Random seed. }
+    required: [path]
+    command: ["/bin/sh", "{adapter_dir}/scripts/iqtree.sh", "{program_path}", "infer", "--alignment", "{path}", "--model", "{model}", "--bootstrap-type", "{bootstrap_type}", "--replicates", "{replicates}", "--outgroup", "{outgroup}", "--seed", "{seed}"]
+    parse: keyvalue
+
+map:
+  - tool: align_sequences
+    match: { algorithm: auto }
+    route: "Run: mafft --auto <in>.fasta > <out>.fasta"
+    params:
+      - { arg: path, label: "<in>.fasta" }
+      - { arg: algorithm, label: "--auto", ui_default: "" }
+    fidelity: close
+    difference: The tool also runs MAFFT with one thread and counts gaps and constant columns. The alignment itself is the same as the command line.
+    evidence: { source: docs, test: mafft_small_set, note: "Alignment properties checked in a test. The command line route was run by hand and gave the same alignment length." }
+    summary: "{metrics.n_sequences} sequences aligned to {metrics.alignment_length} columns."
+
+  - tool: align_sequences
+    match: { algorithm: linsi }
+    route: "Run: mafft --localpair --maxiterate 1000 <in>.fasta > <out>.fasta"
+    params:
+      - { arg: path, label: "<in>.fasta" }
+    fidelity: close
+    difference: Same as auto. This is the L-INS-i method (the same as the linsi command).
+    evidence: { source: docs, test: mafft_small_set }
+    summary: "{metrics.n_sequences} sequences aligned to {metrics.alignment_length} columns."
+
+  - tool: align_sequences
+    match: { algorithm: ginsi }
+    route: "Run: mafft --globalpair --maxiterate 1000 <in>.fasta > <out>.fasta"
+    params:
+      - { arg: path, label: "<in>.fasta" }
+    fidelity: close
+    difference: Same as auto. This is the G-INS-i method (the same as the ginsi command). Route not tested.
+    evidence: { source: docs }
+    summary: "{metrics.n_sequences} sequences aligned to {metrics.alignment_length} columns."
+
+  - tool: align_sequences
+    match: { algorithm: einsi }
+    route: "Run: mafft --genafpair --maxiterate 1000 <in>.fasta > <out>.fasta"
+    params:
+      - { arg: path, label: "<in>.fasta" }
+    fidelity: close
+    difference: Same as auto. This is the E-INS-i method (the same as the einsi command). Route not tested.
+    evidence: { source: docs }
+    summary: "{metrics.n_sequences} sequences aligned to {metrics.alignment_length} columns."
+
+  - tool: align_sequences
+    match: { algorithm: fftns2 }
+    route: "Run: mafft --retree 2 --maxiterate 0 <in>.fasta > <out>.fasta"
+    params:
+      - { arg: path, label: "<in>.fasta" }
+    fidelity: close
+    difference: Same as auto. This is the FFT-NS-2 method (the same as the fftns2 command).
+    evidence: { source: docs, test: mafft_small_set }
+    summary: "{metrics.n_sequences} sequences aligned to {metrics.alignment_length} columns."
+
+  - tool: alignment_stats
+    route: "Open the alignment in an alignment viewer such as AliView or Jalview and read the sequence count and the alignment length."
+    params:
+      - { arg: path, label: alignment file }
+    fidelity: code_only
+    evidence: { source: code, test: mafft_small_set }
+    summary: "{metrics.n_sequences} sequences, {metrics.alignment_length} columns, mean identity {metrics.mean_pairwise_identity}."
+
+  - tool: trim_alignment
+    route: "Run a trimming program such as trimAl: trimal -in <in>.fasta -out <out>.fasta -gt <1 minus gap fraction>. Or delete the gappy columns in an alignment viewer."
+    params:
+      - { arg: path, label: "-in" }
+      - { arg: max_gap_fraction, label: "-gt (1 minus this value)", ui_default: "" }
+    fidelity: close
+    difference: The tool removes columns by gap fraction only. trimAl -gt does the same for the same cutoff, but the tool was not compared with trimAl. Route not tested.
+    evidence: { source: code, test: trim_removes_gappy_columns }
+    summary: "Removed {metrics.columns_removed} of {metrics.columns_before} columns."
+
+  - tool: select_model
+    route: "Run: iqtree3 -s <alignment> -m MF -seed <seed> -T 1"
+    params:
+      - { arg: path, label: "-s" }
+      - { arg: seed, label: "-seed", ui_default: "random" }
+    fidelity: exact
+    evidence: { source: docs, test: example_phy_models, note: "The IQ-TREE tutorial uses example.phy. The best model by BIC is the same by hand." }
+    summary: "Best model by BIC: {data.best_model_bic}."
+
+  - tool: infer_tree
+    match: { bootstrap_type: none }
+    route: "Run: iqtree3 -s <alignment> -m <model> -seed <seed> -T 1"
+    params:
+      - { arg: path, label: "-s" }
+      - { arg: model, label: "-m", ui_default: "MFP" }
+      - { arg: outgroup, label: "-o", ui_default: "" }
+      - { arg: seed, label: "-seed", ui_default: "random" }
+    fidelity: exact
+    evidence: { source: docs, test: example_phy_tree, note: "Run by hand with -seed 1 on example.phy. The log-likelihood matches." }
+    summary: "Model {data.model}. Log-likelihood {metrics.log_likelihood}."
+
+  - tool: infer_tree
+    match: { bootstrap_type: ufboot }
+    route: "Run: iqtree3 -s <alignment> -m <model> -B <replicates> -seed <seed> -T 1"
+    params:
+      - { arg: path, label: "-s" }
+      - { arg: model, label: "-m", ui_default: "MFP" }
+      - { arg: replicates, label: "-B", ui_default: 1000 }
+      - { arg: outgroup, label: "-o", ui_default: "" }
+      - { arg: seed, label: "-seed", ui_default: "random" }
+    fidelity: exact
+    evidence: { source: docs, test: example_phy_tree, note: "Run by hand with -seed 1 on example.phy. The model and log-likelihood match." }
+    summary: "Model {data.model}. Log-likelihood {metrics.log_likelihood}. Ultrafast bootstrap with {data.bootstrap_replicates} replicates."
+
+  - tool: infer_tree
+    match: { bootstrap_type: standard }
+    route: "Run: iqtree3 -s <alignment> -m <model> -b <replicates> -seed <seed> -T 1"
+    params:
+      - { arg: path, label: "-s" }
+      - { arg: model, label: "-m", ui_default: "MFP" }
+      - { arg: replicates, label: "-b", ui_default: 100 }
+      - { arg: outgroup, label: "-o", ui_default: "" }
+      - { arg: seed, label: "-seed", ui_default: "random" }
+    fidelity: close
+    difference: The tool and the command line use the same options. Route not tested for the standard bootstrap, which is slow.
+    evidence: { source: docs }
+    summary: "Model {data.model}. Log-likelihood {metrics.log_likelihood}. Standard bootstrap with {data.bootstrap_replicates} replicates."
+
+checks:
+  - id: no_bootstrap
+    description: A tree was built with no bootstrap, so it has no support values.
+    severity: warning
+    rule:
+      tool: infer_tree
+      arg: bootstrap_type
+      op: "=="
+      value: none
+      message: The tree has no support values. Do not describe a branch as well supported.
+  - id: model_not_stated
+    description: The report does not name the substitution model and say how it was chosen.
+    severity: warning
+    text: The report must name the substitution model. It must say if ModelFinder chose it (and by which criterion) or if the scientist fixed it.
+  - id: bootstrap_scale
+    description: The report treats ultrafast bootstrap values like standard bootstrap values.
+    severity: warning
+    text: If the tree uses the ultrafast bootstrap, the report must not use the 70 percent rule for support. It must name the type and the number of replicates.
+  - id: trim_not_stated
+    description: The report does not say whether the alignment was trimmed.
+    severity: warning
+    text: The report must say if the alignment was trimmed, with which gap fraction, and how many columns were removed.
+  - id: fewer_than_four
+    description: A tree needs at least four sequences to have a meaningful topology.
+    severity: error
+    text: Do not report a tree topology for an alignment with fewer than four sequences.
+
+tests:
+  - id: mafft_small_set
+    description: >
+      Six DNA sequences of 230 to 236 bases (cut from the IQ-TREE example.phy file, with a few bases deleted)
+      are aligned. The checks do not depend on the MAFFT version. The alignment has six sequences. Removing
+      the gaps gives back the input. The length is at least the longest input and not more than 260. The set
+      has at least 70 constant columns. Values come from a run by hand with MAFFT 7.526 and loose bounds.
+    data: [data/unaligned.fasta]
+    manual_route_checked: true
+    calls:
+      - tool: align_sequences
+        args: { path: "{adapter_dir}/data/unaligned.fasta", algorithm: linsi }
+        save_as: aln
+      - tool: alignment_stats
+        args: { path: "{saved.aln.data.alignment}" }
+    expect:
+      - { path: saved.aln.metrics.n_sequences, equals: 6 }
+      - { path: saved.aln.metrics.sequences_intact, equals: 1 }
+      - { path: saved.aln.metrics.alignment_length, min: 236, max: 260 }
+      - { path: saved.aln.metrics.constant_columns, min: 70 }
+      - { path: metrics.n_sequences, equals: 6 }
+      - { path: metrics.alignment_length, min: 236, max: 260 }
+
+  - id: trim_removes_gappy_columns
+    description: Trimming at gap fraction 0 keeps only columns with no gap. The result is shorter than the full alignment and has no gaps.
+    data: [data/unaligned.fasta]
+    calls:
+      - tool: align_sequences
+        args: { path: "{adapter_dir}/data/unaligned.fasta", algorithm: fftns2 }
+        save_as: aln
+      - tool: trim_alignment
+        args: { path: "{saved.aln.data.alignment}", max_gap_fraction: 0 }
+    expect:
+      - { path: metrics.columns_removed, min: 1 }
+      - { path: metrics.gap_fraction, equals: 0 }
+      - { path: metrics.n_sequences, equals: 6 }
+
+  - id: example_phy_models
+    description: >
+      The IQ-TREE tutorial data example.phy (17 sequences, 1998 sites). ModelFinder picks TIM2+F+I+G4 by BIC.
+      The tutorial reports this model. Checked with IQ-TREE 3.1.4 and seed 1.
+    data: [data/example.phy]
+    manual_route_checked: true
+    calls:
+      - tool: select_model
+        args: { path: "{adapter_dir}/data/example.phy", seed: 1 }
+    expect:
+      - { path: data.best_model_bic, equals: "TIM2+F+I+G4" }
+      - { path: metrics.n_sequences, equals: 17 }
+      - { path: metrics.n_sites, equals: 1998 }
+      - { path: metrics.constant_sites, equals: 686 }
+
+  - id: example_phy_tree
+    description: >
+      Build the tree for example.phy with ModelFinder and 1000 ultrafast bootstrap replicates, seed 1. The
+      tutorial shows a log-likelihood near -21152. IQ-TREE 3.1.4 gives -21152.5377 (also -21152.5376 without
+      bootstrap). The tolerance is 1 log-likelihood unit, for small differences between versions and machines.
+    data: [data/example.phy]
+    manual_route_checked: true
+    calls:
+      - tool: infer_tree
+        args: { path: "{adapter_dir}/data/example.phy", model: MFP, bootstrap_type: ufboot, replicates: 1000, seed: 1 }
+    expect:
+      - { path: data.model, equals: "TIM2+F+I+G4" }
+      - { path: metrics.log_likelihood, approx: -21152.54, abs: 1 }
+      - { path: metrics.tree_length, approx: 4.217, abs: 0.05 }
+      - { path: data.consensus_tree, contains: ".contree" }
+
+  - id: example_phy_fixed_model
+    description: A fixed HKY model with no bootstrap gives a lower log-likelihood than the best model. The value -23117.03 comes from IQ-TREE 3.1.4 by hand (seed 1).
+    data: [data/example.phy]
+    manual_route_checked: true
+    calls:
+      - tool: infer_tree
+        args: { path: "{adapter_dir}/data/example.phy", model: HKY, bootstrap_type: none, seed: 1 }
+    expect:
+      - { path: metrics.log_likelihood, approx: -23117.03, abs: 2 }

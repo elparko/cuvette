@@ -1,0 +1,25 @@
+tool: iqtree3 and mafft
+adapter_kind: cli
+data:
+  - /Volumes/T7/guided-analysis/data/minh2020-iqtree2/example.phy
+  - /Volumes/T7/guided-analysis/data/minh2020-iqtree2/unaligned.fasta
+decisions:
+  model: MFP (ModelFinder chooses)
+  bootstrap_type: ufboot
+  replicates: 1000
+  outgroup: none (unrooted)
+  algorithm: auto
+  trim: no
+  seed: 1 (fixed by the harness)
+expected:
+  - {description: "best model by BIC", value: "TIM2+F+I+G4", tolerance: 0, source: "IQ-TREE tutorial and a run with IQ-TREE 3.1.4"}
+  - {description: "log-likelihood of the ML tree", value: -21152.54, tolerance: 1, source: "IQ-TREE tutorial shows about -21152; IQ-TREE 3.1.4 seed 1 gives -21152.5377"}
+  - {description: "sequences in example.phy", value: 17, tolerance: 0, source: "file header"}
+  - {description: "sites in example.phy", value: 1998, tolerance: 0, source: "file header"}
+  - {description: "constant sites", value: 686, tolerance: 0, source: "computed, IQ-TREE 3.1.4"}
+  - {description: "sequences in the MAFFT alignment", value: 6, tolerance: 0, source: "input file"}
+  - {description: "MAFFT alignment length", value: 240, tolerance: 20, source: "computed, MAFFT 7.526 (version independent bounds 236 to 260)"}
+notes: |
+  The IQ-TREE 2 paper has no numbers for example.phy. The model and the log-likelihood come from the tutorial and from runs on this machine.
+  IQ-TREE 2 is not in Homebrew. The adapter uses iqtree3 (3.1.4), which reads the same options.
+  Ultrafast bootstrap values are not standard bootstrap values. A good answer says so.
