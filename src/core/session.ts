@@ -82,6 +82,25 @@ function extOf(p: string): string {
   return m ? m[0].toLowerCase() : "";
 }
 
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+export function withoutShown(o: ToolOutput): { value?: unknown; fullTable: boolean } {
+  if (o.data === undefined) return { fullTable: false };
+  if (!o.data || typeof o.data !== "object" || Array.isArray(o.data)) return { value: o.data, fullTable: false };
+  const rest: Record<string, unknown> = { ...(o.data as Record<string, unknown>) };
+  const shown: Record<string, unknown> = { ok: o.ok, summary: o.summary, error: o.error, metrics: o.metrics, table: o.table };
+  let fullTable = false;
+  for (const [k, v] of Object.entries(rest)) {
+    const t = v as { columns?: unknown; rows?: unknown } | null;
+    if (k === "table" && o.table && t && same(t.columns, o.table.columns) && same(t.rows, o.table.rows)) {
+      fullTable = true;
+      delete rest[k];
+    }
+    if ((k in shown && same(v, shown[k])) || (typeof v === "number" && o.metrics?.[k] === v)) delete rest[k];
+  }
+  return { value: Object.keys(rest).length ? rest : undefined, fullTable };
+}
+
 function stringsIn(v: unknown, out: string[] = []): string[] {
   if (typeof v === "string") out.push(v);
   else if (Array.isArray(v)) v.forEach((x) => stringsIn(x, out));
@@ -730,15 +749,20 @@ export class Session {
     if (o.summary) obj.summary = o.summary;
     if (vis !== "none") {
       if (o.metrics && Object.keys(o.metrics).length) obj.metrics = o.metrics;
-      if (vis === "all" && o.text) obj.text = o.text;
-      if (o.table) obj.table = vis === "summaries" ? { columns: o.table.columns, n_rows: o.table.n_rows, path: o.table.path } : { ...o.table, rows: o.table.rows.slice(0, small ? 5 : 12) };
+      const data = vis === "all" ? withoutShown(o) : undefined;
+      if (vis === "all" && o.text && o.text !== JSON.stringify(o.data)) obj.text = o.text;
+      if (data?.value !== undefined) obj.data = data.value;
       if (o.outputs?.length) {
         const cap = small ? 12 : 30;
         const files = [...o.outputs.filter((f) => f.kind !== "image"), ...o.outputs.filter((f) => f.kind === "image")];
         obj.outputs = files.slice(0, cap).map((f) => ({ name: f.name, kind: f.kind, path: f.path }));
         if (files.length > cap) obj.outputs_omitted = files.length - cap;
       }
-      if (vis === "all" && o.data !== undefined) obj.data = o.data;
+      if (o.table)
+        obj.table =
+          vis === "summaries"
+            ? { columns: o.table.columns, n_rows: o.table.n_rows, path: o.table.path }
+            : { path: o.table.path, ...o.table, rows: data?.fullTable ? o.table.rows : o.table.rows.slice(0, small ? 5 : 12) };
     }
     if (o.manualRoute && !small) obj.manual_route = o.manualRoute;
     let text = JSON.stringify(obj, null, small ? 0 : 1);

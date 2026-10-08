@@ -287,6 +287,32 @@ test("a result shows the text and the main files before the long list of picture
   expect(parsed.outputs.length + parsed.outputs_omitted).toBe(41);
 });
 
+test("a result shows the program reply once, with the whole table", async () => {
+  const provider = new FakeProvider([{ text: "x" }]);
+  provider.info = { ...provider.info, small: true };
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false } });
+  const tool = session.allTools().find((t) => t.name === "count")!;
+  const table = { columns: ["gate", "count"], rows: Array.from({ length: 14 }, (_, i) => [`g${i}`, i * 10]), n_rows: 14 };
+  const data = { ok: true, summary: "14 gates", metrics: { n_gates: 14 }, n_gates: 14, warning: "two gates share a name", table };
+  const out = (session as any).render(tool, { ok: true, summary: "14 gates", metrics: { n_gates: 14 }, text: JSON.stringify(data), data, table });
+  const parsed = JSON.parse(out.text);
+  expect(parsed.text).toBeUndefined();
+  expect(parsed.data).toEqual({ warning: "two gates share a name" });
+  expect(parsed.table.rows).toHaveLength(14);
+  expect(out.text.match(/g13/g)).toHaveLength(1);
+});
+
+test("a result keeps data that differs from the table and a text that is not the data", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "x" }]), cwd: tmpdir(), settings: { guidance: false } });
+  const tool = session.allTools().find((t) => t.name === "count")!;
+  const table = { columns: ["a"], rows: Array.from({ length: 20 }, (_, i) => [i]), n_rows: 20 };
+  const out = (session as any).render(tool, { ok: true, summary: "s", metrics: { n: 1 }, text: "log line", data: { other: [1, 2] }, table });
+  const parsed = JSON.parse(out.text);
+  expect(parsed.text).toBe("log line");
+  expect(parsed.data).toEqual({ other: [1, 2] });
+  expect(parsed.table.rows).toHaveLength(12);
+});
+
 test("a result that used the recorded value says so to the model", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", min_size: 99 } }] }, { text: "done" }]);
   session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
