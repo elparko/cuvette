@@ -39,5 +39,5 @@ items:
   - {key: n100_amplitude_gfp, description: "N100 global field power amplitude in gradiometers (fT/cm).", value: 42.1, tolerance: 2.0}
   - {key: strongest_grad_latency, description: "Latency (s) of the strongest gradiometer channel.", value: 0.0866, tolerance: 0.007}
   - {key: strongest_grad_amplitude, description: "Amplitude (fT/cm) of the strongest gradiometer channel, absolute value.", value: 199, tolerance: 8, abs: true}
-  - {key: n100_latency_eeg, description: "N100 latency (s), EEG negative peak.", value: 0.0999, tolerance: 0.007, in_answer: false}
-  - {key: n100_amplitude_eeg, description: "N100 amplitude (uV), EEG negative peak.", value: -6.0, tolerance: 0.4, in_answer: false}
+  - {key: n100_latency_eeg, description: "N100 latency (s), EEG negative peak.", value: 0.0999, tolerance: 0.007, in_answer: false, reference: true}
+  - {key: n100_amplitude_eeg, description: "N100 amplitude (uV), EEG negative peak.", value: -6.0, tolerance: 0.4, in_answer: false, reference: true}
