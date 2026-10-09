@@ -37,6 +37,23 @@ const PROSE = [
   ["<Text bold>guided-analysis</Text>", "<Text bold>Cuvette</Text>"],
   ["# Guided Analysis Agent Design", "# Cuvette Design"],
   ["Use guided-analysis in Claude Desktop", "Use Cuvette in Claude Desktop"],
+  ["`CUVETTE_KEYLOG=/tmp/keys.log ga` ", "`CUVETTE_KEYLOG=/tmp/keys.log cuvette` "],
+  ["where you start ga,", "where you start cuvette,"],
+  ["Node or ga moved", "Node or cuvette moved"],
+  ["Terminal ga $dir", "Terminal cuvette $dir"],
+  ["when ga has the app command", "when cuvette has the app command"],
+  ["falls back to Terminal with ga in", "falls back to Terminal with cuvette in"],
+  ["  ga: string;", "  cuvette: string;"],
+  ['which("ga", ', 'which("cuvette", '],
+  ["const ga = linked", "const cuvette = linked"],
+  ["process.execPath, ga, path", "process.execPath, cuvette, path"],
+  ["paths: { node, ga, path", "paths: { node, cuvette, path"],
+  ['ga: "/Users/a', 'cuvette: "/Users/a'],
+  ["const ga = join(", "const cuvette = join("],
+  ["[ga, ...args]", "[cuvette, ...args]"],
+  ['[ga, "mcp"', '[cuvette, "mcp"'],
+  ['"ga.js"', '"cuvette.js"'],
+  ["writeFileSync(ga,", "writeFileSync(cuvette,"],
   ["what `guided-analysis` takes", "what Cuvette takes"],
   ["What guided-analysis takes", "What Cuvette takes"],
 ];
@@ -44,7 +61,7 @@ const PROSE = [
 // Real folders that keep their names: the source folder and the T7 data drive.
 const KEEP = ["Code/guided-analysis", "Code-guided-analysis", "T7/guided-analysis", 'T7, "guided-analysis'];
 
-const COMMANDS = "\\[|-|\\(|<|adapters?\\b|onboard\\b|models\\b|spend\\b|key\\b|eln\\b|sessions\\b|export\\b|replay\\b|run-step\\b|questions\\b|bench\\b|mcp\\b|app\\b|terminal\\b|tools\\b";
+const COMMANDS = "\\[|-|\\(|<|adapters?\\b|onboard\\b|models\\b|spend\\b|key\\b|eln\\b|sessions\\b|export\\b|replay\\b|run-step\\b|questions\\b|bench\\b|mcp\\b|app\\b|terminal\\b|tools\\b|doctor\\b|programs\\b|open\\b|resume\\b|install-|uninstall-|trust\\b|config\\b|method\\b|databook\\b|status\\b|compare\\b|learn\\b|run\\b|again\\b|asks\\b";
 const GA_CMD = new RegExp(`(?<![\\w./@$-])ga(?= (?:${COMMANDS}))`, "g");
 
 // Keeps the next column in line when a name before it gets longer.
@@ -121,7 +138,7 @@ if (!existsSync("bin/cuvette.js")) writeIfChanged("bin/cuvette.js", readFileSync
 writeIfChanged(
   "bin/ga.js",
   `#!/usr/bin/env node
-console.error("ga is now cuvette. Use cuvette or node bin/cuvette.js.");
+console.error("The command ga is now cuvette.");
 await import("./cuvette.js");
 `,
 );
@@ -146,7 +163,7 @@ const next = {
   repository: { type: "git", url: "git+https://github.com/elparko/cuvette.git" },
   type,
   bin: { cuvette: "bin/cuvette.js" },
-  files: ["bin/", "src/", "catalog/", "!catalog/**/*.test.ts", "!**/__pycache__", "!**/*.pyc", "docs/adapter-spec.md", "docs/onboarding-guide.md", "README.md", "LICENSE"],
+  files: ["bin/", "src/", "catalog/", "samples/", "README.md", "!**/__pycache__/", "!**/*.pyc"],
   engines,
   scripts,
   ...rest,
