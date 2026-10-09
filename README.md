@@ -8,6 +8,18 @@ It works like Claude Code: a terminal app with a model loop, tools, permission p
 skills and slash commands. The difference is what the harness enforces: the scientist's decision
 record, a manual route for each step, and a record of every number.
 
+## Install: terminal or desktop
+
+There are two installs with one core:
+
+- Terminal: the npm package gives the `cuvette` command (and `ga`). `cuvette app` opens the app in
+  the browser. From this repository: `npm install`, then `npm link`.
+- Desktop (Mac): open the .dmg and drag Cuvette to Applications. To get `cuvette` in Terminal
+  too, choose Cuvette > Install Command Line Tool. It runs the core inside the app.
+
+[docs/desktop.md](docs/desktop.md) has the details, the first open of the unsigned app, and the
+build (`npm run desktop:build`).
+
 ## Start
 
 Cuvette needs Node 22 or later. Only ImageJ needs Java.

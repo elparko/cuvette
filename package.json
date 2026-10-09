@@ -4,8 +4,18 @@
   "description": "A terminal agent that analyzes data in existing science software while the scientist owns the method decisions.",
   "type": "module",
   "bin": {
-    "ga": "bin/ga.js"
+    "ga": "bin/ga.js",
+    "cuvette": "bin/ga.js"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "catalog/",
+    "samples/",
+    "README.md",
+    "!**/__pycache__/",
+    "!**/*.pyc"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -15,13 +25,16 @@
     "test:live": "GA_LIVE=1 vitest run",
     "typecheck": "tsc --noEmit",
     "lint:text": "tsx src/lint-text.ts",
-    "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/cli.js"
+    "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/cli.js",
+    "desktop:dev": "node desktop/scripts/build.mjs dev",
+    "desktop:build": "node desktop/scripts/build.mjs build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "ink": "^8.0.0",
     "react": "^19.3.0",
+    "tsx": "^4.23.15",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },
@@ -29,7 +42,6 @@
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "esbuild": "^0.28.2",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   }

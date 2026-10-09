@@ -117,4 +117,10 @@ test.runIf(mac && !existsSync("/Applications/Cuvette.app"))("the Quick Action us
   mkdirSync(join(t.env.HOME, "Applications/Cuvette.app"), { recursive: true });
   spawnSync("/bin/bash", ["-c", actionScript(t.paths), "action", t.data], { env: t.env });
   expect(readFileSync(t.log, "utf8").trim()).toBe(`open -a ${join(t.env.HOME, "Applications/Cuvette.app")} --args ${t.data}`);
+  const d = sandbox(true);
+  const desktop = join(d.env.HOME, "Applications/Cuvette.app");
+  mkdirSync(join(desktop, "Contents"), { recursive: true });
+  writeFileSync(join(desktop, "Contents/Info.plist"), "<string>com.elparko.cuvette</string>");
+  spawnSync("/bin/bash", ["-c", actionScript(d.paths), "action", d.data], { env: d.env });
+  expect(readFileSync(d.log, "utf8").trim()).toBe(`open -a ${desktop} ${d.data}`);
 });

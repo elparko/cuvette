@@ -76,7 +76,7 @@ export function actionScript(p: GaPaths): string {
     `for app in "/Applications/Cuvette.app" "$HOME/Applications/Cuvette.app"; do`,
     `  if [ -d "$app" ]; then`,
     `    echo "$(date '+%F %T') open -a $app $dir" >> "$LOGDIR/launcher.log"`,
-    `    open -a "$app" --args "$dir"`,
+    `    if grep -q com.elparko.cuvette "$app/Contents/Info.plist" 2>/dev/null; then open -a "$app" "$dir"; else open -a "$app" --args "$dir"; fi`,
     `    exit 0`,
     `  fi`,
     `done`,

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cuvette</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f6f4; --fg: #1a1a1a; --dim: #6b6b6b; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #141414; --fg: #e8e8e8; --dim: #8a8a8a; } }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; display: grid; place-items: center; }
+  main { max-width: 32rem; padding: 1.5rem; text-align: center; }
+  p { color: var(--dim); }
+  pre { text-align: left; white-space: pre-wrap; font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cuvette</h1>
+  <p id="msg">Cuvette is starting.</p>
+  <pre id="detail"></pre>
+</main>
+</body>
+</html>
