@@ -1,11 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
 <rect x="100" y="100" width="824" height="824" rx="185" fill="#151515"/>
 <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#2c2c2c" stroke-width="3"/>
-<g stroke="#151515" stroke-width="7" stroke-linejoin="round">
-<polygon fill="#dedede" points="395.8,752.8 512.0,820.0 512.0,337.7 395.8,271.2"/>
-<polygon fill="#9a9a9a" points="628.2,752.8 512.0,820.0 512.0,337.7 628.2,271.2"/>
-<polygon fill="#5e5e5e" points="411.2,480.5 496.6,529.5 496.6,780.8 411.2,731.8"/>
-<polygon fill="#f2f2f2" points="512.0,204.0 628.2,271.2 512.0,337.7 395.8,271.2"/>
-<polygon fill="#1e1e1e" points="512.0,224.3 590.4,271.2 512.0,316.0 433.6,271.2"/>
-</g>
+<rect x="150" y="548" width="249" height="80" fill="#f06a8e"/>
+<rect x="625" y="548" width="249" height="80" fill="#f06a8e" opacity=".35"/>
+<rect x="420" y="178" width="184" height="668" rx="26" fill="none" stroke="#ecebe7" stroke-width="42"/>
+<rect x="462" y="380" width="100" height="424" rx="8" fill="#ecebe7"/>
+<rect x="462" y="548" width="100" height="80" fill="#f06a8e" opacity=".7"/>
 </svg>

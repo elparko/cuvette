@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
+  <img src="docs/images/logo.svg" alt="Cuvette" height="64">
+</picture>
+
 # Cuvette
 
 A terminal agent that analyzes data in existing science programs. The scientist owns the

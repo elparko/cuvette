@@ -345,6 +345,7 @@ All 259 packages in `package-lock.json` have licenses that permit distribution w
 ### Fonts
 
 - Inter, by Rasmus Andersson and the Inter Project Authors. SIL Open Font License 1.1. The benchmark site generator (`src/bench/papers-site.ts`) loads it from Google Fonts. The repository ships no font file. https://rsms.me/inter/
+- Source Serif 4, by the Source Serif 4 Project Authors (Adobe). SIL Open Font License 1.1. The wordmark in `docs/images/logo.svg` and on the site is drawn from its outlines (weight 560). The repository ships no font file. https://github.com/adobe-fonts/source-serif
 
 ## Datasets
 

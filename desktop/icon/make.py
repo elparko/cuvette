@@ -8,34 +8,25 @@ HERE = Path(__file__).resolve().parent
 OUT = HERE.parent / "src-tauri" / "icons"
 
 TILE = "#151515"
-RIM = "#f2f2f2"
-HOLE = "#1e1e1e"
-GLASS = "#dedede"
-LIQUID = "#5e5e5e"
-FROST = "#9a9a9a"
-
-
-def pts(points, s, ox, oy, wide):
-    return " ".join(f"{ox + (x - 50) * s * wide:.1f},{oy + (y - 6) * s:.1f}" for x, y in points)
+EDGE = "#2c2c2c"
+GLASS = "#ecebe7"
+BEAM = "#f06a8e"
 
 
 def svg(small):
-    s = 8.4 if small else 7.0
-    ox, oy = 512, 512 - 44 * s
-    hole = [(50, 9.8), (59.2, 15.6), (50, 21.0), (40.8, 15.6)] if small else [(50, 8.9), (61.2, 15.6), (50, 22.0), (38.8, 15.6)]
-    liquid = [(33.4, 43), (50, 52.5), (50, 94), (33.4, 84.4)] if small else [(35.6, 45.5), (47.8, 52.5), (47.8, 88.4), (35.6, 81.4)]
-    stroke = "" if small else f' stroke="{TILE}" stroke-width="7" stroke-linejoin="round"'
-    p = lambda pp: pts(pp, s, ox, oy, 1.3 if small else 1.0)
+    # A cuvette from the front. The beam comes out weaker on the far side.
+    wall, beam = (56, 110) if small else (42, 80)
+    x0, x1, top, bottom = (402, 622, 170, 854) if small else (420, 604, 178, 846)
+    inset = wall // 2 + 21
+    by = 588 - beam // 2
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
 <rect x="100" y="100" width="824" height="824" rx="185" fill="{TILE}"/>
-<rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#2c2c2c" stroke-width="3"/>
-<g{stroke}>
-<polygon fill="{GLASS}" points="{p([(33.4, 84.4), (50, 94), (50, 25.1), (33.4, 15.6)])}"/>
-<polygon fill="{FROST}" points="{p([(66.6, 84.4), (50, 94), (50, 25.1), (66.6, 15.6)])}"/>
-<polygon fill="{LIQUID}" points="{p(liquid)}"/>
-<polygon fill="{RIM}" points="{p([(50, 6), (66.6, 15.6), (50, 25.1), (33.4, 15.6)])}"/>
-<polygon fill="{HOLE}" points="{p(hole)}"/>
-</g>
+<rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="{EDGE}" stroke-width="3"/>
+<rect x="150" y="{by}" width="{x0 - 150 - wall // 2}" height="{beam}" fill="{BEAM}"/>
+<rect x="{x1 + wall // 2}" y="{by}" width="{874 - x1 - wall // 2}" height="{beam}" fill="{BEAM}" opacity=".35"/>
+<rect x="{x0}" y="{top}" width="{x1 - x0}" height="{bottom - top}" rx="26" fill="none" stroke="{GLASS}" stroke-width="{wall}"/>
+<rect x="{x0 + inset}" y="380" width="{x1 - x0 - 2 * inset}" height="{bottom - inset - 380}" rx="8" fill="{GLASS}"/>
+<rect x="{x0 + inset}" y="{by}" width="{x1 - x0 - 2 * inset}" height="{beam}" fill="{BEAM}" opacity=".7"/>
 </svg>
 """
 
