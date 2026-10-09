@@ -1088,3 +1088,32 @@ test("the proposed metrics leave at most two settings open", async () => {
   const r = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "plan").at(-1)!;
   expect(String(r.data.error)).toMatch(/^Too many open settings: a; b; c\./);
 });
+
+test("a setting named like a decision counts as that decision, and the run asks no second time; a hand count named by a relative path is found", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "ga-rel-"));
+  mkdirSync(join(cwd, "images", "control"), { recursive: true });
+  writeFileSync(join(cwd, "images", "control", "field1_ch1.png"), "x");
+  writeFileSync(join(cwd, "hand_counts.csv"), "field,red-positive cells\ncontrol/field1,7\n");
+  const provider = new FakeProvider([
+    CLARIFY,
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count", tool: "count", settings: [{ label: "Threshold method", value: "Triangle", by: "agent" }] }] } }] },
+    { calls: [{ name: "count", args: { input: "/data/a.tif", method: "Triangle", min_size: 5 } }] },
+    { text: "There are 66 particles." },
+    { text: "There are 66 particles." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd, interactive: true });
+  session.decisions.applySetup({});
+  const asked: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "question") {
+      asked.push(e.question.title);
+      setTimeout(() => session!.answer(e.question.qid, "none"), 0);
+    }
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Count the red-positive cells in images/ for each group.");
+  expect(asked).toEqual(["Earlier results"]);
+  expect(session.record.entries(["clarify"])[0]!.data.reference).toBe(join(cwd, "hand_counts.csv"));
+  expect(session.decisions.value("method")).toBe("Triangle");
+  expect(session.record.nodes().find((n) => n.tool === "count")!.decisions).toMatchObject({ method: "Triangle" });
+});

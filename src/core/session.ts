@@ -706,7 +706,7 @@ export class Session {
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode], ...(this.pilotOn() ? [PILOT_NOTE] : []));
-      if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning();
+      if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning(text);
       this.chooseActiveTools(text);
       if (this.pick) {
         const hint = fileTypeHint(text, this.adapterList(), this.cwd, this.adapters.map((a) => a.name));
@@ -1660,13 +1660,13 @@ export class Session {
 
   // ------------------------------------------------------------- analysis plan
 
-  private startPlanning() {
+  private startPlanning(request: string) {
     this.planning = true;
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
     this.clarified = !this.tools.has("clarify");
     this.modeBefore = this.mode === "plan" ? "watch" : this.mode;
-    this.refCandidates = this.findReferenceFiles();
+    this.refCandidates = this.findReferenceFiles(request);
     if (this.mode !== "plan") {
       this.record.append("mode", { old: this.mode, new: "plan", reason: "plan first" });
       this.mode = "plan";
@@ -1677,16 +1677,21 @@ export class Session {
       this.notes.push(`Files in the project folder that may be earlier results on the same data: ${this.refCandidates.map(describeCandidate).join("; ")}. If one fits, name it in the reference section, state each measure in the reference's own terms, and ask in reference.question whether your measure is the same as the reference's measure.`);
   }
 
-  private findReferenceFiles(): Candidate[] {
-    const text = String(this.record.entries(["user"]).at(-1)?.data.text ?? "");
-    const paths = pathsIn(text).filter((p) => existsSync(p));
+  private findReferenceFiles(text: string): Candidate[] {
+    const relative = (text.match(/[\w][\w./ -]*[\w/]/g) ?? []).flatMap((w) => w.split(/\s+/)).map((w) => resolve(this.cwd, w.replace(/[.,;:]+$/, ""))).filter((p) => p !== this.cwd && existsSync(p));
+    const paths = [...new Set([...pathsIn(text).filter((p) => existsSync(p)), ...relative])];
     const names: string[] = [];
     const skip: string[] = [];
     for (const p of paths) {
       names.push(basename(p, extname(p)), basename(dirname(p)));
       skip.push(p);
       try {
-        if (statSync(p).isDirectory()) names.push(...readdirSync(p).slice(0, 60).map((n) => basename(n, extname(n))));
+        if (statSync(p).isDirectory())
+          for (const n of readdirSync(p).slice(0, 60)) {
+            names.push(basename(n, extname(n)));
+            const sub = join(p, n);
+            if (statSync(sub).isDirectory()) names.push(...readdirSync(sub).slice(0, 30).map((m) => basename(m, extname(m))));
+          }
       } catch {}
     }
     names.push(basename(this.cwd));
@@ -1992,6 +1997,8 @@ export class Session {
     const fields = this.decisions.fields();
     for (const step of plan.steps)
       for (const d of step.decisions ?? []) {
+        const byLabel = fields.find((x) => [x.label, x.key].some((n) => norm(n) === norm(d.label)));
+        if (!d.key && byLabel) d.key = byLabel.key;
         const f = d.key ? fields.find((x) => x.key === d.key) : undefined;
         const qid = [...this.planQids].find(([, x]) => x === d)?.[0];
         const answered = qid ? this.record.entries(["answer"]).filter((e) => e.data.qid === qid).at(-1) : undefined;

@@ -73,7 +73,7 @@ const PLAN_FULL = {
           settings: {
             type: "array",
             description: "The settings of the step, each with its value filled in and who set it: default, from your answer, or agent. Leave value out only if you cannot pick a sensible value (at most two in the whole plan).",
-            items: { type: "object", properties: { key: { type: "string", description: "The decision key, if the decision record has one." }, label: { type: "string" }, value: {}, by: { type: "string", enum: ["default", "from your answer", "agent"] }, options: { type: "array", items: { type: "string" } }, recommendation: { type: "string" } }, required: ["label"] },
+            items: { type: "object", properties: { key: { type: "string", description: "The decision key from the decision record, when the setting has one (for example threshold_method). The harness then uses this value at run time and does not ask again." }, label: { type: "string" }, value: {}, by: { type: "string", enum: ["default", "from your answer", "agent"] }, options: { type: "array", items: { type: "string" } }, recommendation: { type: "string" } }, required: ["label"] },
           },
           status: { type: "string", enum: ["todo", "doing", "done", "waiting", "skipped"] },
           reason: { type: "string", description: "Why the step was skipped or added." },
