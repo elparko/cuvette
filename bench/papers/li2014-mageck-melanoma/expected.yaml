@@ -1,0 +1,31 @@
+tool: MAGeCK 0.5.9.5 (mageck test), through the mageck adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/li2014-mageck-melanoma/melanoma_counts.txt
+decisions:
+  norm_method: median
+  remove_zero: both
+  adjust_method: fdr
+  gene_lfc_method: median
+  gene_test_threshold: 0.25
+  comparison_day14: "PLX14_R1,PLX14_R2 against D14_R1,D14_R2"
+  comparison_day7: "PLX7_R1,PLX7_R2 against D7_R1,D7_R2"
+expected:
+  - {description: "rank of CDH13, positive selection, day 14", value: 9, tolerance: 0, source: "Li 2014, results on the melanoma data"}
+  - {description: "rank of PPT1, positive selection, day 14", value: 14, tolerance: 0, source: "Li 2014"}
+  - {description: "rank of TADA1, positive selection, day 14", value: 11, tolerance: 0, source: "Li 2014, table of the melanoma genes (largest rank 11)"}
+  - {description: "rank of RREB1, negative selection, day 14", value: 1, tolerance: 0, source: "Li 2014"}
+  - {description: "rank of EGFR, negative selection, day 7", value: 6, tolerance: 0, source: "Li 2014"}
+  - {description: "FDR of EGFR, negative selection, day 7", value: 0.025, tolerance: 0.005, source: "Li 2014"}
+  - {description: "reference: FDR of CDH13, day 14", value: 0.017, tolerance: 0.015, source: "Li 2014; MAGeCK 0.5.9.5 gives 0.028"}
+  - {description: "reference: genes ranked", value: 17419, tolerance: 40, source: "Li 2014; the cleaned table has 17396"}
+notes: |
+  The expected values are the numbers that the paper prints for the melanoma screen. MAGeCK 0.5.9.5 on the supplement table
+  gives the same ranks (check.out). The false discovery rates differ from the paper, because the paper used an older MAGeCK:
+  CDH13 0.028 against 0.017, PPT1 0.097 against 0.085, TADA1 0.041 against less than 0.031, RREB1 0.025 against 0.05.
+  Trap: 118 gene symbols of the melanoma sheet (SEPT and MARCH families) are dates in the supplement. fetch.sh restores them from the
+  sgRNA names. A count table with dates in the gene column gives a wrong ranking (the date entries rank first), and the mageck
+  tools refuse such a table.
+  The rank statements for the leukemia screen of the same paper do not reproduce (MAP4K3 rank 17, not 9), and the beta scores
+  of the MAGeCK demo page (RNF11 3.6354) do not reproduce on the same count table (0.129). Both are rejected.
+  The paper has no run time. A rank test of 64,077 sgRNAs takes about 3 minutes on a Mac.

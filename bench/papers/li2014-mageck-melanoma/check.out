@@ -1,0 +1,12 @@
+genes ranked: day 14 17396, day 7 17396
+day 14 MED12: positive rank 1, FDR 0.00165
+day 14 NF2: positive rank 2, FDR 0.00165
+day 14 CUL3: positive rank 3, FDR 0.00165
+day 14 TADA2B: positive rank 5, FDR 0.003713
+day 14 NF1: positive rank 8, FDR 0.008045
+day 14 CDH13: positive rank 9, FDR 0.028218
+day 14 TADA1: positive rank 11, FDR 0.040954
+day 14 PPT1: positive rank 14, FDR 0.097242
+day 14 RREB1: negative rank 1, FDR 0.024752
+day 7 EGFR: negative rank 6, FDR 0.027228
+day 7 positive ranks: MED12 3, NF2 1, CUL3 2, TADA2B 4, NF1 27, TADA1 9

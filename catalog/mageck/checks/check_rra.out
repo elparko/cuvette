@@ -1,0 +1,13 @@
+size factors 1.46987 1.77595 0.63089 0.572181
+sgRNAs 999 max absolute difference of sgRNA LFC 2.44e+00
+genes 100 max absolute difference of gene LFC (median of sgRNA LFC) 4.96e-06
+max absolute difference of log10 of the negative RRA score over 100 genes: 0.003
+sgRNAs with LFC difference above 0.001: 2
+ADRA1A_m26722428 0/0 68.136/184.24 4.5473 6.9908
+ADNP2_m77891006 0/0 15.772/168.79 4.1 6.5435
+genes with a score difference above 0.01 in log10: 0 []
+ACTR8 n 10 rho 3.6799e-06 tool 3.6799e-06 gene LFC -0.8638 tool -0.8638
+ACIN1 n 10 rho 5.1993e-05 tool 5.1993e-05 gene LFC -0.8802 tool -0.8802
+AHCY n 10 rho 4.1303e-04 tool 0.00041303 gene LFC -0.5607 tool -0.56069
+AATF n 10 rho 1.4635e-03 tool 0.0014635 gene LFC -0.7026 tool -0.70265
+ABT1 n 10 rho 1.5551e-03 tool 0.0015551 gene LFC -0.5896 tool -0.58957

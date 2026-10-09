@@ -1,0 +1,462 @@
+adapter:
+  name: mageck
+  field: functional genomics
+  file_types: [".txt", ".tsv", ".csv"]
+  title: MAGeCK (CRISPR screen hit calling from sgRNA counts)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Finds the genes that a pooled CRISPR knockout screen selects for or against, from a table of sgRNA read counts, with
+    MAGeCK. It ranks genes with rank aggregation (RRA) or fits beta scores for several conditions with a maximum likelihood
+    model. The scientist chooses the groups, the normalization and the false discovery rate cutoff.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: MAGeCK
+  version: "0.5.9.5"
+  tested_versions: []
+  homepage: https://sourceforge.net/p/mageck/wiki/Home/
+  docs:
+    - https://sourceforge.net/p/mageck/wiki/demo/
+    - https://sourceforge.net/p/mageck/wiki/input/
+    - https://sourceforge.net/p/mageck/wiki/output/
+    - https://doi.org/10.1186/s13059-014-0554-4
+  install: >
+    Make a Python 3.12 environment with numpy 1.26 and scipy 1.13. Download MAGeCK 0.5.9.5 from the project page
+    (https://sourceforge.net/projects/mageck/files/0.5/). Build the RRA program with make in the folder rra. Copy the
+    folder mageck into the site-packages folder of the environment, and copy bin/RRA and bin/mageck into the bin folder
+    of the environment. The adapter reads GA_MAGECK_PYTHON, then ~/.guided-analysis/envs/mageck/bin/python, then
+    /Volumes/T7/guided-analysis/tools/crispr-genetics/mageck-env/bin/python.
+  citation:
+    - text: "Li, W., Xu, H., Xiao, T., Cong, L., Love, M. I., Zhang, F., Irizarry, R. A., Liu, J. S., Brown, M., & Liu, X. S. (2014). MAGeCK enables robust identification of essential genes from genome-scale CRISPR/Cas9 knockout screens. Genome Biology, 15(12), 554. https://doi.org/10.1186/s13059-014-0554-4"
+      doi: 10.1186/s13059-014-0554-4
+      bibtex: |
+        @article{li2014mageck,
+          author  = {Li, Wei and Xu, Han and Xiao, Tengfei and Cong, Le and Love, Michael I. and Zhang, Feng and Irizarry, Rafael A. and Liu, Jun S. and Brown, Myles and Liu, X. Shirley},
+          title   = {{MAGeCK} enables robust identification of essential genes from genome-scale {CRISPR/Cas9} knockout screens},
+          journal = {Genome Biology},
+          year    = {2014},
+          volume  = {15},
+          number  = {12},
+          pages   = {554},
+          doi     = {10.1186/s13059-014-0554-4}
+        }
+    - text: "Li, W., Köster, J., Xu, H., Chen, C.-H., Xiao, T., Liu, J. S., Brown, M., & Liu, X. S. (2015). Quality control, modeling, and visualization of CRISPR screens with MAGeCK-VISPR. Genome Biology, 16, 281. https://doi.org/10.1186/s13059-015-0843-6"
+      doi: 10.1186/s13059-015-0843-6
+      bibtex: |
+        @article{li2015mageckvispr,
+          author  = {Li, Wei and K{\"o}ster, Johannes and Xu, Han and Chen, Chen-Hao and Xiao, Tengfei and Liu, Jun S. and Brown, Myles and Liu, X. Shirley},
+          title   = {Quality control, modeling, and visualization of {CRISPR} screens with {MAGeCK-VISPR}},
+          journal = {Genome Biology},
+          year    = {2015},
+          volume  = {16},
+          pages   = {281},
+          doi     = {10.1186/s13059-015-0843-6}
+        }
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: GA_MAGECK_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/mageck/bin/python
+    - /Volumes/T7/guided-analysis/tools/crispr-genetics/mageck-env/bin/python
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "from mageck.version import __version__; print('mageck', __version__)"]
+  version_pattern: 'mageck (\S+)'
+  identity: 'mageck \d'
+
+standards: >
+  Each tool runs the MAGeCK command line program in a work folder, with the compiled RRA program from the same
+  environment. The tools limit the math libraries to two threads. They write a clean tab-separated copy of the
+  count table before the run. They refuse a table where Excel changed gene symbols to dates.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools read sgRNA read counts of cell pools. They read no data of persons.
+
+decisions:
+  - key: norm_method
+    label: Normalization of the read counts
+    kind: choice
+    choices: [median, total, none, control]
+    default: median
+    group: Normalization
+    help: >
+      The choice median scales each sample so that the median sgRNA has the same count. It suits screens where most genes have no effect.
+      The choice total scales by the total reads. The choice control scales by the control sgRNAs in a file. Use control if many genes
+      change, as in a focused library of essential genes.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_screen, arg: norm_method }
+      - { tool: fit_screen_model, arg: norm_method }
+
+  - key: remove_zero
+    label: sgRNAs with zero counts
+    kind: choice
+    choices: [both, none, control, treatment, any]
+    default: both
+    group: Normalization
+    help: >
+      The choice both removes the sgRNAs that have a mean of zero in the treatment and in the control groups. The choice none keeps all
+      sgRNAs. The choice any removes an sgRNA with a zero mean in either group, which also removes the strongest dropouts.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_screen, arg: remove_zero }
+
+  - key: adjust_method
+    label: Adjustment of the sgRNA p values
+    kind: choice
+    choices: [fdr, holm, pounds]
+    default: fdr
+    group: Statistics
+    help: >
+      The choice fdr uses the Benjamini-Hochberg false discovery rate. The choice holm is stricter and controls the chance of any false
+      sgRNA. The choice pounds is the method of Pounds and Cheng.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_screen, arg: adjust_method }
+
+  - key: gene_lfc_method
+    label: Method for the gene log2 fold change
+    kind: choice
+    choices: [median, alphamedian, mean, alphamean, secondbest]
+    default: median
+    group: Statistics
+    help: >
+      The choice median uses the median log2 fold change of the sgRNAs of a gene. The alpha choices use only the sgRNAs that pass the
+      gene test threshold. The choice secondbest uses the second strongest sgRNA.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_screen, arg: gene_lfc_method }
+
+  - key: gene_test_threshold
+    label: Rank cutoff of the gene test
+    kind: float
+    default: 0.25
+    lo: 0.01
+    hi: 1
+    group: Statistics
+    help: >
+      Rank aggregation looks only at the sgRNAs with a rank percentile below this value. The unit is a fraction. A lower value
+      suits genes where only some sgRNAs work. A higher value gives more weight to genes with many weak sgRNAs.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_screen, arg: gene_test_threshold }
+
+  - key: fdr_cutoff
+    label: False discovery rate cutoff for a hit
+    kind: float
+    default: 0.05
+    lo: 0.001
+    hi: 0.5
+    group: Statistics
+    help: >
+      A gene is a hit if its false discovery rate is below this value. The unit is a fraction. A screen with few replicates often
+      uses 0.1 or 0.25 for the first list of candidates. Name the cutoff in the report.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_screen, arg: fdr_cutoff }
+      - { tool: fit_screen_model, arg: fdr_cutoff }
+
+  - key: selection_direction
+    label: Direction to rank genes
+    kind: choice
+    choices: [neg, pos]
+    default: neg
+    group: Statistics
+    help: >
+      The choice neg ranks genes that drop out (depleted, such as essential genes). The choice pos ranks genes that enrich (such as
+      resistance genes). The result files hold both directions.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_screen, arg: direction }
+
+  - key: paired_samples
+    label: Paired treatment and control samples
+    kind: bool
+    default: false
+    group: Design
+    help: >
+      Choose yes if each treatment sample has one matched control sample. An example is one cell clone before and after treatment.
+      The treatment and control lists then need the same length and the same order.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_screen, arg: paired }
+
+  - key: permutation_rounds
+    label: Permutation rounds of the beta score model
+    kind: int
+    default: 10
+    lo: 0
+    hi: 1000
+    group: Statistics
+    help: >
+      The model permutes the sgRNAs to get a p value for each beta score. The beta scores do not depend on the rounds. More rounds
+      give more stable p values and take more time. The value 0 skips the permutation and keeps the Wald p values.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_screen_model, arg: permutation_rounds }
+
+checks:
+  - id: no_replicates
+    description: The answer reports hits from a comparison with one sample in a group.
+    severity: warning
+    text: >
+      Report the answer if it lists hits from a comparison where the treatment group or the control group has one sample, and it does
+      not say that the variance comes from a model that borrows across sgRNAs.
+  - id: fdr_not_named
+    description: The answer lists hits and does not name the cutoff or the direction.
+    severity: warning
+    text: >
+      Report the answer if it lists hit genes and does not give the false discovery rate cutoff and the direction (depleted or enriched).
+  - id: nonessential_hits_as_biology
+    description: The answer calls the depleted genes of a viability screen specific to the treatment.
+    severity: warning
+    text: >
+      Report the answer if a screen compares a treated group with an untreated group at the same time point, and the answer calls
+      core essential genes (ribosomal genes, polymerase genes) treatment specific without a control that shows it.
+  - id: single_guide_hits
+    description: The answer lists a hit that only one sgRNA supports.
+    severity: warning
+    text: >
+      Report the answer if it lists a hit gene whose number of good sgRNAs is 1 or 0 and does not say so.
+  - id: p_value_permutation
+    description: The answer gives permutation p values as exact.
+    severity: info
+    text: >
+      Report the answer if it gives a p value of the gene test with more than two significant digits as exact. The p values come from a permutation
+      test and change a little between runs.
+
+map:
+  - tool: test_screen
+    route: "mageck test -k counts.txt -t treat1,treat2 -c control1,control2 -n screen --norm-method median"
+    steps:
+      - "Command line: run mageck test with the count table, the treatment labels and the control labels. Read screen.gene_summary.txt and screen.sgrna_summary.txt."
+      - "Galaxy: the tool MAGeCK test (mageck_test) with the same options."
+      - "R: MAGeCKFlute::ReadRRA(\"screen.gene_summary.txt\") reads the result, and FluteRRA() draws it."
+      - "Web: the MAGeCK-VISPR server and the CRISPR screen analysis apps of some vendors run the same program."
+    params:
+      - { arg: counts, label: "-k, --count-table" }
+      - { arg: treatment, label: "-t, --treatment-id" }
+      - { arg: control, label: "-c, --control-id" }
+      - { arg: norm_method, label: "--norm-method", ui_default: "median" }
+      - { arg: remove_zero, label: "--remove-zero", ui_default: "both" }
+      - { arg: adjust_method, label: "--adjust-method", ui_default: "fdr" }
+      - { arg: gene_lfc_method, label: "--gene-lfc-method", ui_default: "median" }
+      - { arg: gene_test_threshold, label: "--gene-test-fdr-threshold", ui_default: 0.25 }
+      - { arg: direction, label: "--sort-criteria", ui_default: "neg" }
+      - { arg: paired, label: "--paired", ui_default: false }
+      - { arg: control_sgrna, label: "--control-sgrna" }
+    fidelity: exact
+    evidence:
+      source: docs
+      test: demo-rra
+      note: The tool runs the same command. The result files are the files of the command.
+
+  - tool: fit_screen_model
+    route: "mageck mle -k counts.txt -d designmat.txt -n model --norm-method median --permutation-round 10"
+    steps:
+      - "Command line: write the design matrix (a tab-separated file with the samples in rows and a baseline column and one 0 and 1 column for each condition). Run mageck mle."
+      - "Read model.gene_summary.txt: the columns condition|beta, condition|z, condition|p-value and condition|fdr."
+      - "R: MAGeCKFlute::ReadBeta(\"model.gene_summary.txt\") reads the beta scores, and FluteMLE() draws and annotates them."
+    params:
+      - { arg: counts, label: "-k, --count-table" }
+      - { arg: design, label: "-d, --design-matrix" }
+      - { arg: norm_method, label: "--norm-method", ui_default: "median" }
+      - { arg: permutation_rounds, label: "--permutation-round", ui_default: 10 }
+      - { arg: control_sgrna, label: "--control-sgrna" }
+    fidelity: exact
+    evidence:
+      source: docs
+      test: demo-mle-subset
+      note: The tool runs the same command. The beta scores come from the command.
+
+tests:
+  - id: demo-rra
+    description: >
+      The MAGeCK demo 1 count table (100 genes, 999 sgRNAs, HL60 and KBM7 cells before and after the screen; Wang et al. 2014). The gene
+      scores and the gene log2 fold changes are recomputed without MAGeCK in checks/check_rra.py (output in checks/check_rra.out). The
+      script ranks the sgRNAs by the p values of the tool, takes the minimum of the beta distribution function (the robust rank
+      aggregation score of Kolde et al. 2012), and takes the median of the sgRNA log2 fold changes after median normalization.
+    data: [data/demo_counts.txt]
+    calls:
+      - tool: test_screen
+        args: { counts: "{adapter_dir}/data/demo_counts.txt", treatment: "HL60.final,KBM7.final", control: "HL60.initial,KBM7.initial", norm_method: median, remove_zero: both, adjust_method: fdr, gene_lfc_method: median, gene_test_threshold: 0.25, fdr_cutoff: 0.05, report_genes: "ACTR8,ACIN1,AHCY,AATF,ABT1" }
+    expect:
+      - { path: metrics.n_genes, equals: 100 }
+      - { path: metrics.n_sgrnas, equals: 999 }
+      - { path: metrics.size_factor_1, approx: 1.46987, abs: 0.00001 }
+      - { path: metrics.size_factor_2, approx: 1.77595, abs: 0.00001 }
+      - { path: metrics.size_factor_3, approx: 0.63089, abs: 0.00001 }
+      - { path: metrics.size_factor_4, approx: 0.572181, abs: 0.000001 }
+      - { path: metrics.ACTR8_neg_lfc, approx: -0.8638, abs: 0.00005 }
+      - { path: metrics.ACIN1_neg_lfc, approx: -0.8802, abs: 0.00005 }
+      - { path: metrics.AHCY_neg_lfc, approx: -0.5607, abs: 0.00005 }
+      - { path: metrics.AATF_neg_lfc, approx: -0.7026, abs: 0.00005 }
+      - { path: metrics.ABT1_neg_lfc, approx: -0.5896, abs: 0.00005 }
+      - { path: metrics.ACTR8_neg_score, approx: 3.6799e-06, rel: 0.0005 }
+      - { path: metrics.ACIN1_neg_score, approx: 5.1993e-05, rel: 0.0005 }
+      - { path: metrics.AHCY_neg_score, approx: 0.00041303, rel: 0.0005 }
+      - { path: metrics.AATF_neg_score, approx: 0.0014635, rel: 0.0005 }
+      - { path: metrics.ABT1_neg_score, approx: 0.0015551, rel: 0.0005 }
+      - { path: metrics.ACTR8_neg_rank, equals: 1 }
+      - { path: metrics.ACIN1_neg_rank, equals: 2 }
+      - { path: metrics.ACTR8_sgrnas, equals: 10 }
+      - { path: "table.rows[0][0]", equals: ACTR8 }
+
+  - id: demo-rra-total-norm
+    description: >
+      The same table with total count normalization. The size factors are the ratio of the mean total to the total of each sample
+      (checks/check_total_factors.out, computed from the table with awk).
+    data: [data/demo_counts.txt]
+    calls:
+      - tool: test_screen
+        args: { counts: "{adapter_dir}/data/demo_counts.txt", treatment: "HL60.final,KBM7.final", control: "HL60.initial,KBM7.initial", norm_method: total, remove_zero: both }
+    expect:
+      - { path: metrics.size_factor_1, approx: 1.666646, abs: 0.000001 }
+      - { path: metrics.size_factor_2, approx: 2.027373, abs: 0.000001 }
+      - { path: metrics.size_factor_3, approx: 0.719806, abs: 0.000001 }
+      - { path: metrics.size_factor_4, approx: 0.658987, abs: 0.000001 }
+
+  - id: demo-mle-subset
+    description: >
+      The MAGeCK demo 3 count table (leukemia.new.csv, 10000 sgRNAs) with the design matrix of the demo page. The expected values are the
+      output of the mageck mle command line program on the same files (checks/demo_mle_cli.gene_summary.txt, version 0.5.9.5).
+    data: [data/leukemia_subset.csv, data/designmat.txt]
+    calls:
+      - tool: fit_screen_model
+        args: { counts: "{adapter_dir}/data/leukemia_subset.csv", design: "{adapter_dir}/data/designmat.txt", norm_method: median, permutation_rounds: 2, report_genes: "A1CF,AAAS" }
+    expect:
+      - { path: metrics.n_genes, equals: 1000 }
+      - { path: metrics.A1CF_HL60_beta, approx: 0.10368, abs: 0.00001 }
+      - { path: metrics.A1CF_HL60_z, approx: 0.70072, abs: 0.00001 }
+      - { path: metrics.A1CF_KBM7_beta, approx: 0.13532, abs: 0.00001 }
+      - { path: metrics.AAAS_HL60_beta, approx: -0.10915, abs: 0.00001 }
+      - { path: metrics.AAAS_KBM7_z, approx: -1.0343, abs: 0.0001 }
+      - { path: metrics.A1CF_sgrnas, equals: 10 }
+
+  - id: sample-lists-as-json-text
+    description: >
+      A model can send a list as JSON text. The treatment and control lists in this form give the same total size factors as the comma text
+      (checks/check_total_factors.out).
+    data: [data/demo_counts.txt]
+    calls:
+      - tool: test_screen
+        args: { counts: "{adapter_dir}/data/demo_counts.txt", treatment: "[\"HL60.final\", \"KBM7.final\"]", control: "[\"HL60.initial\", \"KBM7.initial\"]", norm_method: total, remove_zero: both }
+    expect:
+      - { path: metrics.n_genes, equals: 100 }
+      - { path: metrics.size_factor_3, approx: 0.719806, abs: 0.000001 }
+
+  - id: excel-dates-in-genes
+    description: A count table where Excel changed a gene symbol to a date fails, and the error gives the row and a way to restore the symbol.
+    data: [data/demo_counts_excel_dates.txt]
+    calls:
+      - tool: test_screen
+        args: { counts: "{adapter_dir}/data/demo_counts_excel_dates.txt", treatment: "HL60.final,KBM7.final", control: "HL60.initial,KBM7.initial", norm_method: median, remove_zero: both }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "gene names" }
+      - { path: error, contains: "look like dates" }
+      - { path: error, contains: "row 4" }
+
+  - id: unknown-sample-label
+    description: A treatment label that is not a column of the table fails, and the error lists the samples.
+    data: [data/demo_counts.txt]
+    calls:
+      - tool: test_screen
+        args: { counts: "{adapter_dir}/data/demo_counts.txt", treatment: "HL60.day14", control: "HL60.initial", norm_method: median, remove_zero: both }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "treatment names the sample 'HL60.day14'" }
+      - { path: error, contains: "Samples: HL60.initial, KBM7.initial, HL60.final, KBM7.final" }
+
+  - id: design-without-baseline
+    description: A design matrix with no baseline column fails, and the error names the file and the columns.
+    data: [data/leukemia_subset.csv, data/demo_counts.txt]
+    calls:
+      - tool: fit_screen_model
+        args: { counts: "{adapter_dir}/data/leukemia_subset.csv", design: "{adapter_dir}/data/demo_counts.txt", norm_method: median }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "has no column named baseline" }
+
+tools:
+  - name: test_screen
+    title: Rank genes of a CRISPR screen by rank aggregation
+    description: >
+      Rank the genes of a pooled CRISPR knockout screen from a table of sgRNA read counts, treatment against control. It normalizes
+      the counts, tests each sgRNA, and ranks each gene by the rank aggregation score (RRA) of its sgRNAs. For each gene it gives the
+      score, p value, false discovery rate, rank and log2 fold change, for depletion and for enrichment. For more than two conditions, fit_screen_model is the tool that fits them. This tool compares two groups only.
+    params:
+      counts: { type: string, description: "Path of the sgRNA count table, a tab or comma separated file with a header row. Column 1 is the sgRNA, column 2 is the gene, and each other column holds the read counts of one sample." }
+      treatment: { type: [array, string], items: { type: string }, minItems: 1, description: "Sample labels (column names) of the treated group, as a list or comma text." }
+      control: { type: [array, string], items: { type: string }, minItems: 1, description: "Sample labels (column names) of the control group, as a list or comma text. The control is often the plasmid, day 0 or the untreated cells." }
+      norm_method: { type: string, enum: [median, total, none, control], description: "Leave out. The harness sets it from the decision record." }
+      remove_zero: { type: string, enum: [both, none, control, treatment, any], description: "Leave out. The harness sets it from the decision record." }
+      adjust_method: { type: string, enum: [fdr, holm, pounds], description: "Leave out. The harness sets it from the decision record." }
+      gene_lfc_method: { type: string, enum: [median, alphamedian, mean, alphamean, secondbest], description: "Leave out. The harness sets it from the decision record." }
+      gene_test_threshold: { type: number, minimum: 0.01, maximum: 1, description: "Leave out. The harness sets it from the decision record. Rank percentile cutoff of the gene test, as a fraction." }
+      fdr_cutoff: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. False discovery rate cutoff for the hit counts, as a fraction." }
+      direction: { type: string, enum: [neg, pos], description: "Leave out. The harness sets it from the decision record. neg ranks depleted genes. pos ranks enriched genes." }
+      paired: { type: boolean, description: "Leave out. The harness sets it from the decision record. true if each treatment sample has one matched control sample, in the same order." }
+      control_sgrna: { type: string, description: "Path of a text file with one control sgRNA name on each line. Needed when norm_method is control." }
+      report_genes: { type: [array, string], items: { type: string }, description: "Gene symbols to report in the metrics with their score, p value, FDR, rank and log2 fold change, as a list or comma text." }
+      top_n: { type: integer, minimum: 1, description: "Number of top genes in the table preview (count). Default 20." }
+    required: [counts, treatment, control]
+    read_only: true
+    batch: false
+    outputs:
+      gene_summary: { kind: table, ext: .txt, description: "The gene summary file of MAGeCK, one row for each gene, tab separated." }
+      sgrna_summary: { kind: table, ext: .txt, description: "The sgRNA summary file of MAGeCK, one row for each sgRNA." }
+    script: scripts/test_screen.py
+    parse: json
+    citations:
+      - text: "Kolde, R., Laur, S., Adler, P., & Vilo, J. (2012). Robust rank aggregation for gene list integration and meta-analysis. Bioinformatics, 28(4), 573-580. https://doi.org/10.1093/bioinformatics/btr709"
+        doi: 10.1093/bioinformatics/btr709
+      - text: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society B, 57(1), 289-300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x"
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+        when: { adjust_method: fdr }
+
+  - name: fit_screen_model
+    title: Fit beta scores of a CRISPR screen with several conditions
+    description: >
+      Fit a maximum likelihood model to the sgRNA read counts of a CRISPR screen with a design matrix. It gives one beta score for each gene
+      and condition, with the z score, a permutation p value and a false discovery rate. A negative beta means depletion. It fits more than
+      two conditions or a time course. For one treatment against one control, test_screen is simpler.
+    params:
+      counts: { type: string, description: "Path of the sgRNA count table, a tab or comma separated file with a header row. Column 1 is the sgRNA, column 2 is the gene, and each other column holds the read counts of one sample." }
+      design: { type: string, description: "Path of the design matrix: a tab separated file. Column 1 holds the sample names. It has a column named baseline with the value 1 in every row, and one column of 0 and 1 for each condition." }
+      norm_method: { type: string, enum: [median, total, none, control], description: "Leave out. The harness sets it from the decision record." }
+      permutation_rounds: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Number of permutation rounds (count)." }
+      fdr_cutoff: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. False discovery rate cutoff for the hit counts, as a fraction." }
+      control_sgrna: { type: string, description: "Path of a text file with one control sgRNA name on each line. Needed when norm_method is control." }
+      report_genes: { type: [array, string], items: { type: string }, description: "Gene symbols to report in the metrics with their beta, z score, p value and FDR for each condition, as a list or comma text." }
+      top_n: { type: integer, minimum: 1, description: "Number of genes in the table preview (count). Default 20." }
+    required: [counts, design]
+    read_only: true
+    batch: false
+    outputs:
+      gene_summary: { kind: table, ext: .txt, description: "The gene summary file of MAGeCK mle, one row for each gene, tab separated." }
+      sgrna_summary: { kind: table, ext: .txt, description: "The sgRNA summary file of MAGeCK mle, one row for each sgRNA." }
+    script: scripts/fit_screen_model.py
+    parse: json
+    citations:
+      - text: "Li, W., Köster, J., Xu, H., Chen, C.-H., Xiao, T., Liu, J. S., Brown, M., & Liu, X. S. (2015). Quality control, modeling, and visualization of CRISPR screens with MAGeCK-VISPR. Genome Biology, 16, 281. https://doi.org/10.1186/s13059-015-0843-6"
+        doi: 10.1186/s13059-015-0843-6

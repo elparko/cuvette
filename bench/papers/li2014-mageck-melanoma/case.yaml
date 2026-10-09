@@ -1,0 +1,98 @@
+kind: research paper
+short: Li 2014
+field: Functional genomics
+program: MAGeCK (Python and C++), through the mageck adapter
+citation:
+  authors: Li W, Xu H, Xiao T, Cong L, Love MI, Zhang F, Irizarry RA, Liu JS, Brown M, Liu XS
+  title: MAGeCK enables robust identification of essential genes from genome-scale CRISPR/Cas9 knockout screens
+  venue: Genome Biology 15:554
+  year: 2014
+  doi: 10.1186/s13059-014-0554-4
+related:
+  - text: >-
+      Shalem O et al. Genome-scale CRISPR-Cas9 knockout screening in human cells. Science 343(6166):84-87 (2014). The melanoma
+      screen of the paper.
+    doi: 10.1126/science.1247005
+  - text: >-
+      Li W et al. Quality control, modeling, and visualization of CRISPR screens with MAGeCK-VISPR. Genome Biology 16:281 (2015).
+    doi: 10.1186/s13059-015-0843-6
+measured: >-
+  A375 melanoma cells received a library of 64,077 sgRNAs and grew with vemurafenib or with DMSO for 7 and 14 days, in two replicates.
+  MAGeCK ranked the genes by robust rank aggregation of the sgRNAs. The paper names the genes that vemurafenib selects for (NF1, NF2,
+  MED12, CUL3, TADA1, TADA2B, CDH13, PPT1) and against (RREB1 at day 14, EGFR at day 7), with their ranks and false discovery rates.
+instruction: >-
+  Compare the vemurafenib replicates with the DMSO replicates of the same day. For day 14, give the ranks of CDH13, PPT1 and TADA1 among
+  the enriched genes and of RREB1 among the depleted genes. For day 7, give the rank and the false discovery rate of EGFR among the depleted genes.
+instruction_basis: >-
+  The results text on the melanoma data in the paper: "CDH13 (FDR = 1.7e-2, ranked 9th out of 17,419)", "PPT1 (FDR = 8.5e-2, ranked 14th)",
+  "RREB1 (FDR = 0.05, ranked 1st)", "EGFR (FDR = 0.025, ranked 6th)", and the table of the genes NF1, NF2, MED12, CUL3, TADA1 and TADA2B
+  with a largest rank of 11 at day 14.
+answers:
+  norm_method:
+    decision: Normalization of the read counts
+    value: median
+    source: Methods of the paper, median normalization (the default of MAGeCK).
+  remove_zero:
+    decision: sgRNAs with zero counts
+    value: both
+    source: The default of MAGeCK. The paper does not state a choice.
+  adjust_method:
+    decision: Adjustment of the sgRNA p values
+    value: fdr
+    source: The default of MAGeCK.
+  gene_lfc_method:
+    decision: Method for the gene log2 fold change
+    value: median
+    source: The default of MAGeCK. The benchmark items do not depend on it.
+  gene_test_threshold:
+    decision: Rank cutoff of the gene test
+    value: 0.25
+    source: The default of MAGeCK.
+  fdr_cutoff:
+    decision: False discovery rate cutoff for a hit
+    value: 0.25
+    source: Not in the paper. The ranks do not depend on it.
+  selection_direction:
+    decision: Direction to rank genes
+    value: pos
+    source: The request asks first for the enriched genes. The result holds both directions.
+  paired_samples:
+    decision: Paired treatment and control samples
+    value: false
+    source: The paper compares the pooled replicates of the treated and the control group.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers a free question with this text.
+items:
+  cdh13_rank_day14:
+    source: published
+    where: Results, melanoma data, "CDH13 (FDR = 1.7e-2, ranked 9th out of 17,419)".
+  ppt1_rank_day14:
+    source: published
+    where: Results, melanoma data, "PPT1 (FDR = 8.5e-2, ranked 14th out of 17,419)".
+  tada1_rank_day14:
+    source: published
+    where: Table 2 of the melanoma data. The row for NF1, NF2, MED12, CUL3, TADA1 and TADA2B gives the largest rank 11 at day 14. TADA1 has the largest rank of the six.
+  rreb1_rank_neg_day14:
+    source: published
+    where: Results, melanoma data, "RREB1 (FDR = 0.05, ranked 1st out of 17,419)".
+  egfr_rank_neg_day7:
+    source: published
+    where: Results, melanoma data, "EGFR (FDR = 0.025, ranked 6th out of 17,419)".
+  egfr_fdr_neg_day7:
+    source: published
+    where: Results, melanoma data, "EGFR (FDR = 0.025, ranked 6th out of 17,419)".
+  cdh13_fdr_day14:
+    source: published
+    where: Results, melanoma data, "CDH13 (FDR = 1.7e-2". Reference only. MAGeCK 0.5.9.5 gives 0.028.
+  genes_ranked:
+    source: published
+    where: Results, melanoma data, "out of 17,419". Reference only. The cleaned supplement has 17,396 gene symbols.
+data:
+  source: Additional file 4 of the paper (sheet "melanoma dataset"), written to a tab-separated table by fetch.sh
+  url: https://static-content.springer.com/esm/art%3A10.1186%2Fs13059-014-0554-4/MediaObjects/13059_2014_554_MOESM4_ESM.xlsx
+  license: >-
+    Open access supplement of a BMC article, under the Creative Commons Attribution license of the article. The files are fetched,
+    not redistributed. The data are read counts of a cell line. They hold no data of persons.
+  size: 12 MB xlsx; the melanoma table has 64,077 sgRNAs and 3 MB

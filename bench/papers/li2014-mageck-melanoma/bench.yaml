@@ -1,0 +1,29 @@
+adapters: [mageck]
+prompt: |
+  We screened A375 melanoma cells with a genome-scale CRISPR knockout library and grew them with the BRAF inhibitor vemurafenib (PLX) or with DMSO. The file {data}/li2014-mageck-melanoma/melanoma_counts.txt is a tab-separated table of sgRNA read counts: column 1 is the sgRNA, column 2 is the gene, and the other columns are the samples plasmid, D7_R1 and D7_R2 (DMSO, day 7), D14_R1 and D14_R2 (DMSO, day 14), PLX7_R1 and PLX7_R2 (vemurafenib, day 7) and PLX14_R1 and PLX14_R2 (vemurafenib, day 14). Find the genes that vemurafenib selects for and against. Compare the two vemurafenib replicates with the two DMSO replicates of the same day, once for day 14 and once for day 7. For day 14, give the rank of CDH13, PPT1 and TADA1 among the positively selected (enriched) genes, and the rank of RREB1 among the negatively selected (depleted) genes. For day 7, give the rank of EGFR among the negatively selected genes with its false discovery rate. Write every number in your final answer text.
+answers:
+  norm_method: median
+  remove_zero: both
+  adjust_method: fdr
+  gene_lfc_method: median
+  gene_test_threshold: 0.25
+  fdr_cutoff: 0.25
+  selection_direction: pos
+  paired_samples: false
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data: [li2014-mageck-melanoma/melanoma_counts.txt]
+items:
+  # Source of the values: the text of Li et al. 2014 (Genome Biology 15:554), section on the melanoma data (Shalem et al. 2014).
+  # MAGeCK 0.5.9.5 on the supplement count table gives the same ranks: CDH13 9, PPT1 14, TADA1 11 (day 14), RREB1 1 (day 14,
+  # negative), EGFR 6 (day 7, negative). The false discovery rates differ from the paper (older MAGeCK version): CDH13 0.028 against
+  # 0.017, PPT1 0.097 against 0.085, RREB1 0.025 against 0.05. The ranks are the items. The FDR of EGFR (0.027 against 0.025) fits.
+  - {key: cdh13_rank_day14, description: "Rank of CDH13 among the positively selected genes, vemurafenib against DMSO, day 14", value: 9, exact: true, tool: test_screen}
+  - {key: ppt1_rank_day14, description: "Rank of PPT1 among the positively selected genes, day 14", value: 14, exact: true, tool: test_screen}
+  - {key: tada1_rank_day14, description: "Rank of TADA1 among the positively selected genes, day 14 (the paper gives rank 11 as the largest rank of NF1, NF2, MED12, CUL3, TADA1 and TADA2B)", value: 11, exact: true, tool: test_screen}
+  - {key: rreb1_rank_neg_day14, description: "Rank of RREB1 among the negatively selected genes, day 14", value: 1, exact: true, tool: test_screen}
+  - {key: egfr_rank_neg_day7, description: "Rank of EGFR among the negatively selected genes, day 7", value: 6, exact: true, tool: test_screen}
+  - {key: egfr_fdr_neg_day7, description: "False discovery rate of EGFR, negative selection, day 7", value: 0.025, tolerance: 0.005, tool: test_screen}
+  - {key: cdh13_fdr_day14, description: "False discovery rate of CDH13, positive selection, day 14 (paper 0.017; MAGeCK 0.5.9.5 gives 0.028)", value: 0.017, tolerance: 0.015, in_answer: true, reference: true}
+  - {key: genes_ranked, description: "Genes ranked (paper 17,419; the cleaned supplement has 17,396 gene symbols)", value: 17419, tolerance: 40, in_answer: false, reference: true}
