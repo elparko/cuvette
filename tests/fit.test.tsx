@@ -95,14 +95,14 @@ describe("resize", () => {
     h.type("\r");
     await until(() => h.term.view().includes("Permission needed: run_script"));
     h.type("y");
-    await until(() => h.term.view().includes("Press a number to answer"));
+    await until(() => h.term.view().includes("Enter accepts"));
     for (const [c, r] of [[60, 30], [120, 30], [45, 14], [100, 40]] as const) {
       const lines = await resize(h, c, r);
       once(lines, "> compare endo and epi");
       once(lines, "Step 1");
       once(lines, "guided-analysis");
       once(lines, "Your decision: Which AUC cutoff");
-      expect(h.term.view()).toContain("Press a number to answer");
+      expect(h.term.view()).toContain("Enter accepts");
     }
     expect(h.term.view()).toContain("2 0.8 (6 features)");
     h.type("2");
@@ -136,7 +136,7 @@ describe("resume", () => {
     const { h } = start(100, 40, again as unknown as SessionLike);
     await until(() => h.term.view().includes("Your decision:"));
     await resize(h, 70, 24);
-    expect(h.term.view()).toContain("Press a number to answer");
+    expect(h.term.view()).toContain("Enter accepts");
     h.type("1");
     await until(() => again.record.entries(["answer"]).some((e) => e.data.qid === qid));
     expect(again.questions.open()).toHaveLength(0);

@@ -434,7 +434,7 @@ function pickCwd(): string {
 
 const toolNames = (p: FakeProvider, i: number) => p.requests[i].tools.map((t) => t.name);
 
-test("with no adapter, use_adapter asks the scientist, then adds the tools, standards, skills and decisions of the adapter", async () => {
+test("with no adapter, use_adapter loads the agent's choice with no card, then adds the tools, standards, skills and decisions of the adapter", async () => {
   const cwd = pickCwd();
   const provider = new FakeProvider([
     { calls: [{ name: "list_adapters", args: { filter: ".lab" } }] },
@@ -470,16 +470,15 @@ test("with no adapter, use_adapter asks the scientist, then adds the tools, stan
   expect(loadText).toMatch(/is a draft/);
   expect(loadText).toMatch(/Smallest particle \(min_size\): 5/);
 
-  expect(asked[0]).toEqual({ key: "adapter", text: "The agent wants to use Lab counter through the lab adapter: The request names a lab image. The request names a.lab, and lab reads that file type.", options: expect.arrayContaining(["lab", "lab2"]) });
-  expect(asked[0].options[0]).toBe("lab");
-  expect(asked[1].key).toBe("method");
+  expect(asked.map((a) => a.key)).toEqual(["method"]);
   const node = session.record.nodes().find((n) => n.tool === "count" && !n.sensitivityOf)!;
   expect(node.decisions.method).toBe("Triangle");
   expect(node.decisions.min_size).toBe(5);
   expect(session.decisions.value("adapter")).toBe("lab");
   const loaded = session.record.entries(["adapter"]);
   expect(loaded).toHaveLength(1);
-  expect(loaded[0].data).toMatchObject({ name: "lab", version: "0.2.0", programVersion: "1.0", reason: "The request names a lab image", by: "human", status: "draft", programFound: null });
+  expect(loaded[0].data).toMatchObject({ name: "lab", program: "Lab counter", version: "0.2.0", programVersion: "1.0", reason: "The request names a lab image", by: "agent", status: "draft", programFound: null });
+  expect(session.record.entries(["decision"]).find((e) => e.data.key === "adapter")!.data).toMatchObject({ new: "lab", by: "agent", reason: "The request names a lab image" });
   expect(session.record.entries(["setup"]).at(-1)!.data).toMatchObject({ values: { min_size: 5 }, adapter: "lab", defaultsAccepted: ["min_size"] });
   expect(session.record.entries(["session"])[0].data.pick).toBe(true);
 });
@@ -516,7 +515,8 @@ test("the answers file can change the program choice", async () => {
   expect(r.text).toMatch(/The scientist chose lab2 instead of lab/);
   expect(session.adapters.map((a) => a.name)).toEqual(["lab2"]);
   expect(session.record.entries(["adapter"])[0].data.reason).toMatch(/chosen by the scientist instead of lab/);
-  expect(session.record.entries(["answer"]).at(-1)!.data.note).toBe("answered from the answers file");
+  expect(session.record.entries(["decision"]).find((e) => e.data.key === "adapter")!.data).toMatchObject({ new: "lab2", by: "human", reason: "from the answers file" });
+  expect(session.record.entries(["question"])).toHaveLength(0);
   expect(session.decisions.value("adapter")).toBe("lab2");
 });
 
@@ -970,7 +970,7 @@ test("a script that only lists files makes no result node; a script that saves a
   expect(session.record.nodes().map((n) => n.tool)).toEqual(["run_script"]);
 });
 
-test("a confirmed plan covers the load of the adapter it names; an adapter that it does not name gets the program card and a note", async () => {
+test("a confirmed plan covers the load of the adapter it names; an adapter that it does not name loads as the agent's choice with a note and no card", async () => {
   const cwd = pickCwd();
   const provider = new FakeProvider([CLARIFY, { calls: [{ name: "use_adapter", args: { name: "lab", reason: "It counts." } }] },
     { calls: [{ name: "list_adapters", args: {} }] },
@@ -994,8 +994,7 @@ test("a confirmed plan covers the load of the adapter it names; an adapter that 
   const uses = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "use_adapter");
   expect(String(uses[0]!.data.error)).toMatch(/^Plan first: name the adapter in the programs section of the plan/);
   expect(uses.slice(1).map((e) => e.data.ok)).toEqual([true, true]);
-  expect(asked).toEqual([{ key: "adapter", options: expect.arrayContaining(["lab2"]) }]);
-  expect(asked[0]!.options[0]).toBe("lab2");
+  expect(asked).toEqual([]);
   expect(session.adapters.map((a) => a.name)).toEqual(["lab", "lab2"]);
   const labDecision = session.record.entries(["decision"]).find((e) => e.data.key === "adapter")!;
   expect(labDecision.data).toMatchObject({ new: "lab", by: "human", reason: "the scientist approved plan version 1, which names lab" });
@@ -1116,4 +1115,27 @@ test("a setting named like a decision counts as that decision, and the run asks 
   expect(session.record.entries(["clarify"])[0]!.data.reference).toBe(join(cwd, "hand_counts.csv"));
   expect(session.decisions.value("method")).toBe("Triangle");
   expect(session.record.nodes().find((n) => n.tool === "count")!.decisions).toMatchObject({ method: "Triangle" });
+});
+
+test("outside the plan the agent's program loads with no card and one line; /program changes it; an empty answer takes the recommendation; setup with no program value does not fail", async () => {
+  const cwd = pickCwd();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd });
+  expect(() => session!.decisions.applySetup({ question: "q", adapter: undefined })).not.toThrow();
+  expect(session.decisions.owner("adapter")).toBe("agent");
+  const r = await session.useAdapter("lab", "It reads .lab files.");
+  expect(r.ok).toBe(true);
+  expect(session.record.entries(["question"])).toHaveLength(0);
+  const { Mapper } = await import("../src/ui/items.ts");
+  const m = new Mapper(session as never);
+  const loaded = session.record.entries(["adapter"]).at(-1)!;
+  expect(m.map(loaded).map((x: any) => x.text)).toEqual(["Using Lab counter through lab: It reads .lab files. Change with /program."]);
+  const changed = await session.changeProgram("lab2");
+  expect(changed).toEqual({ ok: true, text: "The program is now Lab counter through lab2. The agent uses it from the next step." });
+  expect(session.record.entries(["decision"]).filter((e) => e.data.key === "adapter").at(-1)!.data).toMatchObject({ new: "lab2", by: "human", reason: "chosen by the scientist with /program" });
+  expect(session.adapters.map((a) => a.name)).toEqual(["lab", "lab2"]);
+  const q = await session.questions.ask({ decisionKey: "", title: "Threshold", text: "?", options: [{ value: "Otsu", label: "Otsu" }, { value: "Li", label: "Li" }], recommendation: { value: "Li", reason: "" }, evidence: "" });
+  await session.answer(q.qid, undefined);
+  expect(session.record.entries(["answer"]).at(-1)!.data.value).toBe("Li");
+  const none = await session.questions.ask({ decisionKey: "", title: "Color", text: "?", options: [], evidence: "" });
+  await expect(session.answer(none.qid, undefined)).rejects.toThrow("Color: choose an option or type a value.");
 });

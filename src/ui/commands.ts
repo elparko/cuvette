@@ -579,6 +579,22 @@ export const commands: Command[] = [
     },
   },
   {
+    name: "program",
+    args: "[adapter]",
+    help: "Show the program the agent uses, or change it to another adapter.",
+    async run([name], ctx) {
+      if (!name) {
+        const rows = ctx.session.adapterInfo.map((a) => [a.name, a.title, a.programVersion]);
+        return ctx.print(`${rows.length ? table(["Adapter", "Program", "Program version"], rows) : "No program is loaded yet. The agent chooses one when the analysis needs it."}\n\nChange it: /program <adapter name>.`, "Program");
+      }
+      if (!ctx.session.changeProgram) return unavailable(ctx);
+      const r = await ctx.session.changeProgram(name);
+      if (r.ok) ctx.notice(r.text);
+      else ctx.error(r.text);
+      ctx.refresh();
+    },
+  },
+  {
     name: "skills",
     help: "List the skills the adapters offer.",
     async run(_, ctx) {

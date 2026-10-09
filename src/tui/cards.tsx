@@ -4,7 +4,7 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { Question } from "../core/types.ts";
 import {
-  CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
+  CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, questionCursor, questionEnter, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
   choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, pilotGate, pilotQuestion, planHint, planInit,
   planQuestions, planReduce, planResolve, planTitle, programSwitches, recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, setupValues, show,
   type Card, type PlanAction, type PlanState,
@@ -35,10 +35,11 @@ function Frame({ title, color, children, arrows }: { title: string; color: strin
   );
 }
 
-function Prompt(props: { label: string; initial?: string; onSubmit: (v: string) => void; onCancel: () => void }) {
+function Prompt(props: { label: string; initial?: string; onSubmit: (v: string) => void; onCancel: () => void; onBack?: () => void }) {
   const [v, setV] = useState(props.initial ?? "");
   useInput((_, key) => {
     if (key.escape) props.onCancel();
+    else if (key.tab && key.shift && props.onBack) props.onBack();
   });
   return (
     <Box>
@@ -113,49 +114,84 @@ export function QuestionCard(props: {
   card: Extract<Card, { t: "question" }>;
   onAnswer: (value: unknown, note?: string) => void;
   onDismiss: () => void;
+  onBack?: () => void;
+  current?: unknown;
+  progress?: string;
+  note?: string;
+  title?: string;
 }) {
   const q = props.card.q;
-  const [other, setOther] = useState(false);
+  const free = !q.options.length;
+  const [other, setOther] = useState(free);
+  const [cursor, setCursor] = useState(() => questionCursor(q, props.current));
+  const [need, setNeed] = useState("");
   const recIndex = recommendedIndex(q);
+  const missing = questionNeed(q);
   useInput(
     (input, key) => {
       const n = Number(input);
       if (Number.isInteger(n) && n >= 1 && n <= Math.min(9, q.options.length)) props.onAnswer(q.options[n - 1]!.value);
+      else if (key.upArrow) setCursor((c) => (c + q.options.length - 1) % q.options.length);
+      else if (key.downArrow) setCursor((c) => (c + 1) % q.options.length);
       else if (input === "o") setOther(true);
-      else if (key.return && q.recommendation) props.onAnswer(q.recommendation.value);
+      else if (key.return) {
+        const r = questionEnter(q, cursor);
+        if ("value" in r) props.onAnswer(r.value);
+        else (setNeed(r.type), setOther(true));
+      } else if (props.onBack && ((key.tab && key.shift) || key.leftArrow)) props.onBack();
       else if (key.escape) props.onDismiss();
     },
     { isActive: !other },
   );
   return (
-    <Frame title={`Your decision: ${q.title}`} color="magenta">
+    <Frame title={props.title ?? `Your decision: ${q.title}`} color="magenta">
+      {props.progress ? <Text dimColor>{props.progress}</Text> : null}
       <Text>{q.text}</Text>
       {q.evidence ? (
         <Box marginTop={1}>
           <Text>{q.evidence}</Text>
         </Box>
       ) : null}
+      {props.note ? <Text color="yellow">{props.note}</Text> : null}
       <Box flexDirection="column">
         <Box flexDirection="column" marginTop={1}>
           {q.options.map((o, i) => (
-            <Text key={i}>
-              <Text color="magenta">{i + 1}</Text> {o.label}
+            <Text key={i} color={i === cursor && !other ? "magenta" : undefined}>
+              {i === cursor && !other ? "▸" : " "} <Text color="magenta">{i + 1}</Text> {o.label}
               {i === recIndex ? <Text color="green"> (recommended)</Text> : null}
             </Text>
           ))}
-          <Text>
-            <Text color="magenta">o</Text> other: type your own answer
-          </Text>
+          {free ? null : (
+            <Text>
+              {"  "}
+              <Text color="magenta">o</Text> other: type your own answer
+            </Text>
+          )}
         </Box>
-        {q.recommendation ? (
+        {q.recommendation?.reason ? (
           <Box marginTop={1}>
-            <Text dimColor>Recommended: {q.recommendation.reason} Press Enter to take it.</Text>
+            <Text dimColor>Recommended: {q.recommendation.reason}</Text>
           </Box>
         ) : null}
+        {need || missing ? <Text color="yellow">{need || missing}</Text> : null}
         {other ? (
-          <Prompt label="Your answer:" onSubmit={(v) => v.trim() && props.onAnswer(v.trim())} onCancel={() => setOther(false)} />
+          <Prompt
+            label="Your answer:"
+            initial={free ? questionStartText(q, props.current) : ""}
+            onSubmit={(v) => {
+              const t = v.trim();
+              if (t) return props.onAnswer(t);
+              const r = questionEnter(q, cursor);
+              if ("value" in r && free) props.onAnswer(r.value);
+              else setNeed(questionNeed(q) ?? "Type your answer.");
+            }}
+            onCancel={() => (free ? props.onDismiss() : setOther(false))}
+            onBack={props.onBack}
+          />
         ) : (
-          <Text dimColor>Press a number to answer. Esc to answer later with /questions.</Text>
+          <Text dimColor>
+            ↑↓ choose · Enter accepts · a number answers at once{props.onBack ? " · ← back" : ""} · Esc {props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions"}
+          </Text>
         )}
       </Box>
     </Frame>
@@ -506,6 +542,8 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
       ) : (
         <Prompt label={settingLabel(card, st) ?? ""} onSubmit={(v) => act({ a: "setValue", value: v })} onCancel={() => act({ a: "back" })} />
       )
+    ) : step === "useprogram" && programQuestion(card, st) ? (
+      ask("useprogram", programQuestion(card, st)!, (v) => act({ a: "useProgram", value: String(v) }))
     ) : step === "definition" && definitionLabel(card, st) ? (
       <Prompt label={definitionLabel(card, st)!} onSubmit={(v) => act({ a: "define", text: v })} onCancel={() => act({ a: "back" })} />
     ) : step === "change" ? (

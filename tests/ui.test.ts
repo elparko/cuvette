@@ -124,3 +124,40 @@ describe("settings", () => {
     expect(settingEditor({ def: { ...def, edit: "key" }, value: "", source: "", locked: false })).toEqual({ t: "edit", card: "key" });
   });
 });
+
+describe("the program choice", () => {
+  test("the program is a pre-filled item in the proposed metrics; a number opens it, and another program becomes a change request", async () => {
+    const { planText } = await import("../src/core/plan.ts");
+    const text = planText({ steps: [{ step: "Compare", status: "todo", decisions: [{ label: "Test", value: "Welch t test", by: "agent" }] }], programs: [{ part: "Statistics", adapter: "biostats", program: "SciPy", why: "It runs the t test." }] }, { view: "compact", numbered: true });
+    expect(text).toContain("[1] Test: Welch t test (agent)");
+    expect(text).toContain("Programs\n[2] Statistics: SciPy through biostats (agent). It runs the t test.");
+    const card = plan({ settings: [{ index: 0, step: 1, label: "Test", value: "Welch t test", by: "agent" }], programs: [{ part: "Statistics", adapter: "biostats", program: "SciPy", why: "It runs the t test.", alternatives: ["r-stats"] }] });
+    const { itemCount, programQuestion } = await import("../src/ui/cards.ts");
+    expect(itemCount(card)).toBe(2);
+    const st = planReduce(card, planInit(card), { a: "item", n: 2 }).state;
+    expect(st.step).toBe("useprogram");
+    const pq = programQuestion(card, st)!;
+    expect(pq.options.map((o) => o.label)).toEqual(["Keep SciPy through biostats", "Use r-stats"]);
+    expect(pq.recommendation?.value).toBe("biostats");
+    expect(planReduce(card, st, { a: "useProgram", value: "biostats" }).state.step).toBe("actions");
+    expect(planReduce(card, st, { a: "useProgram", value: "r-stats" }).respond).toEqual({ action: "change", text: "Use r-stats for Statistics, not biostats." });
+  });
+
+  test("Enter accepts the recommendation or the default; with neither, the card says what is needed and the cursor stays on the first option", async () => {
+    const { questionCursor, questionEnter, questionNeed, setupValues } = await import("../src/ui/cards.ts");
+    const opts = [{ value: "a", label: "A" }, { value: "b", label: "B" }];
+    const base = { ...q("q1"), options: opts };
+    expect(questionCursor({ ...base, recommendation: { value: "b", reason: "" } })).toBe(1);
+    expect(questionCursor({ ...base, default: "b" })).toBe(1);
+    expect(questionCursor({ ...base, recommendation: { value: "b", reason: "" } }, "a")).toBe(0);
+    expect(questionEnter({ ...base, recommendation: { value: "b", reason: "" } }, 1)).toEqual({ value: "b" });
+    expect(questionEnter({ ...base, options: [], recommendation: { value: "lab", reason: "" } }, 0)).toEqual({ value: "lab" });
+    expect(questionEnter({ ...base, options: [], default: 5 }, 0)).toEqual({ value: 5 });
+    expect(questionEnter({ ...base, options: [], title: "Program (adapter)" }, 0)).toEqual({ type: "Program (adapter) needs your answer. Type it here." });
+    expect(questionCursor(base)).toBe(0);
+    expect(questionNeed({ ...base, title: "Color" })).toBe("There is no recommendation for Color. Choose one of the options.");
+    expect(questionNeed({ ...base, recommendation: { value: "a", reason: "" } })).toBeUndefined();
+    const fields = [{ key: "adapter", label: "Program (adapter)", kind: "text", owner: "agent" as const, value: undefined, set: false }, { key: "alpha", label: "Alpha", kind: "float", owner: "human" as const, value: undefined, set: false, default: 0.05 }];
+    expect(setupValues(fields, { t: "setup", profiles: [] })).toEqual({ alpha: 0.05 });
+  });
+});

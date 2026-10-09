@@ -119,6 +119,34 @@ export function recommendedIndex(q: Question): number {
   return q.options.findIndex((o) => Object.is(o.value, q.recommendation!.value) || JSON.stringify(o.value) === JSON.stringify(q.recommendation!.value));
 }
 
+const sameValue = (a: unknown, b: unknown) => Object.is(a, b) || JSON.stringify(a) === JSON.stringify(b) || (a !== undefined && b !== undefined && String(a) === String(b));
+
+export function questionCursor(q: Question, current?: unknown): number {
+  for (const v of [current, q.recommendation?.value, q.default]) {
+    if (v === undefined) continue;
+    const i = q.options.findIndex((o) => sameValue(o.value, v));
+    if (i >= 0) return i;
+  }
+  return 0;
+}
+
+export function questionEnter(q: Question, cursor: number): { value: unknown } | { type: string } {
+  if (q.options.length) return { value: q.options[Math.max(0, Math.min(cursor, q.options.length - 1))]!.value };
+  if (q.recommendation) return { value: q.recommendation.value };
+  if (q.default !== undefined) return { value: q.default };
+  return { type: `${q.title} needs your answer. Type it here.` };
+}
+
+export function questionNeed(q: Question): string | undefined {
+  if (q.recommendation || q.default !== undefined) return undefined;
+  return q.options.length ? `There is no recommendation for ${q.title}. Choose one of the options.` : `There is no recommendation for ${q.title}. Type your answer.`;
+}
+
+export function questionStartText(q: Question, current?: unknown): string {
+  const v = current ?? q.recommendation?.value ?? q.default;
+  return v === undefined || v === null ? "" : typeof v === "string" ? v : JSON.stringify(v);
+}
+
 export function localQuestion(qid: string, title: string, text: string, options: { value: string; label: string }[], rec?: string): Question {
   return { qid, session: "", decisionKey: "", title, text, options, recommendation: rec ? { value: rec, reason: "" } : undefined, evidence: "", status: "open", created: "" };
 }
@@ -143,7 +171,7 @@ export function choiceLabel(c: any): string {
 }
 
 export function setupValues(fields: DecisionFieldLike[], card: Extract<Card, { t: "setup" }>): Record<string, unknown> {
-  return Object.fromEntries(fields.map((f) => [f.key, f.key in (card.proposed ?? {}) ? card.proposed![f.key] : f.set ? f.value : (f.value ?? f.default)]));
+  return Object.fromEntries(fields.map((f) => [f.key, f.key in (card.proposed ?? {}) ? card.proposed![f.key] : f.set ? f.value : (f.value ?? f.default)]).filter(([, v]) => v !== undefined && v !== null));
 }
 
 export function numberProblem(f: DecisionFieldLike, raw: string): string | undefined {
@@ -232,7 +260,7 @@ export const CLARIFY_SKIP_ANSWER = "No answer. Use your judgment and say what yo
 
 export const RUN_MODES: Mode[] = ["watch", "follow", "teach"];
 
-export type PlanStep = "restate" | "decisions" | "reference" | "refpath" | "refmode" | "actions" | "change" | "correct" | "program" | "definition" | "setting" | "pick";
+export type PlanStep = "restate" | "decisions" | "reference" | "refpath" | "refmode" | "actions" | "change" | "correct" | "program" | "definition" | "setting" | "pick" | "useprogram";
 
 export interface PlanState {
   step: PlanStep;
@@ -241,6 +269,7 @@ export interface PlanState {
   ref?: ReferenceChoice;
   defIndex: number;
   setIndex: number;
+  progIndex?: number;
   details: boolean;
 }
 
@@ -267,7 +296,8 @@ export type PlanAction =
   | { a: "details" }
   | { a: "item"; n: number }
   | { a: "pick" }
-  | { a: "setValue"; value: unknown };
+  | { a: "setValue"; value: unknown }
+  | { a: "useProgram"; value: string };
 
 export function parseReference(raw: string): ReferenceChoice | undefined {
   const [path = "", sheet = "", cols = ""] = raw.split(";").map((x) => x.trim());
@@ -333,7 +363,14 @@ export function definitionLabel(card: PlanCard, st: PlanState): string | undefin
 }
 
 export function itemCount(card: PlanCard): number {
-  return (card.stage === "plan" ? (card.definitions ?? []).length : 0) + (card.settings ?? []).length;
+  return (card.stage === "plan" ? (card.definitions ?? []).length + card.programs.length : 0) + (card.settings ?? []).length;
+}
+
+export function programQuestion(card: PlanCard, st: PlanState): Question | undefined {
+  const g = card.programs[st.progIndex ?? -1];
+  if (!g) return undefined;
+  const name = (a: string) => (a === g.adapter && g.program && g.program !== a ? `${g.program} through ${a}` : a);
+  return localQuestion("program", `Program for ${g.part || "this analysis"}`, `Now: ${name(g.adapter)}, chosen by the agent${g.why ? `: ${g.why}` : "."}`, [g.adapter, ...g.alternatives].map((a, i) => ({ value: a, label: i ? `Use ${a}` : `Keep ${name(a)}` })), g.adapter);
 }
 
 export function settingQuestion(card: PlanCard, st: PlanState): Question | undefined {
@@ -364,12 +401,19 @@ export function planReduce(card: PlanCard, st: PlanState, act: PlanAction): { st
       const i = act.n - 1;
       if (i < 0 || i >= itemCount(card)) return to(after);
       if (i < ndefs) return to("definition", { defIndex: i });
-      return to("setting", { setIndex: i - ndefs });
+      const nset = (card.settings ?? []).length;
+      if (i < ndefs + nset) return to("setting", { setIndex: i - ndefs });
+      return to("useprogram", { progIndex: i - ndefs - nset });
     }
     case "setValue": {
       const v = typeof act.value === "string" ? act.value.trim() : act.value;
       if (v === "" || v === undefined) return to(after);
       return respond({ action: "set", index: st.setIndex, value: v });
+    }
+    case "useProgram": {
+      const g = card.programs[st.progIndex ?? -1];
+      if (!g || act.value === g.adapter) return to(after);
+      return respond({ action: "change", text: `Use ${act.value} for ${g.part || "the analysis"}, not ${g.adapter}.` });
     }
     case "restate":
       return to(act.ok ? "decisions" : "correct");

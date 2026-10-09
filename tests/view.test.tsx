@@ -43,8 +43,9 @@ test("the spinner turns on the status line only, and stops when a card waits for
   expect(h.term.view()).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] Thinking about the next step/);
 
   s.proposePlan("Question: Q1");
-  await until(() => h.term.view().includes("● Waiting for your answer"));
+  await until(() => h.term.view().includes("● Waiting for your answer") && h.term.view().includes("No analysis step runs") && !h.term.view().includes(" of ?"));
   expect(h.term.view()).not.toMatch(SPIN);
+  await sleep(100);
   const quiet = h.frames.length;
   await sleep(400);
   expect(h.frames.length).toBe(quiet);

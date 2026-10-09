@@ -56,6 +56,7 @@ export interface SessionLike {
   answer(qid: string, value: unknown, note?: string): Promise<void>;
   setDecision(key: string, value: unknown, reason?: string): string[];
   setOwner(key: string, owner: Owner): void;
+  changeProgram?(name: string): Promise<{ ok: boolean; text: string }>;
   setMode(mode: Mode): void;
   setPermissionMode(m: "ask" | "bypass"): void;
   followDone(step: number, note?: string, agentDoes?: boolean): Promise<void>;

@@ -66,7 +66,7 @@ test("lists adapter tools with their schemas and the ga tools", async () => {
   expect(transportErrors).toEqual([]);
 });
 
-test("with no adapter, the client lists the adapters, the scientist answers the program card, and the tool list grows", async () => {
+test("with no adapter, the client lists the adapters, use_adapter loads the agent's choice with no card, and the tool list grows", async () => {
   mkdirSync(join(home, "adapters"), { recursive: true });
   symlinkSync(lab, join(home, "adapters", "lab"));
   const c = await connect();
@@ -78,13 +78,8 @@ test("with no adapter, the client lists the adapters, the scientist answers the 
   expect(names).not.toContain("count");
   expect((await call("list_adapters", { filter: "lab" })).text).toMatch(/- lab \| Lab counter/);
   await call("ga_setup", { values: { question: "q" } });
-  const blocked = await call("use_adapter", { name: "lab", reason: "it counts particles" });
-  expect(blocked.isError).toBe(true);
-  expect(blocked.text).toMatch(/BLOCKED: the choice of program belongs to the scientist/);
-  const open = JSON.parse((await call("ga_questions")).text) as { qid: string; text: string }[];
-  expect(open[0].text).toBe("The agent wants to use Lab counter through the lab adapter: it counts particles.");
-  await call("ga_answer", { qid: open[0].qid, value: "lab" });
   const ok = await call("use_adapter", { name: "lab", reason: "it counts particles" });
+  expect(JSON.parse((await call("ga_questions")).text)).toEqual([]);
   expect(ok.isError).toBe(false);
   expect(ok.text).toMatch(/Loaded the adapter lab/);
   const after = (await c.listTools()).tools.map((t) => t.name);

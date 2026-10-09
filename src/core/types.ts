@@ -331,7 +331,7 @@ export interface PlanEvent {
   text: string;
   update: boolean;
   qids: string[];
-  programs: { part: string; adapter: string; alternatives: string[] }[];
+  programs: { part: string; adapter: string; alternatives: string[]; program?: string; why?: string }[];
   mode: Mode;
   restatement?: string;
   definitions?: { measure: string; definition: string }[];

@@ -96,6 +96,7 @@ const PLAN_NOTE = "Plan first, in two phases. Phase 1, clarifying questions: loo
 const PLAN_UPDATE_NOTE = "This is a new request in a session with an approved plan. If the request needs analysis steps that are not in the plan, call plan with only what changes: the new steps and the changed sections. The scientist approves the update before a new step runs. If the request needs no new step, answer directly.";
 const PILOT_NOTE = "Pilot: before the first step that changes or counts things, say in one sentence how you will check the method on one sample first. A step that processes many files does not run until the scientist approves a pilot: run the method on one sample, save QC images with outlines of what was counted and what was left out, and call pilot_result.";
 const TECHNICAL = /\b(threshold|otsu|triangle|segmentation model|cellpose model|stardist|cyto\d|diameter|size (filter|limit|cut-?off)|(minimum|maximum|min|max)\.? (cell |object |particle )?size|pixels? (size|area)|sigma|blur|error bars?|standard error|sem|sd bars|test family|t-?test|wilcoxon|mann-?whitney|anova|alpha|significance level|p-?value cut|one-?sided|two-?sided|sidedness|fdr|bonferroni|correction method|random seed|iterations|normali[sz]ation method)\b/i;
+const PROGRAM_REASON = "chosen by the scientist with /program";
 const CONTINUE = /^(continue|go on|go ahead|proceed|yes|ok|okay|next|carry on)\b[\s\S]{0,40}$/i;
 
 function lastSentence(text: string): string {
@@ -511,7 +512,7 @@ export class Session {
     if (have(a.name)) return already(a.name);
     if (this.activePlan() && !this.planApproves(a)) {
       this.record.append("notice", { text: `Not in the approved plan: the adapter ${a.name}. Reason: ${reason.trim() || "the agent gave none."}`, plan: "deviation", tool: "use_adapter", adapter: a.name });
-      this.notes.push(`The approved plan does not name the adapter ${a.name}. The scientist decides on the program card. If it loads, call plan to add it to programs, with the reason.`);
+      this.notes.push(`The approved plan does not name the adapter ${a.name}. It loads as your choice, and the scientist can change it with /program. Call plan to add it to programs, with the reason.`);
     }
     const gate = await this.chooseProgram(a, reason);
     if (gate.blocked) return { ok: false, error: gate.blocked };
@@ -546,13 +547,22 @@ export class Session {
     const owner = this.decisions.owner(key);
     if (owner === "fixed") return { load: [], by: "fixed", blocked: `The lab fixed the program: ${chosen.join(", ") || "none"}. Load one of these adapters, or ask the scientist.` };
     const value = (n: string) => [...new Set([...loaded, n])].join(", ");
-    if (owner === "agent") {
-      this.decisions.change(key, value(a.name), { by: "agent", reason });
-      return { load: [a.name], by: "agent" };
-    }
     if (this.planApproves(a)) {
       this.decisions.change(key, value(a.name), { by: "human", reason: `the scientist approved plan version ${this.pilotPlan?.version ?? this.planVersion}, which names ${a.name}` });
       return { load: [a.name], by: "human", text: `The approved plan names ${a.name}, so the plan approval covers this load.` };
+    }
+    const preset = this.setupPreset?.[key];
+    if (preset && !this.programByScientist().length) this.decisions.change(key, String(preset), { by: "human", reason: "from the answers file" });
+    const picked = this.programByScientist();
+    if (picked.includes(a.name)) return { load: [a.name], by: "human" };
+    if (picked.length) {
+      const load = picked.filter((n) => !loaded.includes(n));
+      if (!load.length) return { load: [], by: "human", blocked: `The scientist chose the program ${picked.join(", ")}. Use that adapter, or ask the scientist in your message.` };
+      return { load, by: "human", text: `The scientist chose ${load.join(", ")} instead of ${a.name}.` };
+    }
+    if (owner === "agent") {
+      this.decisions.change(key, value(a.name), { by: "agent", reason });
+      return { load: [a.name], by: "agent" };
     }
     const list = this.adapterList();
     const request = String(this.lastRequest()?.data.text ?? "");
@@ -581,6 +591,31 @@ export class Session {
     }
     const now = split(this.decisions.value(key)).filter((n) => !loaded.includes(n));
     return { load: now, by: "human", text: now.includes(a.name) ? undefined : `The scientist chose ${now.join(", ") || "no new adapter"} instead of ${a.name}.` };
+  }
+
+  private programByScientist(): string[] {
+    const key = ADAPTER_DECISION.key;
+    const last = this.record.entries(["setup", "decision"]).filter((e) => (e.kind === "decision" ? e.data.key === key : key in ((e.data.values as object) ?? {}))).at(-1);
+    if (!last) return [];
+    const human = last.kind === "setup" || (last.data.by === "human" && !String(last.data.reason ?? "").startsWith("the scientist approved plan"));
+    return human ? String(this.decisions.value(key) ?? "").split(/[,\s]+/).filter(Boolean) : [];
+  }
+
+  async changeProgram(name: string): Promise<{ ok: boolean; text: string }> {
+    let a: LoadedAdapter;
+    try {
+      a = applyOverlay(findAdapter(name, this.cwd));
+    } catch (e) {
+      return { ok: false, text: `${(e as Error).message}. /adapters lists the loaded programs.` };
+    }
+    if (this.decisions.has(ADAPTER_DECISION.key)) this.decisions.change(ADAPTER_DECISION.key, a.name, { by: "human", reason: PROGRAM_REASON });
+    const before = this.adapters.map((x) => x.name).filter((n) => n !== a.name);
+    if (!this.adapters.some((x) => x.name === a.name)) {
+      const r = await this.loadOne(a, PROGRAM_REASON, "human");
+      if (!r.ok) return { ok: false, text: r.error ?? `The adapter ${a.name} did not load.` };
+    }
+    this.notes.push(`The scientist changed the program to ${a.manifest.program.name} (adapter ${a.name}) with /program. Use its tools from now on${before.length ? `, not the tools of ${before.join(", ")}` : ""}.`);
+    return { ok: true, text: `The program is now ${a.manifest.program.name} through ${a.name}. The agent uses it from the next step.` };
   }
 
   private async loadOne(a: LoadedAdapter, reason: string, by: string): Promise<ToolOutput> {
@@ -613,7 +648,7 @@ export class Session {
     } else names.forEach((n) => this.active.add(n));
     this.system = this.buildSystem();
     const info = this.adapterInfo.at(-1)!;
-    this.record.append("adapter", { name: a.name, version: info.version, programVersion: info.programVersion, reason, by, status: m.adapter.status, path: a.root, programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
+    this.record.append("adapter", { name: a.name, program: m.program.name, version: info.version, programVersion: info.programVersion, reason, by, status: m.adapter.status, path: a.root, programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
     const shown = names.filter((n) => this.active.has(n));
     const skills = a.skills();
     const brief = added.length ? this.decisions.brief(added) : "";
@@ -1641,6 +1676,11 @@ export class Session {
   async answer(qid: string, value: unknown, note = ""): Promise<void> {
     const waited = this.waitedQids.has(qid);
     const open = this.questions.get(qid);
+    if (open && (value === undefined || value === null)) {
+      if (open.recommendation) value = open.recommendation.value;
+      else if (open.default !== undefined) value = open.default;
+      else throw new Error(`${open.title}: choose an option or type a value.`);
+    }
     if (open?.decisionKey && open.status === "open") this.decisions.validate(open.decisionKey, this.questions.match(open, value));
     const q = this.questions.answer(qid, value, note);
     if (q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by: "human", reason: `answer to ${qid}` });
@@ -2123,13 +2163,14 @@ export class Session {
       if (g.dropped.length) this.notes.push(`The restatement holds only the scientific goal. The harness took out: ${g.dropped.join(" ")} Answer such setup points briefly in your message.`);
     }
     this.fillDecisions(plan);
+    for (const g of plan.programs ?? []) g.program ??= this.adapterList().find((x) => x.name === g.adapter)?.program;
     const open = openDecisions(plan);
     if (open.length > 2) return { ok: false, error: `Too many open settings: ${open.map((x) => x.decision.label).join("; ")}. Fill in a sensible value for each technical setting (a default, or from the answers, or your choice checked in the pilot), and say who set it. Leave at most two open, only when you cannot choose.` };
     let version = ++this.planVersion;
     const part = this.planUpdate ? { ...given, steps: addedSteps(this.plan!, plan) } : plan;
     this.record.append("plan", { action: this.planUpdate ? "update_proposed" : "proposed", phase: "Proposed analysis", version, text: planText(part), full: planText(plan), plan: structuredClone(plan) });
     const qids = await this.askPlanDecisions(plan);
-    const programs = (plan.programs ?? []).map((g) => ({ part: g.part, adapter: g.adapter, alternatives: g.alternatives ?? [] }));
+    const programs = (plan.programs ?? []).map((g) => ({ part: g.part, adapter: g.adapter, alternatives: g.alternatives ?? [], program: g.program, why: g.why }));
     let r: PlanResponse | undefined;
     for (;;) {
       const shownPart = this.planUpdate ? { ...given, steps: addedSteps(this.plan!, plan) } : plan;

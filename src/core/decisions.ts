@@ -46,10 +46,10 @@ export const ADAPTER_DECISION: Decision = Decision.parse({
   key: "adapter",
   label: "Program (adapter)",
   kind: "text",
-  owner: "human",
+  owner: "agent",
   group: "Method",
   stage: "when_needed",
-  help: "The programs that do the analysis, as adapter names. The agent proposes one with use_adapter; the scientist accepts or changes it.",
+  help: "The programs that do the analysis, as adapter names. The agent chooses one with use_adapter and gives the reason. Change it with /program.",
 });
 
 export function getPath(obj: unknown, path: string): unknown {

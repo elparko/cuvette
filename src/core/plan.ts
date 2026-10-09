@@ -23,6 +23,7 @@ export interface PlanStep {
 export interface PlanProgram {
   part: string;
   adapter: string;
+  program?: string;
   why?: string;
   alternatives?: string[];
 }
@@ -130,6 +131,10 @@ function settingLine(d: PlanDecision): string {
   return `${d.label}: open, you decide.${opts}${rec}`;
 }
 
+export function programLine(g: PlanProgram): string {
+  return `${g.part ? `${g.part}: ` : ""}${g.program && g.program !== g.adapter ? `${g.program} through ${g.adapter}` : g.adapter} (agent)${g.why ? `. ${g.why.replace(/[.\s]+$/, "")}.` : ""}`;
+}
+
 export function settingsOf(p: Partial<AnalysisPlan>): { step: number; setting: PlanDecision }[] {
   return (p.steps ?? []).flatMap((s, i) => (s.decisions ?? []).map((setting) => ({ step: i + 1, setting })));
 }
@@ -164,6 +169,10 @@ export function planText(p: Partial<AnalysisPlan>, o: PlanTextOptions = {}): str
         else for (const x of set) out.push(`   - ${x}`);
         if (s.reason) out.push(`   Reason: ${s.reason}`);
       });
+    }
+    if (view === "compact" && p.programs?.length) {
+      out.push("", "Programs");
+      for (const g of p.programs) out.push(`${n(++item)}${programLine(g)}`);
     }
     if (p.pilot) out.push("", view === "compact" ? `Demonstration: the metrics run on ${p.pilot.sample} first. You check the result before the other samples run.` : `Demonstration on a sample\n- First sample: ${p.pilot.sample}. The metrics run on this sample only. You check the result before the other samples run.${(p.pilot.shows ?? []).map((x) => `\n- You will see: ${x}`).join("")}`);
     if (view === "compact") return out.join("\n").trim();
