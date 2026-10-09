@@ -143,3 +143,52 @@ describe("resume", () => {
     await again.close();
   });
 });
+
+describe("bottom of the terminal", () => {
+  const atBottom = (h: Harness, rows: number) => {
+    const view = h.term.view().split("\n");
+    expect(view).toHaveLength(rows);
+    let last = view.length - 1;
+    while (last > 0 && !view[last]!.trim()) last--;
+    expect(last).toBeGreaterThanOrEqual(rows - 2);
+    const box = view.findLastIndex((l) => l.startsWith("╰"));
+    expect(box).toBeGreaterThan(rows - 8);
+    const seen = h.term.lines().filter((l) => /[a-z]/i.test(l) && !/^[╭╰│]/.test(l));
+    expect(new Set(seen).size).toBe(seen.length);
+  };
+
+  for (const rows of [40, 80]) {
+    test(`at ${rows} rows the input box sits on the bottom rows after start, /clear and a resize`, async () => {
+      const { h } = start(100, rows);
+      await until(() => h.term.view().includes("Type /plan"));
+      await sleep(100);
+      atBottom(h, rows);
+      h.type("/clear");
+      await sleep(40);
+      h.type("\r");
+      await until(() => !h.term.view().includes("Type /plan"));
+      await sleep(100);
+      atBottom(h, rows);
+      h.type("/help");
+      await sleep(40);
+      h.type("\r");
+      await sleep(200);
+      await resize(h, 80, rows - 10);
+      atBottom(h, rows - 10);
+    });
+  }
+
+  test("the input box keeps its row when the status line comes and goes", async () => {
+    const { h, s } = start(100, 40);
+    await until(() => h.term.view().includes("Type /plan"));
+    await sleep(100);
+    const row = () => h.term.view().split("\n").findLastIndex((l) => l.startsWith("╰"));
+    const idle = row();
+    s.bus.emit({ type: "status", state: "thinking", since: Date.now() });
+    await until(() => h.term.view().includes("Thinking about the next step"));
+    expect(row()).toBe(idle);
+    s.bus.emit({ type: "status", state: "idle" });
+    await until(() => !h.term.view().includes("Thinking about the next step"));
+    expect(row()).toBe(idle);
+  });
+});

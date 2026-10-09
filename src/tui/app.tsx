@@ -24,8 +24,14 @@ const MAX_SUGGESTIONS = 8;
 
 export const RESIZE_MS = 150;
 const CLEAR_ALL = "\x1b[2J\x1b[3J\x1b[H";
+const toBottom = (rows: number | undefined) => `\x1b[${rows ?? 24};1H`;
 
-export function App({ session, opts, reprint }: { session: SessionLike; opts: TuiOptions; reprint?: { current?: () => void } }) {
+interface Screen {
+  reprint?: () => void;
+  wipe?: () => void;
+}
+
+export function App({ session, opts, screen }: { session: SessionLike; opts: TuiOptions; screen?: Screen }) {
   const { exit } = useApp();
   const { write, stdout } = useStdout();
   const env = opts.env ?? process.env;
@@ -41,7 +47,8 @@ export function App({ session, opts, reprint }: { session: SessionLike; opts: Tu
 
   const [items, setItems] = useState<StaticItem[]>([{ key: "header", t: "header" }]);
   const [epoch, setEpoch] = useState(0);
-  if (reprint) reprint.current = () => setEpoch((x) => x + 1);
+  if (screen) screen.reprint = () => setEpoch((x) => x + 1);
+  const wipe = () => (screen?.wipe ? screen.wipe() : (opts.stdout ?? process.stdout).write(CLEAR_ALL));
   const [live, setLive] = useState("");
   const [status, setStatus] = useState<{ state: string; tool?: string; purpose?: string; since?: number }>({ state: "idle" });
   const [cards, setCards] = useState<Card[]>([]);
@@ -83,7 +90,7 @@ export function App({ session, opts, reprint }: { session: SessionLike; opts: Tu
   const toggleDetails = useCallback(() => {
     details.current = !details.current;
     setShowAll(details.current);
-    (opts.stdout ?? process.stdout).write(CLEAR_ALL);
+    wipe();
     let rows: Item[];
     if (details.current) {
       rows = log.current.flatMap((l) => l.items);
@@ -221,7 +228,7 @@ export function App({ session, opts, reprint }: { session: SessionLike; opts: Tu
       hasQuestionCard: (qid) => cards.some((c) => c.t === "question" && c.q.qid === qid),
       refresh,
       clear: () => {
-        (opts.stdout ?? process.stdout).write(CLEAR_ALL);
+        wipe();
         log.current = [];
         setItems([]);
         setEpoch((x) => x + 1);
@@ -395,7 +402,9 @@ export function App({ session, opts, reprint }: { session: SessionLike; opts: Tu
           animate={animate}
           color={!env.NO_COLOR}
         />
-      ) : null}
+      ) : (
+        <Text> </Text>
+      )}
       {card ? (
         <CardRows.Provider value={fit.card}>
           {(cardViews({ session, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: running, program })[card.t] as (c: Card) => React.ReactNode)(card)}
@@ -549,9 +558,10 @@ function cardViews(d: CardDeps): CardViews {
 export const TUI_CARD_TYPES = Object.keys(cardViews({} as CardDeps)) as CardType[];
 
 export async function runTui(session: SessionLike, opts: TuiOptions = {}): Promise<void> {
-  const reprint: { current?: () => void } = {};
+  const screen: Screen = {};
   const stdout = opts.stdout ?? process.stdout;
-  const instance = render(<App session={session} opts={opts} reprint={reprint} />, {
+  if (stdout.isTTY) stdout.write(toBottom(stdout.rows));
+  const instance = render(<App session={session} opts={opts} screen={screen} />, {
     stdin: opts.stdin,
     stdout: opts.stdout,
     exitOnCtrlC: false,
@@ -559,13 +569,16 @@ export async function runTui(session: SessionLike, opts: TuiOptions = {}): Promi
     kittyKeyboard: { mode: "auto", flags: ["disambiguateEscapeCodes"] },
     incrementalRendering: true,
   });
+  screen.wipe = () => {
+    instance.clear();
+    stdout.write(CLEAR_ALL + (stdout.isTTY ? toBottom(stdout.rows) : ""));
+  };
   let timer: NodeJS.Timeout | undefined;
   const onResize = () => {
     clearTimeout(timer);
     timer = setTimeout(() => {
-      instance.clear();
-      stdout.write(CLEAR_ALL);
-      reprint.current?.();
+      screen.wipe!();
+      screen.reprint?.();
     }, RESIZE_MS);
   };
   if (stdout.isTTY) stdout.on("resize", onResize);

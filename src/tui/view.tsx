@@ -17,7 +17,7 @@ export function animationsOn(stdout: { isTTY?: boolean } | undefined, env: Recor
 
 export function liveLayout(o: { rows: number; columns: number; card: boolean; running: boolean; input: number; inputRows?: number; keys?: boolean; queue: number; suggestions: number; text: boolean; pending: boolean }) {
   const budget = o.rows - 2;
-  const footer = 2 + (o.keys ? 1 : 0) + (o.running ? 1 : 0) + o.queue + o.suggestions;
+  const footer = 3 + (o.keys ? 1 : 0) + o.queue + o.suggestions;
   const box = 2 + (o.inputRows ?? Math.max(1, Math.ceil((o.input + 4) / Math.max(1, o.columns - 4))));
   const inputBox = !o.card || budget - footer - box >= 16;
   const avail = Math.max(0, budget - footer - (inputBox ? box : 0));
