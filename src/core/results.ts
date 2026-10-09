@@ -501,8 +501,9 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
   }
 
   for (const d of DECKS) if (!listed.has(join(dir, d)) && existsSync(join(dir, d))) fileRows.push(["", "image deck", d, ""]);
-  for (const e of envsUsed(record)) summary.push(["Environment", e.name, e.language || e.packages.map((p) => `${p.name} ${p.version}`).join(", "), `${e.kind === "program" ? "program" : `${e.packages.length} packages`}, lock ${e.hash.slice(0, 12)}`]);
-  const packageRows: Cell[][] = envsUsed(record).flatMap((e) => e.packages.map((p) => [e.name, e.language, p.name, p.version, e.path, e.hash.slice(0, 12)]));
+  const packaged = envsUsed(record).filter((e) => e.kind !== "program");
+  for (const e of packaged) summary.push(["Environment", e.name, e.language, `${e.packages.length} packages, lock ${e.hash.slice(0, 12)}`]);
+  const packageRows: Cell[][] = packaged.flatMap((e) => e.packages.map((p) => [e.name, e.language, p.name, p.version, e.path, e.hash.slice(0, 12)]));
   const changeRowsOut: Cell[][] = reruns(record).flatMap((d) => d.rows.map((r) => [d.step, d.oldStep, d.tool, r.name, r.before, r.after, r.change, changeCell(r), d.reasons.join(" ")]));
 
   const pilot = pilotRows(record);
