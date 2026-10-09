@@ -1,0 +1,38 @@
+livak dilution c_myc: slope -3.388095 intercept 25.696691 R2 0.9965504 efficiency 1.973109
+livak dilution GAPDH: slope -3.414551 intercept 22.682211 R2 0.9990278 efficiency 1.962747
+ddct brain: mean dCt 6.860000 ddCt 0.000000 fold 1.000000 sd_livak 0.886410 to 1.128146 sd_dct 0.891229 to 1.122047
+ddct kidney: mean dCt 4.365000 ddCt -2.495000 fold 5.637283 sd_livak 5.276399 to 6.022850 sd_dct 5.218697 to 6.089443
+ci95 kidney: Welch p 3.4666e-10 fold CI 4.956993 to 6.410935
+pfaffl kidney with the dilution efficiencies: fold 5.477833; Pfaffl 2001 formula on group means 5.477833
+embryo dilution GAPDH: slope -3.4557 efficiency 1.947042 points 8
+embryo dilution HTATSF1: slope -3.1799 efficiency 2.062893 points 8
+embryo dilution CDC40: slope -3.2067 efficiency 2.050442 points 8
+embryo dilution RPL13a: slope -3.2923 efficiency 2.012509 points 8
+embryo dilution CSNK2A2: slope -3.2359 efficiency 2.037215 points 6
+embryo dilution AP3D1: slope -3.2235 efficiency 2.042784 points 8
+embryo dilution HPRT1: slope -3.2105 efficiency 2.048695 points 8
+embryo dilution CYC1: slope -3.4611 efficiency 1.945012 points 7
+embryo dilution EIF4A: slope -3.2491 efficiency 2.031321 points 8
+embryo dilution UBC: slope -3.3788 efficiency 1.976821 points 7
+embryo dilution PAK1IP1: slope -3.2935 efficiency 2.011994 points 8
+embryo dilution ACTB: slope -3.2993 efficiency 2.009520 points 8
+embryo dilution 18S: slope -3.4209 efficiency 1.960299 points 8
+embryo dilution SDHA: slope -3.2331 efficiency 2.038443 points 8
+geNorm step, remove HPRT1: average M 0.527538
+geNorm step, remove B2M: average M 0.490111
+geNorm step, remove GAPDH: average M 0.440995
+geNorm step, remove CYC1: average M 0.425833
+geNorm step, remove SDHA: average M 0.404908
+geNorm step, remove EIF4A: average M 0.385287
+geNorm step, remove CSNK2A2: average M 0.358428
+geNorm step, remove UBC: average M 0.340960
+geNorm step, remove 18S: average M 0.326448
+geNorm step, remove AP3D1: average M 0.307712
+geNorm step, remove PAK1IP1: average M 0.291643
+geNorm step, remove RPL13a: average M 0.256966
+geNorm step, remove ActB: average M 0.227746
+geNorm best pair CDC40/HTATSF1: average M 0.217549
+geNorm V2/3 0.068640
+geNorm V3/4 0.064205
+geNorm V4/5 0.061454
+geNorm V5/6 0.047374

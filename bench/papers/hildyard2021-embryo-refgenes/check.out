@@ -1,0 +1,37 @@
+samples 44 genes 15
+all samples, geNorm step HPRT1: average M 0.527538
+all samples, geNorm step B2M: average M 0.490111
+all samples, geNorm step GAPDH: average M 0.440995
+all samples, geNorm step CYC1: average M 0.425833
+all samples, geNorm step SDHA: average M 0.404908
+all samples, geNorm step EIF4A: average M 0.385287
+all samples, geNorm step CSNK2A2: average M 0.358428
+all samples, geNorm step UBC: average M 0.340960
+all samples, geNorm step 18S: average M 0.326448
+all samples, geNorm step AP3D1: average M 0.307712
+all samples, geNorm step PAK1IP1: average M 0.291643
+all samples, geNorm step RPL13a: average M 0.256966
+all samples, geNorm step ActB: average M 0.227746
+all samples, geNorm step CDC40/HTATSF1: average M 0.217549
+all samples, V2/3 0.068640; genes with average M below 0.5: 14
+heads, best pair CDC40/HTATSF1: average M 0.114216; first step HPRT1 0.358255
+dilution GAPDH: slope -3.4557 efficiency 1.947042
+dilution HTATSF1: slope -3.1799 efficiency 2.062893
+dilution CDC40: slope -3.2067 efficiency 2.050442
+dilution RPL13a: slope -3.2923 efficiency 2.012509
+dilution CSNK2A2: slope -3.2359 efficiency 2.037215
+dilution AP3D1: slope -3.2235 efficiency 2.042784
+dilution HPRT1: slope -3.2105 efficiency 2.048695
+dilution CYC1: slope -3.4611 efficiency 1.945012
+dilution EIF4A: slope -3.2491 efficiency 2.031321
+dilution UBC: slope -3.3788 efficiency 1.976821
+dilution PAK1IP1: slope -3.2935 efficiency 2.011994
+dilution ACTB: slope -3.2993 efficiency 2.009520
+dilution 18S: slope -3.4209 efficiency 1.960299
+dilution SDHA: slope -3.2331 efficiency 2.038443
+published geNorm, all samples: {'HPRT1': 0.527538, 'B2M': 0.490111, 'GAPDH': 0.440995, 'CYC1': 0.425833, 'SDHA': 0.404908, 'EIF4A': 0.385286, 'CSNK2A2': 0.358428, 'UBC': 0.34096, '18S': 0.326448, 'AP3D1': 0.307712, 'PAK1IP1': 0.291643, 'RPL13a': 0.256966, 'ActB': 0.227746, 'HTATSF1\nCDC40': 0.217549}
+published geNorm, heads: {'HPRT1': 0.358255, 'B2M': 0.31256, 'EIF4A': 0.259122, 'SDHA': 0.232748, 'CYC1': 0.224698, 'CSNK2A2': 0.210986, 'AP3D1': 0.19675, 'PAK1IP1': 0.186256, 'UBC': 0.176465, '18S': 0.164055, 'GAPDH': 0.145017, 'RPL13a': 0.134148, 'ActB': 0.119353, 'HTATSF1\nCDC40': 0.114216}
+published V2/3, all samples: 0.06864
+published NormFinder, no groups: {'HPRT1': 0.480987, 'B2M': 0.472801, 'EIF4A': 0.285643, 'GAPDH': 0.285336, 'ActB': 0.283006, '18S': 0.253421, 'CYC1': 0.249832, 'HTATSF1': 0.241196, 'CDC40': 0.240349, 'SDHA': 0.20839, 'RPL13a': 0.203921, 'PAK1IP1': 0.183181, 'CSNK2A2': 0.170915, 'UBC': 0.164031, 'AP3D1': 0.134827}
+published NormFinder, grouped by tissue: {'B2M': 0.180476, 'EIF4A': 0.166975, 'HPRT1': 0.163275, '18S': 0.139932, 'HTATSF1': 0.139195, 'CSNK2A2': 0.133269, 'GAPDH': 0.127699, 'ActB': 0.126684, 'RPL13a': 0.124191, 'AP3D1': 0.123404, 'CYC1': 0.120897, 'CDC40': 0.114739, 'PAK1IP1': 0.110832, 'SDHA': 0.107627, 'UBC': 0.081032}
+published slopes and efficiencies: {'GAPDH': (-3.4557, 1.947049), 'HTATSF1': (-3.1799, 2.062886), 'CDC40': (-3.2067, 2.05044), 'RPL13a': (-3.2923, 2.012515), 'CSNK2A2': (-3.2359, 2.037197), 'Ap3d1': (-3.2235, 2.042781), 'HPRT1': (-3.2105, 2.048698), 'CYC1': (-3.4611, 1.945026), 'EIF4A': (-3.2491, 2.031316), 'UBC': (-3.3788, 1.976802), 'B2M': (' (from amp)', 2.042208), 'PAK1IP1': (-3.2935, 2.012002), 'ACTB': (-3.2293, 2.040162), '18S': (-3.4209, 1.960292), 'SDHA': (-3.2331, 2.038453)}

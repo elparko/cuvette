@@ -1,0 +1,143 @@
+kind: research paper
+short: Hildyard 2021
+field: qPCR gene expression
+program: NormqPCR (R), through the qpcr adapter. The paper used the geNorm and NormFinder Excel add-ins, Excel and Prism 8.
+citation:
+  authors: Hildyard JCW, Wells DJ, Piercy RJ
+  title: Identification of qPCR reference genes suitable for normalising gene expression in the developing mouse embryo
+  venue: Wellcome Open Research 6:197 (version 2)
+  year: 2021
+  doi: 10.12688/wellcomeopenres.16972.2
+related:
+  - text: "Underlying data: raw qPCR data, figshare, CC BY 4.0."
+    doi: 10.6084/m9.figshare.14755803
+  - text: "Underlying data: reference gene analysis (geNorm, NormFinder, BestKeeper and deltaCt outputs), figshare, CC BY 4.0."
+    doi: 10.6084/m9.figshare.14756484
+  - text: "Extended data: additional reference gene validation and primer efficiencies, figshare, CC BY 4.0."
+    doi: 10.6084/m9.figshare.14763024
+measured: >-
+  The study measured 15 candidate reference genes by RT-qPCR in 44 mouse samples: whole embryos from 11.5 to 18.5 days
+  post coitum, heads and forelimbs. It ranked the genes with geNorm, NormFinder, BestKeeper and deltaCt. A ten-fold dilution
+  series of each primer pair gave the amplification efficiency.
+instruction: >-
+  Rank the 15 genes with geNorm and NormFinder over all samples, and with NormFinder grouped by tissue. Give the geNorm
+  average M values, the number of genes with M below 0.5 and V2/3. Run geNorm on the heads only. Give the standard curve
+  slope and the efficiency of each gene.
+instruction_basis: >-
+  Results (geNorm analysis, Normfinder analysis), Tables 2, 5 and 6, Figure 3, and the Underlying and Extended data
+  workbooks that give the values behind the figures.
+answers:
+  efficiencies:
+    decision: Amplification efficiencies
+    value: "2"
+    source: The raw data workbook gives the relative quantities as 2^(min Cq - Cq), so the geNorm and NormFinder inputs use an efficiency of 2.
+  replicates:
+    decision: Technical replicates
+    value: mean
+    source: Methods and the raw data workbook. The analysis uses the mean Cq of the technical duplicates.
+  exclude_wells:
+    decision: Wells that you exclude
+    value: none
+    source: The mean Cq sheet has a value for every sample and gene.
+  cq_cutoff:
+    decision: Highest Cq that counts as detected
+    value: 40
+    source: Not in the paper. The highest Cq in the mean Cq sheet is below 30, so the cutoff changes nothing.
+  stability_groups:
+    decision: Column of the groups for NormFinder
+    value: empty, so that the agent sets the group column for each call
+    source: >-
+      Normfinder analysis section. The paper runs NormFinder ungrouped and grouped (by tissue or by age). One value of the
+      decision applies to every call, so the answer is empty.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers a free question with this text.
+items:
+  samples:
+    source: published
+    where: Methods and the raw data workbook. 44 samples.
+    check: check.py reads 44 samples.
+  genorm_best_pair_m:
+    source: published
+    where: Underlying data, analysis workbook, sheet geNorm (geNorm Excel add-in), and Figure 3A. Best pair HTATSF1 and CDC40, M 0.217549 (Table 2 and the text name the pair).
+    check: numpy gives 0.217549 (check.py).
+  genorm_m_all_genes:
+    source: published
+    where: Analysis workbook, sheet geNorm, and Figure 3A. 0.527538 at the step that removes HPRT1.
+    check: numpy gives 0.527538 (check.py).
+  genorm_m_13_genes:
+    source: published
+    where: Analysis workbook, sheet geNorm. 0.440995 at the step that removes GAPDH.
+    check: numpy gives 0.440995 (check.py).
+  genorm_m_actb_step:
+    source: published
+    where: Analysis workbook, sheet geNorm. 0.227746.
+    check: numpy gives 0.227746 (check.py).
+  genorm_n_below_0_5:
+    source: published
+    where: Results, geNorm analysis. "14 of our 15 candidate genes had acceptable M values (M<0.5)". Only HPRT1 is above.
+    check: numpy gives 14 (check.py).
+  genorm_v2_3:
+    source: published
+    where: Analysis workbook, sheet geNorm. V2/3 0.06864 (Extended data Figure E1).
+    check: numpy gives 0.068640 (check.py).
+  normfinder_ap3d1:
+    source: published
+    where: Analysis workbook, sheet Normfinder data (NormFinder Excel add-in), all samples ungrouped. 0.134827. Table 5 ranks AP3D1 first.
+    check: NormqPCR stabMeasureRho on the natural-log scale gives 0.134827 (square root of the variance estimate).
+  normfinder_hprt1:
+    source: published
+    where: Analysis workbook, sheet Normfinder data, all samples ungrouped. 0.480987.
+    check: NormqPCR gives 0.480987.
+  normfinder_tissue_ubc:
+    source: published
+    where: Analysis workbook, sheet Normfinder data, all samples grouped by tissue. 0.081032. Table 6 ranks UBC first.
+    check: NormqPCR stabMeasureRho grouped by tissue gives 0.081032.
+  normfinder_tissue_b2m:
+    source: published
+    where: Analysis workbook, sheet Normfinder data, grouped by tissue. 0.180476.
+    check: NormqPCR gives 0.180476.
+  heads_best_pair_m:
+    source: published
+    where: Analysis workbook, sheet geNorm, Heads, and Figure 3C. HTATSF1 and CDC40, 0.114216.
+    check: numpy gives 0.114216 (check.py).
+  slope_gapdh:
+    source: published
+    where: Extended data, efficiency workbook, sheet Summary. -3.4557.
+    check: numpy polyfit gives -3.4557 (check.py).
+  slope_htatsf1:
+    source: published
+    where: Efficiency workbook, sheet Summary. -3.1799.
+    check: numpy gives -3.1799 (check.py).
+  slope_ubc:
+    source: published
+    where: Efficiency workbook, sheet Summary. -3.3788.
+    check: numpy gives -3.3788 (check.py).
+  efficiency_cyc1:
+    source: published
+    where: Efficiency workbook, sheet Summary. 1.945026 (from the rounded slope).
+    check: numpy gives 1.945012 (check.py).
+  efficiency_pak1ip1:
+    source: published
+    where: Efficiency workbook, sheet Summary. 2.012002 (from the rounded slope).
+    check: numpy gives 2.011994 (check.py).
+  slope_actb_computed:
+    source: computed
+    tool: fit_efficiency (base R lm)
+    where: Not printed. The efficiency data give -3.2993.
+    independence: independent
+    check: numpy polyfit gives -3.2993 (check.py).
+  slope_actb_printed:
+    source: published
+    where: Efficiency workbook, sheet Summary. -3.2293. It does not reproduce. The data give -3.2993, so the printed value has two digits in the wrong order, and the printed efficiency 2.040 must be 2.010.
+    check: numpy gives -3.2993 (check.py).
+data:
+  source: >-
+    Three figshare records of the paper. fetch.sh keeps the three workbooks in the reference folder and writes two CSV files to
+    the data folder: embryo_cq.csv (sheet "Mean Cq and RQ Refgenes" of the raw data workbook, one row for each sample and gene,
+    with the tissue and the age from the sample name) and embryo_dilution.csv (sheet "Efficiency data" of the efficiency
+    workbook, one row for each gene and dilution point).
+  url: https://doi.org/10.6084/m9.figshare.c.3136658
+  license: CC BY 4.0, from the figshare records and the data availability statement. The paper is CC BY 4.0.
+  size: Three Excel workbooks of 223 KB, 320 KB and 84 KB. embryo_cq.csv has 660 rows; embryo_dilution.csv has 108 rows.

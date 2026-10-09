@@ -1,0 +1,37 @@
+tool: NormqPCR (R) selectHKs and stabMeasureRho, and base R lm, through the qpcr adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/hildyard2021-embryo-refgenes/embryo_cq.csv
+  - /Volumes/T7/guided-analysis/data/hildyard2021-embryo-refgenes/embryo_dilution.csv
+decisions:
+  efficiencies: "2"
+  replicates: "mean (the sheet already holds the mean Cq of the duplicates)"
+  exclude_wells: none
+  cq_cutoff: 40
+  stability_groups: "none for the ungrouped runs, tissue for the grouped run"
+expected:
+  - {description: "samples", value: 44, tolerance: 0, source: "paper, Methods"}
+  - {description: "geNorm best pair M, all samples", value: 0.217549, tolerance: 0.0005, source: "analysis workbook, geNorm sheet; Figure 3A"}
+  - {description: "geNorm average M, 15 genes", value: 0.527538, tolerance: 0.0005, source: "analysis workbook, geNorm sheet"}
+  - {description: "geNorm average M, 13 genes", value: 0.440995, tolerance: 0.0005, source: "analysis workbook, geNorm sheet"}
+  - {description: "geNorm average M, 3 genes", value: 0.227746, tolerance: 0.0005, source: "analysis workbook, geNorm sheet"}
+  - {description: "genes with M below 0.5", value: 14, tolerance: 0, source: "paper, Results: 14 of 15"}
+  - {description: "V2/3", value: 0.06864, tolerance: 0.0003, source: "analysis workbook, geNorm sheet"}
+  - {description: "NormFinder ungrouped, AP3D1", value: 0.134827, tolerance: 0.0005, source: "analysis workbook, Normfinder data sheet"}
+  - {description: "NormFinder ungrouped, HPRT1", value: 0.480987, tolerance: 0.0005, source: "analysis workbook, Normfinder data sheet"}
+  - {description: "NormFinder by tissue, UBC", value: 0.081032, tolerance: 0.0005, source: "analysis workbook, Normfinder data sheet"}
+  - {description: "NormFinder by tissue, B2M", value: 0.180476, tolerance: 0.0005, source: "analysis workbook, Normfinder data sheet"}
+  - {description: "geNorm best pair M, heads", value: 0.114216, tolerance: 0.0005, source: "analysis workbook, geNorm sheet; Figure 3C"}
+  - {description: "slope GAPDH", value: -3.4557, tolerance: 0.0006, source: "efficiency workbook, Summary sheet"}
+  - {description: "slope HTATSF1", value: -3.1799, tolerance: 0.0006, source: "efficiency workbook, Summary sheet"}
+  - {description: "slope UBC", value: -3.3788, tolerance: 0.0006, source: "efficiency workbook, Summary sheet"}
+  - {description: "efficiency CYC1", value: 1.945026, tolerance: 0.0005, source: "efficiency workbook, Summary sheet"}
+  - {description: "efficiency PAK1IP1", value: 2.012002, tolerance: 0.0005, source: "efficiency workbook, Summary sheet"}
+  - {description: "slope ACTB from the data", value: -3.2993, tolerance: 0.0006, source: "computed (numpy and R)"}
+  - {description: "slope ACTB as printed", value: -3.2293, tolerance: 0.0006, source: "efficiency workbook; does not reproduce; reference only"}
+notes: |
+  The geNorm and NormFinder values come from the Excel add-ins of the authors (analysis workbook on figshare). NormqPCR gives the same values to six digits. NormFinder needs the natural-log scale (Cq times ln 2), and with no groups the add-in reports the square root of the NormqPCR variance estimate.
+  The tables of the paper print rankings only. The numbers are in the Underlying and Extended data workbooks, which the paper cites for Figures 3 to 6.
+  NormFinder grouped by age reproduces for 12 of 15 genes; GAPDH, ACTB and CDC40 differ in the third decimal (0.2175 against 0.2185 for GAPDH). It is not an item.
+  The ACTB slope in the efficiency Summary sheet is -3.2293. The dilution data give -3.2993. The printed efficiency (2.040) follows from the wrong slope; the data give 2.010.
+  The workbooks go to the reference folder. They hold the published values.

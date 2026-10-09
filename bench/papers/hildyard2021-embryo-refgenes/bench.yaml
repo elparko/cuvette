@@ -1,0 +1,35 @@
+adapters: [qpcr]
+prompt: |
+  I want to choose qPCR reference genes for the developing mouse embryo. The file {data}/hildyard2021-embryo-refgenes/embryo_cq.csv has the mean Cq of 15 candidate genes in 44 samples, one row for each sample and gene. The columns are sample, tissue (E whole embryo, H head, FL forelimb), age (days post coitum), gene and cq. Rank the genes with geNorm and with NormFinder over all samples. Give the geNorm best pair with its average M, the average M when the least stable gene is still in the set, the average M with the two least stable genes removed, the number of genes with an average M below 0.5, and V2/3. Give the NormFinder stability values of the most stable and the least stable gene with no groups, and the most stable and the least stable gene with the samples grouped by tissue. Then run geNorm on the head samples only and give the best pair and its average M. The file {data}/hildyard2021-embryo-refgenes/embryo_dilution.csv has a ten-fold dilution series (columns gene, molecules, cq). Give the slope and the efficiency of each gene. Write every number in your final answer text.
+answers:
+  efficiencies: "2"
+  replicates: mean
+  exclude_wells: none
+  cq_cutoff: 40
+  stability_groups: ""
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data:
+  - hildyard2021-embryo-refgenes/embryo_cq.csv
+  - hildyard2021-embryo-refgenes/embryo_dilution.csv
+items:
+  - {key: samples, description: "Number of samples", value: 44, exact: true, in_answer: false, tool: rank_reference_genes}
+  - {key: genorm_best_pair_m, description: "geNorm average M of the best pair HTATSF1 and CDC40, all samples", value: 0.217549, tolerance: 0.0005}
+  - {key: genorm_m_all_genes, description: "geNorm average M of all 15 genes (step that removes HPRT1)", value: 0.527538, tolerance: 0.0005}
+  - {key: genorm_m_13_genes, description: "geNorm average M of 13 genes (step that removes GAPDH)", value: 0.440995, tolerance: 0.0005}
+  - {key: genorm_m_actb_step, description: "geNorm average M of 3 genes (step that removes ACTB)", value: 0.227746, tolerance: 0.0005, in_answer: false}
+  - {key: genorm_n_below_0_5, description: "Genes with geNorm average M below 0.5", value: 14, exact: true}
+  - {key: genorm_v2_3, description: "geNorm pairwise variation V2/3", value: 0.068640, tolerance: 0.0003}
+  - {key: normfinder_ap3d1, description: "NormFinder stability, no groups, AP3D1 (most stable)", value: 0.134827, tolerance: 0.0005}
+  - {key: normfinder_hprt1, description: "NormFinder stability, no groups, HPRT1 (least stable)", value: 0.480987, tolerance: 0.0005}
+  - {key: normfinder_tissue_ubc, description: "NormFinder stability grouped by tissue, UBC (most stable)", value: 0.081032, tolerance: 0.0005}
+  - {key: normfinder_tissue_b2m, description: "NormFinder stability grouped by tissue, B2M (least stable)", value: 0.180476, tolerance: 0.0005}
+  - {key: heads_best_pair_m, description: "geNorm average M of the best pair, head samples", value: 0.114216, tolerance: 0.0005}
+  - {key: slope_gapdh, description: "Standard curve slope, GAPDH", value: -3.4557, tolerance: 0.0006}
+  - {key: slope_htatsf1, description: "Standard curve slope, HTATSF1", value: -3.1799, tolerance: 0.0006}
+  - {key: slope_ubc, description: "Standard curve slope, UBC", value: -3.3788, tolerance: 0.0006}
+  - {key: efficiency_cyc1, description: "Efficiency, CYC1", value: 1.945026, tolerance: 0.0005}
+  - {key: efficiency_pak1ip1, description: "Efficiency, PAK1IP1", value: 2.012002, tolerance: 0.0005}
+  - {key: slope_actb_computed, description: "Standard curve slope, ACTB, from the data", value: -3.2993, tolerance: 0.0006}
+  - {key: slope_actb_printed, description: "Standard curve slope, ACTB, as printed (does not reproduce; the data give -3.2993)", value: -3.2293, tolerance: 0.0006, reference: true}

@@ -1,0 +1,510 @@
+adapter:
+  name: qpcr
+  field: qPCR gene expression
+  file_types: [".csv", ".tsv"]
+  title: qPCR (NormqPCR, ddCt and Pfaffl)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Ranks qPCR reference genes with geNorm and NormFinder from the R package NormqPCR. Fits amplification efficiencies
+    from a dilution series. Gives relative expression by the 2^-ddCt or the Pfaffl method from a table of Cq values.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: NormqPCR
+  version: "1.58.0"
+  tested_versions: []
+  homepage: https://bioconductor.org/packages/NormqPCR
+  docs:
+    - https://bioconductor.org/packages/release/bioc/vignettes/NormqPCR/inst/doc/NormqPCR.pdf
+    - https://doi.org/10.1186/1471-2164-13-296
+  install: >
+    Install R (brew install r on macOS). Then install the R packages NormqPCR, ReadqPCR, svglite and jsonlite into a library
+    folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("BiocManager", "svglite", "jsonlite"), repos = "https://cloud.r-project.org"); BiocManager::install(c("ReadqPCR", "NormqPCR"))'
+  citation:
+    - text: "Perkins JR, Dawes JM, McMahon SB, Bennett DLH, Orengo C, Kohl M (2012). ReadqPCR and NormqPCR: R packages for the reading, quality checking and normalisation of RT-qPCR quantification cycle (Cq) data. BMC Genomics 13: 296."
+      doi: 10.1186/1471-2164-13-296
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 600
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that exists
+  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library. The
+  program version in this adapter is the version of the R package NormqPCR, not of R. The ddCt and Pfaffl arithmetic
+  and the standard curves are in base R.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return the Cq values that the scientist gave and the results for each gene and group.
+
+decisions:
+  - key: reference_genes
+    label: Reference genes
+    kind: text
+    group: Normalization
+    help: >
+      The genes that normalize the targets, such as Gapdh or Actb and Rpl13a. Several genes give a geometric mean.
+      Choose them from a stability analysis of your samples, not from habit.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: relative_quantification, arg: reference_genes }
+
+  - key: calibrator
+    label: Calibrator group
+    kind: text
+    group: Normalization
+    help: >
+      The group that has a fold change of 1, such as the control or the untreated group. The name must be a value of
+      the group column.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: relative_quantification, arg: calibrator }
+
+  - key: quant_method
+    label: Quantification method
+    kind: choice
+    choices: [ddct, pfaffl]
+    default: ddct
+    group: Normalization
+    help: >
+      ddct is the 2^-ddCt method. It treats each efficiency as 2. pfaffl uses the measured efficiency of each gene. Use
+      pfaffl when the efficiencies differ from 2 or between genes.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: relative_quantification, arg: method }
+
+  - key: efficiencies
+    label: Amplification efficiencies
+    kind: text
+    default: "2"
+    group: Normalization
+    help: >
+      The amplification factor of each gene, from a dilution series. 2 is 100 percent. Write one number for all genes,
+      or pairs such as Actb=1.93, Myc=2.07.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: relative_quantification, arg: efficiencies }
+      - { tool: rank_reference_genes, arg: efficiencies }
+
+  - key: replicates
+    label: Technical replicates
+    kind: choice
+    choices: [mean, median]
+    default: mean
+    group: Data
+    help: >
+      How the tool combines the replicate wells of one sample and gene before the analysis. The median resists one bad
+      well. The biological sample is the unit of replication.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: relative_quantification, arg: replicates }
+      - { tool: rank_reference_genes, arg: replicates }
+
+  - key: error_type
+    label: Error of the fold change
+    kind: choice
+    choices: [ci95, sd_dct, sd_livak]
+    default: ci95
+    group: Statistics
+    help: >
+      The ci95 option gives a Welch t interval for the group against the calibrator, with a p value. The sd_dct option
+      gives plus or minus one SD of the sample dCt values. The sd_livak option combines the target and the reference SD,
+      as in Livak and Schmittgen.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: relative_quantification, arg: error }
+
+  - key: exclude_wells
+    label: Wells that you exclude
+    kind: text
+    default: none
+    group: Data
+    help: >
+      Name each excluded well and the reason, such as a bad melt curve or a failed replicate. Write none to keep all
+      wells. Decide before you see the fold changes.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: relative_quantification, arg: exclude }
+      - { tool: rank_reference_genes, arg: exclude }
+      - { tool: fit_efficiency, arg: exclude }
+
+  - key: cq_cutoff
+    label: Highest Cq that counts as detected
+    kind: float
+    default: 40
+    lo: 20
+    hi: 50
+    group: Data
+    help: >
+      A well with a Cq above this value counts as not detected. The tool leaves it out and reports the count. Many labs
+      use 35 to 40 cycles.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: relative_quantification, arg: cq_cutoff }
+      - { tool: rank_reference_genes, arg: cq_cutoff }
+      - { tool: fit_efficiency, arg: cq_cutoff }
+
+  - key: stability_groups
+    label: Column of the groups for NormFinder
+    kind: text
+    default: none
+    group: Normalization
+    help: >
+      NormFinder can use groups, such as tissue or treatment, to separate the variation within and between groups. Write
+      the column name, or none for no groups.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: rank_reference_genes, arg: stability_group_col }
+
+checks:
+  - id: single_unvalidated_reference
+    description: The answer normalizes to one reference gene and gives no stability analysis.
+    severity: warning
+    text: >
+      Report the answer if it gives fold changes with one reference gene and the session has no rank_reference_genes
+      result for these samples, and the answer does not say so.
+  - id: technical_as_biological
+    description: The answer counts technical replicate wells as samples.
+    severity: error
+    text: >
+      Report the answer if it gives n or a p value from the number of wells, not from the number of biological
+      samples.
+  - id: efficiency_ignored
+    description: The efficiencies are far from 2 and the answer uses ddCt without a comment.
+    severity: warning
+    text: >
+      Report the answer if fit_efficiency gives an efficiency below 1.9 or above 2.1 for a gene in the analysis, and the
+      answer uses ddct without a note on the efficiency.
+  - id: method_named
+    description: The answer does not name the method, the reference genes and the calibrator.
+    severity: warning
+    text: Report the answer if it gives fold changes and does not name the method, the reference genes and the calibrator group.
+
+map:
+  - tool: rank_reference_genes
+    route: "library(NormqPCR); b <- new(\"qPCRBatch\", exprs = -cq_matrix); selectHKs(b, method = \"geNorm\", log = TRUE, Symbols = rownames(cq_matrix)); stabMeasureRho(t(-cq_matrix) * log(2), group = groups, log = TRUE)"
+    steps:
+      - "R: make a matrix of mean Cq with one row for each gene and one column for each sample."
+      - "R: run selectHKs with method geNorm for the stepwise M values and the pairwise V values."
+      - "R: run stabMeasureRho on the natural-log scale for NormFinder. Without groups, take the square root of the result."
+      - "CFX Maestro: Gene Study, Reference Gene Selection Tool. It shows the geNorm M value and the CV of each candidate."
+      - "QuantStudio Design and Analysis has no geNorm. Export the Cq values and use the geNorm or NormFinder Excel add-in."
+      - "Excel: the geNorm and NormFinder add-ins read relative quantities, E^(min Cq - Cq) for each gene."
+    params:
+      - { arg: method, label: "method of selectHKs(); the add-in that you use" }
+      - { arg: stability_group_col, label: "group of stabMeasureRho(); Group identifier in the NormFinder add-in" }
+    fidelity: close
+    difference: >
+      The R route is the same as the tool. The NormFinder Excel add-in uses the natural log of the relative quantities, and
+      the tool uses the same scale. With no groups, the add-in reports the square root of the NormqPCR value. The CFX Maestro
+      and add-in routes were not run; the add-in values in the paper workbook match the tool.
+    evidence:
+      source: docs
+      test: rank-embryo-genorm
+      note: The geNorm and NormFinder Excel outputs of Hildyard et al. 2021 match the tool to six digits.
+
+  - tool: fit_efficiency
+    route: "fit <- lm(Cq ~ log10(quantity), data = d[d$gene == \"Actb\", ]); slope <- coef(fit)[2]; E <- 10^(-1 / slope)"
+    steps:
+      - "R: fit a straight line of Cq against log10 of the quantity for each gene. E is 10^(-1/slope)."
+      - "CFX Maestro: mark the dilution wells as Std with their concentration. The Quantification tab shows E, R^2 and the slope."
+      - "QuantStudio Design and Analysis: Standard Curve analysis. Read Slope, Efficiency % and R2 for each target."
+      - "Excel: =SLOPE(Cq_range, LOG10(quantity_range)), then =10^(-1/slope). Percent efficiency is (E - 1) times 100."
+    params:
+      - { arg: quantity_col, label: "concentration of the Std wells (CFX Maestro); Quantity (QuantStudio)" }
+    fidelity: close
+    difference: >
+      The R and Excel routes give the same numbers as the tool. CFX Maestro and QuantStudio fit the same line; they show
+      efficiency in percent. The CFX Maestro and QuantStudio routes were not run.
+    evidence:
+      source: docs
+      test: efficiency-livak
+      note: The pcr package (pcr_assess, standard_curve) and numpy give the same slopes.
+
+  - tool: relative_quantification
+    route: "dCt <- Cq_target - Cq_reference; ddCt <- mean(dCt[group]) - mean(dCt[calibrator]); fold <- 2^-ddCt"
+    steps:
+      - "R: combine the replicate wells, then take dCt = Cq target minus Cq reference (geometric mean of several reference genes) for each sample."
+      - "R: ddCt is the mean dCt of a group minus the mean dCt of the calibrator group. The fold change is 2^-ddCt."
+      - "R, Pfaffl: the ratio is E_target^(dCq target) / E_reference^(dCq reference), with dCq = calibrator mean minus group mean."
+      - "CFX Maestro: Gene Expression tab. Mark the reference genes, set the control sample or the control biological group, and use Relative Normalized Expression (ddCq)."
+      - "QuantStudio Design and Analysis: Relative Quantification. Set the endogenous control and the reference sample. Read RQ, RQ Min and RQ Max."
+      - "Excel: =AVERAGE() of the dCt of each group, then =2^-(ddCt). For Pfaffl, =E_t^(dCq_t)/E_r^(dCq_r)."
+    params:
+      - { arg: reference_genes, label: "Reference in the target settings (CFX Maestro); Endogenous Control (QuantStudio)" }
+      - { arg: calibrator, label: "Control sample or control group (CFX Maestro); Reference Sample (QuantStudio)" }
+      - { arg: efficiencies, label: "efficiency of each target (CFX Maestro); efficiency setting (QuantStudio)", ui_default: "2" }
+      - { arg: error, label: "error bars: SD or SEM (CFX Maestro); RQ Min and Max at a confidence level (QuantStudio)" }
+    fidelity: close
+    difference: >
+      The R and Excel routes give the same numbers as the tool. CFX Maestro shows SEM or SD error bars and QuantStudio shows
+      RQ Min and Max, which differ from the Welch interval of the tool. The CFX Maestro and QuantStudio routes were not run.
+    evidence:
+      source: docs
+      test: rq-livak-ddct
+      note: The pcr package (Ahmed and Kim 2018) and numpy give the same ddCt, fold change and interval.
+
+tests:
+  - id: rq-livak-ddct
+    description: >
+      Livak and Schmittgen c-myc and GAPDH data in brain and kidney (pcr package data ct1). Ahmed and Kim 2018, PeerJ,
+      Table 2 prints dCt 6.86 and 4.37, ddCt -2.50 and a fold change of 5.6 (5.3 to 6.0). pcr 1.2.2 and numpy give the
+      exact values (checks/check_qpcr.py and .out).
+    data: [data/livak_ct.csv]
+    calls:
+      - tool: relative_quantification
+        args: { data: "{adapter_dir}/data/livak_ct.csv", method: ddct, reference_genes: GAPDH, calibrator: brain, error: sd_livak }
+    expect:
+      - { path: metrics.mean_dct_c_myc_brain, approx: 6.86, abs: 0.000001 }
+      - { path: metrics.mean_dct_c_myc_kidney, approx: 4.365, abs: 0.000001 }
+      - { path: metrics.ddct_c_myc_kidney, approx: -2.495, abs: 0.000001 }
+      - { path: metrics.fold_c_myc_kidney, approx: 5.637283, abs: 0.000001 }
+      - { path: metrics.lower_c_myc_kidney, approx: 5.276399, abs: 0.000001 }
+      - { path: metrics.upper_c_myc_kidney, approx: 6.022850, abs: 0.000001 }
+      - { path: "outputs[0].path", contains: ".png" }
+      - { path: "outputs[1].path", contains: ".svg" }
+
+  - id: rq-livak-welch
+    description: >
+      The same data with the Welch interval. The fold change interval and the p value are from SciPy ttest_ind with
+      equal_var False (checks/check_qpcr.py and .out).
+    data: [data/livak_ct.csv]
+    calls:
+      - tool: relative_quantification
+        args: { data: "{adapter_dir}/data/livak_ct.csv", method: ddct, reference_genes: [GAPDH], calibrator: brain, error: ci95 }
+    expect:
+      - { path: metrics.lower_c_myc_kidney, approx: 4.956993, abs: 0.000005 }
+      - { path: metrics.upper_c_myc_kidney, approx: 6.410935, abs: 0.000005 }
+      - { path: metrics.p_c_myc_kidney, approx: 3.4666e-10, rel: 0.0001 }
+
+  - id: rq-livak-pfaffl
+    description: >
+      The Pfaffl ratio with the efficiencies of the pcr dilution series (c-myc 1.973109, GAPDH 1.962747). numpy gives
+      5.477833 by the Pfaffl 2001 formula on the group means (checks/check_qpcr.py and .out).
+    data: [data/livak_ct.csv]
+    calls:
+      - tool: relative_quantification
+        args: { data: "{adapter_dir}/data/livak_ct.csv", method: pfaffl, reference_genes: GAPDH, calibrator: brain, error: sd_dct, efficiencies: "c_myc=1.973109, GAPDH=1.962747" }
+    expect:
+      - { path: metrics.fold_c_myc_kidney, approx: 5.477833, abs: 0.00001 }
+
+  - id: efficiency-livak
+    description: >
+      The pcr dilution series (data ct3, seven amounts in triplicate). pcr_assess with method standard_curve and numpy give
+      the slopes and R-squared (checks/check_qpcr.py and .out).
+    data: [data/livak_dilution.csv]
+    calls:
+      - tool: fit_efficiency
+        args: { data: "{adapter_dir}/data/livak_dilution.csv" }
+    expect:
+      - { path: metrics.slope_c_myc, approx: -3.388095, abs: 0.000001 }
+      - { path: metrics.slope_GAPDH, approx: -3.414551, abs: 0.000001 }
+      - { path: metrics.r_squared_c_myc, approx: 0.9965504, abs: 0.0000001 }
+      - { path: metrics.efficiency_GAPDH, approx: 1.962747, abs: 0.000001 }
+
+  - id: efficiency-embryo
+    description: >
+      Hildyard et al. 2021 dilution series of 14 genes (CC BY 4.0). The slopes match the Summary sheet of the efficiency
+      workbook, such as -3.4557 for GAPDH. For ACTB the sheet prints -3.2293; the data give -3.2993 (numpy, checks/check_qpcr.out).
+    data: [data/embryo_dilution.csv]
+    calls:
+      - tool: fit_efficiency
+        args: { data: "{adapter_dir}/data/embryo_dilution.csv", quantity_col: molecules }
+    expect:
+      - { path: metrics.n_genes, equals: 14 }
+      - { path: metrics.slope_GAPDH, approx: -3.4557, abs: 0.00005 }
+      - { path: metrics.slope_UBC, approx: -3.3788, abs: 0.00005 }
+      - { path: metrics.slope_ACTB, approx: -3.2993, abs: 0.00005 }
+
+  - id: rank-embryo-genorm
+    description: >
+      Hildyard et al. 2021 mean Cq of 15 genes in 44 samples (CC BY 4.0). The geNorm average M values, V2/3 and the
+      ungrouped NormFinder values are in the geNorm and NormFinder sheets of the paper workbook (Excel add-ins). numpy gives
+      the same geNorm values (checks/check_qpcr.out). The paper text gives 14 of 15 genes with M below 0.5.
+    data: [data/embryo_cq.csv]
+    calls:
+      - tool: rank_reference_genes
+        args: { data: "{adapter_dir}/data/embryo_cq.csv", method: both }
+    expect:
+      - { path: metrics.genorm_average_M_HPRT1, approx: 0.527538, abs: 0.000001 }
+      - { path: metrics.genorm_best_pair_M, approx: 0.217549, abs: 0.000001 }
+      - { path: metrics.genorm_V2_3, approx: 0.068640, abs: 0.000001 }
+      - { path: metrics.genorm_n_genes_M_below_0_5, equals: 14 }
+      - { path: "table.rows[13][1]", equals: HTATSF1/CDC40 }
+      - { path: metrics.normfinder_AP3D1, approx: 0.134827, abs: 0.000001 }
+      - { path: metrics.normfinder_HPRT1, approx: 0.480987, abs: 0.000001 }
+
+  - id: rank-embryo-normfinder-tissue
+    description: >
+      The same data, NormFinder grouped by tissue. The values are in the NormFinder sheet of the paper workbook (UBC
+      0.081032, B2M 0.180476).
+    data: [data/embryo_cq.csv]
+    calls:
+      - tool: rank_reference_genes
+        args: { data: "{adapter_dir}/data/embryo_cq.csv", method: NormFinder, stability_group_col: tissue }
+    expect:
+      - { path: metrics.normfinder_UBC, approx: 0.081032, abs: 0.000001 }
+      - { path: metrics.normfinder_B2M, approx: 0.180476, abs: 0.000001 }
+      - { path: metrics.normfinder_n_groups, equals: 3 }
+
+  - id: rq-unknown-reference
+    description: A reference gene that is not in the data fails, and the error names the gene and the valid genes.
+    data: [data/livak_ct.csv]
+    calls:
+      - tool: relative_quantification
+        args: { data: "{adapter_dir}/data/livak_ct.csv", method: ddct, reference_genes: Actb, calibrator: brain }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "reference_genes names Actb, which is not a gene of the data" }
+      - { path: error, contains: "Genes: c_myc, GAPDH" }
+
+  - id: rq-missing-file
+    description: A data file that does not exist fails, and the error names the file.
+    calls:
+      - tool: relative_quantification
+        args: { data: "{adapter_dir}/data/no_such_plate.csv", method: ddct, reference_genes: GAPDH, calibrator: brain }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_plate.csv" }
+
+tools:
+  - name: rank_reference_genes
+    title: Rank candidate reference genes
+    description: >
+      Rank candidate reference genes by expression stability with geNorm and NormFinder. Returns the geNorm average M at
+      each step, the pairwise variation V and the NormFinder stability of each gene. Saves bar plots as PNG and SVG.
+      The input has one row for each well or sample and gene. Use it before you choose the reference genes.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each well or sample and gene, and a header row." }
+      method: { type: string, enum: [geNorm, NormFinder, both], default: both, description: "The stability methods to run." }
+      genes: { type: [array, string], items: { type: string }, description: "Candidate genes to rank, as a list or comma text. Default: all genes of the data." }
+      stability_group_col: { type: string, description: "Leave out. The harness sets it from the decision record. Column with the group of each sample for NormFinder, or none." }
+      efficiencies: { type: [string, number], description: "Leave out. The harness sets it from the decision record. Amplification factor (2 is 100 percent), one number or gene=value pairs." }
+      replicates: { type: string, enum: [mean, median], description: "Leave out. The harness sets it from the decision record." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Wells to drop, as a list or comma text, or none." }
+      cq_cutoff: { type: number, description: "Leave out. The harness sets it from the decision record. Highest detected Cq, as a count of PCR cycles." }
+      sample_col: { type: string, description: "Column with the sample name. Default sample." }
+      gene_col: { type: string, description: "Column with the gene name. Default gene." }
+      cq_col: { type: string, description: "Column with the Cq (cycles). Text such as Undetermined counts as not detected. Default cq." }
+      well_col: { type: string, description: "Column with the well name, such as A1. Default well, if the column exists." }
+      subset_col: { type: string, description: "Column for a subset of the samples, such as tissue. Give subset_value too." }
+      subset_value: { type: [array, string], items: { type: string }, description: "The values of subset_col to keep, as a list or comma text." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      genorm: { kind: table, ext: .csv, description: The average M at each geNorm step. }
+      variation: { kind: table, ext: .csv, description: The pairwise variation V for n and n+1 genes. }
+      normfinder: { kind: table, ext: .csv, description: The NormFinder stability of each gene. }
+      plot: { kind: image, ext: .png, description: "Bar plots of M, V and the NormFinder stability." }
+      plot_svg: { kind: file, ext: .svg, description: The same plots as SVG. }
+    script: scripts/rank_reference_genes.R
+    parse: json
+    citations:
+      - text: "Vandesompele J, De Preter K, Pattyn F, Poppe B, Van Roy N, De Paepe A, Speleman F (2002). Accurate normalization of real-time quantitative RT-PCR data by geometric averaging of multiple internal control genes. Genome Biology 3(7): research0034."
+        doi: 10.1186/gb-2002-3-7-research0034
+      - text: "Andersen CL, Jensen JL, Orntoft TF (2004). Normalization of real-time quantitative reverse transcription-PCR data: a model-based variance estimation approach to identify genes suited for normalization, applied to bladder and colon cancer data sets. Cancer Research 64(15): 5245-5250."
+        doi: 10.1158/0008-5472.CAN-04-0496
+
+  - name: fit_efficiency
+    title: Fit amplification efficiencies
+    description: >
+      Fit the amplification efficiency of each gene from a dilution series. Returns the slope of Cq against log10 of the
+      quantity, the intercept, R-squared and the efficiency E = 10^(-1/slope). Saves the standard curves as PNG and SVG.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each well of the dilution series." }
+      quantity_col: { type: string, description: "Column with the amount of template, such as copies or a relative dilution (unitless). Default quantity." }
+      quantity_scale: { type: string, enum: [linear, log10], default: linear, description: "linear if quantity_col holds amounts, log10 if it holds log10 amounts." }
+      gene_col: { type: string, description: "Column with the gene name. Default gene." }
+      cq_col: { type: string, description: "Column with the Cq (cycles). Default cq." }
+      well_col: { type: string, description: "Column with the well name. Default well, if the column exists." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Wells to drop, or none." }
+      cq_cutoff: { type: number, description: "Leave out. The harness sets it from the decision record. Highest detected Cq, as a count of PCR cycles." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      results: { kind: table, ext: .csv, description: One row for each gene. }
+      plot: { kind: image, ext: .png, description: The standard curves. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    script: scripts/fit_efficiency.R
+    parse: json
+    citations:
+      - text: "Pfaffl MW (2001). A new mathematical model for relative quantification in real-time RT-PCR. Nucleic Acids Research 29(9): e45."
+        doi: 10.1093/nar/29.9.e45
+
+  - name: relative_quantification
+    title: Relative expression by ddCt or Pfaffl
+    description: >
+      Compute relative expression of target genes against reference genes and a calibrator group. Returns dCt, ddCt, the
+      fold change and its interval for each gene and group, with a Welch p value for ci95. Saves a bar plot as PNG and SVG.
+      Run fit_efficiency first if you use the pfaffl method.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each well or sample and gene, and a header row." }
+      reference_genes: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. One or more reference genes." }
+      calibrator: { type: string, description: "Leave out. The harness sets it from the decision record. The group with a fold change of 1." }
+      method: { type: string, enum: [ddct, pfaffl], description: "Leave out. The harness sets it from the decision record." }
+      efficiencies: { type: [string, number], description: "Leave out. The harness sets it from the decision record. Amplification factor (2 is 100 percent), one number or gene=value pairs." }
+      error: { type: string, enum: [ci95, sd_dct, sd_livak], description: "Leave out. The harness sets it from the decision record." }
+      ci_level: { type: number, minimum: 0.5, maximum: 0.999, default: 0.95, description: "Confidence level of the ci95 interval (fraction)." }
+      replicates: { type: string, enum: [mean, median], description: "Leave out. The harness sets it from the decision record." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Wells to drop, or none." }
+      cq_cutoff: { type: number, description: "Leave out. The harness sets it from the decision record. Highest detected Cq, as a count of PCR cycles." }
+      targets: { type: [array, string], items: { type: string }, description: "Target genes, as a list or comma text. Default: every gene that is not a reference gene." }
+      sample_col: { type: string, description: "Column with the biological sample. Replicate wells share a name. Default sample." }
+      group_col: { type: string, description: "Column with the group of each sample, such as treatment. Default group." }
+      gene_col: { type: string, description: "Column with the gene name. Default gene." }
+      cq_col: { type: string, description: "Column with the Cq (cycles). Text such as Undetermined counts as not detected. Default cq." }
+      well_col: { type: string, description: "Column with the well name. Default well, if the column exists." }
+      subset_col: { type: string, description: "Column for a subset of the samples. Give subset_value too." }
+      subset_value: { type: [array, string], items: { type: string }, description: "The values of subset_col to keep." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      results: { kind: table, ext: .csv, description: One row for each target gene and group. }
+      samples: { kind: table, ext: .csv, description: The dCt of each sample. }
+      plot: { kind: image, ext: .png, description: Log2 fold change with intervals and sample points. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    script: scripts/relative_quantification.R
+    parse: json
+    citations:
+      - text: "Livak KJ, Schmittgen TD (2001). Analysis of relative gene expression data using real-time quantitative PCR and the 2-ddCT method. Methods 25(4): 402-408."
+        doi: 10.1006/meth.2001.1262
+        when: { method: ddct }
+      - text: "Pfaffl MW (2001). A new mathematical model for relative quantification in real-time RT-PCR. Nucleic Acids Research 29(9): e45."
+        doi: 10.1093/nar/29.9.e45
+        when: { method: pfaffl }
+      - text: "Welch BL (1947). The generalization of Student's problem when several different population variances are involved. Biometrika 34(1-2): 28-35."
+        doi: 10.1093/biomet/34.1-2.28
+        when: { error: ci95 }
