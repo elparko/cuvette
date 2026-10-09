@@ -6,11 +6,13 @@ The project is in early development. Version numbers start at the first public r
 ## Unreleased: work in progress on 8 and 9 October 2026
 
 These items are being built and are not on main yet:
-- A desktop app for macOS (Tauri), about one third the size of an Electron app.
 - New analyses: dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
 - A map of proprietary lab software and the open-source alternatives that Cuvette supports.
 
 ## 9 October 2026
+
+### Desktop app
+- Cuvette for macOS: a Tauri app of 68 MB (a 17 MB .dmg), with the Cuvette core and its own Node inside. Open a folder from the File menu, drag a folder onto the Dock icon, or use the Finder action. Cuvette > Install Command Line Tool adds the `cuvette` command for Terminal. The app is not signed yet.
 
 ### Session flow
 - Before it asks anything, the agent looks at the data with a new read-only tool, `inspect_data`: the channels and their kind (brightfield or fluorescence), names, bit depth and groups. It then says what it found, and it never asks about a stain or channel that the data does not have.
