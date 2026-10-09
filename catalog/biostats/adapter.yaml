@@ -3,10 +3,12 @@ adapter:
   field: statistics
   file_types: [".csv", ".tsv"]
   title: Biostatistics (statsmodels, pingouin, lifelines)
-  version: 0.1.2
+  version: 0.2.0
   spec: "1"
   description: >
-    Runs classical tests, ANOVA, regression, mixed models and survival analysis on a CSV file.
+    Runs classical tests, ANOVA, regression, logistic regression, contingency table tests (chi-square, Fisher,
+    McNemar), mixed models and survival analysis on a CSV file. It replaces the same analyses in SPSS, SAS, Stata,
+    JMP and GraphPad Prism.
     Each tool reads one CSV file and names its columns. The scientist can repeat each step with
     the code line in the map.
   authors: [Parker Smith]
@@ -122,6 +124,10 @@ decisions:
       - { tool: fit_mixed_model, arg: alpha }
       - { tool: kaplan_meier, arg: alpha }
       - { tool: fit_cox, arg: alpha }
+      - { tool: fit_logistic, arg: alpha }
+      - { tool: chi_square_test, arg: alpha }
+      - { tool: fisher_exact, arg: alpha }
+      - { tool: mcnemar_test, arg: alpha }
 
   - key: paired
     label: Paired test
@@ -398,6 +404,87 @@ decisions:
       compare: [metrics.p_value, metrics.statistic]
       max_runs: 2
 
+  - key: logistic_covariates
+    label: Covariates of the logistic model
+    kind: text
+    group: Binary outcome
+    help: >
+      Column names, separated by commas. The model adjusts each odds ratio for the other covariates. Choose them from the
+      science, not from the p-values. Each covariate needs about 10 events of the rarer outcome.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_logistic, arg: covariates }
+
+  - key: logistic_event
+    label: Outcome value that counts as the event
+    kind: text
+    group: Binary outcome
+    help: >
+      The value of the outcome column that the model counts as 1, such as yes, dead or 1. The odds ratios give the odds
+      of this value. The other value gives the inverse odds ratios.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_logistic, arg: event }
+
+  - key: reference_levels
+    label: Reference level of each categorical covariate
+    kind: text
+    default: first
+    group: Binary outcome
+    help: >
+      Write column=level pairs separated by commas, such as stage=I, or first for the first sorted level. Each odds ratio
+      or hazard ratio of a category compares it with the reference. SPSS uses the last category by default.
+    owner: human
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: fit_logistic, arg: reference }
+      - { tool: fit_cox, arg: reference }
+
+  - key: chi_square_correction
+    label: Yates continuity correction for a 2x2 chi-square test
+    kind: bool
+    group: Contingency tables
+    help: >
+      True applies the Yates correction, as R does by default. It gives a larger p-value. False gives the plain Pearson
+      test, as the first row of SPSS does. Only a 2x2 table uses it.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: chi_square_test, arg: correction }
+
+  - key: fisher_alternative
+    label: Sidedness of the Fisher exact test
+    kind: choice
+    choices: [two-sided, greater, less]
+    default: two-sided
+    group: Contingency tables
+    help: >
+      Two-sided tests for an association in either direction. greater tests only an odds ratio above 1 (first row
+      against second row). Choose a one-sided test before you see the data.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fisher_exact, arg: alternative }
+
+  - key: mcnemar_method
+    label: Method of the McNemar test
+    kind: choice
+    choices: [exact, chi-square, chi-square-corrected]
+    group: Contingency tables
+    help: >
+      exact is the binomial test on the discordant pairs, as SPSS gives. chi-square-corrected is the R default. With
+      fewer than 25 discordant pairs, use exact.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: mcnemar_test, arg: method }
+
 tools:
   - name: inspect_table
     title: Inspect the CSV file
@@ -429,6 +516,7 @@ tools:
     outputs:
       result: { kind: table, ext: csv, description: The test result. }
     citations:
+      - { text: "Virtanen P, Gommers R, Oliphant TE, et al. SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods 17, 261-272 (2020).", doi: 10.1038/s41592-019-0686-2, kind: program }
       - text: Welch, B. L. (1947). The Generalization of "Student's" Problem when Several Different Population Variances are Involved. Biometrika, 34(1-2), 28–35. https://doi.org/10.1093/biomet/34.1-2.28
         doi: 10.1093/biomet/34.1-2.28
         when:
@@ -689,10 +777,11 @@ tools:
     params:
       path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
       duration: { type: string, description: Column of follow-up time. }
-      event: { type: string, description: "Column that is 1 if the event happened and 0 if the subject was censored." }
+      event: { type: string, description: "Column with 1 for the event and 0 for a censored subject." }
       group: { type: string, description: Column with the group labels. }
       alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level for the confidence band. }
-      time_points: { type: array, items: { type: number }, description: Times at which to report survival. }
+      time_points: { type: array, items: { type: number }, description: "Times at which to report survival, in the unit of the duration column." }
+      subset: { type: string, description: "Optional row filter as a pandas query, such as \"stage == 'I'\". Leave out to use all rows." }
     required: [path, duration, event]
     outputs:
       curves: { kind: image, ext: png, description: The Kaplan-Meier curves. }
@@ -716,16 +805,20 @@ tools:
     title: Fit a Cox proportional hazards model
     description: >
       Fit a Cox model. Reports coefficients, hazard ratios, the concordance, and a test of the proportional
-      hazards assumption (efron only). Rows with missing values are dropped.
+      hazards assumption (efron only). Text columns become indicator columns against a reference level. The tool drops
+      rows with missing values.
     function: "ga_biostats:fit_cox"
     params:
       path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
       duration: { type: string, description: Column of follow-up time. }
-      event: { type: string, description: "Column that is 1 if the event happened and 0 if the subject was censored." }
+      event: { type: string, description: "Column with 1 for the event and 0 for a censored subject." }
       covariates: { type: string, description: "Covariate column names, separated by commas." }
       ties: { type: string, enum: [efron, breslow], default: efron, description: How to handle tied event times. }
       strata: { type: string, description: "Column names to stratify by, separated by commas." }
       alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level for the confidence intervals. }
+      categorical: { type: string, description: "Numeric covariate columns to treat as categories, separated by commas, such as a stage coded 1 to 4. Text columns are always categories." }
+      reference: { type: string, description: "Leave out. The harness sets it from the decision record. Reference level of each categorical covariate as column=level pairs separated by commas, or first for the first sorted level." }
+      subset: { type: string, description: "Optional row filter as a pandas query, such as \"lauren == 'intestinal'\". Leave out to use all rows." }
     required: [path, duration, event, covariates]
     outputs:
       coefficients: { kind: table, ext: csv, description: Coefficients and hazard ratios. }
@@ -904,6 +997,83 @@ tools:
         doi: 10.1214/aoms/1177730491
         when: { paired: false }
 
+  - name: fit_logistic
+    title: Fit a logistic regression
+    description: >
+      Fit a logistic regression model of a binary outcome on covariates. Reports odds ratios with confidence
+      intervals, the likelihood-ratio test of the model and of each categorical covariate, and events per parameter.
+      Text columns become indicator columns against a reference level. The tool drops rows with a missing value.
+    function: "ga_biostats:fit_logistic"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. One row for each subject. }
+      outcome: { type: string, description: "Column of the binary outcome. If its values are not 0 and 1, give event." }
+      covariates: { type: string, description: "Covariate column names, separated by commas. The model adjusts each odds ratio for the other covariates." }
+      event: { type: string, description: "Value of the outcome column that counts as the event (1), such as yes or dead. Leave out if the column holds 0 and 1." }
+      categorical: { type: string, description: "Numeric covariate columns to treat as categories, separated by commas, such as a stage coded 1 to 4. Text columns are always categories." }
+      reference: { type: string, description: "Leave out. The harness sets it from the decision record. Reference level of each categorical covariate as column=level pairs separated by commas, or first for the first sorted level." }
+      subset: { type: string, description: "Optional row filter as a pandas query, such as \"smoke == 1\" or \"sex == 'F'\". Leave out to use all rows." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. The confidence level is 1 minus alpha. }
+    required: [path, outcome, covariates]
+    outputs:
+      coefficients: { kind: table, ext: csv, description: Coefficients and odds ratios with confidence intervals. }
+
+  - name: chi_square_test
+    title: Chi-square test of a contingency table
+    description: >
+      Test whether two categorical variables are independent with the Pearson chi-square test. Reports the
+      statistic, df, p, Cramer's V and the expected counts, and warns when expected counts are below 5.
+      Give two columns of a CSV file or a table of counts.
+    citations:
+      - { text: "Virtanen P, Gommers R, Oliphant TE, et al. SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods 17, 261-272 (2020).", doi: 10.1038/s41592-019-0686-2, kind: program }
+    function: "ga_biostats:chi_square_test"
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each subject. Leave out if you give counts." }
+      row: { type: string, description: Column for the rows of the table. }
+      column: { type: string, description: Column for the columns of the table. }
+      counts: { type: array, items: { type: array, items: { type: integer, minimum: 0 } }, description: "Optional table of counts, one list for each row, such as [[12, 5], [3, 9]]. Use it in place of path, row and column." }
+      correction: { type: boolean, description: "Leave out. The harness sets it from the decision record. 2x2 tables only. True applies the Yates continuity correction." }
+      subset: { type: string, description: "Optional row filter as a pandas query, such as \"smoke == 1\". Leave out to use all rows." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+    outputs:
+      expected: { kind: table, ext: csv, description: The expected counts. }
+
+  - name: fisher_exact
+    title: Fisher exact test
+    description: >
+      Test whether two categorical variables are independent with Fisher's exact test. A 2x2 table also gives
+      the conditional odds ratio with an exact confidence interval. A larger table gives the exact p, or a
+      Monte Carlo p when the table is too large to enumerate.
+    citations:
+      - { text: "Virtanen P, Gommers R, Oliphant TE, et al. SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods 17, 261-272 (2020).", doi: 10.1038/s41592-019-0686-2, kind: program }
+    function: "ga_biostats:fisher_exact"
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each subject. Leave out if you give counts." }
+      row: { type: string, description: Column for the rows of the table. }
+      column: { type: string, description: Column for the columns of the table. }
+      counts: { type: array, items: { type: array, items: { type: integer, minimum: 0 } }, description: "Optional table of counts, one list for each row, such as [[3, 1], [1, 3]]. Use it in place of path, row and column." }
+      alternative: { type: string, enum: [two-sided, greater, less], default: two-sided, description: "2x2 tables only. greater means the odds ratio of the first row against the second row is above 1." }
+      subset: { type: string, description: "Optional row filter as a pandas query. Leave out to use all rows." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. The confidence level is 1 minus alpha. }
+      seed: { type: integer, minimum: 0, maximum: 1000000, default: 1, description: "Random seed (an integer) for the Monte Carlo p of a large table. It has no effect on an exact p." }
+
+  - name: mcnemar_test
+    title: McNemar test for paired binary data
+    description: >
+      Test whether a binary result changes between two paired measurements with McNemar's test. Examples are before
+      and after in one patient, or two tests on one sample. The test uses only the discordant pairs. Give two columns of
+      a CSV file with one row for each subject, or a 2x2 table of pairs.
+    citations:
+      - { text: "McNemar Q. Note on the sampling error of the difference between correlated proportions or percentages. Psychometrika 12(2), 153-157 (1947).", doi: 10.1007/BF02295996 }
+    function: "ga_biostats:mcnemar_test"
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each subject. Leave out if you give counts." }
+      first: { type: string, description: Column of the first binary measurement. }
+      second: { type: string, description: "Column of the second binary measurement. It must have the same 2 values as first." }
+      counts: { type: array, items: { type: array, items: { type: integer, minimum: 0 } }, description: "Optional 2x2 table of pairs: rows are the first result, columns the second result." }
+      method: { type: string, enum: [exact, chi-square, chi-square-corrected], description: "Leave out. The harness sets it from the decision record. exact is the binomial test on the discordant pairs." }
+      subset: { type: string, description: "Optional row filter as a pandas query. Leave out to use all rows." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+
 map:
   - tool: inspect_table
     route: "print(pd.read_csv(path).describe(include='all'))"
@@ -978,6 +1148,11 @@ map:
     params:
       - { arg: duration, label: durations }
       - { arg: event, label: event_observed }
+    steps:
+      - "Apply the subset first if there is one."
+      - "Fit the Kaplan-Meier estimate for each group and run the log-rank test."
+      - "In SPSS: Analyze > Survival > Kaplan-Meier. Put the time in Time, the event in Status (Define Event: 1), the group in Factor. Click Compare Factor and select Log rank. Use Data > Select Cases for a subset."
+      - "In GraphPad Prism: a Survival table, then Analyze > Survival analysis. In Stata: sts graph, by(group) and sts test group."
     fidelity: exact
     evidence: { source: docs, test: rossi-km-logrank }
 
@@ -989,6 +1164,12 @@ map:
       - { arg: event, label: event_col }
       - { arg: strata, label: strata }
       - { arg: ties, label: ties, ui_default: efron, note: lifelines supports Efron only. }
+    steps:
+      - "Apply the subset first if there is one. Code each categorical covariate as indicator columns, without the reference level."
+      - "Fit the Cox model with Efron ties and read the hazard ratios exp(coef) with their intervals."
+      - "In SPSS: Analyze > Survival > Cox Regression. Put the time in Time, the event in Status, the covariates in Covariates. Click Categorical and set Reference Category to First (SPSS uses Last by default). SPSS uses Breslow ties."
+      - "In Stata: stcox fin age i.celltype (Efron ties with the option efron; the default is Breslow). In SAS: PROC PHREG; CLASS celltype (REF=FIRST); MODEL time*status(0) = ... / TIES=EFRON."
+      - "In GraphPad Prism: Analyze > Survival analysis > Cox proportional hazards regression."
     fidelity: exact
     evidence: { source: docs, test: rossi-cox-efron, note: "The lifelines docs show coef -0.38 for fin, -0.06 for age and concordance 0.64 on the Rossi data." }
 
@@ -1073,6 +1254,86 @@ map:
     fidelity: exact
     evidence: { source: docs, test: hollander-exact-ranks, note: "R wilcox.test gives V = 40 with p = 0.01953 and W = 35 with p = 0.1272 (checks/anova_r.R)." }
 
+  - tool: fit_logistic
+    route: |
+      X = pandas.get_dummies(df[covariates], columns=categorical, drop_first=True)   # first sorted level is the reference
+      res = statsmodels.api.Logit(df[outcome], statsmodels.api.add_constant(X)).fit()
+      numpy.exp(res.params); numpy.exp(res.conf_int()); res.llr, res.llr_pvalue
+      R: glm(outcome ~ age + factor(race), family = binomial); exp(confint.default(fit)); drop1(fit, test = "LRT")
+    steps:
+      - "Drop rows with a missing value in the outcome or a covariate. Apply the subset first if there is one."
+      - "Code each categorical covariate as indicator columns. Leave out the reference level."
+      - "Fit the logistic model. Take exp() of each coefficient and of each Wald interval bound for the odds ratios."
+      - "For the likelihood-ratio test of a covariate, fit the model without it and compare twice the difference of the log-likelihoods with a chi-square distribution."
+      - "In SPSS: Analyze > Regression > Binary Logistic. Put the outcome in Dependent and the covariates in Covariates. Click Categorical, move each categorical covariate, set Reference Category to First and click Change. In Options, select CI for exp(B)."
+      - "In Stata: logistic outcome age lwt i.race ftv (menu Statistics > Binary outcomes > Logistic regression (reporting odds ratios)). Then lrtest for a covariate."
+      - "In SAS: PROC LOGISTIC; CLASS race (PARAM=REF REF=FIRST); MODEL outcome(EVENT='1') = age lwt race ftv / CLODDS=WALD."
+      - "In GraphPad Prism: Analyze > Multiple variable analyses > Multiple logistic regression. In JMP: Analyze > Fit Model, Personality Nominal Logistic."
+    params:
+      - { arg: outcome, label: Dependent }
+      - { arg: covariates, label: Covariates }
+      - { arg: reference, label: Reference Category, ui_default: "Last (SPSS), effect coding (SAS CLASS)", note: "SPSS uses the last category as the reference by default, and SAS CLASS uses effect coding unless PARAM=REF. The tool uses the first sorted level. Set the same reference before you compare odds ratios." }
+      - { arg: alpha, label: CI for exp(B), ui_default: 95 }
+    fidelity: exact
+    difference: >
+      The confidence intervals are Wald intervals, as in SPSS and Stata. R confint() on a glm gives profile likelihood intervals,
+      which differ a little. The SPSS and SAS reference levels differ from the tool default, as the parameter notes say.
+    evidence: { source: docs, test: logistic-birthwt-race, note: "R glm gives the same coefficients, standard errors, Wald intervals and likelihood-ratio tests (checks/clinical_check.R)." }
+
+  - tool: chi_square_test
+    route: |
+      table = pandas.crosstab(df[row], df[column])
+      chi2, p, dof, expected = scipy.stats.chi2_contingency(table, correction=False)   # correction=True is Yates, 2x2 only
+      R: chisq.test(table(df$row, df$column), correct = FALSE); chisq.test(...)$expected
+    steps:
+      - "Make the cross-table of the two columns, or type the counts."
+      - "Run the Pearson chi-square test. For a 2x2 table, choose the Yates correction or no correction."
+      - "Read the expected counts. If a cell has an expected count below 5, use the Fisher exact test."
+      - "In SPSS: Analyze > Descriptive Statistics > Crosstabs. Put one variable in Row(s) and one in Column(s). Click Statistics and select Chi-square. Click Cells and select Expected. SPSS shows the Pearson test, the continuity correction for a 2x2 table and a footnote with the number of cells below 5."
+      - "In Stata: tabulate row column, chi2 expected (menu Statistics > Summaries, tables, and tests > Frequency tables > Two-way table with measures of association)."
+      - "In GraphPad Prism: enter a Contingency table, then Analyze > Contingency table analyses > Chi-square (and Fisher's exact) test. In JMP: Analyze > Fit Y by X with two nominal columns."
+    params:
+      - { arg: correction, label: Continuity Correction (SPSS row) or Yates correction, ui_default: "both shown (SPSS); Yates on (R, 2x2)", note: "R chisq.test applies the Yates correction to a 2x2 table by default. scipy also does. The decision sets it." }
+    fidelity: exact
+    evidence: { source: docs, test: chi-square-agresti-party, note: "R chisq.test gives the same statistic, p and expected counts (checks/clinical_check.R)." }
+
+  - tool: fisher_exact
+    route: |
+      scipy.stats.fisher_exact(table, alternative="two-sided")                      # 2x2 p
+      scipy.stats.contingency.odds_ratio(table, kind="conditional").confidence_interval()
+      R: fisher.test(table)   # same p and conditional odds ratio; r x c tables use the network algorithm
+    steps:
+      - "Make the cross-table of the two columns, or type the counts."
+      - "Run the Fisher exact test. For a 2x2 table, read the conditional odds ratio and its exact interval."
+      - "For a larger table, the tool counts all tables with the same margins. If there are too many, it gives a Monte Carlo p with a fixed seed."
+      - "In SPSS: Analyze > Descriptive Statistics > Crosstabs > Statistics > Chi-square. SPSS shows Fisher's Exact Test for a 2x2 table. For a larger table, click Exact and select Exact (needs the Exact Tests module)."
+      - "In Stata: tabulate row column, exact. In SAS: PROC FREQ; TABLES row*column / FISHER."
+      - "In GraphPad Prism: Contingency table > Analyze > Chi-square (and Fisher's exact) test, then Fisher's exact test (2x2 tables only)."
+    params:
+      - { arg: alternative, label: alternative, ui_default: two-sided }
+    fidelity: close
+    difference: >
+      The p-value of a 2x2 table and of an enumerated larger table equals R fisher.test. A large table gets a Monte Carlo p
+      (R uses an exact network algorithm). The upper bound of the odds ratio interval can differ from R in the fourth digit.
+      SPSS and Stata print the sample odds ratio, not the conditional odds ratio (sample_odds_ratio in the result).
+    evidence: { source: docs, test: fisher-tea-tasting, note: "R fisher.test help examples (checks/clinical_check.R)." }
+
+  - tool: mcnemar_test
+    route: |
+      table = pandas.crosstab(df[first], df[second])
+      statsmodels.stats.contingency_tables.mcnemar(table, exact=False, correction=True)   # exact=True is the binomial test
+      R: mcnemar.test(table(df$first, df$second), correct = TRUE)
+    steps:
+      - "Make the 2x2 table of pairs: rows are the first result, columns the second result."
+      - "Run McNemar's test on the two discordant cells: exact binomial, chi-square, or chi-square with continuity correction."
+      - "In SPSS: Analyze > Descriptive Statistics > Crosstabs > Statistics > McNemar. SPSS gives the exact binomial p for a 2x2 table. Or Analyze > Nonparametric Tests > Legacy Dialogs > 2 Related Samples > McNemar."
+      - "In Stata: mcc first second (menu Statistics > Epidemiology and related > Tables for epidemiologists > Matched case-control studies). It gives the McNemar chi-square and the exact p."
+      - "In SAS: PROC FREQ; TABLES first*second / AGREE. In GraphPad: QuickCalcs McNemar test."
+    params:
+      - { arg: method, label: test, ui_default: "exact binomial (SPSS); continuity correction (R)", note: "SPSS Crosstabs gives the exact p. R mcnemar.test uses the continuity correction by default. The decision sets it." }
+    fidelity: exact
+    evidence: { source: docs, test: mcnemar-agresti-approval, note: "R mcnemar.test and binom.test give the same values (checks/clinical_check.R)." }
+
 checks:
   - id: id_column_missing
     severity: warning
@@ -1082,6 +1343,7 @@ checks:
       arg: id_column
       op: missing
       message: Name the subject column. A test with no subject column cannot warn that the same subjects are in both groups.
+
   - id: pseudoreplication
     severity: error
     description: Rows from the same subject are used as independent observations.
@@ -1090,6 +1352,7 @@ checks:
       answer uses fit_ols with nonrobust errors, or an unpaired test, and reports a p-value for a
       within-subject effect, flag it as an error. The standard errors are too small. The answer must
       use fit_mixed_model with the subject as groups, cluster standard errors, or one value for each subject.
+
   - id: test_settings_not_reported
     severity: warning
     description: The answer gives a p-value but not the test, the sidedness, the alpha and the direction of the difference.
@@ -1097,6 +1360,7 @@ checks:
       If the answer gives a p-value, it must name the test (paired or unpaired, t-test or rank test, Student or
       Welch), the sidedness, alpha, the direction of the difference (second group minus first group) and the
       confidence interval. Flag the answer if one is missing. Flag it too if it says "significant" without alpha.
+
   - id: multiplicity_not_handled
     severity: warning
     description: Several tests or pairwise comparisons were run and no correction is reported.
@@ -1104,6 +1368,7 @@ checks:
       If the answer reports more than 2 tests of one question (pairwise comparisons, many outcomes, many
       covariates), it must say which correction was used (anova_oneway posthoc or adjust_pvalues) and report
       the adjusted p-values. Flag the answer if it calls raw p-values significant.
+
   - id: cox_assumptions_not_reported
     severity: warning
     description: A Cox model is reported without the ties method, the covariates and the proportional hazards test.
@@ -1112,6 +1377,41 @@ checks:
       events and the concordance. It must also report the result of the proportional hazards test
       (ph_violations in the tool result). If a covariate violates the assumption, the answer must say so and
       must not present its hazard ratio as constant over time.
+
+  - id: chi_square_small_expected
+    severity: warning
+    description: The answer reports a chi-square p-value from a table with expected counts below 5.
+    text: >
+      If a chi_square_test result in the log has a warning about expected counts below 5, and the answer reports its
+      p-value with no Fisher exact test and no word about the small counts, flag the answer.
+
+  - id: paired_binary_unpaired_test
+    severity: error
+    description: Paired binary data are tested with a test for independent groups.
+    text: >
+      If the same subjects give both binary results (before and after, two tests on one sample, matched pairs), and
+      the answer uses chi_square_test or fisher_exact on them, flag it as an error. Paired binary data need mcnemar_test.
+
+  - id: odds_ratio_as_risk
+    severity: warning
+    description: The answer describes an odds ratio as a risk ratio for a common outcome.
+    text: >
+      If the answer reports an odds ratio from fit_logistic or fisher_exact as "times the risk" or "times as likely",
+      and the outcome has more than 10 percent events, flag it. An odds ratio overstates a risk ratio for a common outcome.
+
+  - id: logistic_overfit
+    severity: warning
+    description: The answer reports odds ratios from a model with fewer than 10 events per parameter and does not say so.
+    text: >
+      If a fit_logistic result in the log has a warning about events per parameter or about separation, the answer must
+      repeat the warning. Flag the answer if it presents the odds ratios as reliable.
+
+  - id: logistic_reference_not_reported
+    severity: warning
+    description: The answer gives odds ratios of a categorical covariate without the reference level.
+    text: >
+      If the answer gives an odds ratio or a hazard ratio for a level of a categorical covariate, it must name the
+      reference level. Flag the answer if it does not.
 
 tests:
   - id: sleep-paired
@@ -1399,3 +1699,263 @@ tests:
     expect:
       - { path: ok, equals: false }
       - { path: error, contains: "Unknown column: no_such_column" }
+
+  - id: logistic-birthwt-race
+    description: >
+      Low birth weight data (Hosmer and Lemeshow, Applied Logistic Regression, 2nd edition 2000, Table 2.2; R MASS
+      birthwt). Model low ~ age + lwt + race + ftv with race as a category (reference white, code 1). The textbook
+      prints the coefficients 1.295, -0.024, -0.014, 1.004 (race 2), 0.433 (race 3), -0.049, the log-likelihood
+      -111.286 and the likelihood-ratio G = 12.099 on 5 df (p = 0.034). R 4.6.1 glm gives the same values and the
+      Wald odds ratio intervals; drop1 gives the race likelihood-ratio test 4.4253 on 2 df, p = 0.10941
+      (checks/clinical_check.R, output checks/clinical_check.txt).
+    data: [data/birthwt.csv]
+    calls:
+      - tool: fit_logistic
+        args: { path: "{adapter_dir}/data/birthwt.csv", outcome: low, covariates: "age,lwt,race,ftv", categorical: race }
+    expect:
+      - { path: metrics.n, equals: 189 }
+      - { path: metrics.events, equals: 59 }
+      - { path: metrics.coef_const, approx: 1.295366, abs: 0.00001 }
+      - { path: metrics.coef_race_2, approx: 1.003898, abs: 0.00001 }
+      - { path: metrics.se_race_2, approx: 0.497859, abs: 0.00001 }
+      - { path: metrics.coef_race_3, approx: 0.433108, abs: 0.00001 }
+      - { path: metrics.coef_lwt, approx: -0.014245, abs: 0.000002 }
+      - { path: metrics.or_race_2, approx: 2.728898, abs: 0.00001 }
+      - { path: metrics.or_lo_race_2, approx: 1.028511, abs: 0.00001 }
+      - { path: metrics.or_hi_race_2, approx: 7.240451, abs: 0.0001 }
+      - { path: metrics.log_likelihood, approx: -111.286453, abs: 0.00001 }
+      - { path: metrics.lr_chi2, approx: 12.099090, abs: 0.00001 }
+      - { path: metrics.lr_p, approx: 0.033455, abs: 0.000001 }
+      - { path: metrics.lrt_chi2_race, approx: 4.4253, abs: 0.0001 }
+      - { path: metrics.lrt_p_race, approx: 0.10941, abs: 0.00001 }
+      - { path: summary, contains: "race = 1" }
+
+  - id: logistic-infert-text-factor
+    description: >
+      R infert data (Trichopoulos et al. 1976). Model case ~ education + spontaneous + induced. education is a text
+      column with three levels, so the tool makes two indicator columns against 0-5yrs. R 4.6.1 glm gives
+      education 12+ yrs -0.024404, 6-11yrs 0.109933, spontaneous 1.203570 (OR 3.331992, Wald 95% CI 2.198636 to
+      5.049573), induced 0.426662, and drop1 gives the education test 0.204 on 2 df, p = 0.90319
+      (checks/clinical_check.txt).
+    data: [data/infert.csv]
+    calls:
+      - tool: fit_logistic
+        args: { path: "{adapter_dir}/data/infert.csv", outcome: case, covariates: "education,spontaneous,induced" }
+    expect:
+      - { path: metrics.n, equals: 248 }
+      - { path: metrics.events, equals: 83 }
+      - { path: metrics.coef_education_12_yrs, approx: -0.024404, abs: 0.00001 }
+      - { path: metrics.coef_education_6_11yrs, approx: 0.109933, abs: 0.00001 }
+      - { path: metrics.or_spontaneous, approx: 3.331992, abs: 0.00001 }
+      - { path: metrics.or_lo_spontaneous, approx: 2.198636, abs: 0.00001 }
+      - { path: metrics.or_hi_spontaneous, approx: 5.049573, abs: 0.00001 }
+      - { path: metrics.coef_induced, approx: 0.426662, abs: 0.00001 }
+      - { path: metrics.lrt_p_education, approx: 0.90319, abs: 0.00001 }
+
+  - id: logistic-subset-and-event
+    description: >
+      Smokers only (subset smoke == 1) of the birth weight data, low ~ lwt, with the event given as a value. R 4.6.1
+      glm on subset(birthwt, smoke == 1) gives 74 mothers, coefficient -0.006318 (se 0.007464) for lwt
+      (checks/clinical_check.txt).
+    data: [data/birthwt.csv]
+    calls:
+      - tool: fit_logistic
+        args: { path: "{adapter_dir}/data/birthwt.csv", outcome: low, event: "1", covariates: lwt, subset: "smoke == 1" }
+    expect:
+      - { path: metrics.n, equals: 74 }
+      - { path: metrics.coef_lwt, approx: -0.006318, abs: 0.000001 }
+      - { path: metrics.se_lwt, approx: 0.007464, abs: 0.000001 }
+      - { path: summary, contains: "smoke == 1" }
+
+  - id: logistic-outcome-not-binary
+    description: An outcome with more than 2 values and no event value fails, and the error names the column.
+    data: [data/birthwt.csv]
+    calls:
+      - tool: fit_logistic
+        args: { path: "{adapter_dir}/data/birthwt.csv", outcome: race, covariates: lwt }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "race is not coded 0 and 1" }
+
+  - id: chi-square-agresti-party
+    description: >
+      Party identification by gender (Agresti 2007, An Introduction to Categorical Data Analysis, p. 39; the example of
+      the R help page of chisq.test). R prints X-squared = 30.07, df = 2, p-value = 2.954e-07, and the expected count
+      703.6714 for the first cell.
+    calls:
+      - tool: chi_square_test
+        args: { counts: [[762, 327, 468], [484, 239, 477]] }
+    expect:
+      - { path: metrics.chi2, approx: 30.07, abs: 0.005 }
+      - { path: metrics.df, equals: 2 }
+      - { path: metrics.p_value, approx: 2.954e-07, abs: 1.0e-10 }
+      - { path: "data.data.expected[0][0]", approx: 703.6714, abs: 0.0001 }
+      - { path: metrics.n_cells_expected_below_5, equals: 0 }
+
+  - id: chi-square-2x2-yates
+    description: >
+      Smoking by low birth weight (birthwt). R 4.6.1 chisq.test gives 4.2359 (p = 0.03958) with the Yates correction
+      and 4.9237 (p = 0.02649) without it (checks/clinical_check.txt).
+    data: [data/birthwt.csv]
+    calls:
+      - tool: chi_square_test
+        args: { path: "{adapter_dir}/data/birthwt.csv", row: smoke, column: low, correction: false }
+        save_as: plain
+      - tool: chi_square_test
+        args: { path: "{adapter_dir}/data/birthwt.csv", row: smoke, column: low, correction: true }
+    expect:
+      - { path: metrics.chi2, approx: 4.2359, abs: 0.0001 }
+      - { path: metrics.p_value, approx: 0.03958, abs: 0.00001 }
+      - { path: saved.plain.metrics.chi2, approx: 4.9237, abs: 0.0001 }
+      - { path: saved.plain.metrics.p_value, approx: 0.02649, abs: 0.00001 }
+
+  - id: chi-square-small-expected-warning
+    description: >
+      Physician visits (ftv) by low birth weight. R 4.6.1 chisq.test gives 5.987 on 5 df (p = 0.3075) and warns
+      that the approximation can be incorrect. 6 of the 12 expected counts are below 5; the smallest is 0.3122
+      (checks/clinical_check.txt).
+    data: [data/birthwt.csv]
+    calls:
+      - tool: chi_square_test
+        args: { path: "{adapter_dir}/data/birthwt.csv", row: ftv, column: low }
+    expect:
+      - { path: metrics.chi2, approx: 5.987, abs: 0.001 }
+      - { path: metrics.p_value, approx: 0.3075, abs: 0.0001 }
+      - { path: metrics.n_cells_expected_below_5, equals: 6 }
+      - { path: metrics.min_expected, approx: 0.3122, abs: 0.0001 }
+      - { path: summary, contains: "fisher_exact" }
+
+  - id: chi-square-2x2-needs-correction
+    description: A 2x2 table with no correction value fails, and the error names the argument and the decision.
+    calls:
+      - tool: chi_square_test
+        args: { counts: [[10, 5], [4, 12]] }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "chi_square_correction" }
+
+  - id: fisher-tea-tasting
+    description: >
+      Tea tasting (Agresti 1990, p. 61; the R help page of fisher.test). R prints p-value = 0.4857 (two-sided),
+      0.2429 (greater) and the conditional odds ratio 6.408309. The two-sided interval lower bound is 0.2117329.
+    calls:
+      - tool: fisher_exact
+        args: { counts: [[3, 1], [1, 3]], alternative: greater }
+        save_as: greater
+      - tool: fisher_exact
+        args: { counts: [[3, 1], [1, 3]] }
+    expect:
+      - { path: metrics.p_value, approx: 0.4857, abs: 0.0001 }
+      - { path: metrics.odds_ratio, approx: 6.408309, abs: 0.0001 }
+      - { path: metrics.or_ci_lo, approx: 0.2117329, abs: 0.0001 }
+      - { path: saved.greater.metrics.p_value, approx: 0.2429, abs: 0.0001 }
+
+  - id: fisher-convictions
+    description: >
+      Convictions of twins (Fisher 1935; the R help page of fisher.test). R prints p-value = 0.0005367, odds ratio
+      0.04693661 and the 95% interval 0.003325764 to 0.363182271. SciPy finds the lower bound 0.0033172; the
+      tolerance allows the difference of the root finders.
+    calls:
+      - tool: fisher_exact
+        args: { counts: [[2, 15], [10, 3]] }
+    expect:
+      - { path: metrics.p_value, approx: 0.0005367, abs: 0.0000001 }
+      - { path: metrics.odds_ratio, approx: 0.04693661, abs: 0.000001 }
+      - { path: metrics.or_ci_lo, approx: 0.003325764, abs: 0.00002 }
+      - { path: metrics.or_ci_hi, approx: 0.363182271, abs: 0.0001 }
+
+  - id: fisher-rxc-exact-and-monte-carlo
+    description: >
+      Race by low birth weight, a 3x2 table: R 4.6.1 fisher.test gives p = 0.07889, and the tool enumerates all tables
+      (checks/clinical_check.txt). The job satisfaction table (Agresti 2002, p. 57; the R help page of fisher.test)
+      gives p = 0.7827 in R. It has too many tables to enumerate, so the tool gives a Monte Carlo p with 100000
+      tables; its standard error is about 0.0013.
+    data: [data/birthwt.csv]
+    calls:
+      - tool: fisher_exact
+        args: { path: "{adapter_dir}/data/birthwt.csv", row: race, column: low }
+        save_as: race
+      - tool: fisher_exact
+        args: { counts: [[1, 3, 10, 6], [2, 3, 10, 7], [1, 6, 14, 12], [0, 1, 9, 11]] }
+    expect:
+      - { path: saved.race.metrics.p_value, approx: 0.07889, abs: 0.00001 }
+      - { path: saved.race.data.data.method, contains: "exact" }
+      - { path: metrics.p_value, approx: 0.7827, abs: 0.005 }
+      - { path: data.data.method, contains: "Monte Carlo" }
+
+  - id: fisher-one-sided-needs-2x2
+    description: A one-sided Fisher test of a 3x2 table fails, and the error names the argument.
+    data: [data/birthwt.csv]
+    calls:
+      - tool: fisher_exact
+        args: { path: "{adapter_dir}/data/birthwt.csv", row: race, column: low, alternative: greater }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "alternative two-sided" }
+
+  - id: mcnemar-agresti-approval
+    description: >
+      Presidential approval in two surveys of the same 1600 people (Agresti 1990, p. 350; the R help page of
+      mcnemar.test). R prints McNemar's chi-squared = 16.818, p-value = 4.115e-05 with the continuity correction, and
+      17.356 (p = 3.099e-05) without it. R binom.test on the discordant pairs gives the exact p 0.000037. The CSV
+      file has one row for each person (checks/make_data.R).
+    data: [data/approval_pairs.csv]
+    calls:
+      - tool: mcnemar_test
+        args: { counts: [[794, 150], [86, 570]], method: chi-square-corrected }
+        save_as: corrected
+      - tool: mcnemar_test
+        args: { path: "{adapter_dir}/data/approval_pairs.csv", first: first, second: second, method: exact }
+        save_as: exact
+      - tool: mcnemar_test
+        args: { path: "{adapter_dir}/data/approval_pairs.csv", first: first, second: second, method: chi-square }
+    expect:
+      - { path: saved.corrected.metrics.statistic, approx: 16.818, abs: 0.001 }
+      - { path: saved.corrected.metrics.p_value, approx: 4.115e-05, abs: 1.0e-08 }
+      - { path: saved.exact.metrics.p_value, approx: 0.000037, abs: 0.000001 }
+      - { path: metrics.statistic, approx: 17.356, abs: 0.001 }
+      - { path: metrics.p_value, approx: 3.099e-05, abs: 1.0e-08 }
+      - { path: metrics.n_pairs, equals: 1600 }
+
+  - id: cox-veteran-celltype
+    description: >
+      Veterans lung cancer trial (Kalbfleisch and Prentice 1980; R survival veteran). Cox model trt + celltype + karno,
+      Efron ties, celltype a text column with the reference adeno. R 4.6.1 coxph gives celltype large -0.759369,
+      smallcell -0.329014, squamous -1.153994 (HR 0.315375), karno -0.031271, trt 0.261744, 137 patients and 128 deaths
+      (checks/clinical_check.txt).
+    data: [data/veteran.csv]
+    calls:
+      - tool: fit_cox
+        args: { path: "{adapter_dir}/data/veteran.csv", duration: time, event: status, covariates: "trt,celltype,karno", reference: "celltype=adeno" }
+    expect:
+      - { path: metrics.n, equals: 137 }
+      - { path: metrics.events, equals: 128 }
+      - { path: metrics.coef_celltype_large, approx: -0.759369, abs: 0.0001 }
+      - { path: metrics.coef_celltype_smallcell, approx: -0.329014, abs: 0.0001 }
+      - { path: metrics.hr_celltype_squamous, approx: 0.315375, abs: 0.0001 }
+      - { path: metrics.coef_karno, approx: -0.031271, abs: 0.00001 }
+      - { path: metrics.coef_trt, approx: 0.261744, abs: 0.0001 }
+
+  - id: cox-veteran-subset
+    description: >
+      The same data, patients with no prior therapy only (subset prior == 0). R 4.6.1 coxph on subset(veteran,
+      prior == 0) gives 97 patients, 91 deaths, trt 0.373301 and karno -0.027838 (checks/clinical_check.txt).
+    data: [data/veteran.csv]
+    calls:
+      - tool: fit_cox
+        args: { path: "{adapter_dir}/data/veteran.csv", duration: time, event: status, covariates: "trt,karno", subset: "prior == 0" }
+    expect:
+      - { path: metrics.n, equals: 97 }
+      - { path: metrics.events, equals: 91 }
+      - { path: metrics.coef_trt, approx: 0.373301, abs: 0.0001 }
+      - { path: metrics.coef_karno, approx: -0.027838, abs: 0.00001 }
+
+  - id: cox-bad-subset
+    description: A subset that names no column fails, and the error names the filter and the columns.
+    data: [data/veteran.csv]
+    calls:
+      - tool: fit_cox
+        args: { path: "{adapter_dir}/data/veteran.csv", duration: time, event: status, covariates: trt, subset: "no_such_column == 1" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "not a valid row filter" }

@@ -30,6 +30,17 @@ Follow these rules in each answer. The review checks look for the same errors.
 - Report the correction by name and the adjusted p-values. Do not call raw p-values significant.
 - A one-sided test needs a reason that the scientist gave before the data were seen.
 
+## Binary outcomes and tables
+
+- For two categorical variables in independent subjects, use chi_square_test. If a cell has an expected count below 5, use fisher_exact and say why.
+- For a 2x2 chi-square test, report whether the Yates correction was used.
+- For a binary result measured twice on the same subjects (before and after, two tests on one sample), use mcnemar_test. Do not use chi_square_test or fisher_exact on paired data.
+- For a binary outcome with covariates, use fit_logistic. Report the event value, the covariates, the reference level of each categorical covariate, n and the number of events.
+- Give each odds ratio with its confidence interval and say that the intervals are Wald intervals. Report the likelihood-ratio test of a categorical covariate with more than 2 levels.
+- An odds ratio is not a risk ratio. For an outcome with more than 10 percent events, do not write "times the risk".
+- If the result warns about events per parameter or separation, repeat the warning in the answer.
+- For a subgroup, pass subset and name the subgroup and its n in the answer.
+
 ## Mixed models
 
 - Report the formula, the random effects, REML or ML, the number of groups, the fixed effects with standard errors and the variance of each random effect.

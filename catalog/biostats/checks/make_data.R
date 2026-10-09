@@ -1,0 +1,10 @@
+library(MASS)
+library(survival)
+here <- commandArgs(trailingOnly = TRUE)[1]
+write.csv(birthwt, file.path(here, "data", "birthwt.csv"), row.names = FALSE)
+write.csv(infert, file.path(here, "data", "infert.csv"), row.names = FALSE)
+p <- matrix(c(794, 86, 150, 570), nrow = 2, dimnames = list(first = c("approve", "disapprove"), second = c("approve", "disapprove")))
+rows <- do.call(rbind, lapply(1:2, function(i) do.call(rbind, lapply(1:2, function(j) data.frame(first = rep(rownames(p)[i], p[i, j]), second = rep(colnames(p)[j], p[i, j]))))))
+rows <- cbind(person = seq_len(nrow(rows)), rows)
+write.csv(rows, file.path(here, "data", "approval_pairs.csv"), row.names = FALSE)
+write.csv(veteran, file.path(here, "data", "veteran.csv"), row.names = FALSE)

@@ -1,0 +1,236 @@
+R version 4.6.1 (2026-06-24) 
+
+== Logistic regression, Hosmer and Lemeshow low birth weight data (MASS birthwt)
+             Estimate Std. Error   z value Pr(>|z|)
+(Intercept)  1.295366   1.071443  1.208992 0.226666
+age         -0.023823   0.033730 -0.706292 0.480006
+lwt         -0.014245   0.006541 -2.177836 0.029418
+race2        1.003898   0.497859  2.016430 0.043755
+race3        0.433108   0.362240  1.195639 0.231838
+ftv         -0.049308   0.167239 -0.294837 0.768118
+log-likelihood -111.286453 
+                  OR       lo        hi
+(Intercept) 3.652332 0.447256 29.825260
+age         0.976459 0.913994  1.043193
+lwt         0.985856 0.973299  0.998576
+race2       2.728898 1.028511  7.240451
+race3       1.542043 0.758154  3.136433
+ftv         0.951888 0.685854  1.321113
+likelihood-ratio G 12.099090 df 5 p 0.033455 
+Single term deletions
+
+Model:
+low ~ age + lwt + race + ftv
+       Df Deviance    AIC    LRT Pr(>Chi)  
+<none>      222.57 234.57                  
+age     1   223.08 233.08 0.5059  0.47692  
+lwt     1   227.90 237.90 5.3217  0.02106 *
+race    2   227.00 235.00 4.4253  0.10941  
+ftv     1   222.66 232.66 0.0877  0.76708  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+== Logistic regression with a text factor, R infert data
+                  Estimate Std. Error   z value Pr(>|z|)
+(Intercept)      -1.757527   0.727555 -2.415662 0.015707
+education12+ yrs -0.024404   0.703698 -0.034679 0.972335
+education6-11yrs  0.109933   0.706277  0.155651 0.876308
+spontaneous       1.203570   0.212113  5.674201 0.000000
+induced           0.426662   0.209174  2.039747 0.041376
+                       OR       lo       hi
+(Intercept)      0.172471 0.041440 0.717814
+education12+ yrs 0.975892 0.245704 3.876057
+education6-11yrs 1.116203 0.279614 4.455820
+spontaneous      3.331992 2.198636 5.049573
+induced          1.532134 1.016829 2.308586
+Single term deletions
+
+Model:
+case ~ education + spontaneous + induced
+            Df Deviance    AIC    LRT  Pr(>Chi)    
+<none>           279.41 289.41                     
+education    2   279.61 285.61  0.204   0.90319    
+spontaneous  1   316.10 324.09 36.686 1.387e-09 ***
+induced      1   283.59 291.59  4.185   0.04079 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+n 248 events 83 
+
+== Logistic regression on a subset: birthwt smokers only, low ~ lwt
+             Estimate Std. Error   z value Pr(>|z|)
+(Intercept)  0.421451   0.972829  0.433222 0.664853
+lwt         -0.006318   0.007464 -0.846559 0.397241
+n 74 
+
+== Chi-square, Agresti (2007) p 39 party by gender, R help of chisq.test
+
+	Pearson's Chi-squared test
+
+data:  M
+X-squared = 30.07, df = 2, p-value = 2.954e-07
+
+         A        B        C
+A 703.6714 319.6453 533.6834
+B 542.3286 246.3547 411.3166
+
+== Chi-square 2x2, birthwt smoke by low, Yates and no correction
+   
+     0  1
+  0 86 29
+  1 44 30
+
+	Pearson's Chi-squared test with Yates' continuity correction
+
+data:  t2
+X-squared = 4.2359, df = 1, p-value = 0.03958
+
+
+	Pearson's Chi-squared test
+
+data:  t2
+X-squared = 4.9237, df = 1, p-value = 0.02649
+
+   
+          0       1
+  0 79.1005 35.8995
+  1 50.8995 23.1005
+
+== Chi-square with small expected counts, birthwt ftv by low
+   
+     0  1
+  0 64 36
+  1 36 11
+  2 23  7
+  3  3  4
+  4  3  1
+  6  1  0
+
+	Pearson's Chi-squared test
+
+data:  t3
+X-squared = 5.987, df = 5, p-value = 0.3075
+
+   
+          0       1
+  0 68.7831 31.2169
+  1 32.3280 14.6720
+  2 20.6349  9.3651
+  3  4.8148  2.1852
+  4  2.7513  1.2487
+  6  0.6878  0.3122
+cells below 5: 6 of 12 
+
+== Fisher exact, R help of fisher.test
+
+	Fisher's Exact Test for Count Data
+
+data:  TeaTasting
+p-value = 0.4857
+alternative hypothesis: true odds ratio is not equal to 1
+95 percent confidence interval:
+   0.2117329 621.9337505
+sample estimates:
+odds ratio 
+  6.408309 
+
+
+	Fisher's Exact Test for Count Data
+
+data:  TeaTasting
+p-value = 0.2429
+alternative hypothesis: true odds ratio is greater than 1
+95 percent confidence interval:
+ 0.3135693       Inf
+sample estimates:
+odds ratio 
+  6.408309 
+
+
+	Fisher's Exact Test for Count Data
+
+data:  Convictions
+p-value = 0.0005367
+alternative hypothesis: true odds ratio is not equal to 1
+95 percent confidence interval:
+ 0.003325764 0.363182271
+sample estimates:
+odds ratio 
+0.04693661 
+
+
+	Fisher's Exact Test for Count Data
+
+data:  Job
+p-value = 0.7827
+alternative hypothesis: two.sided
+
+
+== Fisher exact r x c, birthwt race by low
+   
+     0  1
+  1 73 23
+  2 15 11
+  3 42 25
+
+	Fisher's Exact Test for Count Data
+
+data:  table(b$race, b$low)
+p-value = 0.07889
+alternative hypothesis: two.sided
+
+
+== Fisher exact 2x2 from columns, birthwt ht by low
+   
+      0   1
+  0 125  52
+  1   5   7
+
+	Fisher's Exact Test for Count Data
+
+data:  table(b$ht, b$low)
+p-value = 0.05161
+alternative hypothesis: true odds ratio is not equal to 1
+95 percent confidence interval:
+  0.8679484 13.9894703
+sample estimates:
+odds ratio 
+  3.340866 
+
+
+== McNemar, Agresti (1990) p 350 presidential approval, R help of mcnemar.test
+
+	McNemar's Chi-squared test with continuity correction
+
+data:  P
+McNemar's chi-squared = 16.818, df = 1, p-value = 4.115e-05
+
+
+	McNemar's Chi-squared test
+
+data:  P
+McNemar's chi-squared = 17.356, df = 1, p-value = 3.099e-05
+
+            
+             approve disapprove
+  approve        794        150
+  disapprove      86        570
+
+	McNemar's Chi-squared test with continuity correction
+
+data:  table(a$first, a$second)
+McNemar's chi-squared = 16.818, df = 1, p-value = 4.115e-05
+
+exact binomial (discordant 86 and 150): p 0.000037 
+
+== Cox model with a text factor and a subset, veteran lung cancer data (Kalbfleisch and Prentice), R survival
+                       coef exp(coef) se(coef)         z Pr(>|z|)
+trt                0.261744  1.299194 0.200923  1.302708 0.192674
+celltypelarge     -0.759369  0.467962 0.298657 -2.542616 0.011003
+celltypesmallcell -0.329014  0.719633 0.269058 -1.222838 0.221391
+celltypesquamous  -1.153994  0.315375 0.295038 -3.911345 0.000092
+karno             -0.031271  0.969213 0.005165 -6.054357 0.000000
+n 137 events 128 
+           coef exp(coef) se(coef)         z Pr(>|z|)
+trt    0.373301  1.452522 0.217011  1.720198 0.085396
+karno -0.027838  0.972546 0.005706 -4.879006 0.000001
+n 97 events 91 
