@@ -1,10 +1,10 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadAdapter } from "../adapters/manifest.ts";
 import { Bus } from "../core/bus.ts";
 import { DecisionRecord } from "../core/decisions.ts";
-import { readOldEnv } from "../core/old-names.ts";
+import { homeFolder, readOldEnv } from "../core/old-names.ts";
 import { AnalysisRecord } from "../core/record.ts";
 import { findPlace, inProject } from "../core/places.ts";
 import { QuestionQueue } from "../core/questions.ts";
@@ -19,7 +19,7 @@ if (!id) {
 }
 const port = Number(args[args.indexOf("--port") + 1]) || 0;
 const place = findPlace(id);
-const source = place?.recordDir ?? join(process.env.CUVETTE_HOME || join(homedir(), ".cuvette"), "sessions", id);
+const source = place?.recordDir ?? join(process.env.CUVETTE_HOME || homeFolder(), "sessions", id);
 if (!existsSync(join(source, "log.jsonl"))) {
   console.error(`No session ${id}.`);
   process.exit(1);
