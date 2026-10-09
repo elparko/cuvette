@@ -1,0 +1,13 @@
+Well,Group,Replicate,Firefly,Renilla
+W01,Empty vector,1,1000,500
+W02,Empty vector,1,1200,500
+W03,Treated,1,4000,500
+W04,Treated,1,4400,500
+W05,Empty vector,2,900,300
+W06,Empty vector,2,1500,500
+W07,Treated,2,2700,300
+W08,Treated,2,3000,250
+W09,Empty vector,3,2000,1000
+W10,Empty vector,3,1600,800
+W11,Treated,3,5000,1000
+W12,Treated,3,3000,600

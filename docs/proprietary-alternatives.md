@@ -49,6 +49,9 @@ of each package. The sources are at the end.
 | QuantStudio Design and Analysis | Thermo Fisher, closed | qPCR analysis. | qpcR, pcr, HTqPCR (as above) | `qpcr` | Partial (as for CFX Maestro). |
 | Seahorse Wave and Seahorse Analytics | Agilent, closed | Oxygen consumption rate (OCR), extracellular acidification rate (ECAR), Mito Stress Test. | ceas (MIT, R); seahtrue (Artistic-2.0, R) | none | Open. |
 | Synbiosis ProtoCOL, Interscience Scan | Synbiosis, Interscience, commercial, with the counter hardware | Colony counts on agar plates and clonogenic dishes. | OpenCFU (GPL-3); Fiji Analyze Particles (GPL-3); scikit-image (BSD-3) | `image-assays` | Covered for plate photos: colony counts with a QC overlay, hand-count comparison, plating efficiency and surviving fraction. |
+| NanoDrop software | Thermo Fisher, closed, comes with the instrument | Nucleic acid concentration from A260, A260/A280 and A260/A230. | pandas, numpy (BSD-3) | `bench-assays` | Partial. `nucleic_acid_qc` reads the exported table and flags ratios outside the usual ranges. It does not read NanoDrop files or spectra. |
+| Countess, TC20 and Cellometer software | Thermo Fisher, Bio-Rad and Nexcelom, closed, come with the counter | Cells per mL and viability. | pandas, numpy (BSD-3) | `bench-assays` | Partial. `cell_counts` reads the export table and plans the seeding volumes. It does not count cells in the images. |
+| Excel worksheets for BCA and Bradford kits, and curve fits in GraphPad Prism | Microsoft and GraphPad (Dotmatics), commercial | Protein assay standard curves, blot and reporter ratios, hemocytometer arithmetic. | pandas, numpy, SciPy (BSD-3) | `bench-assays` | Partial. `protein_assay`, `ratio_normalize` and `cell_counts` do the same arithmetic from a table. Each tool gives the manual route. The tools do not read plate reader or imager files. |
 
 ## Gels, blots and electrophoresis
 
