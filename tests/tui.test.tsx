@@ -282,7 +282,7 @@ describe("cards", () => {
   test("setup card edits a field and saves", async () => {
     const { h, s } = start({ autoSetup: true });
     const card = () => {
-      const t = h.all();
+      const t = h.term.view();
       return t.slice(t.lastIndexOf("Setup: your choices"));
     };
     await until(() => h.all().includes("Setup: your choices for this analysis"));
@@ -582,11 +582,11 @@ describe("quiet view", () => {
     await until(() => h.all().includes("read_file  Read 400 of 400 bytes."));
     expect(h.all()).toContain("list_dir  3 entries in /data/msi.");
     expect(h.all()).toContain("Ctrl+O: short view");
-    h.frames.length = 0;
+    h.reset();
     await submit(h, "again");
     await until(() => h.all().includes("Permission needed: run_script"));
     expect(h.all()).toContain("read_file  Read 90 of 90 bytes.");
-    h.frames.length = 0;
+    h.reset();
     await type(h, "\x0f");
     await until(() => h.all().includes("· Looked at 1 folder (msi)"));
     expect(h.all()).not.toContain("read_file  Read");

@@ -8,6 +8,7 @@ export interface Harness {
   frames: string[];
   all(): string;
   last(): string;
+  reset(): void;
   term: Term;
 }
 
@@ -16,6 +17,9 @@ export class Term {
   screen: string[][];
   x = 0;
   y = 0;
+  wraps = 0;
+  painted: string[] = [];
+  private shown: string[] = [];
 
   constructor(
     public cols: number,
@@ -27,8 +31,11 @@ export class Term {
   private feed() {
     this.y++;
     if (this.y < this.rows) return;
-    this.scrollback.push(this.row(0));
+    const top = this.row(0);
+    if (top && top !== this.shown[0]) this.painted.push(top);
+    this.scrollback.push(top);
     this.screen.shift();
+    this.shown.shift();
     this.screen.push([]);
     this.y = this.rows - 1;
   }
@@ -38,6 +45,15 @@ export class Term {
   }
 
   write(data: string) {
+    this.parse(data);
+    this.screen.forEach((_, i) => {
+      const r = this.row(i);
+      if (r !== this.shown[i] && r) this.painted.push(r);
+      this.shown[i] = r;
+    });
+  }
+
+  private parse(data: string) {
     const re = /\x1b\[([?0-9;]*)([A-Za-z])|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[78=>]|\n|\r|[^\x1b\n\r]/gsu;
     for (const m of data.matchAll(re)) {
       const t = m[0];
@@ -48,6 +64,7 @@ export class Term {
       else if (m[2]) this.csi(m[1] ?? "", m[2]);
       else if (!t.startsWith("\x1b")) {
         if (this.x >= this.cols) {
+          this.wraps++;
           this.x = 0;
           this.feed();
         }
@@ -79,7 +96,10 @@ export class Term {
     } else if (op === "J") {
       const mode = Number(args || 0);
       if (mode === 3) this.scrollback = [];
-      else if (mode === 2) this.screen = Array.from({ length: this.rows }, () => []);
+      else if (mode === 2) {
+        this.screen = Array.from({ length: this.rows }, () => []);
+        this.wraps = 0;
+      }
       else if (mode === 0) {
         line.length = Math.min(line.length, this.x);
         for (let i = this.y + 1; i < this.rows; i++) this.screen[i] = [];
@@ -141,8 +161,12 @@ export function makeHarness(columns = 100, rows = 40): Harness {
       out.emit("resize");
     },
     frames,
-    all: () => plain(frames.join("")),
-    last: () => plain([...frames].reverse().find((f) => plain(f).trim().length > 20) ?? ""),
+    all: () => term.painted.join("\n"),
+    last: () => term.view(),
+    reset: () => {
+      frames.length = 0;
+      term.painted = [];
+    },
     term,
   };
 }

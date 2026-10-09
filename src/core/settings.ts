@@ -178,6 +178,15 @@ export const SETTINGS: SettingDef[] = [
     def: "cuvette",
   },
   {
+    name: "animations",
+    group: "Display",
+    label: "Animations",
+    help: "on: the status line shows a spinner while the agent thinks or runs a step. off: the status line does not move. A terminal that is not interactive never shows the spinner.",
+    scopes: ALL,
+    choices: () => ["on", "off"],
+    def: "on",
+  },
+  {
     name: "export_xlsx",
     group: "Outputs",
     label: "Save results.xlsx",

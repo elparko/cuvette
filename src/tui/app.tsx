@@ -22,7 +22,10 @@ import { INPUT_MAX_ROWS, InputBox } from "./input-box.tsx";
 const MODE_ORDER: Mode[] = ["watch", "follow", "teach", "plan"];
 const MAX_SUGGESTIONS = 8;
 
-export function App({ session, opts }: { session: SessionLike; opts: TuiOptions }) {
+export const RESIZE_MS = 150;
+const CLEAR_ALL = "\x1b[2J\x1b[3J\x1b[H";
+
+export function App({ session, opts, reprint }: { session: SessionLike; opts: TuiOptions; reprint?: { current?: () => void } }) {
   const { exit } = useApp();
   const { write, stdout } = useStdout();
   const env = opts.env ?? process.env;
@@ -37,6 +40,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
 
   const [items, setItems] = useState<StaticItem[]>([{ key: "header", t: "header" }]);
   const [epoch, setEpoch] = useState(0);
+  if (reprint) reprint.current = () => setEpoch((x) => x + 1);
   const [live, setLive] = useState("");
   const [status, setStatus] = useState<{ state: string; tool?: string; purpose?: string; since?: number }>({ state: "idle" });
   const [cards, setCards] = useState<Card[]>([]);
@@ -78,7 +82,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
   const toggleDetails = useCallback(() => {
     details.current = !details.current;
     setShowAll(details.current);
-    (opts.stdout ?? process.stdout).write("\x1b[2J\x1b[3J\x1b[H");
+    (opts.stdout ?? process.stdout).write(CLEAR_ALL);
     let rows: Item[];
     if (details.current) {
       rows = log.current.flatMap((l) => l.items);
@@ -196,7 +200,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
       hasQuestionCard: (qid) => cards.some((c) => c.t === "question" && c.q.qid === qid),
       refresh,
       clear: () => {
-        (opts.stdout ?? process.stdout).write("\x1b[2J\x1b[3J\x1b[H");
+        (opts.stdout ?? process.stdout).write(CLEAR_ALL);
         log.current = [];
         setItems([]);
         setEpoch((x) => x + 1);
@@ -530,12 +534,30 @@ function cardViews(d: CardDeps): CardViews {
 export const TUI_CARD_TYPES = Object.keys(cardViews({} as CardDeps)) as CardType[];
 
 export async function runTui(session: SessionLike, opts: TuiOptions = {}): Promise<void> {
-  const instance = render(<App session={session} opts={opts} />, {
+  const reprint: { current?: () => void } = {};
+  const stdout = opts.stdout ?? process.stdout;
+  const instance = render(<App session={session} opts={opts} reprint={reprint} />, {
     stdin: opts.stdin,
     stdout: opts.stdout,
     exitOnCtrlC: false,
     patchConsole: false,
     kittyKeyboard: { mode: "auto", flags: ["disambiguateEscapeCodes"] },
+    incrementalRendering: true,
   });
-  await instance.waitUntilExit();
+  let timer: NodeJS.Timeout | undefined;
+  const onResize = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      instance.clear();
+      stdout.write(CLEAR_ALL);
+      reprint.current?.();
+    }, RESIZE_MS);
+  };
+  if (stdout.isTTY) stdout.on("resize", onResize);
+  try {
+    await instance.waitUntilExit();
+  } finally {
+    clearTimeout(timer);
+    stdout.off("resize", onResize);
+  }
 }

@@ -61,6 +61,7 @@ test("in a short terminal the panel keeps the selected row and the help line in 
   expect(h.term.view()).toContain("Enter or Space change");
   expect(h.term.view()).not.toContain("Lab notebook");
   await key(h, "\x1b[A");
+  await until(() => h.term.view().includes("Lab notebook"));
   const view = h.term.view();
   expect(view).toContain("Lab notebook");
   expect(view).toContain("Enter or Space change");

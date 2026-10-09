@@ -1,17 +1,34 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
-import { runTui } from "../src/tui/app.tsx";
+import { RESIZE_MS, runTui } from "../src/tui/app.tsx";
 import { FakeSession } from "../src/ui/fake-session.ts";
+import { Session } from "../src/core/session.ts";
+import { FakeProvider } from "../src/providers/fake.ts";
+import type { SessionLike } from "../src/tui/types.ts";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 
 let live: { h: Harness; done: Promise<void> } | undefined;
 
-function start(columns = 100, rows = 40) {
+function start(columns = 100, rows = 40, session?: SessionLike) {
   const h = makeHarness(columns, rows);
-  const s = new FakeSession({ delayMs: 0 });
+  const s = session ?? new FakeSession({ delayMs: 0 });
   const done = runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} });
   live = { h, done };
-  return { h, s };
+  return { h, s: s as FakeSession };
 }
+
+async function resize(h: Harness, columns: number, rows: number) {
+  h.resize(columns, rows);
+  await sleep(RESIZE_MS + 150);
+  const lines = h.term.lines();
+  for (const l of lines) expect(l.length).toBeLessThanOrEqual(columns);
+  expect(h.term.wraps).toBe(0);
+  return lines;
+}
+
+const once = (lines: string[], part: string) => expect(lines.filter((l) => l.includes(part))).toHaveLength(1);
 
 afterEach(async () => {
   if (!live) return;
@@ -66,5 +83,63 @@ describe("a card taller than the terminal", () => {
     h.type("a");
     await until(() => s.planResponses.length === 1);
     expect(s.planResponses[0]).toEqual({ action: "approve", mode: "watch" });
+  });
+});
+
+describe("resize", () => {
+  test("after each resize the transcript shows once, every line fits, and the open card still takes its keys", async () => {
+    const { h, s } = start(100, 40);
+    await until(() => h.all().includes("Type /plan"));
+    h.type("compare endo and epi");
+    await sleep(40);
+    h.type("\r");
+    await until(() => h.term.view().includes("Permission needed: run_script"));
+    h.type("y");
+    await until(() => h.term.view().includes("Press a number to answer"));
+    for (const [c, r] of [[60, 30], [120, 30], [45, 14], [100, 40]] as const) {
+      const lines = await resize(h, c, r);
+      once(lines, "> compare endo and epi");
+      once(lines, "Step 1");
+      once(lines, "guided-analysis");
+      once(lines, "Your decision: Which AUC cutoff");
+      expect(h.term.view()).toContain("Press a number to answer");
+    }
+    expect(h.term.view()).toContain("2 0.8 (6 features)");
+    h.type("2");
+    await until(() => s.record.entries(["answer"]).length === 1);
+    expect(s.record.entries(["answer"])[0]!.data.value).toBe(0.8);
+    await until(() => h.term.view().includes("14 features differ between endo and epi at AUC 0.8."));
+  });
+});
+
+describe("resume", () => {
+  test("an open question from the last run shows as a card again and takes its answer", async () => {
+    process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-fit-"));
+    const cwd = mkdtempSync(join(tmpdir(), "ga-proj-"));
+    const adapters = [join(__dirname, "fixtures/lab")];
+    const first = await Session.create({
+      adapters,
+      cwd,
+      provider: new FakeProvider([
+        { text: "I will blur, then count.", calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+        { calls: [{ name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 10 } }] },
+      ]),
+    });
+    first.decisions.applySetup({ question: "How many particles?" });
+    const asked = new Promise<void>((r) => first.bus.on((e) => e.type === "question" && r()));
+    void first.send("Count the particles in a.tif").catch(() => {});
+    await asked;
+    await first.close();
+
+    const again = await Session.resume(first.id, { cwd, provider: new FakeProvider([{ text: "Counted with the answer." }]) });
+    const qid = again.questions.open()[0]!.qid;
+    const { h } = start(100, 40, again as unknown as SessionLike);
+    await until(() => h.term.view().includes("Your decision:"));
+    await resize(h, 70, 24);
+    expect(h.term.view()).toContain("Press a number to answer");
+    h.type("1");
+    await until(() => again.record.entries(["answer"]).some((e) => e.data.qid === qid));
+    expect(again.questions.open()).toHaveLength(0);
+    await again.close();
   });
 });

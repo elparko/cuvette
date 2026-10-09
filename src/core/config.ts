@@ -29,6 +29,7 @@ export interface Settings {
   hooks: Partial<Record<HookEvent, { matcher?: string; command: string[] }[]>>;
   notify: { ntfy?: string };
   export_xlsx: "on" | "off" | boolean;
+  animations?: "on" | "off";
   figure_formats: string;
   output_folder: string;
   defaultAdapters: string[];
