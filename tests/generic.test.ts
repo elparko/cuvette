@@ -25,16 +25,16 @@ test("tool list and flags", () => {
 });
 
 test("run_command runs without a shell and reports failures", async () => {
-  const r = await tools.run_command.execute({ argv: [process.execPath, "-e", "console.log(process.argv[1]); console.error('warn')", "a;b $(x)"] }, ctx());
+  const r = await tools.run_command.execute({ purpose: "Test", does: "Runs a test.", argv: [process.execPath, "-e", "console.log(process.argv[1]); console.error('warn')", "a;b $(x)"] }, ctx());
   expect(r).toMatchObject({ ok: true, fidelity: "none" });
   expect(r.text).toContain("a;b $(x)");
   expect(r.text).toContain("[stderr]");
   expect(r.manualRoute).toContain(process.platform === "win32" ? '"a;b $(x)"' : "'a;b $(x)'");
-  const f = await tools.run_command.execute({ argv: [process.execPath, "-e", "process.exit(2)"] }, ctx());
+  const f = await tools.run_command.execute({ purpose: "Test", does: "Runs a test.", argv: [process.execPath, "-e", "process.exit(2)"] }, ctx());
   expect(f).toMatchObject({ ok: false, error: expect.stringMatching(/exited with code 2/) });
-  expect((await tools.run_command.execute({ argv: [] }, ctx())).ok).toBe(false);
-  expect((await tools.run_command.execute({ argv: ["/no/such/prog"] }, ctx())).error).toMatch(/cannot start/);
-  const t = await tools.run_command.execute({ argv: [process.execPath, "-e", "setTimeout(()=>{},30000)"], timeout_s: 1 }, ctx());
+  expect((await tools.run_command.execute({ purpose: "Test", does: "Runs a test.", argv: [] }, ctx())).ok).toBe(false);
+  expect((await tools.run_command.execute({ purpose: "Test", does: "Runs a test.", argv: ["/no/such/prog"] }, ctx())).error).toMatch(/cannot start/);
+  const t = await tools.run_command.execute({ purpose: "Test", does: "Runs a test.", argv: [process.execPath, "-e", "setTimeout(()=>{},30000)"], timeout_s: 1 }, ctx());
   expect(t.error).toMatch(/timed out after 1 s/);
 });
 

@@ -23,6 +23,8 @@ export type Item =
       settings: string;
       fidelity?: Fidelity;
       outputs: OutputRef[];
+      purpose?: string;
+      code?: string;
     }
   | { key: string; t: "line"; sym: string; color?: string; text: string; dim?: boolean }
   | { key: string; t: "block"; title?: string; text: string };
@@ -35,10 +37,25 @@ function show(v: unknown): string {
   return JSON.stringify(v);
 }
 
+const NOT_SETTINGS = new Set(["purpose", "does", "code", "argv"]);
+
+export function codeOf(args: Record<string, unknown>): string | undefined {
+  if (typeof args.code === "string") return args.code;
+  if (Array.isArray(args.argv)) return args.argv.map(String).join(" ");
+  return undefined;
+}
+
+export function plainOf(args: Record<string, unknown>): { purpose?: string; does?: string } {
+  return {
+    purpose: typeof args.purpose === "string" && args.purpose.trim() ? args.purpose.trim() : undefined,
+    does: typeof args.does === "string" && args.does.trim() ? args.does.trim() : undefined,
+  };
+}
+
 export function settingsLine(args: unknown): string {
   if (!args || typeof args !== "object") return "";
   const parts = Object.entries(args as Record<string, unknown>)
-    .filter(([, v]) => v !== undefined && v !== null && typeof v !== "object")
+    .filter(([k, v]) => !NOT_SETTINGS.has(k) && v !== undefined && v !== null && typeof v !== "object")
     .slice(0, MAX_SETTINGS)
     .map(([k, v]) => `${k.replace(/_/g, " ")} ${show(v)}`);
   return parts.join(" · ");
@@ -153,13 +170,17 @@ export class Mapper {
         outputs.push(ref);
       }
     }
+    const args = (d.effectiveArgs && typeof d.effectiveArgs === "object" ? d.effectiveArgs : {}) as Record<string, unknown>;
+    const { purpose, does } = plainOf(args);
     return {
       key,
       t: "step",
       n: numbered ? ++this.step : undefined,
       ok: d.ok !== false,
       tool,
-      summary: String(d.summary || d.text || tool).split("\n")[0]!,
+      purpose,
+      code: codeOf(args),
+      summary: does ?? String(d.summary || d.text || tool).split("\n")[0]!,
       error: d.error ? String(d.error) : undefined,
       route: d.manualRoute ? String(d.manualRoute) : undefined,
       settings: settingsLine(d.effectiveArgs),

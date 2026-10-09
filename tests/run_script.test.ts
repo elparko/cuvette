@@ -1,5 +1,6 @@
 import { createServer } from "node:net";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { genericTools } from "../src/tools/generic.ts";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -18,7 +19,7 @@ function setup(callTool: (name: string, args: Args) => Promise<ToolOutput> = asy
   const tool = runScriptTool(dirs, { network });
   const run = (code: string, extra: Args = {}, signal: AbortSignal = new AbortController().signal) => {
     const ctx: ToolContext = { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal, log: () => { throw new Error("no log"); }, callTool };
-    return tool.execute({ code, ...extra }, ctx);
+    return tool.execute({ purpose: "Test", does: "Runs a test.", code, ...extra }, ctx);
   };
   return { tool, run, dirs };
 }
@@ -157,3 +158,44 @@ test.skipIf(!hasScience || !sandboxed)("the script environment has the statistic
     setBlindPolicy(undefined);
   }
 }, 120000);
+
+test("a relative path means the same file in list_dir, read_file, run_script and run_command", async () => {
+  const project = mkdtempSync(join(tmpdir(), "ga-project-"));
+  mkdirSync(join(project, "LDL", "Set 1"), { recursive: true });
+  writeFileSync(join(project, "LDL", "Set 1", "20X_CH1.txt"), "red cells");
+  const workDir = join(root, `work${++n}`);
+  mkdirSync(workDir, { recursive: true });
+  const dirs = { workDir, sessionDir: join(root, `session${n}`), projectDir: project };
+  const generic = Object.fromEntries(genericTools(dirs).map((t) => [t.name, t]));
+  const ctx: ToolContext = { session: "s", callId: "c", workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) };
+  const rel = "LDL/Set 1";
+  const listed = await generic.list_dir!.execute({ path: rel }, ctx);
+  expect(listed.summary).toBe(`1 entries in ${join(project, rel)}.`);
+  expect((await generic.read_file!.execute({ path: `${rel}/20X_CH1.txt` }, ctx)).text).toBe("red cells");
+  const r = await runScriptTool(dirs, { network: false }).execute({
+    purpose: "Read one image file",
+    does: "Lists the Set 1 folder, reads one file and saves a note.",
+    code: "import os\nprint(os.path.abspath('LDL/Set 1'))\nprint(os.listdir('LDL/Set 1'))\nprint(open('LDL/Set 1/20X_CH1.txt').read())\nopen('note.txt', 'w').write('x')\nprint(open('note.txt').read())\nprint(os.environ['PROJECT_DIR'], os.environ['WORK_DIR'], os.environ['CUVETTE_PROJECT_DIR'])",
+  }, ctx);
+  expect(r.ok).toBe(true);
+  const [abs, names, text, note, env] = r.text!.trim().split("\n");
+  expect(realpathSync(abs!)).toBe(realpathSync(join(project, rel)));
+  expect(names).toBe("['20X_CH1.txt']");
+  expect(text).toBe("red cells");
+  expect(note).toBe("x");
+  expect(env).toBe(`${project} ${workDir} ${project}`);
+  expect(existsSync(join(workDir, "note.txt"))).toBe(true);
+  expect(existsSync(join(project, "note.txt"))).toBe(false);
+  expect(r.summary).toBe(`The script ran in ${project} and wrote 1 new file(s) to ${workDir}.`);
+  const cmd = await generic.run_command!.execute({ purpose: "List Set 1", does: "Lists the Set 1 folder.", argv: [process.execPath, "-e", "console.log(require('fs').readdirSync('LDL/Set 1').join())"] }, ctx);
+  expect(cmd.text!.trim()).toBe("20X_CH1.txt");
+  expect(cmd.summary).toBe(`Ran ${process.execPath} in ${project}; exit code 0.`);
+});
+
+test("purpose and does are required", async () => {
+  const { tool, dirs } = setup();
+  const ctx: ToolContext = { session: "s", callId: "c", workDir: dirs.workDir, sessionDir: dirs.sessionDir, signal: new AbortController().signal, log: () => ({}) as never, callTool: async () => ({ ok: true }) };
+  expect(tool.inputSchema.required).toEqual(["purpose", "does", "code"]);
+  expect((await tool.execute({ code: "print(1)" }, ctx)).ok).toBe(false);
+  expect(tool.description).toContain("not the code");
+});

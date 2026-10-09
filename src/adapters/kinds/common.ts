@@ -11,6 +11,7 @@ import type { AdapterRuntime } from "../runtime.ts";
 export interface Dirs {
   workDir: string;
   sessionDir: string;
+  projectDir?: string;
 }
 
 export interface KindContext {

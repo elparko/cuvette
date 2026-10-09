@@ -7,6 +7,7 @@ import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
+import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
@@ -211,7 +212,8 @@ export class Session {
     const first = entries.find((e) => e?.kind === "session");
     const loaded = entries.filter((e) => e?.kind === "adapter").map((e) => e.data);
     const adapters = opts.adapters ?? [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded].map((a) => (a.path && existsSync(a.path) ? a.path : a.name));
-    return Session.create({ ...opts, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? first?.data.mode, pick: opts.pick ?? !!first?.data.pick });
+    const cwd = opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
+    return Session.create({ ...opts, cwd, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? first?.data.mode, pick: opts.pick ?? !!first?.data.pick });
   }
 
   private async init(opts: SessionOptions) {
@@ -240,13 +242,13 @@ export class Session {
     const extra: Tool[] = [];
     try {
       const { genericTools } = await import("../tools/generic.ts");
-      const generic = genericTools({ workDir: this.workDir, sessionDir: this.dir });
+      const generic = genericTools({ workDir: this.workDir, sessionDir: this.dir, projectDir: this.cwd });
       const always = new Set(["read_file", "list_dir"]);
       extra.push(...generic.filter((t) => opts.generic || this.pick || this.adapters.length === 0 || always.has(t.name)));
     } catch {}
     try {
       const { runScriptTool } = await import("../tools/run_script.ts");
-      extra.push(runScriptTool({ workDir: this.workDir, sessionDir: this.dir }, { network: this.settings.networkForScripts }));
+      extra.push(runScriptTool({ workDir: this.workDir, sessionDir: this.dir, projectDir: this.cwd }, { network: this.settings.networkForScripts }));
     } catch {}
     extra.push((await import("../tools/calculate.ts")).calculateTool());
     extra.push(
@@ -307,7 +309,7 @@ export class Session {
   }
 
   private buildSystem(): string {
-    return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick });
+    return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { project: this.cwd, work: this.workDir } });
   }
 
   private async startOne(a: LoadedAdapter): Promise<string[]> {
@@ -773,7 +775,8 @@ export class Session {
   private async runCall(call: Extract<Part, { type: "tool_call" }>, signal: AbortSignal): Promise<Part> {
     const tool = this.findTool(call.name);
     this.record.append("tool_call", { callId: call.id, tool: call.name, adapter: tool?.adapter, args: call.args as Record<string, unknown> });
-    this.bus.emit({ type: "status", state: "running", tool: call.name });
+    const purpose = (call.args as Args | undefined)?.purpose;
+    this.bus.emit({ type: "status", state: "running", tool: call.name, purpose: typeof purpose === "string" ? purpose : undefined, since: Date.now() });
     if (call.parseError) return this.fail(call.id, call.name, `the arguments are not valid JSON: ${call.parseError}`);
     if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use find_tools to search.`);
     if (!this.active.has(tool.name)) this.active.add(tool.name);
@@ -819,7 +822,11 @@ export class Session {
     let perm = this.sessionAllow.has(tool.name) ? "allow" : this.permissions.check(tool, eff);
     if (pre.decision === "ask" && perm === "allow") perm = "ask";
     if (perm === "deny") return error("the permission rules deny this tool");
-    if (perm === "ask") {
+    const searchRoot = tool.source !== "adapter" ? broadSearch(tool.name, eff, this.cwd) : undefined;
+    if (searchRoot) {
+      const res = await this.requestPermission(tool, eff, signal, undefined, { root: searchRoot, purpose: typeof eff.purpose === "string" ? eff.purpose : "" });
+      if (!res.ok) return error(`the scientist did not allow a search of ${searchRoot}${res.note ? `: ${res.note}` : ""}. Do not search large folders. Use the absolute paths from earlier tool results, or ask the scientist where the files are.`);
+    } else if (perm === "ask") {
       const res = await this.requestPermission(tool, eff, signal);
       if (!res.ok) return error(`the scientist did not allow this${res.note ? `: ${res.note}` : ""}. Ask what they want instead.`);
     }
@@ -1173,7 +1180,7 @@ export class Session {
 
   // ------------------------------------------------------------- permissions and follow mode
 
-  private async requestPermission(tool: Tool, args: Args, signal: AbortSignal, outward?: string): Promise<{ ok: boolean; note: string; always: boolean }> {
+  private async requestPermission(tool: Tool, args: Args, signal: AbortSignal, outward?: string, search?: { root: string; purpose: string }): Promise<{ ok: boolean; note: string; always: boolean }> {
     const rid = `r${++this.permCount}`;
     const code = typeof args.code === "string" ? args.code : undefined;
     let touches = outward ?? ( tool.adapter ? `Runs ${tool.remoteName ?? tool.name} in ${this.adapterInfo.find((a) => a.name === tool.adapter)?.title}. It writes only to the session folder.` : "Runs on this computer with your user permissions.");
@@ -1185,7 +1192,8 @@ export class Session {
     }
     const sha256 = code ? createHash("sha256").update(code).digest("hex") : undefined;
     const p = new Promise<{ ok: boolean; note: string; always: boolean }>((resolve) => this.permissionWaits.set(rid, { resolve }));
-    this.bus.emit({ type: "permission", rid, tool: tool.name, args, code, touches });
+    if (search) touches = `The agent wants to search ${search.root}${search.purpose ? ` for this purpose: ${search.purpose.replace(/\.$/, "")}` : ""}. This can take minutes and reads folders outside your project.`;
+    this.bus.emit({ type: "permission", rid, tool: tool.name, args, code, touches, search });
     this.bus.emit({ type: "status", state: "waiting", tool: tool.name });
     let res: { ok: boolean; note: string; always: boolean };
     try {
@@ -1194,8 +1202,9 @@ export class Session {
       res = { ok: false, note: "the turn stopped", always: false };
     }
     this.permissionWaits.delete(rid);
-    if (res.ok && res.always) this.sessionAllow.add(tool.name);
-    this.record.append("permission", { rid, tool: tool.name, decision: res.ok ? "allowed" : "denied", by: "scientist", note: res.note, always: res.always, sha256 });
+    if (res.ok && res.always && !search) this.sessionAllow.add(tool.name);
+    this.record.append("permission", { rid, tool: tool.name, decision: res.ok ? "allowed" : "denied", by: "scientist", note: res.note, always: res.always && !search, sha256, ...(search ? { search: search.root } : {}) });
+    if (res.ok) this.bus.emit({ type: "status", state: "running", tool: tool.name, purpose: typeof args.purpose === "string" ? args.purpose : undefined, since: Date.now() });
     return res;
   }
 

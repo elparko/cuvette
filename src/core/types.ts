@@ -306,7 +306,7 @@ export interface Claim {
 export type BusEvent =
   | { type: "entry"; entry: Entry }
   | { type: "delta"; kind: "text" | "thinking"; text: string }
-  | { type: "status"; state: "idle" | "thinking" | "running" | "waiting"; tool?: string }
-  | { type: "permission"; rid: string; tool: string; args: Args; code?: string; touches: string }
+  | { type: "status"; state: "idle" | "thinking" | "running" | "waiting"; tool?: string; purpose?: string; since?: number }
+  | { type: "permission"; rid: string; tool: string; args: Args; code?: string; touches: string; search?: { root: string; purpose: string } }
   | { type: "question"; question: Question }
   | { type: "instruction"; step: number; tool: string; text: string };

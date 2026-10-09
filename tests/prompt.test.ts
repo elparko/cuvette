@@ -19,3 +19,9 @@ test("with no adapter at the start, the prompt tells the agent to list and load 
   expect(systemPrompt({ ...base, model })).not.toContain("list_adapters");
   expect(systemPrompt({ ...base, model, guidance: false, pick: true })).toMatch(/list_adapters/);
 });
+
+test("the prompt gives the absolute project folder and forbids a disk search", () => {
+  const text = systemPrompt({ ...base, model: { provider: "claude", model: "m", contextWindow: 1, vision: true, small: false }, folders: { project: "/data/exp1", work: "/data/exp1/out" } });
+  expect(text).toContain("The project folder is /data/exp1.");
+  expect(text).toContain("Never search the whole disk for a file. If you cannot find a file, ask the scientist for the path.");
+});

@@ -9,7 +9,7 @@ import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from ".
 import { imageProtocol, inlineImage } from "./image.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "./items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
-import { Header, ItemView, StatusLine, type StaticItem } from "./view.tsx";
+import { Header, ItemView, RunningLine, StatusLine, type StaticItem } from "./view.tsx";
 import { Markdown } from "./markdown.tsx";
 
 const MODE_ORDER: Mode[] = ["watch", "follow", "teach", "plan"];
@@ -31,7 +31,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
   const [items, setItems] = useState<StaticItem[]>([{ key: "header", t: "header" }]);
   const [epoch, setEpoch] = useState(0);
   const [live, setLive] = useState("");
-  const [status, setStatus] = useState<{ state: string; tool?: string }>({ state: "idle" });
+  const [status, setStatus] = useState<{ state: string; tool?: string; purpose?: string; since?: number }>({ state: "idle" });
   const [cards, setCards] = useState<Card[]>([]);
   const [input, setInput] = useState("");
   const [inputKey, setInputKey] = useState(0);
@@ -170,7 +170,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           if (e.kind === "text") setLive((t) => t + e.text);
           break;
         case "status":
-          setStatus({ state: e.state, tool: e.tool });
+          setStatus({ state: e.state, tool: e.tool, purpose: e.purpose, since: e.state === "running" ? e.since : undefined });
           idle.current = e.state === "idle";
           if (e.state === "idle") {
             show(collapser.current.flush());
@@ -184,7 +184,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           }
           break;
         case "permission":
-          addCard({ t: "permission", rid: e.rid, tool: e.tool, args: e.args, code: e.code, touches: e.touches });
+          addCard({ t: "permission", rid: e.rid, tool: e.tool, args: e.args, code: e.code, touches: e.touches, search: e.search });
           break;
         case "question":
           addCard({ t: "question", q: e.question });
@@ -350,7 +350,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           <Markdown text={live} width={((stdout as unknown as { columns?: number })?.columns ?? 80) - 1} />
         </Box>
       ) : null}
-      {status.tool ? <Text dimColor>● Running {status.tool}...</Text> : null}
+      {status.tool ? <RunningLine key={`${status.tool}${status.since ?? ""}`} tool={status.tool} purpose={status.purpose} since={status.since} /> : null}
       {card?.t === "setup" ? (
         <SetupCard
           key="setup"
@@ -447,6 +447,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         busy={status.state !== "idle"}
         state={status.state}
         tool={status.tool}
+        purpose={status.purpose}
         openQuestions={openQ}
         tokens={tokens}
         hint={hint}

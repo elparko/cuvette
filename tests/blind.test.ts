@@ -96,13 +96,13 @@ test.runIf(darwin)("run_script under blind mode reads the data, cannot read the 
     log: (kind, d) => (logged.push({ kind, data: d }), {} as Entry),
     callTool: async () => ({ ok: true }),
   };
-  const ok = await tool.execute({ code: `print(open(${JSON.stringify(join(data, "in.csv"))}).read())` }, ctx);
-  const skill = await tool.execute({ code: `import os\nprint(open(os.path.join(${JSON.stringify(adapter)}, "skill.md")).read())` }, ctx);
+  const ok = await tool.execute({ purpose: "Test", does: "Runs a test.", code: `print(open(${JSON.stringify(join(data, "in.csv"))}).read())` }, ctx);
+  const skill = await tool.execute({ purpose: "Test", does: "Runs a test.", code: `import os\nprint(open(os.path.join(${JSON.stringify(adapter)}, "skill.md")).read())` }, ctx);
   expect(skill.ok).toBe(false);
   expect(ok.ok).toBe(true);
   expect(ok.text).toContain("1,2");
   const path = join(secret, "expected.yaml");
-  const bad = await tool.execute({ code: `import os\np = os.path.join(${JSON.stringify(secret)}, "expected.yaml")\nprint(open(p).read())` }, ctx);
+  const bad = await tool.execute({ purpose: "Test", does: "Runs a test.", code: `import os\np = os.path.join(${JSON.stringify(secret)}, "expected.yaml")\nprint(open(p).read())` }, ctx);
   expect(bad.ok).toBe(false);
   expect(bad.text).not.toContain("0.752");
   expect(logged).toContainEqual({ kind: "blocked", data: expect.objectContaining({ path, reason: "blind mode", tool: "run_script" }) });

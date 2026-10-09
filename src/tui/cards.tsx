@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { Finding, Question } from "../core/types.ts";
+import { codeOf, plainOf } from "./items.ts";
 import type { DecisionFieldLike, SessionLike } from "./types.ts";
 
 export type Card =
   | { t: "setup"; profiles: { name: string; version: number }[]; proposed?: Record<string, unknown>; proposedFrom?: string }
   | { t: "eln" }
-  | { t: "permission"; rid: string; tool: string; args: Record<string, unknown>; code?: string; touches: string }
+  | { t: "permission"; rid: string; tool: string; args: Record<string, unknown>; code?: string; touches: string; search?: { root: string; purpose: string } }
   | { t: "question"; q: Question }
   | { t: "instruction"; step: number; tool: string; text: string }
   | { t: "findings"; list: Finding[] }
@@ -52,21 +53,29 @@ export function PermissionCard(props: {
 }) {
   const { card } = props;
   const [asking, setAsking] = useState(false);
+  const [showCode, setShowCode] = useState(false);
+  const always = card.tool !== "eln_push" && !card.search;
+  const { purpose, does } = plainOf(card.args);
+  const code = card.code ?? codeOf(card.args);
   useInput(
     (input, key) => {
       if (input === "y") props.onAllow();
-      else if (input === "a" && card.tool !== "eln_push") props.onAlways();
+      else if (input === "a" && always) props.onAlways();
       else if (input === "n") setAsking(true);
+      else if (input === "c" && code) setShowCode((x) => !x);
       else if (key.escape) props.onInterrupt();
     },
     { isActive: !asking },
   );
+  const hidden = new Set(["purpose", "does", "code", ...(code && purpose ? ["argv"] : [])]);
   const args = Object.entries(card.args)
-    .filter(([, v]) => !(card.code && typeof v === "string" && v.trim() === card.code.trim()))
+    .filter(([k, v]) => !hidden.has(k) && !(code && typeof v === "string" && v.trim() === code.trim()))
     .map(([k, v]) => `${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`);
-  const lines = card.code?.split("\n") ?? [];
+  const lines = showCode && code ? code.split("\n") : [];
   return (
-    <Frame title={`Permission needed: ${card.tool}`} color="yellow">
+    <Frame title={card.search ? "Search outside the project" : `Permission needed: ${card.tool}`} color="yellow">
+      {purpose ? <Text bold>{purpose}</Text> : null}
+      {does ? <Text>{does}</Text> : null}
       {args.map((a, i) => (
         <Text key={i}>{a.length > 160 ? a.slice(0, 157) + "..." : a}</Text>
       ))}
@@ -81,7 +90,7 @@ export function PermissionCard(props: {
         </Box>
       ) : null}
       <Box marginTop={1}>
-        <Text>This will touch: {card.touches}</Text>
+        <Text>{card.search ? card.touches : `This will touch: ${card.touches}`}</Text>
       </Box>
       {asking ? (
         <Prompt
@@ -92,7 +101,8 @@ export function PermissionCard(props: {
       ) : (
         <Text>
           <Text color="green">y</Text> allow · <Text color="red">n</Text> deny
-          {card.tool === "eln_push" ? "" : ` · a always allow ${card.tool} in this session`}
+          {always ? ` · a always allow ${card.tool} in this session` : ""}
+          {code ? ` · c ${showCode ? "hides" : "shows"} the code` : ""}
         </Text>
       )}
     </Frame>

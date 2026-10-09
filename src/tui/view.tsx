@@ -75,7 +75,7 @@ function AssistantView({ text }: { text: string }) {
 }
 
 function StepView({ item }: { item: Extract<Item, { t: "step" }> }) {
-  const label = item.n ? `Step ${item.n}` : item.tool;
+  const label = item.purpose ?? (item.n ? `Step ${item.n}` : item.tool);
   const detail = [item.route, item.settings].filter(Boolean).join(" · ");
   const fid = fidelityLabel(item.fidelity);
   return (
@@ -101,6 +101,25 @@ function StepView({ item }: { item: Extract<Item, { t: "step" }> }) {
   );
 }
 
+export function elapsedText(s: number): string {
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;
+}
+
+export function runningText(tool: string, purpose: string | undefined, seconds: number): string {
+  const what = purpose ?? `Running ${tool}`;
+  return seconds >= 5 ? `${what} · ${elapsedText(seconds)} · Esc stops it` : what;
+}
+
+export function RunningLine(props: { tool: string; purpose?: string; since?: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const seconds = props.since ? Math.max(0, Math.floor((now - props.since) / 1000)) : 0;
+  return <Text dimColor>● {runningText(props.tool, props.purpose, seconds)}</Text>;
+}
+
 const MODE_TEXT: Record<Mode, string> = {
   watch: "watch: the agent runs the steps",
   follow: "follow: you run the steps",
@@ -117,6 +136,7 @@ export function StatusLine(props: {
   model: string;
   busy: boolean;
   tool?: string;
+  purpose?: string;
   state: string;
   openQuestions: number;
   tokens: { input: number; output: number };
@@ -132,7 +152,7 @@ export function StatusLine(props: {
   if (props.busy) {
     parts.push(
       <Text key="b">
-        <Spinner /> {props.tool ? `running ${props.tool}` : props.state === "waiting" ? "waiting for you" : "thinking"}
+        <Spinner /> {props.tool ? props.purpose ?? `running ${props.tool}` : props.state === "waiting" ? "waiting for you" : "thinking"}
       </Text>,
     );
   }

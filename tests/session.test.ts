@@ -541,3 +541,24 @@ test("with --adapter, the session has no adapter tools and no program decision",
   expect(session.allTools().map((t) => t.name)).not.toContain("use_adapter");
   expect(session.decisions.has("adapter")).toBe(false);
 });
+
+test("a script that walks a large folder asks first, even after always allow", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "ga-cwd-"));
+  const plain = { purpose: "Count the files", does: "Counts the files in the project folder.", code: "import os\nprint(len(os.listdir('.')))" };
+  const walk = { purpose: "Find the image folder", does: "Looks through every folder on the drives for the images.", code: "import os\nfor r, d, f in os.walk('/Volumes'):\n    pass" };
+  const provider = new FakeProvider([{ calls: [{ name: "run_script", args: plain }] }, { calls: [{ name: "run_script", args: walk }] }, { text: "ok" }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false } });
+  const seen: { search?: { root: string; purpose: string }; touches: string }[] = [];
+  session.bus.on((e) => {
+    if (e.type !== "permission") return;
+    seen.push(e);
+    setTimeout(() => (e.search ? session!.respondPermission(e.rid, false) : session!.respondPermission(e.rid, true, "", true)), 0);
+  });
+  await session.send("find the images");
+  expect(seen).toHaveLength(2);
+  expect(seen[0]!.search).toBeUndefined();
+  expect(seen[1]!.search).toEqual({ root: "/Volumes", purpose: "Find the image folder" });
+  expect(seen[1]!.touches).toBe("The agent wants to search /Volumes for this purpose: Find the image folder. This can take minutes and reads folders outside your project.");
+  expect(lastToolText(provider)).toMatch(/did not allow a search of \/Volumes/);
+  expect(session.record.entries(["permission"]).map((e) => e.data.search)).toEqual([undefined, "/Volumes"]);
+});

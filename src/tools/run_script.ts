@@ -7,6 +7,7 @@ import type { Readable, Writable } from "node:stream";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import { gaHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
+import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { cap, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, type Dirs } from "../adapters/kinds/common.ts";
 
 export function scriptPython(): string {
@@ -22,7 +23,7 @@ import os
 
 _to_parent = os.fdopen(3, "w", buffering=1, encoding="utf-8")
 _from_parent = os.fdopen(4, "r", encoding="utf-8")
-_work = os.environ.get("GA_WORK_DIR", os.getcwd())
+_work = os.environ.get("WORK_DIR") or os.environ.get("GA_WORK_DIR") or os.getcwd()
 
 
 class ToolError(RuntimeError):
@@ -81,9 +82,40 @@ def save_figure(name, fig=None, dpi=150):
     path = _unique(name, ".png")
     (fig or plt.gcf()).savefig(path, dpi=dpi, bbox_inches="tight")
     return path
+
+
+def _redirect(file, mode):
+    if not isinstance(file, (str, bytes, os.PathLike)):
+        return file
+    p = os.fsdecode(file)
+    if os.path.isabs(p):
+        return file
+    if any(c in mode for c in "wax+"):
+        target = os.path.join(_work, p)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        return target
+    if not os.path.exists(p) and os.path.exists(os.path.join(_work, p)):
+        return os.path.join(_work, p)
+    return file
+
+
+def _install():
+    import builtins
+    import io
+
+    real = builtins.open
+
+    def ga_open(file, mode="r", *args, **kwargs):
+        return real(_redirect(file, mode), mode, *args, **kwargs)
+
+    builtins.open = ga_open
+    io.open = ga_open
+
+
+_install()
 `;
 
-const BOOT = "import sys,runpy;d,s=sys.argv[1:3];sys.path.insert(0,d);sys.argv=[s];runpy.run_path(s,run_name='__main__')";
+const BOOT = "import sys,runpy;d,s=sys.argv[1:3];sys.path.insert(0,d);import ga_api;sys.argv=[s];runpy.run_path(s,run_name='__main__')";
 
 type SandboxState = "unknown" | "on" | "off";
 let sandbox: SandboxState = "unknown";
@@ -145,28 +177,37 @@ function snapshot(dir: string, skip: string): Map<string, string> {
 
 const SECRET = /key|token|secret|password|credential/i;
 
-function scriptEnv(dirs: Dirs): Record<string, string> {
+function scriptEnv(dirs: Dirs, project: string): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !SECRET.test(k)) env[k] = v;
-  return { ...env, GA_WORK_DIR: dirs.workDir, GA_SESSION_DIR: dirs.sessionDir, MPLBACKEND: "Agg", MPLCONFIGDIR: join(tmpdir(), "ga-mpl"), PYTHONIOENCODING: "utf-8" };
+  const folders = { PROJECT_DIR: project, WORK_DIR: dirs.workDir, SESSION_DIR: dirs.sessionDir };
+  for (const [k, v] of Object.entries(folders)) env[k] = env[`GA_${k}`] = env[`CUVETTE_${k}`] = v;
+  return { ...env, MPLBACKEND: "Agg", MPLCONFIGDIR: join(tmpdir(), "ga-mpl"), PYTHONIOENCODING: "utf-8" };
 }
 
 export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
   void probeSandbox();
+  const project = dirs.projectDir ?? process.cwd();
   const schema = {
     type: "object",
     properties: {
+      purpose: { type: "string", minLength: 1, maxLength: 160, description: PLAIN_PURPOSE },
+      does: { type: "string", minLength: 1, maxLength: 600, description: PLAIN_DOES },
       code: { type: "string", minLength: 1, description: "Python 3 code." },
       timeout_s: { type: "number", minimum: 1, maximum: 3600, default: 120 },
     },
-    required: ["code"],
+    required: ["purpose", "does", "code"],
     additionalProperties: false,
   };
   return {
     name: "run_script",
     title: "Run a Python script",
     description:
-      "Run Python 3 code for statistics and plots. The work folder is the working directory; new files there are returned. " +
+      "Run Python 3 code for statistics and plots. " +
+      `The script runs in the project folder ${project}, so a relative path reads from there, the same as in list_dir and read_file. ` +
+      `A relative path that the script opens for writing goes to the session work folder ${dirs.workDir}; new files there are returned. ` +
+      "os.environ['PROJECT_DIR'] and os.environ['WORK_DIR'] give the two folders. Do not search the home folder, / or /Volumes for files: use the paths from earlier results or ask the scientist. " +
+      "Give purpose and does in plain language: the scientist sees them, not the code. " +
       "Use `from ga_api import call, save_table, save_figure`. `call(tool, **args)` runs another tool and returns its result as a dict. " +
       "`save_table(name, rows)` writes a CSV. `save_figure(name)` writes a PNG of the current figure. " +
       (scriptPython().includes("science") ? "numpy, pandas, scipy, statsmodels, scikit-learn and matplotlib are installed. " : "Only the standard library is sure to exist; use csv and statistics. ") +
@@ -189,8 +230,8 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network);
 
       const child = spawn(argv[0], argv.slice(1), {
-        cwd: dirs.workDir,
-        env: scriptEnv(dirs),
+        cwd: existsSync(project) ? project : dirs.workDir,
+        env: scriptEnv(dirs, project),
         stdio: ["ignore", "pipe", "pipe", "pipe", "pipe"],
         detached: process.platform !== "win32",
         windowsHide: true,
@@ -261,7 +302,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       if (aborted) return { ok: false, error: "the script was cancelled", ...base };
       if (timedOut) return { ok: false, error: `the script timed out after ${timeoutS} s`, ...base };
       if (code !== 0) return { ok: false, error: `the script exited with code ${code}: ${tail(stderr.trim(), 2000)}`, ...base };
-      return { ok: true, summary: `The script finished and wrote ${outputs.length} new file(s).`, ...base };
+      return { ok: true, summary: `The script ran in ${project} and wrote ${outputs.length} new file(s) to ${dirs.workDir}.`, ...base };
     },
   };
 }

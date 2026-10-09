@@ -6,6 +6,9 @@ import { Collapser, Mapper, mainView, settingsLine, type Item, type Logged } fro
 import { tableLines } from "../src/tui/markdown.tsx";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 import { renderGraph, suggestions } from "../src/tui/commands.ts";
+import React from "react";
+import { render } from "ink";
+import { ItemView, runningText } from "../src/tui/view.tsx";
 
 let live: { h: Harness; s: FakeSession; done: Promise<void> } | undefined;
 
@@ -156,12 +159,18 @@ describe("follow step lines", () => {
 });
 
 describe("cards", () => {
-  test("permission card lists the code once", async () => {
+  test("permission card shows the purpose in plain words and the code only after c", async () => {
     const { h } = start();
     await sleep(100);
     await submit(h, "go");
     await until(() => h.all().includes("Permission needed: run_script"));
-    expect(h.all().match(/import numpy as np/g)).toHaveLength(1);
+    expect(h.all()).toContain("AUC per feature");
+    expect(h.all()).toContain("Computes the AUC of each feature between endo and epi.");
+    expect(h.all()).toContain("c shows the code");
+    expect(h.all()).not.toContain("import numpy as np");
+    await type(h, "c");
+    await until(() => h.all().includes("import numpy as np"));
+    expect(h.last().match(/import numpy as np/g)).toHaveLength(1);
   });
 
   test("permission: n asks for a note and denies", async () => {
@@ -169,7 +178,6 @@ describe("cards", () => {
     await sleep(100);
     await submit(h, "go");
     await until(() => h.all().includes("Permission needed: run_script"));
-    expect(h.all()).toContain("1 import numpy as np");
     expect(h.all()).toContain("This will touch: a Python process");
     await type(h, "n");
     await until(() => h.all().includes("Reason for the agent"));
@@ -503,5 +511,44 @@ describe("pieces", () => {
     const [item] = m.map(e);
     expect(item).toMatchObject({ t: "step", n: 1, summary: "Did it", route: "Menu > Item" });
     expect(m.outputs).toHaveLength(1);
+  });
+
+  const script = {
+    purpose: "Find the ImageJ install",
+    does: "Looks for ImageJ in the usual program folders and prints where it is.",
+    code: "import shutil\nprint(shutil.which('ImageJ'))",
+    timeout_s: 30,
+  };
+
+  test("a script step shows the purpose and the plain description, not the code", async () => {
+    const s = new FakeSession({ delayMs: 0 });
+    const [item] = new Mapper(s).map(s.record.append("tool_result", { tool: "run_script", ok: true, summary: "The script ran in /p and wrote 0 new file(s) to /w.", effectiveArgs: script, manualRoute: "Run the Python code in /w/script-1/script.py" }));
+    expect(item).toMatchObject({ t: "step", purpose: script.purpose, summary: script.does, code: script.code, settings: "timeout s 30" });
+    const h = makeHarness();
+    const app = render(<ItemView item={item!} />, { stdout: h.stdout as never, patchConsole: false });
+    await sleep(30);
+    app.unmount();
+    expect(h.all()).toContain(`${script.purpose}  ${script.does}`);
+    expect(h.all()).not.toContain("shutil");
+  });
+
+  test("a command step hides the argument list", () => {
+    const s = new FakeSession({ delayMs: 0 });
+    const [item] = new Mapper(s).map(s.record.append("tool_result", { tool: "run_command", ok: true, summary: "Ran ls.", effectiveArgs: { purpose: "List the images", does: "Lists the image folder.", argv: ["ls", "-la"] } }));
+    expect(item).toMatchObject({ purpose: "List the images", summary: "Lists the image folder.", code: "ls -la", settings: "" });
+  });
+
+  test("the running line gives the purpose, and after 5 s the time and how to stop", () => {
+    expect(runningText("run_script", script.purpose, 2)).toBe("Find the ImageJ install");
+    expect(runningText("run_script", script.purpose, 12)).toBe("Find the ImageJ install · 12 s · Esc stops it");
+    expect(runningText("list_dir", undefined, 75)).toBe("Running list_dir · 1 min 15 s · Esc stops it");
+  });
+
+  test("the live screen shows the purpose and the elapsed time of a running call", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "status", state: "running", tool: "run_script", purpose: script.purpose, since: Date.now() - 12_000 });
+    await until(() => /Find the ImageJ install · 1\d s · Esc stops it/.test(h.all()));
+    expect(h.all()).not.toContain("running run_script");
   });
 });

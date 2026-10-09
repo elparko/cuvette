@@ -45,6 +45,16 @@ The session started with no program adapter. An adapter gives the tools, standar
 - Do not guess tool names. The program tools appear after use_adapter.
 - If no adapter fits, say so and use the generic tools.`;
 
+export function foldersText(f: { project: string; work: string }): string {
+  return [
+    "# Folders",
+    `- The project folder is ${f.project}. A relative path in read_file, list_dir, run_script and run_command starts there.`,
+    `- Files that scripts write go to the session work folder ${f.work}.`,
+    "- Use the absolute paths from earlier tool results. Never search the whole disk for a file. If you cannot find a file, ask the scientist for the path.",
+    "- For run_script and run_command, give purpose (one short line) and does (what the code does, in plain words for a scientist, with no code terms).",
+  ].join("\n");
+}
+
 export function systemPrompt(opts: {
   adapters: { adapter: LoadedAdapter; programVersion: string; instructions: string }[];
   model: ModelInfo;
@@ -52,11 +62,13 @@ export function systemPrompt(opts: {
   lab: string;
   guidance: boolean;
   pick?: boolean;
+  folders?: { project: string; work: string };
 }): string {
   if (!opts.guidance) return "You are a data analysis agent. Use the tools to answer the scientist's request." + (opts.pick ? " Call list_adapters, then use_adapter to load the program tools that fit the request." : "");
   const small = opts.model.small;
   const parts = [small ? SMALL_RULES : RULES, MODES[opts.mode]];
   if (opts.pick) parts.push(PICK);
+  if (opts.folders) parts.push(foldersText(opts.folders));
   for (const { adapter, programVersion, instructions } of opts.adapters) {
     const m = adapter.manifest;
     const lines = [`# Program: ${m.adapter.title || m.program.name} ${programVersion || m.program.version}`.trim()];
