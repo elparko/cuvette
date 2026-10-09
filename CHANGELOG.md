@@ -6,7 +6,7 @@ The project is in early development. Version numbers start at the first public r
 ## Unreleased: work in progress on 8 and 9 October 2026
 
 These items are being built and are not on main yet:
-- New analyses: dose-response, qPCR, growth curves and enzyme kinetics; blot and gel densitometry, colony counts, wound healing and colocalization.
+- New analyses: metabolomics statistics, epidemiology rates, clinical trial endpoints, histology scoring, electrophysiology and calcium imaging.
 
 ## 9 October 2026
 
