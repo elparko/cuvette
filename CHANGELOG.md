@@ -6,7 +6,7 @@ The project is in early development. Version numbers start at the first public r
 ## Unreleased: work in progress on 8 and 9 October 2026
 
 These items are being built and are not on main yet:
-- New analyses: dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
+- New analyses: dose-response, qPCR, growth curves and enzyme kinetics; blot and gel densitometry, colony counts, wound healing and colocalization.
 - A map of proprietary lab software and the open-source alternatives that Cuvette supports.
 
 ## 9 October 2026
@@ -22,6 +22,7 @@ These items are being built and are not on main yet:
 - Settings that you confirm in the proposed metrics count as answered when the steps run, so no card asks again.
 
 ### New analyses
+- Clinical statistics: logistic regression with odds ratios, chi-square, Fisher's exact and McNemar tests, and Cox models with categorical covariates and row subsets (biostats). Meta-analysis with forest and funnel plots and Egger's test (metafor). ROC curves, AUC with DeLong intervals and best thresholds (pROC). Power and sample size (pwr). Manual routes give the menu paths in SPSS, Stata, SAS, Prism, RevMan, MedCalc and G*Power. Four new benchmark papers: TB treatment default, HCC biomarkers, passive smoking and lung cancer, and a trial sample size.
 - ELISA and other immunoassays (R drc): standard curves with 4PL and 5PL fits, in the Prism and SoftMax Pro forms, back-calculated concentrations with the dilution factor, replicate CV, LOD, LLOQ and ULOQ, and samples outside the curve flagged. A published Lassa ELISA paper is the benchmark case.
 
 ### Patient data and cost
