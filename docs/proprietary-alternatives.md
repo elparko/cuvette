@@ -75,7 +75,9 @@ of each package. The sources are at the end.
 | Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
 | --- | --- | --- | --- | --- | --- |
 | FlowJo | FlowJo LLC (BD, then Waters), commercial | Gating and population statistics. The usual flow program in most labs. | FlowKit (BSD-3, reads FlowJo `.wsp`); flowCore (Artistic-2.0); CytoML (AGPL-3) | `flowkit`, `flowcore` | Covered for gates from a workspace (`flowkit`). `flowcore`: spillover matrix from single-stain controls, percent positive and MFI from cutoffs, group tests. Automated gates (openCyto, flowDensity) are open. |
-| FCS Express | De Novo Software (Dotmatics), commercial | Flow and image cytometry. | FlowKit (BSD-3); flowCore (Artistic-2.0); FlowSOM (GPL-2 or later) | `flowkit` | Partial. Clustering of high-dimensional data is open. |
+| FCS Express | De Novo Software (Dotmatics), commercial | Flow and image cytometry. | FlowKit (BSD-3); flowCore (Artistic-2.0); FlowSOM (GPL-2 or later) | `flowkit`, `cytof` | Partial. Gating is covered by `flowkit`. FlowSOM clustering and abundance tests are covered by `cytof`. |
+| Cytobank | Cytobank (Beckman Coulter), commercial, cloud | Mass cytometry and flow cytometry: arcsinh scaling, FlowSOM, viSNE, Citrus, population statistics. | FlowSOM (GPL-2 or later); flowCore (Artistic-2.0); diffcyt (MIT); CATALYST (GPL-2 or later) | `cytof` | Partial. Arcsinh scaling, FlowSOM, population counts and differential abundance are covered. viSNE, UMAP and Citrus are open. |
+| OMIQ | Dotmatics, commercial, cloud | Spectral and mass cytometry: scaling, FlowSOM, UMAP, population statistics. | FlowSOM (GPL-2 or later); diffcyt (MIT); CATALYST (GPL-2 or later) | `cytof` | Partial. As for Cytobank. |
 
 ## Microbiology susceptibility testing
 
@@ -99,6 +101,7 @@ of each package. The sources are at the end.
 | MaxQuant and Perseus | Max Planck Institute of Biochemistry, free, closed | Label-free, SILAC and TMT protein quantification; statistics in Perseus. | Sage (MIT); OpenMS (BSD-3); limma (GPL-2 or later); MSstats (Artistic-2.0) | `sage`, `openms`, `pyopenms`, `limma-proteomics` | Partial. `limma-proteomics` replaces the Perseus steps for a proteinGroups.txt table: filter rows, log2, valid values, normalization, imputation by down shift, the test and the volcano plot. The Perseus t test with permutation FDR, clustering and the other Perseus plugins are open. MSstats on feature-level input is open. |
 | MetaboAnalyst (web server) | Xia lab, McGill University, free web service | Normalization, PCA, PLS-DA, OPLS-DA, t tests with FDR and volcano plots for a metabolite table. | ropls (CeCILL); limma (GPL-2 or later); mixOmics (GPL-2 or later) | `metabolomics-stats` | This work: row-wise normalization (PQN, total area, median), log and square root transforms, PCA, PLS-DA and OPLS-DA with permutation tests and VIP scores, and univariate tests with FDR. Pathway analysis, spectral processing and the web service itself stay open. |
 | SIMCA | Sartorius (Umetrics), commercial | Principal component analysis (PCA), PLS-DA and OPLS-DA of multivariate data, multi-block models. | MOFA+ (mofapy2, LGPL-3); mixOmics (GPL-2 or later); ropls (CeCILL) | `mofa`, `metabolomics-stats` | Partial. `metabolomics-stats` fits PCA, PLS-DA and OPLS-DA with ropls: R2X, R2Y, cross-validated Q2, permutation tests and VIP scores. `mofa` finds the factors and the variance of each view for several tables. The SIMCA CV-ANOVA test, O2PLS and multi-block models stay open. |
+| CLC Microbial Genomics Module | QIIME (Qiagen), commercial add-on to CLC Genomics Workbench | Alpha and beta diversity, PERMANOVA and differential abundance for 16S and shotgun abundance tables. | vegan (GPL-2 or later); MaAsLin 2 (MIT); ALDEx2 (GPL-3); QIIME 2 (BSD-3) | `microbiome` | Partial. Diversity, PERMANOVA and differential abundance from a feature table are covered. Read processing (DADA2, taxonomy assignment), UniFrac and ANCOM-BC are open. |
 
 ## Sequences, cloning and primers
 
@@ -236,6 +239,34 @@ What stays open:
 - limma runs the moderated t test only. The DEqMS variance model, MSstats on feature-level input and the
   roll-up of peptides to proteins stay open. The DEqMS numbers of Zhu 2020 do not reproduce.
 - The work did not run the Perseus, Proteome Discoverer, Spectronaut and SIMCA manual routes.
+
+## Microbiome tables and mass cytometry
+
+Added on 9 October 2026. `ga adapter check <name> --run-tests` passes with no error for both adapters.
+
+| Part | Adapter | Tools | Known-answer tests | Benchmark paper |
+| --- | --- | --- | --- | --- |
+| Mass cytometry clustering and population tests | `cytof` (FlowSOM, GPL-2 or later; diffcyt, MIT; flowCore) | 4 | 12 | Nowicka 2019 (version 3 of the 2017 paper), DOI 10.12688/f1000research.11622.3 |
+| Microbiome feature tables | `microbiome` (Maaslin2, MIT; ALDEx2, GPL-3; vegan, GPL-2 or later) | 4 | 16 | El Masri 2026, DOI 10.1080/19490976.2026.2712811 |
+
+Where each test value comes from:
+
+- `cytof`, `inspect_fcs` and `population_frequencies` on the Bodenmiller BCR-XL data: the cells in each of 16 samples and the percent of each cell type. The Nowicka workflow prints them. A count with flowio (`checks/check_bcrxl.py`) gives the same values.
+- `cytof`, `differential_abundance`: the p values and the numbers of significant cell types that the workflow prints for the GLMM with and without the donor pairing. A direct lme4 fit (`checks/check_glmm.R`) gives the same values.
+- `cytof`, `cluster_cells`: the sizes and the arcsinh medians of three synthetic populations, from numpy (`checks/check_synthetic.py`). The benchmark does not score the FlowSOM cluster numbers of the real data. The paper merges its clusters by hand.
+- `microbiome`, `differential_abundance` with MaAsLin 2: the q value, the 132 samples and the 7 samples with the OTU that the El Masri paper prints. An OLS fit in Python (`checks/check_limit_maaslin.py`) gives the same coefficient and q. On the HMP2 example data, statsmodels gives the same linear and mixed model coefficients (`checks/check_maaslin2.py`).
+- `microbiome`, `differential_abundance` with ALDEx2: a Python implementation with Dirichlet draws gives the same number of significant features. Its median difference is within 2 percent (`checks/check_aldex.py`).
+- `microbiome`, `alpha_diversity` and `beta_diversity`: numpy and SciPy calculations of Shannon, richness, the Kruskal-Wallis test and the PERMANOVA R2 and F (`checks/check_limit.py`).
+
+Paper results:
+
+- Nowicka 2019: all 10 scored values reproduce, and the model scores 10 of 10 in a blind run. The paper merges 20 FlowSOM metaclusters into 8 cell types by hand, so the benchmark scores the published cell type labels.
+- El Masri 2026: the q value 0.043, the 132 samples and the 7 samples reproduce. The model scores 9 of 9 in a blind run. An independent script computes the four diversity values, because the paper prints no number for them.
+
+What stays open:
+
+- No ANCOM-BC, UniFrac or DADA2 read processing. The reasons are in `bench/papers/CANDIDATES-microbiome-cytometry.md`. Several papers failed because their printed numbers do not reproduce from the open data.
+- No viSNE, UMAP or Citrus for cytometry, and no differential state tests (marker levels inside a cell type).
 
 ## Sources
 

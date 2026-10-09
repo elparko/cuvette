@@ -345,6 +345,8 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `scanpy` | scanpy | Python library | single-cell RNA |
 | `harmony` | harmonypy | Python library | single-cell sample integration |
 | `squidpy` | Squidpy | Python library | spatial transcriptomics |
+| `cytof` | FlowSOM, diffcyt | R packages | mass cytometry clustering and population frequencies |
+| `microbiome` | MaAsLin 2, ALDEx2, vegan | R packages | microbiome feature tables: diversity, PERMANOVA, differential abundance |
 | `samtools` | samtools | command line | sequencing alignments |
 | `fastqc` | FastQC | command line | sequencing quality |
 | `rdkit` | RDKit | Python library | chemistry |

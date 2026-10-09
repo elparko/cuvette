@@ -47,5 +47,8 @@ Status: searched on 2026-10-09. The sections "Selected" and "Outcome" show the c
 
 ## Outcome
 
-- Built: cytof (paper 1) and microbiome (paper 2).
-- Rejected papers and the reason are in the lists above.
+- Built: `cytof` (paper 1) and `microbiome` (paper 2). `ga adapter check <name> --run-tests` passes with no error for both.
+- Blind runs with claude:claude-haiku-5-5: Nowicka 2019 scores 10 of 10 computed and 10 of 10 reported. El Masri 2026 scores 9 of 9 computed and 9 of 9 reported, and the reference item (65 OTUs tested) matches. The run logs are in `bench/papers/*/runs.md`.
+- El Masri 2026 prints numbers for MaAsLin 2 only. The diversity items (Shannon test, PERMANOVA) have independent values from `check_limit_diversity.py`, not printed values.
+- ALDEx2 has no benchmark paper. Its known-answer test uses the `selex` data set of the package and a Python implementation as the independent check. The IBS paper that prints ALDEx2 counts was not run with ALDEx2 itself (see the list above).
+- The rejected papers and the reason are in the lists above.
