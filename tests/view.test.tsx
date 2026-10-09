@@ -128,6 +128,7 @@ test("/config changes the footer hints at once; /help shows Ctrl+T", async () =>
     const before = h.term.view();
     h.type("\x1b[B");
     await until(() => h.term.view() !== before);
+    await sleep(60);
   }
   let before = h.term.view();
   h.type("\r");

@@ -304,8 +304,8 @@ The benchmark (`ga bench papers`) trusts its own checkout. It passes the model o
   session, or stop.
 - A local model (Ollama) gets no card. The record still logs a notice.
 - Settings: `phi_check` (on by default; off needs a second confirmation), `local_model` (the
-  model that the card offers, for example `ollama:qwen3:8b`), and "This folder has no patient
-  data" for the project folder.
+  model that the card offers, for example `ollama:qwen3:8b`), and `no_patient_data` ("No
+  patient data here") for the project folder. All three are in `/config`, under Patient data.
 - The reference is the HIPAA Safe Harbor list of 18 identifiers, 45 CFR 164.514(b)(2). The check
   covers only some of them. [docs/patient-data.md](docs/patient-data.md) lists what it checks
   and what it does not check.
