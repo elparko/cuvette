@@ -3,7 +3,7 @@ import type { BusEvent, Entry, Mode, PlanResponse } from "../core/types.ts";
 import type { SettingSession } from "../core/settings.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import {
-  applySetup, cardFromEvent, CLARIFY_SKIP_ANSWER, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
+  applySetup, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
   respondPermission, saveEln, saveKey, startCards, type Card, type PlanAction, type Say,
 } from "../ui/cards.ts";
 import { commands, openPanels, openSetup, type CommandCtx } from "../ui/commands.ts";
@@ -374,7 +374,7 @@ export class WebView {
         break;
       case "question": {
         if (a === "later") break;
-        const value = a === "answer" ? card.q.options[Number(body.value)]?.value : a === "recommend" ? card.q.recommendation?.value : str("other");
+        const value = a === "sheet" ? { rows: sheetRows(f, card.q) } : a === "answer" ? card.q.options[Number(body.value)]?.value : a === "recommend" ? card.q.recommendation?.value : str("other");
         if (value === undefined || value === "") return this.keep(slot, "Choose an answer or type one.");
         this.drop(slot);
         this.sendCards();
@@ -421,7 +421,7 @@ export class WebView {
       case "clarify": {
         const q = s.questions.open().find((x) => x.qid === body.qid);
         if (!q) return this.keep(slot);
-        const value = a === "answer" ? q.options[Number(body.value)]?.value : a === "recommend" ? q.recommendation?.value : a === "skip" ? CLARIFY_SKIP_ANSWER : str("other");
+        const value = a === "sheet" ? { rows: sheetRows(f, q) } : a === "answer" ? q.options[Number(body.value)]?.value : a === "recommend" ? q.recommendation?.value : a === "skip" ? CLARIFY_SKIP_ANSWER : str("other");
         if (value === undefined || value === "") return this.keep(slot, "Choose an answer or type one.");
         await s.answer(q.qid, value).catch((e: Error) => this.line("✗", e.message, "red"));
         return this.keep(slot);

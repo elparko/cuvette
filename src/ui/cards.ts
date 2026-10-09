@@ -14,7 +14,7 @@ export type Card =
   | { t: "key"; reason?: string }
   | { t: "config" }
   | ({ t: "plan" } & Omit<PlanEvent, "type">)
-  | { t: "clarify"; found: string; qids: string[]; skipped: string[] };
+  | { t: "clarify"; found: string; qids: string[]; skipped: string[]; check?: string; notes?: string[] };
 
 export type CardType = Card["t"];
 
@@ -45,7 +45,7 @@ export function cardFromEvent(e: BusEvent): Card | undefined {
       return { t: "plan", ...rest };
     }
     case "clarify":
-      return { t: "clarify", found: e.found, qids: e.qids, skipped: e.skipped };
+      return { t: "clarify", found: e.found, qids: e.qids, skipped: e.skipped, check: e.check, notes: e.notes };
   }
   return undefined;
 }
@@ -255,6 +255,20 @@ export function clarifyProgress(card: ClarifyCard, open: Question[]): string {
 }
 
 export const CLARIFY_SKIP_ANSWER = "No answer. Use your judgment and say what you chose.";
+
+export const DATA_CHECK_TITLE = "Data check";
+export const DESIGN_TITLE = "Design notes";
+
+export function checkLines(card: ClarifyCard, max = 14): string[] {
+  const lines = (card.check ?? "").split("\n").filter(Boolean);
+  if (max === 1) return lines.slice(0, 1);
+  return lines.length > max ? [...lines.slice(0, max - 1), `… ${lines.length - max + 1} more lines. Type /samples check to see all.`] : lines;
+}
+
+export function sheetRows(fields: Record<string, unknown>, q: Question): string[][] | undefined {
+  if (!q.table) return undefined;
+  return q.table.rows.map((r, i) => q.table!.columns.map((_, j) => (typeof fields[`cell:${i}:${j}`] === "string" ? (fields[`cell:${i}:${j}`] as string).trim() : (r[j] ?? ""))));
+}
 
 // ---------------------------------------------------------------- the proposed metrics
 

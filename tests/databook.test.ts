@@ -84,6 +84,21 @@ describe("databook", () => {
     expect(b.html).toContain("size:A4");
   });
 
+  it("has a data check and sample sheet section under Data, with the answers", () => {
+    const r = session();
+    r.append("data_check", { source: "/data/Ox-LDL", kind: "files", items: [{ id: "channel:red", check: "missing_channel", level: "ask", text: "1 field has no 'red' image: Control/Set 3/Set 3_02.", files: ["Control/Set 3/Set 3_02"] }, { id: "names:20x", check: "inconsistent_names", level: "note", text: "The names spell one part in 2 ways." }], text: "Data check of Ox-LDL" });
+    r.append("decision", { key: "data_check:channel:red", old: null, new: "leave_out", by: "human", reason: "1 field has no 'red' image" });
+    r.append("samples", { action: "drafted", from: "the folder and file names", path: "/out/samples.csv", rows: [{ sample: "Ceramide Set 1_01", group: "Ceramide", unit: "Set 1", batch: "", path: "Ox-LDL/Ceramide/Set 1/Set 1_01*" }] });
+    r.append("samples", { action: "design_checks", n: "One Set", issues: [{ id: "pseudoreplication", check: "pseudoreplication", level: "warn", text: "n is the Set." }] });
+    const b = book([r]);
+    expect(titles(b)).toContain("Data check and sample sheet");
+    expect(b.toc.find((t) => t.title === "Data check and sample sheet")!.num).toBe("2.1");
+    expect(b.html).toContain("leave_out");
+    expect(b.html).toContain("Ceramide Set 1_01");
+    expect(b.html).toContain("The agent made the sample sheet from the folder and file names.");
+    expect(b.html).toContain("n is the Set.");
+  });
+
   it("leaves out the plan and the pilot when the record has no such events", () => {
     const b = book([session({ plan: false })]);
     expect(titles(b)).toEqual(["Question", "Data", "Methods", "Results", "Final answer", "Checks", "Manual route", "References", "Steps and arguments", "Software environment", "Record files"]);

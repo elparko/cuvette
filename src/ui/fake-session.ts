@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { activity } from "../core/housekeeping.ts";
 import { Bus } from "../core/bus.ts";
 import { AnalysisRecord } from "../core/record.ts";
+import { applyEdit, type SampleRow } from "../core/samples.ts";
 import type { Args, Fidelity, Finding, Mode, ModelInfo, Owner, PlanResponse, Question } from "../core/types.ts";
 import type { DecisionFieldLike, SessionLike } from "./types.ts";
 
@@ -334,8 +335,22 @@ export class FakeSession implements SessionLike {
     this.bus.emit({ type: "plan", stage: "plan", version: 1, text, update: false, qids: questions.map((q) => q.qid), programs, mode: this.mode });
   }
 
-  clarify(found: string, questions: Question[], skipped: string[] = []): void {
-    this.bus.emit({ type: "clarify", found, qids: questions.map((q) => q.qid), skipped });
+  sheet?: { rows: SampleRow[]; path: string; from: string };
+
+  sampleSheet() {
+    return this.sheet;
+  }
+
+  async editSamples(text: string): Promise<string> {
+    if (!this.sheet) return "There is no sample sheet yet.";
+    const r = applyEdit(this.sheet.rows, text);
+    if ("error" in r) return r.error;
+    this.sheet = { ...this.sheet, rows: r.rows };
+    return r.said;
+  }
+
+  clarify(found: string, questions: Question[], skipped: string[] = [], more: { check?: string; notes?: string[] } = {}): void {
+    this.bus.emit({ type: "clarify", found, qids: questions.map((q) => q.qid), skipped, ...more });
     for (const q of questions) {
       this.qs.push(q);
       this.bus.emit({ type: "question", question: q });

@@ -140,6 +140,13 @@ ul.files { margin: 4px 0; padding-left: 18px; font-size: 14px; }
 .card .opts.col { flex-direction: column; align-items: flex-start; }
 .card .evidence { background: var(--panel2); border-radius: 6px; padding: 6px 8px; white-space: pre-wrap; }
 .card .touches { font-weight: 600; }
+.card .sheetwrap { overflow: auto; max-height: 50vh; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; margin: 6px 0; }
+.card table.sheet { border-collapse: collapse; font-size: 13px; }
+.card table.sheet th { position: sticky; top: 0; background: var(--panel2); text-align: left; padding: 4px 6px; }
+.card table.sheet td { padding: 2px 4px; border-top: 1px solid var(--line); }
+.card table.sheet input { width: 100%; min-width: 7em; font: inherit; }
+.card details.datacheck { margin: 6px 0; }
+.card ul.warn { padding-left: 20px; }
 .card .args { font: 13px ui-monospace, Menlo, monospace; padding-left: 18px; overflow-wrap: anywhere; }
 .card.active { box-shadow: 0 0 0 3px var(--accent-bg); }
 .card:focus { outline: none; }

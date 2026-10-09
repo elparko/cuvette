@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entry, Question } from "../src/core/types.ts";
-import { cardFromEvent, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, type Card, type PlanCard } from "../src/ui/cards.ts";
+import { cardFromEvent, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, type Card, type PlanCard } from "../src/ui/cards.ts";
 import { routeMessage, nextQueued } from "../src/ui/messages.ts";
 import { settingEditor } from "../src/ui/config.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
@@ -31,6 +31,23 @@ describe("card queue", () => {
   test("the permission view hides the code from the arguments", () => {
     const v = permissionView({ t: "permission", rid: "r1", tool: "run_script", args: { purpose: "Count cells", does: "Opens 3 images.", code: "print(1)", timeout: 60 }, touches: "files" });
     expect(v).toMatchObject({ title: "Permission needed: run_script", purpose: "Count cells", does: "Opens 3 images.", code: "print(1)", args: ["timeout = 60"], always: true });
+  });
+});
+
+describe("the data check and the sample sheet on the questions card", () => {
+  test("the clarify event carries the data check and the design notes", () => {
+    const check = ["Data check of Ox-LDL: 35 files in 6 folders.", "Questions for you:", ...Array.from({ length: 20 }, (_, i) => `- problem ${i + 1}`)].join("\n");
+    const c = cardFromEvent({ type: "clarify", found: "I see 2 groups.", qids: ["q1"], skipped: [], check, notes: ["n is the Set."] }) as Extract<Card, { t: "clarify" }>;
+    expect(c.notes).toEqual(["n is the Set."]);
+    expect(checkLines(c, 1)).toEqual(["Data check of Ox-LDL: 35 files in 6 folders."]);
+    const lines = checkLines(c, 5);
+    expect(lines).toHaveLength(5);
+    expect(lines.at(-1)).toBe("… 18 more lines. Type /samples check to see all.");
+  });
+  test("the edited cells of the sample sheet come back as rows", () => {
+    const sheet = { ...q("q3"), title: "Sample sheet", table: { columns: ["sample", "group", "unit", "batch", "path"], rows: [["a", "Cer", "Set 1", "", "a.tif"], ["b", "Ctrl", "Set 2", "", "b.tif"]] } };
+    expect(sheetRows({ "cell:0:1": " Ceramide ", "cell:1:3": "Day 2" }, sheet)).toEqual([["a", "Ceramide", "Set 1", "", "a.tif"], ["b", "Ctrl", "Set 2", "Day 2", "b.tif"]]);
+    expect(sheetRows({}, q("q4"))).toBeUndefined();
   });
 });
 

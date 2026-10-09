@@ -6,6 +6,7 @@ import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, re
 import { stepNumbers } from "../core/housekeeping.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { listSessions, sessionLine } from "../core/sessions.ts";
+import { groupSummary, sheetTable } from "../core/samples.ts";
 import { choiceLabel, choiceValue, show, type Card } from "./cards.ts";
 import type { OutputRef } from "./items.ts";
 import type { SessionLike } from "./types.ts";
@@ -385,6 +386,29 @@ export const commands: Command[] = [
       if (mine.length) parts.push("", "Answer with /answer <id> <value>, or use the cards below.");
       ctx.print(parts.join("\n"), "Open questions");
       for (const q of mine) if (!ctx.hasQuestionCard(q.qid)) ctx.openCard({ t: "question", q });
+    },
+  },
+  {
+    name: "samples",
+    args: "[check | open | reload | <row> <column> <value> | <column> <old> = <new>]",
+    help: "Show the sample sheet (samples.csv) and change it. check shows the data check.",
+    async run(args, ctx) {
+      const text = args.join(" ").trim();
+      if (text === "check") {
+        const checks = ctx.session.record.entries(["data_check"]).map((e) => String(e.data.text ?? ""));
+        return ctx.print(checks.length ? checks.join("\n\n") : "No data check yet. The harness checks the data when the agent first reads a table or a folder.", "Data check");
+      }
+      const sheet = ctx.session.sampleSheet?.();
+      if (!sheet) return ctx.notice("There is no sample sheet yet. The agent makes one when it reads the data.");
+      if (text === "open") {
+        openWithOs(sheet.path);
+        return ctx.notice(`Opening ${sheet.path}. After you save it, type /samples reload.`);
+      }
+      if (text) {
+        const said = await ctx.session.editSamples!(text);
+        return ctx.notice(said);
+      }
+      ctx.print([`From ${sheet.from}. Saved as ${sheet.path}.`, "", sheetTable(sheet.rows, 60), "", `${groupSummary(sheet.rows)}.`, "", "Change a cell: /samples 3 group Ceramide. Change a value in all rows: /samples batch Day1 = 2024-03-01. Edit the file: /samples open, then /samples reload."].join("\n"), "Sample sheet");
     },
   },
   {

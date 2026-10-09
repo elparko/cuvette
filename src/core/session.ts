@@ -31,6 +31,8 @@ import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
+import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
+import { applyEdit, designChecks, groupSummary, readSheet, SAMPLE_COLUMNS, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet } from "./samples.ts";
 import { AnalysisRecord } from "./record.ts";
 import { Findings, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
@@ -93,9 +95,13 @@ const MODE_NOTE: Record<Mode, string> = {
 };
 
 const PLAN_NOTE = "Plan first, in two phases. Phase 1, clarifying questions: look at the data with read-only tools, at most three calls. Then call clarify once. In found, tell the scientist in one or two sentences what you see, with counts (for example: I see 6 groups, 139 fields, 2 channels plus an overlay in each field). In questions, ask at most 5 questions about meaning only: what to measure and what counts as one (for example a red-positive cell or a red spot), which groups to compare, what one replicate is, whether earlier results or hand counts exist, and what the output is for. Give options from the data. Leave out a question that the request already answers, and say in answered_by_request what the request says. Never ask about technical settings such as thresholds, segmentation models, size filters, error bars, test families or alpha: you choose those in phase 2. Phase 2, proposed metrics: after the answers, call plan. In definitions, turn the answers into concrete metrics and how each is measured, with the setting values, one short line each (what counts as one n, what counts as one object, what counts as positive, the metric). restatement: only the scientific goal, starting with 'You want:'. Answer setup questions (is the program ready, where the results go) briefly in your message, not in the plan. steps: one line each in plain words, the actions you will run, with every setting filled in: its value and who set it (default, from your answer, or agent). Leave a setting open only if you cannot pick a sensible value, and at most two. Also give exclusions with their effects, pilot (if the method runs on more than one sample), outputs, programs, data, checks and out_of_scope. Write for a scientist: short sentences, plain words. No analysis step runs before the scientist confirms the proposed analysis.";
+const DATA_CHECK_NOTE = "When you first read a table or list a data folder, the harness checks the data (missing values, copies, mixed columns, group sizes, extreme values, channels, names, bit depths) and makes a sample sheet. The harness asks the scientist about these problems and the sample sheet in the Questions stage. Do not ask about them in clarify.";
 const PLAN_UPDATE_NOTE = "This is a new request in a session with an approved plan. If the request needs analysis steps that are not in the plan, call plan with only what changes: the new steps and the changed sections. The scientist approves the update before a new step runs. If the request needs no new step, answer directly.";
 const PILOT_NOTE = "Pilot: before the first step that changes or counts things, say in one sentence how you will check the method on one sample first. A step that processes many files does not run until the scientist approves a pilot: run the method on one sample, save QC images with outlines of what was counted and what was left out, and call pilot_result.";
 const TECHNICAL = /\b(threshold|otsu|triangle|segmentation model|cellpose model|stardist|cyto\d|diameter|size (filter|limit|cut-?off)|(minimum|maximum|min|max)\.? (cell |object |particle )?size|pixels? (size|area)|sigma|blur|error bars?|standard error|sem|sd bars|test family|t-?test|wilcoxon|mann-?whitney|anova|alpha|significance level|p-?value cut|one-?sided|two-?sided|sidedness|fdr|bonferroni|correction method|random seed|iterations|normali[sz]ation method)\b/i;
+const CHECK_TITLE: Record<string, string> = { missing: "missing values", mixed_type: "text in a number column", decimal_comma: "decimal comma", duplicate_rows: "copied rows", duplicate_ids: "repeated IDs", group_labels: "group names", mixed_units: "units", missing_channel: "missing images", bit_depth: "bit depth", pseudoreplication: "what is n", confounding: "group and batch", too_few: "too few n" };
+const CLARIFY_SKIP = "No answer. Use your judgment and say what you chose.";
+const SHEET_TITLE = "Sample sheet";
 const PROGRAM_REASON = "chosen by the scientist with /program";
 const CONTINUE = /^(continue|go on|go ahead|proceed|yes|ok|okay|next|carry on)\b[\s\S]{0,40}$/i;
 
@@ -234,6 +240,8 @@ export class Session {
   private stopTurn = false;
   pilotStage = false;
   private clarified = false;
+  private checked = new Set<string>();
+  private sheet?: SampleSheet;
   reference?: Reference;
   private hidden: string[] = [];
   private refCandidates: Candidate[] = [];
@@ -1190,7 +1198,8 @@ export class Session {
     const post = await this.hooks.post({ event: "PostToolUse", session: this.id, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args: eff, output: out.output, node: out.node });
     for (const f of post.findings ?? []) this.findings.add(f, "hook");
     const r = this.render(tool, out.output);
-    const extra = [keptNote, post.additionalContext].filter(Boolean).join("\n");
+    const checked = depth === 0 && tool.readOnly && tool.source !== "harness" && out.output.ok ? this.checkData(tool.remoteName ?? tool.name, eff, out.output) : "";
+    const extra = [keptNote, post.additionalContext, checked].filter(Boolean).join("\n");
     return { text: extra ? `${r.text}\n\nNote: ${extra}` : r.text, images: r.images, isError: !out.output.ok, output: out.output };
   }
 
@@ -1746,7 +1755,7 @@ export class Session {
       this.record.append("mode", { old: this.mode, new: "plan", reason: "plan first" });
       this.mode = "plan";
     }
-    this.notes.push(this.planUpdate ? PLAN_UPDATE_NOTE : PLAN_NOTE);
+    this.notes.push(this.planUpdate ? PLAN_UPDATE_NOTE : `${PLAN_NOTE} ${DATA_CHECK_NOTE}`);
     if (!this.planUpdate && this.pick && !this.adapters.length) this.notes.push("No adapter is loaded yet. Call list_adapters, then name the adapter for each part in programs, with its exact name. When the scientist confirms the plan, call use_adapter for it. The confirmation covers that load, so no second card shows.");
     if (!this.planUpdate && this.refCandidates.length)
       this.notes.push(`Files in the project folder that may be earlier results on the same data: ${this.refCandidates.map(describeCandidate).join("; ")}. If one fits, name it in the reference section, state each measure in the reference's own terms, and ask in reference.question whether your measure is the same as the reference's measure.`);
@@ -2163,6 +2172,7 @@ export class Session {
       if (g.dropped.length) this.notes.push(`The restatement holds only the scientific goal. The harness took out: ${g.dropped.join(" ")} Answer such setup points briefly in your message.`);
     }
     this.fillDecisions(plan);
+    if (this.sheet && !this.planUpdate) this.planFromSheet(plan);
     for (const g of plan.programs ?? []) g.program ??= this.adapterList().find((x) => x.name === g.adapter)?.program;
     const open = openDecisions(plan);
     if (open.length > 2) return { ok: false, error: `Too many open settings: ${open.map((x) => x.decision.label).join("; ")}. Fill in a sensible value for each technical setting (a default, or from the answers, or your choice checked in the pilot), and say who set it. Leave at most two open, only when you cannot choose.` };
@@ -2298,45 +2308,245 @@ export class Session {
     const refAsked = c && !asked.some((q) => /hand count|earlier (analysis|result)|reference|previous (analysis|result)/i.test(q.question));
     this.record.append("clarify", { action: "asked", phase: "Questions", found, questions: asked.map((q) => q.question), skipped, technical, reference: refAsked ? c.path : undefined });
     const fields = this.decisions.fields();
-    const qs: { qid: string; question: string; ref?: boolean }[] = [];
+    type Asked = { qid: string; question: string; ref?: boolean; key?: string; item?: CheckItem | DesignIssue; design?: boolean };
+    const qs: Asked[] = [];
+    const notes: string[] = [];
+    const check = this.record.entries(["data_check"]).map((e) => String(e.data.text ?? "")).join("\n\n") || undefined;
+    const emit = () => this.bus.emit({ type: "clarify", found, qids: qs.map((q) => q.qid), skipped, check, notes: [...notes] });
+    const askItem = async (item: CheckItem | DesignIssue, design: boolean) => {
+      const q = await this.questions.ask({ decisionKey: "", title: `${design ? "Design check" : "Data check"}: ${CHECK_TITLE[item.check] ?? item.check.replace(/_/g, " ")}`, text: item.question ?? item.text, options: item.options ?? [], recommendation: item.recommendation ? { value: item.recommendation, reason: "" } : undefined, evidence: "" });
+      qs.push({ qid: q.qid, question: item.question ?? item.text, item, design });
+    };
+    for (const item of this.openChecks()) await askItem(item, false);
     for (const q of asked) {
       const f = q.key ? fields.find((x) => x.key === q.key && x.owner === "human") : undefined;
       const options = (q.options.length ? q.options : (f?.choices ?? []).map(String)).map((o) => ({ value: o, label: o }));
       const asked1 = await this.questions.ask({ decisionKey: f?.key ?? "", title: q.question.length > 80 ? q.question.slice(0, 77) + "..." : q.question, text: q.question, options, recommendation: q.recommendation ? { value: q.recommendation, reason: "" } : undefined, evidence: "" });
-      qs.push({ qid: asked1.qid, question: q.question });
+      qs.push({ qid: asked1.qid, question: q.question, key: q.key });
     }
     if (refAsked) {
       const rq = this.referenceQuestion();
       const asked1 = await this.questions.ask({ decisionKey: "", title: "Earlier results", text: rq.question, options: [{ value: "compare", label: "Yes. Compare in the demonstration" }, { value: "blind", label: "Yes. Hold it back (blind test)" }, { value: "none", label: "No, it is not a reference" }], recommendation: { value: this.settings.referenceMode ?? "compare", reason: "" }, evidence: "" });
       qs.push({ qid: asked1.qid, question: rq.question, ref: true });
     }
-    this.bus.emit({ type: "clarify", found, qids: qs.map((q) => q.qid), skipped });
-    for (const q of qs) this.bus.emit({ type: "question", question: this.questions.open().find((x) => x.qid === q.qid)! });
+    const show = (list: Asked[]) => {
+      emit();
+      for (const q of list) this.bus.emit({ type: "question", question: this.questions.open().find((x) => x.qid === q.qid)! });
+    };
+    show(qs);
     const answers: string[] = [];
-    for (const q of qs) {
-      this.waitedQids.add(q.qid);
-      try {
-        await abortable(this.questions.wait(q.qid), this.abort?.signal);
-      } catch {
-        return { ok: false, error: "the scientist stopped the turn before answering the questions" };
-      }
-      const ans = this.record.entries(["answer"]).filter((e) => e.data.qid === q.qid).at(-1);
-      const value = String(ans?.data.value ?? "");
-      answers.push(`${q.question} -> ${value}${ans?.data.note ? ` (${String(ans.data.note)})` : ""}`);
+    const checkAnswers: string[] = [];
+    const stops: string[] = [];
+    let n: string | undefined;
+    const take = async (q: Asked): Promise<boolean> => {
+      const ans = await this.waitAnswer(q.qid);
+      if (!ans) return false;
+      const value = String(ans.value ?? "");
+      if (q.item) {
+        this.record.append("decision", { key: `${q.design ? "design" : "data_check"}:${q.item.id}`, old: null, new: value, by: ans.by, reason: q.item.text });
+        const label = (q.item.options ?? []).find((o) => o.value === value)?.label ?? value;
+        if (value === "stop") stops.push(q.item.text);
+        else checkAnswers.push(`${q.item.text} Answer: ${label}.`);
+      } else answers.push(`${q.question} -> ${value}${ans.note ? ` (${ans.note})` : ""}`);
+      if (q.key === "replicate" || (!q.item && !q.ref && /\b(one n|unit of replication|replicate|what is n|as n)\b/i.test(q.question))) n = value;
       if (q.ref && c && (value === "compare" || value === "blind")) this.setReference({ mode: value, path: c.path, sheet: c.sheet });
+      return true;
+    };
+    const stopped = { ok: false, error: "the scientist stopped the turn before answering the questions" };
+    for (const q of [...qs]) if (!(await take(q))) return stopped;
+    if (!stops.length && this.sheet) {
+      if (!(await this.askSheet(qs, emit))) return stopped;
+      n ??= this.decisions.isSet("replicate") ? String(this.decisions.value("replicate")) : undefined;
+      const issues = designChecks(this.sheet.rows, { n });
+      this.record.append("samples", { action: "design_checks", n: n ?? null, issues });
+      notes.push(...issues.filter((x) => x.level === "warn").map((x) => x.text));
+      const before = qs.length;
+      for (const i of issues.filter((x) => x.level === "ask")) await askItem(i, true);
+      const more = qs.slice(before);
+      if (more.length || notes.length) show(more);
+      for (const q of more) if (!(await take(q))) return stopped;
     }
     this.clarified = true;
-    this.record.append("clarify", { action: "answered", phase: "Questions", found, answers, skipped });
+    this.record.append("clarify", { action: "answered", phase: "Questions", found, answers: [...checkAnswers, ...answers], skipped, notes });
+    if (stops.length) {
+      this.record.append("notice", { text: `You stopped the analysis to correct the data: ${stops.join(" ")}` });
+      this.endPlanning();
+      this.stopTurn = true;
+      return { ok: true, summary: `The scientist stops to correct the data: ${stops.join(" ")} No step runs. Stop now. Say in one or two sentences what the scientist must correct.` };
+    }
     return {
       ok: true,
       summary: [
         answers.length ? `The scientist answered: ${answers.join("; ")}.` : "No question was needed.",
+        checkAnswers.length ? `Data check answers: ${checkAnswers.join(" ")} Put each row or file that is left out in exclusions of the plan, with its effect.` : "",
+        this.sheet ? `The scientist checked the sample sheet ${join(this.outputDir, "samples.csv")}: ${groupSummary(this.sheet.rows)}. The steps must use it for the groups and for n: match files on the path column, and use the unit column as n.` : "",
+        notes.length ? `Design notes from the sample sheet: ${notes.join(" ")}` : "",
         skipped.length ? `Skipped because the request answers them: ${skipped.join("; ")}.` : "",
         technical.length ? `These are technical settings, not questions for the scientist: ${technical.join("; ")}. Choose a sensible value for each and show it as a setting in the proposed metrics.` : "",
         this.reference ? (this.reference.mode === "blind" ? `The reference ${basename(this.reference.path)} is held back for a blind test. Do not read it.` : `The demonstration compares with the reference ${basename(this.reference.path)}.`) : "",
         "Now call plan with the proposed metrics: each measure defined in plain words with its setting values, and the actions.",
       ].filter(Boolean).join(" "),
     };
+  }
+
+  private planFromSheet(plan: AnalysisPlan): void {
+    const rows = this.sheet!.rows;
+    const path = join(this.outputDir, "samples.csv");
+    plan.data = { ...(plan.data ?? {}), files: plan.data?.files?.length ? plan.data.files : [path], n: plan.data?.n || `From the sample sheet: ${groupSummary(rows)}` };
+    const test = plan.steps.map((x) => [x.step, x.method, x.tool].filter(Boolean).join(" ")).join(" ");
+    const n = this.record.entries(["samples"]).filter((e) => e.data.action === "design_checks").at(-1)?.data.n;
+    const said = new Set(this.record.entries(["samples"]).flatMap((e) => ((e.data.issues as DesignIssue[]) ?? []).map((i) => i.text)));
+    const fresh = designChecks(rows, { n: typeof n === "string" ? n : undefined, test }).filter((i) => !said.has(i.text));
+    if (!fresh.length) return;
+    this.record.append("samples", { action: "design_checks", n: n ?? null, issues: fresh, test });
+    this.notes.push(`Design check of the proposed test with the sample sheet ${path}: ${fresh.map((i) => i.text).join(" ")}`);
+  }
+
+  private async waitAnswer(qid: string): Promise<{ value: unknown; note: string; by: string } | undefined> {
+    this.waitedQids.add(qid);
+    try {
+      await abortable(this.questions.wait(qid), this.abort?.signal);
+    } catch {
+      return undefined;
+    }
+    const ans = this.record.entries(["answer"]).filter((e) => e.data.qid === qid).at(-1);
+    return { value: ans?.data.value, note: String(ans?.data.note ?? ""), by: String(ans?.data.by ?? "human") };
+  }
+
+  private openChecks(): CheckItem[] {
+    const done = new Set(this.record.entries(["decision"]).map((e) => String(e.data.key)));
+    const items = this.record.entries(["data_check"]).flatMap((e) => (e.data.items as CheckItem[]) ?? []);
+    return items.filter((i, k) => i.level === "ask" && !done.has(`data_check:${i.id}`) && items.findIndex((x) => x.id === i.id) === k).slice(0, 8);
+  }
+
+  private checkData(name: string, args: Args, output: ToolOutput): string {
+    const given = ["path", "folder", "input", "dir", "directory", "input_dir", "data_dir"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && isAbsolute(v));
+    const own = (p: string) => [this.dir, this.outputDir, gaHome()].some((d) => p === d || p.startsWith(`${d}/`));
+    const found: { path: string; label: string; kind: "table" | "files" }[] = [];
+    const saved = /^(read|load|import|open|inspect)/.test(name) ? (output.table?.path ?? output.outputs?.find((o) => o.kind === "table")?.path) : undefined;
+    if (saved && existsTable(saved)) found.push({ path: saved, label: given[0] ?? saved, kind: "table" });
+    for (const g of given) {
+      if (own(g) || !existsSync(g)) continue;
+      if (statSync(g).isDirectory()) found.push({ path: g, label: g, kind: "files" });
+      else if (!found.length && existsTable(g)) found.push({ path: g, label: g, kind: "table" });
+    }
+    const out: string[] = [];
+    for (const f of found) {
+      if (this.checked.has(f.label)) continue;
+      this.checked.add(f.label);
+      let check: DataCheck;
+      let sheet: SampleSheet | undefined;
+      try {
+        if (f.kind === "files") {
+          const rels = listDataFiles(f.path);
+          if (rels.length < 2) continue;
+          check = checkFiles(fileInfos(f.path, rels), f.path);
+          const inside = (p: string) => (p.startsWith(`${this.cwd}/`) ? relative(this.cwd, p) : p);
+          if (!this.sheet) sheet = sheetFromFiles(rels.map((r) => inside(join(f.path, r))), f.path);
+        } else {
+          const t = readCsvTable(f.path);
+          if (!t.rows.length) continue;
+          check = checkTable(t, f.label);
+          if (!this.sheet) sheet = sheetFromTable(t, f.label);
+        }
+      } catch {
+        continue;
+      }
+      const text = dataCheckText(check);
+      this.record.append("data_check", { source: f.label, kind: check.kind, size: check.size, items: check.items, groups: check.groups ?? null, units: check.units ?? [], text });
+      out.push(`Data check by the harness (code, not a model):\n${text}`);
+      if (check.items.some((i) => i.level === "ask")) out.push(this.planning ? "The harness asks the scientist about each problem under Questions for you in the Questions stage. Do not ask about them again." : "Ask the scientist about each problem under Questions for you before a step uses the data.");
+      if (sheet?.rows.length) {
+        this.sheet = sheet;
+        this.saveSheet(sheet.rows, "drafted");
+        out.push(`Sample sheet: the harness made ${join(this.outputDir, "samples.csv")} (${sheet.rows.length} rows) from ${sheet.from}. ${groupSummary(sheet.rows)}. The scientist checks it in the Questions stage. Use it for the groups and for n.`);
+      }
+    }
+    return out.join("\n");
+  }
+
+  private saveSheet(rows: SampleRow[], action: string, said = ""): void {
+    if (!this.sheet) return;
+    this.sheet = { ...this.sheet, rows };
+    const path = join(this.outputDir, "samples.csv");
+    try {
+      writeSheet(path, rows);
+    } catch (e) {
+      this.record.append("notice", { text: `The harness could not save ${path}: ${(e as Error).message}` });
+    }
+    this.record.append("samples", { action, source: this.sheet.source, from: this.sheet.from, path, rows, said });
+  }
+
+  private sheetQuestion(msg = ""): Omit<Question, "qid" | "session" | "status" | "created"> {
+    const s = this.sheet!;
+    return {
+      decisionKey: "",
+      title: SHEET_TITLE,
+      text: `${msg ? `${msg} ` : ""}The agent made this sample sheet from ${s.from}. One row is one sample. unit is the unit of replication (one n). batch is the slide, plate, day or run. Is it correct?`,
+      evidence: `${sheetTable(s.rows)}\n${groupSummary(s.rows)}.\nTo change a cell, type: row column value (for example: 3 group Ceramide), or: column old = new (for example: batch Day1 = 2024-03-01). You can also edit ${join(this.outputDir, "samples.csv")} and choose Read samples.csv again.`,
+      options: [{ value: "accept", label: "The sheet is correct" }, { value: "reload", label: "Read samples.csv again (I edited it)" }],
+      recommendation: { value: "accept", reason: "" },
+      table: { columns: [...SAMPLE_COLUMNS], rows: s.rows.map((r) => SAMPLE_COLUMNS.map((c) => r[c])) },
+    };
+  }
+
+  private async askSheet(qs: { qid: string; question: string }[], emit: () => void): Promise<boolean> {
+    let msg = "";
+    for (;;) {
+      const q = await this.questions.ask(this.sheetQuestion(msg));
+      qs.push({ qid: q.qid, question: SHEET_TITLE });
+      emit();
+      this.bus.emit({ type: "question", question: q });
+      const ans = await this.waitAnswer(q.qid);
+      if (!ans) return false;
+      const r = this.sheetAnswer(ans.value);
+      if (r.done) return true;
+      msg = r.said;
+    }
+  }
+
+  private sheetAnswer(value: unknown): { done: boolean; said: string } {
+    const v = value as { rows?: unknown };
+    if (v && typeof v === "object" && Array.isArray(v.rows)) {
+      const rows = (v.rows as unknown[]).filter(Array.isArray).map((r) => Object.fromEntries(SAMPLE_COLUMNS.map((c, i) => [c, String((r as unknown[])[i] ?? "").trim()])) as SampleRow);
+      if (JSON.stringify(rows) !== JSON.stringify(this.sheet!.rows)) this.saveSheet(rows, "edited", "edited in the table");
+      this.record.append("samples", { action: "accepted", rows: rows.length });
+      return { done: true, said: "" };
+    }
+    const text = String(value ?? "").trim();
+    if (text === "accept" || text === CLARIFY_SKIP || !text) {
+      this.record.append("samples", { action: "accepted", rows: this.sheet!.rows.length });
+      return { done: true, said: "" };
+    }
+    if (text === "reload") {
+      try {
+        const rows = readSheet(join(this.outputDir, "samples.csv"));
+        this.saveSheet(rows, "reloaded", "read samples.csv again");
+        return { done: false, said: `Read samples.csv again: ${rows.length} rows.` };
+      } catch (e) {
+        return { done: false, said: `Could not read samples.csv: ${(e as Error).message}` };
+      }
+    }
+    const r = applyEdit(this.sheet!.rows, text);
+    if ("error" in r) return { done: false, said: r.error };
+    this.saveSheet(r.rows, "edited", r.said);
+    return { done: false, said: r.said };
+  }
+
+  sampleSheet(): { rows: SampleRow[]; path: string; from: string } | undefined {
+    return this.sheet ? { rows: this.sheet.rows, path: join(this.outputDir, "samples.csv"), from: this.sheet.from } : undefined;
+  }
+
+  async editSamples(text: string): Promise<string> {
+    if (!this.sheet) return "There is no sample sheet yet. The agent makes one when it reads the data.";
+    const open = this.questions.open().find((q) => q.title === SHEET_TITLE);
+    if (open) {
+      await this.answer(open.qid, text);
+      return "Sent to the open sample sheet.";
+    }
+    const r = this.sheetAnswer(text);
+    if (r.said) this.notes.push(`The scientist changed the sample sheet ${join(this.outputDir, "samples.csv")}: ${r.said}`);
+    return r.said || "The sample sheet is unchanged.";
   }
 
   private checkPlanned(tool: Tool) {

@@ -783,6 +783,42 @@ describe("proposed analysis card", () => {
     expect(s.record.entries(["answer"]).map((e) => e.data.value)).toEqual(["One Set", "At least 1 red pixel"]);
   });
 
+  test("Questions: the data check, the design notes and the sample sheet; a typed edit changes a cell", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    const check = "Data check of Ox-LDL: 35 files in 6 folders, 2 channels (green, red).\nQuestions for you:\n- 1 field has no 'red' image: Control/Set 3/Set 3_02.\nShown, not asked:\n- The names spell one part in 2 ways: '20x' (30 files) and '20X' (5 files).";
+    const mk = (qid: string, title: string, text: string, options: string[], evidence = "") => ({ qid, session: s.id, decisionKey: "", title, text, options: options.map((o) => ({ value: o, label: o })), evidence, status: "open" as const, created: "" });
+    const evidence = "#  sample             group     unit   batch  path\n1  Ceramide Set 1_01  Ceramide  Set 1         Ox-LDL/Ceramide/Set 1/Set 1_01*\nCeramide: 3 Sets, 9 samples; Control: 3 Sets, 9 samples.";
+    s.clarify("I see 2 groups.", [mk("q1", "Data check: missing images", "1 field has no 'red' image (Control/Set 3/Set 3_02). Leave this field out, or stop?", ["leave_out", "stop"]), mk("q2", "Sample sheet", "The agent made this sample sheet. Is it correct?", ["accept", "reload"], evidence)], [], { check, notes: ["n is the Set. n per group: Ceramide 3 (9 samples), Control 3 (9 samples)."] });
+    await until(() => h.all().includes("Data check of Ox-LDL"));
+    expect(h.all()).toContain("1 field has no 'red' image: Control/Set 3/Set 3_02.");
+    expect(h.all()).toContain("Design notes");
+    expect(h.all()).toContain("! n is the Set.");
+    await type(h, "1");
+    await until(() => h.all().includes("Ceramide Set 1_01"));
+    expect(h.all()).toContain("Ceramide: 3 Sets, 9 samples");
+    await type(h, "o");
+    await type(h, "1 batch Day 1");
+    h.type("\r");
+    await until(() => s.record.entries(["answer"]).length === 2);
+    expect(s.record.entries(["answer"]).map((e) => e.data.value)).toEqual(["leave_out", "1 batch Day 1"]);
+  });
+
+  test("/samples shows the sheet, changes a cell and shows the data check", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.sheet = { rows: [{ sample: "Cer Set 1_01", group: "Cer", unit: "Set 1", batch: "", path: "Cer/Set 1/Set 1_01.tif" }], path: "/out/samples.csv", from: "the folder and file names" };
+    s.record.append("data_check", { source: "/data/Ox-LDL", text: "Data check of Ox-LDL: 2 files in 1 folder.\nNo missing channels, name problems or odd files." });
+    await submit(h, "/samples");
+    await until(() => h.all().includes("Saved as /out/samples.csv"));
+    expect(h.all()).toContain("Cer Set 1_01");
+    await submit(h, "/samples 1 group Ceramide");
+    await until(() => h.all().includes("Row 1: group is now Ceramide."));
+    expect(s.sheet.rows[0]!.group).toBe("Ceramide");
+    await submit(h, "/samples check");
+    await until(() => h.all().includes("No missing channels, name problems or odd files."));
+  });
+
   test("the settings are pre-filled and a number changes one", async () => {
     const { h, s } = start();
     await sleep(100);

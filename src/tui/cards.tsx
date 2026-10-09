@@ -4,7 +4,7 @@ import { Box, Text, useInput } from "ink";
 import { Field } from "./input-box.tsx";
 import type { Question } from "../core/types.ts";
 import {
-  CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, questionCursor, questionEnter, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
+  CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
   choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, pilotGate, pilotQuestion, planHint, planInit,
   planQuestions, planReduce, planResolve, planTitle, programSwitches, recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, setupValues, show,
   type Card, type PlanAction, type PlanState,
@@ -468,6 +468,22 @@ export function ClarifyCard(props: { card: Extract<Card, { t: "clarify" }>; sess
   return (
     <Frame title={CLARIFY_TITLE} color="magenta">
       {card.found ? <Text>{card.found}</Text> : null}
+      {card.check ? (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>{DATA_CHECK_TITLE}</Text>
+          {checkLines(card, q && !q.title.startsWith(DATA_CHECK_TITLE) ? 1 : 14).map((l, i) => (
+            <Text key={i} dimColor={!l.startsWith("- ")}>{l}</Text>
+          ))}
+        </Box>
+      ) : null}
+      {card.notes?.length ? (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>{DESIGN_TITLE}</Text>
+          {card.notes.map((l, i) => (
+            <Text key={i} color="yellow">! {l}</Text>
+          ))}
+        </Box>
+      ) : null}
       {card.skipped.length ? <Text dimColor>Not asked, because your request answers it: {card.skipped.map((x) => x.split(" The request says:")[0]).join(" ")}</Text> : null}
       {q ? (
         <Box flexDirection="column" marginTop={1}>

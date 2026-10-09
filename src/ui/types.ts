@@ -1,6 +1,7 @@
 import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import type { BusEvent, Entry, Finding, Mode, ModelInfo, Owner, PlanResponse, Question } from "../core/types.ts";
+import type { SampleRow } from "../core/samples.ts";
 
 export interface DecisionFieldLike {
   key: string;
@@ -66,6 +67,8 @@ export interface SessionLike {
   elnPush?(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }>;
   elnLink?(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }>;
   openEvents?(): BusEvent[];
+  sampleSheet?(): { rows: SampleRow[]; path: string; from: string } | undefined;
+  editSamples?(text: string): Promise<string>;
   markOpen?(extra?: Record<string, unknown>): void;
   close(): Promise<void>;
 }

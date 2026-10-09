@@ -10,6 +10,7 @@ import { mainNodes, methodsSentence, stepLines } from "./exports.ts";
 import { stepNumbers } from "./housekeeping.ts";
 import { inProject, outputRoot, placeAt, readIndex } from "./places.ts";
 import { pilotRows, validationRows } from "./pilot.ts";
+import { checkSheets } from "./results.ts";
 import { AnalysisRecord } from "./record.ts";
 import { find, resolve as resolveSetting, type Paper } from "./settings.ts";
 export { localePaper, type Paper } from "./settings.ts";
@@ -322,6 +323,24 @@ function sectionData(w: Writer, p: Part, level: number): void {
   if (data.n) w.p(`Planned sample size: ${sentence(str(data.n))}`);
   const rows = p.nodes.flatMap((n) => sizes(n).map(([k, v]) => [stepLink(p, p.steps.get(n.id)!), esc(k), cell(v)]));
   if (rows.length) w.table("Sample sizes that each step reported. Each value counts the units in one group or in the whole data.", ["Step", "Measure", "n"], rows, "", true);
+}
+
+function sectionDataCheck(w: Writer, p: Part, level: number): void {
+  const sheets = checkSheets(p.record);
+  const check = sheets.find((s) => s.name === "Data check");
+  const samples = sheets.find((s) => s.name === "Samples");
+  if (!check && !samples) return;
+  w.head(level, "Data check and sample sheet");
+  if (check) {
+    w.p("Code in the harness checked the data when the agent first read it: missing values, copied rows and IDs, text in number columns, group sizes, extreme values (modified z-score above 3.5; reported, never removed), units in the column names, and for file sets missing channels, names, file sizes and bit depths. Each problem that needed a choice went to the scientist as a question. The answer is in the last column.");
+    w.table("Data check findings and the answers of the scientist.", check.columns, check.rows);
+  }
+  if (samples) {
+    const from = p.record.entries(["samples"]).find((e) => e.data.action === "drafted");
+    const edits = p.record.entries(["samples"]).filter((e) => e.data.action === "edited" || e.data.action === "reloaded").length;
+    w.p(`The agent made the sample sheet from ${str(from?.data.from) || "the data"}.${edits ? ` The scientist changed it ${edits === 1 ? "one time" : `${edits} times`}.` : ""} The analysis used it for the groups and for n.`);
+    w.table("Sample sheet: one row for each sample. unit is the unit of replication (one n).", samples.columns, samples.rows.slice(0, 200), samples.rows.length > 200 ? `The table shows 200 of ${samples.rows.length} rows. All rows are in samples.csv.` : "");
+  }
 }
 
 interface DecisionRow {
@@ -747,6 +766,7 @@ export function buildDatabook(input: BookInput): Book {
     }
     sectionQuestion(w, p, L);
     sectionData(w, p, L);
+    sectionDataCheck(w, p, L + 1);
     sectionMethods(w, p, L, refs);
     sectionPilot(w, p, L);
     sectionResults(w, p, L);

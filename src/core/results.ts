@@ -375,9 +375,26 @@ function stepTitle(n: Node): string {
   return t.replace(/[_-]+/g, " ").trim();
 }
 
+export function checkSheets(record: AnalysisRecord): Sheet[] {
+  const answer = new Map(record.entries(["decision"]).filter((e) => /^(data_check|design):/.test(String(e.data.key))).map((e) => [String(e.data.key), show(e.data.new)]));
+  const rows: Cell[][] = [];
+  for (const e of record.entries(["data_check"])) {
+    for (const i of (e.data.items as { id: string; check: string; level: string; text: string; column?: string; files?: string[] }[]) ?? [])
+      rows.push([String(e.data.source ?? ""), i.check.replace(/_/g, " "), i.level === "ask" ? "question" : "shown", i.column ?? (i.files ?? []).slice(0, 5).join("; "), i.text, answer.get(`data_check:${i.id}`) ?? (i.level === "ask" ? "not answered" : "")]);
+    if (!((e.data.items as unknown[]) ?? []).length) rows.push([String(e.data.source ?? ""), "all", "shown", "", "No problem found.", ""]);
+  }
+  const issues = record.entries(["samples"]).filter((e) => e.data.action === "design_checks").flatMap((e) => (e.data.issues as { id: string; check: string; level: string; text: string }[]) ?? []);
+  for (const i of issues.filter((x, k) => issues.findIndex((y) => y.text === x.text) === k)) rows.push(["sample sheet", i.check.replace(/_/g, " "), i.level === "ask" ? "question" : "shown", "", i.text, answer.get(`design:${i.id}`) ?? (i.level === "ask" ? "not answered" : "")]);
+  const out: Sheet[] = [];
+  if (rows.length) out.push({ name: "Data check", columns: ["Source", "Check", "Level", "Column or files", "Finding", "Answer"], rows });
+  const sheet = record.entries(["samples"]).filter((e) => Array.isArray(e.data.rows)).at(-1);
+  if (sheet) out.push({ name: "Samples", columns: ["sample", "group", "unit", "batch", "path"], rows: (sheet.data.rows as Record<string, string>[]).map((r) => [r.sample, r.group, r.unit, r.batch, r.path]) });
+  return out;
+}
+
 export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const { record, adapters, dir } = w;
-  const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation"]);
+  const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation", "data check", "samples"]);
   const steps = stepNumbers(record.nodes());
   const stale = record.stale();
   const nodes = mainNodes(record);
@@ -483,6 +500,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     { name: "Summary", columns: ["Section", "Item", "Value", "Source", "Definition"], rows: summary },
     ...(pilot.rows.length ? [{ name: "Pilot", columns: pilot.columns, rows: pilot.rows }] : []),
     ...(validation ? [{ name: "Validation", columns: validation.columns, rows: [...validation.rows, [], ...validation.summary.map((x) => [x]), ...(validation.plot ? [[`Bland-Altman plot: ${rel(dir, validation.plot)}`]] : [])] }] : []),
+    ...checkSheets(record),
     ...tableSheets,
     { name: "Steps", columns: ["Step", "Tool", "Adapter", "Description", "Result", "Inputs", "Input SHA-256", "Outputs", "Table sheets", "Manual route", "Fidelity", "Status", "Node"], rows: stepRows },
     ...(metricRows.length ? [{ name: "Metrics", columns: ["Step", "Metric", "Value"], rows: metricRows }] : []),

@@ -123,6 +123,7 @@ export class Mapper {
       case "blocked":
         return line("⏸", `Waiting for your decision: ${String(d.reason ?? "")}`, "yellow");
       case "decision":
+        if (/^(data_check|design):/.test(String(d.key))) return [];
         return line("✎", `Decision: ${d.key} ${show(d.old)} → ${show(d.new)} (${d.by ?? "human"})`, "cyan");
       case "owner_change":
         return line("✎", `Owner of ${d.key}: ${d.old} → ${d.new}`, "cyan");
@@ -150,7 +151,14 @@ export class Mapper {
       case "plan_approved":
         return [{ key, t: "block", title: `Confirmed, version ${d.version}. Mode: ${d.mode}.`, text: String(d.text ?? "") }];
       case "clarify":
-        return d.action === "answered" ? [{ key, t: "block", title: "Questions", text: [String(d.found ?? ""), ...((d.answers as string[]) ?? []).map((x) => `- ${x}`), ...((d.skipped as string[]) ?? []).map((x) => `- Not asked: ${x}`)].filter(Boolean).join("\n") }] : [];
+        return d.action === "answered" ? [{ key, t: "block", title: "Questions", text: [String(d.found ?? ""), ...((d.answers as string[]) ?? []).map((x) => `- ${x}`), ...((d.skipped as string[]) ?? []).map((x) => `- Not asked: ${x}`), ...((d.notes as string[]) ?? []).map((x) => `- Design note: ${x}`)].filter(Boolean).join("\n") }] : [];
+      case "data_check":
+        return [{ key, t: "block", title: "Data check", text: String(d.text ?? "") }];
+      case "samples":
+        if (d.action === "drafted") return line("▸", `Sample sheet: ${((d.rows as unknown[]) ?? []).length} rows from ${d.from}. Saved as ${d.path}.`, "cyan");
+        if (d.action === "edited" || d.action === "reloaded") return line("✎", `Sample sheet: ${d.said || "changed"} Saved as ${d.path}.`, "cyan");
+        if (d.action === "accepted") return line("✓", `You confirmed the sample sheet (${d.rows} rows).`, "green");
+        return [];
       case "pilot_run":
         return [{ key, t: "block", title: `Demonstration on a sample: ${d.sample}`, text: pilotText(d as never) }];
       case "pilot_approved":

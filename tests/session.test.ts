@@ -1139,3 +1139,91 @@ test("outside the plan the agent's program loads with no card and one line; /pro
   const none = await session.questions.ask({ decisionKey: "", title: "Color", text: "?", options: [], evidence: "" });
   await expect(session.answer(none.qid, undefined)).rejects.toThrow("Color: choose an option or type a value.");
 });
+
+test("the data check and the sample sheet: problems become question cards, the sheet is edited and saved, and the design notes reach the agent", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "ga-effero-"));
+  const root = join(cwd, "Ox-LDL");
+  for (const g of ["Ceramide", "Control"]) for (const s of [1, 2, 3]) for (const f of [1, 2, 3]) for (const ch of ["red", "green"]) {
+    if (g === "Control" && s === 3 && f === 2 && ch === "red") continue;
+    mkdirSync(join(root, g, `Set ${s}`), { recursive: true });
+    writeFileSync(join(root, g, `Set ${s}`, `Set ${s}_0${f}_${ch}.tif`), "xxxx");
+  }
+  const steps = [{ step: "Count the red-positive cells in each field", tool: "count", settings: [{ key: "method", label: "Threshold method", value: "Otsu", by: "default" }, { key: "min_size", label: "Smallest particle", value: 5, by: "default" }] }];
+  const provider = new FakeProvider([
+    { calls: [{ name: "list_dir", args: { path: root } }] },
+    { calls: [{ name: "clarify", args: { found: "I see 2 groups, 3 Sets each, 2 channels.", questions: [{ question: "What counts as one n?", options: ["One Set", "One field"], key: "replicate" }] } }] },
+    { calls: [{ name: "plan", args: { restatement: "You want: the share of red-positive cells.", steps } }] },
+    { text: "Done." },
+    { text: "Done." },
+    { text: "Done." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd, interactive: true });
+  session.decisions.applySetup({});
+  const titles: string[] = [];
+  const clarifies: { qids: string[]; check?: string; notes?: string[] }[] = [];
+  let sheetAsked = 0;
+  session.bus.on((e) => {
+    if (e.type === "clarify") clarifies.push(e);
+    if (e.type === "question") {
+      const q = e.question;
+      titles.push(q.title);
+      const value = q.title.startsWith("Data check") ? "leave_out" : q.title === "Sample sheet" ? (sheetAsked++ ? "accept" : "1-9 batch Day 1") : "One Set";
+      if (q.title === "Sample sheet") expect(q.table?.columns).toEqual(["sample", "group", "unit", "batch", "path"]);
+      setTimeout(() => session!.answer(q.qid, value), 0);
+    }
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Count the red-positive cells in Ox-LDL for each group.");
+
+  const listed = toolTexts(provider).find((t) => t.includes("Data check by the harness"))!;
+  expect(listed).toContain("1 field has no 'red' image: Control/Set 3/Set 3_02.");
+  expect(listed).toContain(`Sample sheet: the harness made ${join(session.outputDir, "samples.csv")} (18 rows)`);
+  expect(titles).toEqual(["Data check: missing images", "What counts as one n?", "Sample sheet", "Sample sheet"]);
+  expect(clarifies[0]!.check).toContain("Data check of Ox-LDL: 35 files in 6 folders, 2 channels (green, red).");
+  expect(clarifies.at(-1)!.notes!.join(" ")).toContain("n is the Set. n per group: Ceramide 3 (9 samples), Control 3 (9 samples).");
+  expect(session.record.entries(["decision"]).find((e) => e.data.key === "data_check:channel:red")!.data).toMatchObject({ new: "leave_out", by: "human" });
+  const csv = readFileSync(join(session.outputDir, "samples.csv"), "utf8").split("\n");
+  expect(csv[0]).toBe("sample,group,unit,batch,path");
+  expect(csv[1]).toBe("Ceramide Set 1_01,Ceramide,Set 1,Day 1,Ox-LDL/Ceramide/Set 1/Set 1_01*");
+  expect(csv[10]).toBe("Control Set 1_01,Control,Set 1,,Ox-LDL/Control/Set 1/Set 1_01*");
+  expect(session.record.entries(["samples"]).map((e) => e.data.action)).toEqual(["drafted", "edited", "accepted", "design_checks"]);
+  const summary = toolTexts(provider).find((t) => t.includes("The scientist checked the sample sheet"))!;
+  expect(summary).toContain("Data check answers: 1 field has no 'red' image: Control/Set 3/Set 3_02. Answer: Leave out the 1 field.");
+  expect(summary).toContain("use the unit column as n");
+  const approved = session.record.entries(["plan_approved"])[0]!.data.plan as { data: { n: string; files: string[] } };
+  expect(approved.data.n).toBe("From the sample sheet: Ceramide: 3 Sets, 9 samples; Control: 3 Sets, 9 samples");
+  expect(approved.data.files).toEqual([join(session.outputDir, "samples.csv")]);
+  const { checkSheets } = await import("../src/core/results.ts");
+  const sheets = checkSheets(session.record);
+  expect(sheets.map((s) => s.name)).toEqual(["Data check", "Samples"]);
+  expect(sheets[0]!.rows.find((r) => r[1] === "missing channel")!.slice(2)).toEqual(["question", "Control/Set 3/Set 3_02", "1 field has no 'red' image: Control/Set 3/Set 3_02.", "leave_out"]);
+  expect(sheets[0]!.rows.some((r) => r[1] === "pseudoreplication")).toBe(true);
+});
+
+test("a table with missing values: the data check asks, and stop ends the turn before the proposed metrics", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "ga-dose-"));
+  const csv = join(cwd, "dose.csv");
+  writeFileSync(csv, ["Animal,Group,dose", ...Array.from({ length: 20 }, (_, i) => `M${i + 1},${i % 2 ? "Drug" : "Control"},${i < 12 ? "" : (i / 10).toFixed(1)}`)].join("\n") + "\n");
+  const provider = new FakeProvider([
+    { calls: [{ name: "read_file", args: { path: csv } }] },
+    { calls: [{ name: "clarify", args: { found: "I see 20 animals in 2 groups." } }] },
+    { text: "Please fill in the dose for the 12 animals." },
+    { text: "Please fill in the dose for the 12 animals." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd, interactive: true });
+  session.decisions.applySetup({});
+  const asked: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "question") {
+      asked.push(e.question.text);
+      setTimeout(() => session!.answer(e.question.qid, "stop"), 0);
+    }
+  });
+  await session.send("Compare the dose between the groups in dose.csv.");
+  expect(asked[0]).toBe("12 rows have no value for 'dose'. Leave them out, or stop?");
+  expect(asked).not.toContain("Sample sheet");
+  expect(session.record.entries(["plan"])).toEqual([]);
+  expect(session.record.entries(["notice"]).some((e) => String(e.data.text).startsWith("You stopped the analysis to correct the data: 12 rows have no value for 'dose'"))).toBe(true);
+  expect(String(session.record.entries(["tool_result"]).find((e) => e.data.tool === "clarify")!.data.summary)).toContain("No step runs. Stop now.");
+  expect(readFileSync(join(session.outputDir, "samples.csv"), "utf8").split("\n").slice(0, 2)).toEqual(["sample,group,unit,batch,path", "M1,Control,M1,,dose.csv row 2"]);
+});

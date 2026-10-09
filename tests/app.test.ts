@@ -275,6 +275,29 @@ describe("card rendering", () => {
     expect(html).toContain('data-act="skip" data-qid="c1"');
   });
 
+  test("the questions card shows the data check, the design notes and the sample sheet as an editable table", async () => {
+    const s3 = new FakeSession();
+    const table = { columns: ["sample", "group", "unit", "batch", "path"], rows: [["Ceramide Set 1_01", "Ceramide", "Set 1", "", "Ox-LDL/Ceramide/Set 1/Set 1_01*"], ["Control Set 1_01", "Control", "Set 1", "", "Ox-LDL/Control/Set 1/Set 1_01*"]] };
+    const sheet: Question = { ...q, qid: "c2", title: "Sample sheet", text: "The agent made this sample sheet.", options: [{ value: "accept", label: "The sheet is correct" }, { value: "reload", label: "Read samples.csv again (I edited it)" }], table };
+    const check = "Data check of Ox-LDL: 35 files in 6 folders.\nQuestions for you:\n- 1 field has no 'red' image: Control/Set 3/Set 3_02.";
+    s3.clarify("I see 2 groups.", [sheet], [], { check, notes: ["n is the Set. n per group: Ceramide 3, Control 3."] });
+    const card: Card = { t: "clarify", found: "I see 2 groups.", qids: ["c2"], skipped: [], check, notes: ["n is the Set. n per group: Ceramide 3, Control 3."] };
+    const html = cardHtml({ token: "t", session: s3 }, slot(card));
+    expect(html).toContain("<summary>Data check</summary>");
+    expect(html).toContain("1 field has no &#39;red&#39; image");
+    expect(html).toContain("<h4>Design notes</h4>");
+    expect(html).toContain('name="cell:0:1" value="Ceramide"');
+    expect(html).toContain('data-act="sheet" data-qid="c2"');
+    expect(html).not.toContain('class="evidence"');
+    const view = new WebView(s3, { token: "t", env, url: (p) => p, quit: async () => {} });
+    view.openCard(card);
+    const id = view.slots.find((x) => x.card.t === "clarify")!.id;
+    await view.act(id, { act: "sheet", qid: "c2", fields: { "cell:1:3": "Day 2" } });
+    const ans = s3.record.entries(["answer"]).at(-1)!.data;
+    expect(ans.value).toEqual({ rows: [table.rows[0], ["Control Set 1_01", "Control", "Set 1", "Day 2", "Ox-LDL/Control/Set 1/Set 1_01*"]] });
+    view.close();
+  });
+
   test("a question card, a disk search card and a setup card", () => {
     expect(cardHtml(ctx, slot({ t: "question", q }))).toContain("0.8 (recommended)");
     const search = cardHtml(ctx, slot({ t: "permission", rid: "r1", tool: "broad_search", args: {}, touches: "The agent wants to search /Volumes.", search: { root: "/Volumes", purpose: "find the images" } }));
