@@ -6,29 +6,53 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE.parent / "src-tauri" / "icons"
+DOCS = HERE.parent.parent / "docs" / "images"
 
 TILE = "#151515"
 EDGE = "#2c2c2c"
-GLASS = "#ecebe7"
-BEAM = "#f06a8e"
+LIGHT = dict(glass="#1c1c1c", beam="#c2183f", liquid="#fbe4ea", surface="#f2bccb", wall=3)
+DARK = dict(glass="#ecebe7", beam="#f06a8e", liquid="#4f1e2d", surface="#73304a")
 
 
-def svg(small):
-    # A cuvette from the front. The beam comes out weaker on the far side.
-    wall, beam = (56, 110) if small else (42, 80)
-    x0, x1, top, bottom = (402, 622, 170, 854) if small else (420, 604, 178, 846)
-    inset = wall // 2 + 21
-    by = 588 - beam // 2
+def mark(glass, beam, liquid, surface, wall=3.5):
+    # A square cuvette in oblique view, on a 64-unit grid. The beam gets
+    # narrower and paler as it goes through the sample: absorbance.
+    x0, x1, top, bottom, dx, dy, level = 18, 38, 12, 60, 8, -6, 27
+    return f"""<path d="M{x0} {level}H{x1}V{bottom}H{x0}Z" fill="{liquid}"/>
+<path d="M{x1} {level}L{x1 + dx} {level + dy}V{bottom + dy}L{x1} {bottom}Z" fill="{surface}"/>
+<path d="M{x0} {level}H{x1}L{x1 + dx} {level + dy}H{x0 + dx}Z" fill="{surface}"/>
+<linearGradient id="beam" x1="{x0}" x2="{x1 + dx}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="{beam}"/><stop offset="1" stop-color="{beam}" stop-opacity=".55"/></linearGradient>
+<path d="M2 31H{x0}V39H2Z" fill="{beam}"/>
+<path d="M{x0} 31L{x1 + dx} 35V36.5L{x0} 39Z" fill="url(#beam)"/>
+<path d="M{x1 + dx} 35H62V36.5H{x1 + dx}Z" fill="{beam}" opacity=".55"/>
+<path d="M{x0} {top}H{x1}V{bottom}H{x0}Z M{x1} {top}L{x1 + dx} {top + dy}V{bottom + dy}L{x1} {bottom} M{x0} {top}L{x0 + dx} {top + dy}H{x1 + dx}" fill="none" stroke="{glass}" stroke-width="{wall}" stroke-linejoin="round" stroke-linecap="round"/>"""
+
+
+def icon(small):
+    scale = 12 if small else 11
+    tx, ty = 512 - 32 * scale, 512 - 36 * scale
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
 <rect x="100" y="100" width="824" height="824" rx="185" fill="{TILE}"/>
 <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="{EDGE}" stroke-width="3"/>
-<rect x="150" y="{by}" width="{x0 - 150 - wall // 2}" height="{beam}" fill="{BEAM}"/>
-<rect x="{x1 + wall // 2}" y="{by}" width="{874 - x1 - wall // 2}" height="{beam}" fill="{BEAM}" opacity=".35"/>
-<rect x="{x0}" y="{top}" width="{x1 - x0}" height="{bottom - top}" rx="26" fill="none" stroke="{GLASS}" stroke-width="{wall}"/>
-<rect x="{x0 + inset}" y="380" width="{x1 - x0 - 2 * inset}" height="{bottom - inset - 380}" rx="8" fill="{GLASS}"/>
-<rect x="{x0 + inset}" y="{by}" width="{x1 - x0 - 2 * inset}" height="{beam}" fill="{BEAM}" opacity=".7"/>
+<g transform="translate({tx} {ty}) scale({scale})">
+{mark(**DARK | dict(wall=5 if small else 3.5))}
+</g>
 </svg>
 """
+
+
+def docs():
+    for name, colors in (("logo.svg", LIGHT), ("logo-dark.svg", DARK)):
+        path = DOCS / name
+        text = path.read_text()
+        start = text.index("</title>\n") + len("</title>\n")
+        end = text.index('<g fill="')
+        path.write_text(text[:start] + mark(**colors) + "\n" + text[end:])
+    (DOCS / "mark.svg").write_text(f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+<title>Cuvette</title>
+{mark(**LIGHT)}
+</svg>
+""")
 
 
 def render(src, size, dest):
@@ -37,9 +61,10 @@ def render(src, size, dest):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    docs()
     full, small = HERE / "cuvette.svg", HERE / "cuvette-small.svg"
-    full.write_text(svg(False))
-    small.write_text(svg(True))
+    full.write_text(icon(False))
+    small.write_text(icon(True))
     with tempfile.TemporaryDirectory() as tmp:
         iconset = Path(tmp) / "icon.iconset"
         iconset.mkdir()
