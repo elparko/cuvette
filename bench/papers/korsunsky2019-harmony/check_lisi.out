@@ -1,0 +1,8 @@
+cells at load: jurkat 3258, t293 2885, mix 3388 total 9531
+genes with at least 3 cells 18877
+cells after quality control: jurkat 3255, t293 2885, mix 3388 total 9528
+cells labeled in the mix: jurkat 1773, t293 1615
+before Harmony iLISI (dataset): median 1.056, 2.5th to 97.5th percentile 1.00 to 2.00
+before Harmony cLISI (cell line): median 1.000, 2.5th to 97.5th percentile 1.00 to 1.00
+after Harmony iLISI (dataset): median 1.657, 2.5th to 97.5th percentile 1.04 to 2.00
+after Harmony cLISI (cell line): median 1.000, 2.5th to 97.5th percentile 1.00 to 1.00

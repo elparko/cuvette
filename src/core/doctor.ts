@@ -61,7 +61,8 @@ export const ENVS: Record<string, { modules: string[]; packages: string[] }> = {
   pyimzml: { modules: ["pyimzml", "numpy"], packages: ["pyimzml", "numpy"] },
   pyopenms: { modules: ["pyopenms", "numpy"], packages: ["pyopenms", "numpy"] },
   rdkit: { modules: ["rdkit", "numpy"], packages: ["rdkit", "numpy"] },
-  scanpy: { modules: ["scanpy", "anndata", "matplotlib", "pandas", "scipy"], packages: ["scanpy", "matplotlib", "pandas", "scipy"] },
+  scanpy: { modules: ["scanpy", "anndata", "matplotlib", "pandas", "scipy", "harmonypy"], packages: ["scanpy", "matplotlib", "pandas", "scipy", "harmonypy>=2.1"] },
+  squidpy: { modules: ["squidpy", "scanpy", "anndata", "matplotlib", "igraph", "leidenalg"], packages: ["squidpy", "matplotlib", "igraph", "leidenalg"] },
   skimage: { modules: ["skimage", "tifffile", "PIL", "scipy"], packages: ["scikit-image", "tifffile", "pillow", "scipy"] },
 };
 

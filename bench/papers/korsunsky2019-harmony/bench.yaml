@@ -1,0 +1,41 @@
+adapters: [scanpy, harmony]
+prompt: |
+  I have three 10x data sets of cell lines: pure Jurkat cells, pure HEK293T cells, and a 50:50 mix of both. Each is a Cell Ranger folder: {data}/korsunsky2019-harmony/jurkat/filtered_matrices_mex/hg19 , {data}/korsunsky2019-harmony/t293/filtered_matrices_mex/hg19 and {data}/korsunsky2019-harmony/mix/filtered_matrices_mex/hg19 . Put the three data sets together and clean the cells the usual way. Then remove the difference between the data sets with Harmony, so that the cells of the mix fall onto the pure data sets. Measure how well the data sets mix before and after Harmony, and check that the two cell lines stay apart. Write every number in the answer text: the cells in each data set after quality control, the median iLISI before and after Harmony, and the median cLISI before and after Harmony.
+setup: {}
+answers:
+  replicate: "cells in one sample (descriptive only)"
+  min_genes_per_cell: 500
+  max_genes_per_cell: 100000
+  max_pct_mito: 20
+  min_cells_per_gene: 3
+  target_sum: 10000
+  n_top_genes: 1000
+  regress_out: none
+  batch_variable: sample
+  batches_are: "also by cell type or condition (some batches hold other cells)"
+  harmony_theta: 2
+  harmony_n_pcs: 30
+  random_seed: 0
+allow: all
+timeout_s: 1500
+data:
+  - korsunsky2019-harmony/jurkat/filtered_matrices_mex/hg19
+  - korsunsky2019-harmony/t293/filtered_matrices_mex/hg19
+  - korsunsky2019-harmony/mix/filtered_matrices_mex/hg19
+items:
+  # Source: Korsunsky 2019, Results, "Harmony ... cell lines": median iLISI 1.01 before and 1.59 after Harmony, median
+  # cLISI 1.00 before and after. Text read in the bioRxiv version 2 (the Nature Methods text was not readable).
+  # check_lisi.py (numpy, scikit-learn, harmonypy) gives 1.056 before and 1.657 after. The tolerance 0.1 covers the
+  # differences between the R code of 2019 and this pipeline: the gene filter, the variable genes and the version of Harmony.
+  - {key: ilisi_before, description: "Median iLISI of the data sets before Harmony", value: 1.01, tolerance: 0.1, tool: compute_lisi}
+  - {key: ilisi_after, description: "Median iLISI of the data sets after Harmony", value: 1.59, tolerance: 0.1, tool: compute_lisi}
+  - {key: clisi_before, description: "Median cLISI of the cell lines before Harmony", value: 1.0, tolerance: 0.02, tool: compute_lisi}
+  - {key: clisi_after, description: "Median cLISI of the cell lines after Harmony", value: 1.0, tolerance: 0.02, tool: compute_lisi}
+  # The paper counts 3255 Jurkat cells in the pure data set. The filter keeps 3255 of 3258 cells.
+  - {key: jurkat_pure_cells_after_qc, description: "Cells of the pure Jurkat data set after quality control", value: 3255, exact: true, tool: count_groups}
+  # Reference only. The paper counts 2859 cells in the pure 293T data set, 1799 Jurkat cells and 1565 293T cells in the mix.
+  # The 10x filtered matrices give 2885 cells in the pure 293T data set after the same filter (3388 in the mix, 1773 and 1615
+  # labeled). The paper removes cells of unclear identity (Figure S1); the text gives no rule.
+  - {key: t293_pure_cells_after_qc, description: "Cells of the pure 293T data set after quality control (paper count)", value: 2859, exact: true, reference: true, tool: count_groups}
+  - {key: mix_jurkat_cells, description: "Jurkat cells in the 50:50 mix (paper count)", value: 1799, exact: true, reference: true, tool: count_groups}
+  - {key: mix_t293_cells, description: "293T cells in the 50:50 mix (paper count)", value: 1565, exact: true, reference: true, tool: count_groups}

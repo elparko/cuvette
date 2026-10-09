@@ -3,7 +3,7 @@ adapter:
   field: single-cell transcriptomics
   file_types: [".h5ad", ".h5", "matrix.mtx", "matrix.mtx.gz"]
   title: Scanpy
-  version: 0.1.1
+  version: 0.1.2
   spec: "1"
   description: >
     Clusters single-cell RNA data with scanpy. Each tool does one scanpy step on a cell-by-gene
@@ -405,6 +405,7 @@ tools:
       n_neighbors: { type: integer, minimum: 2, description: Number of neighbors. }
       n_pcs: { type: integer, minimum: 2, description: Number of principal components to use. }
       random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
+      use_rep: { type: string, default: X_pca, description: "The obsm key of the embedding. Use X_pca_harmony after integrate_harmony of the harmony adapter." }
     required: [adata]
 
   - name: run_umap
@@ -600,6 +601,7 @@ map:
       - { arg: n_neighbors, label: n_neighbors, ui_default: 15 }
       - { arg: n_pcs, label: n_pcs, ui_default: null, note: Scanpy uses all computed components if you give none. }
       - { arg: random_state, label: random_state, ui_default: 0 }
+      - { arg: use_rep, label: use_rep, ui_default: X_pca }
     fidelity: exact
     evidence: { source: docs, test: small-pipeline }
 
@@ -917,3 +919,64 @@ tests:
       - { path: metrics.n_genes_missing, equals: 1 }
       - { path: summary, contains: "Genes not found: NOT_A_GENE" }
       - { path: "outputs[0].path", contains: ".png" }
+
+  - id: handle-as-json-text
+    description: A handle can arrive as JSON text. The tool reads it. A list of genes can arrive as JSON text too.
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: load_data
+        args: { path: "{adapter_dir}/data/pbmc3k_small.h5ad" }
+        save_as: a
+      - tool: normalize_log
+        args: { adata: { handle: "{saved.a.data.adata.handle}" }, target_sum: 10000 }
+        save_as: b
+      - tool: run_pca
+        args: { adata: { handle: "{saved.b.data.adata.handle}" }, random_state: 0 }
+        save_as: c
+      - tool: build_neighbors
+        args: { adata: { handle: "{saved.c.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0 }
+        save_as: d
+      - tool: run_umap
+        args: { adata: { handle: "{saved.d.data.adata.handle}" }, random_state: 0 }
+        save_as: e
+      - tool: plot_genes
+        args: { adata: '{"handle": "{saved.e.data.adata.handle}"}', genes: '["CD3E", "MS4A1", "NOT_A_GENE"]', kind: umap }
+    expect:
+      - { path: metrics.n_genes_plotted, equals: 2 }
+      - { path: metrics.n_genes_missing, equals: 1 }
+
+  - id: missing-adata-file
+    description: An adata path that does not exist fails, and the error names the path and how to pass an object.
+    calls:
+      - { tool: calculate_qc, args: { adata: "{adapter_dir}/data/no_such_checkpoint.h5ad" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "adata file not found" }
+      - { path: error, contains: "no_such_checkpoint.h5ad" }
+
+  - id: neighbors-use-rep
+    description: >
+      build_neighbors takes the embedding from obsm. The default X_pca gives the same graph as
+      before. An embedding that does not exist fails, and the error names the embeddings that exist.
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: load_data
+        args: { path: "{adapter_dir}/data/pbmc3k_small.h5ad" }
+        save_as: a
+      - tool: normalize_log
+        args: { adata: { handle: "{saved.a.data.adata.handle}" }, target_sum: 10000 }
+        save_as: b
+      - tool: run_pca
+        args: { adata: { handle: "{saved.b.data.adata.handle}" }, random_state: 0 }
+        save_as: c
+      - tool: build_neighbors
+        args: { adata: { handle: "{saved.c.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0, use_rep: X_pca }
+        save_as: d
+      - tool: build_neighbors
+        args: { adata: { handle: "{saved.c.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0, use_rep: X_pca_harmony }
+    expect:
+      - { path: saved.d.metrics.n_pcs, equals: 10 }
+      - { path: saved.d.summary, contains: "10 dimensions of X_pca" }
+      - { path: ok, equals: false }
+      - { path: error, contains: "No embedding X_pca_harmony found in obsm" }
+      - { path: error, contains: "Available: X_pca" }

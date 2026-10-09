@@ -1,0 +1,4 @@
+jurkat: cells 100, jurkat 100, t293 0
+t293: cells 100, jurkat 0, t293 100
+mix: cells 100, jurkat 45, t293 55
+XIST counts: jurkat 0, t293 1474, mix 927

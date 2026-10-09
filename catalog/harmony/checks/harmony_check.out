@@ -1,0 +1,3 @@
+cells 3500 dimensions 30 donors A, B, C
+batch shift before 0.3456 | R harmony2 reference 0.0913 | harmonypy 0.0912
+Pearson r with the R reference per dimension: min 0.9985 mean 0.9991

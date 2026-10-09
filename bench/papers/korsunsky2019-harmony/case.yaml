@@ -1,0 +1,135 @@
+kind: research paper
+short: Korsunsky 2019
+field: Genomics and transcriptomics
+program: scanpy and harmonypy (Python), through the scanpy and harmony adapters
+citation:
+  authors: Korsunsky I, Millard N, Fan J, Slowikowski K, Zhang F, Wei K, Baglaenko Y, Brenner M, Loh P, Raychaudhuri S
+  title: Fast, sensitive and accurate integration of single-cell data with Harmony
+  venue: Nature Methods 16:1289-1296
+  year: 2019
+  doi: 10.1038/s41592-019-0619-0
+related:
+  - text: "Zheng GXY et al. Massively parallel digital transcriptional profiling of single cells. Nat Commun 8:14049 (2017). Source of the 10x Jurkat, 293T and 50:50 mix data sets."
+    doi: 10.1038/ncomms14049
+  - text: "bioRxiv version 2 of the Harmony paper. The cell line numbers were read in this version. The Nature Methods page could not be read."
+    doi: 10.1101/461954
+measured: >-
+  The paper introduces Harmony, a method that removes the difference between data sets from the principal components
+  of single cells. It tests the method on three 10x data sets of cell lines: pure Jurkat cells, pure 293T cells and a
+  50:50 mix of both. The test uses the local inverse Simpson index (LISI). The index of the data set (iLISI) measures the
+  mixing of the data sets. The index of the cell line (cLISI) measures if the cell lines stay apart. The quality filters
+  decide how many cells stay, and the Harmony penalty decides how strongly the data sets mix.
+instruction: >-
+  I have three 10x data sets of cell lines: pure Jurkat cells, pure HEK293T cells, and a 50:50 mix of both. Put them
+  together, clean the cells and remove the difference between the data sets with Harmony. How well do the data sets
+  mix before and after, and do the two cell lines stay apart?
+instruction_basis: >-
+  The cell line experiment in the Results of the Harmony paper. The paper filters cells with fewer than 500 genes or more
+  than 20 percent mitochondrial reads, scales each cell to 10,000 reads, takes the top 1000 variable genes, keeps 30
+  principal components and uses theta 2.
+answers:
+  replicate:
+    decision: What is the unit of replication?
+    value: cells in one sample (descriptive only)
+    source: The test compares mixing of cell lines. It makes no claim about samples.
+  min_genes_per_cell:
+    decision: Minimum genes per cell
+    value: 500
+    source: Paper, Methods, preprocessing. Cells with fewer than 500 genes are removed.
+  max_genes_per_cell:
+    decision: Maximum genes per cell
+    value: 100000
+    source: The paper has no upper limit. The value 100000 removes no cell.
+  max_pct_mito:
+    decision: Maximum percent of mitochondrial counts
+    value: 20
+    source: Paper, Methods, preprocessing. Cells with more than 20 percent mitochondrial reads are removed.
+  min_cells_per_gene:
+    decision: Minimum cells per gene
+    value: 3
+    source: Not in the paper. The paper has no gene filter. The value 3 is the scanpy tutorial value.
+  target_sum:
+    decision: Counts per cell after normalization
+    value: 10000
+    source: Paper, Methods, preprocessing. Each cell scales to 10,000 reads, then log scale.
+  n_top_genes:
+    decision: Number of highly variable genes
+    value: 1000
+    source: Paper, Methods. The paper takes the top 1000 variable genes in each data set and pools them. The tool takes the top 1000 of the pooled cells.
+  regress_out:
+    decision: Variables to regress out
+    value: none
+    source: The paper regresses nothing out.
+  batch_variable:
+    decision: Column that holds the batch
+    value: sample
+    source: The batch is the data set (Jurkat, 293T or mix). The column name is the default of merge_samples.
+  batches_are:
+    decision: Do the batches differ only by technique, or also by cell type or condition?
+    value: also by cell type or condition (some batches hold other cells)
+    source: The pure data sets hold one cell line each. The mix holds both.
+  harmony_theta:
+    decision: Harmony diversity penalty
+    value: 2
+    source: Paper, Methods. Harmony default.
+  harmony_n_pcs:
+    decision: Number of principal components
+    value: 30
+    source: Paper, Methods. The truncated SVD keeps the top 30 components.
+  random_seed:
+    decision: Random seed
+    value: 0
+    source: Not in the paper. The benchmark fixes the seed.
+items:
+  ilisi_before:
+    source: published
+    where: Results, cell line section. "iLISI (median iLISI 1.01, 95% [1.00, 1.61])" for the standard PCA pipeline before Harmony.
+    independence: independent
+    check: >-
+      check_lisi.py redoes the pipeline without scanpy (numpy and SciPy for filters, normalization, variable genes,
+      scaling and the SVD) and uses its own LISI code, which equals the R LISI reference of the harmonypy tests.
+      It gives 1.056. The difference to 1.01 comes from the R pipeline of 2019.
+  ilisi_after:
+    source: published
+    where: Results, cell line section. "The increased iLISI (median iLISI 1.59, 95% [1.27, 1.97])" after Harmony.
+    independence: independent
+    check: >-
+      check_lisi.py gives 1.657 with harmonypy 2.1.0, theta 2 and 30 components. The paper value 1.59 differs by 0.07.
+      Output check_lisi.out.
+  clisi_before:
+    source: published
+    where: Results, cell line section. "low cLISI (median iLISI 1.00, 95% [1.00, 1.00])" before Harmony (the text writes iLISI for cLISI).
+    independence: independent
+    check: check_lisi.py gives 1.000.
+  clisi_after:
+    source: published
+    where: Results, cell line section. "median cLISI 1.00, 95% [1.00, 1.02]" after Harmony.
+    independence: independent
+    check: check_lisi.py gives 1.000.
+  jurkat_pure_cells_after_qc:
+    source: published
+    where: Results, cell line section. "3255 cells from the pure Jurkat dataset".
+    independence: independent
+    check: check_lisi.py keeps 3255 of the 3258 cells of the pure Jurkat data set.
+  t293_pure_cells_after_qc:
+    source: published
+    where: Results, cell line section. "2859 from the pure 293T dataset".
+    independence: independent
+    check: check_lisi.py keeps 2885 of the 2885 cells. The count does not reproduce.
+  mix_jurkat_cells:
+    source: published
+    where: Results, cell line section. "1799 Jurkat cells from the mixture dataset".
+    independence: independent
+    check: check_lisi.py labels 1773 cells of the mix as Jurkat. The count does not reproduce.
+  mix_t293_cells:
+    source: published
+    where: Results, cell line section. "the 1565 293T cells from the mixture dataset".
+    independence: independent
+    check: check_lisi.py labels 1615 cells of the mix as 293T. The count does not reproduce.
+data:
+  source: 10x Genomics public data sets "Jurkat", "293T" and "50:50 Jurkat:293T" cells, Cell Ranger 1.1.0 filtered gene-barcode matrices (hg19)
+  url: https://cf.10xgenomics.com/samples/cell-exp/1.1.0/jurkat/jurkat_filtered_gene_bc_matrices.tar.gz
+  license: >-
+    CC BY 4.0 on the 10x dataset pages of the same series (the page of the 3k PBMC data set states it). The pages of these
+    three data sets answered HTTP 429 on 2026-10-09, so the license of these three is not confirmed. Cell lines, no patient data.
+  size: 33.0 MB, 30.8 MB and 36.2 MB archives, 3258, 2885 and 3388 cells by 32738 genes

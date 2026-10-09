@@ -1,0 +1,2 @@
+label1: own median 1.3186 mean 1.4709 | R reference median 1.3187 mean 1.4710 | max abs diff 0.0016 | mean abs diff 0.0001
+label2: own median 1.9394 mean 1.9023 | R reference median 1.9395 mean 1.9024 | max abs diff 0.0012 | mean abs diff 0.0001

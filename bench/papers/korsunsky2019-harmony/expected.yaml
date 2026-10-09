@@ -1,0 +1,27 @@
+tool: scanpy, harmony
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/korsunsky2019-harmony/jurkat/filtered_matrices_mex/hg19
+  - /Volumes/T7/guided-analysis/data/korsunsky2019-harmony/t293/filtered_matrices_mex/hg19
+  - /Volumes/T7/guided-analysis/data/korsunsky2019-harmony/mix/filtered_matrices_mex/hg19
+decisions:
+  min_genes_per_cell: 500
+  max_pct_mito: 20
+  normalization: "normalize_total target_sum 1e4, then log1p"
+  hvg: "top 1000 genes"
+  n_pcs: 30
+  harmony_theta: 2
+expected:
+  - {description: "median iLISI of the data sets before Harmony", value: 1.01, tolerance: 0.1, source: "Korsunsky 2019, Results, cell lines; computed 1.056 by check_lisi.py"}
+  - {description: "median iLISI of the data sets after Harmony", value: 1.59, tolerance: 0.1, source: "Korsunsky 2019, Results, cell lines; computed 1.657 by check_lisi.py"}
+  - {description: "median cLISI of the cell lines before Harmony", value: 1.0, tolerance: 0.02, source: "Korsunsky 2019, Results, cell lines"}
+  - {description: "median cLISI of the cell lines after Harmony", value: 1.0, tolerance: 0.02, source: "Korsunsky 2019, Results, cell lines"}
+  - {description: "cells of the pure Jurkat data set after quality control", value: 3255, tolerance: 0, source: "Korsunsky 2019, Results, cell lines; 3255 by check_lisi.py"}
+  - {description: "cells of the pure 293T data set after quality control (paper count)", value: 2859, tolerance: 0, source: "Korsunsky 2019, Results, cell lines; check_lisi.py gives 2885"}
+  - {description: "Jurkat cells in the 50:50 mix (paper count)", value: 1799, tolerance: 0, source: "Korsunsky 2019, Results, cell lines; check_lisi.py gives 1773"}
+  - {description: "293T cells in the 50:50 mix (paper count)", value: 1565, tolerance: 0, source: "Korsunsky 2019, Results, cell lines; check_lisi.py gives 1615"}
+notes: |
+  The text of the paper was read in bioRxiv version 2 (10.1101/461954). The Nature Methods page could not be read.
+  The three cell counts marked "paper count" do not reproduce. The paper labels cells in Figure S1 and drops cells of unclear identity.
+  Trap: Harmony with the batch column set to a column that does not mix the cell types gives a cLISI above 1.
+  Trap: scanpy.external.pp.harmony_integrate fails with harmonypy 2.1.0. The harmony adapter does not call it.

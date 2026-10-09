@@ -1,0 +1,621 @@
+adapter:
+  name: harmony
+  field: single-cell transcriptomics
+  file_types: [".h5ad"]
+  title: Harmony integration of single-cell samples
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Merges single-cell samples, removes the batch effect from the principal components with Harmony,
+    and measures the mixing with LISI (local inverse Simpson index). It works on the .h5ad
+    checkpoints of the scanpy adapter.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: harmonypy
+  version: ""
+  tested_versions: ["2.1.0"]
+  homepage: https://github.com/slowkow/harmonypy
+  docs:
+    - https://github.com/slowkow/harmonypy/blob/master/README.md
+    - https://scanpy.readthedocs.io/en/stable/api/preprocessing.html
+  install: >
+    The adapter uses the Python environment of the scanpy adapter. Add harmonypy 2.1.0 or later:
+    uv pip install --python ~/.guided-analysis/envs/scanpy/bin/python "harmonypy>=2.1"
+  citation:
+    - text: "Korsunsky, I., Millard, N., Fan, J., Slowikowski, K., Zhang, F., Wei, K., Baglaenko, Y., Brenner, M., Loh, P., & Raychaudhuri, S. (2019). Fast, sensitive and accurate integration of single-cell data with Harmony. Nature Methods, 16(12), 1289-1296. https://doi.org/10.1038/s41592-019-0619-0"
+      doi: 10.1038/s41592-019-0619-0
+      bibtex: |
+        @article{korsunsky2019harmony,
+          author  = {Korsunsky, Ilya and Millard, Nghia and Fan, Jean and Slowikowski, Kamil and Zhang, Fan and Wei, Kevin and Baglaenko, Yuriy and Brenner, Michael and Loh, Po-ru and Raychaudhuri, Soumya},
+          title   = {Fast, sensitive and accurate integration of single-cell data with {Harmony}},
+          journal = {Nature Methods},
+          year    = {2019},
+          volume  = {16},
+          number  = {12},
+          pages   = {1289--1296},
+          doi     = {10.1038/s41592-019-0619-0}
+        }
+    - text: "Slowikowski, K. (2021). harmonypy: a data alignment algorithm. Zenodo. https://doi.org/10.5281/zenodo.4531400"
+      doi: 10.5281/zenodo.4531400
+      kind: program
+    - text: "Wolf, F. A., Angerer, P., & Theis, F. J. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biology, 19(1), 15. https://doi.org/10.1186/s13059-017-1382-0"
+      doi: 10.1186/s13059-017-1382-0
+      bibtex: |
+        @article{wolf2018scanpy,
+          author  = {Wolf, F. Alexander and Angerer, Philipp and Theis, Fabian J.},
+          title   = {{SCANPY}: large-scale single-cell gene expression data analysis},
+          journal = {Genome Biology},
+          year    = {2018},
+          volume  = {19},
+          number  = {1},
+          pages   = {15},
+          doi     = {10.1186/s13059-017-1382-0}
+        }
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: GA_HARMONY_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/scanpy/bin/python
+    - ~/.guided-analysis/envs/scanpy/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import harmonypy; print('harmonypy', harmonypy.__version__)"]
+  version_pattern: 'harmonypy (\S+)'
+  identity: 'harmonypy \d'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and small PNG previews. It never sees the cell-by-gene matrix.
+
+decisions:
+  - key: batch_variable
+    label: Which column of the cell table holds the batch (sample, donor or run)?
+    kind: text
+    group: Design
+    help: >
+      Harmony removes the differences between the values of this column. Choose the technical
+      source of variation, such as the sequencing run or the donor. Do not choose a column that
+      holds the biology that you want to compare.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: integrate_harmony, arg: batch_key }
+      - { tool: plot_integration, arg: batch_key }
+
+  - key: batches_are
+    label: Do the batches differ only by technique, or also by cell type or condition?
+    kind: choice
+    choices:
+      - only by technique (every batch holds the same cell types)
+      - also by cell type or condition (some batches hold other cells)
+    default: only by technique (every batch holds the same cell types)
+    group: Design
+    help: >
+      Harmony removes differences between batches. If a batch holds cell types that no other batch
+      holds, Harmony can pull those cells onto other cell types. Check the cLISI of the cell types.
+      If the batches are the conditions that you compare, do not integrate over them.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: harmony_theta
+    label: Harmony diversity penalty (theta)
+    kind: float
+    default: 2
+    lo: 0
+    hi: 10
+    group: Integration
+    help: >
+      A higher value mixes the batches more strongly. The value 0 removes no batch effect. The
+      Harmony default is 2.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: integrate_harmony, arg: theta }
+    sensitivity:
+      options: [0, 2, 4]
+      tool: integrate_harmony
+      compare: [metrics.batch_shift_after]
+      max_runs: 3
+
+  - key: harmony_n_pcs
+    label: Number of principal components for Harmony and LISI
+    kind: int
+    default: 30
+    lo: 2
+    hi: 50
+    group: Integration
+    help: >
+      Harmony corrects these components. LISI uses the same number. Use the same number in the
+      before and after comparison.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: integrate_harmony, arg: n_pcs }
+      - { tool: compute_lisi, arg: n_pcs }
+
+  - key: random_seed
+    label: Random seed
+    kind: int
+    default: 0
+    lo: 0
+    hi: 2147483647
+    group: Reproducibility
+    help: Harmony starts its clusters from a random state. The same seed gives the same result.
+    owner: agent
+    stage: setup
+    changes_conclusion: false
+    links:
+      - { tool: integrate_harmony, arg: random_state }
+
+tools:
+  - name: merge_samples
+    title: Merge samples into one object
+    description: >
+      Read 2 or more samples and join them in one cell-by-gene object. Each sample is a 10x folder,
+      a 10x .h5 file or an .h5ad file. Keeps the genes that all samples share. Saves merged.h5ad.
+    batch: false
+    function: "ga_harmony:merge_samples"
+    params:
+      paths: { type: array, items: { type: string }, minItems: 2, description: "Absolute paths of the samples, one for each sample, in the order that you want." }
+      sample_names: { type: [array, string], description: "One name for each path. The default is the file or folder name. Give names if the folder names are equal, such as hg19." }
+      batch_key: { type: string, default: sample, description: "Name of the new column in the cell table that holds the sample name." }
+      var_names: { type: string, enum: [gene_symbols, gene_ids], default: gene_symbols, description: Use gene symbols or gene ids as gene names. }
+    required: [paths]
+    outputs:
+      samples: { kind: table, ext: csv, description: Cells and genes of each sample. }
+
+  - name: integrate_harmony
+    title: Remove batch effects with Harmony
+    description: >
+      Correct the principal components in obsm['X_pca'] so that cells of different batches mix.
+      Writes the corrected components to obsm['X_pca_harmony']. Run run_pca of the scanpy adapter first.
+      Do not use it if the batches are the conditions that you compare.
+    function: "ga_harmony:integrate_harmony"
+    params:
+      adata: { type: [object, string], description: "A handle or an .h5ad path. The object must hold obsm X_pca." }
+      batch_key: { type: string, description: The column of the cell table that holds the batch. }
+      theta: { type: number, minimum: 0, maximum: 10, description: "Diversity penalty, unitless. A higher value mixes the batches more. 0 removes no batch effect." }
+      n_pcs: { type: integer, minimum: 2, description: "Number of principal components to correct, counted from the first." }
+      random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
+      basis: { type: string, default: X_pca, description: The obsm key of the components to correct. }
+      adjusted_basis: { type: string, default: X_pca_harmony, description: The obsm key for the corrected components. }
+    required: [adata, batch_key]
+    citations:
+      - text: "Korsunsky, I., Millard, N., Fan, J., Slowikowski, K., Zhang, F., Wei, K., Baglaenko, Y., Brenner, M., Loh, P., & Raychaudhuri, S. (2019). Fast, sensitive and accurate integration of single-cell data with Harmony. Nature Methods, 16(12), 1289-1296. https://doi.org/10.1038/s41592-019-0619-0"
+        doi: 10.1038/s41592-019-0619-0
+
+  - name: compute_lisi
+    title: Measure mixing with LISI
+    description: >
+      Compute the local inverse Simpson index (LISI) of a column of the cell table in an embedding.
+      Use the batch column to measure mixing (iLISI, higher is better). Use the cell type column to
+      measure separation (cLISI, 1 is best).
+    read_only: true
+    function: "ga_harmony:compute_lisi"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      label_key: { type: string, description: "The column of the cell table with the labels. Use the batch column for iLISI and the cell type column for cLISI." }
+      use_rep: { type: string, default: X_pca_harmony, description: "The obsm key of the embedding. X_pca holds the components before integration." }
+      n_pcs: { type: integer, minimum: 2, description: "Number of dimensions of the embedding to use, counted from the first." }
+      perplexity: { type: number, minimum: 2, default: 30, description: "Effective number of neighbors, unitless. The tool uses 3 times this number of neighbors." }
+      by: { type: string, description: "Optional column of the cell table. The tool also gives the median LISI inside each of its groups." }
+    required: [adata, label_key]
+    outputs:
+      lisi: { kind: table, ext: csv, description: Median LISI of all cells and of each group. }
+    citations:
+      - text: "Korsunsky, I., Millard, N., Fan, J., Slowikowski, K., Zhang, F., Wei, K., Baglaenko, Y., Brenner, M., Loh, P., & Raychaudhuri, S. (2019). Fast, sensitive and accurate integration of single-cell data with Harmony. Nature Methods, 16(12), 1289-1296. https://doi.org/10.1038/s41592-019-0619-0"
+        doi: 10.1038/s41592-019-0619-0
+
+  - name: label_by_reference
+    title: Label cells by their closest reference group
+    description: >
+      Give each cell the label of the reference group with the highest Pearson correlation to the
+      cell. A reference group is the mean expression profile of a pure sample. This labels a mixed
+      sample, such as two cell lines mixed.
+    function: "ga_harmony:label_by_reference"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      reference_key: { type: string, description: The column of the cell table that holds the sample of each cell. }
+      reference_groups: { type: [array, string], minItems: 2, description: "Values of reference_key that define the labels. Each value must be a pure sample. Give at least 2." }
+      label_key: { type: string, default: reference_label, description: Name of the new column with the labels. }
+    required: [adata, reference_key, reference_groups]
+    outputs:
+      labels: { kind: table, ext: csv, description: Cells of each sample by label. }
+
+  - name: count_groups
+    title: Count cells in each group
+    description: >
+      Count the cells in each value of a column of the cell table. With a second column, count each
+      pair of values. Use it to report the cells of each sample after quality control.
+    read_only: true
+    function: "ga_harmony:count_groups"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      key: { type: string, description: The column of the cell table to count. }
+      by: { type: string, description: Optional second column. The tool then counts each pair of values. }
+    required: [adata, key]
+    outputs:
+      counts: { kind: table, ext: csv, description: Cells in each group. }
+
+  - name: compare_embeddings
+    title: Compare two embeddings
+    description: >
+      Give the Pearson correlation of each dimension of two embeddings of the same cells.
+      Use it to compare the Harmony result with a result from another run or program.
+    read_only: true
+    function: "ga_harmony:compare_embeddings"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      rep_a: { type: string, description: The obsm key of the first embedding. }
+      rep_b: { type: string, description: The obsm key of the second embedding. }
+      n_dims: { type: integer, minimum: 1, description: "Number of dimensions to compare, counted from the first." }
+    required: [adata, rep_a, rep_b]
+    outputs:
+      correlation: { kind: table, ext: csv, description: Pearson r of each dimension. }
+
+  - name: plot_integration
+    title: Plot UMAP before and after integration
+    description: >
+      Draw UMAP plots of the embeddings, colored by batch and by an optional label column.
+      The plots show structure. They give no numbers. compute_lisi gives the numbers.
+    read_only: true
+    function: "ga_harmony:plot_integration"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      batch_key: { type: string, description: The column of the cell table that holds the batch. }
+      label_key: { type: string, description: Optional column with the cell types. }
+      reps: { type: [array, string], description: "The obsm keys to draw. The default is X_pca and X_pca_harmony." }
+      n_pcs: { type: integer, minimum: 2, description: "Number of dimensions to use, counted from the first." }
+      n_neighbors: { type: integer, minimum: 2, default: 15, description: Number of neighbors for the UMAP graph. }
+      random_state: { type: integer, minimum: 0, default: 0, description: Random seed. }
+    required: [adata, batch_key]
+    outputs:
+      plot: { kind: image, ext: png, description: UMAP plots. }
+    citations:
+      - text: "McInnes, L., Healy, J., & Melville, J. (2018). UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction. arXiv. https://doi.org/10.48550/arXiv.1802.03426"
+        doi: 10.48550/arXiv.1802.03426
+
+map:
+  - tool: merge_samples
+    route: |
+      import anndata as ad
+      parts = [sc.read_10x_mtx(p) for p in paths]
+      adata = ad.concat(parts, join="inner", label="sample", keys=names, index_unique="-")
+    params:
+      - { arg: paths, label: paths }
+      - { arg: sample_names, label: keys }
+      - { arg: batch_key, label: label, ui_default: null }
+      - { arg: var_names, label: var_names, ui_default: gene_symbols }
+    fidelity: exact
+    evidence: { source: docs, test: merge-small, note: The tool calls anndata.concat with join inner. }
+
+  - tool: integrate_harmony
+    route: |
+      import harmonypy
+      out = harmonypy.run_harmony(adata.obsm["X_pca"][:, :30], adata.obs, "sample", theta=2, random_state=0)
+      adata.obsm["X_pca_harmony"] = out.Z_corr
+      # In R: harmony::RunHarmony(seurat, group.by.vars = "sample", theta = 2)
+    params:
+      - { arg: batch_key, label: vars_use }
+      - { arg: theta, label: theta, ui_default: 2 }
+      - { arg: n_pcs, label: columns of the data matrix, ui_default: null }
+      - { arg: random_state, label: random_state, ui_default: 0 }
+      - { arg: basis, label: data_mat, ui_default: X_pca }
+      - { arg: adjusted_basis, label: key of obsm, ui_default: X_pca_harmony }
+    fidelity: close
+    difference: >
+      The tool does not call scanpy.external.pp.harmony_integrate. With harmonypy 2.1.0 that
+      function fails, because it transposes the result (checked on 2026-10-09 with scanpy 1.12.4).
+      The tool reads the result in the shape of the input. The numbers equal a direct harmonypy call.
+    evidence: { source: docs, test: harmony-r-reference, note: "The corrected components correlate with the R harmony reference of the harmonypy tests (minimum Pearson r 0.9985 per dimension)." }
+
+  - tool: compute_lisi
+    route: |
+      import harmonypy
+      lisi = harmonypy.compute_lisi(adata.obsm["X_pca_harmony"][:, :30], adata.obs, ["sample"], perplexity=30)
+      # In R: lisi::compute_lisi(X, meta_data, "sample", perplexity = 30)
+    params:
+      - { arg: label_key, label: label_colnames }
+      - { arg: use_rep, label: X, ui_default: null }
+      - { arg: n_pcs, label: columns of X, ui_default: null }
+      - { arg: perplexity, label: perplexity, ui_default: 30 }
+      - { arg: by, label: group by, ui_default: null }
+    fidelity: exact
+    evidence: { source: docs, test: lisi-r-reference, note: "The values match the R LISI reference of the harmonypy tests, and an own implementation (checks/lisi_check.py) gives the same medians." }
+
+  - tool: label_by_reference
+    route: |
+      logx = adata.raw.X if adata.raw is not None else adata.X
+      ref = {g: logx[adata.obs["sample"] == g].mean(axis=0) for g in groups}
+      label = [max(groups, key=lambda g: np.corrcoef(row, ref[g])[0, 1]) for row in logx]
+    params:
+      - { arg: reference_key, label: sample column }
+      - { arg: reference_groups, label: groups }
+      - { arg: label_key, label: new column, ui_default: null }
+    fidelity: exact
+    evidence: { source: docs, test: label-reference, note: The labels equal a numpy calculation (checks/label_check.py). }
+
+  - tool: count_groups
+    route: 'adata.obs["sample"].value_counts()   # with a second column: pd.crosstab(adata.obs["sample"], adata.obs["cell_line"])'
+    params:
+      - { arg: key, label: column }
+      - { arg: by, label: second column, ui_default: null }
+    fidelity: exact
+    evidence: { source: docs, test: count-groups }
+
+  - tool: compare_embeddings
+    route: "np.corrcoef(adata.obsm['X_pca_harmony'][:, i], other[:, i])[0, 1]   # for each dimension i"
+    params:
+      - { arg: rep_a, label: first embedding }
+      - { arg: rep_b, label: second embedding }
+      - { arg: n_dims, label: dimensions, ui_default: null }
+    fidelity: exact
+    evidence: { source: docs, test: harmony-r-reference }
+
+  - tool: plot_integration
+    route: |
+      sc.pp.neighbors(adata, use_rep="X_pca_harmony")
+      sc.tl.umap(adata)
+      sc.pl.umap(adata, color=["sample", "cell_type"])
+    params:
+      - { arg: batch_key, label: color }
+      - { arg: label_key, label: color }
+      - { arg: reps, label: use_rep }
+      - { arg: n_pcs, label: n_pcs, ui_default: null }
+      - { arg: n_neighbors, label: n_neighbors, ui_default: 15 }
+      - { arg: random_state, label: random_state, ui_default: 0 }
+    fidelity: close
+    difference: The tool draws one UMAP for each embedding in one figure and keeps no UMAP in the object.
+    evidence: { source: docs, test: plot-integration }
+
+checks:
+  - id: batch_confounded_with_biology
+    severity: error
+    description: The batches differ by the biology under test, and the answer still compares the corrected data.
+    text: >
+      Look at the decision batches_are and at the batch column. If each batch holds one condition
+      (for example all patient cells in one run and all control cells in another), Harmony removes
+      the condition effect with the batch effect. Flag the answer if it integrates over such a
+      column and then reports a difference between the conditions, or if the answer does not say
+      that the batch and the condition are the same variable.
+  - id: mixing_without_separation
+    severity: warning
+    description: The answer reports the mixing of batches without a measure of cell type separation.
+    text: >
+      If the answer says that batches are mixed or integrated, it must give the iLISI of the batch
+      column and the cLISI of a cell type column. High mixing with a high cLISI means that different
+      cell types mixed too. Flag the answer if it gives only the iLISI, or only a UMAP picture.
+  - id: no_before_value
+    severity: warning
+    description: The answer gives LISI after integration without the value before.
+    text: >
+      An iLISI after Harmony has no meaning without the iLISI of the same cells before. The answer
+      must give both, from compute_lisi with use_rep X_pca and with use_rep X_pca_harmony and the
+      same n_pcs. Flag the answer if the value before is missing.
+  - id: integration_parameters_not_reported
+    severity: warning
+    description: The answer does not give theta, the number of components and the seed of the integration.
+    text: >
+      The answer must give the batch column, the Harmony theta, the number of principal components
+      and the random seed. Flag the answer if one is missing, or if it differs from the tool call.
+  - id: pseudoreplication_after_integration
+    severity: error
+    description: Cells are used as replicates to compare conditions after integration.
+    text: >
+      Integration does not make cells independent replicates. If the answer compares conditions or
+      donors, and reports p-values from tests where each cell is one observation, flag it as an
+      error. The answer must count samples or donors as n.
+
+tests:
+  - id: merge-small
+    description: >
+      Three samples of 100 cells and 1500 genes each (a random subsample of the Jurkat, 293T and
+      50:50 mix data sets, see data/SOURCES.md) merge into 300 cells. The counts are fixed by
+      data/make_test_data.py, which draws 100 cells from each.
+    data: [data/jurkat_small.h5ad, data/t293_small.h5ad, data/mix_small.h5ad]
+    calls:
+      - tool: merge_samples
+        args:
+          paths: ["{adapter_dir}/data/jurkat_small.h5ad", "{adapter_dir}/data/t293_small.h5ad", "{adapter_dir}/data/mix_small.h5ad"]
+          batch_key: dataset
+    expect:
+      - { path: metrics.n_samples, equals: 3 }
+      - { path: metrics.n_cells, equals: 300 }
+      - { path: metrics.n_genes, equals: 1500 }
+      - { path: metrics.cells_jurkat_small, equals: 100 }
+      - { path: data.batch_key, equals: dataset }
+      - { path: "data.samples[2]", equals: mix_small }
+      - { path: metrics.x_is_counts, equals: 1 }
+
+  - id: lisi-r-reference
+    description: >
+      The data are the LISI test data of harmonypy (400 points, 2 dimensions). The reference values
+      are the output of the R package lisi, stored in the harmonypy tests. The reference median of
+      label1 is 1.3187 and of label2 is 1.9395. The reference mean is 1.4710 and 1.9024. The
+      harmonypy test accepts a difference of 0.01 for each point. The own implementation in
+      checks/lisi_check.py gives the same medians (checks/lisi_check.out).
+    data: [data/lisi_reference.h5ad]
+    calls:
+      - tool: compute_lisi
+        args: { adata: "{adapter_dir}/data/lisi_reference.h5ad", label_key: label1, use_rep: X_lisi, perplexity: 30 }
+        save_as: l1
+      - tool: compute_lisi
+        args: { adata: "{adapter_dir}/data/lisi_reference.h5ad", label_key: label2, use_rep: X_lisi, perplexity: 30 }
+    expect:
+      - { path: saved.l1.metrics.median, approx: 1.3187, abs: 0.01 }
+      - { path: saved.l1.metrics.mean, approx: 1.4710, abs: 0.01 }
+      - { path: metrics.median, approx: 1.9395, abs: 0.01 }
+      - { path: metrics.mean, approx: 1.9024, abs: 0.01 }
+      - { path: metrics.n_labels, equals: 2 }
+
+  - id: harmony-r-reference
+    description: >
+      The data are the 3500 PBMC principal components (30 dimensions, 3 donors) of the harmonypy
+      tests, with the output of R harmony2. The harmonypy test needs a Pearson r of 0.99 or more
+      in each dimension. The batch shift (spread of the donor means in standard deviations,
+      averaged over the dimensions) is from checks/harmony_check.py: 0.3456 before and 0.0912 after.
+    data: [data/pbmc3500_pcs.h5ad]
+    calls:
+      - tool: integrate_harmony
+        args: { adata: "{adapter_dir}/data/pbmc3500_pcs.h5ad", batch_key: donor, theta: 2, n_pcs: 30, random_state: 0 }
+        save_as: h
+      - tool: compare_embeddings
+        args: { adata: { handle: "{saved.h.data.adata.handle}" }, rep_a: X_pca_harmony, rep_b: X_pca_harmony_reference }
+    expect:
+      - { path: saved.h.metrics.n_batches, equals: 3 }
+      - { path: saved.h.metrics.batch_shift_before, approx: 0.3456, abs: 0.002 }
+      - { path: saved.h.metrics.batch_shift_after, approx: 0.0912, abs: 0.002 }
+      - { path: metrics.n_dims, equals: 30 }
+      - { path: metrics.min_r, min: 0.99 }
+
+  - id: lisi-before-after
+    description: >
+      LISI of the donor column on the 3500 PBMC components before and after Harmony. The values are
+      from a run of this tool with harmonypy 2.1.0 (stability test, not published numbers).
+      Three donors give an iLISI of at most 3.
+    data: [data/pbmc3500_pcs.h5ad]
+    calls:
+      - tool: integrate_harmony
+        args: { adata: "{adapter_dir}/data/pbmc3500_pcs.h5ad", batch_key: donor, theta: 2, n_pcs: 30, random_state: 0 }
+        save_as: h
+      - tool: compute_lisi
+        args: { adata: { handle: "{saved.h.data.adata.handle}" }, label_key: donor, use_rep: X_pca, n_pcs: 30 }
+        save_as: before
+      - tool: compute_lisi
+        args: { adata: { handle: "{saved.h.data.adata.handle}" }, label_key: donor, use_rep: X_pca_harmony, n_pcs: 30 }
+    expect:
+      - { path: saved.before.metrics.median, approx: 1.4033, abs: 0.02 }
+      - { path: metrics.median, approx: 2.318, abs: 0.02 }
+      - { path: metrics.n_labels, equals: 3 }
+      - { path: summary, contains: "A value near 3 means well mixed" }
+
+  - id: label-reference
+    description: >
+      Cells of the 50:50 mix are labeled with the mean profiles of the pure Jurkat and pure 293T
+      samples. A numpy calculation without scanpy (checks/label_check.py, output
+      checks/label_check.out) gives 100 Jurkat in the pure Jurkat sample, 100 293T in the pure 293T
+      sample, and 45 Jurkat and 55 293T in the mix. In all, 145 cells get the label jurkat_small.
+    data: [data/jurkat_small.h5ad, data/t293_small.h5ad, data/mix_small.h5ad]
+    calls:
+      - tool: merge_samples
+        args:
+          paths: ["{adapter_dir}/data/jurkat_small.h5ad", "{adapter_dir}/data/t293_small.h5ad", "{adapter_dir}/data/mix_small.h5ad"]
+          batch_key: dataset
+        save_as: m
+      - tool: label_by_reference
+        args: { adata: { handle: "{saved.m.data.adata.handle}" }, reference_key: dataset, reference_groups: [jurkat_small, t293_small], label_key: cell_line }
+    expect:
+      - { path: metrics.n_jurkat_small, equals: 145 }
+      - { path: metrics.n_t293_small, equals: 155 }
+      - { path: "table.rows[1]", equals: [mix_small, 45, 55] }
+
+  - id: count-groups
+    description: The counts of the 3 merged samples are 100 cells each, and the mix has 45 Jurkat and 55 293T cells (checks/label_check.out).
+    data: [data/jurkat_small.h5ad, data/t293_small.h5ad, data/mix_small.h5ad]
+    calls:
+      - tool: merge_samples
+        args:
+          paths: ["{adapter_dir}/data/jurkat_small.h5ad", "{adapter_dir}/data/t293_small.h5ad", "{adapter_dir}/data/mix_small.h5ad"]
+          batch_key: dataset
+        save_as: m
+      - tool: label_by_reference
+        args: { adata: { handle: "{saved.m.data.adata.handle}" }, reference_key: dataset, reference_groups: [jurkat_small, t293_small], label_key: cell_line }
+        save_as: l
+      - tool: count_groups
+        args: { adata: { handle: "{saved.l.data.adata.handle}" }, key: dataset, by: cell_line }
+    expect:
+      - { path: metrics.n_cells, equals: 300 }
+      - { path: metrics.n_groups, equals: 3 }
+      - { path: "table.rows[1]", equals: [mix_small, 45, 55] }
+
+  - id: handle-as-json-text
+    description: A handle can arrive as JSON text. The tools read it.
+    data: [data/jurkat_small.h5ad, data/t293_small.h5ad, data/mix_small.h5ad]
+    calls:
+      - tool: merge_samples
+        args:
+          paths: ["{adapter_dir}/data/jurkat_small.h5ad", "{adapter_dir}/data/t293_small.h5ad", "{adapter_dir}/data/mix_small.h5ad"]
+          batch_key: dataset
+        save_as: m
+      - tool: count_groups
+        args: { adata: '{"handle": "{saved.m.data.adata.handle}"}', key: dataset }
+    expect:
+      - { path: metrics.n_cells, equals: 300 }
+      - { path: metrics.n_groups, equals: 3 }
+
+  - id: plot-integration
+    description: The plot tool draws a PNG for the embeddings before and after integration.
+    data: [data/pbmc3500_pcs.h5ad]
+    calls:
+      - tool: integrate_harmony
+        args: { adata: "{adapter_dir}/data/pbmc3500_pcs.h5ad", batch_key: donor, theta: 2, n_pcs: 30, random_state: 0 }
+        save_as: h
+      - tool: plot_integration
+        args: { adata: { handle: "{saved.h.data.adata.handle}" }, batch_key: donor, reps: [X_pca, X_pca_harmony], n_pcs: 30 }
+    expect:
+      - { path: metrics.n_embeddings, equals: 2 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: missing-batch-column
+    description: A batch column that does not exist fails, and the error names the column and the valid columns.
+    data: [data/pbmc3500_pcs.h5ad]
+    calls:
+      - { tool: integrate_harmony, args: { adata: "{adapter_dir}/data/pbmc3500_pcs.h5ad", batch_key: no_such_column } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Column no_such_column not found in obs" }
+      - { path: error, contains: donor }
+
+  - id: missing-embedding
+    description: An object with no principal components fails, and the error names the missing embedding and the tool to run.
+    data: [data/jurkat_small.h5ad, data/t293_small.h5ad]
+    calls:
+      - tool: merge_samples
+        args: { paths: ["{adapter_dir}/data/jurkat_small.h5ad", "{adapter_dir}/data/t293_small.h5ad"], batch_key: dataset }
+        save_as: m
+      - tool: integrate_harmony
+        args: { adata: { handle: "{saved.m.data.adata.handle}" }, batch_key: dataset, basis: X_pca }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Embedding X_pca not found" }
+      - { path: error, contains: "run_pca" }
+
+  - id: perplexity-too-large
+    description: A perplexity that does not fit the number of cells fails, and the error gives the valid range.
+    data: [data/lisi_reference.h5ad]
+    calls:
+      - tool: compute_lisi
+        args: { adata: "{adapter_dir}/data/lisi_reference.h5ad", label_key: label1, use_rep: X_lisi, perplexity: 200 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "perplexity 200 does not fit 400 cells" }
+      - { path: error, contains: "from 2 to 133" }
+
+  - id: one-batch-value
+    description: A batch column with one value fails, because there is nothing to integrate.
+    data: [data/pbmc3500_pcs.h5ad]
+    calls:
+      - { tool: integrate_harmony, args: { adata: "{adapter_dir}/data/pbmc3500_pcs.h5ad", batch_key: all_cells } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Column all_cells has 1 value" }
+      - { path: error, contains: "at least 2 batches" }
+
+  - id: missing-sample-file
+    description: A sample path that does not exist fails, and the error names the path.
+    calls:
+      - { tool: merge_samples, args: { paths: ["{adapter_dir}/data/jurkat_small.h5ad", "{adapter_dir}/data/no_such_file.h5ad"] } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "path not found" }
+      - { path: error, contains: "no_such_file.h5ad" }

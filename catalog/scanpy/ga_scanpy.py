@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import re
 import sys
@@ -25,7 +26,25 @@ def _handle(name):
     return table[name]
 
 
+def _names(x):
+    if x is None:
+        return []
+    if isinstance(x, str):
+        if x.lstrip().startswith("["):
+            try:
+                return [str(v) for v in json.loads(x)]
+            except ValueError:
+                pass
+        return [p.strip() for p in x.split(",") if p.strip()]
+    return list(x)
+
+
 def _get(x):
+    if isinstance(x, str) and x.lstrip().startswith("{"):
+        try:
+            x = json.loads(x)
+        except ValueError:
+            pass
     if isinstance(x, dict) and isinstance(x.get("handle"), str):
         x = _handle(x["handle"])
     if isinstance(x, str) and re.fullmatch(r"h\d+", x):
@@ -33,7 +52,10 @@ def _get(x):
     if isinstance(x, ad.AnnData):
         return x.copy()
     if isinstance(x, str):
-        return sc.read_h5ad(os.path.expanduser(x))
+        path = os.path.expanduser(x)
+        if not os.path.isfile(path):
+            raise FileNotFoundError('adata file not found: %s. Pass a handle such as {"handle": "h3"} or the path of an .h5ad checkpoint.' % x)
+        return sc.read_h5ad(path)
     raise TypeError('adata must be a handle such as {"handle": "h3"} or the path of an .h5ad file')
 
 
@@ -292,15 +314,16 @@ def run_pca(adata, n_comps=50, random_state=0):
     return _result(a, "pca", summary, metrics, [plot, csv], _preview(frame, csv, 10))
 
 
-def build_neighbors(adata, n_neighbors=15, n_pcs=None, random_state=0):
+def build_neighbors(adata, n_neighbors=15, n_pcs=None, random_state=0, use_rep="X_pca"):
     a = _get(adata)
-    if "X_pca" not in a.obsm:
-        return _fail("No PCA found. Run run_pca first.")
-    if n_pcs is not None and n_pcs > a.obsm["X_pca"].shape[1]:
-        return _fail("n_pcs %d is larger than the %d components that run_pca made." % (n_pcs, a.obsm["X_pca"].shape[1]))
-    sc.pp.neighbors(a, n_neighbors=int(n_neighbors), n_pcs=None if n_pcs is None else int(n_pcs), random_state=int(random_state))
-    summary = "Built the neighbor graph with %d neighbors on %s principal components." % (n_neighbors, "all" if n_pcs is None else int(n_pcs))
-    metrics = {"n_neighbors": n_neighbors, "n_pcs": n_pcs if n_pcs is not None else a.obsm["X_pca"].shape[1], "random_state": random_state, "n_cells": a.n_obs}
+    if use_rep not in a.obsm:
+        return _fail("No embedding %s found in obsm. Available: %s. Run run_pca first, or integrate_harmony of the harmony adapter." % (use_rep, ", ".join(a.obsm.keys()) or "none"))
+    width = a.obsm[use_rep].shape[1]
+    if n_pcs is not None and n_pcs > width:
+        return _fail("n_pcs %d is larger than the %d dimensions of %s." % (n_pcs, width, use_rep))
+    sc.pp.neighbors(a, n_neighbors=int(n_neighbors), n_pcs=None if n_pcs is None else int(n_pcs), use_rep=use_rep, random_state=int(random_state))
+    summary = "Built the neighbor graph with %d neighbors on %s dimensions of %s." % (n_neighbors, "all" if n_pcs is None else int(n_pcs), use_rep)
+    metrics = {"n_neighbors": n_neighbors, "n_pcs": n_pcs if n_pcs is not None else width, "random_state": random_state, "n_cells": a.n_obs}
     return _result(a, "neighbors", summary, metrics)
 
 
@@ -354,7 +377,7 @@ def find_markers(adata, groupby="leiden", method="t-test", n_genes=25, n_top=3):
 
 def plot_genes(adata, genes=None, kind="umap", groupby="leiden"):
     a = _get(adata)
-    names = [genes] if isinstance(genes, str) else list(genes or [])
+    names = _names(genes)
     pool = set(a.raw.var_names) if a.raw is not None else set(a.var_names)
     missing = [g for g in names if g not in pool]
     names = [g for g in names if g in pool]
