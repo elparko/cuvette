@@ -28,3 +28,12 @@ The search used about 20 Europe PMC full-text queries (open access, CC BY) with 
 
 - The Cascade ground truth database (Rupprecht et al. 2021, DOI 10.1038/s41593-021-00895-5) holds cell-attached spike times with calcium traces. The adapter tests use neuron 101084 of dataset 12 (Allen Institute, GCaMP6s). The test checks the event counts against an independent count. The sensitivity and precision against the reference spikes are tool values, not published values.
 - The CaImAn demo movie (Giovannucci et al. 2019, DOI 10.7554/eLife.38173) has no printed result. The adapter uses it for a test of the whole light pipeline and of Suite2p.
+
+## Later search (9 October 2026, after the adapter push)
+
+- Nicotinic receptors on iPSC-derived astrocytes (Int J Mol Sci, doi:10.3390/ijms27135902, PMC13361451). Data: Zenodo 20840279, CC BY 4.0 (Zenodo metadata; not checked on the paper).
+  - The sheet "Figure 1F" has 2,949 cells with PBS and KCl delta fluorescence. With the printed threshold of 58 (baseline 7 + 3 × 17), the KCl mean is 129.2 ± 166.1 and 59.4% respond. The paper prints 130 ± 166 and 60%.
+  - The PBS responder fraction is 3.0% against the printed 0.1%. The cause is not known.
+  - Only three example traces are in the deposit, so the test covers `find_responsive_cells` only. Replicates are wells, not animals.
+  - Status: a candidate for a later benchmark case. The DOI and the file URLs are not checked through Crossref or `curl -sIL`.
+- Not opened yet: iScience 2025 macaque microendoscopic imaging (PMC12192352, Zenodo 14727695, a tidy CSV of 132 kB), and PLOS Biology mouse seminiferous tubules (PMC13399359, Zenodo 20938795).
