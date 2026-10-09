@@ -8,7 +8,6 @@ The project is in early development. Version numbers start at the first public r
 These items are being built and are not on main yet:
 - Folder trust: settings, hooks and adapters in a data folder take effect only after you trust the folder.
 - A desktop app for macOS (Tauri), about one third the size of an Electron app.
-- A Programs manager: install, update, remove and control access to the science programs.
 - Citations for every program and method that a session uses: `/cite`, BibTeX, RIS, APA and Vancouver.
 - New analyses: ELISA standard curves, dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
 - A map of proprietary lab software and the open-source alternatives that Cuvette supports.
@@ -18,6 +17,9 @@ These items are being built and are not on main yet:
 - Rewind, branches and method templates.
 
 ## 9 October 2026
+
+### Programs
+- A Programs manager in the app, in the terminal (`/programs`) and on the command line (`ga programs`). It shows each science program with its status, version, size, last use and access. It installs, updates and removes the environments that Cuvette made, sets a custom program path, turns adapters on or off, and controls whether an adapter may run code that the agent writes. Every change asks first. Cuvette never removes a program that you installed yourself.
 
 ### Outputs
 - Image decks: `/export images` compiles figures and QC images into a PowerPoint file or a PDF, one per page or in grids of 2, 4, 6 or 9. Each image has an editable caption from the record. The last page lists the methods and the record hash. The app has a "Make an image deck" button.
