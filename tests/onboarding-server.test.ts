@@ -88,6 +88,19 @@ describe("onboarding server", () => {
     expect(existsSync(join(tmp, "escape.txt"))).toBe(false);
   });
 
+  test("write_adapter_file runs the lint once adapter.yaml exists and lists the errors", async () => {
+    const yaml = "adapter: { name: draft }\nprogram: { name: draft }\nconnection: { kind: cli }\n";
+    const r = await call("write_adapter_file", { rel_path: "adapter.yaml", content: yaml });
+    expect(r.ok).toBe(true);
+    expect(r.summary).toMatch(/checklist error/);
+    expect(r.summary).toMatch(/\[field\]/);
+    expect(r.data.lint.errors.join("\n")).toMatch(/\[kat-present\]/);
+    const c = await call("check_adapter", {});
+    expect(c.ok).toBe(false);
+    expect(c.error).toMatch(/^Fix each error/);
+    rmSync(join(draft, "adapter.yaml"));
+  });
+
   test("record_demonstration numbers its files", async () => {
     await call("record_demonstration", { text: "run(\"Gaussian Blur...\", \"sigma=2\");" });
     const r = await call("record_demonstration", { text: "second" });

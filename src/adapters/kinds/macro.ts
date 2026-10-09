@@ -171,7 +171,7 @@ async function programVersion(c: KindContext, found: string): Promise<string> {
 }
 
 export async function startMacro(adapter: LoadedAdapter, dirs: Dirs): Promise<AdapterRuntime> {
-  const found = await locate(adapter.manifest);
+  const found = await locate(adapter.manifest, adapter.root);
   const c: KindContext = {
     adapter,
     dirs,

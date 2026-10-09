@@ -18,6 +18,7 @@ export interface RuntimeLike {
 
 export interface RunOptions {
   only?: string[];
+  gui?: boolean;
   workDir?: string;
   sessionDir?: string;
   callTimeoutMs?: number;
@@ -68,7 +69,7 @@ function resolveTarget(path: string, last: ToolOutput, saved: Record<string, Too
   return out && (m[2] ? getPath(out, m[2]) : out);
 }
 
-function judge(e: Expect, got: unknown): string[] {
+export function judge(e: Expect, got: unknown): string[] {
   const out: string[] = [];
   const at = e.path;
   if (e.equals !== undefined && JSON.stringify(got) !== JSON.stringify(e.equals)) {
@@ -173,7 +174,7 @@ export async function runTests(adapter: LoadedAdapter, runtime: RuntimeLike, opt
   for (const t of (await adapter.module()).tools ?? []) if (!byName.has(t.name)) byName.set(t.name, t);
   const base = opts.workDir ?? mkdtempSync(join(tmpdir(), "ga-kat-"));
   const resolved = { workDir: base, sessionDir: opts.sessionDir ?? base, callTimeoutMs: opts.callTimeoutMs ?? 600_000 };
-  const selected = adapter.manifest.tests.filter((t) => !opts.only || opts.only.includes(t.id));
+  const selected = adapter.manifest.tests.filter((t) => (!opts.only || opts.only.includes(t.id)) && (opts.gui || !t.gui));
   const outcomes: TestOutcome[] = [];
   for (const t of selected) outcomes.push(await runOne(t, adapter, byName, resolved));
   return outcomes;

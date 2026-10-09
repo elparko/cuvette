@@ -23,6 +23,7 @@ const Locate = z.strictObject({
   which: z.array(z.string()).default([]),
   version_command: z.array(z.string()).default([]),
   version_pattern: z.string().default(""),
+  identity: z.string().default(""),
 });
 
 export const ConnectionKind = z.enum(["mcp", "cli", "python", "script", "http", "macro", "files", "screen"]);
@@ -137,6 +138,7 @@ export const KnownAnswerTest = z.strictObject({
   expect: z.array(ExpectItem).default([]),
   data: z.array(z.string()).default([]),
   manual_route_checked: z.boolean().default(false),
+  gui: z.boolean().optional(),
 });
 
 const OutputSpec = z.strictObject({
@@ -187,7 +189,7 @@ export const Manifest = z
     adapter: AdapterInfo,
     program: Program,
     connection: Connection,
-    locate: Locate.default({ env: "", paths: [], which: [], version_command: [], version_pattern: "" }),
+    locate: Locate.default({ env: "", paths: [], which: [], version_command: [], version_pattern: "", identity: "" }),
     standards: z.string().default(""),
     module: z.string().default(""),
     decisions: z.array(Decision).default([]),
@@ -195,6 +197,7 @@ export const Manifest = z
     checks: z.array(Check).default([]),
     tests: z.array(KnownAnswerTest).default([]),
     tools: z.array(ToolDef).default([]),
+    batch_tools: z.array(z.string()).default([]),
     data_rules: DataRules.default({ cloud_visibility: "all", note: "" }),
   })
   .superRefine((m, ctx) => {

@@ -4,11 +4,14 @@ adapter:
   title: Mean statistics
   version: 0.1.0
   description: Computes the mean of a column in a table.
+  field: statistics
+  file_types: [".csv"]
 
 program:
   name: meanstat
   version: "1.0"
   tested_versions: []
+  install: "Install meanstat from its homepage. The adapter runs meanstat from PATH."
 
 connection:
   kind: cli
@@ -22,12 +25,14 @@ decisions:
     default: 0.1
     lo: 0
     hi: 0.5
+    help: The share of values cut from each end before the mean.
     links:
       - { tool: summarize, arg: options.trim }
   - key: column_name
     label: Column
     kind: text
     stage: when_needed
+    help: The column that holds the measured values.
     links:
       - { tool: summarize, arg: column }
     sensitivity:
@@ -43,6 +48,7 @@ map:
     fidelity: close
     difference: The program trims 0 percent by default.
     evidence: { source: docs, note: manual page 4 }
+    summary: "mean {metrics.mean}"
 
 checks:
   - id: small_n
@@ -66,7 +72,7 @@ tools:
   - name: summarize
     description: Mean of one column.
     params:
-      column: { type: string }
-      options: { type: object }
+      column: { type: string, description: Name of the column. }
+      options: { type: object, description: "Extra settings: trim, the fraction of values cut from each end." }
     required: [column]
     command: ["meanstat", "{column}"]

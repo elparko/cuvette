@@ -8,16 +8,47 @@ import { adapterDirs, loadAdapter, Manifest } from "../adapters/manifest.ts";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { runTests as runKnownAnswerTests } from "./kat.ts";
 import type { TestOutcome } from "./kat.ts";
+import { benchmarkValues, lint } from "./lint.ts";
+import type { Finding, LintTool } from "./lint.ts";
 
 export interface Report {
   ok: boolean;
   errors: string[];
   warnings: string[];
+  findings: Finding[];
   tests?: TestOutcome[];
 }
 
 interface ToolInfo {
   args: Set<string> | undefined;
+}
+
+type SchemaTool = { name: string; remoteName?: string; description: string; inputSchema: Record<string, unknown> };
+
+function lintTools(adapter: LoadedAdapter, raw: Record<string, any>, extra: SchemaTool[], source: LintTool["source"]): LintTool[] {
+  const m = adapter.manifest;
+  const rawTools: Record<string, any>[] = Array.isArray(raw?.tools) ? raw.tools : [];
+  const out: LintTool[] = m.tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    params: t.params,
+    required: t.required,
+    batch: rawTools.find((r) => r?.name === t.name)?.batch,
+    source: "manifest",
+  }));
+  for (const t of extra) {
+    const name = t.remoteName ?? t.name;
+    if (out.some((o) => o.name === name)) continue;
+    const schema = t.inputSchema as { properties?: Record<string, Record<string, unknown>>; required?: string[] };
+    out.push({ name, description: t.description ?? "", params: schema.properties ?? {}, required: schema.required ?? [], batch: m.batch_tools.includes(name) ? true : undefined, source });
+  }
+  return out;
+}
+
+let benchCache: ReturnType<typeof benchmarkValues> | undefined;
+
+function applyLint(report: { errors: string[]; warnings: string[] }, findings: Finding[]) {
+  for (const f of findings) (f.severity === "error" ? report.errors : report.warnings).push(`[${f.rule}] ${f.where}: ${f.message}`);
 }
 
 function zodLines(err: z.ZodError): string[] {
@@ -51,7 +82,7 @@ function readFrontmatter(text: string): Record<string, unknown> | undefined {
 export async function locatedVersion(adapter: LoadedAdapter): Promise<string> {
   if (!adapter.manifest.locate.version_command.length) return "";
   try {
-    return (await locate(adapter.manifest)).version;
+    return (await locate(adapter.manifest, adapter.root)).version;
   } catch {
     return "";
   }
@@ -137,7 +168,6 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
       if (!known) warnings.push(`test "${t.id}": expectation on "${e.path}" has no comparison`);
     }
   }
-  if (!m.tests.length) warnings.push("no known-answer tests");
 }
 
 async function checkModule(adapter: LoadedAdapter, errors: string[]): Promise<Awaited<ReturnType<LoadedAdapter["module"]>>> {
@@ -190,21 +220,21 @@ async function checkVersions(adapter: LoadedAdapter, warnings: string[]) {
   }
 }
 
-export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean } = {}): Promise<Report> {
+export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean; gui?: boolean } = {}): Promise<Report> {
   const errors: string[] = [];
   const warnings: string[] = [];
   const dir = resolveDir(dirOrName);
   if (!dir || !existsSync(join(dir, "adapter.yaml"))) {
-    return { ok: false, errors: [`no adapter.yaml found for "${dirOrName}"`], warnings };
+    return { ok: false, errors: [`no adapter.yaml found for "${dirOrName}"`], warnings, findings: [] };
   }
   let raw: unknown;
   try {
     raw = parseYaml(readFileSync(join(dir, "adapter.yaml"), "utf8"));
   } catch (err) {
-    return { ok: false, errors: [`adapter.yaml is not valid YAML: ${(err as Error).message}`], warnings };
+    return { ok: false, errors: [`adapter.yaml is not valid YAML: ${(err as Error).message}`], warnings, findings: [] };
   }
   const parsed = Manifest.safeParse(raw);
-  if (!parsed.success) return { ok: false, errors: zodLines(parsed.error), warnings };
+  if (!parsed.success) return { ok: false, errors: zodLines(parsed.error), warnings, findings: [] };
 
   const adapter = loadAdapter(dir);
   const m = adapter.manifest;
@@ -215,6 +245,8 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   }
   if (m.connection.kind === "files") for (const n of ["list_files", "read_table", "image_info", "wait_for_file"]) tools.set(n, { args: undefined });
   const mod = await checkModule(adapter, errors);
+  const schemaTools: SchemaTool[] = (mod.tools ?? []).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
+  let serverTools: SchemaTool[] = [];
   for (const t of mod.tools ?? []) {
     const props = (t.inputSchema as { properties?: Record<string, unknown> }).properties;
     tools.set(t.name, { args: props ? new Set(Object.keys(props)) : undefined });
@@ -228,6 +260,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
     try {
       const { startAdapter } = await import("../adapters/runtime.ts");
       runtime = await startAdapter(adapter, { workDir: work, sessionDir: work });
+      if (m.connection.kind === "mcp") serverTools = (await runtime.tools()).filter((t) => t.source !== "adapter");
       for (const t of await runtime.tools()) {
         const props = (t.inputSchema as { properties?: Record<string, unknown> }).properties;
         const key = t.remoteName ?? t.name;
@@ -235,7 +268,9 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
       }
       toolsKnown = true;
       checkStatic(adapter, errors, warnings, tools, toolsKnown);
-      tests = await runKnownAnswerTests(adapter, runtime, { workDir: work });
+      tests = await runKnownAnswerTests(adapter, runtime, { workDir: work, gui: opts.gui });
+      const skipped = m.tests.filter((t) => t.gui && !opts.gui).length;
+      if (skipped) warnings.push(`${skipped} known-answer test(s) open a window (gui: true) and did not run. Run with --gui to include them`);
       for (const t of tests) for (const f of t.failures) errors.push(`test "${t.id}" failed: ${f}`);
     } catch (err) {
       errors.push(`the adapter did not start: ${(err as Error).message}`);
@@ -250,9 +285,18 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
 
   checkFiles(adapter, errors, warnings);
   await checkVersions(adapter, warnings);
-  const report: Report = { ok: errors.length === 0, errors, warnings };
+  benchCache ??= benchmarkValues();
+  const toolsForLint = [...lintTools(adapter, raw as Record<string, any>, schemaTools, "module"), ...lintTools(adapter, raw as Record<string, any>, serverTools, "server").filter((t) => t.source === "server")];
+  const findings = lint({ adapter, raw: raw as Record<string, any>, tools: dedupe(toolsForLint), toolsKnown, benchmark: benchCache });
+  applyLint({ errors, warnings }, findings);
+  const report: Report = { ok: errors.length === 0, errors, warnings, findings };
   if (tests) report.tests = tests;
   return report;
+}
+
+function dedupe(tools: LintTool[]): LintTool[] {
+  const seen = new Set<string>();
+  return tools.filter((t) => (seen.has(t.name) ? false : (seen.add(t.name), true)));
 }
 
 export async function approveAdapter(

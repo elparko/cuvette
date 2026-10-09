@@ -59,7 +59,7 @@ export async function adapterPaths(paper: Paper): Promise<{ roots: string[]; pro
   const programs: string[] = [];
   for (const r of roots) {
     try {
-      const found = await locate(loadAdapter(r).manifest);
+      const found = await locate(loadAdapter(r).manifest, r);
       if (found.path) programs.push(...installRoot(found.path));
     } catch {}
   }

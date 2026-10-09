@@ -672,7 +672,7 @@ export class Session {
     }
   }
 
-  private findTool(name: string): Tool | undefined {
+  findTool(name: string): Tool | undefined {
     return this.tools.get(name) ?? [...this.tools.values()].find((t) => t.remoteName === name);
   }
 
@@ -1747,7 +1747,8 @@ export class Session {
   private pilotGate(tool: Tool, args: Args): string | undefined {
     if (!this.pilotOn() || tool.readOnly) return undefined;
     const remote = tool.remoteName ?? tool.name;
-    const declared = !!this.adapterOf(tool)?.manifest.tools.find((t) => t.name === remote)?.batch;
+    const m = this.adapterOf(tool)?.manifest;
+    const declared = !!m?.tools.find((t) => t.name === remote)?.batch || !!m?.batch_tools.includes(remote);
     const why = batchReason(remote, args, declared);
     if (!why) return undefined;
     const st = pilotState(this.record);

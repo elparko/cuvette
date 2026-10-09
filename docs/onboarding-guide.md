@@ -15,6 +15,104 @@ Read `docs/adapter-spec.md` for the exact fields. This guide gives the order of 
 - Keep a short list of open questions. Give it to the scientist at the end of each step.
 - Use short sentences in every file you write. Use the words of the program's own menus.
 
+## Adapter checklist
+
+Each rule comes from a fault that a benchmark run found. `ga adapter check` tests the rules
+that have a rule id in brackets. An `error` stops the adapter. A `warning` does not. Small
+models (qwen3:8b) are the strict reader: write each text for them.
+
+Tool descriptions:
+
+- Start with one plain sentence that says what the tool does. The model picks a tool from this sentence. [tool-description, tool-description-plain]
+- Keep the description to 600 characters or fewer. Put detail in the argument descriptions or a skill. [tool-description-length]
+- Do not write advice as an absolute ("Use neg for an EEG N100", "for every ratio"). Say when it is wrong. The MNE model passed neg for gradiometers. [advice-limits]
+- If a tool takes two input routes (a CSV or x and y), say which route measures what. The astropy model measured the wrong rows.
+- Say which input the tool refuses and which tool to use for it. The phylo model aligned a PHYLIP file again.
+- Name the next tool when a claim needs it. The rdkit model stated R² without the fit.
+
+Arguments and units:
+
+- Describe each argument. A required argument without a description is an error. [arg-description]
+- Put a description with a comma in quotes. In a YAML flow map, `{ description: Path, such as x }` cuts the text at the comma. [arg-schema]
+- Name the unit of each number: ppm, s, pixels, Hz. Say "count", "fraction", "index (0-based)" or "unitless" when there is no unit. MDAnalysis `stop: 97` gave frame 96. [arg-units]
+- Set `minItems: 1` on a required list. An empty covariate list gave an empty Cox model with no error. [array-min-items]
+- Accept a list or comma text for a list argument, or say which one. fit_cox `strata` failed on `[]`.
+- Use a word such as `all`, not an empty text, for "all values".
+- Do not hide a method value in a function default. Leave it empty and fail with the decision name.
+- A handle can arrive as JSON text (`{"handle": "h1"}`). The Python worker reads it. Test it once.
+
+Errors:
+
+- Say the cause and the argument or the file in each error. Never a bare `raise`, never only "failed" or "not found". [error-text]
+- Never build an error only from stderr. It can be empty: mafft gave "failed:" and no reason. Add the exit code and the input. [error-text]
+- Do not pass a library message with no context (`_fail(str(e))`). Put the step and the input before it. [error-text]
+- Do not give two possible causes ("not found or not public"). Test each cause and name the one that happened. The model read "private" and stopped. [error-text]
+- Check a pattern or a regular expression against the inputs before a long run. CellProfiler ran 12 minutes with a `truth_regex` that matched no file.
+- Check columns and keys before you read them. Name the valid choices. METASPACE gave `KeyError: 'offSample'` 13 times.
+- A result with `ok: false` has an `error` text. [fail-without-error]
+
+Results and summaries:
+
+- Give each tool a summary template in the map, or write the summary in the tool code. Else the step shows "<tool> finished." [summary-template]
+- Put every value that the model must report in the summary, with the confidence interval and the test p values. fit_cox hid the proportional hazards p values, and the model took the wrong one.
+- Explain a zero or an empty result: give the count without the limit and the setting to change. MNE said "0 events" and the model said that the data had no events.
+- Return each part once. Do not repeat the table, the metrics or the summary in `data`.
+- Put key paths first. FastQC listed 40 images before `data_file`, and the model guessed the name.
+
+Manual routes:
+
+- Give each map entry a route. A `code_only` entry says in `difference` why there is none. [manual-route]
+- Show each step that changes n in the route, such as a `dropna`.
+- Mark fidelity as tested. A `close` entry has a `difference`.
+
+Decisions:
+
+- Give each decision `choices` or an explicit `kind`. [decision-type]
+- Give a default, or let the scientist own the decision so that the harness asks. [decision-default]
+- Write a plain help text of one or two sentences. [decision-help]
+- Link each decision to a tool argument. A decision with no link changes nothing.
+- Write sensitivity `compare` entries as result paths: `metrics.n_peaks`. [sensitivity-compare]
+
+Batch and pilot:
+
+- A tool that takes a folder, a pattern or a list of files states `batch: true` (each call processes many files) or `batch: false` (one file; the harness finds a folder or 3 or more paths at run time). A `batch: true` tool waits for an approved one-sample pilot. [batch-flag]
+- For a tool from an MCP server or the module, list the batch tools in `batch_tools`. [batch-flag]
+- A tool that runs code from the model sets `approval: true`. [approval-code]
+
+Program and install:
+
+- Set `field` and `file_types`. The model picks an adapter by them. [field, file-types]
+- Write `program.install` with the install command and the place where the adapter looks. [install-hint]
+- Check the program's identity in `locate`: a `version_command` and an `identity` pattern that its output must match. On macOS, `FileInfo` also found leptonica's `fileinfo`. [locate-identity]
+- Run scripts in the environment that has the libraries. The run_script environment had no pandas, lifelines or openpyxl.
+
+Data and tests:
+
+- Write known-answer tests. [kat-present]
+- Call each tool in at least one test. The drive test needs a test input for each tool. [kat-coverage]
+- Pin each test with `equals` or `approx` on a number from a trusted source, not only `ok` or a range. [kat-exact]
+- Add a test with bad input that expects `ok: false` and a `contains` on the error. [kat-failure-path]
+- Use public or synthetic data. List each file in `data/SOURCES.md`: `| File | Source | License |`. [kat-data-license]
+- A test runs headless, or it has `gui: true`. Default test runs skip `gui: true` tests; `--gui` runs them. A macro or screen adapter states `gui` on each test. [kat-gui]
+- Take expected numbers from a real program run or a publication, never from your own tool.
+
+Blinding:
+
+- Put no number from a known-answer test or a benchmark answer in text that the model sees: STANDARDS.md, skills, descriptions, examples, decision help, the map. `calculate` showed `ratio(4696, 5007)`, the BBBC005 answer. [blinding-number]
+- Use made-up example numbers. Keep method advice; leave out results.
+- Keep result files out of the data folders.
+
+The drive test shows how a small model reads the adapter. Run it before a release, when the
+GPU is free:
+
+```
+ga adapter check <name> --drive --model ollama:qwen3:8b
+```
+
+For each tool it writes one plain request from the description and a test input, runs a short
+session with this adapter only, and reports the tool choice, the arguments, the answer and each
+confusion with its record entry.
+
 ## Step 1. Find the program
 
 1. Ask the scientist for the program name and the version in use.
@@ -192,8 +290,13 @@ write it in the test `description`.
 
 ## Step 10. Run the checker
 
-1. Call `check_adapter`.
-2. Read the errors. Fix each one. Call `check_adapter` again.
+`write_adapter_file` runs the checklist rules each time `adapter.yaml` exists, and the reply
+lists the errors. Fix them as you go. The session does not let you finish while the draft has
+an error.
+
+1. Call `check_adapter`. It runs the checklist rules and the headless tests.
+2. Read the errors. Each one has a rule id in brackets and says how to fix it. Fix each one.
+   Call `check_adapter` again.
 3. Read the warnings. Fix each one, or tell the scientist why you leave it.
 4. If a test fails, do not change the expected number to make it pass. Find out why. Either the
    tool is wrong, or the number is wrong. Tell the scientist.

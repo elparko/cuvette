@@ -49,6 +49,13 @@ def resolve(value):
         return [resolve(v) for v in value]
     if isinstance(value, str) and value in handles and value[:1] == "h" and value[1:].isdigit():
         return handles[value]
+    if isinstance(value, str) and value.lstrip().startswith("{") and '"handle"' in value:
+        try:
+            parsed = json.loads(value)
+        except ValueError:
+            return value
+        if isinstance(parsed, dict) and parsed.get("handle") in handles and set(parsed.keys()) <= {"handle", "type", "repr"}:
+            return handles[parsed["handle"]]
     return value
 
 

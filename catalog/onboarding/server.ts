@@ -244,7 +244,7 @@ server.registerTool(
   {
     description: "List the public functions, classes and submodules of a Python module with signatures and the first line of each docstring.",
     inputSchema: {
-      module: z.string().regex(/^[A-Za-z_][\w.]*$/),
+      module: z.string().regex(/^[A-Za-z_][\w.]*$/).describe("Python module name, such as scanpy or skimage.filters"),
       interpreter: z.string().optional().describe("Path to a Python interpreter. Default python3."),
     },
     annotations: readOnly,
@@ -267,7 +267,7 @@ server.registerTool(
   "fetch_url",
   {
     description: "Fetch a web page and return its text with the HTML tags removed. Limit 200 kB.",
-    inputSchema: { url: z.string().url() },
+    inputSchema: { url: z.string().url().describe("Web address that starts with http or https") },
     annotations: readOnly,
   },
   async ({ url }) => {
@@ -290,7 +290,7 @@ server.registerTool(
   "list_files",
   {
     description: "List the files in a folder with sizes. Folders end with /.",
-    inputSchema: { path: z.string() },
+    inputSchema: { path: z.string().describe("Absolute path of the folder") },
     annotations: readOnly,
   },
   async ({ path }) => {
@@ -316,7 +316,7 @@ server.registerTool(
   "read_file",
   {
     description: "Read a text file. Limit 200 kB.",
-    inputSchema: { path: z.string() },
+    inputSchema: { path: z.string().describe("Absolute path of the text file") },
     annotations: readOnly,
   },
   async ({ path }) => {
@@ -334,10 +334,10 @@ server.registerTool(
 server.registerTool(
   "write_adapter_file",
   {
-    description: "Write a file inside the draft adapter folder. Paths outside the folder are refused.",
+    description: "Write a file inside the draft adapter folder. Paths outside the folder are refused. When adapter.yaml exists, the reply has the adapter checklist errors (lint), so that you can fix them at once.",
     inputSchema: {
       rel_path: z.string().describe("Path inside the draft folder, such as adapter.yaml or skills/analysis.md"),
-      content: z.string(),
+      content: z.string().describe("The full text of the file."),
       name: z.string().optional().describe("Adapter name. Needed only if no draft folder is set."),
     },
   },
@@ -348,15 +348,19 @@ server.registerTool(
     if (!target) return fail(`"${rel_path}" is outside the draft folder ${base}`);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, content);
-    return reply({ ok: true, summary: `wrote ${rel_path} (${content.length} characters)`, data: { path: target } });
+    if (!existsSync(join(base, "adapter.yaml"))) return reply({ ok: true, summary: `wrote ${rel_path} (${content.length} characters)`, data: { path: target } });
+    const report = await checkAdapter(base);
+    const lint = { errors: report.errors, warnings: report.warnings.length };
+    const note = report.errors.length ? `. The draft has ${report.errors.length} checklist error(s). Fix each one before you finish:\n${report.errors.join("\n")}` : ". The draft has no checklist errors";
+    return reply({ ok: true, summary: `wrote ${rel_path} (${content.length} characters)${note}`, data: { path: target, lint } });
   },
 );
 
 server.registerTool(
   "check_adapter",
   {
-    description: "Run the adapter checker with the known-answer tests. Without a name, it checks the draft folder.",
-    inputSchema: { name: z.string().optional() },
+    description: "Run the adapter checker: the checklist rules (lint) and the headless known-answer tests. Without a name, it checks the draft folder.",
+    inputSchema: { name: z.string().optional().describe("Adapter name or folder. Leave it out to check the draft folder.") },
   },
   async ({ name }) => {
     const draft = process.env.GA_DRAFT_DIR;
@@ -367,7 +371,7 @@ server.registerTool(
     const passed = report.tests?.filter((t) => t.ok).length ?? 0;
     return reply({
       ok: report.ok,
-      error: report.ok ? undefined : report.errors.join("\n"),
+      error: report.ok ? undefined : `Fix each error, then call check_adapter again:\n${report.errors.join("\n")}`,
       summary: `${report.errors.length} errors, ${report.warnings.length} warnings, ${passed} of ${report.tests?.length ?? 0} tests passed`,
       data: report,
     });
@@ -378,7 +382,7 @@ server.registerTool(
   "record_demonstration",
   {
     description: "Save the scientist's macro recorder output or description of the steps as evidence in the draft folder.",
-    inputSchema: { text: z.string().min(1), name: z.string().optional() },
+    inputSchema: { text: z.string().min(1).describe("The macro recorder output, or the steps that the scientist did, in order"), name: z.string().optional().describe("Adapter name. Needed only if no draft folder is set.") },
   },
   async ({ text, name }) => {
     const base = draftBase(name);

@@ -1,0 +1,25 @@
+adapter:
+  name: drivefix
+  field: statistics
+  file_types: [".csv"]
+  description: A small adapter for the drive test.
+program:
+  name: drivefix
+connection:
+  kind: files
+module: adapter.ts
+map:
+  - { tool: mean_of, route: "=AVERAGE(column) in a spreadsheet", fidelity: code_only, summary: "mean {metrics.mean}" }
+  - { tool: count_rows, route: "=COUNTA(column) - 1 in a spreadsheet", fidelity: code_only, summary: "{metrics.n_rows} rows" }
+tests:
+  - id: mean-x
+    data: [data/a.csv]
+    calls:
+      - { tool: mean_of, args: { path: "{adapter_dir}/data/a.csv", column: x } }
+    expect:
+      - { path: metrics.mean, approx: 2.5 }
+  - id: rows
+    calls:
+      - { tool: count_rows, args: { path: "{adapter_dir}/data/a.csv" } }
+    expect:
+      - { path: metrics.n_rows, equals: 4 }

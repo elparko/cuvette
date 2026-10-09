@@ -83,13 +83,13 @@ describe("checker", () => {
     expect((await checkAdapter(dir)).errors.join("\n")).toMatch(/uses saved result "zed"/);
   });
 
-  test("warnings for a missing standards file and no tests", async () => {
+  test("a missing standards file is a warning; no tests is an error", async () => {
     const dir = broken("warn", (y) => y.replace(/^tests:[\s\S]*?^tools:/m, "tests: []\ntools:"));
     rmSync(join(dir, "STANDARDS.md"));
     const r = await checkAdapter(dir);
-    expect(r.ok).toBe(true);
     expect(r.warnings.join("\n")).toMatch(/STANDARDS/);
-    expect(r.warnings).toContain("no known-answer tests");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join("\n")).toMatch(/\[kat-present\]/);
   });
 
   test("an approved adapter with no tested versions warns", async () => {
@@ -216,5 +216,37 @@ describe("onboard command", () => {
     expect(o.firstMessage).toContain("onboarding-guide.md");
     expect(o.env.GA_DRAFT_DIR).toBe(o.draftDir);
     expect(o.draftDir).toMatch(/pandoc-3$/);
+  });
+
+  test("tells the agent to use the checklist and to fix lint errors before it finishes", () => {
+    const o = onboardCommand("seqkit", { model: "fake" });
+    expect(o.firstMessage).toMatch(/Adapter checklist/);
+    expect(o.firstMessage).toMatch(/run check_adapter\. Fix every checklist error before you finish/);
+  });
+});
+
+describe("the onboarding adapter uses the lint", () => {
+  test("the skill, the standards and the guide tell the agent to run the lint and fix errors", () => {
+    const a = loadAdapter("catalog/onboarding");
+    expect(a.standardsText()).toMatch(/Do not finish while `check_adapter` reports an error/);
+    expect(readFileSync(a.skills()[0].path, "utf8")).toMatch(/Finish only when it reports no error/);
+    expect(readFileSync("docs/onboarding-guide.md", "utf8")).toMatch(/## Adapter checklist/);
+  });
+
+  test("the draft_lint check blocks the answer while the draft has a lint error, and passes a clean draft", async () => {
+    const { draftLint } = await import("../catalog/onboarding/adapter.ts");
+    const bad = broken("draft-bad", (y) => y.replace("  field: statistics\n", ""));
+    const f = await draftLint(bad);
+    expect(f).toHaveLength(1);
+    expect(f[0].severity).toBe("error");
+    expect(f[0].message).toMatch(/\[field\]/);
+    expect(await draftLint(broken("draft-good", (y) => y))).toEqual([]);
+    expect(await draftLint(join(tmp, "no-draft"))).toEqual([]);
+  });
+
+  test("the onboarding manifest declares the check, so the review runs it", () => {
+    const m = loadAdapter("catalog/onboarding").manifest;
+    expect(m.checks.find((c) => c.id === "draft_lint")?.severity).toBe("error");
+    expect(m.module).toBe("adapter.ts");
   });
 });

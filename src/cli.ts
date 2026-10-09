@@ -29,7 +29,12 @@ Usage
   sandbox still apply; a push to eLabFTW still asks; "deny" rules in settings still deny.
 
   ga adapters                        list the adapters (name, kind, status, field, program)
-  ga adapter check <name|dir> [--run-tests]
+  ga adapter check <name|dir> [--run-tests] [--gui]
+                                     --gui also runs the tests marked gui: true (they open a window)
+  ga adapter check <name|dir> --drive [--model ollama:qwen3:8b] [--tool <name>]
+                                     drive test: one plain request for each tool, run by the
+                                     model with this adapter only; reports the tool choice, the
+                                     arguments and the answer
   ga adapter approve <name|dir> --by <name>
   ga onboard <program> --model <model> [--docs <url>] [--kind cli]
   Each session saves its work in the folder where you start ga, in cuvette/<date>-<title>/:
@@ -119,6 +124,9 @@ const { values: o, positionals: pos } = parseArgs({
     user: { type: "boolean" },
     project: { type: "boolean" },
     "run-tests": { type: "boolean" },
+    drive: { type: "boolean" },
+    gui: { type: "boolean" },
+    tool: { type: "string", multiple: true },
     generic: { type: "boolean" },
     "bypass-permissions": { type: "boolean" },
     plan: { type: "boolean" },
@@ -263,8 +271,15 @@ async function main() {
     }
     case "adapter": {
       const checker = await import("./onboarding/checker.ts");
+      if (a1 === "check" && o.drive) {
+        const { runDrive, driveText } = await import("./onboarding/drive.ts");
+        const results = await runDrive(a2, { model: str(o.model) ?? "ollama:qwen3:8b", only: (o.tool as string[]) ?? [] });
+        console.log(driveText(results));
+        process.exitCode = results.every((r) => r.rightTool && r.validArgs && r.reached !== false) ? 0 : 1;
+        return;
+      }
       if (a1 === "check") {
-        const r = await checker.checkAdapter(a2, { runTests: !!o["run-tests"] });
+        const r = await checker.checkAdapter(a2, { runTests: !!o["run-tests"], gui: !!o.gui });
         for (const e of r.errors) console.log(`error: ${e}`);
         for (const w of r.warnings) console.log(`warning: ${w}`);
         for (const t of r.tests ?? []) console.log(`${t.ok ? "pass" : "FAIL"} ${t.id}${t.failures.length ? ": " + t.failures.join("; ") : ""}`);

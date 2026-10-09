@@ -24,7 +24,7 @@ export interface AdapterRuntime {
 export async function startAdapter(adapter: LoadedAdapter, dirs: { workDir: string; sessionDir: string }): Promise<AdapterRuntime> {
   mkdirSync(dirs.workDir, { recursive: true });
   mkdirSync(dirs.sessionDir, { recursive: true });
-  const found = await locate(adapter.manifest);
+  const found = await locate(adapter.manifest, adapter.root);
   const c: KindContext = {
     adapter,
     dirs: dirs as Dirs,

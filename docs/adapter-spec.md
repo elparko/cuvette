@@ -16,6 +16,7 @@ my-adapter/
   skills/*.md         procedures, loaded when the task needs them.
   adapter.ts          optional. Checks, hooks, extra tools, manual routes.
   data/               small test datasets and reference outputs.
+  data/SOURCES.md     required if the tests read data. Source and license of each file.
   evidence/           optional. Notes, macro recorder output, demonstrations.
   server.ts           optional. Code for an MCP server or a worker that the adapter starts.
 ```
@@ -27,6 +28,7 @@ my-adapter/
 | `skills/*.md` | One procedure per file. Each file starts with frontmatter that has `name` and `description`. |
 | `adapter.ts` | A module named in the `module` field. Its default export has the keys `checks`, `hooks`, `tools` and `manualRoute`. |
 | `data/` | Files that known-answer tests read. Refer to them with `{adapter_dir}/data/<file>`. |
+| `data/SOURCES.md` | One table, `| File | Source | License |`, with a row for each file or folder that the tests read. For made-up data, name the script and write "synthetic". "not confirmed" in the license column gives a warning. |
 
 A skill file looks like this:
 
@@ -70,6 +72,7 @@ The top level has these keys. A key with a default can be left out.
 | `checks` | list | `[]` | Review checks. |
 | `tests` | list | `[]` | Known-answer tests. |
 | `tools` | list | `[]` | Tools that the adapter declares. |
+| `batch_tools` | list of text | `[]` | Tools from an MCP server or the module that process many files in each call. A tool in `tools` uses its own `batch` field. |
 | `data_rules` | object | see below | What the cloud model can see. |
 
 Every object is strict. An unknown key is an error. A duplicate decision key, check id, test id
@@ -104,8 +107,9 @@ or tool name is an error. Two map entries with the same tool and the same `match
 
 ### `locate`
 
-The harness tries `env`, then `paths`, then `which`. The first hit is the program path. Use it
-as `{program_path}` in other fields.
+The harness tries `env`, then `paths`, then `which`. The first hit whose version output matches
+`identity` is the program path. Use it as `{program_path}` in other fields. `version_command`
+can also use `{adapter_dir}`. On macOS, a path must match the file name with the same case.
 
 | Field | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -114,6 +118,7 @@ as `{program_path}` in other fields.
 | `which` | list of text | `[]` | Command names to search for on `PATH`. |
 | `version_command` | list of text | `[]` | Command that prints the version. It can use `{program_path}`. |
 | `version_pattern` | text | `""` | Regular expression. Group 1 is the version. If empty, the first output line is the version. |
+| `identity` | text | `""` | Regular expression that the output of `version_command` must match, such as `samtools \d`. Required when `env`, `paths` or `which` is set. The harness tries each candidate path in order and takes the first one whose output matches. A file with the right name that is a different program is skipped. For a Python environment, print the module name with the version: `print('scanpy', scanpy.__version__)`. |
 
 ### `connection`
 
@@ -163,6 +168,7 @@ A tool is one job. The harness shows each tool to the model with its parameters.
 | `params` | name to JSON Schema | `{}` | One JSON Schema for each argument, such as `{ type: number, minimum: 0 }`. |
 | `required` | list of text | `[]` | Argument names that the model must give. Each must be in `params`. |
 | `read_only` | true or false | `false` | `true` if the tool changes nothing. Read-only tools run in plan mode. |
+| `batch` | true or false | `false` | `true` if each call processes many files. The pilot gate holds the tool until the scientist approves a pilot on one sample. A tool that takes a folder, a pattern or a list of files must state `batch: true` or `batch: false`. With `false`, the harness still detects a folder or 3 or more paths at run time. |
 | `approval` | true or false | `false` | `true` if the scientist must approve each call. |
 | `outputs` | name to output spec | `{}` | Files that the tool writes. The harness gives each file a path. |
 | `command` | list of text | `[]` | For `cli`. The command template. |
@@ -305,6 +311,7 @@ known.
 | `expect` | list of expectations | `[]` | What the result must be. |
 | `data` | list of text | `[]` | Files in the adapter folder that the test needs. They must exist. |
 | `manual_route_checked` | true or false | `false` | `true` if a person ran the manual route and got the same numbers. |
+| `gui` | true or false | none | `true` if the test opens a program window or takes the focus. `ga adapter check --run-tests` skips it; `--gui` runs it. Each test of a `macro` or `screen` adapter must state it. |
 
 A call has `tool`, `args` (default `{}`) and `save_as` (default empty). The tool can be a program tool
 or a tool of the module.
@@ -559,7 +566,11 @@ Rules:
    again and add the version.
 6. Change `adapter.version` whenever a tool, a default or a map entry changes.
 
-The checker prints errors and warnings. An error stops use. A warning does not.
+The checker prints errors and warnings. An error stops use. A warning does not. The checker
+also runs the adapter checklist rules. Each finding has a rule id in brackets, such as
+`[arg-units]`, and says how to fix it. `docs/onboarding-guide.md` lists the rules with the reason
+for each. The rules are in `src/onboarding/lint.ts`. Tools of an MCP server are checked only
+with `--run-tests`, because the server must start to list them.
 
 | Check | Level |
 | --- | --- |
@@ -579,3 +590,17 @@ The checker prints errors and warnings. An error stops use. A warning does not.
 | An `exact` entry has the evidence source `unverified`. | warning |
 | The status is not `draft` and `tested_versions` is empty. | warning |
 | The installed version is not in `tested_versions`. | warning |
+| A checklist rule with level error fails: `field`, `file-types`, `install-hint`, `locate-identity`, `tool-description`, `arg-description` (required argument), `arg-schema`, `batch-flag`, `manual-route`, `approval-code`, `blinding-number`, `decision-type`, `decision-default`, `decision-help`, `sensitivity-compare`, `kat-present`, `kat-data-license`, `kat-gui`. | error |
+| A checklist rule with level warning fails: `tool-description-length` (over 600 characters), `tool-description-plain`, `advice-limits`, `arg-description` (optional argument), `arg-units`, `array-min-items`, `summary-template`, `error-text`, `fail-without-error`, `kat-coverage`, `kat-exact`, `kat-failure-path`, a license that is not confirmed. | warning |
+
+`ga adapter check <name> --drive [--model ollama:qwen3:8b] [--tool <name>]` is the drive test.
+For each tool, it makes one plain request from the tool description and the input of a
+known-answer test, and runs a short headless session with only this adapter. It reports whether
+the model called the right tool, whether the arguments were valid, and whether the result and
+the answer reached the known value. Each confusion names its record entry. The default model is
+`ollama:qwen3:8b`.
+
+The pull request workflow `.github/workflows/adapter-check.yml` (on the license branch, not yet on
+main) runs `ga adapter check` on each changed adapter folder. The checklist rules run inside that
+command, so the workflow needs no new step. The ImageJ job in `.github/workflows/test.yml` passes
+`--gui`.

@@ -3,7 +3,7 @@ adapter:
   field: adapter authoring
   file_types: []
   title: Onboarding a new program
-  version: 0.1.0
+  version: 0.2.0
   description: Finds a program, reads its help and docs, and writes an adapter folder for it.
   status: draft
 
@@ -20,6 +20,13 @@ connection:
   startup_timeout_s: 30
   call_timeout_s: 180
 
+module: adapter.ts
+
+checks:
+  - id: draft_lint
+    description: The draft adapter must pass the adapter checklist (the lint of ga adapter check) before the agent finishes.
+    severity: error
+
 map:
   - { tool: probe_program, route: "Run the program name in a terminal with --version", fidelity: code_only }
   - { tool: read_help, route: "Run the program in a terminal with --help", fidelity: code_only }
@@ -30,6 +37,28 @@ map:
   - { tool: write_adapter_file, route: "Write the file in the draft folder with a text editor", fidelity: code_only }
   - { tool: check_adapter, route: "Run: ga adapter check <name> --run-tests", fidelity: code_only }
   - { tool: record_demonstration, route: "Save the scientist's notes as a text file in the draft folder", fidelity: code_only }
+
+tests:
+  - id: read-own-standards
+    description: read_file returns the text of a file. The file is this adapter's STANDARDS.md.
+    calls:
+      - { tool: read_file, args: { path: "{adapter_dir}/STANDARDS.md" } }
+    expect:
+      - { path: ok, equals: true }
+      - { path: text, contains: "Onboarding standards" }
+  - id: list-own-folder
+    description: list_files lists this adapter's folder, which has adapter.yaml.
+    calls:
+      - { tool: list_files, args: { path: "{adapter_dir}" } }
+    expect:
+      - { path: text, contains: "adapter.yaml" }
+  - id: read-missing-file
+    description: read_file on a missing file fails and names the file.
+    calls:
+      - { tool: read_file, args: { path: "{adapter_dir}/no-such-file.txt" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no-such-file.txt" }
 
 data_rules:
   cloud_visibility: all

@@ -61,7 +61,7 @@ jobs:
         run: |
           sudo apt-get install -y xvfb
           xvfb-run -a npx vitest run tests/imagej.test.ts tests/macro.test.ts
-          xvfb-run -a node bin/ga.js adapter check imagej --run-tests
+          xvfb-run -a node bin/ga.js adapter check imagej --run-tests --gui
         env:
           GA_LIVE: "1"
           CI: "false"
@@ -69,7 +69,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           npx vitest run tests/imagej.test.ts tests/macro.test.ts
-          node bin/ga.js adapter check imagej --run-tests
+          node bin/ga.js adapter check imagej --run-tests --gui
         env:
           GA_LIVE: "1"
           CI: "false"
