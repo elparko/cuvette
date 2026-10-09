@@ -8,3 +8,4 @@
 | plate_softmax.csv | synthetic, made by data/make_test_data.py (SoftMax-style block) | synthetic, no third-party data |
 | plate_softmax_map.csv | synthetic, made by data/make_test_data.py (plate map as a long table) | synthetic, no third-party data |
 | plate_384.csv | synthetic, made by data/make_test_data.py (Tecan-style 384-well grid) | synthetic, no third-party data |
+| plate_softmax_pro.tsv | synthetic, made by data/make_test_data.py (SoftMax Pro plate format, no row letters, two plates) | synthetic, no third-party data |

@@ -843,8 +843,15 @@ def _plate_blocks(cells):
             while str(cells.get((r + 1 + k, lc), "")).upper() == get_column_letter(k + 1):
                 k += 1
             if k >= 2:
-                found.append({"head": r, "lc": lc, "c0": c, "c1": c + n - 1, "r0": r + 1, "r1": r + k})
+                found.append({"head": r, "lc": lc, "c0": c, "c1": c + n - 1, "r0": r + 1, "r1": r + k, "by_order": False})
                 break
+        else:
+            m = 0
+            while any(_number(cells.get((r + 1 + m, cc))) is not None for cc in range(c, c + n)):
+                m += 1
+            k = 16 if m >= 16 else 8 if m >= 8 else 0
+            if k and n in (12, 24):
+                found.append({"head": r, "lc": max(c - 1, 1), "c0": c, "c1": c + n - 1, "r0": r + 1, "r1": r + k, "by_order": True})
     return found
 
 
@@ -940,7 +947,7 @@ def read_plate(path, sheet=None, plate_map=None, map_sheet=None, map_well_column
             if not any(_number(v) is not None for line in grid for v in line):
                 skipped.append("%s on %s" % (rng, plate))
                 continue
-            info = {"plate": plate, "block": name, "range": rng, "n_rows": len(grid), "n_cols": len(grid[0]), "n_wells": 0, "n_values": 0, "n_empty": 0, "n_text": 0, "n_overflow": 0, "overflow_wells": [], "text_wells": [], "empty_wells": []}
+            info = {"plate": plate, "block": name, "range": rng, "n_rows": len(grid), "n_cols": len(grid[0]), "n_wells": 0, "n_values": 0, "n_empty": 0, "n_text": 0, "n_overflow": 0, "letters_from_order": b["by_order"], "overflow_wells": [], "text_wells": [], "empty_wells": []}
             have = set()
             for i, line in enumerate(grid):
                 for j, v in enumerate(line):
@@ -990,6 +997,9 @@ def read_plate(path, sheet=None, plate_map=None, map_sheet=None, map_well_column
             miss.append("%d other text (%s)" % (b["n_text"], _list_wells(b["text_wells"])))
         lines.append("Block %s on %s at %s: %d wells, %d with a value%s." % (
             b["block"], b["plate"], b["range"], b["n_wells"], b["n_values"], ", missing: " + "; ".join(miss) if miss else ", none missing"))
+    by_order = [b["block"] for b in blocks if b["letters_from_order"]]
+    if by_order:
+        lines.append("The file has no row letters for %d blocks (%s). The row letters came from the row order, A for the first row." % (len(by_order), "; ".join(by_order)))
     if skipped:
         lines.append("Skipped text-only grids: %s." % "; ".join(skipped))
     if mapping:

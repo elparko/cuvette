@@ -21,8 +21,8 @@ program:
     - https://openpyxl.readthedocs.io
     - https://matplotlib.org/stable/
   install: >
-    The adapter uses the biostats Python environment. Add openpyxl to it:
-    uv pip install --python ~/.cuvette/envs/biostats/bin/python openpyxl
+    The adapter uses the biostats Python environment. Add openpyxl, and xlrd for old .xls files, to it:
+    uv pip install --python ~/.cuvette/envs/biostats/bin/python openpyxl xlrd
   citation:
     - text: McKinney, W. (2010). Data Structures for Statistical Computing in Python. In Proceedings of the 9th Python in Science Conference (pp. 56–61). https://doi.org/10.25080/Majora-92bf1922-00a
       doi: 10.25080/Majora-92bf1922-00a
@@ -455,3 +455,25 @@ tests:
     expect:
       - { path: ok, equals: false }
       - { path: error, contains: No plate block found }
+
+  - id: plate-softmax-no-letters
+    description: >
+      SoftMax Pro plate format export (tab-separated). Two "Plate:" sections, the Temperature cell, rows with no row letters and "~End" at the end.
+      The tool gives the rows A to H in order. A1 of Plate#1 is 0.05 and A12 is 0.072. Plate#2 has the values of Plate#1 times 2, and C4 is empty.
+    data: [data/plate_softmax_pro.tsv]
+    calls:
+      - { tool: read_plate, args: { path: "{adapter_dir}/data/plate_softmax_pro.tsv" } }
+    expect:
+      - { path: metrics.n_blocks, equals: 2 }
+      - { path: metrics.n_wells, equals: 192 }
+      - { path: metrics.n_values, equals: 191 }
+      - { path: metrics.n_empty, equals: 1 }
+      - { path: "data.blocks[0].block", contains: "Plate#1" }
+      - { path: "data.blocks[1].block", contains: "Plate#2" }
+      - { path: "data.blocks[0].range", equals: "A2:M10" }
+      - { path: "data.blocks[1].range", equals: "A13:M21" }
+      - { path: "data.blocks[0].letters_from_order", equals: true }
+      - { path: "data.blocks[1].empty_wells[0]", equals: C4 }
+      - { path: "table.rows[0][5]", approx: 0.05, abs: 1.0e-9 }
+      - { path: "table.rows[11][5]", approx: 0.072, abs: 1.0e-9 }
+      - { path: summary, contains: The row letters came from the row order }

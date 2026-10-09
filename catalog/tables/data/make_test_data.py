@@ -95,3 +95,13 @@ with open(os.path.join(here, "plate_384.csv"), "w") as f:
     for i, letter in enumerate(letters(16)):
         f.write("%s,%s\n" % (letter, ",".join(str(round((i * 24 + j + 1) / 1000, 3)) for j in range(24))))
     f.write("\nEnd Time:,2026-09-01\n")
+
+with open(os.path.join(here, "plate_softmax_pro.tsv"), "w", encoding="utf-8") as f:
+    for name, nm, scale, gap in [("Plate#1", 450, 1, None), ("Plate#2", 650, 2, (2, 3))]:
+        f.write("Plate:\t%s\t1.3\tPlateFormat\tEndpoint\tAbsorbance\tRaw\tTRUE\t1\t\t\t%d\t\t\t1\t12\t96\t1\t8\t\t\t\t\t\t\n" % (name, nm))
+        f.write("Temperature(°C)\t%s\t\n" % "\t".join(str(j + 1) for j in range(12)))
+        for i in range(8):
+            cells = ["" if gap == (i, j) else str(round((0.05 * (i + 1) + 0.002 * j) * scale, 4)) for j in range(12)]
+            f.write("%s\t%s\t\n" % ("24.3" if i == 0 else "", "\t".join(cells)))
+        f.write("\n")
+    f.write("~End\n")
