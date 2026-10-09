@@ -5,6 +5,7 @@ import { activity } from "../core/housekeeping.ts";
 import { Bus } from "../core/bus.ts";
 import { AnalysisRecord } from "../core/record.ts";
 import { applyEdit, type SampleRow } from "../core/samples.ts";
+import { promptTokens, usageSummary, type UsageSummary } from "../core/spend.ts";
 import type { Args, Fidelity, Finding, Mode, ModelInfo, Owner, PlanResponse, Question } from "../core/types.ts";
 import type { DecisionFieldLike, SessionLike } from "./types.ts";
 
@@ -69,6 +70,10 @@ export class FakeSession implements SessionLike {
   ];
   bus = new Bus();
   record: AnalysisRecord;
+  usage(): UsageSummary {
+    const last = this.record.entries(["usage"]).at(-1);
+    return usageSummary(this.record.entries(["user", "usage"]), this.model, last ? promptTokens(last.data) : 0);
+  }
   interrupts = 0;
   sent: string[] = [];
   private fields = initialFields();
@@ -322,6 +327,12 @@ export class FakeSession implements SessionLike {
   }
 
   planResponses: PlanResponse[] = [];
+  phiResponses: { rid: string; action: string }[] = [];
+
+  respondPhi(rid: string, action: "send" | "mask" | "local" | "stop"): void {
+    this.phiResponses.push({ rid, action });
+    this.record.append("phi", { rid, action, by: "scientist", count: 1, hits: [] });
+  }
 
   respondPlan(r: PlanResponse): void {
     this.planResponses.push(r);

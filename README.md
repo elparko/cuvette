@@ -166,6 +166,7 @@ shortens tool results and summarizes old turns near the context limit.
 | `/databook` | A data book (PDF and HTML): question, data, methods, results, figures, checks and the manual route. `/databook project` covers all sessions of the project folder. `/databook docx` needs pandoc. On the command line: `ga databook [<session folder>\|<project folder>]`. |
 | `/cite` | The programs and methods to cite for this session. Only what ran is listed. A method that ran only in a comparison run is listed apart. `/cite vancouver` or `/cite apa` changes the style for one list; the setting `citation_style` changes it for all outputs. `/cite bibtex`, `/cite ris` and `/cite text` save the list in the output folder. `/cite programs` shows how to cite each program. In the app: the Cite section of the Results tab. |
 | `/lab` | Approve or reject lab rules that the agent proposed. |
+| `/usage` | The cost and the tokens of each turn, and how full the context is. The status line and the app header show the short form, for example `$0.42 · context 18%`. A local model shows `local, $0`. |
 
 ### Input box keys
 
@@ -288,6 +289,26 @@ The benchmark (`ga bench papers`) trusts its own checkout. It passes the model o
   fix error findings once before the answer reaches the scientist. The referee reads only the
   log, in a fresh context. By default it is the agent's own model; `--referee claude:claude-haiku-5-5`
   picks another model, and `--referee none` turns it off.
+
+## Patient data
+
+**Warning: the patient identifier check is a help, not a guarantee. Do not send patient data to a cloud model unless your institution allows it.**
+
+- Before content goes to a cloud model (Claude), the harness looks for likely patient identifiers:
+  names next to clinical words, dates of birth, medical record numbers, Social Security numbers,
+  phone numbers, email addresses, street addresses, and ZIP codes with dates. It also looks for
+  table columns such as name, MRN, DOB, patient, SSN and address.
+- If it finds one, a card shows what it found and where (file, column, line), with the values
+  masked, for example `J*** D**`. You choose: send anyway (the record logs it), mask the values
+  and send (the model sees `[NAME 1]`; your files do not change), use a local model for this
+  session, or stop.
+- A local model (Ollama) gets no card. The record still logs a notice.
+- Settings: `phi_check` (on by default; off needs a second confirmation), `local_model` (the
+  model that the card offers, for example `ollama:qwen3:8b`), and "This folder has no patient
+  data" for the project folder.
+- The reference is the HIPAA Safe Harbor list of 18 identifiers, 45 CFR 164.514(b)(2). The check
+  covers only some of them. [docs/patient-data.md](docs/patient-data.md) lists what it checks
+  and what it does not check.
 
 ## Adapters
 

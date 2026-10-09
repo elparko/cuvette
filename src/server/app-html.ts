@@ -6,7 +6,7 @@ import { credentialsPath } from "../core/credentials.ts";
 import type { SettingCtx } from "../core/settings.ts";
 import { ageText, type SessionInfo } from "../core/sessions.ts";
 import {
-  choiceLabel, choiceValue, CLARIFY_TITLE, DATA_CHECK_TITLE, DESIGN_TITLE, clarifyOpen, clarifyProgress, definitionLabel, itemCount, PICK_LABEL, settingLabel, settingQuestion, fieldKind, permissionView, pilotGate, pilotQuestion, planHint, planQuestions, planResolve, planTitle, programSwitches,
+  choiceLabel, choiceValue, CLARIFY_TITLE, DATA_CHECK_TITLE, DESIGN_TITLE, clarifyOpen, clarifyProgress, definitionLabel, itemCount, PICK_LABEL, settingLabel, settingQuestion, fieldKind, permissionView, phiView, pilotGate, pilotQuestion, planHint, planQuestions, planResolve, planTitle, programSwitches,
   recommendedIndex, REWIND_HELP, REWIND_TITLE, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, RUN_MODES, setupValues, show,
   type Card, type CardType, type PlanAction, type PlanState,
 } from "../ui/cards.ts";
@@ -263,6 +263,14 @@ ${v.code ? `<details><summary>Show the code</summary><pre>${esc(v.code)}</pre></
 <label class="field"><span>Reason for the agent if you deny (optional)</span><input type="text" name="note"></label>`);
 }
 
+function phiCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "phi" }>): string {
+  const v = phiView(card);
+  return frame(slot, v.title, "red", `<p>${esc(v.intro)}</p>
+<ul class="args">${v.lines.map((l) => `<li>${esc(l)}</li>`).join("")}${v.more ? `<li class="dim">${esc(v.more)}</li>` : ""}</ul>
+<p class="dim small">${esc(v.note)}</p>${v.noLocal ? `<p class="dim small">${esc(v.noLocal)}</p>` : ""}
+<div class="row">${v.actions.map((a) => btn(a.label, `${act(a.act)} title="${esc(a.help)}"`, a.act === "mask" ? "primary" : a.act === "stop" ? "quiet" : a.act === "send" ? "danger" : "")).join("")}</div>`);
+}
+
 function questionCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "question" }>): string {
   return frame(slot, `Your decision: ${card.q.title}`, "magenta", card.q.table ? sheetHtml(card.q) : questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend")));
 }
@@ -416,6 +424,7 @@ type WebCards = { [K in CardType]: (c: Ctx, slot: Slot, card: Extract<Card, { t:
 export const WEB_CARDS: WebCards = {
   setup: setupCard,
   permission: permissionCard,
+  phi: phiCard,
   question: questionCard,
   instruction: instructionCard,
   plan: planCard,

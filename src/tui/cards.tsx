@@ -6,7 +6,7 @@ import { Field } from "./input-box.tsx";
 import type { Question } from "../core/types.ts";
 import {
   CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
-  choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, pilotGate, pilotQuestion, planHint, planInit,
+  choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, phiView, pilotGate, pilotQuestion, planHint, planInit,
   planQuestions, planReduce, planResolve, planTitle, programSwitches, recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, setupValues, show,
   REWIND_HELP, REWIND_TITLE, type Card, type PlanAction, type PlanState,
 } from "../ui/cards.ts";
@@ -106,6 +106,36 @@ export function PermissionCard(props: {
           {code ? ` · c ${showCode ? "hides" : "shows"} the code` : ""}
         </Text>
       )}
+    </Frame>
+  );
+}
+
+export function PhiCard(props: { card: Extract<Card, { t: "phi" }>; onAction: (a: "send" | "mask" | "local" | "stop") => void }) {
+  const v = phiView(props.card);
+  useInput((input, key) => {
+    if (key.escape) return props.onAction("stop");
+    const a = v.actions.find((x) => x.key === input);
+    if (a) props.onAction(a.act);
+  });
+  return (
+    <Frame title={v.title} color="red">
+      <Text>{v.intro}</Text>
+      {v.lines.map((l, i) => (
+        <Text key={i}>  {l}</Text>
+      ))}
+      {v.more ? <Text dimColor>  {v.more}</Text> : null}
+      <Box marginTop={1}>
+        <Text dimColor>{v.note}</Text>
+      </Box>
+      {v.noLocal ? <Text dimColor>{v.noLocal}</Text> : null}
+      <Box flexDirection="column" marginTop={1}>
+        {v.actions.map((a) => (
+          <Text key={a.act}>
+            <Text color="cyan">{a.key}</Text> {a.label}
+            <Text dimColor>. {a.help}{a.act === "stop" ? " (Esc)" : ""}</Text>
+          </Text>
+        ))}
+      </Box>
     </Frame>
   );
 }

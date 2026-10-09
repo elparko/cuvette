@@ -209,8 +209,15 @@ export class Mapper {
         return line("⚠", `Out of date: ${((d.nodes as string[]) ?? []).join(", ")} (${d.reason ?? d.key})`, "yellow");
       case "note":
         return line("▸", String(d.text ?? ""), undefined, true);
+      case "phi": {
+        const n = Number(d.count ?? 0);
+        const what = `${n} possible patient ${n === 1 ? "identifier" : "identifiers"}`;
+        if (d.action === "local model") return [];
+        const done = d.action === "send" ? "sent as they are" : d.action === "mask" ? "masked before they went to the model" : d.action === "local" ? "sent to the local model" : "not sent";
+        return line(d.action === "send" ? "⚠" : "▸", `Patient data check: ${what}, ${done} (${d.by}).`, d.action === "send" ? "yellow" : "cyan");
+      }
       case "notice":
-        return d.plan ? line("⚠", String(d.text ?? ""), "yellow") : d.saved ? line("✓", String(d.text ?? ""), "green") : line("▸", String(d.text ?? d.message ?? ""));
+        return d.plan || d.warn ? line("⚠", String(d.text ?? ""), "yellow") : d.saved ? line("✓", String(d.text ?? ""), "green") : line("▸", String(d.text ?? d.message ?? ""));
       case "adapter":
         if (d.by === "agent") return line("+", `Using ${d.program ?? d.name} through ${d.name}${d.reason ? `: ${String(d.reason).replace(/[.\s]+$/, "")}` : ""}. Change with /program.`, "cyan");
         return line("+", `Loaded the adapter ${d.name} ${d.version ?? ""}${d.programVersion ? ` (program ${d.programVersion})` : ""}${d.reason ? `: ${d.reason}` : ""}`, "cyan");

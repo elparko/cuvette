@@ -1,4 +1,5 @@
-import type { BusEvent, Entry, Finding, Mode, PlanEvent, PlanResponse, Question, ReferenceChoice } from "../core/types.ts";
+import type { BusEvent, Entry, Finding, Mode, PhiEvent, PlanEvent, PlanResponse, Question, ReferenceChoice } from "../core/types.ts";
+import type { PhiAction } from "../core/phi.ts";
 import { claudeKey, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { codeOf, plainOf } from "./items.ts";
@@ -18,7 +19,8 @@ export type Card =
   | { t: "programs"; name?: string }
   | ({ t: "plan" } & Omit<PlanEvent, "type">)
   | { t: "clarify"; found: string; qids: string[]; skipped: string[]; check?: string; notes?: string[] }
-  | { t: "rewind"; points: RewindPoint[] };
+  | { t: "rewind"; points: RewindPoint[] }
+  | ({ t: "phi" } & Omit<PhiEvent, "type">);
 
 export type CardType = Card["t"];
 
@@ -50,6 +52,10 @@ export function cardFromEvent(e: BusEvent): Card | undefined {
     }
     case "clarify":
       return { t: "clarify", found: e.found, qids: e.qids, skipped: e.skipped, check: e.check, notes: e.notes };
+    case "phi": {
+      const { type: _t, ...rest } = e;
+      return { t: "phi", ...rest };
+    }
   }
   return undefined;
 }
@@ -59,6 +65,7 @@ const PLAN_ENDS = ["change_requested", "cancelled", "pilot_requested"];
 export function closesCard(en: Entry, c: Card): boolean {
   if (en.kind === "answer") return c.t === "question" && c.q.qid === en.data.qid;
   if (en.kind === "permission") return c.t === "permission" && c.rid === en.data.rid;
+  if (en.kind === "phi") return c.t === "phi" && c.rid === en.data.rid;
   if (en.kind === "follow_step") return c.t === "instruction" && c.step === en.data.step;
   if (en.kind === "clarify" && en.data.action === "answered") return c.t === "clarify";
   if (en.kind === "plan_approved" || en.kind === "pilot_approved" || en.kind === "pilot_rejected" || (en.kind === "plan" && PLAN_ENDS.includes(String(en.data.action)))) return c.t === "plan";
@@ -129,6 +136,32 @@ export function respondPermission(session: SessionLike, card: Extract<Card, { t:
   if ("stop" in c) return session.interrupt();
   if (c.ok) session.respondPermission(card.rid, true, ...((c.always ? ["", true] : []) as [string?, boolean?]));
   else session.respondPermission(card.rid, false, c.note);
+}
+
+// ---------------------------------------------------------------- patient identifiers
+
+export const PHI_TITLE = "Possible patient identifiers";
+
+export function phiView(card: Extract<Card, { t: "phi" }>) {
+  const actions: { act: PhiAction; key: string; label: string; help: string }[] = [
+    { act: "send", key: "s", label: "Send anyway", help: "The record logs this choice." },
+    { act: "mask", key: "m", label: "Mask the values and send", help: "The model sees placeholders, such as [NAME 1]. Your files do not change." },
+    ...(card.local ? [{ act: "local" as const, key: "l", label: `Use the local model ${card.local} for this session`, help: "The data stays on this computer." }] : []),
+    { act: "stop", key: "x", label: "Stop", help: "Nothing goes to the model." },
+  ];
+  return {
+    title: PHI_TITLE,
+    intro: `This content goes to the cloud model ${card.model}. It can contain patient identifiers:`,
+    lines: card.hits.map((h) => `${h.label}: ${h.masked} (${h.where})`),
+    more: card.more ? `${card.more} more not shown.` : "",
+    actions,
+    noLocal: card.local ? "" : "No local model is set. To add one, set local_model in /config.",
+    note: "This check looks for patterns. It does not find all identifiers, and it can be wrong. Your choice applies to the rest of this session.",
+  };
+}
+
+export function respondPhi(session: SessionLike, card: Extract<Card, { t: "phi" }>, action: PhiAction): void {
+  session.respondPhi?.(card.rid, action);
 }
 
 // ---------------------------------------------------------------- question

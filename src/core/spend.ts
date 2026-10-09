@@ -72,3 +72,102 @@ export function budgetProblem(): string | undefined {
   const spent = totalSpend(process.env.GA_BUDGET_SINCE || monthStart());
   return spent >= budget ? `The Claude budget of $${budget.toFixed(2)} for this month is used up ($${spent.toFixed(2)} spent). Raise GA_BUDGET_USD or the budgetUsd setting to continue.` : undefined;
 }
+
+export function promptTokens(d: Record<string, unknown>): number {
+  return ["inputTokens", "cacheRead", "cacheWrite", "outputTokens"].reduce((n, k) => n + (Number(d[k]) || 0), 0);
+}
+
+export function entryCost(d: Record<string, unknown>): number | undefined {
+  if (d.local === true) return 0;
+  const model = String(d.model ?? "");
+  const claude = d.provider ? d.provider === "claude" : model.startsWith("claude");
+  if (!claude) return undefined;
+  return costUsd(model, { inputTokens: Number(d.inputTokens) || 0, outputTokens: Number(d.outputTokens) || 0, cacheRead: Number(d.cacheRead) || 0, cacheWrite: Number(d.cacheWrite) || 0 });
+}
+
+export interface TurnUsage {
+  turn: number;
+  request: string;
+  steps: number;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  usd?: number;
+}
+
+export interface UsageSummary {
+  model: string;
+  local: boolean;
+  usd?: number;
+  turns: TurnUsage[];
+  total: TurnUsage;
+  contextTokens: number;
+  contextWindow: number;
+  percent: number;
+  steps: number;
+}
+
+const blank = (turn: number, request: string): TurnUsage => ({ turn, request, steps: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, usd: 0 });
+
+function add(t: TurnUsage, d: Record<string, unknown>): void {
+  t.steps++;
+  t.input += Number(d.inputTokens) || 0;
+  t.output += Number(d.outputTokens) || 0;
+  t.cacheRead += Number(d.cacheRead) || 0;
+  t.cacheWrite += Number(d.cacheWrite) || 0;
+  const c = entryCost(d);
+  t.usd = c === undefined || t.usd === undefined ? undefined : t.usd + c;
+}
+
+export function usageSummary(entries: { kind: string; data: Record<string, unknown> }[], info: { model: string; provider: string; contextWindow: number; local?: boolean }, contextTokens: number): UsageSummary {
+  const turns: TurnUsage[] = [];
+  const total = blank(0, "Total");
+  let cur: TurnUsage | undefined;
+  for (const e of entries) {
+    if (e.kind === "user") {
+      if (e.data.during) continue;
+      cur = blank(turns.length + 1, String(e.data.text ?? ""));
+      turns.push(cur);
+    } else if (e.kind === "usage") {
+      if (!cur) turns.push((cur = blank(turns.length + 1, "")));
+      add(cur, e.data);
+      add(total, e.data);
+    }
+  }
+  const local = info.local ?? info.provider === "ollama";
+  const win = info.contextWindow || 1;
+  return { model: info.model, local, usd: total.usd, turns: turns.filter((t) => t.steps), total, contextTokens, contextWindow: win, percent: (contextTokens / win) * 100, steps: total.steps };
+}
+
+export function dollars(usd: number | undefined): string {
+  if (usd === undefined) return "price not known";
+  if (usd === 0) return "$0";
+  return usd < 0.01 ? "<$0.01" : `$${usd.toFixed(2)}`;
+}
+
+export function kTokens(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : String(n);
+}
+
+export function percentText(p: number): string {
+  return p > 0 && p < 1 ? "<1%" : `${Math.round(p)}%`;
+}
+
+export function usageShort(u: UsageSummary): string {
+  return `${u.local ? `local, ${dollars(u.usd)}` : dollars(u.usd)} · context ${percentText(u.percent)}`;
+}
+
+export function usageLong(u: UsageSummary): string {
+  const money = u.local ? `local model, ${dollars(u.usd)} this session` : u.usd === undefined ? "the price of this model is not known" : `${dollars(u.usd)} this session`;
+  return `${money} · context ${kTokens(u.contextTokens)} of ${kTokens(u.contextWindow)} tokens (${percentText(u.percent)})`;
+}
+
+export function contextWarning(used: number, win: number): string {
+  return `The context is ${percentText((used / win) * 100)} full: ${kTokens(used)} of ${kTokens(win)} tokens. Before each step, the harness summarizes the older messages if its estimate is more than 70%. It does not summarize the current request. Type /compact to summarize now.`;
+}
+
+export function priceLine(model: string): string {
+  const p = PRICES[model];
+  return p ? `List prices for ${model}, in US dollars for each million tokens: input $${p.input}, output $${p.output}, cache read $${p.cacheRead}, cache write $${p.cacheWrite}.` : "";
+}

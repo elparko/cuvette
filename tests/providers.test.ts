@@ -222,7 +222,7 @@ describe("claude", () => {
 
   test("makeProvider claude uses default model and info", async () => {
     const p = await makeProvider("claude", { client: {} });
-    expect(p.info).toEqual({ provider: "claude", model: "claude-opus-5-5", contextWindow: 1_000_000, vision: true, small: false });
+    expect(p.info).toEqual({ provider: "claude", model: "claude-opus-5-5", contextWindow: 1_000_000, vision: true, small: false, local: false });
     expect((await makeProvider("claude:claude-haiku-5-5", { client: {} })).info.model).toBe("claude-haiku-5-5");
   });
 });
@@ -280,7 +280,7 @@ describe("ollama", () => {
       ]),
     );
     const p = await makeProvider("ollama:qwen3:8b");
-    expect(p.info).toEqual({ provider: "ollama", model: "qwen3:8b", contextWindow: 32768, vision: false, small: true });
+    expect(p.info).toEqual({ provider: "ollama", model: "qwen3:8b", contextWindow: 32768, vision: false, small: true, local: true });
     const deltas: string[] = [];
     const history: Message[] = [user("add"), { role: "assistant", parts: [{ type: "tool_call", id: "call_4", name: "add", args: {} }] }];
     const r = await p.step(req(history, { onDelta: (d) => deltas.push(`${d.type}:${d.text}`) }));

@@ -190,7 +190,7 @@ export function StatusLine(props: {
   purpose?: string;
   state: string;
   openQuestions: number;
-  tokens: { input: number; output: number };
+  usage?: string;
   hint?: string;
   details?: boolean;
   queue?: boolean;
@@ -217,6 +217,7 @@ export function StatusLine(props: {
           ) : null}
           <Text dimColor>
             <Text color="cyan">{props.mode}</Text> · {props.model}
+            {props.usage ? ` · ${props.usage}` : ""}
           </Text>
         </Text>
       ) : props.bypass ? (
@@ -252,13 +253,7 @@ export function StatusLine(props: {
       </Text>,
     );
   }
-  if (props.tokens.input || props.tokens.output) {
-    parts.push(
-      <Text key="t">
-        {tokensText(props.tokens.input)} in / {tokensText(props.tokens.output)} out
-      </Text>,
-    );
-  }
+  if (props.usage) parts.push(<Text key="t">{props.usage}</Text>);
   const line = (
     <Text dimColor wrap="truncate-end">
       {parts.map((p, i) => (

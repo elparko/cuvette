@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -7,6 +7,8 @@ import { changeSetting, describe, find, recordSetting, settingsPath, type Settin
 import { budgetUsd } from "../src/core/spend.ts";
 import { loadSettings, xlsxOn } from "../src/core/config.ts";
 import { trustFolder } from "../src/core/trust.ts";
+import { folderHasNoPatientData } from "../src/core/phi.ts";
+import { saveSetting } from "../src/ui/config.ts";
 
 const KEY = "sk-ant-api03-secretsecretsecret-WXYZ";
 const old = process.env.GA_HOME;
@@ -201,4 +203,37 @@ test("the adapters for every session are a list, and none clears the list", asyn
   expect(row(describe({ cwd, env: {} }), "defaultAdapters")).toMatchObject({ value: "tables, biostats", source: "project" });
   await changeSetting({ cwd, env: {} }, "defaultAdapters", "none", "user");
   expect(JSON.parse(readFileSync(settingsPath("user", cwd), "utf8")).defaultAdapters).toEqual([]);
+});
+
+test("the patient identifier check is on by default, and off needs a confirmation", async () => {
+  const { s, events } = fakeSession();
+  const ctx = { cwd, session: s };
+  expect(row(describe(ctx), "phi_check").value).toBe("on");
+  expect(find("phi_check")!.scopes).toEqual(["session", "user"]);
+  writeJson(settingsPath("project", cwd), { phi_check: "off" });
+  expect(loadSettings(cwd).phi_check).toBe("on");
+  const first = await saveSetting(ctx, find("phi_check")!, "off", "user");
+  expect(first).toMatchObject({ confirm: true, color: "yellow" });
+  expect(first.text).toMatch(/Choose off again to confirm/);
+  expect(existsSync(settingsPath("user", cwd))).toBe(false);
+  const second = await saveSetting(ctx, find("phi_check")!, "off", "user", true);
+  expect(second.color).toBe("green");
+  expect(JSON.parse(readFileSync(settingsPath("user", cwd), "utf8")).phi_check).toBe("off");
+  expect(loadSettings(cwd).phi_check).toBe("off");
+  expect(events.at(-1)).toEqual({ kind: "setting", data: { name: "phi_check", old: "on", new: "off", scope: "user" } });
+  expect((await saveSetting(ctx, find("phi_check")!, "on", "user")).color).toBe("green");
+});
+
+test("the folder answer about patient data goes to the user settings, next to the folder trust", async () => {
+  const { s, events } = fakeSession();
+  const ctx = { cwd, session: s };
+  expect(row(describe(ctx), "no_patient_data").value).toBe("no");
+  expect((await saveSetting(ctx, find("no_patient_data")!, "yes", "user")).confirm).toBe(true);
+  await saveSetting(ctx, find("no_patient_data")!, "yes", "user", true);
+  expect(row(describe(ctx), "no_patient_data").value).toBe("yes");
+  expect(folderHasNoPatientData(cwd)).toBe(true);
+  expect(existsSync(settingsPath("project", cwd))).toBe(false);
+  expect(events.at(-1)!.data).toMatchObject({ name: "no_patient_data", old: "no", new: "yes" });
+  await changeSetting(ctx, "local_model", "ollama:qwen3:8b", "session");
+  expect(s.settings.local_model).toBe("ollama:qwen3:8b");
 });

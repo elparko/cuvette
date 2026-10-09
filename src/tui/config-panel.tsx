@@ -39,15 +39,18 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
   const [step, setStep] = useState<Step>({ t: "list" });
   const [text, setText] = useState("");
   const [msg, setMsg] = useState<{ text: string; color?: string }>();
+  const [confirming, setConfirming] = useState("");
   const row = rows[Math.min(sel, rows.length - 1)];
   const max = useContext(CardRows);
 
   const save = async (def: SettingDef, value: string, scope: Scope) => {
     setStep({ t: "list" });
     lastScope.set(def.name, scope);
-    const m = await saveSetting(ctx, def, value, scope);
+    const key = `${def.name}=${value}=${scope}`;
+    const r = await saveSetting(ctx, def, value, scope, confirming === key);
+    setConfirming(r.confirm ? key : "");
     props.onSaved?.();
-    setMsg(m);
+    setMsg(r);
   };
 
   const reset = async (def: SettingDef) => {

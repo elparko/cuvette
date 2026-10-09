@@ -37,6 +37,8 @@ export interface Settings {
   defaultAdapters: string[];
   input_keys: "mac" | "emacs" | "vim" | "classic";
   text_style: "ste" | "plain";
+  phi_check: "on" | "off" | boolean;
+  local_model?: string;
 }
 
 export const DEFAULTS: Settings = {
@@ -66,6 +68,7 @@ export const DEFAULTS: Settings = {
   defaultAdapters: ["tables"],
   input_keys: "mac",
   text_style: "ste",
+  phi_check: "on",
 };
 
 export function xlsxOn(s: Pick<Settings, "export_xlsx">): boolean {
@@ -102,5 +105,6 @@ export function loadSettings(cwd: string, overrides: Partial<Settings> = {}): Se
   let s = merge(DEFAULTS, readJson(join(gaHome(), "settings.json")));
   const trusted = folderTrusted(cwd);
   for (const layer of projectSettings(cwd)) s = merge(s, (trusted ? layer : safeOnly(layer)) as Partial<Settings>);
+  s = { ...s, phi_check: readJson(join(gaHome(), "settings.json")).phi_check ?? DEFAULTS.phi_check };
   return merge(s, Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined)));
 }

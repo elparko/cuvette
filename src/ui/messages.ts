@@ -1,4 +1,5 @@
 import type { SessionLike } from "./types.ts";
+import { usageLong, usageShort, type UsageSummary } from "../core/spend.ts";
 
 export type Routed = { t: "none" } | { t: "send"; text: string } | { t: "queue"; text: string } | { t: "steer"; text: string; now: boolean; note: string };
 
@@ -37,4 +38,14 @@ export function activityText(state: string, purpose?: string, tool?: string): st
   if (state === "running") return purpose || (tool ? `Running ${tool.replace(/_/g, " ")}` : "Working");
   if (state === "waiting") return "Waiting for your answer";
   return "Thinking about the next step";
+}
+
+export function usageOf(session: SessionLike): UsageSummary | undefined {
+  const u = session.usage?.();
+  return u && u.steps ? u : undefined;
+}
+
+export function usageFields(session: SessionLike): { usage: string; usageLong: string } {
+  const u = usageOf(session);
+  return u ? { usage: usageShort(u), usageLong: usageLong(u) } : { usage: "", usageLong: "" };
 }

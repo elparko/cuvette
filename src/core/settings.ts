@@ -7,6 +7,7 @@ import { DEFAULTS } from "./config.ts";
 import { claudeKey, elabftwConfig } from "./credentials.ts";
 import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
 import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
+import { folderHasNoPatientData, setFolderNoPatientData } from "./phi.ts";
 
 export type Scope = "session" | "user" | "project";
 export type Source = "default" | "user" | "project" | "session" | "env" | "";
@@ -52,6 +53,8 @@ export interface SettingDef {
   shown?: (ctx: SettingCtx) => boolean;
   read?: (ctx: SettingCtx) => { value: string; source: Source; file?: string };
   details?: (ctx: SettingCtx) => string[];
+  confirm?: (value: string) => string | undefined;
+  write?: (ctx: SettingCtx, value: unknown) => void;
 }
 
 export interface SettingRow {
@@ -247,6 +250,37 @@ export const SETTINGS: SettingDef[] = [
     def: localePaper(),
   },
   {
+    name: "phi_check",
+    group: "Patient data",
+    label: "Patient identifier check",
+    brief: "Look for patient identifiers before content goes to a cloud model.",
+    help: "on: before content goes to a cloud model, the harness looks for patient identifiers, such as names, dates of birth and record numbers. If it finds one, a card asks what to do. The check is a help, not a guarantee. off: no check.",
+    scopes: ["session", "user"],
+    choices: () => ["on", "off"],
+    confirm: (v) => (v === "off" ? "With the check off, patient identifiers can go to a cloud model with no card. Choose off again to confirm." : undefined),
+  },
+  {
+    name: "no_patient_data",
+    group: "Patient data",
+    label: "This folder has no patient data",
+    brief: "Skip the patient identifier check in this folder.",
+    help: "yes: the harness does not check the content of this project folder for patient identifiers. Cuvette keeps this answer in your user settings, with the folder trust.",
+    scopes: ["user"],
+    choices: () => ["no", "yes"],
+    read: (ctx) => (folderHasNoPatientData(ctx.cwd) ? { value: "yes", source: "user" } : { value: "no", source: "default" }),
+    write: (ctx, v) => setFolderNoPatientData(ctx.cwd, v === "yes"),
+    confirm: (v) => (v === "yes" ? "With yes, the harness does not check this folder for patient identifiers. Choose yes again to confirm." : undefined),
+  },
+  {
+    name: "local_model",
+    group: "Patient data",
+    label: "Local model for patient data",
+    brief: "The local model that the patient data card offers.",
+    help: "The local model that the patient data card offers, for example ollama:qwen3:8b. The data stays on this computer.",
+    scopes: ALL,
+    free: true,
+  },
+  {
     name: "permissionMode",
     group: "Permissions",
     label: "Permission mode",
@@ -348,7 +382,7 @@ export const SETTINGS: SettingDef[] = [
     name: "footer_hints",
     group: "Display",
     label: "Footer hints",
-    help: "full: the mode with its explanation, the model and the key hints. short: only the mode name and the model. off: no footer, except Esc stops this step while a step runs. The bypass permissions marker and Waiting for your answer show in each value. Ctrl+T changes the value for this session. The change applies at once.",
+    help: "full: the mode with its explanation, the model, the cost and context fill, and the key hints. short: only the mode name, the model, and the cost and context fill. off: no footer, except Esc stops this step while a step runs. The bypass permissions marker and Waiting for your answer show in each value. Ctrl+T changes the value for this session. The change applies at once.",
     brief: "How much the footer under the input box shows. Ctrl+T changes it.",
     scopes: ALL,
     choices: () => ["full", "short", "off"],
@@ -483,7 +517,7 @@ function fileValue(d: SettingDef, cwd: string): { value: unknown; source: Source
   let source: Source = "default";
   let file: string | undefined;
   for (const [s, layer, p] of layers(cwd))
-    if (d.name in layer) {
+    if (d.name in layer && (s === "user" || d.name !== "phi_check")) {
       value = layer[d.name];
       source = s;
       file = p;
@@ -552,11 +586,12 @@ export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown,
   if (d.lockedInTurn && ctx.session?.busy) throw new Error(`${d.label} is locked until the turn ends.`);
   if (name === "output_folder" && (typeof raw !== "string" || !raw.trim())) throw new Error(`${d.label} must be a folder: a name in the project folder, such as cuvette, or an absolute path.`);
   const value = parseValue(d, raw);
-  const old = name === "details" ? d.read!(ctx).value : d.read ? fileValue(d, ctx.cwd).value : resolve(d, ctx).value;
+  const old = name === "details" || d.write ? d.read!(ctx).value : d.read ? fileValue(d, ctx.cwd).value : resolve(d, ctx).value;
   const s = ctx.session;
   if (name === "details" && value !== old) ctx.ui?.toggleDetails();
   if (!d.read) await applyLive(ctx, name, value);
-  if (scope === "project") {
+  if (d.write) d.write(ctx, value);
+  else if (scope === "project") {
     const before = trustStatus(ctx.cwd).state;
     writeSetting(settingsPath(scope, ctx.cwd), name, value);
     afterProjectWrite(ctx.cwd, before);

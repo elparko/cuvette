@@ -163,7 +163,7 @@ dialog#cfgdirs { width: min(560px, 96vw); }
 `;
 
 export const SETTINGS_JS = String.raw`
-const cfg = { sec: "", q: "", saved: null };
+const cfg = { sec: "", q: "", saved: null, confirm: "" };
 async function loadSettings() {
   const boxes = [$("settingsbody"), ...document.querySelectorAll("#cards .settings")];
   let html;
@@ -219,9 +219,9 @@ function cfgAsk(row, value) {
   row.querySelector(".sdone").textContent = "";
   pick.focus();
 }
-async function cfgPost(path, body) {
+async function cfgPost(path, body, key) {
   let r;
-  try { r = await call(path, body); cfg.saved = { name: body.name, text: r.text, ok: true }; }
+  try { r = await call(path, body); cfg.saved = { name: body.name, text: r.text, ok: !r.confirm }; cfg.confirm = r.confirm ? key : ""; }
   catch (err) { cfg.saved = { name: body.name, text: err.message, ok: false }; }
   clearTimeout(cfgPost.timer);
   cfgPost.timer = setTimeout(() => { cfg.saved = null; }, 8000);
@@ -318,7 +318,12 @@ document.addEventListener("click", async (e) => {
     return;
   }
   const sc = t.closest("[data-sx-scope]");
-  if (sc) { cfgRemember(name, sc.dataset.sxScope); await cfgPost("api/setting", { name: name, value: row.dataset.pending, scope: sc.dataset.sxScope }); return; }
+  if (sc) {
+    cfgRemember(name, sc.dataset.sxScope);
+    const key = name + "=" + row.dataset.pending + "=" + sc.dataset.sxScope;
+    await cfgPost("api/setting", { name: name, value: row.dataset.pending, scope: sc.dataset.sxScope, confirm: cfg.confirm === key }, key);
+    return;
+  }
   if (t.closest("[data-sx-cancel]")) { loadSettings(); return; }
   if (t.closest("[data-sx-reset]")) { await cfgPost("api/setting/reset", { name: name }); return; }
   const rm = t.closest("[data-sx-remove]");

@@ -14,7 +14,7 @@ export type EntryKind =
   | "mode" | "follow_step" | "lab_memory" | "plan" | "plan_approved" | "clarify"
   | "pilot_run" | "pilot_approved" | "pilot_rejected" | "reference" | "validation"
   | "data_check" | "samples" | "eln_push" | "eln_link" | "setting" | "note" | "notice" | "error" | "usage" | "compaction" | "correction" | "adapter" | "title" | "program" | "trust"
-  | "rewind" | "fork" | "branch" | "method";
+  | "rewind" | "fork" | "branch" | "method" | "phi";
 
 export interface Entry {
   id: number;
@@ -114,6 +114,7 @@ export interface ModelInfo {
   contextWindow: number;
   vision: boolean;
   small: boolean;
+  local?: boolean;
 }
 
 export interface StepRequest {
@@ -325,7 +326,17 @@ export type BusEvent =
   | { type: "question"; question: Question }
   | { type: "instruction"; step: number; tool: string; text: string }
   | PlanEvent
-  | { type: "clarify"; found: string; qids: string[]; skipped: string[]; check?: string; notes?: string[] };
+  | { type: "clarify"; found: string; qids: string[]; skipped: string[]; check?: string; notes?: string[] }
+  | PhiEvent;
+
+export interface PhiEvent {
+  type: "phi";
+  rid: string;
+  model: string;
+  hits: { kind: string; label: string; masked: string; where: string }[];
+  more: number;
+  local?: string;
+}
 
 export interface PlanEvent {
   type: "plan";

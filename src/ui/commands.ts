@@ -8,6 +8,7 @@ import { statusText, stepStatus, type StepState } from "../core/status.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { listSessions, sessionLine } from "../core/sessions.ts";
 import { groupSummary, sheetTable } from "../core/samples.ts";
+import { dollars, kTokens, percentText, priceLine, usageLong, type UsageSummary } from "../core/spend.ts";
 import { applyRewind, choiceLabel, choiceValue, show, type Card } from "./cards.ts";
 import { rewindPoints } from "../core/rewind.ts";
 import { branchesText } from "../core/branch.ts";
@@ -168,6 +169,20 @@ const TRAIL_ICON: Record<string, string> = {
   finding: "⚠",
   note: "▸",
 };
+
+export function usageText(u: UsageSummary): string {
+  const row = (t: UsageSummary["total"], label: string) => [label, clip(t.request, 36), String(t.steps), kTokens(t.input), kTokens(t.output), kTokens(t.cacheRead), kTokens(t.cacheWrite), u.local && t.usd === 0 ? "$0" : dollars(t.usd)];
+  const rows = u.turns.map((t) => row(t, String(t.turn)));
+  rows.push(row({ ...u.total, request: "" }, "Total"));
+  return [
+    table(["Turn", "Request", "Model steps", "Input", "Output", "Cache read", "Cache write", "Cost"], rows),
+    "",
+    `Now: ${usageLong(u)}. Model: ${u.model}${u.local ? ", on this computer" : ""}.`,
+    u.local ? "A local model has no cost." : priceLine(u.model) || "Cuvette has no price for this model.",
+    `Before each step, the harness summarizes the older messages if its estimate of the context is more than 70% of the window. The context is at ${percentText(u.percent)} now.`,
+    "This table counts the steps of the analysis model. The referee, the titles and the summaries are not in it. /config shows the Claude spend of this month.",
+  ].filter(Boolean).join("\n");
+}
 
 export function renderTrail(lines: any[], level: number): string {
   const out: string[] = [];
@@ -868,6 +883,16 @@ export const commands: Command[] = [
     async run(_, ctx) {
       await ctx.session.compact();
       ctx.notice("Older messages are summarized.");
+    },
+  },
+  {
+    name: "usage",
+    help: "Show the cost and the tokens of each turn, and how full the context is.",
+    run(_, ctx) {
+      const u = ctx.session.usage?.();
+      if (!u) return unavailable(ctx);
+      if (!u.steps) return ctx.notice("No model step yet. The cost is $0.");
+      ctx.print(usageText(u), "Usage");
     },
   },
   {

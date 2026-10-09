@@ -59,6 +59,8 @@ export interface SessionLike {
   setPilot?(on: boolean): void;
   interrupt(): void;
   respondPermission(rid: string, ok: boolean, note?: string, always?: boolean): void;
+  respondPhi?(rid: string, action: "send" | "mask" | "local" | "stop"): void;
+  usage?(): import("../core/spend.ts").UsageSummary;
   answer(qid: string, value: unknown, note?: string): Promise<void>;
   setDecision(key: string, value: unknown, reason?: string): string[];
   setOwner(key: string, owner: Owner): void;

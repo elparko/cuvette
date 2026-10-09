@@ -134,8 +134,10 @@ export function secretState(r: SettingRow): string {
   return r.source === "env" ? "set by environment" : r.value === "saved" ? "saved" : "not set";
 }
 
-export async function saveSetting(ctx: SettingCtx, def: SettingDef, value: string, scope: Scope): Promise<{ text: string; color: string }> {
+export async function saveSetting(ctx: SettingCtx, def: SettingDef, value: string, scope: Scope, confirmed = false): Promise<{ text: string; color: string; confirm?: boolean }> {
   if (value === RESET) return resetRow(ctx, def);
+  const ask = confirmed ? undefined : def.confirm?.(value);
+  if (ask) return { text: ask, color: "yellow", confirm: true };
   try {
     const r = await changeSetting(ctx, def.name, value, scope);
     return { text: `${SAVED_FOR[scope]} ${def.label} is now ${show(r.value)}.${r.note ? " " + r.note : ""}`, color: "green" };

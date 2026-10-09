@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Static, Text, render, useApp, useInput, useStdout, useWindowSize } from "ink";
 import type { BusEvent, Mode } from "../core/types.ts";
-import { ElnCard, FindingsCard, InstructionCard, RewindCard, KeyCard, PermissionCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
+import { ElnCard, FindingsCard, InstructionCard, RewindCard, KeyCard, PermissionCard, PhiCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import { commands, openPanels, openSetup, openWithOs, suggestions, table, type CommandCtx } from "../ui/commands.ts";
@@ -15,8 +15,8 @@ import { ConfigPanel } from "./config-panel.tsx";
 import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
 import { changeSetting, type SettingSession } from "../core/settings.ts";
-import { applyRewind, applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
-import { inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
+import { applyRewind, applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
+import { inputPlaceholder, nextQueued, routeMessage, stopTurn, usageFields } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
 import { INPUT_MAX_ROWS, InputBox, KeyStyle } from "./input-box.tsx";
 import { terminalStdin } from "./key-stream.ts";
@@ -62,7 +62,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   const [mode, setMode] = useState<Mode>(session.mode);
   const [bypass, setBypass] = useState(session.permissionMode === "bypass");
   const [openQ, setOpenQ] = useState(() => session.questions.open().length);
-  const [tokens, setTokens] = useState({ input: 0, output: 0 });
+  const [usage, setUsage] = useState(() => usageFields(session).usage);
   const [hint, setHint] = useState("");
   const [pending, setPending] = useState<Item[]>([]);
   const [showAll, setShowAll] = useState(false);
@@ -191,7 +191,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
           }
           record({ e: en, items: out });
           if (en.kind === "assistant") setLive("");
-          if (en.kind === "usage") setTokens({ ...mapper.current.tokens });
+          if (en.kind === "usage" || en.kind === "setting") setUsage(usageFields(session).usage);
           dropCard((c) => closesCard(en, c));
           if (refreshesStatus(en)) refresh();
           break;
@@ -461,7 +461,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
         tool={status.tool}
         purpose={status.purpose}
         openQuestions={openQ}
-        tokens={tokens}
+        usage={usage}
         hint={hint}
         details={showAll}
         queue={session.settings?.messages === "queue" || !session.steer}
@@ -522,6 +522,7 @@ function cardViews(d: CardDeps): CardViews {
         onDeny={(note) => (respondPermission(session, card, { ok: false, note }), popCard())}
       />
     ),
+    phi: (card) => <PhiCard key={card.rid} card={card} onAction={(a) => (respondPhi(session, card, a), popCard())} />,
     question: (card) => (
       <QuestionCard
         key={card.q.qid}

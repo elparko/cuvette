@@ -1,6 +1,7 @@
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
 import { ProviderError } from "../core/types.ts";
 import { extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
+import { localUrl } from "../core/phi.ts";
 
 const TIMEOUT_MS = 600_000;
 
@@ -14,7 +15,7 @@ export class OpenAIProvider implements Provider {
 
   constructor(baseUrl: string, readonly model: string, opts: OpenAIOpts = {}) {
     this.base = baseUrl.replace(/\/+$/, "");
-    this.info = { provider: "openai", model, contextWindow: opts.numCtx ?? 32768, vision: false, small: true };
+    this.info = { provider: "openai", model, contextWindow: opts.numCtx ?? 32768, vision: false, small: true, local: localUrl(this.base) };
   }
 
   toNative(system: string, messages: Message[]): unknown[] {

@@ -1,3 +1,4 @@
+import { localUrl } from "../core/phi.ts";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
 import { ProviderError } from "../core/types.ts";
 import { ImageBudget } from "./images.ts";
@@ -99,6 +100,7 @@ export class OllamaProvider implements Provider {
       contextWindow: this.numCtx,
       vision: show.capabilities.includes("vision"),
       small: (show.paramSize ?? 0) < 30 || this.numCtx < 64000,
+      local: localUrl(ollamaHost()),
     };
   }
 

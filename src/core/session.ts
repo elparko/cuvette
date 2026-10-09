@@ -14,7 +14,9 @@ import { findPlace, inProject, placeAt, legacyPlace, local, newPlace, outputRoot
 import { changedAnalysis, describeSession, lastTitle } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
-import { compact, needsCompaction, summaryMessage } from "./compaction.ts";
+import { compact, estimateTokens, needsCompaction, summaryMessage } from "./compaction.ts";
+import { folderHasNoPatientData, groupHits, isCloud, isLocal, Masker, phiOn, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
+import { contextWarning, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
 import { loadSettings, xlsxOn, type Settings } from "./config.ts";
 import { outputDir, savedLine, writeResults, type Saved } from "./results.ts";
 import type { Dirs } from "../adapters/kinds/common.ts";
@@ -258,6 +260,14 @@ export class Session {
   private pilotPlan?: { plan: AnalysisPlan; version: number; target: Mode; answers: string[] };
   private lastSaid = "";
   private waiting = new Map<string, BusEvent>();
+  private phiFrom = 0;
+  private phiChoice?: PhiAction;
+  private masker = new Masker();
+  private phiWaits = new Map<string, Pending<PhiAction>>();
+  private phiCount = 0;
+  private phiOffNoted = false;
+  private refereeOffNoted = false;
+  private contextWarned = false;
   lastStatus: Extract<BusEvent, { type: "status" }> = { type: "status", state: "idle" };
   method?: Method;
 
@@ -424,6 +434,8 @@ export class Session {
           this.method = loadMethod(String(used.data.path));
         } catch {}
       this.history = this.record.messages();
+      const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
+      if (choice) this.phiChoice = choice as PhiAction;
       this.notes.push("The session was resumed after a restart. Program state may have reset; outputs from earlier steps are still on disk.");
     } else {
       this.record.append("session", {
@@ -791,6 +803,10 @@ export class Session {
       const notes = this.drainNotes();
       this.push({ role: "user", parts: [{ type: "text", text: notes ? `${notes}\n\n${text}` : text }] });
       for (let step = 0; step < this.settings.maxSteps; step++) {
+        if (!(await this.phiGate(signal))) {
+          this.record.append("notice", { text: "Stopped before the content went to the model. Nothing was sent." });
+          return "";
+        }
         await this.maybeCompact(signal);
         this.bus.emit({ type: "status", state: "thinking" });
         const res = await this.provider.step({
@@ -801,7 +817,8 @@ export class Session {
           onDelta: (d) => this.bus.emit({ type: "delta", kind: d.type, text: d.text }),
         });
         this.push(res.message);
-        this.record.append("usage", { ...res.usage, model: this.provider.info.model });
+        this.record.append("usage", { ...res.usage, model: this.provider.info.model, provider: this.provider.info.provider, local: isLocal(this.provider.info) });
+        this.checkContext();
         if (res.note) this.record.append("notice", { text: res.note });
         const thinking = res.message.parts.flatMap((p) => (p.type === "thinking" && p.text ? [p.text] : [])).join("\n");
         if (thinking) this.record.append("thinking", { text: thinking });
@@ -935,7 +952,7 @@ export class Session {
   titling?: Promise<void>;
 
   private async retitle(turnStart: number): Promise<void> {
-    if (!this.interactive || this.settings.headless || this.provider.info.provider === "fake") return;
+    if (!this.interactive || this.settings.headless || this.provider.info.provider === "fake" || this.phiChoice === "mask") return;
     const all = this.record.entries();
     const had = lastTitle(all);
     if (!changedAnalysis(all.slice(turnStart)) && (had || !all.some((e) => e.kind === "assistant" && e.data.final))) return;
@@ -1015,6 +1032,138 @@ export class Session {
     this.record.append("compaction", { summary: res.summary, upTo });
     this.history = [summaryMessage(res.summary), ...res.kept];
     for (const m of res.kept) this.record.append("message", { message: m as unknown as Record<string, unknown> });
+    this.phiFrom = this.history.length;
+    this.contextWarned = false;
+  }
+
+  // ------------------------------------------------------------- patient identifiers
+
+  private phiOff(): string | undefined {
+    if (!phiOn(this.settings.phi_check)) return "The patient identifier check is off (the phi_check setting).";
+    if (folderHasNoPatientData(this.cwd)) return "The patient identifier check is off for this folder: you said that it has no patient data.";
+    return undefined;
+  }
+
+  private maskFrom(from: number) {
+    if (!this.masker.map.size) return;
+    for (let i = from; i < this.history.length; i++) this.history[i] = this.masker.message(this.history[i]!);
+  }
+
+  private localSpec(): string | undefined {
+    const spec = this.settings.local_model?.trim();
+    return spec && /^(ollama|openai):/.test(spec) ? spec : undefined;
+  }
+
+  private async phiGate(signal: AbortSignal): Promise<boolean> {
+    const from = Math.min(this.phiFrom, this.history.length);
+    this.phiFrom = this.history.length;
+    if (from >= this.history.length) return true;
+    const off = this.phiOff();
+    if (off) {
+      if (!this.phiOffNoted) this.record.append("notice", { text: off });
+      this.phiOffNoted = true;
+      return true;
+    }
+    const hits = scanMessages(this.history.slice(from), this.history);
+    if (!hits.length) {
+      this.maskFrom(from);
+      return true;
+    }
+    const shown = groupHits(hits);
+    const entry = (action: PhiAction | "local model", by: string, rid?: string) =>
+      this.record.append("phi", { rid, action, by, model: this.provider.info.model, count: hits.length, hits: shown.slice(0, 20) as unknown as Record<string, unknown>[] });
+    if (!isCloud(this.provider.info)) {
+      entry("local model", "harness");
+      this.record.append("notice", { text: `Possible patient identifiers (${hits.length}) go to the local model ${this.provider.info.model}. They stay on this computer.` });
+      return true;
+    }
+    let action: PhiAction;
+    let by = "scientist";
+    let rid: string | undefined;
+    if (this.phiChoice) {
+      action = this.phiChoice;
+      by = "your earlier choice in this session";
+    } else if (this.settings.headless) {
+      action = "mask";
+      by = "harness: no one can answer the card in a headless run";
+    } else ({ rid, action } = await this.askPhi(shown, signal, this.localSpec()));
+    if (action === "local") {
+      const problem = await this.useLocalModel();
+      if (problem) {
+        this.record.append("notice", { text: `The local model did not start: ${problem}` });
+        if (by !== "scientist") return false;
+        ({ rid, action } = await this.askPhi(shown, signal, undefined));
+      }
+    }
+    entry(action, by, rid);
+    if (action === "stop") {
+      for (let i = from; i < this.history.length; i++) this.history[i] = withheld(this.history[i]!);
+      return false;
+    }
+    this.phiChoice = action;
+    if (action === "mask") {
+      this.masker.add(hits);
+      this.maskFrom(from);
+    }
+    return true;
+  }
+
+  private async askPhi(hits: PhiShown[], signal: AbortSignal, local: string | undefined): Promise<{ rid: string; action: PhiAction }> {
+    const rid = `phi${++this.phiCount}`;
+    const p = new Promise<PhiAction>((resolve) => this.phiWaits.set(rid, { resolve }));
+    this.emitWaiting(rid, { type: "phi", rid, model: this.provider.info.model, hits: hits.slice(0, 8), more: Math.max(0, hits.length - 8), local });
+    this.bus.emit({ type: "status", state: "waiting", tool: "patient data check" });
+    let action: PhiAction;
+    try {
+      action = await abortable(p, signal);
+    } catch {
+      action = "stop";
+    }
+    if (action === "local" && !local) action = "stop";
+    this.phiWaits.delete(rid);
+    this.waiting.delete(rid);
+    this.bus.emit({ type: "status", state: "thinking" });
+    return { rid, action };
+  }
+
+  respondPhi(rid: string, action: PhiAction): void {
+    this.phiWaits.get(rid)?.resolve(action);
+  }
+
+  private async useLocalModel(): Promise<string | undefined> {
+    const spec = this.localSpec();
+    if (!spec) return "no local model is set (the local_model setting).";
+    const old = this.settings.model;
+    try {
+      await this.applySetting("model", spec);
+    } catch (e) {
+      return (e as Error).message;
+    }
+    this.record.append("setting", { name: "model", old, new: spec, scope: "session", reason: "patient data card" });
+    if (this.refereeProvider && isCloud(this.refereeProvider.info)) {
+      this.refereeProvider = undefined;
+      this.record.append("notice", { text: "The referee is off for this session: its model is a cloud model." });
+    }
+    return undefined;
+  }
+
+  // ------------------------------------------------------------- usage
+
+  contextTokens(): number {
+    const last = this.record.entries(["usage", "compaction"]).at(-1);
+    return !last || last.kind === "compaction" ? estimateTokens(this.history, this.system) : promptTokens(last.data);
+  }
+
+  usage(): UsageSummary {
+    return usageSummary(this.record.entries(["user", "usage"]), this.provider.info, this.contextTokens());
+  }
+
+  private checkContext() {
+    const used = this.contextTokens();
+    const win = this.provider.info.contextWindow;
+    if (this.contextWarned || used < win * 0.8) return;
+    this.contextWarned = true;
+    this.record.append("notice", { text: contextWarning(used, win), warn: true });
   }
 
   private draft?: { answer: string; claims: ReturnType<typeof checkAnswer>; found: { f: FindingIn; source: Finding["source"] }[]; errors: number; measured: number };
@@ -1035,7 +1184,11 @@ export class Session {
     const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const found: { f: FindingIn; source: Finding["source"] }[] = [...(pre.findings ?? []).map((f) => ({ f, source: "hook" as const }))];
     for (const f of await runChecks(ctx)) found.push({ f, source: "rule" });
-    if (this.refereeProvider && !signal.aborted) {
+    if (this.refereeProvider && this.phiChoice === "mask" && isCloud(this.refereeProvider.info) && !this.refereeOffNoted) {
+      this.refereeOffNoted = true;
+      this.record.append("notice", { text: "The referee did not run: it reads the record, and the record holds the values that the patient data card masked." });
+    }
+    if (this.refereeProvider && !signal.aborted && !(this.phiChoice === "mask" && isCloud(this.refereeProvider.info))) {
       try {
         for (const f of await referee(this.refereeProvider, ctx)) found.push({ f, source: "referee" });
       } catch (e) {

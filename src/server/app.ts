@@ -353,7 +353,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       if (!def) return send(res, 404, { error: "no such setting" });
       const scope = (def.scopes.includes(body.scope as never) ? body.scope : def.scopes[0]) as never;
       if (!scope) return send(res, 400, { error: `${def.label} cannot change here.` });
-      const r = await saveSetting(settingCtx(), def, String(body.value ?? ""), scope);
+      const r = await saveSetting(settingCtx(), def, String(body.value ?? ""), scope, body.confirm === true);
       if (c) c.view.ctx.refresh();
       return send(res, r.color === "red" ? 400 : 200, r);
     }

@@ -74,7 +74,7 @@ describe("transcript", () => {
     expect(text).toContain("· Looked at 1 folder (msi); Read 2 files (endo_epi.imzML, samples.csv)");
     expect(text).not.toContain("read_file");
     expect(text).toContain("◇ code only: no manual route");
-    expect(text).toMatch(/\d+(\.\d)?k? in \/ \d+ out/);
+    expect(text).toMatch(/price not known · context (<1|\d+)%/);
   });
 });
 

@@ -139,6 +139,8 @@ ul.files { margin: 4px 0; padding-left: 18px; font-size: 14px; }
 .card.green { border-color: var(--ok); }
 .card.green h3 { color: var(--ok); }
 .card.cyan h3 { color: var(--accent); }
+.card.red { border-color: var(--bad); }
+.card.red h3 { color: var(--bad); }
 .card .opts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .card .opts.col { flex-direction: column; align-items: flex-start; }
 .card .evidence { background: var(--panel2); border-radius: 6px; padding: 6px 8px; white-space: pre-wrap; }
@@ -290,6 +292,7 @@ ul.dirs li button .dim { margin-left: 6px; }
     <option value="plan">Plan: the agent plans only</option>
   </select></label>
   <span class="tag hidden" id="bypass">bypass permissions</span>
+  <span class="tag hidden" id="usage"></span>
 </header>
 
 <main class="split hidden" id="p-session">
@@ -582,6 +585,9 @@ function setStatus(m) {
   if (m.where) setWhere(m.where);
   $("mode").value = m.mode;
   $("bypass").classList.toggle("hidden", !m.bypass);
+  $("usage").classList.toggle("hidden", !m.usage);
+  $("usage").textContent = m.usage || "";
+  $("usage").title = m.usageLong || "";
   $("msg").placeholder = m.placeholder;
   $("send").textContent = m.state && m.state !== "idle" ? "Send after this step" : "Send";
   $("queue").textContent = (m.queue || []).map((q) => "Queued: " + q).join("\n");

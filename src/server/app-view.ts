@@ -4,13 +4,14 @@ import type { SettingSession } from "../core/settings.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import {
   applyRewind, applySetup, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
-  respondPermission, saveEln, saveKey, startCards, type Card, type PlanAction, type Say,
+  respondPermission, respondPhi, saveEln, saveKey, startCards, type Card, type PlanAction, type Say,
 } from "../ui/cards.ts";
 import { commands, openPanels, openSetup, type CommandCtx } from "../ui/commands.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import { activityText, inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
 import type { SessionLike } from "../ui/types.ts";
 import { cardHtml, itemHtml, type Ctx, type Slot } from "./app-html.ts";
+import { usageFields } from "../ui/messages.ts";
 
 export interface ViewHost {
   token: string;
@@ -119,6 +120,7 @@ export class WebView {
       queueMode: s.settings?.messages === "queue" || !s.steer,
       details: this.details,
       where: `${s.folderLine || s.cwd || ""} · ${s.model.model}`,
+      ...usageFields(s),
     };
   }
 
@@ -211,7 +213,7 @@ export class WebView {
         const before = this.slots.length;
         this.slots = this.slots.filter((sl) => !closesCard(en, sl.card));
         if (this.slots.length !== before || en.kind === "answer") this.sendCards();
-        if (refreshesStatus(en)) this.sendStatus();
+        if (refreshesStatus(en) || en.kind === "usage" || en.kind === "setting") this.sendStatus();
         this.touch();
         break;
       }
@@ -245,7 +247,7 @@ export class WebView {
         const c = cardFromEvent(e);
         if (c) this.openCard(c);
         if (e.type === "question") this.sendStatus();
-        if (e.type === "permission" || e.type === "question" || e.type === "plan" || e.type === "instruction") this.send({ t: "notify", title: "The agent needs you", body: e.type === "permission" ? `Permission needed: ${e.tool}` : e.type === "question" ? e.question.title : e.type === "plan" ? "Check the proposed analysis." : `Your turn: step ${e.step}`, quiet: true });
+        if (e.type === "permission" || e.type === "question" || e.type === "plan" || e.type === "instruction" || e.type === "phi") this.send({ t: "notify", title: "The agent needs you", body: e.type === "phi" ? "Possible patient identifiers. Choose what goes to the model." : e.type === "permission" ? `Permission needed: ${e.tool}` : e.type === "question" ? e.question.title : e.type === "plan" ? "Check the proposed analysis." : `Your turn: step ${e.step}`, quiet: true });
       }
     }
   }
@@ -371,6 +373,10 @@ export class WebView {
         else if (a === "deny") respondPermission(s, card, { ok: false, note: str("note") || undefined });
         else if (a === "stop") respondPermission(s, card, { stop: true });
         else return { ok: false, error: "unknown action" };
+        break;
+      case "phi":
+        if (a !== "send" && a !== "mask" && a !== "local" && a !== "stop") return { ok: false, error: "unknown action" };
+        respondPhi(s, card, a);
         break;
       case "question": {
         if (a === "later") break;
