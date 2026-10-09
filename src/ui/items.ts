@@ -146,7 +146,7 @@ export class Mapper {
       case "mode":
         return d.reason ? [] : line("▸", `Mode: ${d.old} → ${d.new}`, "cyan");
       case "setting":
-        return line("⚙", d.change ? `Setting ${d.name} changed (${scopeLabel(d.scope as Scope)})` : `Setting ${d.name}: ${show(d.old)} → ${show(d.new)} (${scopeLabel(d.scope as Scope)})`, "cyan");
+        return line("⚙", d.change ? `Setting ${d.name} ${d.change} (${scopeLabel(d.scope as Scope)})` : `Setting ${d.name}: ${show(d.old)} → ${show(d.new)} (${scopeLabel(d.scope as Scope)})`, "cyan");
       case "plan_approved":
         return [{ key, t: "block", title: `Confirmed, version ${d.version}. Mode: ${d.mode}.`, text: String(d.text ?? "") }];
       case "clarify":

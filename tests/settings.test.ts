@@ -152,7 +152,7 @@ test("secrets never show and the record keeps only that they changed", async () 
   const rows = describe({ cwd, env: {}, session: s });
   expect(row(rows, "claude_key")).toMatchObject({ value: "saved", source: "user" });
   expect(row(rows, "elabftw_key").value).toBe("saved");
-  expect(row(describe({ cwd, env: { ANTHROPIC_API_KEY: KEY } }), "claude_key").value).toBe("set in ANTHROPIC_API_KEY");
+  expect(row(describe({ cwd, env: { ANTHROPIC_API_KEY: KEY } }), "claude_key")).toMatchObject({ value: "set by environment", source: "env" });
   const all = JSON.stringify(rows.map((r) => r.value));
   expect(all).not.toContain("secret");
   expect(all).not.toContain("WXYZ");

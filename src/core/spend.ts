@@ -12,6 +12,10 @@ const PRICES: Record<string, { input: number; output: number; cacheRead: number;
 };
 const FALLBACK = PRICES["claude-fable-5-1"]!;
 
+export function modelPrice(model: string): { input: number; output: number } | undefined {
+  return PRICES[model.replace(/^claude:/, "")];
+}
+
 export function spendFile(): string {
   return process.env.GA_SPEND_FILE || join(homedir(), ".guided-analysis", "spend.jsonl");
 }

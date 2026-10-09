@@ -4,14 +4,13 @@ import type { Mode, Question } from "../core/types.ts";
 import type { Check } from "../core/doctor.ts";
 import { credentialsPath } from "../core/credentials.ts";
 import type { SettingCtx } from "../core/settings.ts";
-import { scopeLabel } from "../core/settings.ts";
 import { ageText, type SessionInfo } from "../core/sessions.ts";
 import {
   choiceLabel, choiceValue, CLARIFY_TITLE, clarifyOpen, clarifyProgress, definitionLabel, itemCount, PICK_LABEL, settingLabel, settingQuestion, fieldKind, permissionView, pilotGate, pilotQuestion, planHint, planQuestions, planResolve, planTitle, programSwitches,
   recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, RUN_MODES, setupValues, show,
   type Card, type CardType, type PlanAction, type PlanState,
 } from "../ui/cards.ts";
-import { rowHelp, rowTag, settingEditor, settingRows, scopeText } from "../ui/config.ts";
+import { settingsHtml } from "./app-settings.ts";
 import { fidelityLabel, type Item } from "../ui/items.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
 import type { SessionLike } from "../ui/types.ts";
@@ -351,30 +350,6 @@ function clarifyCard(c: Ctx, slot: Slot, card: Extract<Card, { t: "clarify" }>):
 }
 
 const MODE_LABEL: Record<Mode, string> = { watch: "Watch: the agent runs the steps", follow: "Follow: you run the steps", teach: "Teach: you work, the agent checks", plan: "Plan: the agent plans only" };
-
-export function settingsHtml(c: Ctx): string {
-  if (!c.settings) return "";
-  const rows = settingRows(c.settings, !!c.busy);
-  let group = "";
-  const out: string[] = [];
-  for (const r of rows) {
-    if (r.def.group !== group) {
-      group = r.def.group;
-      out.push(`<h4>${esc(group)}</h4>`);
-    }
-    const e = settingEditor(r);
-    const scopes = r.def.scopes.map((s) => `<option value="${s}" title="${esc(scopeText(s, c.settings!.cwd))}">${esc(scopeLabel(s))}</option>`).join("");
-    let control: string;
-    if (e.t === "message") control = `<span class="dim small">${esc(e.text)}</span>`;
-    else if (e.t === "edit") control = btn("Change", `data-setting-edit="${e.card}"`);
-    else if (e.t === "text") control = `<input type="text" name="value" placeholder="New value" aria-label="New value for ${esc(r.def.label)}">`;
-    else control = `<select name="value" aria-label="New value for ${esc(r.def.label)}">${e.options.map((o, i) => `<option${i === e.sel ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
-    const save = e.t === "text" || e.t === "value" ? `<select name="scope" aria-label="Where to save">${scopes}</select>${btn("Save", `data-setting-save="${esc(r.def.name)}"`)}` : "";
-    const details = (r.def.details?.(c.settings) ?? []).map((d) => `<div class="dim small">${esc(d)}</div>`).join("");
-    out.push(`<div class="setting${r.locked ? " locked" : ""}" data-setting="${esc(r.def.name)}"><div class="sname"><strong>${esc(r.def.label)}</strong><span class="sval">${esc(r.value)}</span><span class="dim small">${esc(rowTag(r))}</span></div><div class="dim small">${esc(rowHelp(r))}</div>${details}<div class="row">${control}${save}</div></div>`);
-  }
-  return out.join("");
-}
 
 function configCard(c: Ctx, slot: Slot): string {
   return frame(slot, "Settings", "cyan", `<div class="settings">${settingsHtml(c)}</div><div class="row end">${btn("Close", act("close"), "quiet")}</div>`);

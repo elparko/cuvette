@@ -79,7 +79,7 @@ test("/config switches to vim at once; Esc leaves insert mode, a second Esc stop
   await keys(h, "\r");
   for (let i = 0; i < 6 && !/▸ vim/.test(screen(h)); i++) await keys(h, "\x1b[B");
   await keys(h, "\r");
-  await until(() => screen(h).includes("Save vim where?"));
+  await until(() => screen(h).includes("Save vim for:"));
   await keys(h, "\r");
   await until(() => s.settings.input_keys === "vim");
   await keys(h, "\x1b");

@@ -30,9 +30,13 @@ export interface SettingCtx {
 
 export interface SettingDef {
   name: string;
+  unit?: string;
+  min?: number;
+  path?: boolean;
   group: string;
   label: string;
   help: string;
+  brief?: string;
   scopes: Scope[];
   choices?: () => string[];
   free?: boolean;
@@ -43,7 +47,7 @@ export interface SettingDef {
   secret?: boolean;
   edit?: "key" | "eln";
   shown?: (ctx: SettingCtx) => boolean;
-  read?: (ctx: SettingCtx) => { value: string; source: Source };
+  read?: (ctx: SettingCtx) => { value: string; source: Source; file?: string };
   details?: (ctx: SettingCtx) => string[];
 }
 
@@ -51,6 +55,7 @@ export interface SettingRow {
   def: SettingDef;
   value: string;
   source: Source;
+  file?: string;
   locked: boolean;
 }
 
@@ -103,6 +108,7 @@ export const SETTINGS: SettingDef[] = [
     group: "Session",
     label: "Mode",
     help: "watch: the agent runs the steps. follow: you run each step. teach: you run the steps and the agent explains. plan: the agent plans only.",
+    brief: "Who runs the steps: the agent, you, or you with the agent as a teacher.",
     scopes: ALL,
     choices: () => ["watch", "follow", "teach", "plan"],
   },
@@ -111,6 +117,7 @@ export const SETTINGS: SettingDef[] = [
     group: "Session",
     label: "Plan first",
     help: "on: in an interactive session the agent writes a proposed analysis, and you confirm it before any step runs. off: the agent starts at once; /plan <request> still plans one request.",
+    brief: "The agent proposes the analysis, and you confirm it before a step runs.",
     scopes: ALL,
     choices: () => ["on", "off"],
     def: "on",
@@ -120,6 +127,7 @@ export const SETTINGS: SettingDef[] = [
     group: "Session",
     label: "Pilot",
     help: "on: a step that processes many files waits until you approve the method on one sample. Bypass permissions does not skip it. off: batch steps run at once.",
+    brief: "A step for many files waits until you approve the method on one sample.",
     scopes: ALL,
     choices: () => ["on", "off"],
     def: "on",
@@ -129,6 +137,7 @@ export const SETTINGS: SettingDef[] = [
     group: "Session",
     label: "Open QC images",
     help: "on: the demonstration on a sample opens its QC images on screen. off: it only saves them in figures/. GA_NO_OPEN=1 also turns it off.",
+    brief: "The demonstration on a sample opens its QC images on screen.",
     scopes: ALL,
     choices: () => ["on", "off"],
     def: "on",
@@ -147,6 +156,7 @@ export const SETTINGS: SettingDef[] = [
     group: "Session",
     label: "Show details",
     help: "on: the transcript shows each housekeeping step, such as a file read. off: these steps collapse into one dim line. Ctrl+O does the same.",
+    brief: "The transcript shows each housekeeping step, such as a file read.",
     scopes: ["session"],
     choices: () => ["on", "off"],
     shown: (ctx) => !!ctx.ui,
@@ -157,6 +167,7 @@ export const SETTINGS: SettingDef[] = [
     group: "Session",
     label: "Messages during a turn",
     help: "after-step: a message that you type while the agent works goes to the agent after the current step. queue: the message waits until the turn ends. A message that starts with ! stops the current step and goes at once.",
+    brief: "When a message that you type during a turn goes to the agent.",
     scopes: ALL,
     choices: () => ["after-step", "queue"],
   },
@@ -170,27 +181,20 @@ export const SETTINGS: SettingDef[] = [
   },
   {
     name: "output_folder",
-    group: "Session",
+    group: "Outputs",
     label: "Save results in",
     help: "Where each session saves its results, report and record. A name, such as cuvette, is a folder in the project folder. An absolute path, such as a lab share, is used as given. A project setting wins over a user setting. The change applies to the next session.",
     scopes: ["user", "project"],
     free: true,
+    path: true,
     def: "cuvette",
-  },
-  {
-    name: "animations",
-    group: "Display",
-    label: "Animations",
-    help: "on: the status line shows a spinner while the agent thinks or runs a step. off: the status line does not move. A terminal that is not interactive never shows the spinner.",
-    scopes: ALL,
-    choices: () => ["on", "off"],
-    def: "on",
   },
   {
     name: "export_xlsx",
     group: "Outputs",
     label: "Save results.xlsx",
     help: "on: at the end of each turn with results, the harness writes results.xlsx in the output folder, with a summary, one sheet for each table, the steps and the files.",
+    brief: "Each turn with results writes results.xlsx in the output folder.",
     scopes: ALL,
     choices: () => ["on", "off"],
   },
@@ -204,10 +208,29 @@ export const SETTINGS: SettingDef[] = [
     free: true,
   },
   {
+    name: "databook_author",
+    group: "Outputs",
+    label: "Data book author",
+    help: "The name on the title page of each data book. If it is not set, the data book uses the name in git config user.name.",
+    scopes: ["user", "project"],
+    free: true,
+  },
+  {
+    name: "databook_paper",
+    group: "Outputs",
+    label: "Data book paper size",
+    help: "a4 or letter. The default follows the system locale.",
+    brief: "The paper size of each data book.",
+    scopes: ["user", "project"],
+    choices: () => ["a4", "letter"],
+    def: localePaper(),
+  },
+  {
     name: "permissionMode",
     group: "Permissions",
     label: "Permission mode",
     help: "ask: a card asks before each tool call that needs permission. bypass: the harness allows these calls without a card. Deny rules still deny.",
+    brief: "Ask before each tool call that needs permission, or allow it without a card.",
     scopes: ALL,
     choices: () => ["ask", "bypass"],
   },
@@ -257,16 +280,27 @@ export const SETTINGS: SettingDef[] = [
     details: (ctx) => adapterFolders(ctx.cwd).map((f) => `${f}${existsSync(f) ? "" : "  (missing)"}`),
   },
   {
+    name: "animations",
+    group: "Display",
+    label: "Animations",
+    help: "on: the status line shows a spinner while the agent thinks or runs a step. off: the status line does not move. A terminal that is not interactive never shows the spinner.",
+    brief: "The status line shows a spinner while the agent works.",
+    scopes: ALL,
+    choices: () => ["on", "off"],
+    def: "on",
+  },
+  {
     name: "claude_key",
     group: "Account and spend",
     label: "Claude API key",
-    help: "The key for the Claude API. The screen never shows it. Enter opens the key card. On the command line: ga key.",
+    help: "The key for the Claude API. The screen never shows it. ANTHROPIC_API_KEY in the shell wins over the saved key. Enter opens the key card. On the command line: ga key.",
+    brief: "The key for the Claude API. The screen never shows it.",
     scopes: [],
     secret: true,
     edit: "key",
     read: (ctx) => {
       const k = claudeKey(ctx.env ?? process.env);
-      return k.from === "env" ? { value: "set in ANTHROPIC_API_KEY", source: "env" } : k.from === "file" ? { value: "saved", source: "user" } : { value: "not set", source: "" };
+      return k.from === "env" ? { value: "set by environment", source: "env" } : k.from === "file" ? { value: "saved", source: "user" } : { value: "not set", source: "" };
     },
   },
   {
@@ -274,8 +308,11 @@ export const SETTINGS: SettingDef[] = [
     group: "Account and spend",
     label: "Budget per month",
     help: "The harness stops Claude requests when the spend this month reaches this limit, in US dollars. GA_BUDGET_USD wins over the setting. Type off to remove it.",
+    brief: "Claude requests stop when the spend this month reaches this limit.",
     scopes: ["user"],
     number: true,
+    unit: "US dollars",
+    min: 0.01,
     read: (ctx) => {
       const env = ctx.env ?? process.env;
       const b = budgetUsd(env);
@@ -292,27 +329,11 @@ export const SETTINGS: SettingDef[] = [
     read: () => ({ value: `$${totalSpend(monthStart()).toFixed(2)}`, source: "" }),
   },
   {
-    name: "databook_author",
-    group: "Data book",
-    label: "Data book author",
-    help: "The name on the title page of each data book. If it is not set, the data book uses the name in git config user.name.",
-    scopes: ["user", "project"],
-    free: true,
-  },
-  {
-    name: "databook_paper",
-    group: "Data book",
-    label: "Data book paper size",
-    help: "a4 or letter. The default follows the system locale.",
-    scopes: ["user", "project"],
-    choices: () => ["a4", "letter"],
-    def: localePaper(),
-  },
-  {
     name: "elabftw_url",
     group: "Lab notebook",
     label: "eLabFTW address",
     help: "The address of your eLabFTW server. Enter opens the eLabFTW card. On the command line: ga eln setup.",
+    brief: "The address of your eLabFTW server.",
     scopes: [],
     edit: "eln",
     read: () => ({ value: elabftwConfig()?.url ?? "not set", source: elabftwConfig() ? "user" : "" }),
@@ -322,6 +343,7 @@ export const SETTINGS: SettingDef[] = [
     group: "Lab notebook",
     label: "eLabFTW API key",
     help: "The key for eLabFTW. The screen never shows it. Enter opens the eLabFTW card.",
+    brief: "The key for eLabFTW. The screen never shows it.",
     scopes: [],
     secret: true,
     edit: "eln",
@@ -346,12 +368,12 @@ function readJson(path: string): Record<string, unknown> {
   }
 }
 
-function layers(cwd: string): [Source, Record<string, unknown>][] {
+function layers(cwd: string): [Source, Record<string, unknown>, string][] {
   const paths = [settingsPath("user", cwd), settingsPath("project", cwd), join(cwd, ".ga", "settings.local.json")];
   return paths.map((p, i) => {
     const { permissions, ...rest } = readJson(p);
     const layer = typeof permissions === "string" ? { ...rest, permissionMode: permissions } : permissions === undefined ? rest : { ...rest, permissions };
-    return [i ? "project" : "user", layer];
+    return [i ? "project" : "user", layer, p];
   });
 }
 
@@ -374,19 +396,26 @@ export function show(v: unknown): string {
   return typeof v === "string" ? v : JSON.stringify(v);
 }
 
-function fileValue(d: SettingDef, cwd: string): { value: unknown; source: Source } {
+function fileValue(d: SettingDef, cwd: string): { value: unknown; source: Source; file?: string } {
   let value = d.def ?? (DEFAULTS as unknown as Record<string, unknown>)[d.name];
   let source: Source = "default";
-  for (const [s, layer] of layers(cwd))
+  let file: string | undefined;
+  for (const [s, layer, p] of layers(cwd))
     if (d.name in layer) {
       value = layer[d.name];
       source = s;
+      file = p;
     }
-  return { value, source };
+  return { value, source, file };
 }
 
-export function resolve(d: SettingDef, ctx: SettingCtx): { value: unknown; source: Source } {
-  if (d.read) return d.read(ctx);
+export function resolve(d: SettingDef, ctx: SettingCtx): { value: unknown; source: Source; file?: string } {
+  if (d.read) {
+    const r = d.read(ctx);
+    if (r.file || (r.source !== "user" && r.source !== "project")) return r;
+    const f = fileValue(d, ctx.cwd);
+    return f.source === r.source ? { ...r, file: f.file } : r;
+  }
   const f = fileValue(d, ctx.cwd);
   const s = ctx.session;
   const live = !s ? undefined : d.name === "mode" || d.name === "permissionMode" ? s[d.name] : s.settings && d.name in s.settings ? s.settings[d.name] : undefined;
@@ -397,7 +426,7 @@ export function resolve(d: SettingDef, ctx: SettingCtx): { value: unknown; sourc
 export function describe(ctx: SettingCtx): SettingRow[] {
   return SETTINGS.filter((d) => !d.shown || d.shown(ctx)).map((d) => {
     const r = resolve(d, ctx);
-    return { def: d, value: show(r.value), source: r.source, locked: !!(d.lockedInTurn && ctx.session?.busy) };
+    return { def: d, value: show(r.value), source: r.source, file: r.file, locked: !!(d.lockedInTurn && ctx.session?.busy) };
   });
 }
 
@@ -443,12 +472,7 @@ export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown,
   const old = name === "details" ? d.read!(ctx).value : d.read ? fileValue(d, ctx.cwd).value : resolve(d, ctx).value;
   const s = ctx.session;
   if (name === "details" && value !== old) ctx.ui?.toggleDetails();
-  if (s && !d.read) {
-    if (name === "mode") s.setMode(value as never);
-    else if (name === "permissionMode" && s.setPermissionMode) s.setPermissionMode(value as never);
-    else if (s.applySetting) await s.applySetting(name, value);
-    else if (s.settings) s.settings[name] = value;
-  }
+  if (!d.read) await applyLive(ctx, name, value);
   if (scope !== "session") writeSetting(settingsPath(scope, ctx.cwd), name, value);
   recordSetting(s, d, old, value, scope);
   const after = d.read ? undefined : fileValue(d, ctx.cwd);
@@ -459,6 +483,39 @@ export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown,
       ? `The ${after.source} setting (${show(after.value)}) still wins in new sessions in this folder.`
       : undefined;
   return { old, value, note };
+}
+
+async function applyLive(ctx: SettingCtx, name: string, value: unknown): Promise<void> {
+  const s = ctx.session;
+  if (!s) return;
+  if (name === "mode") s.setMode(value as never);
+  else if (name === "permissionMode" && s.setPermissionMode) s.setPermissionMode(value as never);
+  else if (s.applySetting) await s.applySetting(name, value);
+  else if (s.settings) s.settings[name] = value;
+}
+
+export function canReset(r: { def: SettingDef; source: Source; locked?: boolean }): boolean {
+  if (r.def.secret || !r.def.scopes.length || r.locked) return false;
+  return r.source === "session" || ((r.source === "user" || r.source === "project") && (!r.def.read || r.def.name === "budgetUsd"));
+}
+
+export async function resetSetting(ctx: SettingCtx, name: string): Promise<{ old: unknown; value: unknown; from: Scope }> {
+  const d = find(name);
+  if (!d) throw new Error(`No setting named ${name}.`);
+  if (d.lockedInTurn && ctx.session?.busy) throw new Error(`${d.label} is locked until the turn ends.`);
+  const now = resolve(d, ctx);
+  if (!canReset({ def: d, source: now.source })) throw new Error(`${d.label} has no saved value to reset.`);
+  if (d.name === "details") {
+    await changeSetting(ctx, "details", "off", "session");
+    return { old: "on", value: "off", from: "session" };
+  }
+  const old = d.read ? fileValue(d, ctx.cwd).value : now.value;
+  if (now.source !== "session") writeSetting(now.file ?? settingsPath(now.source as "user" | "project", ctx.cwd), name, undefined);
+  const after = fileValue(d, ctx.cwd);
+  if (!d.read) await applyLive(ctx, name, after.value);
+  const from = now.source as Scope;
+  recordSetting(ctx.session, d, old, after.value, from);
+  return { old, value: after.value, from };
 }
 
 export function scopeLabel(scope: Scope | Source): string {

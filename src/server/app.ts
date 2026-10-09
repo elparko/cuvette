@@ -16,9 +16,10 @@ import { findPlace } from "../core/places.ts";
 import { find, recordSetting, type SettingCtx, type SettingSession } from "../core/settings.ts";
 import type { Mode } from "../core/types.ts";
 import { commands, decisionRows, noOpen, openWithOs } from "../ui/commands.ts";
-import { saveSetting } from "../ui/config.ts";
+import { removeSecret, resetRow, saveSetting } from "../ui/config.ts";
 import type { SessionLike } from "../ui/types.ts";
-import { decisionsHtml, doctorHtml, planTextHtml, resultsHtml, sessionsHtml, settingsHtml, stepsHtml, type Ctx } from "./app-html.ts";
+import { decisionsHtml, doctorHtml, planTextHtml, resultsHtml, sessionsHtml, stepsHtml, type Ctx } from "./app-html.ts";
+import { settingsHtml } from "./app-settings.ts";
 import { appPageHtml } from "./app-page.ts";
 import { WebView } from "./app-view.ts";
 import { hostAllowed, windowRoutes, type WindowSession } from "./window.ts";
@@ -327,6 +328,14 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       const scope = (def.scopes.includes(body.scope as never) ? body.scope : def.scopes[0]) as never;
       if (!scope) return send(res, 400, { error: `${def.label} cannot change here.` });
       const r = await saveSetting(settingCtx(), def, String(body.value ?? ""), scope);
+      if (c) c.view.ctx.refresh();
+      return send(res, r.color === "red" ? 400 : 200, r);
+    }
+    if (p === "/api/setting/reset" || p === "/api/setting/remove") {
+      const def = find(String(body.name ?? ""));
+      if (!def) return send(res, 404, { error: "no such setting" });
+      if (p.endsWith("remove") && !def.secret) return send(res, 400, { error: `${def.label} is not a key.` });
+      const r = p.endsWith("reset") ? await resetRow(settingCtx(), def) : removeSecret(settingCtx(), def);
       if (c) c.view.ctx.refresh();
       return send(res, r.color === "red" ? 400 : 200, r);
     }

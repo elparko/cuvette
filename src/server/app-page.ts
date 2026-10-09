@@ -1,3 +1,5 @@
+import { SETTINGS_CSS, SETTINGS_JS } from "./app-settings.ts";
+
 export function appPageHtml(token: string): string {
   return PAGE.replace("__TOKEN__", () => JSON.stringify(token).replace(/</g, "\\u003c"));
 }
@@ -176,11 +178,7 @@ table.decisions select, table.decisions input { max-width: 150px; }
 .notice.warn { background: var(--warn-bg); border: 1px solid var(--warn); border-radius: 8px; padding: 6px 10px; }
 main.page { flex: 1; padding: 16px; max-width: 900px; width: 100%; margin: 0 auto; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 0 0 14px; box-shadow: var(--shadow); }
-.setting { border-bottom: 1px solid var(--line); padding: 8px 0; }
-.setting .sname { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
-.setting .sval { font: 13px ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
-.setting .row { margin: 4px 0 0; }
-.setting.locked { opacity: .7; }
+${SETTINGS_CSS}
 ul.scards, ul.dirs { list-style: none; margin: 0; padding: 0; }
 .sfilter { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 .sfilter input { flex: 1; min-width: 180px; padding: 6px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); min-height: 36px; }
@@ -324,8 +322,8 @@ ul.dirs li button .dim { margin-left: 6px; }
   </div>
 </main>
 
-<main class="page hidden" id="p-settings">
-  <div class="panel"><h2>Settings</h2><p class="dim small">The same settings as /config in the terminal. Each change goes in the record.</p><p id="settingmsg" role="status"></p><div id="settingsbody"></div></div>
+<main class="page wide hidden" id="p-settings">
+  <div class="panel"><h2>Settings</h2><p class="dim small">The same settings as /config in the terminal. Each change goes in the record.</p><div id="settingsbody"></div></div>
   <div class="panel"><h3>Programs on this computer</h3><p class="dim small">The same check as ga doctor in the terminal.</p><div id="doctorbody2"></div><div class="row"><button type="button" class="btn" data-doctor="doctorbody2">Check this computer</button><button type="button" class="btn quiet" data-doctor="doctorbody2" data-doctor-all="1">Show the full list</button></div></div>
 </main>
 
@@ -445,6 +443,7 @@ function handle(m) {
       $("cards").innerHTML = m.cards;
     });
     focusCard();
+    cfgApply();
     setStatus(m.status);
     follow = true;
     stick(() => {});
@@ -452,7 +451,7 @@ function handle(m) {
   }
   if (m.t === "append") stick(() => $("items").insertAdjacentHTML("beforeend", m.html));
   else if (m.t === "pending") stick(() => { $("pending").innerHTML = m.html; });
-  else if (m.t === "cards") { stick(() => { $("cards").innerHTML = m.html; }); drawStatus(); focusCard(); }
+  else if (m.t === "cards") { stick(() => { $("cards").innerHTML = m.html; }); drawStatus(); focusCard(); cfgApply(); }
   else if (m.t === "live") stick(() => { if (m.reset) $("live").textContent = ""; else $("live").textContent += m.text; });
   else if (m.t === "status") setStatus(m);
   else if (m.t === "changed") loadTab(true);
@@ -636,16 +635,6 @@ document.addEventListener("click", async (e) => {
   if (sample) { askNotify(); await post("api/open", { sample: true }); page = "session"; setTimeout(boot, 300); return; }
   const os = t.closest("[data-open-session]");
   if (os) { await post("api/open", { id: os.dataset.openSession }); page = "session"; setTimeout(boot, 300); return; }
-  const ss = t.closest("[data-setting-save]");
-  if (ss) {
-    const row = ss.closest("[data-setting]");
-    const f = fields(row);
-    try { const r = await call("api/setting", { name: ss.dataset.settingSave, value: f.value, scope: f.scope }); $("settingmsg").textContent = r.text; }
-    catch (err) { $("settingmsg").textContent = err.message; }
-    loadSettings();
-    if (!state.session) boot();
-    return;
-  }
   const se = t.closest("[data-setting-edit]");
   if (se) {
     if (!state.session) { if (se.dataset.settingEdit === "key") { show("setup"); setupPage(); } else toast("Open a session first."); return; }
@@ -706,9 +695,7 @@ async function loadTab(quiet) {
   body.replaceChildren(tpl.content);
 }
 
-async function loadSettings() {
-  try { $("settingsbody").innerHTML = await call("api/settings"); } catch (e) { $("settingsbody").textContent = e.message; }
-}
+${SETTINGS_JS}
 async function loadSessions(box) {
   try { box.innerHTML = await call("api/sessions"); } catch (e) { box.textContent = e.message; }
 }
