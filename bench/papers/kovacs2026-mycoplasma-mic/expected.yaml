@@ -1,0 +1,28 @@
+tool: AMR (R), mic_summary of the amr adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/kovacs2026-mycoplasma-mic/mycoplasma_mics.csv
+decisions:
+  off_scale: "next dilution (not used by MIC50 and MIC90)"
+expected:
+  - {description: "MIC50 of tylvalosin in ug/ml", value: 0.5, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC90 of tylvalosin in ug/ml", value: 2, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC50 of oxytetracycline in ug/ml", value: 16, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC90 of oxytetracycline in ug/ml", value: 64, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC50 of doxycycline in ug/ml", value: 5, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC90 of doxycycline in ug/ml", value: 10, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC50 of tiamulin in ug/ml", value: 0.625, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC90 of tiamulin in ug/ml", value: 2.5, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC50 of tylosin in ug/ml", value: 16, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC90 of tylosin in ug/ml (the paper prints 64 or more)", value: 64, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC50 of lincomycin in ug/ml", value: 2, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC50 of spectinomycin in ug/ml", value: 8, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC50 of tilmicosin in ug/ml (the paper prints 64 or more)", value: 64, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC90 of tilmicosin in ug/ml (the paper prints 64 or more)", value: 64, tolerance: 0.001, source: "paper, Results"}
+  - {description: "MIC50 of enrofloxacin as printed in the paper (more than 10; does not reproduce, computed 5)", value: 10, tolerance: 0.001, source: "paper, Results; reference only, computed 5"}
+notes: |
+  MIC50 and MIC90 are the values at rank ceil(0.5 n) and ceil(0.9 n) of the ordered MICs. For n = 110 the rank rule of the paper (0.5 n-th and 0.9 n-th place) gives the same ranks 55 and 99.
+  A value with a ">" sign ranks above the same number without a sign. The tool reports the MIC50 or MIC90 value with its sign in the table and the number in the metrics.
+  The paper prints tilmicosin as 64 or more for the MIC50 and the MIC90, and tylosin MIC90 as 64 or more. The data give 64 for the MIC50 of tilmicosin, more than 64 for its MIC90, and 64 for the MIC90 of tylosin.
+  The enrofloxacin MIC50 does not reproduce. The paper prints more than 10. The table gives 5, because 38 of 110 strains have 10 or more.
+  Several values lie outside the stated dilution series (enrofloxacin 16 and 4, tylosin 1.25, oxytetracycline 5, tiamulin 0.132 in the source). The tools read them as numbers.

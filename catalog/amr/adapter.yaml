@@ -1,0 +1,455 @@
+adapter:
+  name: amr
+  field: microbiology susceptibility testing
+  file_types: [".csv", ".tsv"]
+  title: AMR (antimicrobial resistance, MIC interpretation)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Reads minimum inhibitory concentration (MIC) tables with the R package AMR. It interprets each MIC as S, I or R with a
+    EUCAST or CLSI breakpoint table that the scientist names. It gives the MIC50, the MIC90 and the percent susceptible of
+    each organism and drug, and it shows the breakpoints in use.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: AMR
+  version: "3.0.1"
+  tested_versions: []
+  homepage: https://amr-for-r.org/
+  docs:
+    - https://amr-for-r.org/reference/as.sir.html
+    - https://amr-for-r.org/reference/as.mic.html
+    - https://doi.org/10.18637/jss.v104.i03
+  install: >
+    Install R (brew install r on macOS). Then install the R packages AMR, svglite and jsonlite into a library folder that
+    the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library-micro or
+    ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("AMR", "svglite", "jsonlite"), repos = "https://cloud.r-project.org")'
+  citation:
+    - text: "Berends MS, Luz CF, Friedrich AW, Sinha BNM, Albers CJ, Glasner C (2022). AMR: An R Package for Working with Antimicrobial Resistance Data. Journal of Statistical Software 104(3): 1-31."
+      doi: 10.18637/jss.v104.i03
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that exists
+  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library-micro, ~/.guided-analysis/R-library. The
+  program version in this adapter is the version of the R package AMR, not of R. The breakpoint tables are the tables that
+  ship inside the AMR package. A new AMR version can add a new table year.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return counts, percents and MIC summaries for each organism and drug. The input has no patient names.
+
+decisions:
+  - key: guideline
+    label: Breakpoint standard and version
+    kind: text
+    default: EUCAST 2024
+    group: Interpretation
+    help: >
+      The standard and the year of the breakpoint table, such as EUCAST 2024 or CLSI 2024. EUCAST and CLSI give different
+      breakpoints for the same drug. Use the version that your laboratory, the journal or the study protocol names. Use the
+      same version for all isolates that you compare.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: interpret_mic, arg: guideline }
+      - { tool: show_breakpoints, arg: guideline }
+    sensitivity:
+      options: ["EUCAST 2024", "CLSI 2024"]
+      tool: interpret_mic
+      compare: [metrics.n_S, metrics.n_R]
+      max_runs: 2
+
+  - key: host
+    label: Host
+    kind: text
+    default: human
+    group: Interpretation
+    help: >
+      The host of the isolates. human uses the human breakpoints. Write an animal such as dog for a veterinary CLSI
+      breakpoint. EUCAST has human breakpoints only.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: interpret_mic, arg: host }
+      - { tool: show_breakpoints, arg: host }
+
+  - key: uti
+    label: Isolates from urine
+    kind: choice
+    choices: [auto, "false", "true"]
+    default: auto
+    group: Interpretation
+    help: >
+      Some drugs have a breakpoint for urine isolates. true uses that breakpoint. false uses the breakpoint
+      for other sites. auto is the AMR default. It uses the breakpoint that exists. Some CLSI drugs, such as ciprofloxacin for
+      Enterococcus, have a urine breakpoint only.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: interpret_mic, arg: uti }
+      - { tool: show_breakpoints, arg: uti }
+
+  - key: capped_mic_handling
+    label: MIC values with a limit sign
+    kind: choice
+    choices: [standard, none, conservative, lenient]
+    default: standard
+    group: Interpretation
+    help: >
+      A value such as >8 is a limit, not a measure. The choice standard is the AMR default. The choice none reads the number
+      as it is. The choice conservative gives NI (not interpretable) if the limit hides the category. The choice lenient
+      reads the limit as a value. Count the NI values in the report.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: interpret_mic, arg: capped_mic_handling }
+
+  - key: include_pkpd
+    label: Use the EUCAST pharmacokinetic and pharmacodynamic breakpoints
+    kind: choice
+    choices: ["true", "false"]
+    default: "true"
+    group: Interpretation
+    help: >
+      EUCAST gives some breakpoints from dosing, for all species. true uses them if no species breakpoint exists. false gives
+      an empty result for those pairs.
+    owner: human
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: interpret_mic, arg: include_pkpd }
+      - { tool: show_breakpoints, arg: include_pkpd }
+
+  - key: susceptible_definition
+    label: What the percent susceptible counts
+    kind: choice
+    choices: [S only, S and I]
+    default: S only
+    group: Reporting
+    help: >
+      S only counts the isolates that are S. S and I also counts SDD (susceptible, dose-dependent) and I. The
+      EUCAST I means susceptible, increased exposure. Many reports use S only. State the choice.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: interpret_mic, arg: susceptible_definition }
+
+  - key: off_scale
+    label: Geometric mean of MIC values with a limit sign
+    kind: choice
+    choices: [next dilution, as written]
+    default: next dilution
+    group: Reporting
+    help: >
+      next dilution reads >8 as 16 and <=0.5 as 0.5 for the geometric mean. as written reads >8 as 8. MIC50 and MIC90 do not
+      use this choice. They rank a ">" value above the same number without a sign.
+    owner: human
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: mic_summary, arg: off_scale }
+
+checks:
+  - id: standard_named
+    description: The answer gives S, I or R without the standard and the version.
+    severity: warning
+    text: Report the answer if it gives percent susceptible or resistant and does not name the standard (EUCAST or CLSI) and the version year.
+  - id: small_n_percent
+    description: The answer gives a percent susceptible for a group with fewer than 30 isolates and no interval.
+    severity: warning
+    text: Report the answer if it gives a percent S or R for a drug with fewer than 30 isolates and gives no confidence interval or the count of isolates.
+  - id: mic90_small_n
+    description: The answer gives a MIC90 from fewer than 10 isolates.
+    severity: warning
+    text: Report the answer if it gives a MIC90 and the group has fewer than 10 isolates. The MIC90 of a small group is the highest or second highest value.
+  - id: no_breakpoint_ignored
+    description: The answer reports a percent for a drug that has no breakpoint.
+    severity: warning
+    text: Report the answer if interpret_mic has values with no breakpoint and the answer gives a percent S or R for that drug with no word about the missing breakpoint.
+
+map:
+  - tool: interpret_mic
+    route: "library(AMR); as.sir(as.mic(c(\"0.25\", \"1\", \">2\")), mo = \"Escherichia coli\", ab = \"ciprofloxacin\", guideline = \"EUCAST 2024\")"
+    steps:
+      - "R: as.sir(as.mic(x), mo = species, ab = drug, guideline = standard and year). Then table() of the result gives the counts."
+      - "EUCAST: open the Breakpoint tables workbook of the year (eucast.org, Clinical breakpoints). Find the species group and the drug. S if MIC is at or below the S breakpoint. R if MIC is above the R breakpoint. I in between."
+      - "CLSI: open M100 of the year, Table 2 for the species group. S if MIC is at or below the S value. R if MIC is at or above the R value. I (or SDD) in between."
+      - "Excel: write the two breakpoints in cells. =IF(mic<=S,\"S\",IF(mic>R,\"R\",\"I\")) for EUCAST. =IF(mic<=S,\"S\",IF(mic>=R,\"R\",\"I\")) for CLSI."
+    params:
+      - { arg: guideline, label: "guideline of as.sir()", ui_default: EUCAST 2024 }
+      - { arg: uti, label: "uti of as.sir()", ui_default: "false" }
+      - { arg: capped_mic_handling, label: "capped_mic_handling of as.sir()", ui_default: standard }
+    fidelity: exact
+    difference: >
+      The R route is the same function as the tool. The EUCAST and CLSI table routes give the same S, I and R if you read
+      the same row of the same table year. The tool counts and gives percent by organism and drug. The workbook and Excel
+      routes were not run.
+    evidence:
+      source: docs
+      test: ertapenem-eucast2023
+      note: The test file of the AMR package gives S, S, R, R for E. coli ertapenem MIC 0.256, 0.5, 1, 2 with EUCAST 2023.
+
+  - tool: mic_summary
+    route: "x <- sort(mic_values); x[ceiling(0.5 * length(x))]; x[ceiling(0.9 * length(x))]; exp(mean(log(x)))"
+    steps:
+      - "R: sort the numeric MICs of one drug. MIC50 is element ceiling(0.5 * n). MIC90 is element ceiling(0.9 * n)."
+      - "Excel: =SMALL(range, ROUNDUP(0.5*COUNT(range),0)) for the MIC50, and 0.9 for the MIC90. =GEOMEAN(range) for the geometric mean."
+      - "Prism: Column table with the MIC values. Analyze, Column statistics, Percentiles shows an interpolated value. It can differ from the MIC50 by one dilution."
+    params:
+      - { arg: off_scale, label: "value of a MIC with a > sign in the geometric mean", ui_default: next dilution }
+    fidelity: close
+    difference: >
+      The MIC50 and the MIC90 are the lowest concentrations that inhibit at least 50% and 90% of the isolates. An interpolated
+      percentile, such as AMR mic_p50 or Prism, can give a value between two dilutions.
+    evidence:
+      source: docs
+      test: mic-percentiles-hand
+      note: A hand count of 20 sorted values gives the 10th and the 18th value.
+
+  - tool: show_breakpoints
+    route: "library(AMR); as.sir(as.mic(2^(-6:6)), mo = \"Escherichia coli\", ab = \"ciprofloxacin\", guideline = \"EUCAST 2024\")"
+    steps:
+      - "R: run as.sir() on a ladder of 2-fold MIC values. The first MIC that is not S is above the S breakpoint."
+      - "EUCAST: Breakpoint tables workbook of the year, sheet of the species group."
+      - "CLSI: M100 of the year, Table 2."
+    params:
+      - { arg: guideline, label: "guideline of as.sir()", ui_default: EUCAST 2024 }
+    fidelity: exact
+    difference: The tool reads the breakpoints from the same function that interpret_mic uses. It does not read the source table.
+    evidence:
+      source: docs
+      test: breakpoints-ecoli-cip
+      note: EUCAST breakpoint table v 14.0 gives ciprofloxacin S at or below 0.25 and R above 0.5 for Enterobacterales.
+
+tests:
+  - id: ertapenem-eucast2023
+    description: >
+      AMR package test (tests/testthat/test-sir.R): E. coli ertapenem MIC 0.256, 0.5, 1, 2 with EUCAST 2023 gives S, S, R, R.
+    data: [data/amr_test_eucast2023.csv]
+    calls:
+      - tool: interpret_mic
+        args: { data: "{adapter_dir}/data/amr_test_eucast2023.csv", organism_col: organism, drug_col: drug, value_col: mic, guideline: EUCAST 2023 }
+    expect:
+      - { path: metrics.n_S, equals: 2 }
+      - { path: metrics.n_R, equals: 2 }
+      - { path: metrics.n_I, equals: 0 }
+
+  - id: spneumoniae-eucast2020
+    description: >
+      AMR package test: S. pneumoniae ampicillin MIC 0.125, 0.5, 1, 2, 4 with EUCAST 2020 gives S, S, I, I, R. E. coli ampicillin
+      MIC 2 gives S and MIC 32 gives R.
+    data: [data/amr_test_eucast2020.csv]
+    calls:
+      - tool: interpret_mic
+        args: { data: "{adapter_dir}/data/amr_test_eucast2020.csv", organism_col: organism, drug_col: drug, value_col: mic, guideline: EUCAST 2020 }
+    expect:
+      - { path: metrics.n_S_Streptococcus_pneumoniae_Ampicillin, equals: 2 }
+      - { path: metrics.n_I_Streptococcus_pneumoniae_Ampicillin, equals: 2 }
+      - { path: metrics.n_R_Streptococcus_pneumoniae_Ampicillin, equals: 1 }
+      - { path: metrics.n_S_Escherichia_coli_Ampicillin, equals: 1 }
+      - { path: metrics.n_R_Escherichia_coli_Ampicillin, equals: 1 }
+
+  - id: spneumoniae-clsi2019
+    description: >
+      AMR package test: S. pneumoniae amoxicillin MIC 1, 2, 4, 8, 16 with CLSI 2019 gives S, S, I, R, R.
+    data: [data/amr_test_clsi2019.csv]
+    calls:
+      - tool: interpret_mic
+        args: { data: "{adapter_dir}/data/amr_test_clsi2019.csv", organism_col: organism, drug_col: drug, value_col: mic, guideline: CLSI 2019 }
+    expect:
+      - { path: metrics.n_S, equals: 2 }
+      - { path: metrics.n_I, equals: 1 }
+      - { path: metrics.n_R, equals: 2 }
+
+  - id: efaecium-clsi2024
+    description: >
+      AMR package test: E. faecium daptomycin MIC 0.25 to 16 with CLSI 2024 gives SDD for 0.25 to 4 and R for 8 and 16.
+      Ciprofloxacin MIC 0.25 to 4 gives S, S, S, I, R.
+    data: [data/amr_test_clsi2024.csv]
+    calls:
+      - tool: interpret_mic
+        args: { data: "{adapter_dir}/data/amr_test_clsi2024.csv", organism_col: organism, drug_col: drug, value_col: mic, guideline: CLSI 2024 }
+    expect:
+      - { path: metrics.n_SDD_Enterococcus_faecium_Daptomycin, equals: 5 }
+      - { path: metrics.n_R_Enterococcus_faecium_Daptomycin, equals: 2 }
+      - { path: metrics.n_S_Enterococcus_faecium_Ciprofloxacin, equals: 3 }
+      - { path: metrics.n_I_Enterococcus_faecium_Ciprofloxacin, equals: 1 }
+      - { path: metrics.n_R_Enterococcus_faecium_Ciprofloxacin, equals: 1 }
+
+  - id: amc-eucast2022-site
+    description: >
+      AMR package test: E. coli amoxicillin/clavulanic acid MIC 0.0625 to 64 with EUCAST 2022 gives 8 S and 3 R for other sites,
+      and 10 S and 1 R for urinary tract isolates (uti true).
+    data: [data/amr_test_eucast2022_amc.csv]
+    calls:
+      - tool: interpret_mic
+        args: { data: "{adapter_dir}/data/amr_test_eucast2022_amc.csv", organism_col: organism, drug_col: drug, value_col: mic, guideline: EUCAST 2022, uti: "false", include_pkpd: "false" }
+        save_as: other_sites
+      - tool: interpret_mic
+        args: { data: "{adapter_dir}/data/amr_test_eucast2022_amc.csv", organism_col: organism, drug_col: drug, value_col: mic, guideline: EUCAST 2022, uti: "true", include_pkpd: "false" }
+    expect:
+      - { path: saved.other_sites.metrics.n_S, equals: 8 }
+      - { path: saved.other_sites.metrics.n_R, equals: 3 }
+      - { path: metrics.n_S, equals: 10 }
+      - { path: metrics.n_R, equals: 1 }
+
+  - id: mic-percentiles-hand
+    description: >
+      Twenty MIC values (0.06 twice, 0.125 four times, 0.25 four times, 0.5 four times, 1 three times, 2, 8 and >8). A hand count
+      (checks/check_mic.py and check_mic.out) gives the 10th sorted value 0.25 as the MIC50 and the 18th value 2 as the MIC90.
+      The geometric mean is 0.433502 if >8 counts as 16, and 0.418735 if it counts as 8.
+    data: [data/amr_test_mic_hand.csv]
+    calls:
+      - tool: mic_summary
+        args: { data: "{adapter_dir}/data/amr_test_mic_hand.csv", organism_col: organism, drug_cols: [AMP], off_scale: next dilution }
+        save_as: next_dilution
+      - tool: mic_summary
+        args: { data: "{adapter_dir}/data/amr_test_mic_hand.csv", organism_col: organism, drug_cols: [AMP], off_scale: as written }
+    expect:
+      - { path: saved.next_dilution.metrics.mic50_Escherichia_coli_Ampicillin, equals: 0.25 }
+      - { path: saved.next_dilution.metrics.mic90_Escherichia_coli_Ampicillin, equals: 2 }
+      - { path: saved.next_dilution.metrics.gmean_Escherichia_coli_Ampicillin, approx: 0.433502, abs: 0.000001 }
+      - { path: metrics.gmean_Escherichia_coli_Ampicillin, approx: 0.418735, abs: 0.000001 }
+
+  - id: non-numeric-mic
+    description: A MIC that is not a number fails, and the error names the value.
+    data: [data/amr_test_mic_hand.csv]
+    calls:
+      - tool: mic_summary
+        args: { data: "{adapter_dir}/data/amr_test_mic_hand.csv", organism_col: organism, drug_cols: [organism] }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Escherichia coli" }
+
+  - id: breakpoints-ecoli-cip
+    description: >
+      EUCAST breakpoint table v 14.0 (2024), Enterobacterales ciprofloxacin: S at or below 0.25 mg/L and R above 0.5 mg/L.
+      Gentamicin: S at or below 2 mg/L and R above 2 mg/L.
+    calls:
+      - tool: show_breakpoints
+        args: { organism: Escherichia coli, drugs: [ciprofloxacin, gentamicin], guideline: EUCAST 2024 }
+    expect:
+      - { path: metrics.s_max_Ciprofloxacin, equals: 0.25 }
+      - { path: metrics.r_above_Ciprofloxacin, equals: 0.5 }
+      - { path: metrics.s_max_Gentamicin, equals: 2 }
+      - { path: metrics.r_above_Gentamicin, equals: 2 }
+
+  - id: unknown-organism
+    description: An organism that AMR does not know fails, and the error names the organism.
+    data: [data/amr_test_eucast2023.csv]
+    calls:
+      - tool: interpret_mic
+        args: { data: "{adapter_dir}/data/amr_test_eucast2023.csv", organism: Xyzzy bogus, drug_col: drug, value_col: mic, guideline: EUCAST 2023 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Xyzzy bogus" }
+
+  - id: unknown-guideline
+    description: A standard that AMR does not have fails, and the error lists the choices.
+    data: [data/amr_test_eucast2023.csv]
+    calls:
+      - tool: interpret_mic
+        args: { data: "{adapter_dir}/data/amr_test_eucast2023.csv", organism_col: organism, drug_col: drug, value_col: mic, guideline: EUCAST 1999 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "EUCAST 2025" }
+
+tools:
+  - name: interpret_mic
+    title: Interpret MIC values as S, I or R
+    description: >
+      Interpret MIC values as S, I or R with the EUCAST or CLSI breakpoint table that you name. It gives the count and the
+      percent of S, SDD, I and R for each organism and drug, with a 95% interval. It saves the S, I or R of each value and a
+      bar plot as PNG and SVG. For MIC50, MIC90 and the geometric mean, use mic_summary.
+    params:
+      data: { type: string, description: "Path of a CSV file. Wide layout: one column for each drug, with the MIC in mg/L. A limit sign such as <=0.5 or >8 can be in the value. Give drug_cols. Long layout: give drug_col and value_col." }
+      organism_col: { type: string, description: "Column with the species name of each row, such as Escherichia coli." }
+      organism: { type: string, description: "One species name for all rows, if the file has no species column." }
+      drug_cols: { type: [array, string], items: { type: string }, description: "Wide layout: the drug columns, as a list or as comma text. Use the drug name or the AMR code, such as CIP." }
+      drug_col: { type: string, description: "Long layout: the column with the drug name of each row." }
+      value_col: { type: string, description: "Long layout: the column with the MIC in mg/L. Default mic." }
+      id_col: { type: string, description: "Column with the isolate identifier. Default the row number." }
+      group_cols: { type: [array, string], items: { type: string }, description: "Columns that split the summary, such as year, ward or country, as a list or as comma text." }
+      guideline: { type: string, description: "Leave out. The harness sets it from the decision record. The standard and the year, such as EUCAST 2024 or CLSI 2024." }
+      host: { type: string, description: "Leave out. The harness sets it from the decision record. human, or an animal such as dog." }
+      uti: { type: string, enum: [auto, "true", "false"], description: "Leave out. The harness sets it from the decision record. true uses the urinary tract breakpoint. auto uses the one that exists." }
+      capped_mic_handling: { type: string, enum: [standard, none, conservative, lenient], description: "Leave out. The harness sets it from the decision record. How to read values with a limit sign." }
+      include_pkpd: { type: string, enum: ["true", "false"], description: "Leave out. The harness sets it from the decision record. true uses the EUCAST breakpoints that do not depend on the species." }
+      susceptible_definition: { type: string, enum: [S only, S and I], description: "Leave out. The harness sets it from the decision record. What the column pct_susceptible counts." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      summary: { kind: table, ext: .csv, description: "One row for each organism and drug with the counts and the percents." }
+      interpretations: { kind: table, ext: .csv, description: "One row for each MIC value with the S, I or R." }
+      plot: { kind: image, ext: .png, description: "Stacked bars of S, I and R for each organism and drug." }
+      plot_svg: { kind: file, ext: .svg, description: "The same plot as SVG." }
+    script: scripts/interpret_mic.R
+    parse: json
+
+  - name: mic_summary
+    title: MIC50, MIC90 and geometric mean
+    description: >
+      Give the MIC50, the MIC90, the range, the mode and the geometric mean for each organism and drug. The
+      MIC50 and MIC90 are the lowest concentrations that inhibit 50% and 90% of the isolates. It needs no breakpoint. Saves a plot as PNG and SVG. For S, I and R, use interpret_mic.
+    params:
+      data: { type: string, description: "Path of a CSV file. Wide layout: one column for each drug, with the MIC in mg/L. A limit sign such as <=0.5 or >8 can be in the value. Give drug_cols. Long layout: give drug_col and value_col." }
+      organism_col: { type: string, description: "Column with the species name of each row, such as Escherichia coli." }
+      organism: { type: string, description: "One species name for all rows, if the file has no species column." }
+      drug_cols: { type: [array, string], items: { type: string }, description: "Wide layout: the drug columns, as a list or as comma text." }
+      drug_col: { type: string, description: "Long layout: the column with the drug name of each row." }
+      value_col: { type: string, description: "Long layout: the column with the MIC in mg/L. Default mic." }
+      id_col: { type: string, description: "Column with the isolate identifier. Default the row number." }
+      group_cols: { type: [array, string], items: { type: string }, description: "Columns that split the summary, such as year, ward or country, as a list or as comma text." }
+      off_scale: { type: string, enum: [next dilution, as written], description: "Leave out. The harness sets it from the decision record. How the geometric mean reads a value with a > sign." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      summary: { kind: table, ext: .csv, description: "One row for each organism and drug with MIC50, MIC90, range, mode and geometric mean." }
+      plot: { kind: image, ext: .png, description: "MIC50 and MIC90 of each organism and drug on a log2 scale." }
+      plot_svg: { kind: file, ext: .svg, description: "The same plot as SVG." }
+    script: scripts/mic_summary.R
+    parse: json
+
+  - name: show_breakpoints
+    title: Show the breakpoints in use
+    description: >
+      Show the S and R breakpoints that AMR uses for one organism and some drugs in one standard and year. Use it to check
+      the table before you read interpret_mic. It saves a CSV table.
+    params:
+      organism: { type: string, description: "Species name, such as Escherichia coli." }
+      drugs: { type: [array, string], minItems: 1, items: { type: string }, description: "One or more drug names or AMR codes, as a list or as comma text." }
+      guideline: { type: string, description: "Leave out. The harness sets it from the decision record. The standard and the year, such as EUCAST 2024 or CLSI 2024." }
+      host: { type: string, description: "Leave out. The harness sets it from the decision record. human, or an animal such as dog." }
+      uti: { type: string, enum: [auto, "true", "false"], description: "Leave out. The harness sets it from the decision record. true uses the urinary tract breakpoint. auto uses the one that exists." }
+      include_pkpd: { type: string, enum: ["true", "false"], description: "Leave out. The harness sets it from the decision record. true uses the EUCAST breakpoints that do not depend on the species." }
+    required: [organism, drugs, guideline]
+    read_only: true
+    batch: false
+    outputs:
+      breakpoints: { kind: table, ext: .csv, description: "One row for each drug with the S and R breakpoints in mg/L." }
+    script: scripts/show_breakpoints.R
+    parse: json

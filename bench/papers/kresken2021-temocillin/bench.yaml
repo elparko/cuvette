@@ -1,0 +1,41 @@
+adapters: [amr]
+prompt: |
+  I tested 109 clinical isolates of Escherichia coli and Klebsiella pneumoniae by broth microdilution. The file {data}/kresken2021-temocillin/temocillin_mics.csv has one row for each isolate. The columns are isolate, species, cephalosporin_group (3GC-resistant or 3GC-susceptible, which means resistant or susceptible to third-generation cephalosporins) and the MIC in mg/L for five drugs. For piperacillin/tazobactam and for temocillin, give for each species and each cephalosporin group: the number of isolates, the MIC50, the MIC90 and the percent of isolates that are susceptible. Write every number in your final answer text.
+answers:
+  guideline: EUCAST 2021
+  host: human
+  uti: auto
+  capped_mic_handling: standard
+  include_pkpd: "true"
+  susceptible_definition: S and I
+  off_scale: next dilution
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 900
+data:
+  - kresken2021-temocillin/temocillin_mics.csv
+items:
+  - {key: ecoli_r_tzp_pct, description: "Percent susceptible, Escherichia coli, 3GC-resistant, piperacillin/tazobactam", value: 79.3, tolerance: 0.06}
+  - {key: ecoli_r_tzp_mic50, description: "MIC50 in mg/L, Escherichia coli, 3GC-resistant, piperacillin/tazobactam", value: 2, tolerance: 0.001}
+  - {key: ecoli_r_tzp_mic90, description: "MIC90 in mg/L, Escherichia coli, 3GC-resistant, piperacillin/tazobactam", value: 32, tolerance: 0.001}
+  - {key: ecoli_r_tmo_pct, description: "Percent susceptible, Escherichia coli, 3GC-resistant, temocillin", value: 94.8, tolerance: 0.06}
+  - {key: ecoli_r_tmo_mic50, description: "MIC50 in mg/L, Escherichia coli, 3GC-resistant, temocillin", value: 8, tolerance: 0.001}
+  - {key: ecoli_r_tmo_mic90, description: "MIC90 in mg/L, Escherichia coli, 3GC-resistant, temocillin", value: 16, tolerance: 0.001}
+  - {key: ecoli_s_tzp_pct, description: "Percent susceptible, Escherichia coli, 3GC-susceptible, piperacillin/tazobactam", value: 93.3, tolerance: 0.06}
+  - {key: ecoli_s_tzp_mic50, description: "MIC50 in mg/L, Escherichia coli, 3GC-susceptible, piperacillin/tazobactam", value: 1, tolerance: 0.001}
+  - {key: ecoli_s_tzp_mic90, description: "MIC90 in mg/L, Escherichia coli, 3GC-susceptible, piperacillin/tazobactam", value: 4, tolerance: 0.001}
+  - {key: ecoli_s_tmo_pct, description: "Percent susceptible, Escherichia coli, 3GC-susceptible, temocillin", value: 100.0, tolerance: 0.06}
+  - {key: ecoli_s_tmo_mic50, description: "MIC50 in mg/L, Escherichia coli, 3GC-susceptible, temocillin", value: 4, tolerance: 0.001}
+  - {key: ecoli_s_tmo_mic90, description: "MIC90 in mg/L, Escherichia coli, 3GC-susceptible, temocillin", value: 16, tolerance: 0.001}
+  - {key: kp_r_tzp_pct, description: "Percent susceptible, Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam", value: 57.1, tolerance: 0.06}
+  - {key: kp_r_tzp_mic50, description: "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam", value: 8, tolerance: 0.001}
+  - {key: kp_r_tzp_mic90, description: "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam", value: 128, tolerance: 0.001}
+  - {key: kp_r_tmo_pct, description: "Percent susceptible, Klebsiella pneumoniae, 3GC-resistant, temocillin", value: 90.5, tolerance: 0.06}
+  - {key: kp_r_tmo_mic50, description: "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-resistant, temocillin", value: 8, tolerance: 0.001}
+  - {key: kp_r_tmo_mic90, description: "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-resistant, temocillin", value: 16, tolerance: 0.001}
+  - {key: kp_s_tzp_pct, description: "Percent susceptible, Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam", value: 93.3, tolerance: 0.06}
+  - {key: kp_s_tzp_mic50, description: "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam", value: 1, tolerance: 0.001}
+  - {key: kp_s_tzp_mic90, description: "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam", value: 8, tolerance: 0.001}
+  - {key: kp_s_tmo_pct, description: "Percent susceptible, Klebsiella pneumoniae, 3GC-susceptible, temocillin", value: 100.0, tolerance: 0.06}
+  - {key: kp_s_tmo_mic50, description: "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, temocillin", value: 2, tolerance: 0.001}
+  - {key: kp_s_tmo_mic90, description: "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, temocillin", value: 8, tolerance: 0.001}

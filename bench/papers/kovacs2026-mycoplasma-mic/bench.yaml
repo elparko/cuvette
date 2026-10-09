@@ -1,0 +1,32 @@
+adapters: [amr]
+prompt: |
+  I measured the minimum inhibitory concentration (MIC) of nine antimicrobial drugs for 110 strains of Mycoplasma anserisalpingitidis by broth microdilution. The file {data}/kovacs2026-mycoplasma-mic/mycoplasma_mics.csv has one row for each strain. The columns are strain, species and the MIC in ug/ml of Tilmicosin, Tylosin, Tylvalosin, Lincomycin, Oxytetracycline, Doxycycline, Spectinomycin, Enrofloxacin and Tiamulin. A value such as <=0.25 or >64 is the limit of the dilution series. This species has no clinical breakpoints. Give the MIC50 and the MIC90 of each drug. Write every number in your final answer text.
+answers:
+  guideline: "none (this species has no clinical breakpoints; do not interpret S, I or R)"
+  host: human
+  uti: auto
+  capped_mic_handling: standard
+  include_pkpd: "true"
+  susceptible_definition: S only
+  off_scale: next dilution
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 900
+data:
+  - kovacs2026-mycoplasma-mic/mycoplasma_mics.csv
+items:
+  - {key: tylvalosin_mic50, description: "MIC50 of tylvalosin in ug/ml", value: 0.5, tolerance: 0.001, tool: mic_summary}
+  - {key: tylvalosin_mic90, description: "MIC90 of tylvalosin in ug/ml", value: 2, tolerance: 0.001, tool: mic_summary}
+  - {key: oxytetracycline_mic50, description: "MIC50 of oxytetracycline in ug/ml", value: 16, tolerance: 0.001, tool: mic_summary}
+  - {key: oxytetracycline_mic90, description: "MIC90 of oxytetracycline in ug/ml", value: 64, tolerance: 0.001, tool: mic_summary}
+  - {key: doxycycline_mic50, description: "MIC50 of doxycycline in ug/ml", value: 5, tolerance: 0.001, tool: mic_summary}
+  - {key: doxycycline_mic90, description: "MIC90 of doxycycline in ug/ml", value: 10, tolerance: 0.001, tool: mic_summary}
+  - {key: tiamulin_mic50, description: "MIC50 of tiamulin in ug/ml", value: 0.625, tolerance: 0.001, tool: mic_summary}
+  - {key: tiamulin_mic90, description: "MIC90 of tiamulin in ug/ml", value: 2.5, tolerance: 0.001, tool: mic_summary}
+  - {key: tylosin_mic50, description: "MIC50 of tylosin in ug/ml", value: 16, tolerance: 0.001, tool: mic_summary}
+  - {key: tylosin_mic90, description: "MIC90 of tylosin in ug/ml (the paper prints 64 or more)", value: 64, tolerance: 0.001, tool: mic_summary}
+  - {key: lincomycin_mic50, description: "MIC50 of lincomycin in ug/ml", value: 2, tolerance: 0.001, tool: mic_summary}
+  - {key: spectinomycin_mic50, description: "MIC50 of spectinomycin in ug/ml", value: 8, tolerance: 0.001, tool: mic_summary}
+  - {key: tilmicosin_mic50, description: "MIC50 of tilmicosin in ug/ml (the paper prints 64 or more)", value: 64, tolerance: 0.001, tool: mic_summary}
+  - {key: tilmicosin_mic90, description: "MIC90 of tilmicosin in ug/ml (the paper prints 64 or more)", value: 64, tolerance: 0.001, tool: mic_summary}
+  - {key: enrofloxacin_mic50_printed, description: "MIC50 of enrofloxacin as printed in the paper (more than 10; does not reproduce, computed 5)", value: 10, tolerance: 0.001, reference: true}

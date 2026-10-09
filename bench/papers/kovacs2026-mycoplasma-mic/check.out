@@ -1,0 +1,10 @@
+strains 110
+Tilmicosin       n=110 MIC50 ceil=64 round=64 MIC90 ceil=>64 round=>64
+Tylosin          n=110 MIC50 ceil=16 round=16 MIC90 ceil=64 round=64
+Tylvalosin       n=110 MIC50 ceil=0.5 round=0.5 MIC90 ceil=2 round=2
+Lincomycin       n=110 MIC50 ceil=2 round=2 MIC90 ceil=4 round=4
+Oxytetracycline  n=110 MIC50 ceil=16 round=16 MIC90 ceil=64 round=64
+Doxycycline      n=110 MIC50 ceil=5 round=5 MIC90 ceil=10 round=10
+Spectinomycin    n=110 MIC50 ceil=8 round=8 MIC90 ceil=16 round=16
+Enrofloxacin     n=110 MIC50 ceil=5 round=5 MIC90 ceil=>10 round=>10
+Tiamulin         n=110 MIC50 ceil=0.625 round=0.625 MIC90 ceil=2.5 round=2.5

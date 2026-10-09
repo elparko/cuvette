@@ -1,0 +1,121 @@
+kind: research paper
+short: Kovacs 2026
+field: Microbiology susceptibility testing
+program: AMR (R), through the amr adapter
+citation:
+  authors: Kovács ÁB et al.
+  title: "Genome-wide association study of Mycoplasma anserisalpingitidis strains for antibiotic susceptibility"
+  venue: Scientific Reports
+  year: 2026
+  doi: 10.1038/s41598-026-39804-w
+related:
+  - text: "Data: Supplementary Table 1 of the paper (41598_2026_39804_MOESM3_ESM.xlsx), CC BY 4.0."
+    doi: 10.1038/s41598-026-39804-w
+measured: >-
+  The study measured the MIC of nine drugs for 110 strains of Mycoplasma anserisalpingitidis by broth microdilution. It
+  gives the MIC50 and the MIC90 of each drug. The MIC50 is the value at the 0.5 n-th place of the ordered list. The MIC90 is the
+  value at the 0.9 n-th place. The species has no clinical breakpoints.
+instruction: Give the MIC50 and the MIC90 of each drug.
+instruction_basis: >-
+  Methods and Results of the paper. The paper states the rank rule for the MIC50 and the MIC90.
+answers:
+  guideline:
+    decision: Breakpoint standard and version
+    value: "none (this species has no clinical breakpoints; do not interpret S, I or R)"
+    source: Results. The paper gives MIC50 and MIC90 only and says that no breakpoints exist.
+  host:
+    decision: Host
+    value: human
+    source: Not used. The benchmark asks for no S, I or R.
+  uti:
+    decision: Isolates from urine
+    value: auto
+    source: Not used.
+  capped_mic_handling:
+    decision: MIC values with a limit sign
+    value: standard
+    source: Not used for MIC50 and MIC90. These tools rank a value with a ">" sign above the same number.
+  include_pkpd:
+    decision: Use the EUCAST pharmacokinetic and pharmacodynamic breakpoints
+    value: "true"
+    source: Not used.
+  susceptible_definition:
+    decision: What the percent susceptible counts
+    value: S only
+    source: Not used.
+  off_scale:
+    decision: Geometric mean of MIC values with a limit sign
+    value: next dilution
+    source: Not used. The paper gives no geometric mean.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text, so that the record of decisions stays the only source of the settings.
+items:
+  tylvalosin_mic50:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Tylvalosin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  tylvalosin_mic90:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Tylvalosin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  oxytetracycline_mic50:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Oxytetracycline. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  oxytetracycline_mic90:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Oxytetracycline. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  doxycycline_mic50:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Doxycycline. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  doxycycline_mic90:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Doxycycline. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  tiamulin_mic50:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Tiamulin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  tiamulin_mic90:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Tiamulin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  tylosin_mic50:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Tylosin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  tylosin_mic90:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Tylosin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  lincomycin_mic50:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Lincomycin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  spectinomycin_mic50:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Spectinomycin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  tilmicosin_mic50:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Tilmicosin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  tilmicosin_mic90:
+    source: published
+    where: "Results of the paper, MIC50 and MIC90 of Tilmicosin. The paper prints it, in some cases as 64 or more."
+    check: check.py gives the same value from the data (check.out).
+  enrofloxacin_mic50_printed:
+    source: published
+    where: "Results of the paper, MIC50 of enrofloxacin: more than 10 ug/ml. The table gives 5 ug/ml for the median strain; only 38 of 110 strains have 10 or more."
+    check: check.py gives 5 (check.out).
+data:
+  source: >-
+    Supplementary Table 1 of the paper, sheet 1. fetch.sh downloads the workbook from the Springer static content server and
+    writes mycoplasma_mics.csv: the strain, the species and the MIC of nine drugs, with ASCII limit signs.
+  url: https://www.nature.com/articles/s41598-026-39804-w
+  license: CC BY 4.0
+  size: 23 KB Excel workbook with 110 strains

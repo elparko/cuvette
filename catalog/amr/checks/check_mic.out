@@ -1,0 +1,7 @@
+n 20
+mic50 0.25
+mic90 2.0
+geometric_mean next dilution 0.433502
+geometric_mean as written 0.418735
+amc uti False S 8 R 3
+amc uti True S 10 R 1

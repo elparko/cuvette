@@ -1,0 +1,13 @@
+organism,drug,mic
+Enterococcus faecium,daptomycin,0.25
+Enterococcus faecium,daptomycin,0.5
+Enterococcus faecium,daptomycin,1
+Enterococcus faecium,daptomycin,2
+Enterococcus faecium,daptomycin,4
+Enterococcus faecium,daptomycin,8
+Enterococcus faecium,daptomycin,16
+Enterococcus faecium,ciprofloxacin,0.25
+Enterococcus faecium,ciprofloxacin,0.5
+Enterococcus faecium,ciprofloxacin,1
+Enterococcus faecium,ciprofloxacin,2
+Enterococcus faecium,ciprofloxacin,4

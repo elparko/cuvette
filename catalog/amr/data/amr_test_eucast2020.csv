@@ -1,0 +1,8 @@
+organism,drug,mic
+Streptococcus pneumoniae,ampicillin,0.125
+Streptococcus pneumoniae,ampicillin,0.5
+Streptococcus pneumoniae,ampicillin,1
+Streptococcus pneumoniae,ampicillin,2
+Streptococcus pneumoniae,ampicillin,4
+Escherichia coli,ampicillin,2
+Escherichia coli,ampicillin,32

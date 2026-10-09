@@ -1,0 +1,567 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "kovacs2026-mycoplasma-mic",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 128.778,
+   "session": "20261009-033411-7b04",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kovacs2026-mycoplasma-mic/run1/home/sessions/20261009-033411-7b04",
+   "answer": "## Result (corrected): MIC50 and MIC90 for nine drugs against 110 *Mycoplasma anserisalpingitidis* strains\n\n**Scope**\n- Standard: none. The species has no clinical breakpoints, so I did not read the results as susceptible (S), intermediate (I) or resistant (R).\n- Isolates: 110 strains. Each strain gives one MIC value per drug.\n- Units: µg/mL, which equals mg/L.\n- Tool: AMR summary tool, which reports AMR version 3.0.1.\n\n**What I did**\n1. I read the MIC table directly. The inspection tool failed.\n2. I ran the MIC summary tool on all nine drugs. MIC50 and MIC90 are the lowest concentrations that inhibit at least 50% and at least 90% of the strains.\n3. I kept values with a limit sign, such as ≤0.25 or >64, at their limit. The tool used the next dilution only for the geometric mean.\n4. I recalculated the extreme-value flags with a script, on the raw scale and on the log2 scale.\n\n**Results (n = 110 strains per drug)**\n\n| Drug | MIC50 (µg/mL) | MIC90 (µg/mL) | Range (µg/mL) | Geometric mean (µg/mL) |\n|---|---|---|---|---|\n| Tilmicosin | 64 | >64 | ≤0.25 to >64 | 21.93 |\n| Tylosin | 16 | 64 | ≤0.25 to >64 | 6.55 |\n| Tylvalosin | 0.5 | 2 | ≤0.25 to 16 | 0.66 |\n| Lincomycin | 2 | 4 | 0.5 to >64 | 2.74 |\n| Oxytetracycline | 16 | 64 | ≤0.25 to 64 | 11.85 |\n| Doxycycline | 5 | 10 | ≤0.039 to >10 | 2.32 |\n| Spectinomycin | 8 | 16 | 4 to >64 | 10.62 |\n| Enrofloxacin | 5 | >10 | 0.312 to 16 | 4.92 |\n| Tiamulin | 0.625 | 2.5 | 0.078 to 2.5 | 0.65 |\n\n**Values at the limit of the dilution series (count of strains)**\n- Tilmicosin: 16 at ≤0.25 and 24 at >64.\n- Tylosin: 20 at ≤0.25 and 5 at >64.\n- Tylvalosin: 33 at ≤0.25.\n- Lincomycin: 1 at >64.\n- Oxytetracycline: 2 at ≤0.25.\n- Doxycycline: 1 at ≤0.039 and 2 at >10.\n- Spectinomycin: 1 at >64.\n- Enrofloxacin: 25 at >10.\n- Tiamulin: none.\n\n**What the results show**\n- Tylvalosin and Tiamulin have the lowest MIC50 and MIC90 values in this set.\n- Tilmicosin has the highest MIC50 and MIC90 values. Its MIC90 is above the top of the series.\n- Enrofloxacin MIC90 is above the top of the series (>10 µg/mL).\n- These are laboratory MIC values. They do not show that a drug works for a patient.\n\n**Extreme-value flags: correction**\n- The harness data check reported extreme values with a modified z-score above 3.5. Its counts were Tylosin 7, Tylvalosin 4, Lincomycin 6 and Tiamulin 12. I could not reproduce these counts.\n- My recalculation on the raw scale gave Tylvalosin 19, Lincomycin 7, Tiamulin 12 and 0 for the other drugs.\n- My recalculation on the log2 scale gave Tylosin 20, Oxytetracycline 3, Doxycycline 4 and 0 for the other drugs.\n- For Tilmicosin and Spectinomycin the median absolute deviation is 0, so the rule cannot score any value.\n- The flagged sets change with the scale. They do not show clear data errors.\n- I removed the total of 29 from the earlier answer. I do not report a total, because it depends on the scale.\n- I kept all values in the data.\n\n**What is uncertain**\n- Values at a limit sign are counted at the limit. The true MIC can lie beyond it.\n- The 110 rows are one row per strain. The file does not show the host bird, flock or herd. If several strains come from one source, they are not independent.\n- The file has one MIC per strain and drug. I cannot tell whether a value is one test or a mean of replicates.\n- The first row is the reference strain ATCC BAA-2147 (American Type Culture Collection). It is one of the 110 rows.\n- The summary tool reports AMR version 3.0.1. The program notes list 4.6.1. I cannot tell which version ran. MIC50 and MIC90 do not depend on breakpoint tables.\n\n**Output files**\n- Summary table: mic_summary-1/summary.csv in the project work folder.\n- Plot: mic_summary-1/plot.png, with an SVG copy.\n- Outlier checks: outlier_check.csv (raw scale) and outlier_check_log2.csv (log2 scale).\n\n**What waits for you**\n1. Decide whether to keep the ATCC BAA-2147 reference strain.\n2. Confirm whether the strains come from separate birds, flocks or herds.\n3. Confirm whether each MIC is one test or a mean of replicates.\n4. Choose the scale for the extreme-value rule (raw or log2), or keep all values. All values are kept now.\n5. Confirm which AMR version you ran.\n\nStep results that the answer does not mention, from the record:\n- n2 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kovacs2026-mycoplasma-mic/run1/home/sessions/20261009-033411-7b04/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kovacs2026-mycoplasma-mic/run1/home/sessions/20261009-033411-7b04/work.\n- n3 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kovacs2026-mycoplasma-mic/run1/home/sessions/20261009-033411-7b04/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kovacs2026-mycoplasma-mic/run1/home/sessions/20261009-033411-7b04/work.\n\nSettings used, from the decision record: Geometric mean of MIC values with a limit sign: next dilution.",
+   "items": [
+    {
+     "key": "tylvalosin_mic50",
+     "description": "MIC50 of tylvalosin in ug/ml",
+     "expected": 0.5,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.5,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic50_Mycoplasma_anserisalpingitidis_Tylvalosin",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "MIC50 and MIC90 are the lowest concentrations that inhibit at least 50% and at least 90% of the strains."
+     }
+    },
+    {
+     "key": "tylvalosin_mic90",
+     "description": "MIC90 of tylvalosin in ug/ml",
+     "expected": 2,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic50_Mycoplasma_anserisalpingitidis_Lincomycin",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 2,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "| Tylvalosin | 0.5 | 2 | ≤0.25 to 16 | 0.66 |"
+     }
+    },
+    {
+     "key": "oxytetracycline_mic50",
+     "description": "MIC50 of oxytetracycline in ug/ml",
+     "expected": 16,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic50_Mycoplasma_anserisalpingitidis_Oxytetracycline",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "| Tylosin | 16 | 64 | ≤0.25 to >64 | 6.55 |"
+     }
+    },
+    {
+     "key": "oxytetracycline_mic90",
+     "description": "MIC90 of oxytetracycline in ug/ml",
+     "expected": 64,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 64,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic90_Mycoplasma_anserisalpingitidis_Oxytetracycline",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 64,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "I kept values with a limit sign, such as ≤0.25 or >64, at their limit."
+     }
+    },
+    {
+     "key": "doxycycline_mic50",
+     "description": "MIC50 of doxycycline in ug/ml",
+     "expected": 5,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic50_Mycoplasma_anserisalpingitidis_Doxycycline",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "| Doxycycline | 5 | 10 | ≤0.039 to >10 | 2.32 |"
+     }
+    },
+    {
+     "key": "doxycycline_mic90",
+     "description": "MIC90 of doxycycline in ug/ml",
+     "expected": 10,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic90_Mycoplasma_anserisalpingitidis_Doxycycline",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 10,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 75,
+      "text": "| Doxycycline | 5 | 10 | ≤0.039 to >10 | 2.32 |"
+     }
+    },
+    {
+     "key": "tiamulin_mic50",
+     "description": "MIC50 of tiamulin in ug/ml",
+     "expected": 0.625,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.625,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic50_Mycoplasma_anserisalpingitidis_Tiamulin",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.625,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "| Tiamulin | 0.625 | 2.5 | 0.078 to 2.5 | 0.65 |"
+     }
+    },
+    {
+     "key": "tiamulin_mic90",
+     "description": "MIC90 of tiamulin in ug/ml",
+     "expected": 2.5,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.5,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic90_Mycoplasma_anserisalpingitidis_Tiamulin",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 75,
+      "text": "| Tiamulin | 0.625 | 2.5 | 0.078 to 2.5 | 0.65 |"
+     }
+    },
+    {
+     "key": "tylosin_mic50",
+     "description": "MIC50 of tylosin in ug/ml",
+     "expected": 16,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic50_Mycoplasma_anserisalpingitidis_Oxytetracycline",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "| Tylosin | 16 | 64 | ≤0.25 to >64 | 6.55 |"
+     }
+    },
+    {
+     "key": "tylosin_mic90",
+     "description": "MIC90 of tylosin in ug/ml (the paper prints 64 or more)",
+     "expected": 64,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 64,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic90_Mycoplasma_anserisalpingitidis_Oxytetracycline",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 64,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "I kept values with a limit sign, such as ≤0.25 or >64, at their limit."
+     }
+    },
+    {
+     "key": "lincomycin_mic50",
+     "description": "MIC50 of lincomycin in ug/ml",
+     "expected": 2,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic50_Mycoplasma_anserisalpingitidis_Lincomycin",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 2,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "| Tylvalosin | 0.5 | 2 | ≤0.25 to 16 | 0.66 |"
+     }
+    },
+    {
+     "key": "spectinomycin_mic50",
+     "description": "MIC50 of spectinomycin in ug/ml",
+     "expected": 8,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic50_Mycoplasma_anserisalpingitidis_Spectinomycin",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "| Spectinomycin | 8 | 16 | 4 to >64 | 10.62 |"
+     }
+    },
+    {
+     "key": "tilmicosin_mic50",
+     "description": "MIC50 of tilmicosin in ug/ml (the paper prints 64 or more)",
+     "expected": 64,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 64,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic90_Mycoplasma_anserisalpingitidis_Oxytetracycline",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 64,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "I kept values with a limit sign, such as ≤0.25 or >64, at their limit."
+     }
+    },
+    {
+     "key": "tilmicosin_mic90",
+     "description": "MIC90 of tilmicosin in ug/ml (the paper prints 64 or more)",
+     "expected": 64,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 64,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic90_Mycoplasma_anserisalpingitidis_Oxytetracycline",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 64,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 75,
+      "text": "I kept values with a limit sign, such as ≤0.25 or >64, at their limit."
+     }
+    },
+    {
+     "key": "enrofloxacin_mic50_printed",
+     "description": "MIC50 of enrofloxacin as printed in the paper (more than 10; does not reproduce, computed 5)",
+     "expected": 10,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mic90_Mycoplasma_anserisalpingitidis_Doxycycline",
+      "entry": 31
+     },
+     "reported": {
+      "pass": true,
+      "value": 10,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 75,
+      "text": "| Doxycycline | 5 | 10 | ≤0.039 to >10 | 2.32 |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 7,
+    "inputTokens": 18,
+    "outputTokens": 14825,
+    "cacheRead": 138096,
+    "cacheWrite": 39272,
+    "toolCalls": 5,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 6,
+     "error": 4
+    },
+    "unsourced": 7,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kovacs2026-mycoplasma-mic/run1/home/sessions/20261009-033411-7b04/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/kovacs2026-mycoplasma-mic",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kovacs2026-mycoplasma-mic/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/catalog/amr",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/catalog/amr"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/kovacs2026-mycoplasma-mic/mycoplasma_mics.csv"
+    ],
+    "outside": [],
+    "blocked": 1,
+    "unsourced": 7,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-kovacs-run1.md",
+  "json": "bench/results/papers-kovacs-run1.json"
+ },
+ "summary": {
+  "cells": {
+   "kovacs2026-mycoplasma-mic": {
+    "claude:claude-haiku-5-5": {
+     "computed": 14,
+     "computedOf": 14,
+     "reported": 14,
+     "reportedOf": 14,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 14,
+    "computedOf": 14,
+    "reported": 14,
+    "reportedOf": 14,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 128.778,
+    "requests": 7,
+    "inputTokens": 18,
+    "outputTokens": 14825,
+    "cacheRead": 138096,
+    "cacheWrite": 39272,
+    "toolCalls": 5,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings_info": 2,
+    "findings_warning": 6,
+    "findings_error": 4,
+    "unsourced": 7,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   }
+  },
+  "skipped": []
+ }
+}

@@ -1,0 +1,810 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "kresken2021-temocillin",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 155.319,
+   "session": "20261009-032859-0ef4",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kresken2021-temocillin/run1/home/sessions/20261009-032859-0ef4",
+   "answer": "I fixed both problems. The corrected answer is below.\n\n## Corrections\n\n1. **Data check.** The tool call to inspect the data failed. No inspection result exists. The extreme-value flags came from a harness note. That note appeared in the result of the file read, not from an inspection. The note reports this: piperacillin/tazobactam has 12 extreme values, and temocillin has 8. The rule is a modified z-score above 3.5 within each cephalosporin group. The note also reports 109 rows and 8 columns. Nothing was removed.\n2. **AMR version.** The number 4.6.1 comes from the program description in my adapter instructions. It does not come from a tool result. Every tool result in this session reports AMR version 3.0.1. I cannot confirm which version ran. Please check the installed R package AMR version.\n\n## Settings\n\n1. Standard: EUCAST 2021. This is the recorded value. I passed EUCAST 2024, but the harness used the recorded value. A comparison with EUCAST 2024 gave the same totals (86 S, 28 R).\n2. Host: human. Urinary tract rule: auto.\n3. Percent susceptible counts S and I (recorded setting). For piperacillin/tazobactam, the I count is 0, so S and I equal S.\n4. The file has 109 isolates. The MIC values have no limit signs. One row is one isolate. The file does not say whether two isolates come from one patient.\n\n## Piperacillin/tazobactam\n\nEUCAST 2021: S at MIC 8 mg/L or less; R above 8 mg/L; no I category.\n\n| Species | Group | n | MIC50 (mg/L) | MIC90 (mg/L) | S, n (%) [95% CI] | R, n (%) | Geometric mean (mg/L) |\n|---|---|---|---|---|---|---|---|\n| E. coli | 3GC-resistant | 58 | 2 | 32 | 46 (79.3) [67.2–87.7] | 12 (20.7) | 3.77 |\n| E. coli | 3GC-susceptible | 15 | 1 | 4 | 14 (93.3) [70.2–98.8] | 1 (6.7) | 2.00 |\n| K. pneumoniae | 3GC-resistant | 21 | 8 | 128 | 12 (57.1) [36.5–75.5] | 9 (42.9) | 10.42 |\n| K. pneumoniae | 3GC-susceptible | 15 | 1 | 8 | 14 (93.3) [70.2–98.8] | 1 (6.7) | 2.09 |\n\n## Temocillin\n\nEUCAST 2021 table: no S breakpoint. R above 16 mg/L. The tool reads MICs of 16 mg/L or less as I.\n\n| Species | Group | n | MIC50 (mg/L) | MIC90 (mg/L) | S, n | I, n | R, n | S and I, % [95% CI] | Geometric mean (mg/L) |\n|---|---|---|---|---|---|---|---|---|---|\n| E. coli | 3GC-resistant | 58 | 8 | 16 | 0 | 55 | 3 | 94.8 [85.9–98.2] | 9.92 |\n| E. coli | 3GC-susceptible | 15 | 4 | 16 | 0 | 15 | 0 | 100 [79.6–100] | 5.53 |\n| K. pneumoniae | 3GC-resistant | 21 | 8 | 16 | 0 | 19 | 2 | 90.5 [71.1–97.3] | 7.49 |\n| K. pneumoniae | 3GC-susceptible | 15 | 2 | 8 | 0 | 15 | 0 | 100 [79.6–100] | 3.03 |\n\nMIC ranges (mg/L):\n- Temocillin, E. coli 3GC-resistant: 4 to 64.\n- Temocillin, E. coli 3GC-susceptible: 1 to 16.\n- Temocillin, K. pneumoniae 3GC-resistant: 2 to 32.\n- Temocillin, K. pneumoniae 3GC-susceptible: 1 to 16.\n\n## What I measured\n\n- For piperacillin/tazobactam, the 3GC-resistant groups have a lower percent S than the 3GC-susceptible groups. K. pneumoniae 3GC-resistant has the lowest percent S (57.1%) and the highest MIC90 (128 mg/L).\n- For temocillin, the MIC50 is higher in 3GC-resistant isolates than in 3GC-susceptible isolates for both species: 8 against 4 mg/L for E. coli, and 8 against 2 mg/L for K. pneumoniae. The MIC90 is 16 against 16 mg/L for E. coli, and 16 against 8 mg/L for K. pneumoniae.\n\n## What is uncertain\n\n- The EUCAST 2021 table has no S breakpoint for temocillin. Under the recorded setting, a temocillin MIC of 16 mg/L or less counts as S and I. The \"S and I\" percent for temocillin does not show true susceptibility. The S count for temocillin is 0 in all four groups.\n- The harness note flags extreme values. These values stay in the analysis. The rule finds unusual values. It does not show lab errors.\n- Groups have 15 to 58 isolates. The 95% intervals are wide, especially for the groups of 15 isolates.\n- The AMR version is not confirmed (see correction 2).\n\n## What waits for the scientist\n\n- Nothing waits for an answer. You asked me to use the recorded values for temocillin.\n- Please confirm the installed AMR version. The adapter says 4.6.1. The tool output says 3.0.1.\n- If you want a true susceptible breakpoint for temocillin, send the value and its source.\n\nStep results that the answer does not mention, from the record:\n- n3 mic_summary: 218 MIC values in 8 groups. MIC50 and MIC90 are the lowest concentrations that inhibit at least 50% and 90% of the isolates. Off-scale values: next dilution.\n\nSettings used, from the decision record: Breakpoint standard and version: EUCAST 2021 · Host: human · Isolates from urine: auto · MIC values with a limit sign: standard · Use the EUCAST pharmacokinetic and pharmacodynamic breakpoints: true · What the percent susceptible counts: S and I · Geometric mean of MIC values with a limit sign: next dilution.",
+   "items": [
+    {
+     "key": "ecoli_r_tzp_pct",
+     "description": "Percent susceptible, Escherichia coli, 3GC-resistant, piperacillin/tazobactam",
+     "expected": 79.3,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 79.3103448275862,
+      "diff": 0.010344827586209249,
+      "node": "n4",
+      "path": "metrics.pct_S_Escherichia_coli_Piperacillin_tazobactam_Escherichia_coli_3GC_resistant",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 79.3,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-resistant | 58 | 2 | 32 | 46 (79.3) [67.2–87.7] | 12 (20.7) | 3.77 |"
+     }
+    },
+    {
+     "key": "ecoli_r_tzp_mic50",
+     "description": "MIC50 in mg/L, Escherichia coli, 3GC-resistant, piperacillin/tazobactam",
+     "expected": 2,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_drugs",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 2,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-resistant | 58 | 2 | 32 | 46 (79.3) [67.2–87.7] | 12 (20.7) | 3.77 |"
+     }
+    },
+    {
+     "key": "ecoli_r_tzp_mic90",
+     "description": "MIC90 in mg/L, Escherichia coli, 3GC-resistant, piperacillin/tazobactam",
+     "expected": 32,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 32,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.mic90_Escherichia_coli_Piperacillin_tazobactam_Escherichia_coli_3GC_resistant",
+      "entry": 59
+     },
+     "reported": {
+      "pass": true,
+      "value": 32,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 124,
+      "text": "coli | 3GC-resistant | 58 | 2 | 32 | 46 (79.3) [67.2–87.7] | 12 (20.7) | 3.77 |"
+     }
+    },
+    {
+     "key": "ecoli_r_tmo_pct",
+     "description": "Percent susceptible, Escherichia coli, 3GC-resistant, temocillin",
+     "expected": 94.8,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 94.8275862068966,
+      "diff": 0.02758620689660063,
+      "node": "n4",
+      "path": "metrics.pct_susceptible_Escherichia_coli_Temocillin_Escherichia_coli_3GC_resistant",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 94.8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-resistant | 58 | 8 | 16 | 0 | 55 | 3 | 94.8 [85.9–98.2] | 9.92 |"
+     }
+    },
+    {
+     "key": "ecoli_r_tmo_mic50",
+     "description": "MIC50 in mg/L, Escherichia coli, 3GC-resistant, temocillin",
+     "expected": 8,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.s_max_Piperacillin_tazobactam",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "The note reports this: piperacillin/tazobactam has 12 extreme values, and temocillin has 8."
+     }
+    },
+    {
+     "key": "ecoli_r_tmo_mic90",
+     "description": "MIC90 in mg/L, Escherichia coli, 3GC-resistant, temocillin",
+     "expected": 16,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.r_above_Temocillin",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 124,
+      "text": "R above 16 mg/L."
+     }
+    },
+    {
+     "key": "ecoli_s_tzp_pct",
+     "description": "Percent susceptible, Escherichia coli, 3GC-susceptible, piperacillin/tazobactam",
+     "expected": 93.3,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 93.3333333333333,
+      "diff": 0.03333333333330302,
+      "node": "n4",
+      "path": "metrics.pct_S_Escherichia_coli_Piperacillin_tazobactam_Escherichia_coli_3GC_susceptible",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 93.3,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-susceptible | 15 | 1 | 4 | 14 (93.3) [70.2–98.8] | 1 (6.7) | 2.00 |"
+     }
+    },
+    {
+     "key": "ecoli_s_tzp_mic50",
+     "description": "MIC50 in mg/L, Escherichia coli, 3GC-susceptible, piperacillin/tazobactam",
+     "expected": 1,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.mic50_Escherichia_coli_Piperacillin_tazobactam_Escherichia_coli_3GC_susceptible",
+      "entry": 59
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-susceptible | 15 | 1 | 4 | 14 (93.3) [70.2–98.8] | 1 (6.7) | 2.00 |"
+     }
+    },
+    {
+     "key": "ecoli_s_tzp_mic90",
+     "description": "MIC90 in mg/L, Escherichia coli, 3GC-susceptible, piperacillin/tazobactam",
+     "expected": 4,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.mic90_Escherichia_coli_Piperacillin_tazobactam_Escherichia_coli_3GC_susceptible",
+      "entry": 59
+     },
+     "reported": {
+      "pass": true,
+      "value": 4,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 124,
+      "text": "coli | 3GC-susceptible | 15 | 1 | 4 | 14 (93.3) [70.2–98.8] | 1 (6.7) | 2.00 |"
+     }
+    },
+    {
+     "key": "ecoli_s_tmo_pct",
+     "description": "Percent susceptible, Escherichia coli, 3GC-susceptible, temocillin",
+     "expected": 100,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.pct_susceptible_Escherichia_coli_Temocillin_Escherichia_coli_3GC_susceptible",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 100,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-susceptible | 15 | 4 | 16 | 0 | 15 | 0 | 100 [79.6–100] | 5.53 |"
+     }
+    },
+    {
+     "key": "ecoli_s_tmo_mic50",
+     "description": "MIC50 in mg/L, Escherichia coli, 3GC-susceptible, temocillin",
+     "expected": 4,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.mic90_Escherichia_coli_Piperacillin_tazobactam_Escherichia_coli_3GC_susceptible",
+      "entry": 59
+     },
+     "reported": {
+      "pass": true,
+      "value": 4,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 124,
+      "text": "coli | 3GC-susceptible | 15 | 1 | 4 | 14 (93.3) [70.2–98.8] | 1 (6.7) | 2.00 |"
+     }
+    },
+    {
+     "key": "ecoli_s_tmo_mic90",
+     "description": "MIC90 in mg/L, Escherichia coli, 3GC-susceptible, temocillin",
+     "expected": 16,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.r_above_Temocillin",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 124,
+      "text": "R above 16 mg/L."
+     }
+    },
+    {
+     "key": "kp_r_tzp_pct",
+     "description": "Percent susceptible, Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam",
+     "expected": 57.1,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 57.1428571428571,
+      "diff": 0.04285714285710185,
+      "node": "n4",
+      "path": "metrics.pct_S_Klebsiella_pneumoniae_Piperacillin_tazobactam_Klebsiella_pneumoniae_3GC_resistant",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 57.1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "pneumoniae | 3GC-resistant | 21 | 8 | 128 | 12 (57.1) [36.5–75.5] | 9 (42.9) | 10.42 |"
+     }
+    },
+    {
+     "key": "kp_r_tzp_mic50",
+     "description": "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam",
+     "expected": 8,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.s_max_Piperacillin_tazobactam",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "The note reports this: piperacillin/tazobactam has 12 extreme values, and temocillin has 8."
+     }
+    },
+    {
+     "key": "kp_r_tzp_mic90",
+     "description": "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam",
+     "expected": 128,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 128,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.mic90_Klebsiella_pneumoniae_Piperacillin_tazobactam_Klebsiella_pneumoniae_3GC_resistant",
+      "entry": 59
+     },
+     "reported": {
+      "pass": true,
+      "value": 128,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 124,
+      "text": "pneumoniae | 3GC-resistant | 21 | 8 | 128 | 12 (57.1) [36.5–75.5] | 9 (42.9) | 10.42 |"
+     }
+    },
+    {
+     "key": "kp_r_tmo_pct",
+     "description": "Percent susceptible, Klebsiella pneumoniae, 3GC-resistant, temocillin",
+     "expected": 90.5,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 90.4761904761905,
+      "diff": 0.023809523809504185,
+      "node": "n4",
+      "path": "metrics.pct_susceptible_Klebsiella_pneumoniae_Temocillin_Klebsiella_pneumoniae_3GC_resistant",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 90.5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "pneumoniae | 3GC-resistant | 21 | 8 | 16 | 0 | 19 | 2 | 90.5 [71.1–97.3] | 7.49 |"
+     }
+    },
+    {
+     "key": "kp_r_tmo_mic50",
+     "description": "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-resistant, temocillin",
+     "expected": 8,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.s_max_Piperacillin_tazobactam",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "The note reports this: piperacillin/tazobactam has 12 extreme values, and temocillin has 8."
+     }
+    },
+    {
+     "key": "kp_r_tmo_mic90",
+     "description": "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-resistant, temocillin",
+     "expected": 16,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.r_above_Temocillin",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 124,
+      "text": "R above 16 mg/L."
+     }
+    },
+    {
+     "key": "kp_s_tzp_pct",
+     "description": "Percent susceptible, Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam",
+     "expected": 93.3,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 93.3333333333333,
+      "diff": 0.03333333333330302,
+      "node": "n4",
+      "path": "metrics.pct_S_Escherichia_coli_Piperacillin_tazobactam_Escherichia_coli_3GC_susceptible",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 93.3,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-susceptible | 15 | 1 | 4 | 14 (93.3) [70.2–98.8] | 1 (6.7) | 2.00 |"
+     }
+    },
+    {
+     "key": "kp_s_tzp_mic50",
+     "description": "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam",
+     "expected": 1,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.mic50_Escherichia_coli_Piperacillin_tazobactam_Escherichia_coli_3GC_susceptible",
+      "entry": 59
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-susceptible | 15 | 1 | 4 | 14 (93.3) [70.2–98.8] | 1 (6.7) | 2.00 |"
+     }
+    },
+    {
+     "key": "kp_s_tzp_mic90",
+     "description": "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam",
+     "expected": 8,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.s_max_Piperacillin_tazobactam",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "The note reports this: piperacillin/tazobactam has 12 extreme values, and temocillin has 8."
+     }
+    },
+    {
+     "key": "kp_s_tmo_pct",
+     "description": "Percent susceptible, Klebsiella pneumoniae, 3GC-susceptible, temocillin",
+     "expected": 100,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.pct_susceptible_Escherichia_coli_Temocillin_Escherichia_coli_3GC_susceptible",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 100,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-susceptible | 15 | 4 | 16 | 0 | 15 | 0 | 100 [79.6–100] | 5.53 |"
+     }
+    },
+    {
+     "key": "kp_s_tmo_mic50",
+     "description": "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, temocillin",
+     "expected": 2,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_drugs",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 2,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "coli | 3GC-resistant | 58 | 2 | 32 | 46 (79.3) [67.2–87.7] | 12 (20.7) | 3.77 |"
+     }
+    },
+    {
+     "key": "kp_s_tmo_mic90",
+     "description": "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, temocillin",
+     "expected": 8,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.s_max_Piperacillin_tazobactam",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 124,
+      "text": "The note reports this: piperacillin/tazobactam has 12 extreme values, and temocillin has 8."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 10,
+    "inputTokens": 26,
+    "outputTokens": 14599,
+    "cacheRead": 293599,
+    "cacheWrite": 52715,
+    "toolCalls": 10,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 5,
+     "error": 3
+    },
+    "unsourced": 1,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 4
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kresken2021-temocillin/run1/home/sessions/20261009-032859-0ef4/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/kresken2021-temocillin",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/kresken2021-temocillin/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/catalog/amr",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/catalog/amr"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/kresken2021-temocillin/temocillin_mics.csv"
+    ],
+    "outside": [],
+    "blocked": 1,
+    "unsourced": 1,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-kresken-run2.md",
+  "json": "bench/results/papers-kresken-run2.json"
+ },
+ "summary": {
+  "cells": {
+   "kresken2021-temocillin": {
+    "claude:claude-haiku-5-5": {
+     "computed": 24,
+     "computedOf": 24,
+     "reported": 24,
+     "reportedOf": 24,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 24,
+    "computedOf": 24,
+    "reported": 24,
+    "reportedOf": 24,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 155.319,
+    "requests": 10,
+    "inputTokens": 26,
+    "outputTokens": 14599,
+    "cacheRead": 293599,
+    "cacheWrite": 52715,
+    "toolCalls": 10,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings_info": 3,
+    "findings_warning": 5,
+    "findings_error": 3,
+    "unsourced": 1,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 4
+   }
+  },
+  "skipped": []
+ }
+}

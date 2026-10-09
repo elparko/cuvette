@@ -1,0 +1,41 @@
+tool: AMR (R), interpret_mic and mic_summary of the amr adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/kresken2021-temocillin/temocillin_mics.csv
+decisions:
+  guideline: "EUCAST 2021 (breakpoint table version 11.0, January 2021)"
+  susceptible_definition: "S and I (the paper counts a temocillin MIC of 16 mg/L or less as susceptible)"
+  uti: "auto"
+  host: "human"
+expected:
+  - {description: "Percent susceptible, Escherichia coli, 3GC-resistant, piperacillin/tazobactam", value: 79.3, tolerance: 0.06, source: "paper, abstract and Results text"}
+  - {description: "MIC50 in mg/L, Escherichia coli, 3GC-resistant, piperacillin/tazobactam", value: 2, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "MIC90 in mg/L, Escherichia coli, 3GC-resistant, piperacillin/tazobactam", value: 32, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "Percent susceptible, Escherichia coli, 3GC-resistant, temocillin", value: 94.8, tolerance: 0.06, source: "paper, abstract and Results text"}
+  - {description: "MIC50 in mg/L, Escherichia coli, 3GC-resistant, temocillin", value: 8, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "MIC90 in mg/L, Escherichia coli, 3GC-resistant, temocillin", value: 16, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "Percent susceptible, Escherichia coli, 3GC-susceptible, piperacillin/tazobactam", value: 93.3, tolerance: 0.06, source: "paper, abstract and Results text"}
+  - {description: "MIC50 in mg/L, Escherichia coli, 3GC-susceptible, piperacillin/tazobactam", value: 1, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "MIC90 in mg/L, Escherichia coli, 3GC-susceptible, piperacillin/tazobactam", value: 4, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "Percent susceptible, Escherichia coli, 3GC-susceptible, temocillin", value: 100.0, tolerance: 0.06, source: "paper, abstract and Results text"}
+  - {description: "MIC50 in mg/L, Escherichia coli, 3GC-susceptible, temocillin", value: 4, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "MIC90 in mg/L, Escherichia coli, 3GC-susceptible, temocillin", value: 16, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "Percent susceptible, Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam", value: 57.1, tolerance: 0.06, source: "paper, abstract and Results text"}
+  - {description: "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam", value: 8, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam", value: 128, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "Percent susceptible, Klebsiella pneumoniae, 3GC-resistant, temocillin", value: 90.5, tolerance: 0.06, source: "paper, abstract and Results text"}
+  - {description: "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-resistant, temocillin", value: 8, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-resistant, temocillin", value: 16, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "Percent susceptible, Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam", value: 93.3, tolerance: 0.06, source: "paper, abstract and Results text"}
+  - {description: "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam", value: 1, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam", value: 8, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "Percent susceptible, Klebsiella pneumoniae, 3GC-susceptible, temocillin", value: 100.0, tolerance: 0.06, source: "paper, abstract and Results text"}
+  - {description: "MIC50 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, temocillin", value: 2, tolerance: 0.001, source: "paper, abstract and Results text"}
+  - {description: "MIC90 in mg/L, Klebsiella pneumoniae, 3GC-susceptible, temocillin", value: 8, tolerance: 0.001, source: "paper, abstract and Results text"}
+notes: |
+  The paper used the EUCAST breakpoints of January 2021 (version 11.0) with broth microdilution. AMR 3.0.1 has this table as EUCAST 2021.
+  Piperacillin/tazobactam: S at 8 mg/L or less, R above 8 mg/L for Enterobacterales. Temocillin: S at 0.001 or less, R above 16, so I covers 0.002 to 16.
+  The paper reports temocillin as susceptible when the MIC is 16 mg/L or less. That is S and I together, so the decision susceptible_definition must be "S and I".
+  Trap: with "S only", the percent susceptible of temocillin is 0 for every group.
+  MIC50 and MIC90 are the values at rank ceil(0.5 n) and ceil(0.9 n) of the sorted MICs. check.py gives all 24 printed values from the data.
+  The data file stores a limit such as "1 or less" as the number 1. The paper prints "<=1" for these MIC50 values and ">=128" for one MIC90.

@@ -1,0 +1,161 @@
+kind: research paper
+short: Kresken 2021
+field: Microbiology susceptibility testing
+program: AMR (R), through the amr adapter
+citation:
+  authors: Kresken M, Pfeifer Y, Werner G
+  title: "Comparative in vitro activity of piperacillin-tazobactam and temocillin against third-generation cephalosporin-resistant, carbapenem-susceptible Escherichia coli and Klebsiella pneumoniae"
+  venue: GMS Infectious Diseases 9:Doc08
+  year: 2021
+  doi: 10.3205/id000077
+related:
+  - text: "Data: Kresken M, Pfeifer Y, Werner G. Temocillin susceptibility in Enterobacterales with an ESBL/AmpC phenotype. Zenodo record 6575080 (mirror of Dryad), CC0."
+    doi: 10.5061/dryad.931zcrjkc
+measured: >-
+  The study tested 109 isolates of E. coli and K. pneumoniae from the PEG surveillance of 2016 and 2017 by broth microdilution
+  (ISO 20776-1). It split the isolates by resistance to third-generation cephalosporins. For each group and for
+  piperacillin/tazobactam and temocillin, it gives the MIC50, the MIC90 and the percent of isolates that are susceptible by
+  the EUCAST breakpoints of January 2021 (version 11.0).
+instruction: >-
+  Give the number of isolates, the MIC50, the MIC90 and the percent susceptible for each species, cephalosporin group and drug.
+instruction_basis: >-
+  Abstract, Methods (EUCAST v 11.0, broth microdilution) and Results of the paper. The temocillin breakpoint of EUCAST v 11.0
+  separates S (MIC 0.001 or less) from R (MIC above 16). The paper counts S and I together as susceptible.
+answers:
+  guideline:
+    decision: Breakpoint standard and version
+    value: EUCAST 2021
+    source: Methods. EUCAST breakpoint table version 11.0, January 2021. The R package AMR names this table EUCAST 2021.
+  host:
+    decision: Host
+    value: human
+    source: The isolates come from patients.
+  uti:
+    decision: Isolates from urine
+    value: auto
+    source: Not in the paper. The paper does not separate urine isolates, so the benchmark uses the AMR default.
+  capped_mic_handling:
+    decision: MIC values with a limit sign
+    value: standard
+    source: Not used. The data file stores each value as a number without a limit sign.
+  include_pkpd:
+    decision: Use the EUCAST pharmacokinetic and pharmacodynamic breakpoints
+    value: "true"
+    source: Not in the paper. The AMR default. The species breakpoints decide the result for both drugs.
+  susceptible_definition:
+    decision: What the percent susceptible counts
+    value: S and I
+    source: Results. The paper counts the isolates with a temocillin MIC of 16 mg/L or less as susceptible, which is S and I together.
+  off_scale:
+    decision: Geometric mean of MIC values with a limit sign
+    value: next dilution
+    source: Not used. The paper gives no geometric mean.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text, so that the record of decisions stays the only source of the settings.
+items:
+  ecoli_r_tzp_pct:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-resistant, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_r_tzp_mic50:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-resistant, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_r_tzp_mic90:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-resistant, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_r_tmo_pct:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-resistant, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_r_tmo_mic50:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-resistant, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_r_tmo_mic90:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-resistant, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_s_tzp_pct:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-susceptible, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_s_tzp_mic50:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-susceptible, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_s_tzp_mic90:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-susceptible, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_s_tmo_pct:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-susceptible, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_s_tmo_mic50:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-susceptible, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  ecoli_s_tmo_mic90:
+    source: published
+    where: "Abstract and Results text of the paper (Escherichia coli, 3GC-susceptible, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  kp_r_tzp_pct:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  kp_r_tzp_mic50:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  kp_r_tzp_mic90:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-resistant, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  kp_r_tmo_pct:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-resistant, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  kp_r_tmo_mic50:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-resistant, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  kp_r_tmo_mic90:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-resistant, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  kp_s_tzp_pct:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  kp_s_tzp_mic50:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  kp_s_tzp_mic90:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-susceptible, piperacillin/tazobactam)."
+    check: check.py gives the same value from the data (check.out).
+  kp_s_tmo_pct:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-susceptible, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  kp_s_tmo_mic50:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-susceptible, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+  kp_s_tmo_mic90:
+    source: published
+    where: "Abstract and Results text of the paper (Klebsiella pneumoniae, 3GC-susceptible, temocillin)."
+    check: check.py gives the same value from the data (check.out).
+data:
+  source: >-
+    Zenodo record 6575080, file Data_MICs_PEG_2016_17_temocillin_data_set_11062021.xlsx (mirror of Dryad 10.5061/dryad.931zcrjkc).
+    fetch.sh writes temocillin_mics.csv: the isolate, the species, the group by third-generation cephalosporin resistance
+    (cefotaxime MIC above 2 or ceftazidime MIC above 4 mg/L) and the MIC of five drugs, named with the drug name.
+  url: https://zenodo.org/records/6575080
+  license: CC0 for the data. The paper is CC BY 4.0.
+  size: 19 KB Excel workbook with 109 isolates

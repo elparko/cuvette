@@ -1,0 +1,12 @@
+organism,drug,mic
+Escherichia coli,amoxicillin/clavulanic acid,0.0625
+Escherichia coli,amoxicillin/clavulanic acid,0.125
+Escherichia coli,amoxicillin/clavulanic acid,0.25
+Escherichia coli,amoxicillin/clavulanic acid,0.5
+Escherichia coli,amoxicillin/clavulanic acid,1
+Escherichia coli,amoxicillin/clavulanic acid,2
+Escherichia coli,amoxicillin/clavulanic acid,4
+Escherichia coli,amoxicillin/clavulanic acid,8
+Escherichia coli,amoxicillin/clavulanic acid,16
+Escherichia coli,amoxicillin/clavulanic acid,32
+Escherichia coli,amoxicillin/clavulanic acid,64

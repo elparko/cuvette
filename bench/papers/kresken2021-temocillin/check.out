@@ -1,0 +1,9 @@
+isolates 109 {'3GC-resistant': 79, '3GC-susceptible': 30}
+Escherichia coli       3GC-resistant    piperacillin/tazobactam  n=58 MIC50=2 MIC90=32 susceptible(S+I, MIC<=8)=79.3%
+Escherichia coli       3GC-resistant    temocillin               n=58 MIC50=8 MIC90=16 susceptible(S+I, MIC<=16)=94.8%
+Escherichia coli       3GC-susceptible  piperacillin/tazobactam  n=15 MIC50=1 MIC90=4 susceptible(S+I, MIC<=8)=93.3%
+Escherichia coli       3GC-susceptible  temocillin               n=15 MIC50=4 MIC90=16 susceptible(S+I, MIC<=16)=100.0%
+Klebsiella pneumoniae  3GC-resistant    piperacillin/tazobactam  n=21 MIC50=8 MIC90=128 susceptible(S+I, MIC<=8)=57.1%
+Klebsiella pneumoniae  3GC-resistant    temocillin               n=21 MIC50=8 MIC90=16 susceptible(S+I, MIC<=16)=90.5%
+Klebsiella pneumoniae  3GC-susceptible  piperacillin/tazobactam  n=15 MIC50=1 MIC90=8 susceptible(S+I, MIC<=8)=93.3%
+Klebsiella pneumoniae  3GC-susceptible  temocillin               n=15 MIC50=2 MIC90=8 susceptible(S+I, MIC<=16)=100.0%
