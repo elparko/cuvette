@@ -1,0 +1,95 @@
+kind: research paper
+short: Hackshaw 1997
+field: Statistics
+program: metafor (R), through the metafor adapter
+citation:
+  authors: Hackshaw AK, Law MR, Wald NJ
+  title: The accumulated evidence on lung cancer and environmental tobacco smoke
+  venue: BMJ 315(7114):980-988
+  year: 1997
+  doi: 10.1136/bmj.315.7114.980
+related:
+  - text: "Data: R package metadat, data set dat.hackshaw1998 (Viechtbauer W), GPL-2 or later. The benchmark downloads the file from the metadat GitHub repository at commit b19c23b."
+    url: https://github.com/wviechtb/metadat
+  - text: "Hackshaw AK. Lung cancer and passive smoking. Statistical Methods in Medical Research 7(2):119-136 (1998)."
+    doi: 10.1177/096228029800700203
+measured: >-
+  The paper pools 37 published epidemiological studies (4 cohort, 33 case-control, 4626 cases) of lung cancer in
+  lifelong non-smokers who did and did not live with a smoker. Each study gives an odds ratio or a relative risk with a
+  95% confidence interval. The paper pools them on the log scale and reports the excess risk.
+instruction: >-
+  Pool the studies. Give the pooled odds ratio with a 95% confidence interval, the number of studies and the
+  heterogeneity.
+instruction_basis: >-
+  The abstract. "The excess risk of lung cancer was 24% (95% confidence interval 13% to 36%) in non-smokers who lived
+  with a smoker (P < 0.001)." The excess risk is the pooled relative risk minus 1.
+answers:
+  question:
+    decision: The question
+    value: Do non-smoking women who live with a smoking husband have a higher risk of lung cancer?
+    source: The title and the abstract of the paper.
+  effect_measure:
+    decision: Effect measure
+    value: GEN, the log odds ratio and its variance that the file holds
+    source: >-
+      The paper pools the relative risk of each study. The file holds the log odds ratio and its variance, which
+      metadat back-calculates from the printed estimate and interval of each study.
+  model:
+    decision: Fixed-effect or random-effects model
+    value: random
+    source: >-
+      The paper uses a method that allows for heterogeneity between the studies (Copas and Shi 2000, BMJ 320:417,
+      describe it so). The fixed-effect model does not reproduce the printed upper bound.
+  tau2_method:
+    decision: Estimator of tau2
+    value: DL
+    source: >-
+      DerSimonian-Laird was the standard random-effects method in 1997. The metadat help states that the overall
+      estimate of the paper is fully reproduced, and its example uses method DL.
+  ci_test:
+    decision: Test of the pooled effect
+    value: z
+    source: The paper gives a normal-theory confidence interval.
+  egger_model:
+    decision: Model of the Egger test
+    value: lm
+    source: The request asks for no Egger test. The default value.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: The abstract gives 95% confidence intervals.
+items:
+  k:
+    source: published
+    where: Abstract, "37 published epidemiological studies".
+    check: The file has 37 rows (check.py).
+  or_pooled:
+    source: published
+    where: Abstract, excess risk 24%, a pooled relative risk of 1.24.
+    check: metafor 5.2.1 rma(method = "DL") gives 1.2385. Python statsmodels combine_effects gives 1.2385 (check.py, check.out).
+  or_ci_lo:
+    source: published
+    where: Abstract, lower bound 13%, that is 1.13.
+    check: metafor gives 1.1292. statsmodels gives 1.1292 (check.out).
+  or_ci_hi:
+    source: published
+    where: Abstract, upper bound 36%, that is 1.36.
+    check: metafor gives 1.3583. statsmodels gives 1.3583 (check.out).
+  or_fixed_trap:
+    source: computed
+    tool: statsmodels combine_effects, fixed effect
+    where: >-
+      Not in the paper. This is the result of a fixed-effect model, which ignores the heterogeneity between the
+      studies. Its upper bound (1.30) does not match the printed 1.36.
+    independence: independent
+    check: metafor rma(method = "FE") gives 1.2041 (1.1192 to 1.2955).
+data:
+  source: >-
+    R package metadat, data set dat.hackshaw1998, file data/dat.hackshaw1998.rda at commit
+    b19c23b4c09e16d0c14a31af94fca190c7dd0357 of github.com/wviechtb/metadat. fetch.sh writes one CSV file with one row
+    for each study. The odds ratios and intervals are the values of the paper; yi and vi are back-calculated by metadat.
+  url: https://github.com/wviechtb/metadat/blob/b19c23b4c09e16d0c14a31af94fca190c7dd0357/data/dat.hackshaw1998.rda
+  license: >-
+    GPL-2 or later, the metadat package license. The values are published study results with no patient data. The
+    paper is free to read on PMC (PMC2127653).
+  size: 2 KB R data file, 37 rows and 11 columns.

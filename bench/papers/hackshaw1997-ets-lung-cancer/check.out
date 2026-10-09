@@ -1,0 +1,5 @@
+studies 37 cases 4626
+DerSimonian-Laird random effects: OR 1.2385, 95% CI 1.1292 to 1.3583, tau2 0.0170
+Paule-Mandel random effects: OR 1.2327, 95% CI 1.1282 to 1.3468, tau2 0.0129
+fixed effect (wrong model for the paper): OR 1.2041, 95% CI 1.1192 to 1.2955
+Q 47.4979 on 36 df, I2 24.21%

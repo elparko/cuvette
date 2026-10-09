@@ -1,0 +1,20 @@
+tool: metafor (R), rma with the DerSimonian-Laird estimator
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/hackshaw1997-ets-lung-cancer/ets_lung_cancer.csv
+decisions:
+  effect_measure: "GEN: log odds ratio yi and its variance vi from the file"
+  model: random
+  tau2_method: DL
+  alpha: 0.05
+expected:
+  - {description: "number of studies", value: 37, tolerance: 0, source: "paper abstract: 37 published studies"}
+  - {description: "pooled odds ratio", value: 1.2385, tolerance: 0.005, source: "paper abstract: excess risk 24%, relative risk 1.24"}
+  - {description: "pooled odds ratio, CI lower", value: 1.1292, tolerance: 0.005, source: "paper abstract: 13%, lower bound 1.13"}
+  - {description: "pooled odds ratio, CI upper", value: 1.3583, tolerance: 0.005, source: "paper abstract: 36%, upper bound 1.36"}
+  - {description: "fixed-effect pooled odds ratio (trap)", value: 1.2041, tolerance: 0.002, source: "computed, statsmodels combine_effects fixed effect"}
+notes: |
+  metafor 5.2.1 rma(yi, vi, method = "DL") gives 1.2385 (1.1292 to 1.3583), Q 47.50 on 36 df, I2 24.2%, tau2 0.0170. statsmodels combine_effects (Python, check.py, check.out) gives the same values.
+  The paper prints the excess risk 24% (95% CI 13% to 36%), that is 1.24 (1.13 to 1.36). The text available on PMC (abstract and page scans) does not name the pooling method. A later critique describes it as a method that allows for heterogeneity between studies. metadat states that the overall estimate of the paper is fully reproduced and its example uses method DL.
+  The log odds ratios and variances are back-calculated by metadat from the printed odds ratios and intervals. The rounding of the printed values gives small errors in each study, not in the pooled value at two decimals.
+  Trap: a fixed-effect model gives 1.2041 (1.1192 to 1.2955). Paule-Mandel gives 1.2327 (1.1282 to 1.3468); both round near the printed value, so the estimator is a decision.

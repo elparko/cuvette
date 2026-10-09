@@ -1,0 +1,20 @@
+adapters: [metafor]
+prompt: |
+  I want to pool the published studies of lung cancer in lifelong non-smoking women whose husband smokes. The file {data}/hackshaw1997-ets-lung-cancer/ets_lung_cancer.csv has one row for each study: author, year, country, design (cohort or case-control), cases, the odds ratio of each study with its 95% confidence interval (or, or.lb, or.ub), and yi and vi, the log odds ratio and its sampling variance. Pool the studies. Give me the pooled odds ratio with a 95% confidence interval, the number of studies, and the heterogeneity (Q, I2, tau2). Draw a forest plot. Write every number in your final answer text.
+answers:
+  question: "Do non-smoking women who live with a smoking husband have a higher risk of lung cancer?"
+  effect_measure: GEN
+  model: random
+  tau2_method: DL
+  ci_test: z
+  egger_model: lm
+  alpha: 0.05
+allow: all
+timeout_s: 1200
+data: [hackshaw1997-ets-lung-cancer/ets_lung_cancer.csv]
+items:
+  - {key: k, description: "Number of studies", value: 37, exact: true, in_answer: false}
+  - {key: or_pooled, description: "Pooled odds ratio, random effects (DerSimonian-Laird)", value: 1.2385, tolerance: 0.005}
+  - {key: or_ci_lo, description: "Pooled odds ratio, 95% CI lower bound", value: 1.1292, tolerance: 0.005}
+  - {key: or_ci_hi, description: "Pooled odds ratio, 95% CI upper bound", value: 1.3583, tolerance: 0.005}
+  - {key: or_fixed_trap, description: "Pooled odds ratio of a fixed-effect model (trap result)", value: 1.2041, tolerance: 0.002, in_answer: false, trap: true}

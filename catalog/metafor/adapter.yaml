@@ -1,0 +1,505 @@
+adapter:
+  name: metafor
+  field: statistics
+  file_types: [".csv"]
+  title: metafor (meta-analysis)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Pools the results of several studies with metafor in R. The adapter reads a CSV file with one row for each
+    study and computes effect sizes. It fits a fixed-effect or random-effects model with the measure and the tau2
+    estimator that the scientist chose. It reports heterogeneity and draws a forest plot and a funnel plot with
+    Egger's test. It replaces the same analyses in RevMan and in the program CMA.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: metafor
+  version: "5.2.1"
+  tested_versions: []
+  homepage: https://www.metafor-project.org
+  docs:
+    - https://wviechtb.github.io/metafor/reference/rma.uni.html
+    - https://wviechtb.github.io/metafor/reference/escalc.html
+    - https://www.jstatsoft.org/article/view/v036i03
+  install: >
+    Install R (brew install r on macOS). Then install metafor and jsonlite into a library folder that the adapter
+    reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("metafor", "jsonlite"), repos = "https://cloud.r-project.org")'
+  citation:
+    text: "Viechtbauer W. Conducting meta-analyses in R with the metafor package. Journal of Statistical Software 36(3), 1-48 (2010)."
+    doi: 10.18637/jss.v036.i03
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 600
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that
+  exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library.
+  The program version in this adapter is the version of the R package metafor, not of R. Each tool reads the study
+  table again and computes the effect sizes with escalc, so the three tools always use the same effect sizes.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return study labels, counts, effect sizes and pooled results. Published study results are not patient data.
+
+decisions:
+  - key: question
+    label: What question does the meta-analysis answer?
+    kind: text
+    group: Question
+    help: "Example - Does BCG vaccination lower the risk of tuberculosis? Name the population, the intervention, the comparison and the outcome."
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: effect_measure
+    label: Effect measure
+    kind: choice
+    choices: [RR, OR, RD, PETO, SMD, MD, ROM, ZCOR, COR, PLO, PR, GEN]
+    group: Method
+    help: >
+      RR is the risk ratio, OR the odds ratio, RD the risk difference, PETO the Peto odds ratio (rare events). SMD is
+      Hedges' g, MD the raw mean difference, ROM the ratio of means. ZCOR is Fisher's z of a correlation. PLO and PR
+      pool a proportion. GEN uses effect sizes and variances that the file already holds. The measure changes the
+      pooled number and its meaning.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compute_effect_sizes, arg: measure }
+      - { tool: fit_meta_analysis, arg: measure }
+      - { tool: funnel_and_egger, arg: measure }
+
+  - key: model
+    label: Fixed-effect or random-effects model
+    kind: choice
+    choices: [fixed, random]
+    group: Method
+    help: >
+      fixed assumes one true effect in all studies. It gives large studies most of the weight. random assumes that the
+      true effects vary between studies. It gives a wider interval. Choose from the design of the studies before you
+      see the heterogeneity, not from the I2 value.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_meta_analysis, arg: model }
+      - { tool: funnel_and_egger, arg: model }
+    sensitivity:
+      options: [fixed, random]
+      tool: fit_meta_analysis
+      compare: [metrics.estimate, metrics.ci_lo, metrics.ci_hi, metrics.p]
+      max_runs: 2
+
+  - key: tau2_method
+    label: Estimator of the between-study variance (tau2)
+    kind: choice
+    choices: [REML, DL, PM, ML, HE, SJ, EB]
+    default: REML
+    group: Method
+    help: >
+      REML is the metafor default. DL (DerSimonian-Laird) is the RevMan and CMA default and can give a tau2 that is
+      too small. PM is Paule-Mandel. A random-effects model only uses it. A different estimator changes tau2 and the
+      width of the interval.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_meta_analysis, arg: method }
+      - { tool: funnel_and_egger, arg: method }
+    sensitivity:
+      options: [REML, DL, PM]
+      tool: fit_meta_analysis
+      compare: [metrics.estimate, metrics.tau2, metrics.ci_lo, metrics.ci_hi]
+      max_runs: 3
+
+  - key: ci_test
+    label: Test and interval of the pooled effect
+    kind: choice
+    choices: [z, knha]
+    default: z
+    group: Method
+    help: >
+      z uses the normal distribution, as RevMan and CMA do. knha is the Knapp-Hartung method with a t distribution. It
+      gives a wider and more accurate interval when there are few studies.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_meta_analysis, arg: test }
+
+  - key: egger_model
+    label: Model of the Egger test
+    kind: choice
+    choices: [lm, rma]
+    default: lm
+    group: Small-study effects
+    help: >
+      lm is the classic Egger regression. CMA reports it. rma tests the standard error as a moderator in the fitted
+      model. rma is the metafor default.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: funnel_and_egger, arg: egger_model }
+
+  - key: alpha
+    label: Significance level (alpha)
+    kind: float
+    default: 0.05
+    lo: 0.0001
+    hi: 0.5
+    group: Inference
+    help: The confidence level of each interval is 1 minus alpha.
+    owner: human
+    stage: setup
+    links:
+      - { tool: fit_meta_analysis, arg: alpha }
+      - { tool: compute_effect_sizes, arg: alpha }
+
+checks:
+  - id: fixed_with_heterogeneity
+    severity: warning
+    description: The answer reports a fixed-effect pooled result with large heterogeneity and does not discuss it.
+    text: >
+      If the answer reports a fixed-effect result and the log shows I2 above 50 percent, flag the answer if it does not
+      say that the studies are heterogeneous and that one common effect is doubtful.
+  - id: egger_few_studies
+    severity: warning
+    description: The answer reads an Egger test with fewer than 10 studies as evidence of no publication bias.
+    text: >
+      If the answer says that there is no publication bias or no small-study effect from funnel_and_egger with fewer
+      than 10 studies, flag it. The test has low power with few studies.
+  - id: log_scale_reported
+    severity: warning
+    description: The answer reports a ratio measure on the log scale as if it were the ratio.
+    text: >
+      If the measure is RR, OR, PETO, ROM or IRR, the answer must give the pooled ratio (effect) with its interval.
+      Flag the answer if it gives the log value (estimate) as the risk ratio or odds ratio.
+  - id: heterogeneity_not_reported
+    severity: warning
+    description: The answer gives a pooled effect without Q, I2 and, for a random-effects model, tau2 and the prediction interval.
+    text: >
+      If the answer reports a pooled effect, it must give the number of studies, the model, the tau2 estimator for a
+      random-effects model, Q with its p-value, I2, tau2 and the prediction interval. Flag the answer if one is missing.
+
+map:
+  - tool: inspect_studies
+    route: "dat <- read.csv(\"studies.csv\"); str(dat); summary(dat)"
+    steps:
+      - "Read the study table with read.csv()."
+      - "Run str() and summary(). Look for zero cells and missing values."
+      - "In RevMan: the data and analyses tree shows the study data of each outcome. In CMA: the data sheet shows one row for each study."
+    fidelity: code_only
+    difference: metafor has no menu. The route is the R call.
+    evidence: { source: docs, test: inspect-bcg }
+
+  - tool: compute_effect_sizes
+    route: "dat <- escalc(measure = \"RR\", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = dat)"
+    steps:
+      - "Run escalc() with the measure and the columns of the counts, the means or the correlations."
+      - "escalc adds 0.5 to each cell of a study with a zero cell."
+      - "In RevMan: add an outcome of type Dichotomous or Continuous, enter the events and totals (or means, SDs and n) of each study. The effect measure is set in the outcome properties."
+      - "In CMA: Insert > Column for > Study names, then Effect size data. Choose the data format, such as Events and sample size in each group, and enter the values."
+    params:
+      - { arg: measure, label: "measure of escalc() / Effect measure (RevMan)", ui_default: "RR (RevMan dichotomous)" }
+    fidelity: exact
+    evidence: { source: docs, test: bcg-random-reml }
+
+  - tool: fit_meta_analysis
+    route: "res <- rma(yi, vi, data = dat, method = \"REML\"); predict(res, transf = exp); forest(res, atransf = exp)"
+    steps:
+      - "Run escalc() as compute_effect_sizes does."
+      - "Run rma(yi, vi, method = \"FE\") for a fixed-effect model, or method = \"REML\" or \"DL\" for a random-effects model."
+      - "Run predict(res, transf = exp) for the pooled ratio and the prediction interval of a ratio measure."
+      - "Run forest(res, atransf = exp) for the forest plot."
+      - "In RevMan: Analysis properties > Statistical Method Inverse Variance (or Mantel-Haenszel), Analysis Model Fixed Effect or Random Effects, Effect Measure Risk Ratio. RevMan 5 uses DerSimonian-Laird for random effects."
+      - "In CMA: Run analyses, then select Fixed or Random at the bottom of the screen. CMA uses DerSimonian-Laird. Click Next table for Q, I2 and tau2."
+    params:
+      - { arg: model, label: "Analysis Model (RevMan) / Fixed or Random (CMA)", ui_default: "Fixed Effect (RevMan)" }
+      - { arg: method, label: "method of rma() / tau2 estimator", ui_default: "DL (RevMan 5, CMA); REML (metafor)", note: "RevMan 5 and CMA use DerSimonian-Laird. RevMan Web offers REML. Set DL to compare with them." }
+      - { arg: test, label: "test of rma()", ui_default: z }
+    fidelity: close
+    difference: >
+      The tool pools with inverse variance weights. RevMan uses Mantel-Haenszel weights by default for a fixed-effect
+      model of dichotomous data, which differ a little. With the DL estimator, the random-effects result equals RevMan 5
+      and CMA. RevMan and CMA print a prediction interval only in newer versions.
+    evidence: { source: docs, test: bcg-random-dl, note: "Colditz et al. 1994 and Viechtbauer 2010 print the values of the tests." }
+
+  - tool: funnel_and_egger
+    route: "res <- rma(yi, vi, data = dat, method = \"REML\"); funnel(res); regtest(res, model = \"lm\")"
+    steps:
+      - "Fit the model as fit_meta_analysis does."
+      - "Run funnel(res) for the funnel plot."
+      - "Run regtest(res, model = \"lm\") for the classic Egger test, or regtest(res) for the test in the fitted model."
+      - "In RevMan: the funnel plot button above the forest plot. RevMan has no Egger test."
+      - "In CMA: Analyses > Publication bias. CMA shows the funnel plot and Egger's regression intercept."
+    params:
+      - { arg: egger_model, label: "model of regtest()", ui_default: "rma (metafor); classic Egger (CMA)" }
+    fidelity: close
+    difference: >
+      CMA reports the intercept of the Egger regression and its p-value. The lm test of the tool gives the same p-value.
+      The rma test uses the fitted model and gives a different value. A person has not compared the numbers with CMA.
+    evidence: { source: docs, test: bcg-egger }
+
+tests:
+  - id: bcg-random-reml
+    description: >
+      BCG vaccine trials (metafor dat.bcg, 13 trials; Colditz et al. 1994, JAMA 271:698). Viechtbauer (2010, JSS
+      36(3), section 4) prints for the random-effects model with REML: estimate -0.7145, SE 0.1798, z -3.9744,
+      95% CI -1.0669 to -0.3622, tau2 0.3132 (SE 0.1664), I2 92.22%, H2 12.86 and Q(df = 12) = 152.2330. The
+      Python check (statsmodels, checks/bcg_check.py, output checks/bcg_check.txt) gives the same Q and the same
+      log risk ratios.
+    data: [data/bcg.csv]
+    calls:
+      - tool: fit_meta_analysis
+        args: { path: "{adapter_dir}/data/bcg.csv", measure: RR, ai: tpos, bi: tneg, ci: cpos, di: cneg, study: author, model: random, method: REML }
+    expect:
+      - { path: metrics.k, equals: 13 }
+      - { path: metrics.estimate, approx: -0.7145, abs: 0.0001 }
+      - { path: metrics.se, approx: 0.1798, abs: 0.0001 }
+      - { path: metrics.ci_lo, approx: -1.0669, abs: 0.0001 }
+      - { path: metrics.ci_hi, approx: -0.3622, abs: 0.0001 }
+      - { path: metrics.tau2, approx: 0.3132, abs: 0.0001 }
+      - { path: metrics.tau2_se, approx: 0.1664, abs: 0.0001 }
+      - { path: metrics.i2, approx: 92.22, abs: 0.005 }
+      - { path: metrics.h2, approx: 12.86, abs: 0.005 }
+      - { path: metrics.q, approx: 152.2330, abs: 0.0001 }
+      - { path: metrics.q_df, equals: 12 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: bcg-random-dl
+    description: >
+      The same trials with the DerSimonian-Laird estimator, the method of Colditz et al. (1994). The paper prints
+      the pooled risk ratio 0.49 with 95% CI 0.34 to 0.70. metafor gives 0.4896 (0.3449 to 0.6950), tau2 0.3088. The
+      Python check (statsmodels combine_effects, method_re "chi2", checks/bcg_check.txt) gives the same DL tau2 and
+      pooled estimate.
+    data: [data/bcg.csv]
+    calls:
+      - tool: fit_meta_analysis
+        args: { path: "{adapter_dir}/data/bcg.csv", measure: RR, ai: tpos, bi: tneg, ci: cpos, di: cneg, model: random, method: DL }
+    expect:
+      - { path: metrics.effect, approx: 0.49, abs: 0.005 }
+      - { path: metrics.effect_ci_lo, approx: 0.34, abs: 0.005 }
+      - { path: metrics.effect_ci_hi, approx: 0.70, abs: 0.006 }
+      - { path: metrics.estimate, approx: -0.7141, abs: 0.0001 }
+      - { path: metrics.tau2, approx: 0.3088, abs: 0.0001 }
+
+  - id: bcg-fixed
+    description: >
+      The same trials with a fixed-effect model. Viechtbauer (2010) and the metafor help of rma.uni give estimate
+      -0.4303, SE 0.0405, 95% CI -0.5097 to -0.3509. The Python check (checks/bcg_check.txt) gives the same.
+      This test also shows that the model choice changes the result.
+    data: [data/bcg.csv]
+    calls:
+      - tool: fit_meta_analysis
+        args: { path: "{adapter_dir}/data/bcg.csv", measure: RR, ai: tpos, bi: tneg, ci: cpos, di: cneg, model: fixed }
+    expect:
+      - { path: metrics.estimate, approx: -0.4303, abs: 0.0001 }
+      - { path: metrics.se, approx: 0.0405, abs: 0.0001 }
+      - { path: metrics.ci_lo, approx: -0.5097, abs: 0.0001 }
+      - { path: summary, contains: "Warning: I2" }
+
+  - id: bcg-effect-sizes
+    description: >
+      Log risk ratio and its variance of the first trial (Aronson 1948: 4 of 123 vaccinated, 11 of 139 controls).
+      By hand, log((4/123)/(11/139)) = -0.8893 and 1/4 - 1/123 + 1/11 - 1/139 = 0.3256. The Python check gives the
+      same values (checks/bcg_check.txt).
+    data: [data/bcg.csv]
+    calls:
+      - tool: compute_effect_sizes
+        args: { path: "{adapter_dir}/data/bcg.csv", measure: RR, ai: tpos, bi: tneg, ci: cpos, di: cneg, study: author }
+    expect:
+      - { path: metrics.k, equals: 13 }
+      - { path: "table.rows[0][1]", approx: -0.8893, abs: 0.0001 }
+      - { path: "table.rows[0][2]", approx: 0.3256, abs: 0.0001 }
+
+  - id: bcg-egger
+    description: >
+      Egger test on the BCG trials. The metafor help of regtest shows the test in the REML model: z = -0.8033,
+      p = 0.4218, limit estimate -0.5104. The classic Egger regression (model lm) gives t = -1.4013 on 11 df,
+      p = 0.1887; the Python check fits the same weighted regression with statsmodels WLS (checks/bcg_check.txt).
+    data: [data/bcg.csv]
+    calls:
+      - tool: funnel_and_egger
+        args: { path: "{adapter_dir}/data/bcg.csv", measure: RR, ai: tpos, bi: tneg, ci: cpos, di: cneg, model: random, method: REML, egger_model: rma }
+        save_as: rma
+      - tool: funnel_and_egger
+        args: { path: "{adapter_dir}/data/bcg.csv", measure: RR, ai: tpos, bi: tneg, ci: cpos, di: cneg, model: random, method: REML, egger_model: lm }
+    expect:
+      - { path: saved.rma.metrics.egger_z, approx: -0.8033, abs: 0.0001 }
+      - { path: saved.rma.metrics.egger_p, approx: 0.4218, abs: 0.0001 }
+      - { path: saved.rma.metrics.limit_estimate, approx: -0.5104, abs: 0.0001 }
+      - { path: metrics.egger_z, approx: -1.4013, abs: 0.0001 }
+      - { path: metrics.egger_p, approx: 0.1887, abs: 0.0001 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: inspect-bcg
+    description: The BCG table has 13 trials (rows) and 9 columns. The metafor help of dat.bcg lists 13 trials.
+    data: [data/bcg.csv]
+    calls:
+      - tool: inspect_studies
+        args: { path: "{adapter_dir}/data/bcg.csv" }
+    expect:
+      - { path: metrics.n_studies, equals: 13 }
+      - { path: metrics.n_columns, equals: 9 }
+
+  - id: unknown-column
+    description: A count column that is not in the file fails, and the error names the column.
+    data: [data/bcg.csv]
+    calls:
+      - tool: fit_meta_analysis
+        args: { path: "{adapter_dir}/data/bcg.csv", measure: RR, ai: no_such_column, bi: tneg, ci: cpos, di: cneg, model: random, method: REML }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_column" }
+
+  - id: missing-file
+    description: A study table that does not exist fails, and the error names the file.
+    calls:
+      - tool: inspect_studies
+        args: { path: "{adapter_dir}/data/no_such_file.csv" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_file.csv" }
+
+tools:
+  - name: inspect_studies
+    title: Inspect the study table
+    description: >
+      Read a CSV file with one row for each study. Returns the number of studies and each column with its type, its
+      missing values and its zero values.
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each study." }
+    required: [path]
+    read_only: true
+    script: scripts/inspect_studies.R
+    parse: json
+
+  - name: compute_effect_sizes
+    title: Compute the effect size of each study
+    description: >
+      Compute the effect size and its sampling variance for each study (escalc). Give the measure and the columns that
+      it needs. Returns one row for each study with the interval, and the ratio for a ratio measure.
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each study." }
+      measure: { type: string, enum: [RR, OR, RD, PETO, SMD, MD, ROM, ZCOR, COR, PLO, PR, GEN], description: "Leave out. The harness sets it from the decision record. The effect measure." }
+      study: { type: string, description: "Column with the study label, such as the author and year." }
+      ai: { type: string, description: "RR, OR, RD, PETO: column with the count of events in the treated group." }
+      bi: { type: string, description: "RR, OR, RD, PETO: column with the count of non-events in the treated group (total minus events)." }
+      ci: { type: string, description: "RR, OR, RD, PETO: column with the count of events in the control group." }
+      di: { type: string, description: "RR, OR, RD, PETO: column with the count of non-events in the control group (total minus events)." }
+      m1i: { type: string, description: "SMD, MD, ROM: column with the mean of the treated group." }
+      sd1i: { type: string, description: "SMD, MD, ROM: column with the standard deviation of the treated group." }
+      n1i: { type: string, description: "SMD, MD, ROM: column with the size of the treated group." }
+      m2i: { type: string, description: "SMD, MD, ROM: column with the mean of the control group." }
+      sd2i: { type: string, description: "SMD, MD, ROM: column with the standard deviation of the control group." }
+      n2i: { type: string, description: "SMD, MD, ROM: column with the size of the control group." }
+      ri: { type: string, description: "ZCOR, COR: column with the correlation of each study." }
+      ni: { type: string, description: "ZCOR, COR, PLO, PR: column with the sample size of each study." }
+      xi: { type: string, description: "PLO, PR: column with the count of events of each study." }
+      yi: { type: string, description: "GEN: column with an effect size that the file already holds, such as a log hazard ratio." }
+      vi: { type: string, description: "GEN: column with the sampling variance of yi." }
+      sei: { type: string, description: "GEN: column with the standard error of yi. Use it in place of vi." }
+      yi_scale: { type: string, enum: [raw, log], default: raw, description: "GEN only. log means that yi is a log ratio, such as a log odds ratio. The tool then also gives the ratio. raw is for other effect sizes." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: "Significance level. The interval of each study is 1 minus alpha." }
+    required: [path]
+    read_only: true
+    outputs:
+      table: { kind: table, ext: .csv, description: One row for each study with the effect size and the interval. }
+    script: scripts/compute_effect_sizes.R
+    parse: json
+
+  - name: fit_meta_analysis
+    title: Pool the studies
+    description: >
+      Fit a fixed-effect or random-effects meta-analysis (rma) of the effect sizes. Returns the pooled effect with its
+      interval and p-value, Q, I2, tau2, the prediction interval, and a forest plot. The tool pools a ratio measure on
+      the log scale and also gives the ratio.
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each study." }
+      measure: { type: string, enum: [RR, OR, RD, PETO, SMD, MD, ROM, ZCOR, COR, PLO, PR, GEN], description: "Leave out. The harness sets it from the decision record. The effect measure." }
+      study: { type: string, description: "Column with the study label, such as the author and year." }
+      ai: { type: string, description: "RR, OR, RD, PETO: column with the count of events in the treated group." }
+      bi: { type: string, description: "RR, OR, RD, PETO: column with the count of non-events in the treated group (total minus events)." }
+      ci: { type: string, description: "RR, OR, RD, PETO: column with the count of events in the control group." }
+      di: { type: string, description: "RR, OR, RD, PETO: column with the count of non-events in the control group (total minus events)." }
+      m1i: { type: string, description: "SMD, MD, ROM: column with the mean of the treated group." }
+      sd1i: { type: string, description: "SMD, MD, ROM: column with the standard deviation of the treated group." }
+      n1i: { type: string, description: "SMD, MD, ROM: column with the size of the treated group." }
+      m2i: { type: string, description: "SMD, MD, ROM: column with the mean of the control group." }
+      sd2i: { type: string, description: "SMD, MD, ROM: column with the standard deviation of the control group." }
+      n2i: { type: string, description: "SMD, MD, ROM: column with the size of the control group." }
+      ri: { type: string, description: "ZCOR, COR: column with the correlation of each study." }
+      ni: { type: string, description: "ZCOR, COR, PLO, PR: column with the sample size of each study." }
+      xi: { type: string, description: "PLO, PR: column with the count of events of each study." }
+      yi: { type: string, description: "GEN: column with an effect size that the file already holds, such as a log hazard ratio." }
+      vi: { type: string, description: "GEN: column with the sampling variance of yi." }
+      sei: { type: string, description: "GEN: column with the standard error of yi. Use it in place of vi." }
+      yi_scale: { type: string, enum: [raw, log], default: raw, description: "GEN only. log means that yi is a log ratio, such as a log odds ratio. The tool then also gives the ratio. raw is for other effect sizes." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: "Significance level. The interval of each study is 1 minus alpha." }
+      model: { type: string, enum: [fixed, random], description: "Leave out. The harness sets it from the decision record. fixed-effect or random-effects model." }
+      method: { type: string, enum: [REML, DL, PM, ML, HE, SJ, EB], description: "Leave out. The harness sets it from the decision record. The tau2 estimator of a random-effects model." }
+      test: { type: string, enum: [z, knha], description: "Leave out. The harness sets it from the decision record. z test or Knapp-Hartung t test." }
+    required: [path]
+    read_only: true
+    outputs:
+      forest: { kind: image, ext: .png, description: The forest plot. }
+    citations:
+      - { text: "DerSimonian R, Laird N. Meta-analysis in clinical trials. Controlled Clinical Trials 7(3), 177-188 (1986).", doi: "10.1016/0197-2456(86)90046-2", when: { method: DL } }
+      - { text: "Higgins JPT, Thompson SG. Quantifying heterogeneity in a meta-analysis. Statistics in Medicine 21(11), 1539-1558 (2002).", doi: 10.1002/sim.1186 }
+    script: scripts/fit_meta_analysis.R
+    parse: json
+
+  - name: funnel_and_egger
+    title: Funnel plot and Egger test
+    description: >
+      Draw a funnel plot of the studies and run Egger's regression test for small-study effects (regtest). Warns when
+      there are fewer than 10 studies. Run fit_meta_analysis first for the pooled result.
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each study." }
+      measure: { type: string, enum: [RR, OR, RD, PETO, SMD, MD, ROM, ZCOR, COR, PLO, PR, GEN], description: "Leave out. The harness sets it from the decision record. The effect measure." }
+      study: { type: string, description: "Column with the study label, such as the author and year." }
+      ai: { type: string, description: "RR, OR, RD, PETO: column with the count of events in the treated group." }
+      bi: { type: string, description: "RR, OR, RD, PETO: column with the count of non-events in the treated group (total minus events)." }
+      ci: { type: string, description: "RR, OR, RD, PETO: column with the count of events in the control group." }
+      di: { type: string, description: "RR, OR, RD, PETO: column with the count of non-events in the control group (total minus events)." }
+      m1i: { type: string, description: "SMD, MD, ROM: column with the mean of the treated group." }
+      sd1i: { type: string, description: "SMD, MD, ROM: column with the standard deviation of the treated group." }
+      n1i: { type: string, description: "SMD, MD, ROM: column with the size of the treated group." }
+      m2i: { type: string, description: "SMD, MD, ROM: column with the mean of the control group." }
+      sd2i: { type: string, description: "SMD, MD, ROM: column with the standard deviation of the control group." }
+      n2i: { type: string, description: "SMD, MD, ROM: column with the size of the control group." }
+      ri: { type: string, description: "ZCOR, COR: column with the correlation of each study." }
+      ni: { type: string, description: "ZCOR, COR, PLO, PR: column with the sample size of each study." }
+      xi: { type: string, description: "PLO, PR: column with the count of events of each study." }
+      yi: { type: string, description: "GEN: column with an effect size that the file already holds, such as a log hazard ratio." }
+      vi: { type: string, description: "GEN: column with the sampling variance of yi." }
+      sei: { type: string, description: "GEN: column with the standard error of yi. Use it in place of vi." }
+      yi_scale: { type: string, enum: [raw, log], default: raw, description: "GEN only. log means that yi is a log ratio, such as a log odds ratio. The tool then also gives the ratio. raw is for other effect sizes." }
+      model: { type: string, enum: [fixed, random], description: "Leave out. The harness sets it from the decision record. fixed-effect or random-effects model." }
+      method: { type: string, enum: [REML, DL, PM, ML, HE, SJ, EB], description: "Leave out. The harness sets it from the decision record. The tau2 estimator of a random-effects model." }
+      egger_model: { type: string, enum: [lm, rma], description: "Leave out. The harness sets it from the decision record. lm is the classic Egger regression. rma tests in the fitted model." }
+    required: [path]
+    read_only: true
+    outputs:
+      funnel: { kind: image, ext: .png, description: The funnel plot. }
+    citations:
+      - { text: "Egger M, Davey Smith G, Schneider M, Minder C. Bias in meta-analysis detected by a simple, graphical test. BMJ 315(7109), 629-634 (1997).", doi: 10.1136/bmj.315.7109.629 }
+    script: scripts/funnel_and_egger.R
+    parse: json

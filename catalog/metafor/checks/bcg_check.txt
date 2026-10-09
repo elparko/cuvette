@@ -1,0 +1,8 @@
+studies 13
+first trial log RR -0.8893 variance 0.3256
+fixed effect -0.4303 se 0.0405 ci -0.5097 to -0.3509
+Q 152.2330 df 12
+DerSimonian-Laird tau2 0.3088 estimate -0.7141 se 0.1787
+DerSimonian-Laird RR 0.4896 ci 0.3449 to 0.6950
+I2 from Q (DL) 92.12%
+classic Egger, weighted regression on the standard error: t -1.4013 df 11 p 0.1887
