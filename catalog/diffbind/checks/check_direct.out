@@ -1,0 +1,6 @@
+DESeq2 ~ condition, Resistant against Responsive: 246 peaks with FDR <= 0.05 (64 up, 182 down)
+DESeq2 ~ tissue + condition, Resistant against Responsive: 783 peaks with FDR <= 0.05 (188 up, 595 down)
+DESeq2 ~ condition + tissue, MCF7 against T47D: 1470 peaks with FDR <= 0.05 (1319 up, 151 down)
+edgeR quasi-likelihood ~ condition, Resistant against Responsive: 31 peaks with FDR <= 0.05 (15 up, 16 down)
+edgeR quasi-likelihood ~ tissue + condition, Resistant against Responsive: 820 peaks with FDR <= 0.05 (201 up, 619 down)
+edgeR quasi-likelihood ~ condition + tissue, MCF7 against T47D: 1517 peaks with FDR <= 0.05 (1331 up, 186 down)

@@ -1,0 +1,125 @@
+kind: tool tutorial or test suite
+short: Ross-Innes 2012
+field: Epigenomics
+program: DiffBind, DESeq2 and edgeR (R), through the diffbind adapter
+citation:
+  authors: Ross-Innes CS, Stark R, Teschendorff AE, Holmes KA, Ali HR, Dunning MJ, Brown GD, Gojis O, Ellis IO, Green AR, Ali S, Chin SF, Palmieri C, Caldas C, Carroll JS
+  title: Differential oestrogen receptor binding is associated with clinical outcome in breast cancer
+  venue: Nature 481:389-393
+  year: 2012
+  doi: 10.1038/nature10730
+related:
+  - text: >-
+      Stark R, Brown G. DiffBind: differential binding analysis of ChIP-Seq peak data. Bioconductor package, vignette version 3.22.
+      The vignette prints all benchmark numbers.
+    url: https://bioconductor.org/packages/release/bioc/vignettes/DiffBind/inst/doc/DiffBind.pdf
+  - text: >-
+      Love MI, Huber W, Anders S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology 15:550 (2014).
+    doi: 10.1186/s13059-014-0550-8
+measured: >-
+  Ross-Innes et al. compared the binding of the estrogen receptor (ER) in breast cancer cell lines and tumors. The DiffBind vignette uses
+  chromosome 18 of eleven ER ChIP-seq samples (BT474, MCF7, T47D, ZR75 and tamoxifen-resistant MCF7 cells) to find the sites with a
+  different ER signal between the resistant and the responsive samples. It prints the number of sites for three analyses.
+instruction: >-
+  Count the reads in the consensus peaks of the 11 samples. Find the peaks with a different ER signal between the 4 resistant and
+  the 7 responsive samples with the tissue as blocking factor, and compare with the model that has no blocking factor.
+instruction_basis: >-
+  The DiffBind vignette 3.22, sections 3, 7 and 8: "11 Samples, 2845 sites in matrix", "246 of the 2845 sites" with DESeq2, "the
+  analysis using the two-factor design finds 783 such sites", and the contrast of MCF7 against T47D with 1470 sites.
+answers:
+  min_overlap:
+    decision: Smallest number of samples that share a peak
+    value: 2
+    source: The default of dba.count in the vignette.
+  summits:
+    decision: Peak width around the summit
+    value: 200
+    source: The default of dba.count in the vignette (401 base pairs).
+  method:
+    decision: Differential method
+    value: deseq2
+    source: The default of dba.analyze in the vignette.
+  normalization:
+    decision: Normalization of the read counts
+    value: library_size
+    source: The default of dba.normalize in the vignette, the full library size.
+  condition_variable:
+    decision: Column that holds the condition to test
+    value: condition
+    source: Vignette section 3, the contrast of the factor Condition.
+  reference_level:
+    decision: Reference level of the condition
+    value: Responsive
+    source: Vignette section 3, the contrast Resistant against Responsive.
+  test_level:
+    decision: Level to compare with the reference
+    value: Resistant
+    source: Vignette section 3.
+  blocking_factors:
+    decision: Blocking factors
+    value: tissue
+    source: Vignette section 7.1 sets the design ~Tissue + Condition. The request names the tissue as blocking factor.
+  fit_type:
+    decision: Dispersion fit of DESeq2
+    value: local
+    source: DiffBind uses a local fit. The number of sites in the vignette reproduces with it and not with the parametric fit in analysis 2.
+  independent_filtering:
+    decision: Independent filtering of DESeq2
+    value: "on"
+    source: The default of DESeq2 in DiffBind.
+  fdr:
+    decision: False discovery rate cutoff
+    value: 0.05
+    source: The default of dba.report in the vignette.
+  lfc_threshold:
+    decision: Smallest log2 fold change
+    value: 0
+    source: The vignette uses no fold change threshold.
+  min_count:
+    decision: Smallest read count of a tested peak
+    value: 1
+    source: The default filter of dba.count (a site needs one read).
+  min_samples:
+    decision: Smallest number of samples that reach the read count
+    value: 1
+    source: The default filter of dba.count.
+  exclude_samples:
+    decision: Samples that you exclude
+    value: none
+    source: The vignette uses all 11 samples.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the vignette. The benchmark answers a free question with this text.
+items:
+  consensus_sites:
+    source: tutorial
+    tool: the DiffBind vignette 3.22
+    where: Section 3, "11 Samples, 2845 sites in matrix".
+  differential_tissue_block:
+    source: tutorial
+    tool: the DiffBind vignette 3.22
+    where: Section 7.1, design ~Tissue + Condition, "finds 783 such sites".
+  gain_tissue_block:
+    source: computed
+    tool: DiffBind 3.22.2 (dba.report) and DESeq2 1.52.0 called directly (checks/check_direct.R of the adapter)
+    where: Design ~Tissue + Condition, sites with a positive Fold in the resistant samples.
+    independence: same path
+    check: DiffBind calls DESeq2, so the direct DESeq2 call is the same code. The count agrees with dba.report.
+  lose_tissue_block:
+    source: computed
+    tool: DiffBind 3.22.2 (dba.report) and DESeq2 1.52.0 called directly (checks/check_direct.R of the adapter)
+    where: Design ~Tissue + Condition, sites with a negative Fold in the resistant samples.
+    independence: same path
+    check: DiffBind calls DESeq2, so the direct DESeq2 call is the same code. The count agrees with dba.report.
+  differential_no_block:
+    source: tutorial
+    tool: the DiffBind vignette 3.22
+    where: Section 3, "246 of the 2845 sites" with FDR 0.05 and DESeq2, design ~Condition.
+data:
+  source: DiffBind vignette data (chromosome 18 BAM files, peak files, sample sheet); the reads are from GEO GSE32222
+  url: https://content.cruk.cam.ac.uk/bioinformatics/software/DiffBind/DiffBind_vignette_data.tar.gz
+  license: >-
+    The vignette data page states no license. The files are fetched, not redistributed. The reads come from cell lines in a public
+    GEO series. They hold no data of persons.
+  size: 561 MB archive, 22 BAM files of chromosome 18

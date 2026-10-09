@@ -1,0 +1,583 @@
+adapter:
+  name: diffbind
+  field: epigenomics
+  file_types: [".csv", ".tsv"]
+  title: DiffBind (differential binding and accessibility of ChIP-seq and ATAC-seq peaks)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Counts the reads in the peaks of a ChIP-seq or ATAC-seq experiment with DiffBind. It finds the peaks that differ between two
+    conditions with DESeq2 or edgeR. It starts from BAM files and peak files, or from a table of read counts for each peak. The
+    scientist chooses the groups, the blocking factors, the normalization and the false discovery rate cutoff.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: DiffBind
+  version: "3.22.2"
+  tested_versions: []
+  homepage: https://bioconductor.org/packages/DiffBind
+  docs:
+    - https://bioconductor.org/packages/release/bioc/vignettes/DiffBind/inst/doc/DiffBind.pdf
+    - https://doi.org/10.1038/nature10730
+    - https://doi.org/10.1186/s13059-014-0550-8
+    - https://doi.org/10.1093/nar/gkaf018
+  install: >
+    Install R (brew install r on macOS). Then install the Bioconductor packages DiffBind, DESeq2, edgeR and the CRAN package jsonlite
+    into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("BiocManager", "jsonlite"), repos = "https://cloud.r-project.org"); BiocManager::install(c("DiffBind", "DESeq2", "edgeR"))'
+  citation:
+    - text: "Stark, R., & Brown, G. (2011). DiffBind: differential binding analysis of ChIP-Seq peak data. Bioconductor. https://bioconductor.org/packages/DiffBind"
+      url: https://bioconductor.org/packages/DiffBind
+      bibtex: |
+        @manual{stark2011diffbind,
+          author = {Stark, Rory and Brown, Gordon},
+          title  = {{DiffBind}: differential binding analysis of {ChIP-Seq} peak data},
+          year   = {2011},
+          url    = {https://bioconductor.org/packages/DiffBind}
+        }
+    - text: "Ross-Innes, C. S., Stark, R., Teschendorff, A. E., Holmes, K. A., Ali, H. R., Dunning, M. J., Brown, G. D., Gojis, O., Ellis, I. O., Green, A. R., Ali, S., Chin, S.-F., Palmieri, C., Caldas, C., & Carroll, J. S. (2012). Differential oestrogen receptor binding is associated with clinical outcome in breast cancer. Nature, 481, 389-393. https://doi.org/10.1038/nature10730"
+      doi: 10.1038/nature10730
+      bibtex: |
+        @article{rossinnes2012differential,
+          author  = {Ross-Innes, Caryn S. and Stark, Rory and Teschendorff, Andrew E. and Holmes, Kelly A. and Ali, H. Raza and Dunning, Mark J. and Brown, Gordon D. and Gojis, Ondrej and Ellis, Ian O. and Green, Andrew R. and Ali, Simak and Chin, Suet-Feung and Palmieri, Carlo and Caldas, Carlos and Carroll, Jason S.},
+          title   = {Differential oestrogen receptor binding is associated with clinical outcome in breast cancer},
+          journal = {Nature},
+          year    = {2012},
+          volume  = {481},
+          pages   = {389--393},
+          doi     = {10.1038/nature10730}
+        }
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first
+  folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  ~/.guided-analysis/R-library. The program version in this adapter is the version of the R package
+  DiffBind, not of R. The count tool runs DiffBind without the blacklist and the greylist, and counts the reads without
+  control subtraction. The differential tool runs DESeq2 or edgeR directly on the raw read counts, as DiffBind does.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools read read counts of peaks from cell lines or tissue samples. Human samples must be de-identified before use.
+
+decisions:
+  - key: method
+    label: Differential method
+    kind: choice
+    choices: [deseq2, edger]
+    default: deseq2
+    group: Method
+    help: >
+      The choice deseq2 fits a negative binomial model and tests with the Wald test, as DiffBind does by default. The choice edger fits a
+      negative binomial model and tests with the quasi-likelihood F test. The two methods can differ in the number of peaks at the cutoff.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: method }
+    sensitivity:
+      options: [deseq2, edger]
+      tool: find_differential_peaks
+      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
+      max_runs: 2
+
+  - key: normalization
+    label: Normalization of the read counts
+    kind: choice
+    choices: [library_size, median_of_ratios, tmm, peak_total]
+    default: library_size
+    group: Method
+    help: >
+      The choice library_size scales each sample by its total number of reads in the BAM file, as DiffBind does by default. The choices
+      median_of_ratios (DESeq2 only), tmm and peak_total use only the reads in peaks. They assume that most peaks do not change. If many
+      peaks gain or lose signal, the library size choice is the safer one.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: normalization }
+    sensitivity:
+      options: [library_size, median_of_ratios]
+      tool: find_differential_peaks
+      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
+      max_runs: 2
+
+  - key: condition_variable
+    label: Column that holds the condition to test
+    kind: text
+    group: Design
+    help: >
+      The name of the column of the sample table that splits the samples into the groups of the question, such as condition or treatment.
+      The column can have more than two values. The test compares two of them.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: condition_variable }
+
+  - key: reference_level
+    label: Reference level of the condition
+    kind: text
+    group: Design
+    help: >
+      The value of the condition column that is the baseline, such as the control or the responsive cells. A positive log2 fold change then means
+      more signal in the test level.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: reference_level }
+
+  - key: test_level
+    label: Level to compare with the reference
+    kind: text
+    group: Design
+    help: The value of the condition column that you compare with the reference, such as the treated or the resistant cells.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: test_level }
+
+  - key: blocking_factors
+    label: Blocking factors
+    kind: text
+    default: none
+    group: Design
+    help: >
+      Columns of the sample table that the model must account for, such as the tissue, the cell line, the batch or the donor. Write the
+      names with commas, or none. The model cannot separate a blocking factor that matches the condition in all samples.
+      The scientist owns this choice. The number of peaks changes a lot with it.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: blocking_factors }
+    sensitivity:
+      options: ["none", "tissue"]
+      tool: find_differential_peaks
+      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
+      max_runs: 2
+
+  - key: fit_type
+    label: Dispersion fit of DESeq2
+    kind: choice
+    choices: [local, parametric, mean]
+    default: local
+    group: Method
+    help: >
+      The choice local fits a local regression of the dispersion on the mean. DiffBind uses it. The choice parametric fits a curve with
+      two parameters, and DESeq2 falls back to local when the curve fits badly. The choice mean uses one value for all peaks. The setting has no effect with edgeR.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: fit_type }
+
+  - key: independent_filtering
+    label: Independent filtering of DESeq2
+    kind: choice
+    choices: ["on", "off"]
+    default: "on"
+    group: Method
+    help: >
+      With on, DESeq2 sets the adjusted p value of the peaks with the lowest mean count to missing. The others keep more power. DiffBind
+      uses on. With off, every peak gets an adjusted p value.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: independent_filtering }
+
+  - key: fdr
+    label: False discovery rate cutoff
+    kind: float
+    default: 0.05
+    lo: 0.001
+    hi: 0.5
+    group: Method
+    help: A peak is differential if its false discovery rate is at most this value. The unit is a fraction. Name the cutoff in the report.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: fdr }
+
+  - key: lfc_threshold
+    label: Smallest log2 fold change
+    kind: float
+    default: 0
+    lo: 0
+    hi: 10
+    group: Method
+    help: >
+      With 0, the test asks if the change is not zero. With a value above 0, DESeq2 and edgeR test if the absolute log2 fold change is
+      larger than the value. A fold change of 2 is a log2 fold change of 1.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: lfc_threshold }
+
+  - key: min_count
+    label: Smallest read count of a tested peak
+    kind: float
+    default: 1
+    lo: 0
+    hi: 1000
+    group: Filter
+    help: >
+      The tool tests a peak if at least min_samples samples have this many reads or more. The unit is reads. The default keeps every peak with a read in
+      one sample. A higher value removes weak peaks and makes the false discovery rate less strict for the others.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: min_count }
+
+  - key: min_samples
+    label: Smallest number of samples that reach the read count
+    kind: int
+    default: 1
+    lo: 1
+    hi: 1000
+    group: Filter
+    help: The tool tests a peak if at least this many samples have min_count reads or more. A usual value is the size of the smallest group.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: min_samples }
+
+  - key: exclude_samples
+    label: Samples that you exclude
+    kind: text
+    default: none
+    group: Samples
+    help: >
+      Name each sample that you remove and the reason, such as a failed library or a low FRiP. Write none to keep all samples. Decide before you see
+      the differential peaks.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_differential_peaks, arg: exclude }
+
+  - key: min_overlap
+    label: Smallest number of samples that share a peak
+    kind: int
+    default: 2
+    lo: 1
+    hi: 100
+    group: Peaks
+    help: >
+      A site enters the consensus peak set if at least this many samples have a peak there. A value of 1 keeps every peak of every sample
+      and gives many weak sites. A higher value keeps the sites that replicates share.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_reads_in_peaks, arg: min_overlap }
+
+  - key: summits
+    label: Peak width around the summit
+    kind: int
+    default: 200
+    lo: 0
+    hi: 5000
+    group: Peaks
+    help: >
+      DiffBind re-centers each consensus site on the summit and counts the reads in this many base pairs on each side. The default gives a width
+      of 401 base pairs. A value of 0 keeps the width of the called peaks, which suits broad marks such as H3K27me3.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_reads_in_peaks, arg: summits }
+
+checks:
+  - id: cell_lines_as_replicates
+    description: The answer treats samples of one cell line as independent biological replicates.
+    severity: warning
+    text: >
+      Report the answer if it calls the replicates of one cell line or one clone independent biological replicates, and the sample table
+      has only one source per group. State that the result is about the cell lines in the experiment.
+  - id: library_size_not_named
+    description: The answer does not name the normalization.
+    severity: warning
+    text: Report the answer if it gives the number of differential peaks and does not name the normalization and the model (design).
+  - id: low_frip
+    description: The answer uses samples with a low FRiP without saying so.
+    severity: warning
+    text: >
+      Report the answer if the count result shows a FRiP (fraction of reads in peaks) below 0.05 for a sample, and the answer does not
+      mention it. A low FRiP means a weak enrichment.
+  - id: direction_of_fold_change
+    description: The answer does not say which level has more signal.
+    severity: warning
+    text: >
+      Report the answer if it gives numbers of gained and lost peaks and does not name the level that has more signal. A positive log2 fold change
+      means more signal in the test level.
+  - id: peaks_to_genes
+    description: The answer links a differential peak to a gene without a method.
+    severity: info
+    text: Report the answer if it names a target gene of a peak and does not say how it assigned the gene (nearest gene, a distance, or a loop).
+
+map:
+  - tool: count_reads_in_peaks
+    route: "library(DiffBind); tam <- dba(sampleSheet = \"samples.csv\"); tam <- dba.count(tam, minOverlap = 2, summits = 200, bSubControl = FALSE)"
+    steps:
+      - "R: build the object with dba(sampleSheet = ...). The sheet has the columns SampleID, Condition, bamReads, Peaks and, if you use input controls, bamControl."
+      - "R: run dba.count(tam, minOverlap, summits, bSubControl = FALSE). Print the sample table with dba.show(tam): the column Reads is the library size and FRiP is the fraction of reads in peaks."
+      - "R: get the read counts with the reads of each site: sapply(tam$peaks, function(p) p$Reads)."
+      - "Alternatives: Rsubread featureCounts on a SAF file of the consensus peaks, or bedtools multicov on a BED file of the consensus peaks."
+    params:
+      - { arg: sample_sheet, label: "sampleSheet of dba()" }
+      - { arg: min_overlap, label: "minOverlap of dba.count()", ui_default: 2 }
+      - { arg: summits, label: "summits of dba.count()", ui_default: 200 }
+      - { arg: min_mapping_quality, label: "minQCth (config) of dba()", ui_default: 15 }
+    fidelity: exact
+    evidence:
+      source: docs
+      test: count-vignette-bam
+      note: The sample table of the vignette lists the same library sizes and FRiP values.
+
+  - tool: find_differential_peaks
+    route: "dds <- DESeqDataSetFromMatrix(counts, coldata, ~ tissue + condition); sizeFactors(dds) <- libsize/mean(libsize); dds <- DESeq(dds, fitType = \"local\"); results(dds, contrast = c(\"condition\", \"Resistant\", \"Responsive\"))"
+    steps:
+      - "R with DiffBind: dba.contrast(tam, design = \"~Tissue + Condition\", minMembers = 2), then dba.analyze(tam, method = DBA_DESEQ2), then dba.report(tam, th = 0.05)."
+      - "R with DESeq2: build the matrix of reads in peaks, set the size factors to the library sizes divided by their mean, run DESeq with fitType local, and call results with the contrast."
+      - "R with edgeR: DGEList with lib.size, estimateDisp(y, design), glmQLFit, glmQLFTest."
+      - "Partek Flow and other point-and-click tools: use their differential analysis task on the same peak count table. The numbers follow from the model, the normalization and the filter that you set."
+    params:
+      - { arg: method, label: "method of dba.analyze(): DBA_DESEQ2 or DBA_EDGER", ui_default: "deseq2" }
+      - { arg: normalization, label: "dba.normalize(): library size (full) is the default", ui_default: "library_size" }
+      - { arg: blocking_factors, label: "design of dba.contrast(), such as ~Tissue + Condition" }
+      - { arg: fit_type, label: "fitType of DESeq()", ui_default: "local" }
+      - { arg: independent_filtering, label: "independentFiltering of results()", ui_default: "on" }
+      - { arg: fdr, label: "th of dba.report()", ui_default: 0.05 }
+    fidelity: close
+    difference: >
+      With DESeq2 and the library size normalization, the tool gives the same number of peaks as DiffBind for the three analyses of the
+      vignette. With edgeR it uses the quasi-likelihood F test, and DiffBind uses another dispersion setting. The number of peaks differs
+      by 1 in the two-factor design of the vignette and the log2 fold changes can differ in the third digit. DiffBind with a blacklist or a greylist
+      removes sites that this tool keeps. The Partek Flow route was not run.
+    evidence:
+      source: docs
+      test: tamoxifen-single-factor
+      note: The DiffBind vignette prints 246, 783 and 1470 differential sites for the three analyses. The tool gives the same numbers.
+
+tests:
+  - id: tamoxifen-single-factor
+    description: >
+      The DiffBind vignette data (Ross-Innes et al. 2012): 2845 sites in 11 samples, 4 resistant and 7 responsive. DESeq2 with the
+      library size normalization and the design ~ condition gives 246 sites at FDR 0.05, as the vignette prints. 64 sites gain and
+      182 lose signal in the resistant samples (dba.report of DiffBind). The size factor of the first sample is the norm factor
+      that DiffBind prints. checks/check_direct.R and .out give the same numbers with DESeq2 called directly.
+    data: [data/tamoxifen_counts.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_counts.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: deseq2, normalization: library_size, condition_variable: condition, reference_level: Responsive, test_level: Resistant, fit_type: local, independent_filtering: "on", fdr: 0.05 }
+    expect:
+      - { path: metrics.n_peaks_tested, equals: 2845 }
+      - { path: metrics.n_significant, equals: 246 }
+      - { path: metrics.n_up, equals: 64 }
+      - { path: metrics.n_down, equals: 182 }
+      - { path: metrics.size_factor_BT4741, approx: 0.809961, abs: 0.000001 }
+      - { path: metrics.size_factor_ZR752, approx: 3.195939, abs: 0.000001 }
+      - { path: metrics.n_reference, equals: 7 }
+      - { path: metrics.n_test, equals: 4 }
+      - { path: "outputs[0].path", contains: ".csv" }
+
+  - id: tamoxifen-tissue-condition
+    description: >
+      The same data with the design ~ tissue + condition. The vignette prints 783 sites for DESeq2 after it sets this design. The
+      direct DESeq2 call in checks/check_direct.out gives 188 gains and 595 losses.
+    data: [data/tamoxifen_counts.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_counts.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: deseq2, normalization: library_size, condition_variable: condition, reference_level: Responsive, test_level: Resistant, blocking_factors: tissue, fit_type: local, independent_filtering: "on", fdr: 0.05 }
+    expect:
+      - { path: metrics.n_significant, equals: 783 }
+      - { path: metrics.n_up, equals: 188 }
+      - { path: metrics.n_down, equals: 595 }
+
+  - id: tamoxifen-tissue-contrast
+    description: >
+      The contrast MCF7 against T47D with the condition as blocking factor. The vignette prints 1470 sites for DESeq2 in this analysis
+      (Tissue MCF7 against T47D). checks/check_direct.out gives 1319 gains and 151 losses.
+    data: [data/tamoxifen_counts.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_counts.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: deseq2, normalization: library_size, condition_variable: tissue, reference_level: T47D, test_level: MCF7, blocking_factors: condition, fit_type: local, independent_filtering: "on", fdr: 0.05 }
+    expect:
+      - { path: metrics.n_significant, equals: 1470 }
+      - { path: metrics.n_up, equals: 1319 }
+      - { path: metrics.n_down, equals: 151 }
+      - { path: metrics.n_other_samples, equals: 4 }
+
+  - id: tamoxifen-edger
+    description: >
+      edgeR with the quasi-likelihood F test and the library sizes, design ~ tissue + condition. The numbers are from edgeR called directly
+      (checks/check_direct.R and .out). DiffBind prints 819 for its edgeR setting in the vignette; the quasi-likelihood test gives 820.
+    data: [data/tamoxifen_counts.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_counts.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: edger, normalization: library_size, condition_variable: condition, reference_level: Responsive, test_level: Resistant, blocking_factors: tissue, fdr: 0.05 }
+    expect:
+      - { path: metrics.n_significant, equals: 820 }
+      - { path: metrics.n_up, equals: 201 }
+      - { path: metrics.n_down, equals: 619 }
+
+  - id: tamoxifen-edger-single
+    description: edgeR with the design ~ condition. The direct edgeR call in checks/check_direct.out gives 31 sites, 15 gains and 16 losses.
+    data: [data/tamoxifen_counts.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_counts.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: edger, normalization: library_size, condition_variable: condition, reference_level: Responsive, test_level: Resistant, fdr: 0.05 }
+    expect:
+      - { path: metrics.n_significant, equals: 31 }
+      - { path: metrics.n_up, equals: 15 }
+
+  - id: json-text-lists
+    description: A model can send the list of blocking factors as JSON text. The result equals the design ~ tissue + condition (783 sites).
+    data: [data/tamoxifen_counts.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_counts.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: deseq2, normalization: library_size, condition_variable: condition, reference_level: Responsive, test_level: Resistant, blocking_factors: "[\"tissue\"]", fit_type: local, independent_filtering: "on" }
+    expect:
+      - { path: metrics.n_significant, equals: 783 }
+
+  - id: count-vignette-bam
+    description: >
+      The DiffBind vignette BAM files of chromosome 18 (11 ER ChIP-seq samples, 22 BAM files, 561 MB). The consensus set has 2845 sites, as
+      the vignette prints. The library sizes and the FRiP values of the first and the last sample are the values of the vignette table
+      (Reads 652697 and FRiP 0.16 for BT4741, Reads 2575408 and FRiP 0.22 for ZR752).
+    data: [data/vignette/tamoxifen.csv]
+    fetch: data/fetch.sh
+    calls:
+      - tool: count_reads_in_peaks
+        args: { sample_sheet: "{adapter_dir}/data/vignette/tamoxifen.csv", min_overlap: 2, summits: 200 }
+    expect:
+      - { path: metrics.n_sites, equals: 2845 }
+      - { path: metrics.n_samples, equals: 11 }
+      - { path: metrics.library_size_BT4741, equals: 652697 }
+      - { path: metrics.frip_BT4741, approx: 0.16, abs: 0.0001 }
+      - { path: metrics.library_size_ZR752, equals: 2575408 }
+      - { path: metrics.frip_ZR752, approx: 0.22, abs: 0.0001 }
+      - { path: metrics.library_size_T47D2, equals: 1475415 }
+
+  - id: counts-with-decimals
+    description: A table of normalized scores (with decimals) fails, and the error says that the tool needs raw read counts.
+    data: [data/tamoxifen_scores_decimals.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_scores_decimals.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: deseq2, normalization: library_size, condition_variable: condition, reference_level: Responsive, test_level: Resistant }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "counts with decimals" }
+
+  - id: wrong-level
+    description: A level that is not a value of the condition column fails, and the error lists the values.
+    data: [data/tamoxifen_counts.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_counts.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: deseq2, normalization: library_size, condition_variable: condition, reference_level: Sensitive, test_level: Resistant }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "the level 'Sensitive' is not a value of 'condition'" }
+      - { path: error, contains: "Values: Resistant, Responsive" }
+
+  - id: blocking-factor-with-one-value
+    description: A blocking factor with one value in all samples fails, and the error names the column.
+    data: [data/tamoxifen_counts.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_counts.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: deseq2, normalization: library_size, condition_variable: condition, reference_level: Responsive, test_level: Resistant, blocking_factors: treatment }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "blocking_factors" }
+
+  - id: missing-library-size-column
+    description: The library size normalization with no library size column fails, and the error lists the columns.
+    data: [data/tamoxifen_counts.csv, data/tamoxifen_samples.csv]
+    calls:
+      - tool: find_differential_peaks
+        args: { counts: "{adapter_dir}/data/tamoxifen_counts.csv", samples: "{adapter_dir}/data/tamoxifen_samples.csv", method: deseq2, normalization: library_size, library_size_col: total_reads, condition_variable: condition, reference_level: Responsive, test_level: Resistant }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "library_size_col 'total_reads' is not a column" }
+
+tools:
+  - name: count_reads_in_peaks
+    title: Count the reads in the consensus peaks of the samples
+    description: >
+      Count the reads of each sample in a set of consensus peaks with DiffBind. The input is a DiffBind sample sheet that lists the BAM
+      files and the peak file of each sample. It merges the peaks of the samples into consensus sites, and counts the reads in each site.
+      It writes a table of raw read counts and a sample table with the library size and the FRiP of each sample. Use the two tables
+      with find_differential_peaks.
+    params:
+      sample_sheet: { type: string, description: "Path of the DiffBind sample sheet, a CSV file with the columns SampleID, bamReads and Peaks, and the factor columns such as Condition. Paths in the sheet are relative to the folder of the sheet." }
+      min_overlap: { type: integer, minimum: 1, description: "Leave out. The harness sets it from the decision record. Smallest number of samples that share a peak (count)." }
+      summits: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Base pairs on each side of the summit (bp). 0 keeps the width of the called peaks." }
+      min_mapping_quality: { type: integer, minimum: 0, description: "Smallest mapping quality of a counted read (unitless Phred score). Default 15." }
+    required: [sample_sheet]
+    read_only: true
+    batch: false
+    outputs:
+      counts: { kind: table, ext: .csv, description: "One row for each consensus site with the coordinates and the raw read count of each sample." }
+      samples: { kind: table, ext: .csv, description: "One row for each sample with the library size, the FRiP and the reads in peaks." }
+    script: scripts/count_reads.R
+    parse: json
+
+  - name: find_differential_peaks
+    title: Find the peaks that differ between two conditions
+    description: >
+      Find the peaks with a different signal between two conditions. The input is a table of raw read counts and a sample table.
+      It fits DESeq2 or edgeR with the design that the scientist chose. It gives the log2 fold change, p value and false discovery rate
+      of each peak. It counts the peaks that gain and lose signal at the cutoff. It writes the results table and a BED file of the
+      significant peaks.
+    params:
+      counts: { type: string, description: "Path of a CSV file with one row for each peak and one column of raw read counts for each sample. The columns peak_id, chr, start and end are optional." }
+      samples: { type: string, description: "Path of a CSV file with one row for each sample. Columns: the sample name, the condition, the blocking factors, and the library size for that normalization." }
+      sample_col: { type: string, description: "Column of the sample table with the sample names. The names must be columns of the count table. Default sample." }
+      library_size_col: { type: string, description: "Column of the sample table with the total number of reads of each sample (count), for the library_size normalization. Default library_size." }
+      method: { type: string, enum: [deseq2, edger], description: "Leave out. The harness sets it from the decision record." }
+      normalization: { type: string, enum: [library_size, median_of_ratios, tmm, peak_total], description: "Leave out. The harness sets it from the decision record." }
+      condition_variable: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the sample table with the condition." }
+      reference_level: { type: string, description: "Leave out. The harness sets it from the decision record. Baseline value of the condition column." }
+      test_level: { type: string, description: "Leave out. The harness sets it from the decision record. Value that you compare with the baseline." }
+      blocking_factors: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Columns of the sample table for the design, as a list or comma text. none for no blocking factor." }
+      fit_type: { type: string, enum: [local, parametric, mean], description: "Leave out. The harness sets it from the decision record." }
+      independent_filtering: { type: string, enum: ["on", "off"], description: "Leave out. The harness sets it from the decision record." }
+      fdr: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. False discovery rate cutoff as a fraction." }
+      lfc_threshold: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest absolute log2 fold change to test." }
+      min_count: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest read count (reads) of the filter." }
+      min_samples: { type: integer, minimum: 1, description: "Leave out. The harness sets it from the decision record. Number of samples (count) that must reach min_count." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Sample names to drop, as a list or comma text. none keeps all samples." }
+    required: [counts, samples]
+    read_only: true
+    batch: false
+    outputs:
+      results: { kind: table, ext: .csv, description: "One row for each peak with the mean, the log2 fold change, the p value and the false discovery rate, sorted by the false discovery rate." }
+      significant: { kind: file, ext: .bed, description: "The peaks at the cutoff as a BED file with the log2 fold change in column 5." }
+    script: scripts/find_differential.R
+    parse: json
+    citations:
+      - text: "Love, M. I., Huber, W., & Anders, S. (2014). Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology, 15(12), 550. https://doi.org/10.1186/s13059-014-0550-8"
+        doi: 10.1186/s13059-014-0550-8
+        when: { method: deseq2 }
+      - text: "Chen, Y., Chen, L., Lun, A. T. L., Baldoni, P. L., & Smyth, G. K. (2025). edgeR v4: powerful differential analysis of sequencing data with expanded functionality and improved support for small counts and larger datasets. Nucleic Acids Research, 53(2), gkaf018. https://doi.org/10.1093/nar/gkaf018"
+        doi: 10.1093/nar/gkaf018
+        when: { method: edger }

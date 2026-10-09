@@ -1,0 +1,12 @@
+"sample","tissue","condition","treatment","replicate","library_size","frip"
+"BT4741","BT474","Resistant","Full-Media","1",652697,0.16
+"BT4742","BT474","Resistant","Full-Media","2",663370,0.15
+"MCF71","MCF7","Responsive","Full-Media","1",346429,0.31
+"MCF72","MCF7","Responsive","Full-Media","2",368052,0.19
+"MCF73","MCF7","Responsive","Full-Media","3",466273,0.25
+"T47D1","T47D","Responsive","Full-Media","1",399879,0.11
+"T47D2","T47D","Responsive","Full-Media","2",1475415,0.06
+"MCF7r1","MCF7","Resistant","Full-Media","1",616630,0.22
+"MCF7r2","MCF7","Resistant","Full-Media","2",593224,0.14
+"ZR751","ZR75","Responsive","Full-Media","1",706836,0.33
+"ZR752","ZR75","Responsive","Full-Media","2",2575408,0.22

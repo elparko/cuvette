@@ -1,0 +1,33 @@
+adapters: [diffbind]
+prompt: |
+  We mapped estrogen receptor (ER) ChIP-seq reads of breast cancer cell lines to chromosome 18. The folder {data}/ross-innes2012-diffbind-tamoxifen/x/DiffBind_Vignette has the sample sheet tamoxifen.csv (11 ER samples: 4 tamoxifen-resistant and 7 responsive; the columns SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, ControlID, bamControl and Peaks) with the BAM files in reads and the peak files in peaks. Count the reads in the consensus peaks, then find the peaks with a different ER signal between the resistant and the responsive samples. The samples come from several cell lines, so use the tissue as blocking factor. Use the false discovery rate cutoff 0.05. Give the number of consensus sites, the number of differential peaks, and the number of peaks that gain and that lose signal in the resistant samples. Then check how the number of differential peaks changes if you leave the tissue out of the model, and give that number. Write every number in your final answer text.
+answers:
+  min_overlap: 2
+  summits: 200
+  method: deseq2
+  normalization: library_size
+  condition_variable: condition
+  reference_level: Responsive
+  test_level: Resistant
+  blocking_factors: tissue
+  fit_type: local
+  independent_filtering: "on"
+  fdr: 0.05
+  lfc_threshold: 0
+  min_count: 1
+  min_samples: 1
+  exclude_samples: none
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data: [ross-innes2012-diffbind-tamoxifen/x/DiffBind_Vignette]
+items:
+  # Source of the values: the DiffBind vignette 3.22 (Bioconductor 3.23). Section 3 prints 2845 sites, 4 resistant and 7 responsive samples
+  # and 246 sites at FDR 0.05 with DESeq2 and the design ~Condition. Section 7.1 prints 783 sites for the design ~Tissue + Condition.
+  # The gain and lose counts are from dba.report of DiffBind 3.22.2 (check.out of this paper gives the same counts with DESeq2
+  # called directly).
+  - {key: consensus_sites, description: "Consensus sites (chromosome 18)", value: 2845, exact: true, tool: count_reads_in_peaks}
+  - {key: differential_tissue_block, description: "Differential peaks, resistant against responsive, tissue as blocking factor, DESeq2, FDR 0.05", value: 783, exact: true, tool: find_differential_peaks}
+  - {key: gain_tissue_block, description: "Peaks that gain signal in the resistant samples, tissue as blocking factor", value: 188, exact: true, tool: find_differential_peaks}
+  - {key: lose_tissue_block, description: "Peaks that lose signal in the resistant samples, tissue as blocking factor", value: 595, exact: true, tool: find_differential_peaks}
+  - {key: differential_no_block, description: "Differential peaks without a blocking factor (the design ~Condition of the vignette)", value: 246, exact: true, tool: find_differential_peaks}

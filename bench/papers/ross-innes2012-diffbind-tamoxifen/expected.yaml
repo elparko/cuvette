@@ -1,0 +1,30 @@
+tool: DiffBind (dba.count) and DESeq2, through the diffbind adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/ross-innes2012-diffbind-tamoxifen/x/DiffBind_Vignette
+decisions:
+  min_overlap: 2
+  summits: 200
+  method: deseq2
+  normalization: library_size
+  fit_type: local
+  independent_filtering: "on"
+  fdr: 0.05
+  blocking_factors: tissue
+  comparison: "design without blocking factor (sensitivity run)"
+expected:
+  - {description: "consensus sites", value: 2845, tolerance: 0, source: "DiffBind vignette 3.22, section 3"}
+  - {description: "differential peaks, tissue as blocking factor", value: 783, tolerance: 0, source: "DiffBind vignette 3.22, section 7.1; check.out"}
+  - {description: "peaks that gain signal, tissue as blocking factor", value: 188, tolerance: 0, source: "dba.report of DiffBind 3.22.2; check.out"}
+  - {description: "peaks that lose signal, tissue as blocking factor", value: 595, tolerance: 0, source: "dba.report of DiffBind 3.22.2; check.out"}
+  - {description: "differential peaks without a blocking factor", value: 246, tolerance: 0, source: "DiffBind vignette 3.22, section 3; check.out"}
+notes: |
+  The expected numbers are the numbers that the DiffBind vignette 3.22 prints. DESeq2 1.52.0 called directly on the raw read
+  counts, with the full library sizes as size factors and the dispersion fit local, gives the same numbers (check.R, check.out).
+  Trap 1: the fit type. With the parametric dispersion fit, the design with the tissue gives 683 sites, not 783. DiffBind uses the local fit.
+  Trap 2: the counts. The normalized scores of DiffBind (with decimals) or the counts minus the control give other numbers
+  (360 and 623 sites without a blocking factor). The tool uses the raw reads without control subtraction.
+  Trap 3: the library size. The size factors from the reads in peaks only (median of ratios) give 378 sites without a blocking factor, with 171 gains.
+  The vignette also prints 819 sites for edgeR with the tissue as blocking factor, and 1470 sites for MCF7 against T47D. The tool gives 1470 for the second (adapter test) and 820 for the first. The quasi-likelihood test of the tool gives 820, so the edgeR number is not an item.
+  DiffBind with the default blacklist and greylist needs genome packages that this setup does not have. The tools run without them.
+  One run takes about one minute for the counting and a few seconds for each analysis.
