@@ -20,6 +20,7 @@ export interface CommandCtx {
   refresh(): void;
   clear(): void;
   quit(): void;
+  keys?(): string;
   outputs(): OutputRef[];
   toggleDetails(): boolean;
   startWindow(): Promise<string>;
@@ -176,7 +177,7 @@ export const commands: Command[] = [
     help: "Show this list.",
     run(_, ctx) {
       const rows = commands.map((c) => [`/${c.name}${c.args ? " " + c.args : ""}`, c.help]);
-      const keys = "Keys: Esc stops the agent. Shift+Tab changes the mode. Ctrl+C twice quits. Up and Down show past input.";
+      const keys = ctx.keys?.() ?? "Keys: Esc stops the agent. Shift+Tab changes the mode. Ctrl+C twice quits. Up and Down show past input.";
       ctx.print(table(["Command", "What it does"], rows) + "\n\n" + keys, "Commands");
     },
   },

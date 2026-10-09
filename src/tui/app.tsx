@@ -5,7 +5,7 @@ import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
-import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from "../ui/commands.ts";
+import { commands, openSetup, openWithOs, suggestions, table, type CommandCtx } from "../ui/commands.ts";
 import { imageProtocol, inlineImage } from "./image.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
@@ -16,6 +16,8 @@ import { CardRows, Last } from "./fit.tsx";
 import type { SettingSession } from "../core/settings.ts";
 import { applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
 import { inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
+import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
+import { INPUT_MAX_ROWS, InputBox } from "./input-box.tsx";
 
 const MODE_ORDER: Mode[] = ["watch", "follow", "teach", "plan"];
 const MAX_SUGGESTIONS = 8;
@@ -52,6 +54,8 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
   const [pending, setPending] = useState<Item[]>([]);
   const [showAll, setShowAll] = useState(false);
   const [queue, setQueue] = useState<string[]>([]);
+  const [vimMode, setVimMode] = useState<VimMode>("insert");
+  const keyStyle = inputKeys(session.settings?.input_keys);
   const queueRef = useRef<string[]>([]);
   const updateQueue = useCallback((next: string[]) => {
     queueRef.current = next;
@@ -198,6 +202,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         setEpoch((x) => x + 1);
       },
       quit: () => void quit(),
+      keys: () => table(["Key", "What it does"], keyRows(keyStyle).map((r) => [r.keys, r.does])),
       outputs: () => mapper.current.outputs,
       toggleDetails: () => {
         toggleDetails();
@@ -234,7 +239,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         return { url, opened, failed };
       },
     }),
-    [session, cards, addCard, refresh, quit, opts, toggleDetails],
+    [session, cards, addCard, refresh, quit, opts, toggleDetails, keyStyle],
   );
 
   const runCommand = async (text: string) => {
@@ -280,6 +285,32 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     session.send(r.text).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
   };
 
+  const escape = () => {
+    if (status.state !== "idle") {
+      updateQueue([]);
+      stopTurn(session);
+    } else if (input && keyStyle !== "vim") setText("");
+  };
+
+  const arrow = (dir: "up" | "down") => {
+    if (dir === "up") {
+      if (sugg.length) setSel((s) => (s + sugg.length - 1) % sugg.length);
+      else if (history.length) {
+        const idx = Math.min(histIdx + 1, history.length - 1);
+        if (histIdx === -1) setDraft(input);
+        setHistIdx(idx);
+        setText(history[history.length - 1 - idx]!);
+      }
+    } else {
+      if (sugg.length) setSel((s) => (s + 1) % sugg.length);
+      else if (histIdx >= 0) {
+        const idx = histIdx - 1;
+        setHistIdx(idx);
+        setText(idx < 0 ? draft : history[history.length - 1 - idx]!);
+      }
+    }
+  };
+
   useInput((ch, key) => {
     if (key.ctrl && ch === "c") {
       const now = Date.now();
@@ -291,41 +322,25 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     }
     if (key.ctrl && ch === "o") return toggleDetails();
     if (cards.length) return;
-    if (key.escape) {
-      if (status.state !== "idle") {
-        updateQueue([]);
-        stopTurn(session);
-      }
-      else if (input) setText("");
-    } else if (key.tab && key.shift) {
+    if (keyStyle !== "classic" && (key.escape || key.upArrow || key.downArrow)) return;
+    if (key.escape) escape();
+    else if (key.tab && key.shift) {
       const next = MODE_ORDER[(MODE_ORDER.indexOf(session.mode) + 1) % MODE_ORDER.length]!;
       session.setMode(next);
       setMode(next);
     } else if (key.tab) {
       if (selected) setText(`/${selected.name} `);
-    } else if (key.upArrow) {
-      if (sugg.length) setSel((s) => (s + sugg.length - 1) % sugg.length);
-      else if (history.length) {
-        const idx = Math.min(histIdx + 1, history.length - 1);
-        if (histIdx === -1) setDraft(input);
-        setHistIdx(idx);
-        setText(history[history.length - 1 - idx]!);
-      }
-    } else if (key.downArrow) {
-      if (sugg.length) setSel((s) => (s + 1) % sugg.length);
-      else if (histIdx >= 0) {
-        const idx = histIdx - 1;
-        setHistIdx(idx);
-        setText(idx < 0 ? draft : history[history.length - 1 - idx]!);
-      }
-    }
+    } else if (key.upArrow) arrow("up");
+    else if (key.downArrow) arrow("down");
   });
 
   const card = cards[0];
   const program = session.adapterInfo[0]?.title ?? "the program";
   const { columns, rows } = useWindowSize();
   const running = status.state !== "idle";
-  const fit = liveLayout({ rows, columns, card: !!card, running, input: input.length, queue: queue.length, suggestions: sugg.length, text: !!live, pending: pending.length > 0 });
+  const footKeys = card ? "" : footerKeys(keyStyle, vimMode, running);
+  const inputRows = keyStyle === "classic" ? undefined : Math.min(INPUT_MAX_ROWS + 1, layout(input, Math.max(10, columns - 6)).length);
+  const fit = liveLayout({ rows, columns, card: !!card, running, input: input.length, inputRows, keys: !!footKeys, queue: queue.length, suggestions: sugg.length, text: !!live, pending: pending.length > 0 });
   const animate = animationsOn(opts.stdout ?? process.stdout, env, session.settings?.animations);
 
   return (
@@ -371,6 +386,22 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         <Text color="cyan">{"> "}</Text>
         {card ? (
           <Text dimColor>Answer the card above.</Text>
+        ) : keyStyle !== "classic" ? (
+          <InputBox
+            style={keyStyle}
+            value={input}
+            width={Math.max(10, columns - 6)}
+            placeholder={inputPlaceholder(session, status.state !== "idle")}
+            arrowsOut={sugg.length > 0}
+            onChange={(v) => {
+              setInput(v);
+              setSel(0);
+            }}
+            onSubmit={submit}
+            onEscape={escape}
+            onEdge={arrow}
+            onVimMode={setVimMode}
+          />
         ) : (
           <TextInput
             key={inputKey}
@@ -408,6 +439,8 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         details={showAll}
         queue={session.settings?.messages === "queue" || !session.steer}
         bypass={bypass}
+        keys={footKeys}
+        esc={keyStyle === "vim" && vimMode === "insert" ? "Esc twice stops this step. " : undefined}
       />
     </Box>
   );
@@ -501,6 +534,7 @@ export async function runTui(session: SessionLike, opts: TuiOptions = {}): Promi
     stdout: opts.stdout,
     exitOnCtrlC: false,
     patchConsole: false,
+    kittyKeyboard: { mode: "auto", flags: ["disambiguateEscapeCodes"] },
   });
   await instance.waitUntilExit();
 }

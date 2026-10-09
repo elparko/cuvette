@@ -152,6 +152,14 @@ export const SETTINGS: SettingDef[] = [
     choices: () => ["after-step", "queue"],
   },
   {
+    name: "input_keys",
+    group: "Session",
+    label: "Input keys",
+    help: "The keys of the terminal input box. mac: Option and Cmd keys as in a Mac text field, for example Option+Backspace deletes a word. emacs: the readline keys. vim: a normal mode and an insert mode. classic: the old one-line box. The change applies at once. /help shows the keys.",
+    scopes: ALL,
+    choices: () => ["mac", "emacs", "vim", "classic"],
+  },
+  {
     name: "output_folder",
     group: "Session",
     label: "Save results in",

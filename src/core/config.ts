@@ -31,6 +31,7 @@ export interface Settings {
   figure_formats: string;
   output_folder: string;
   defaultAdapters: string[];
+  input_keys: "mac" | "emacs" | "vim" | "classic";
 }
 
 export const DEFAULTS: Settings = {
@@ -58,6 +59,7 @@ export const DEFAULTS: Settings = {
   figure_formats: "png,svg",
   output_folder: "cuvette",
   defaultAdapters: ["tables"],
+  input_keys: "mac",
 };
 
 export function xlsxOn(s: Pick<Settings, "export_xlsx">): boolean {

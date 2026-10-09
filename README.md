@@ -130,6 +130,27 @@ results, and summarizes old turns near the context limit.
 | `/databook` | A data book (PDF and HTML): question, data, methods, results, figures, checks and the manual route. `/databook project` covers all sessions of the project folder. `/databook docx` needs pandoc. On the command line: `ga databook [<session folder>\|<project folder>]`. |
 | `/lab` | Approve or reject lab rules that the agent proposed. |
 
+### Input box keys
+
+The setting `input_keys` (in `/config`, group Session) sets the keys of the input box. The
+change applies at once. `/help` shows the keys of the current style.
+
+| Action | `mac` (default) | `emacs` | `vim` |
+| --- | --- | --- | --- |
+| Send | Enter | Enter | Enter |
+| New line | Shift+Enter, Option+Enter, `\` then Enter | Alt+Enter, `\` then Enter | Shift+Enter in insert mode, `o` |
+| Word left, right | Option+Left, Option+Right | Alt+B, Alt+F | `b`, `w` |
+| Line start, end | Cmd+Left, Cmd+Right, Home, End | Ctrl+A, Ctrl+E | `0`, `$` |
+| Delete word before | Option+Backspace | Alt+Backspace, Ctrl+W | Ctrl+W in insert mode |
+| Delete word after | Fn+Option+Backspace | Alt+D | `dw` |
+| Delete to line start | Cmd+Backspace | Ctrl+U | Ctrl+U in insert mode |
+| Lines, then past messages | Up, Down | Up, Down, Ctrl+P, Ctrl+N | `k`, `j` |
+| Undo | Ctrl+Z, Cmd+Z | Ctrl+_ | `u` |
+| Stop the agent | Esc | Esc | Esc in normal mode (Esc twice from insert mode) |
+
+`classic` is the old one-line box. A paste with line breaks stays one message in each style.
+Shift+Tab, Ctrl+O, Ctrl+C twice, Tab and the `!` prefix work in each style.
+
 ### Bypass permissions
 
 By default, a tool call that needs permission shows a card, and you allow or deny it. These

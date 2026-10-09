@@ -15,10 +15,10 @@ export function animationsOn(stdout: { isTTY?: boolean } | undefined, env: Recor
   return Boolean(stdout?.isTTY) && env.TERM !== "dumb" && setting !== "off" && setting !== false;
 }
 
-export function liveLayout(o: { rows: number; columns: number; card: boolean; running: boolean; input: number; queue: number; suggestions: number; text: boolean; pending: boolean }) {
+export function liveLayout(o: { rows: number; columns: number; card: boolean; running: boolean; input: number; inputRows?: number; keys?: boolean; queue: number; suggestions: number; text: boolean; pending: boolean }) {
   const budget = o.rows - 2;
-  const footer = 2 + (o.running ? 1 : 0) + o.queue + o.suggestions;
-  const box = 2 + Math.max(1, Math.ceil((o.input + 4) / Math.max(1, o.columns - 4)));
+  const footer = 2 + (o.keys ? 1 : 0) + (o.running ? 1 : 0) + o.queue + o.suggestions;
+  const box = 2 + (o.inputRows ?? Math.max(1, Math.ceil((o.input + 4) / Math.max(1, o.columns - 4))));
   const inputBox = !o.card || budget - footer - box >= 16;
   const avail = Math.max(0, budget - footer - (inputBox ? box : 0));
   if (o.card) {
@@ -164,9 +164,9 @@ const MODE_TEXT: Record<Mode, string> = {
   plan: "plan: the agent plans only",
 };
 
-export function busyHint(state: string, queue?: boolean): string {
+export function busyHint(state: string, queue?: boolean, esc = "Esc stops this step. "): string {
   const after = queue ? "Your message waits until the turn ends." : state === "running" ? "Your message goes in after the step." : "Your message goes in after the next step.";
-  return `${state === "running" ? "Esc stops this step. " : ""}${after} Start it with ! to send it now.`;
+  return `${state === "running" ? esc : ""}${after} Start it with ! to send it now.`;
 }
 
 export function tokensText(n: number): string {
@@ -186,6 +186,8 @@ export function StatusLine(props: {
   details?: boolean;
   queue?: boolean;
   bypass?: boolean;
+  keys?: string;
+  esc?: string;
 }) {
   const parts: React.ReactNode[] = [
     <Text key="m" color="cyan">
@@ -235,7 +237,8 @@ export function StatusLine(props: {
       ) : (
         line
       )}
-      <Text dimColor wrap="truncate-end">{props.hint || (props.busy ? busyHint(props.state, props.queue) : props.details ? "Ctrl+O: short view" : "Ctrl+O: all steps")}</Text>
+      <Text dimColor wrap="truncate-end">{props.hint || (props.busy ? busyHint(props.state, props.queue, props.esc) : props.details ? "Ctrl+O: short view" : "Ctrl+O: all steps")}</Text>
+      {props.keys ? <Text dimColor wrap="truncate-end">{props.keys}</Text> : null}
     </Box>
   );
 }
