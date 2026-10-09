@@ -3,7 +3,7 @@ adapter:
   field: proteomics
   file_types: [".mzml", ".featurexml", ".idxml"]
   title: OpenMS TOPP tools for peptide data
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Runs four OpenMS TOPP command line tools on proteomics files: FileInfo, FeatureFinderCentroided,
@@ -22,6 +22,11 @@ program:
     - https://www.openms.de/documentation/TOPP_PeptideIndexer.html
     - https://www.openms.de/documentation/TOPP_FalseDiscoveryRate.html
     - https://doi.org/10.1038/nmeth.3959
+  install: >
+    The OpenMS TOPP tools have no Homebrew formula. Install the bioconda package openms with micromamba into
+    /Volumes/T7/guided-analysis/tools/openms/env or ~/.guided-analysis/openms/env. The adapter finds FileInfo in env/bin
+    and runs the other TOPP tools from the same folder. Set OPENMS_FILEINFO to the FileInfo path for another location.
+    micromamba create -y -p ~/.guided-analysis/openms/env -c conda-forge -c bioconda openms
 
 connection:
   kind: cli
@@ -38,6 +43,7 @@ locate:
   which: [FileInfo]
   version_command: ["{program_path}", "--help"]
   version_pattern: "Version: (\\S+)"
+  identity: 'FileInfo -- Shows basic information about the file'
 
 decisions:
   - key: fasta
@@ -207,7 +213,7 @@ tools:
       spectra of each MS level, the retention time range, or the number of features or identifications.
     read_only: true
     params:
-      path: { type: string, minLength: 1, description: Absolute path of the mzML, featureXML or idXML file. }
+      path: { type: string, minLength: 1, description: "Absolute path of the mzML, featureXML or idXML file." }
     required: [path]
     command: ["/bin/sh", "{adapter_dir}/scripts/info.sh", "{program_path}", "{path}"]
     parse: keyvalue

@@ -3,7 +3,7 @@ adapter:
   field: microscopy
   file_types: [".tif", ".tiff", ".png", ".cppipe"]
   title: CellProfiler
-  version: 0.1.2
+  version: 0.1.3
   spec: "1"
   description: >
     Counts and measures nuclei in microscope images with CellProfiler. The adapter writes a
@@ -21,6 +21,11 @@ program:
   docs:
     - https://cellprofiler-manual.s3.amazonaws.com/CellProfiler-4.2.8/index.html
     - https://cellprofiler-manual.s3.amazonaws.com/CellProfiler-4.2.8/modules/objectprocessing.html
+  install: >
+    Download CellProfiler from https://cellprofiler.org and install it. The macOS build is x86_64, so it runs through Rosetta and needs an x86_64 Java 17.
+    Set CELLPROFILER_JAVA_HOME or JAVA_HOME to that Java, or put it in /Volumes/T7/guided-analysis/tools/cellprofiler/jre17x64 on the T7 drive.
+    The adapter reads the cp executable from CELLPROFILER_PATH, from CellProfiler.app on the T7 drive or in /Applications, or from the PATH:
+    export CELLPROFILER_PATH=/Applications/CellProfiler.app/Contents/MacOS/cp
 
 connection:
   kind: script
@@ -40,6 +45,7 @@ locate:
   which: [cellprofiler]
   version_command: ["{program_path}", "-c", "--version"]
   version_pattern: "Starting CellProfiler (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Starting CellProfiler \d'
 
 data_rules:
   cloud_visibility: all
@@ -489,11 +495,12 @@ tools:
       pipeline: { type: string, description: Full path of the .cppipe file. }
       folder: { type: string, description: "Full path of the folder with the images." }
       pattern: { type: string, default: "*", description: "File name pattern with * and ? wildcards, such as *_w1.TIF. Not case sensitive." }
-      every_nth: { type: integer, minimum: 1, default: 1, description: "Use every nth file of the sorted list. 1 uses all files." }
-      max_images: { type: integer, minimum: 0, default: 0, description: "Use at most this many files. 0 means no limit." }
+      every_nth: { type: integer, minimum: 1, default: 1, description: "Use every nth file of the sorted list. The value is a count of files. 1 uses all files." }
+      max_images: { type: integer, minimum: 0, default: 0, description: "Use at most this count of files. 0 means no limit." }
       truth_regex: { type: string, description: "Optional regular expression with one group that reads the known count from the file name, such as _C(\\d+)_F." }
       group_regex: { type: string, description: "Optional regular expression with one group that reads a group label from the file name, such as _F(\\d+)_. Gives accuracy for each group." }
     required: [pipeline, folder]
+    batch: true
     outputs:
       per_image: { kind: table, ext: .csv, description: One row for each image. }
     script: scripts/run_pipeline.mjs
@@ -509,8 +516,8 @@ tools:
     params:
       folder: { type: string, description: "Full path of the folder with the images." }
       pattern: { type: string, default: "*", description: "File name pattern with * and ? wildcards, such as *_w1.TIF. Not case sensitive." }
-      every_nth: { type: integer, minimum: 1, default: 1, description: "Use every nth file of the sorted list. 1 uses all files." }
-      max_images: { type: integer, minimum: 0, default: 0, description: "Use at most this many files. 0 means no limit." }
+      every_nth: { type: integer, minimum: 1, default: 1, description: "Use every nth file of the sorted list. The value is a count of files. 1 uses all files." }
+      max_images: { type: integer, minimum: 0, default: 0, description: "Use at most this count of files. 0 means no limit." }
       truth_regex: { type: string, description: "Optional regular expression with one group that reads the known count from the file name, such as _C(\\d+)_F." }
       group_regex: { type: string, description: "Optional regular expression with one group that reads a group label from the file name, such as _F(\\d+)_. Gives accuracy for each group." }
       diameter_min: { type: integer, minimum: 1, maximum: 2000, description: "Leave out. The harness sets it from the decision record. Smallest typical diameter of a nucleus in pixels. First number of Typical diameter of objects, in pixel units (Min,Max)." }
@@ -528,6 +535,7 @@ tools:
       threshold_correction: { type: number, minimum: 0.1, maximum: 5, description: "Leave out. The harness sets it from the decision record. Threshold correction factor. A value above 1 raises the threshold." }
       adaptive_window: { type: integer, minimum: 0, maximum: 1000, default: 50, description: "Size of adaptive window in pixels. Used only with the Adaptive strategy. Leave out otherwise. 0 means 50." }
     required: [folder]
+    batch: true
     outputs:
       pipeline: { kind: file, ext: .cppipe, description: The pipeline file that the tool wrote. }
       per_image: { kind: table, ext: .csv, description: One row for each image. }

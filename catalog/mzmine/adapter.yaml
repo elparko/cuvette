@@ -3,7 +3,7 @@ adapter:
   field: metabolomics
   file_types: [".mzml", ".mzxml"]
   title: MZmine
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Finds LC-MS features in mzML files with MZmine batch mode. The adapter writes a batch file
@@ -21,6 +21,10 @@ program:
   homepage: https://mzmine.github.io
   docs:
     - https://mzmine.github.io/mzmine_documentation/
+  install: >
+    Download the MZmine portable zip for your system from the MZmine GitHub releases page (linked from https://mzmine.github.io) and unzip it.
+    The adapter looks for /Volumes/T7/guided-analysis/tools/mzmine/mzmine.app, then /Applications and ~/Applications,
+    or the program that MZMINE_PATH names. The steps after the chromatogram builder need an MZmine user file; set MZMINE_USER_FILE to it.
 
 connection:
   kind: script
@@ -40,6 +44,7 @@ locate:
   which: [mzmine]
   version_command: ["{program_path}", "-help"]
   version_pattern: "Starting mzmine (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Starting mzmine \d'
 
 data_rules:
   cloud_visibility: all
@@ -347,8 +352,8 @@ tools:
     title: Detect features in mzML files
     description: >
       Write the batch file and run it in one step. Gives the number of scans read, the steps that
-      finished, and the feature table if the export step ran. mzmine 4.10.90 needs a user login for
-      every step after the chromatogram builder.
+      finished, and the feature table if the export step ran. mzmine 4.10.90 runs the steps after
+      the chromatogram builder only with a user login.
     params:
       input: { type: string, description: "mzML file, a glob pattern such as /data/*.mzML, or a text file with one path on each line." }
       noise_level: { type: number, minimum: 0, description: "Noise level of the Centroid mass detector, in intensity units. Intensities below it are noise. Also the minimum intensity for consecutive scans of the chromatogram builder. The scientist chooses it." }

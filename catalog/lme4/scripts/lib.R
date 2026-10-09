@@ -30,7 +30,14 @@ emit <- function(x) {
 fail <- function(msg) emit(list(ok = FALSE, error = msg))
 
 run_tool <- function(body) {
-  tryCatch(body(), error = function(e) fail(conditionMessage(e)))
+  tryCatch(body(), error = function(e) {
+    script <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+    step <- if (length(script)) sub("\\.R$", "", basename(sub("^--file=", "", script[1]))) else "the R step"
+    p <- tryCatch(read_params(), error = function(e2) list())
+    files <- unlist(Filter(function(v) is.character(v) && length(v) == 1 && file.exists(v), p))
+    where <- if (length(files)) paste0(" on ", paste(files, collapse = ", ")) else ""
+    fail(paste0(step, " failed", where, ". R says: ", conditionMessage(e)))
+  })
 }
 
 out_path <- function(key) Sys.getenv(paste0("GA_OUTPUT_", toupper(key)))

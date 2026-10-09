@@ -3,7 +3,7 @@ adapter:
   field: geospatial
   file_types: [".geojson", ".gpkg", ".shp", ".tif"]
   title: QGIS Processing
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Runs QGIS Processing algorithms from the command line with qgis_process. Each tool runs one
@@ -20,6 +20,11 @@ program:
     - https://docs.qgis.org/latest/en/docs/user_manual/processing/standalone.html
     - https://docs.qgis.org/latest/en/docs/user_manual/processing_algs/qgis/rasteranalysis.html
     - https://docs.qgis.org/latest/en/docs/user_manual/processing_algs/gdal/rasterprojections.html
+  install: >
+    Download the QGIS desktop app from https://qgis.org and put it in /Applications. The adapter runs the
+    headless program qgis_process in QGIS*.app/Contents/MacOS. For an app in another folder, set
+    GA_QGIS_PROCESS to the path of qgis_process. The tools start scripts/ga_qgis.py with python3, and the
+    script uses only the Python standard library.
 
 connection:
   kind: cli
@@ -34,6 +39,7 @@ locate:
   which: [qgis_process]
   version_command: ["{program_path}", "--version"]
   version_pattern: 'QGIS (\d+\.\d+\.\d+)'
+  identity: 'QGIS \d'
 
 data_rules:
   cloud_visibility: all
@@ -116,7 +122,7 @@ tools:
     read_only: true
     params:
       path: { type: string, minLength: 1, description: Absolute path of the raster file. }
-      band: { type: integer, minimum: 1, description: "Band number. Default 1." }
+      band: { type: integer, minimum: 1, description: "Band number (index, starting at 1). Default 1." }
     required: [path]
     command: ["python3", "{adapter_dir}/scripts/ga_qgis.py", "raster_statistics", "{path}", "--band", "{band}"]
     parse: json
@@ -130,7 +136,7 @@ tools:
       raster: { type: string, minLength: 1, description: Absolute path of the raster file. }
       zones: { type: string, minLength: 1, description: Absolute path of the polygon file. }
       stats: { type: string, description: "Comma list of count, sum, mean, median, stdev, min, max, range, minority, majority, variety, variance. Default count,sum,mean,min,max." }
-      band: { type: integer, minimum: 1, description: Band number. Default 1. }
+      band: { type: integer, minimum: 1, description: "Band number (index, starting at 1). Default 1." }
       id_field: { type: string, description: Polygon field that names each row. Leave out to number the rows from 1. }
     required: [raster, zones]
     outputs:

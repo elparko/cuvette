@@ -3,7 +3,7 @@ adapter:
   field: mass spectrometry imaging
   file_types: [".imzml", ".ibd"]
   title: pyimzML reader for imzML mass spectrometry imaging files
-  version: 0.1.1
+  version: 0.1.2
   description: Reads any imzML file with pyimzML. It gives file facts, the total ion current image, ion images at an m/z with a ppm window, the mean spectrum and the strongest peaks.
 program:
   name: pyimzML
@@ -12,6 +12,9 @@ program:
   docs:
     - https://pyimzml.readthedocs.io/
     - https://www.ms-imaging.org/imzml/
+  install: >
+    The adapter uses the pyimzml Python environment. Make the environment and add pyimzML to it:
+    uv venv ~/.guided-analysis/envs/pyimzml && uv pip install --python ~/.guided-analysis/envs/pyimzml/bin/python pyimzml
 connection:
   kind: python
   interpreter: ["{program_path}"]
@@ -22,10 +25,9 @@ locate:
   paths:
     - ~/.guided-analysis/envs/pyimzml/bin/python
     - ~/.guided-analysis/envs/pyimzml/Scripts/python.exe
-  version_command:
-    - "{program_path}"
-    - -c
-    - "import importlib.metadata as m; print(m.version('pyimzml'))"
+  version_command: ["{program_path}", "-c", "import importlib.metadata as m; print('pyimzml', m.version('pyimzml'))"]
+  version_pattern: 'pyimzml (\S+)'
+  identity: 'pyimzml \d'
 module: ""
 decisions:
   - key: ion_ppm
@@ -420,7 +422,7 @@ tools:
     read_only: true
     params:
       path: { type: string, minLength: 1, description: Absolute path of the .imzML file. }
-      snr: { type: number, minimum: 1, maximum: 50, description: Signal-to-noise cutoff. The decision snr sets it. }
+      snr: { type: number, minimum: 1, maximum: 50, description: "Signal-to-noise cutoff, a unitless ratio. The decision snr sets it." }
       n_peaks: { type: integer, minimum: 1, maximum: 1000, description: Number of peaks returned. }
       normalization: { type: string, enum: [none, tic, rms], description: Pixel normalization. The decision normalization sets it. }
       bin_width: { type: number, minimum: 0, description: Bin width in m/z. 0 uses the default of get_mean_spectrum. }

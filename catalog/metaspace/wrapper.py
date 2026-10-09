@@ -32,6 +32,12 @@ def _fail(msg):
     return {"ok": False, "error": msg}
 
 
+def _step_error(step, dataset_id, e):
+    if type(e).__name__ == "DatasetNotFound":
+        return "%s: no public METASPACE dataset has the id %r. This adapter reads public datasets only. Find the id with search_datasets." % (step, dataset_id)
+    return "%s on dataset_id %r: %s" % (step, dataset_id, e)
+
+
 def _split_ids(ids):
     return [d.strip() for d in re.split(r"[,|;\s]+", ids) if d.strip()]
 
@@ -118,11 +124,16 @@ def search_datasets(name=None, organism=None, polarity=None, submitter=None, mal
         for r in found
     ]
     capped = scanned >= scan_cap and len(found) < limit
+    given = ", ".join("%s=%s" % (k, v) for k, v in (("name", name), ("dataset_id", dataset_id), ("organism", organism), ("polarity", polarity), ("submitter", submitter), ("maldi_matrix", maldi_matrix), ("analyzer_type", analyzer_type), ("ionisation_source", ionisation_source), ("group", group)) if v)
+    if "ids" in flt:
+        none_msg = "No public dataset has the id %s. This adapter reads public datasets only. Check the id on the METASPACE web page of the dataset." % flt["ids"]
+    else:
+        none_msg = "No public dataset matched the filters (%s). Run the search again with fewer filters and compare the spelling of each value with the result." % (given or "none")
     return {
         "n_found": len(found),
         "n_scanned": scanned,
         "scan_capped": capped,
-        "warning": "The search read only the newest %d datasets that match the filters. Add a filter to narrow it." % scan_cap if capped else ("No dataset matched. The dataset can be private, or a filter value can be spelled differently. Try get_dataset_info with the id." if not found else ""),
+        "warning": "The search read only the newest %d datasets that match the filters. Add a filter to narrow it." % scan_cap if capped else (none_msg if not found else ""),
         "table": {"columns": columns, "rows": table_rows, "n_rows": len(table_rows)},
     }
 
@@ -130,10 +141,8 @@ def search_datasets(name=None, organism=None, polarity=None, submitter=None, mal
 def get_dataset_info(dataset_id):
     try:
         ds = _dataset(dataset_id)
-    except ValueError as e:
-        return _fail(str(e))
     except Exception as e:
-        return _fail("dataset not found or not public: %s" % e)
+        return _fail(_step_error("get_dataset_info", dataset_id, e))
     md = ds.metadata
     ms = md.get("MS_Analysis", {})
     rp = ms.get("Detector_Resolving_Power", {})
@@ -189,7 +198,7 @@ def list_annotations(dataset_id, database="HMDB v4", fdr=0.1, exclude_off_sample
         ds = _dataset(dataset_id)
         df = _results(ds, database, fdr)
     except Exception as e:
-        return _fail(str(e))
+        return _fail(_step_error("list_annotations", dataset_id, e))
     df = df.reset_index()
     n_all = len(df)
     n_off = int(df["offSample"].fillna(False).sum()) if n_all else 0
@@ -226,7 +235,7 @@ def compare_fdr_counts(dataset_id, database="HMDB v4", exclude_off_sample=False)
         ds = _dataset(dataset_id)
         df = _results(ds, database, 0.2).reset_index()
     except Exception as e:
-        return _fail(str(e))
+        return _fail(_step_error("compare_fdr_counts", dataset_id, e))
     off = df["offSample"].fillna(False).astype(bool)
     out = {"dataset_id": dataset_id, "database": database, "off_sample_excluded": bool(exclude_off_sample)}
     rows = []
@@ -281,6 +290,7 @@ def overlap_annotations(dataset_ids, database="HMDB v4", fdr=0.1, exclude_off_sa
     dataset_ids = list(dict.fromkeys(dataset_ids))
     if len(dataset_ids) < 2 or len(dataset_ids) > 6:
         return _fail("give 2 to 6 different dataset ids")
+    d = ", ".join(dataset_ids)
     try:
         _check_fdr(fdr)
         sets = {}
@@ -291,7 +301,7 @@ def overlap_annotations(dataset_ids, database="HMDB v4", fdr=0.1, exclude_off_sa
             sets[d] = set(zip(df["formula"], df["adduct"]))
             time.sleep(0.5)
     except Exception as e:
-        return _fail(str(e))
+        return _fail(_step_error("overlap_annotations", d, e))
     shared = set.intersection(*sets.values())
     union = set.union(*sets.values())
     out = {"database": database, "fdr_max": fdr, "off_sample_excluded": bool(exclude_off_sample), "n_datasets": len(sets), "n_in_all": len(shared), "n_in_union": len(union), "fraction_in_all": round(len(shared) / len(union), 3) if union else None}

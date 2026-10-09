@@ -3,7 +3,7 @@ adapter:
   field: neurophysiology
   file_types: [".fif", ".edf", ".bdf", ".set", ".vhdr"]
   title: MNE-Python
-  version: 0.1.2
+  version: 0.1.3
   spec: "1"
   description: >
     Analyzes EEG and MEG recordings with MNE-Python. Each tool does one MNE step on a raw
@@ -22,6 +22,11 @@ program:
     - https://mne.tools/stable/auto_tutorials/epochs/10_epochs_overview.html
     - https://mne.tools/stable/auto_tutorials/preprocessing/40_artifact_correction_ica.html
     - https://mne.tools/stable/auto_tutorials/time-freq/20_sensors_time_frequency.html
+  install: >
+    The adapter uses a Python environment in ~/.guided-analysis/envs/mne. Make it and install MNE-Python, the
+    packages that ga_mne.py imports, and scikit-learn for the fastica method of ICA:
+    uv venv ~/.guided-analysis/envs/mne && uv pip install --python ~/.guided-analysis/envs/mne/bin/python
+    mne matplotlib pandas scikit-learn
 
 connection:
   kind: python
@@ -35,8 +40,9 @@ locate:
     - ~/.guided-analysis/envs/mne/bin/python
     - ~/.guided-analysis/envs/mne/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import mne; print(mne.__version__)"]
-  version_pattern: '(\d+\.\d+\.\d+)'
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import mne; print('mne', mne.__version__)"]
+  version_pattern: 'mne (\S+)'
+  identity: 'mne \d'
 
 data_rules:
   cloud_visibility: summaries
@@ -416,7 +422,7 @@ tools:
     function: "ga_mne:set_bad_channels"
     params:
       raw: { type: [object, string], description: A handle or a .fif path. }
-      bads: { type: string, description: Channel names separated by commas, or none. }
+      bads: { type: string, description: "Channel names separated by commas, or none." }
     required: [raw]
 
   - name: filter_raw
@@ -439,7 +445,7 @@ tools:
     params:
       raw: { type: [object, string], description: A handle or a .fif path. }
       ref_channels: { type: string, description: 'average, channel names separated by commas, or none.' }
-      projection: { type: boolean, default: false, description: Add the reference as a projection that is applied later, instead of now. }
+      projection: { type: boolean, default: false, description: "Add the reference as a projection that is applied later, instead of now." }
     required: [raw]
 
   - name: run_ica
@@ -454,7 +460,7 @@ tools:
       n_components: { type: integer, minimum: 2, description: Number of components. }
       method: { type: string, enum: [fastica, infomax, picard], default: fastica }
       random_state: { type: integer, minimum: 0, description: Random seed. }
-      fit_l_freq: { type: number, minimum: 0, default: 1.0, description: High-pass edge of the copy that ICA is fitted on. }
+      fit_l_freq: { type: number, minimum: 0, default: 1.0, description: High-pass edge in Hz of the copy that ICA is fitted on. }
       picks: { type: string, enum: [meg, eeg, "meg+eeg"], default: meg, description: Channel types to fit. }
     required: [raw]
     outputs:
@@ -467,7 +473,7 @@ tools:
     params:
       raw: { type: [object, string], description: A handle or a .fif path. }
       ica: { type: [object, string], description: The ICA handle or the path of fitted-ica.fif. }
-      exclude: { type: [string, array], description: Component numbers separated by commas, or a list. }
+      exclude: { type: [string, array], description: "Component numbers separated by commas, or a list." }
     required: [raw, ica]
 
   - name: make_epochs
@@ -489,7 +495,7 @@ tools:
       reject_mag: { type: number, minimum: 0, description: Magnetometer limit in fT. }
       reject_eeg: { type: number, minimum: 0, description: EEG limit in uV. }
       reject_eog: { type: number, minimum: 0, description: EOG limit in uV. }
-      stim_channel: { type: string, default: "STI 014" }
+      stim_channel: { type: string, default: "STI 014", description: Name of the stimulus channel. }
     required: [raw, event_id]
     outputs:
       counts: { kind: table, ext: csv, description: Epochs kept for each condition. }
@@ -550,7 +556,7 @@ tools:
       ch_type: { type: string, enum: [grad, mag, eeg], default: eeg }
       baseline_mode: { type: string, enum: [mean, ratio, logratio, percent, zscore, zlogratio], description: How power is compared with the baseline. }
       baseline_start: { type: number, description: Baseline start in seconds. Leave out for the epoch start. }
-      baseline_end: { type: number, default: 0 }
+      baseline_end: { type: number, default: 0, description: Baseline end in seconds. }
     required: [epochs, condition]
     outputs:
       plot: { kind: image, ext: png, description: Power over time and frequency. }

@@ -3,7 +3,7 @@ adapter:
   field: microscopy
   file_types: [".tif", ".tiff", ".png", ".jpg"]
   title: Cellpose
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Segments cells and nuclei in an image or a folder of images with a Cellpose model, and scores
@@ -21,6 +21,10 @@ program:
     - https://cellpose.readthedocs.io/en/latest/api.html
     - https://cellpose.readthedocs.io/en/latest/settings.html
     - https://github.com/MouseLand/cellpose
+  install: >
+    The adapter uses its own Python environment at ~/.guided-analysis/envs/cellpose, or the Python in CELLPOSE_PYTHON.
+    Make the environment and install Cellpose with packaging, which Cellpose needs but does not list:
+    uv venv ~/.guided-analysis/envs/cellpose && uv pip install --python ~/.guided-analysis/envs/cellpose/bin/python cellpose packaging
 
 connection:
   kind: python
@@ -33,8 +37,9 @@ locate:
   paths:
     - ~/.guided-analysis/envs/cellpose/bin/python
     - ~/.guided-analysis/envs/cellpose/Scripts/python.exe
-  version_command: ["{program_path}", "-c", "import importlib.metadata as m; print(m.version('cellpose'))"]
-  version_pattern: "([0-9]+\\.[0-9]+(?:\\.[0-9]+)*)"
+  version_command: ["{program_path}", "-c", "import importlib.metadata as m; print('cellpose', m.version('cellpose'))"]
+  version_pattern: 'cellpose (\S+)'
+  identity: 'cellpose \d'
 
 data_rules:
   cloud_visibility: summaries
@@ -172,25 +177,26 @@ tools:
     read_only: true
     function: "cellpose_tools:inspect_image"
     params:
-      path: { type: string, minLength: 1, description: Path of an image file, or of a folder of images. }
+      path: { type: string, minLength: 1, description: "Path of an image file, or of a folder of images." }
     required: [path]
 
   - name: segment_cells
     title: Segment cells
     description: >-
-      Find the cells or nuclei in one image, or in all images of a folder, with a Cellpose model. For a folder, give the folder as the path (use "." for the current folder), a pattern and optionally a truth folder to score each image. Folder example: path "images", truth_folder "masks". Writes a label image, an outline PNG and a CSV of areas.
+      Find the cells or nuclei in one image, or in all images of a folder, with a Cellpose model. For a folder, give the folder as the path (the current folder is "."), a pattern and optionally a truth folder to score each image. Folder example: path "images", truth_folder "masks". Writes a label image, an outline PNG and a CSV of areas.
     function: "cellpose_tools:segment_cells"
+    batch: false
     params:
-      path: { type: string, minLength: 1, description: Path of one image file, or of a folder of images. }
+      path: { type: string, minLength: 1, description: "Path of one image file, or of a folder of images." }
       model_type: { type: string, enum: [cpsam_v2, cpsam], default: cpsam_v2, description: Cellpose model name. }
       cell_diameter: { type: number, minimum: 0, default: 0, description: Cell diameter in pixels. 0 means no resizing. }
-      flow_threshold: { type: number, minimum: 0, default: 0.4 }
-      cellprob_threshold: { type: number, minimum: -6, maximum: 6, default: 0 }
-      min_cell_size: { type: integer, minimum: 0, default: 15, description: Smallest cell to keep, in pixels. }
-      exclude_border_cells: { type: boolean, default: false }
+      flow_threshold: { type: number, minimum: 0, default: 0.4, description: Largest flow error of a cell that Cellpose keeps. Unitless. A higher value keeps more cells. }
+      cellprob_threshold: { type: number, minimum: -6, maximum: 6, default: 0, description: Cell probability cutoff. Unitless. Cellpose keeps the pixels above it for masks. A lower value finds more and larger masks. }
+      min_cell_size: { type: integer, minimum: 0, default: 15, description: "Smallest cell to keep, in pixels." }
+      exclude_border_cells: { type: boolean, default: false, description: True to remove the cells that touch the image border. }
       pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
       use_gpu: { type: boolean, default: true, description: Use the GPU if there is one. }
-      pattern: { type: string, default: "*", description: For a folder. File pattern under the folder, such as "*/tissue images/*.png". The default takes all image files directly in the folder. }
+      pattern: { type: string, default: "*", description: 'For a folder. File pattern under the folder, such as "*/tissue images/*.png". The default takes all image files directly in the folder.' }
       only_listed_in: { type: string, description: "For a folder. Path of a text file with one image file name for each line. Only these images are used. Always give it when the scientist names a list of images, such as a test set." }
       truth_folder: { type: string, description: For a folder. Folder with the hand-drawn masks. The mask has the same file name stem as the image. }
       truth_match: { type: string, default: "", description: For a folder. Text that the mask folder path must contain. }

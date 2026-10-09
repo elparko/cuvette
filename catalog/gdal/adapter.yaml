@@ -3,7 +3,7 @@ adapter:
   field: geospatial
   file_types: [".geojson", ".gpkg", ".shp", ".tif"]
   title: GDAL and OGR
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Reads, reprojects and measures raster and vector map data with the GDAL and OGR command line
@@ -23,6 +23,12 @@ program:
     - https://gdal.org/programs/ogr2ogr.html
     - https://gdal.org/programs/ogrinfo.html
     - https://pythonhosted.org/rasterstats/manual.html
+  install: >
+    Install GDAL with its command line programs (brew install gdal on macOS). The tools run
+    scripts/ga_gdal.py in a Python environment in ~/.guided-analysis/envs/gdal. Make it and install the
+    packages that the script imports:
+    uv venv ~/.guided-analysis/envs/gdal && uv pip install --python ~/.guided-analysis/envs/gdal/bin/python
+    rasterstats geopandas rasterio matplotlib numpy
 
 connection:
   kind: cli
@@ -35,6 +41,7 @@ locate:
   which: [gdalinfo]
   version_command: ["{program_path}", "--version"]
   version_pattern: 'GDAL (\d+\.\d+\.\d+)'
+  identity: 'GDAL \d'
 
 data_rules:
   cloud_visibility: all
@@ -139,11 +146,11 @@ tools:
     title: Describe a raster
     description: >
       Read the size, the CRS (EPSG code), the pixel size, the nodata value and the exact band
-      statistics (min, max, mean, stddev) of a raster file with gdalinfo -stats.
+      statistics (min, max, mean, stddev) of a raster file. The tool runs gdalinfo with the stats option.
     read_only: true
     params:
       path: { type: string, minLength: 1, description: Absolute path of the raster file. }
-      band: { type: integer, minimum: 1, description: "Band number. Default 1." }
+      band: { type: integer, minimum: 1, description: "Band number (index, starting at 1). Default 1." }
     required: [path]
     command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "raster_info", "{path}", "--band", "{band}"]
     parse: json
@@ -171,7 +178,7 @@ tools:
       target_crs: { type: string, minLength: 1, description: "Target CRS, such as EPSG:4326 (gdalwarp -t_srs)." }
       resampling: { type: string, enum: [near, bilinear, cubic, cubicspline, lanczos, average, rms, mode, max, min, med, q1, q3, sum], description: Resampling method (gdalwarp -r). }
       pixel_size: { type: string, description: Output pixel size in target CRS units (gdalwarp -tr). Leave out or empty to let GDAL choose. }
-      src_nodata: { type: string, description: Nodata value of the input, if the file has none (gdalwarp -srcnodata). }
+      src_nodata: { type: string, description: "Nodata value of the input, if the file has none (gdalwarp -srcnodata)." }
       dst_nodata: { type: string, description: Nodata value of the output (gdalwarp -dstnodata). }
     required: [path, target_crs]
     outputs:
@@ -182,7 +189,7 @@ tools:
   - name: calc_raster
     title: Raster algebra
     description: >
-      Compute a new raster from a numpy expression of one raster with gdal_calc. The band is A.
+      Compute a new raster from a numpy expression of one raster. The tool runs gdal_calc, and the band is A.
       GDAL does the arithmetic in the data type of the band, so a Byte band overflows. Cast first,
       such as A.astype(numpy.float32)*2.
     params:
@@ -221,7 +228,7 @@ tools:
       zones: { type: string, minLength: 1, description: Absolute path of the polygon file. }
       pixels: { type: string, enum: [centers, all_touched], description: "centers counts pixels whose center is inside the polygon. all_touched counts every pixel that the polygon touches." }
       nodata: { type: string, description: Nodata value. Leave out to use the value in the raster file. }
-      band: { type: integer, minimum: 1, description: Band number. Default 1. }
+      band: { type: integer, minimum: 1, description: "Band number (index, starting at 1). Default 1." }
       id_field: { type: string, description: Polygon field that names each row. Leave out to number the rows from 1. }
     required: [raster, zones]
     command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "zonal_stats", "{raster}", "{zones}", "--pixels", "{pixels}", "--nodata", "{nodata}", "--band", "{band}", "--id-field", "{id_field}"]
@@ -236,7 +243,7 @@ tools:
     params:
       raster: { type: string, minLength: 1, description: Absolute path of the raster file. }
       zones: { type: string, description: Absolute path of a polygon file to draw as outlines. }
-      band: { type: integer, minimum: 1, description: Band number. Default 1. }
+      band: { type: integer, minimum: 1, description: "Band number (index, starting at 1). Default 1." }
       colormap: { type: string, description: Matplotlib colormap name. Default viridis. }
       title: { type: string, description: Title of the map. }
     required: [raster]

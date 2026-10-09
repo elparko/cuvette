@@ -3,7 +3,7 @@ adapter:
   field: proteomics
   file_types: [".mzml", ".fasta"]
   title: Sage peptide search
-  version: 0.1.1
+  version: 0.1.2
   spec: "1"
   description: >
     Searches MS2 spectra against a protein database with the Sage search engine, then counts the
@@ -20,6 +20,12 @@ program:
     - https://sage-docs.vercel.app/docs
     - https://github.com/lazear/sage/blob/master/DOCS.md
     - https://doi.org/10.1021/acs.jproteome.3c00486
+  install: >
+    Sage is a single binary on the T7 drive. Download the release archive for your platform from
+    https://github.com/lazear/sage/releases and unpack it into /Volumes/T7/guided-analysis/tools/sage/ or
+    ~/.guided-analysis/sage/. The adapter finds sage-*/sage in these folders, or reads the SAGE variable,
+    ~/.cargo/bin, /opt/homebrew/bin, /usr/local/bin and the PATH.
+    mkdir -p ~/.guided-analysis/sage && tar -xzf <downloaded archive> -C ~/.guided-analysis/sage
 
 connection:
   kind: cli
@@ -36,6 +42,7 @@ locate:
   which: [sage]
   version_command: ["{program_path}", "--version"]
   version_pattern: "sage (\\S+)"
+  identity: 'sage \d'
 
 decisions:
   - key: fasta
@@ -315,29 +322,30 @@ tools:
       Search MS2 spectra in mzML files against a FASTA file with Sage. Writes a Sage configuration file and
       the result table (one row per PSM, targets and decoys). The result has the number of PSMs, the number of
       decoy PSMs, and the Sage version. Use results in count_at_fdr.
+    batch: false
     params:
       mzml_paths: { type: array, items: { type: string }, minItems: 1, description: Absolute paths of the mzML files (or mzML.gz). }
       fasta: { type: string, minLength: 1, description: "Absolute path of the FASTA file. Leave it out. The harness sets it from the decision." }
       decoys: { type: string, enum: [sage_reverse, in_fasta], description: "Decoy strategy. Leave it out. The harness sets it from the decision." }
       decoy_tag: { type: string, description: "Decoy tag. Leave it out. The harness sets it from the decision." }
       enzyme: { type: string, enum: [trypsin, trypsin_p, lys_c, arg_c, chymotrypsin, asp_n, none], description: "Enzyme. Leave it out. The harness sets it from the decision." }
-      missed_cleavages: { type: integer, minimum: 0, maximum: 5, description: "Missed cleavages. Leave it out. The harness sets it from the decision." }
-      min_len: { type: integer, minimum: 4, maximum: 100, description: Shortest peptide. The Sage default is 5. }
-      max_len: { type: integer, minimum: 4, maximum: 100, description: Longest peptide. The Sage default is 50. }
+      missed_cleavages: { type: integer, minimum: 0, maximum: 5, description: "Missed cleavages, a count for each peptide. Leave it out. The harness sets it from the decision." }
+      min_len: { type: integer, minimum: 4, maximum: 100, description: "Shortest peptide, in residues. The Sage default is 5." }
+      max_len: { type: integer, minimum: 4, maximum: 100, description: "Longest peptide, in residues. The Sage default is 50." }
       fixed_mods: { type: string, description: "Fixed modifications. Leave it out. The harness sets it from the decision." }
       variable_mods: { type: string, description: "Variable modifications. Leave it out. The harness sets it from the decision." }
-      max_variable_mods: { type: integer, minimum: 0, maximum: 5, description: "Leave it out. The harness sets it from the decision." }
-      precursor_tol_ppm: { type: number, minimum: 0.1, maximum: 1000, description: "Leave it out. The harness sets it from the decision." }
-      fragment_tol: { type: number, minimum: 0.001, maximum: 1000, description: "Leave it out. The harness sets it from the decision." }
-      fragment_tol_unit: { type: string, enum: [ppm, da], description: "Leave it out. The harness sets it from the decision." }
-      isotope_min: { type: integer, minimum: -3, maximum: 0, description: "Leave it out. The harness sets it from the decision." }
-      isotope_max: { type: integer, minimum: 0, maximum: 5, description: "Leave it out. The harness sets it from the decision." }
-      deisotope: { type: boolean, description: Deisotope and find the charge of fragment peaks. Use it for high-resolution fragment scans. The Sage default is false. }
+      max_variable_mods: { type: integer, minimum: 0, maximum: 5, description: "Most variable modifications on one peptide, a count. Leave it out. The harness sets it from the decision." }
+      precursor_tol_ppm: { type: number, minimum: 0.1, maximum: 1000, description: "Precursor mass tolerance, in ppm. Leave it out. The harness sets it from the decision." }
+      fragment_tol: { type: number, minimum: 0.001, maximum: 1000, description: "Fragment mass tolerance, in the unit of fragment_tol_unit (ppm or Da). Leave it out. The harness sets it from the decision." }
+      fragment_tol_unit: { type: string, enum: [ppm, da], description: "Unit of fragment_tol. Leave it out. The harness sets it from the decision." }
+      isotope_min: { type: integer, minimum: -3, maximum: 0, description: "Lowest precursor isotope error to search, a count of isotope peaks. Leave it out. The harness sets it from the decision." }
+      isotope_max: { type: integer, minimum: 0, maximum: 5, description: "Highest precursor isotope error to search, a count of isotope peaks. Leave it out. The harness sets it from the decision." }
+      deisotope: { type: boolean, description: "Deisotope and find the charge of fragment peaks. Use it only for high-resolution fragment scans. Keep it false for low-resolution fragment scans, such as ion trap scans. The Sage default is false." }
       max_fragment_charge: { type: integer, minimum: 1, maximum: 6, description: "Highest fragment charge to match. Leave it out. The harness sets it from the decision." }
       min_peaks: { type: integer, minimum: 1, maximum: 1000, description: "Skip spectra with fewer peaks. Leave it out. The harness sets it from the decision." }
       max_peaks: { type: integer, minimum: 10, maximum: 5000, description: Keep this many of the strongest peaks. The Sage default is 150. }
       min_matched_peaks: { type: integer, minimum: 1, maximum: 100, description: Fewest matched fragment peaks for a reported PSM. The Sage default is 4. }
-      report_psms: { type: integer, minimum: 1, maximum: 10, description: PSMs to report for each spectrum. The Sage default is 1. }
+      report_psms: { type: integer, minimum: 1, maximum: 10, description: "Number of PSMs to report for each spectrum, a count. The Sage default is 1." }
       predict_rt: { type: boolean, description: Use a retention time model as a feature in the rescoring. The Sage default is true. It needs enough PSMs. }
       chimera: { type: boolean, description: Search for more than one peptide in one spectrum. The Sage default is false. }
     required: [mzml_paths, fasta, precursor_tol_ppm, fragment_tol]
@@ -407,8 +415,8 @@ tools:
   - name: count_at_fdr
     title: Count hits at an FDR
     description: >
-      Read the result table from search_sage and count the target hits whose q-value is at or under the
-      threshold, at the PSM, peptide or protein level. The result has the counts of PSMs, distinct peptide
+      Count the target hits in a Sage result table whose q-value is at or under the threshold, at the PSM,
+      peptide or protein level. The table comes from search_sage. The result has the counts of PSMs, distinct peptide
       sequences and protein groups, the decoys among them, and (PSM level) a recount of the PSMs from the decoy labels.
     read_only: true
     params:

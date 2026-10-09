@@ -3,7 +3,7 @@ adapter:
   field: pathology
   file_types: [".svs", ".ndpi", ".qpdata", ".tif", ".tiff"]
   title: QuPath
-  version: 0.1.1
+  version: 0.1.2
   spec: "1"
   description: >
     Counts cells and positive cells in stained tissue images with QuPath. Each tool opens one image
@@ -21,6 +21,10 @@ program:
     - https://qupath.readthedocs.io/en/0.7/docs/tutorials/cell_detection.html
     - https://qupath.readthedocs.io/en/0.7/docs/scripting/overview.html
     - https://qupath.readthedocs.io/en/0.7/docs/reference/commands.html
+  install: >
+    Download QuPath from https://qupath.github.io and install it. On macOS without admin rights, unpack the .pkg file with pkgutil --expand-full.
+    The adapter reads the QuPath executable from QUPATH, from /Applications/QuPath-*.app, from /Volumes/T7/guided-analysis/tools/qupath/expanded on the T7 drive, or from the PATH:
+    export QUPATH=/Applications/QuPath-0.7.0-arm64.app/Contents/MacOS/QuPath-0.7.0-arm64
 
 connection:
   kind: macro
@@ -46,6 +50,7 @@ locate:
   which: [QuPath, qupath]
   version_command: ["{program_path}", "--version"]
   version_pattern: "QuPath v(\\S+)"
+  identity: 'QuPath v\d'
 
 module: adapter.ts
 
@@ -107,7 +112,7 @@ decisions:
     group: Image
     help: >
       QuPath uses the pixel size to turn sizes in micrometers into pixels. Read it from the scanner
-      or the file. The Ki-67 slide of the QuPath workshop has 0.4537. The prostate files have no
+      or the file metadata (open_image shows it). Some files, such as PNG exports, have no
       pixel size.
     essential: true
     owner: human
@@ -545,8 +550,9 @@ tools:
       Open an image file, or the state file of an earlier step, and report its size, pixel size,
       channels and image type. Use this first. The pixel size is missing for many files.
     read_only: true
+    batch: false
     params:
-      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      input: { type: string, minLength: 1, description: "Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay." }
     required: [input]
     parse: keyvalue
     macro: |
@@ -562,8 +568,8 @@ tools:
       Set the image type so that QuPath can separate the stains. Saves a new state file named state.
       Use Brightfield (H-DAB) for a brown DAB stain such as Ki-67.
     params:
-      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
-      image_type: { type: string, enum: ["Brightfield (H&E)", "Brightfield (H-DAB)", "Brightfield (other)", "Fluorescence"] }
+      input: { type: string, minLength: 1, description: "Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay." }
+      image_type: { type: string, enum: ["Brightfield (H&E)", "Brightfield (H-DAB)", "Brightfield (other)", "Fluorescence"], description: "Image type. Brightfield (H&E) is hematoxylin and eosin. Brightfield (H-DAB) is hematoxylin and a brown DAB stain, such as Ki-67. Brightfield (other) is another brightfield stain. Fluorescence is a fluorescence image." }
       stain_vectors: { type: string, description: 'The word default, or the text of a setColorDeconvolutionStains line from QuPath.' }
     required: [input, image_type]
     outputs:
@@ -585,7 +591,7 @@ tools:
       or if the scientist gives another value. Saves a new state file named state. All sizes in
       micrometers depend on this value.
     params:
-      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      input: { type: string, minLength: 1, description: "Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay." }
       pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel width in micrometers. }
       pixel_height_um: { type: number, exclusiveMinimum: 0, description: Pixel height in micrometers. The default is the pixel width. }
     required: [input, pixel_width_um]
@@ -609,7 +615,7 @@ tools:
       Add one annotation that covers the whole image. Saves a new state file named state. The
       detection tools make this annotation by themselves if the state has none.
     params:
-      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      input: { type: string, minLength: 1, description: "Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay." }
     required: [input]
     outputs:
       state: { kind: file, ext: .qpdata, description: The state file for the next step. }
@@ -631,12 +637,12 @@ tools:
       tissue area in square millimeters. Needs the pixel size. Deletes all earlier objects. Saves a
       new state file named state.
     params:
-      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      input: { type: string, minLength: 1, description: "Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay." }
       pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel size of the image in micrometers. Give it to set the pixel size in this call. It is not needed if the file or an earlier step has it. }
-      threshold: { type: integer, minimum: 0, maximum: 255, description: Gray value that separates tissue from glass. }
+      threshold: { type: integer, minimum: 0, maximum: 255, description: Gray level that separates tissue from glass. }
       requested_pixel_size: { type: number, minimum: 5, maximum: 100, description: Pixel size in micrometers for the search. Use 10 to 50. This is not the pixel size of the image. A small value makes the search very slow on a slide. }
       minimum_area: { type: number, minimum: 0, description: Smallest piece of tissue in square micrometers. }
-      max_fill_area: { type: number, minimum: 0, description: Largest hole in the tissue to fill, in square micrometers. }
+      max_fill_area: { type: number, minimum: 0, description: "Largest hole in the tissue to fill, in square micrometers." }
       dark_background: { type: boolean, description: True if the background is darker than the tissue. }
       single_annotation: { type: boolean, description: True to merge all tissue pieces into one annotation. }
     required: [input]
@@ -687,7 +693,7 @@ tools:
       Cut the annotation into square tiles of a fixed size in micrometers. Needs the pixel size.
       Makes a full image annotation if the state has none. Saves a new state file named state.
     params:
-      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      input: { type: string, minLength: 1, description: "Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay." }
       pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel size of the image in micrometers. Give it to set the pixel size in this call. It is not needed if the file or an earlier step has it. }
       tile_size: { type: number, exclusiveMinimum: 0, description: Tile width and height in micrometers. }
       trim_to_roi: { type: boolean, description: True to cut tiles at the edge of the annotation. }
@@ -734,7 +740,7 @@ tools:
       the state has none. Saves a new state file named state. Leave a setting out to use the
       decision value or the QuPath default.
     params:
-      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      input: { type: string, minLength: 1, description: "Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay." }
       image_type: { type: string, enum: ["Brightfield (H&E)", "Brightfield (H-DAB)", "Brightfield (other)", "Fluorescence"], description: Image type. Give it to set the type in this call. It is not needed if an earlier step set it. }
       stain_vectors: { type: string, description: 'The word default, or the text of a setColorDeconvolutionStains line from QuPath.' }
       pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel size of the image in micrometers. Give it to set the pixel size in this call. It is not needed if the file or an earlier step has it. }
@@ -746,8 +752,8 @@ tools:
       sigma: { type: number, exclusiveMinimum: 0, description: Sigma of the Gaussian blur in micrometers. }
       minimum_area: { type: number, minimum: 0, description: Smallest nucleus in square micrometers. }
       maximum_area: { type: number, exclusiveMinimum: 0, description: Largest nucleus in square micrometers. }
-      threshold: { type: number, minimum: 0, maximum: 10, description: Lowest hematoxylin optical density of a nucleus. Typical values are 0.05 to 0.5. The QuPath default is 0.1. }
-      max_background_intensity: { type: number, minimum: 0, maximum: 20, description: Highest background optical density. The QuPath default is 2. }
+      threshold: { type: number, minimum: 0, maximum: 10, description: Lowest hematoxylin optical density of a nucleus. Optical density has no unit. Typical values are 0.05 to 0.5. The QuPath default is 0.1. }
+      max_background_intensity: { type: number, minimum: 0, maximum: 20, description: Highest background optical density. Optical density has no unit. The QuPath default is 2. }
       split_by_shape: { type: boolean, description: True to split touching nuclei by their shape. }
       cell_expansion: { type: number, minimum: 0, description: Distance in micrometers to grow each nucleus to the cell. }
       include_cell_nucleus: { type: boolean, description: True to keep the nucleus in each cell. }
@@ -780,7 +786,7 @@ tools:
       and set_pixel_size first. Saves a new state file named state. Leave a setting out to use
       the decision value or the QuPath default.
     params:
-      input: { type: string, minLength: 1, description: Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay. }
+      input: { type: string, minLength: 1, description: "Path of an image file for the first step. For each later step, the path of the state file that the last step saved, so that earlier settings stay." }
       image_type: { type: string, enum: ["Brightfield (H&E)", "Brightfield (H-DAB)", "Brightfield (other)", "Fluorescence"], description: Image type. Give it to set the type in this call. It is not needed if an earlier step set it. }
       stain_vectors: { type: string, description: 'The word default, or the text of a setColorDeconvolutionStains line from QuPath.' }
       pixel_width_um: { type: number, exclusiveMinimum: 0, description: Pixel size of the image in micrometers. Give it to set the pixel size in this call. It is not needed if the file or an earlier step has it. }
@@ -792,17 +798,17 @@ tools:
       sigma: { type: number, exclusiveMinimum: 0, description: Sigma of the Gaussian blur in micrometers. }
       minimum_area: { type: number, minimum: 0, description: Smallest nucleus in square micrometers. }
       maximum_area: { type: number, exclusiveMinimum: 0, description: Largest nucleus in square micrometers. }
-      threshold: { type: number, minimum: 0, maximum: 10, description: Lowest hematoxylin optical density of a nucleus. Typical values are 0.05 to 0.5. The QuPath default is 0.1. }
-      max_background_intensity: { type: number, minimum: 0, maximum: 20, description: Highest background optical density. The QuPath default is 2. }
+      threshold: { type: number, minimum: 0, maximum: 10, description: Lowest hematoxylin optical density of a nucleus. Optical density has no unit. Typical values are 0.05 to 0.5. The QuPath default is 0.1. }
+      max_background_intensity: { type: number, minimum: 0, maximum: 20, description: Highest background optical density. Optical density has no unit. The QuPath default is 2. }
       split_by_shape: { type: boolean, description: True to split touching nuclei by their shape. }
       cell_expansion: { type: number, minimum: 0, description: Distance in micrometers to grow each nucleus to the cell. }
       include_cell_nucleus: { type: boolean, description: True to keep the nucleus in each cell. }
       smooth_boundaries: { type: boolean, description: True to smooth the outlines. }
       score_compartment: { type: string, description: 'The measurement that is compared with the cutoff, such as "Nucleus: DAB OD mean".' }
-      threshold_1: { type: number, exclusiveMinimum: 0, maximum: 10, description: Cutoff for positive, or for 1+, in optical density of the score compartment. The QuPath default is 0.2. }
-      threshold_2: { type: number, exclusiveMinimum: 0, maximum: 10, description: Cutoff for 2+. Used when single_threshold is false. }
-      threshold_3: { type: number, exclusiveMinimum: 0, maximum: 10, description: Cutoff for 3+. Used when single_threshold is false. }
-      single_threshold: { type: boolean, description: True for Negative and Positive. False for Negative, 1+, 2+ and 3+. }
+      threshold_1: { type: number, exclusiveMinimum: 0, maximum: 10, description: "Cutoff for positive, or for 1+, in optical density of the score compartment. Optical density has no unit. The QuPath default is 0.2." }
+      threshold_2: { type: number, exclusiveMinimum: 0, maximum: 10, description: "Cutoff for 2+, in optical density (no unit). Used when single_threshold is false." }
+      threshold_3: { type: number, exclusiveMinimum: 0, maximum: 10, description: "Cutoff for 3+, in optical density (no unit). Used when single_threshold is false." }
+      single_threshold: { type: boolean, description: "True for Negative and Positive. False for Negative, 1+, 2+ and 3+." }
     required: [input]
     outputs:
       state: { kind: file, ext: .qpdata, description: The state file for the next step. }
@@ -908,6 +914,7 @@ checks:
 
 tests:
   - id: open_ome_crop
+    gui: true
     description: >
       The crop has 300 by 300 pixels by construction. The pixel size 0.4537 um matches the TIFF
       XResolution of the source slide in the paper expected.yaml (tolerance 0.001). The image type
@@ -925,6 +932,7 @@ tests:
       - { path: data.values.image_type, equals: Not set }
 
   - id: open_png_uncalibrated
+    gui: true
     description: A PNG file has no pixel size. The tool reports calibrated 0.
     data: [data/ki67_crop.png]
     calls:
@@ -934,6 +942,7 @@ tests:
       - { path: metrics.calibrated, equals: 0 }
 
   - id: set_type_and_size
+    gui: true
     description: The type and the pixel size that one step sets are present in the state of the next step.
     data: [data/ki67_crop.png]
     calls:
@@ -947,6 +956,7 @@ tests:
       - { path: data.values.image_type, equals: Brightfield (H-DAB) }
 
   - id: full_annotation_area
+    gui: true
     description: >
       One annotation of the full image has the area 300 by 300 pixels at 0.4537 um. The area is
       300 x 300 x 0.4537 x 0.4537 / 1e6 = 0.0185259 mm2 (arithmetic, not a program number).
@@ -959,6 +969,7 @@ tests:
       - { path: metrics.region_area_mm2, approx: 0.0185259, rel: 0.00001 }
 
   - id: cells_crop
+    gui: true
     description: >
       Cell detection with the QuPath defaults on the Ki-67 crop. This count is a number from the
       first run of this tool, not a published number. It shows that the tool is stable.
@@ -973,6 +984,7 @@ tests:
       - { path: metrics.mean_nucleus_area_um2, approx: 21.19, abs: 0.1 }
 
   - id: cells_threshold_moves
+    gui: true
     description: >
       A lower detection threshold finds more cells. Two numbers from runs of this tool, not
       published numbers.
@@ -987,6 +999,7 @@ tests:
       - { path: saved.low.metrics.n_cells, equals: 289 }
 
   - id: positive_crop
+    gui: true
     description: >
       Positive cell detection with the QuPath defaults on the H-DAB crop. Score compartment is
       Nucleus: DAB OD mean and Threshold 1+ is 0.2. These numbers are from the first run of this
@@ -1003,6 +1016,7 @@ tests:
       - { path: metrics.positive_percent, approx: 8.3045, rel: 0.0001 }
 
   - id: positive_cutoff_moves
+    gui: true
     description: >
       A lower cutoff gives more positive cells and a higher cutoff gives fewer. Numbers from runs
       of this tool, not published numbers.
@@ -1017,6 +1031,7 @@ tests:
       - { path: saved.low.metrics.n_positive, equals: 32 }
 
   - id: positive_three_levels
+    gui: true
     description: >
       With three levels the cells are 1+, 2+ and 3+. The H-score is 1 x weak + 2 x moderate + 3 x
       strong as a percent of all cells. Numbers from runs of this tool, not published numbers.
@@ -1030,6 +1045,7 @@ tests:
       - { path: metrics.h_score, approx: 14.8789, rel: 0.0001 }
 
   - id: tissue_area
+    gui: true
     description: >
       Tissue detection on a 400 by 400 pixel thumbnail of the prostate slide. The slide has no
       pixel size, so the test sets 10 um for each pixel. The area is in assumed units. The number
@@ -1046,6 +1062,7 @@ tests:
       - { path: metrics.image_area_mm2, approx: 16, rel: 0.000001 }
 
   - id: tissue_default_finds_nothing
+    gui: true
     description: At the QuPath default threshold 127 the pale tissue is lighter than the threshold and the tool finds no tissue.
     data: [data/prostate_thumb.png]
     calls:
@@ -1056,6 +1073,7 @@ tests:
       - { path: metrics.n_annotations, equals: 0 }
 
   - id: tiles_count
+    gui: true
     description: >
       Tiles of 100 um on the 4 mm by 4 mm thumbnail with an assumed 10 um for each pixel. The
       full image is 40 by 40 tiles (arithmetic: 4000 / 100 = 40, so 1600 tiles).
@@ -1067,6 +1085,7 @@ tests:
       - { path: metrics.n_tiles, equals: 1600 }
 
   - id: export_cells
+    gui: true
     description: The CSV file has one row for each cell and the DAB measurement columns.
     data: [data/ki67_crop.png]
     calls:
@@ -1081,6 +1100,7 @@ tests:
       - { path: "outputs[0].path", contains: ".csv" }
 
   - id: workflow_script
+    gui: true
     description: The history of the state has the cell detection step with the settings.
     data: [data/ki67_crop.png]
     calls:
@@ -1093,6 +1113,7 @@ tests:
       - { path: data.values.n_steps, min: 3 }
 
   - id: positive_one_call
+    gui: true
     description: >
       One call with image_type and pixel_width_um gives the same numbers as the three-step chain of
       the test positive_crop.
@@ -1105,6 +1126,7 @@ tests:
       - { path: metrics.positive_percent, approx: 8.3045, rel: 0.0001 }
 
   - id: positive_region
+    gui: true
     description: >
       A region of 150 by 150 pixels at 0.4537 um is 150 x 150 x 0.4537 x 0.4537 / 1e6 = 0.00463148
       mm2 (arithmetic). The cell and positive counts are from the first run of this tool, not

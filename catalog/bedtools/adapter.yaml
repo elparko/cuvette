@@ -3,7 +3,7 @@ adapter:
   field: genomics
   file_types: [".bed", ".gff", ".gtf", ".bedgraph"]
   title: bedtools
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Finds overlaps between genome intervals, merges intervals and measures coverage with bedtools.
@@ -21,6 +21,10 @@ program:
     - https://bedtools.readthedocs.io/en/latest/content/tools/merge.html
     - https://bedtools.readthedocs.io/en/latest/content/tools/coverage.html
     - https://doi.org/10.1093/bioinformatics/btq033
+  install: >
+    Install bedtools with Homebrew. The adapter reads the BEDTOOLS variable, then /opt/homebrew/bin,
+    /usr/local/bin, /usr/bin, ~/.local/bin and the PATH.
+    brew install bedtools
 
 connection:
   kind: cli
@@ -32,6 +36,7 @@ locate:
   which: [bedtools]
   version_command: ["{program_path}", "--version"]
   version_pattern: "bedtools v(\\S+)"
+  identity: 'bedtools v\d'
 
 decisions:
   - key: genome_build

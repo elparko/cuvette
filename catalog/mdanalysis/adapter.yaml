@@ -3,7 +3,7 @@ adapter:
   field: structural biology
   file_types: [".pdb", ".dcd", ".psf", ".xtc", ".gro", ".cif"]
   title: MDAnalysis and Bio.PDB
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Measures molecular dynamics trajectories with MDAnalysis (RMSD, RMSF, radius of gyration,
@@ -22,6 +22,10 @@ program:
     - https://docs.mdanalysis.org/stable/documentation_pages/analysis/rms.html
     - https://docs.mdanalysis.org/stable/documentation_pages/analysis/hydrogenbonds.html
     - https://biopython.org/docs/latest/api/Bio.PDB.html
+  install: >
+    The adapter uses its own Python environment at ~/.guided-analysis/envs/mdanalysis, or the Python in GA_MDANALYSIS_PYTHON.
+    Make the environment and install MDAnalysis, Biopython and the libraries that the adapter imports:
+    uv venv ~/.guided-analysis/envs/mdanalysis && uv pip install --python ~/.guided-analysis/envs/mdanalysis/bin/python MDAnalysis biopython pandas matplotlib
 
 connection:
   kind: python
@@ -35,8 +39,9 @@ locate:
     - ~/.guided-analysis/envs/mdanalysis/bin/python
     - ~/.guided-analysis/envs/mdanalysis/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import MDAnalysis; print(MDAnalysis.__version__)"]
-  version_pattern: '(\d+\.\d+\.\d+)'
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import MDAnalysis; print('MDAnalysis', MDAnalysis.__version__)"]
+  version_pattern: 'MDAnalysis (\S+)'
+  identity: 'MDAnalysis \d'
 
 data_rules:
   cloud_visibility: summaries
@@ -309,13 +314,13 @@ tools:
     params:
       topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
       trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
-      select: { type: string, description: Atoms to measure, as an MDAnalysis selection. }
-      fit_select: { type: string, description: Atoms for the superposition, as an MDAnalysis selection. If empty, select is used. }
+      select: { type: string, description: "Atoms to measure, as an MDAnalysis selection." }
+      fit_select: { type: string, description: "Atoms for the superposition, as an MDAnalysis selection. If empty, select is used." }
       fit: { type: boolean, description: Superpose each frame before the measurement. }
       reference_frame: { type: integer, minimum: 0, description: Index of the reference frame. }
       stride: { type: integer, minimum: 1, description: Use every nth frame. }
-      start: { type: integer, minimum: 0, default: 0, description: First frame index. }
-      stop: { type: integer, description: Frame index to stop before. If empty, use all frames to the end. }
+      start: { type: integer, minimum: 0, default: 0, description: "First frame index, 0-based. The start frame is included." }
+      stop: { type: integer, description: "Frame index to stop before, 0-based. The stop frame is excluded. If empty, use all frames to the end." }
     required: [topology, trajectory]
     outputs:
       table: { kind: table, ext: csv, description: "Frame, time and RMSD." }
@@ -330,13 +335,13 @@ tools:
     params:
       topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
       trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
-      select: { type: string, description: Atoms to measure, as an MDAnalysis selection. }
-      fit_select: { type: string, description: Atoms for the superposition, as an MDAnalysis selection. }
+      select: { type: string, description: "Atoms to measure, as an MDAnalysis selection." }
+      fit_select: { type: string, description: "Atoms for the superposition, as an MDAnalysis selection." }
       fit: { type: boolean, description: Superpose each frame before the measurement. }
       reference_frame: { type: integer, minimum: 0, description: Index of the reference frame. }
       stride: { type: integer, minimum: 1, description: Use every nth frame. }
-      start: { type: integer, minimum: 0, default: 0 }
-      stop: { type: integer }
+      start: { type: integer, minimum: 0, default: 0, description: "First frame index, 0-based. The start frame is included." }
+      stop: { type: integer, description: "Frame index to stop before, 0-based. The stop frame is excluded. If empty, use all frames to the end." }
     required: [topology, trajectory]
     outputs:
       table: { kind: table, ext: csv, description: Residue and RMSF. }
@@ -349,10 +354,10 @@ tools:
     params:
       topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
       trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
-      select: { type: string, description: Atoms to measure, as an MDAnalysis selection. }
+      select: { type: string, description: "Atoms to measure, as an MDAnalysis selection." }
       stride: { type: integer, minimum: 1, description: Use every nth frame. }
-      start: { type: integer, minimum: 0, default: 0 }
-      stop: { type: integer }
+      start: { type: integer, minimum: 0, default: 0, description: "First frame index, 0-based. The start frame is included." }
+      stop: { type: integer, description: "Frame index to stop before, 0-based. The stop frame is excluded. If empty, use all frames to the end." }
     required: [topology, trajectory]
     outputs:
       table: { kind: table, ext: csv, description: "Frame, time and radius of gyration." }
@@ -367,12 +372,12 @@ tools:
     params:
       topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
       trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
-      select_a: { type: string, description: First group, as an MDAnalysis selection. }
-      select_b: { type: string, description: Second group, as an MDAnalysis selection. }
+      select_a: { type: string, description: "First group, as an MDAnalysis selection." }
+      select_b: { type: string, description: "Second group, as an MDAnalysis selection." }
       cutoff: { type: number, minimum: 0.5, description: Contact distance in angstrom. }
       stride: { type: integer, minimum: 1, description: Use every nth frame. }
-      start: { type: integer, minimum: 0, default: 0 }
-      stop: { type: integer }
+      start: { type: integer, minimum: 0, default: 0, description: "First frame index, 0-based. The start frame is included." }
+      stop: { type: integer, description: "Frame index to stop before, 0-based. The stop frame is excluded. If empty, use all frames to the end." }
     required: [topology, trajectory]
     outputs:
       table: { kind: table, ext: csv, description: Contacts in each frame. }
@@ -388,14 +393,14 @@ tools:
     params:
       topology: { type: string, minLength: 1, description: Absolute path of the topology file. }
       trajectory: { type: string, minLength: 1, description: Absolute path of the trajectory file. }
-      donors_sel: { type: string, description: Donor heavy atoms, as an MDAnalysis selection. }
-      hydrogens_sel: { type: string, description: Hydrogen atoms, as an MDAnalysis selection. }
-      acceptors_sel: { type: string, description: Acceptor atoms, as an MDAnalysis selection. }
+      donors_sel: { type: string, description: "Donor heavy atoms, as an MDAnalysis selection." }
+      hydrogens_sel: { type: string, description: "Hydrogen atoms, as an MDAnalysis selection." }
+      acceptors_sel: { type: string, description: "Acceptor atoms, as an MDAnalysis selection." }
       d_a_cutoff: { type: number, minimum: 1.5, description: Donor-acceptor distance cutoff in angstrom. }
       d_h_a_angle_cutoff: { type: number, minimum: 90, maximum: 180, description: Minimum donor-hydrogen-acceptor angle in degrees. }
       stride: { type: integer, minimum: 1, description: Use every nth frame. }
-      start: { type: integer, minimum: 0, default: 0 }
-      stop: { type: integer }
+      start: { type: integer, minimum: 0, default: 0, description: "First frame index, 0-based. The start frame is included." }
+      stop: { type: integer, description: "Frame index to stop before, 0-based. The stop frame is excluded. If empty, use all frames to the end." }
     required: [topology, trajectory]
     outputs:
       per_frame: { kind: table, ext: csv, description: Hydrogen bonds in each frame. }
@@ -420,11 +425,11 @@ tools:
       path: { type: string, minLength: 1, description: Absolute path of the PDB file. }
       chain_a: { type: string, description: Chain id of the first atom. }
       resid_a: { type: integer, description: Residue number of the first atom. }
-      atom_a: { type: string, description: Atom name of the first atom, such as CA. }
+      atom_a: { type: string, description: "Atom name of the first atom, such as CA." }
       chain_b: { type: string, description: Chain id of the second atom. }
       resid_b: { type: integer, description: Residue number of the second atom. }
       atom_b: { type: string, description: Atom name of the second atom. }
-      model: { type: integer, minimum: 0, default: 0, description: Model index. }
+      model: { type: integer, minimum: 0, default: 0, description: Model index. The index is 0-based. Model 0 is the first model in the file. }
     required: [path, chain_a, resid_a, atom_a, chain_b, resid_b, atom_b]
 
   - name: superpose_structures
@@ -440,8 +445,8 @@ tools:
       mobile_chain: { type: string, description: Chain id in the mobile file. }
       reference_chain: { type: string, description: Chain id in the reference file. }
       fit_atoms: { type: string, enum: [CA, backbone], description: "CA fits alpha carbons. backbone fits N, CA, C and O." }
-      mobile_model: { type: integer, minimum: 0, default: 0 }
-      reference_model: { type: integer, minimum: 0, default: 0 }
+      mobile_model: { type: integer, minimum: 0, default: 0, description: Model index in the mobile file. The index is 0-based. Model 0 is the first model. }
+      reference_model: { type: integer, minimum: 0, default: 0, description: Model index in the reference file. The index is 0-based. Model 0 is the first model. }
     required: [mobile_path, reference_path, mobile_chain, reference_chain]
     outputs:
       fitted: { kind: file, ext: pdb, description: The fitted chain. }
@@ -547,7 +552,8 @@ map:
 
   - tool: measure_distance
     route: |
-      s[0]["A"][1]["CA"] - s[0]["A"][214]["CA"]
+      s = PDBParser(QUIET=True).get_structure("x", path)
+      s[model][chain_a][resid_a][atom_a] - s[model][chain_b][resid_b][atom_b]
     params:
       - { arg: atom_a, label: atom name }
       - { arg: atom_b, label: atom name }

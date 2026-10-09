@@ -3,7 +3,7 @@ adapter:
   field: flow cytometry
   file_types: [".fcs", ".wsp"]
   title: FlowKit (flow cytometry)
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Reads FCS files and counts events per gate with FlowKit. The scientist chooses the
@@ -21,6 +21,11 @@ program:
     - https://flowkit.readthedocs.io/
     - https://github.com/whitews/FlowKit/tree/master/docs/notebooks
     - https://pubmed.ncbi.nlm.nih.gov/34248832/
+  install: >
+    The adapter uses a Python environment in ~/.guided-analysis/envs/flowkit. Make it and install FlowKit
+    and the packages that ga_flowkit.py imports:
+    uv venv ~/.guided-analysis/envs/flowkit && uv pip install --python ~/.guided-analysis/envs/flowkit/bin/python
+    flowkit numpy pandas matplotlib
 
 connection:
   kind: python
@@ -34,8 +39,9 @@ locate:
     - ~/.guided-analysis/envs/flowkit/bin/python
     - ~/.guided-analysis/envs/flowkit/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import flowkit; print(flowkit.__version__)"]
-  version_pattern: '(\d+\.\d+\.\d+)'
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import flowkit; print('flowkit', flowkit.__version__)"]
+  version_pattern: 'flowkit (\S+)'
+  identity: 'flowkit \d'
 
 data_rules:
   cloud_visibility: summaries
@@ -298,7 +304,7 @@ tools:
       matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
       gating_file: { type: string, description: Path of the FlowJo workspace. Needed for gating_file. }
       sample_id: { type: string, description: Sample name in the workspace. The default is the file name. }
-      ignore_offset_error: { type: boolean, default: false }
+      ignore_offset_error: { type: boolean, default: false, description: Read a file whose data offset is off by one byte. }
     required: [path]
     outputs:
       effect: { kind: table, ext: csv, description: Channel statistics before and after. }
@@ -315,15 +321,15 @@ tools:
     params:
       path: { type: string, minLength: 1, description: Path of the FCS file. }
       transform: { type: string, enum: [none, logicle, asinh, hyperlog], default: logicle }
-      transform_t: { type: number, exclusiveMinimum: 0, default: 262144, description: Top of scale. }
-      transform_w: { type: number, minimum: 0, default: 0.5, description: Linear width in decades. }
-      transform_m: { type: number, exclusiveMinimum: 0, default: 4.5, description: Decades at the high end. }
-      transform_a: { type: number, minimum: 0, default: 0, description: Extra negative decades. }
+      transform_t: { type: number, exclusiveMinimum: 0, default: 262144, description: "Top of scale, in the data units of the channel." }
+      transform_w: { type: number, minimum: 0, default: 0.5, description: Linear width in decades (unitless). The asinh transform does not use it. }
+      transform_m: { type: number, exclusiveMinimum: 0, default: 4.5, description: Number of decades at the high end (unitless). }
+      transform_a: { type: number, minimum: 0, default: 0, description: Number of extra negative decades (unitless). }
       compensation: { type: string, enum: [fcs, csv, none], default: none }
       matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
       channels: { type: string, description: Channel names separated by commas. The default is every fluorescence channel. }
       include_scatter: { type: boolean, default: false, description: Also transform the scatter channels. }
-      ignore_offset_error: { type: boolean, default: false }
+      ignore_offset_error: { type: boolean, default: false, description: Read a file whose data offset is off by one byte. }
     required: [path]
     outputs:
       effect: { kind: table, ext: csv, description: Range of each channel before and after. }
@@ -350,7 +356,7 @@ tools:
       Run the gates of a GatingML file or a FlowJo workspace on one FCS file. Show the event count
       of each gate, the percent of all events and the percent of the parent gate. For a workspace,
       also show the count that FlowJo stored. With control_path, show the counts of the control
-      sample next to the sample. The compensation can be overridden for every gate.
+      sample next to the sample. A compensation other than gating_file replaces the compensation of all gates.
     function: "ga_flowkit:count_gates"
     params:
       path: { type: string, minLength: 1, description: Path of the FCS file. }
@@ -359,7 +365,7 @@ tools:
       compensation: { type: string, enum: [gating_file, fcs, csv, none], default: gating_file, description: "gating_file: as the file defines. fcs: spill matrix in the FCS file. csv: matrix_path. none: raw values." }
       matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
       control_path: { type: string, description: Path of the control FCS file. }
-      ignore_offset_error: { type: boolean, default: false }
+      ignore_offset_error: { type: boolean, default: false, description: Read a file whose data offset is off by one byte. }
     required: [path, gating_file]
     outputs:
       counts: { kind: table, ext: csv, description: Counts for each gate. }
@@ -379,7 +385,7 @@ tools:
       sample_id: { type: string, description: Sample name. For a workspace the default is the file name. }
       modes: { type: string, default: "gating_file,none", description: "Compensation choices separated by commas, from gating_file, fcs, csv, none. The change is the last minus the first." }
       matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
-      ignore_offset_error: { type: boolean, default: false }
+      ignore_offset_error: { type: boolean, default: false, description: Read a file whose data offset is off by one byte. }
     required: [path, gating_file]
     outputs:
       comparison: { kind: table, ext: csv, description: Counts for each gate and each choice. }
@@ -396,10 +402,10 @@ tools:
       gating_file: { type: string, minLength: 1, description: Path of the .xml or .wsp file. }
       gate_name: { type: string, minLength: 1, description: Name of the gate. }
       gate_path: { type: string, description: "Parent names from the top, separated by /, for example Time/Singlets/aAmine-/CD3+/CD4+." }
-      sample_id: { type: string }
+      sample_id: { type: string, description: Sample name. For a workspace the default is the file name. }
       compensation: { type: string, enum: [gating_file, fcs, csv, none], default: gating_file }
-      matrix_path: { type: string }
-      ignore_offset_error: { type: boolean, default: false }
+      matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
+      ignore_offset_error: { type: boolean, default: false, description: Read a file whose data offset is off by one byte. }
     required: [path, gating_file, gate_name]
     outputs:
       plot: { kind: image, ext: png, description: Dot plot with the gate. }
@@ -415,19 +421,19 @@ tools:
     params:
       path: { type: string, minLength: 1, description: Path of the FCS file. }
       x_channel: { type: string, minLength: 1, description: Channel name for the first axis. }
-      x_min: { type: number }
-      x_max: { type: number }
+      x_min: { type: number, description: "Lower limit on the first axis, in channel units after compensation and transform. Leave empty for no lower limit." }
+      x_max: { type: number, description: "Upper limit on the first axis, in channel units after compensation and transform. Leave empty for no upper limit." }
       y_channel: { type: string, description: Channel name for the second axis. }
-      y_min: { type: number }
-      y_max: { type: number }
+      y_min: { type: number, description: "Lower limit on the second axis, in channel units after compensation and transform. Leave empty for no lower limit." }
+      y_max: { type: number, description: "Upper limit on the second axis, in channel units after compensation and transform. Leave empty for no upper limit." }
       compensation: { type: string, enum: [fcs, csv, none], default: none }
-      matrix_path: { type: string }
+      matrix_path: { type: string, description: Path of the matrix CSV file. Needed for csv. }
       transform: { type: string, enum: [none, logicle, asinh, hyperlog], default: none }
-      transform_t: { type: number, exclusiveMinimum: 0, default: 262144 }
-      transform_w: { type: number, minimum: 0, default: 0.5 }
-      transform_m: { type: number, exclusiveMinimum: 0, default: 4.5 }
-      transform_a: { type: number, minimum: 0, default: 0 }
-      ignore_offset_error: { type: boolean, default: false }
+      transform_t: { type: number, exclusiveMinimum: 0, default: 262144, description: "Top of scale, in the data units of the channel." }
+      transform_w: { type: number, minimum: 0, default: 0.5, description: Linear width in decades (unitless). The asinh transform does not use it. }
+      transform_m: { type: number, exclusiveMinimum: 0, default: 4.5, description: Number of decades at the high end (unitless). }
+      transform_a: { type: number, minimum: 0, default: 0, description: Number of extra negative decades (unitless). }
+      ignore_offset_error: { type: boolean, default: false, description: Read a file whose data offset is off by one byte. }
     required: [path, x_channel]
     outputs:
       plot: { kind: image, ext: png, description: Dot plot with the gate. }

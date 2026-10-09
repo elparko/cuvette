@@ -3,7 +3,7 @@ adapter:
   field: microscopy
   file_types: [".czi", ".nd2", ".lif", ".lsm", ".oib", ".vsi", ".ome.tif", ".ome.tiff"]
   title: Bio-Formats command line tools
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Reads the metadata of a microscopy image file and converts one series or one plane to OME-TIFF
@@ -21,6 +21,10 @@ program:
     - https://bio-formats.readthedocs.io/en/stable/users/comlinetools/index.html
     - https://bio-formats.readthedocs.io/en/stable/users/comlinetools/display.html
     - https://bio-formats.readthedocs.io/en/stable/users/comlinetools/conversion.html
+  install: >
+    Download bftools.zip from the Bio-Formats release on GitHub (see https://www.openmicroscopy.org/bio-formats/) and unzip it. The tools need Java.
+    The adapter reads the bftools folder from BFTOOLS_DIR, from /Volumes/T7/guided-analysis/tools/bftools/bftools on the T7 drive, or from ~/bftools, /Applications/bftools or /opt/bftools:
+    export BFTOOLS_DIR=~/bftools
 
 connection:
   kind: cli
@@ -39,6 +43,7 @@ locate:
     - C:\Program Files\bftools
   version_command: ["{program_path}/showinf", "-version"]
   version_pattern: "Version: (\\S+)"
+  identity: 'Version: \S+\s+Build date: .*\s+VCS revision'
 
 data_rules:
   cloud_visibility: summaries
@@ -168,9 +173,9 @@ tools:
       of the series. The file is the output named image.
     params:
       path: { type: string, minLength: 1, description: Absolute path of the image file. }
-      series: { type: integer, minimum: 0, description: Series to convert. Series 0 is the first. }
-      channel: { type: integer, minimum: 0, description: Channel to convert. The first is 0. }
-      z: { type: integer, minimum: 0, description: Z section to convert. The first is 0. }
+      series: { type: integer, minimum: 0, description: Index of the series to convert. The index is 0-based. Series 0 is the first. }
+      channel: { type: integer, minimum: 0, description: Index of the channel to convert. The index is 0-based. The first is 0. }
+      z: { type: integer, minimum: 0, description: Index of the Z section to convert. The index is 0-based. The first is 0. }
       timepoint: { type: integer, minimum: 0, description: Timepoint to convert. The first is 0. }
       crop: { type: string, pattern: '^\d+,\d+,\d+,\d+$', description: 'Region as x,y,width,height in pixels.' }
       compression: { type: string, enum: [Uncompressed, LZW, zlib, JPEG-2000, JPEG], description: Codec of the output file. }
@@ -204,9 +209,9 @@ tools:
       8 bit or 16 bit gray or 8 bit color. The file is the output named image.
     params:
       path: { type: string, minLength: 1, description: Absolute path of the image file. }
-      series: { type: integer, minimum: 0, description: Series to convert. Series 0 is the first. }
-      channel: { type: integer, minimum: 0, description: Channel to convert. The first is 0. }
-      z: { type: integer, minimum: 0, description: Z section to convert. The first is 0. }
+      series: { type: integer, minimum: 0, description: Index of the series to convert. The index is 0-based. Series 0 is the first. }
+      channel: { type: integer, minimum: 0, description: Index of the channel to convert. The index is 0-based. The first is 0. }
+      z: { type: integer, minimum: 0, description: Index of the Z section to convert. The index is 0-based. The first is 0. }
       timepoint: { type: integer, minimum: 0, description: Timepoint to convert. The first is 0. }
       crop: { type: string, pattern: '^\d+,\d+,\d+,\d+$', description: 'Region as x,y,width,height in pixels.' }
     required: [path]

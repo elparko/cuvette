@@ -3,7 +3,7 @@ adapter:
   field: tables and figures
   file_types: [".xlsx", ".csv", ".tsv", ".xlsm"]
   title: Tables, Excel and figures (pandas, openpyxl, matplotlib)
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Reads CSV and Excel lab sheets, summarizes and reshapes tables, writes xlsx files and makes journal-style plots.
@@ -35,8 +35,9 @@ locate:
   paths:
     - ~/.guided-analysis/envs/biostats/bin/python
     - ~/.guided-analysis/envs/biostats/Scripts/python.exe
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import openpyxl; print(openpyxl.__version__)"]
-  version_pattern: '(\d+\.\d+\.\d+)'
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import openpyxl; print('openpyxl', openpyxl.__version__)"]
+  version_pattern: 'openpyxl (\S+)'
+  identity: 'openpyxl \d'
 
 module: adapter.ts
 
@@ -94,7 +95,7 @@ tools:
     params:
       path: { type: string, description: CSV or xlsx path. }
       values: { type: array, items: { type: string }, description: Columns to summarize. Default is all numeric columns. }
-      group_by: { type: array, items: { type: string } }
+      group_by: { type: array, items: { type: string }, description: Columns that define the groups. Leave out to summarize the whole table. }
       ratios: { type: object, description: 'New column to formula, for example {"Red %": "Red dots / Total cells * 100"}. Computed per row, then summarized.' }
 
   - name: reshape_table
@@ -105,13 +106,13 @@ tools:
     read_only: true
     function: "ga_tables:reshape_table"
     params:
-      path: { type: string }
+      path: { type: string, description: Absolute path of the CSV or xlsx file. }
       join: { type: object, description: '{path, on, how}. how is left (default), inner, right or outer.' }
       compute: { type: object, description: 'New column to formula, for example {"Ratio": "Red dots / Total cells"}.' }
       filter: { type: string, description: "Rows to keep, for example: Group == 'Control' and Age > 3" }
       pivot: { type: object, description: "To wide: {index, columns, values}." }
       melt: { type: object, description: "To long: {id_columns, value_columns, name, value}." }
-      select: { type: array, items: { type: string } }
+      select: { type: array, items: { type: string }, description: "Columns to keep, in this order." }
       rename: { type: object, description: Old name to new name. }
       sort: { type: array, items: { type: string }, description: Columns. A leading - sorts from largest. }
       name: { type: string, description: Name of the new file. }
@@ -124,19 +125,19 @@ tools:
       scatter: optional linear fit and r. line: mean of y at each x. histogram: values of y. Labels need units.
     function: "ga_tables:make_plot"
     params:
-      path: { type: string }
-      kind: { type: string, enum: [bar, box, scatter, line, histogram] }
+      path: { type: string, description: Absolute path of the CSV or xlsx file. }
+      kind: { type: string, enum: [bar, box, scatter, line, histogram], description: "bar: mean with error bars. box: median and quartiles. scatter: one dot for each row. line: mean of y at each x. histogram: distribution of y." }
       y: { type: string, description: Value column. }
       y_label: { type: string, description: "Value axis label with unit, for example 'Red dots per cell (%)'." }
       x: { type: string, description: Group column for bar and box. Numeric column for scatter and line. }
       x_label: { type: string, description: Needed with unit for scatter and line. }
-      group: { type: string, description: Color by this column (scatter, line, histogram). }
+      group: { type: string, description: "Color by this column (scatter, line, histogram)." }
       error_bars: { type: string, enum: [SD, SEM] }
-      points: { type: boolean }
-      fit: { type: boolean }
-      bins: { type: integer }
-      title: { type: string }
-      file_name: { type: string }
+      points: { type: boolean, description: "Show each value as a dot on bar and box plots, and on line plots with repeated x values. Default true." }
+      fit: { type: boolean, description: Draw a linear fit and give r on a scatter plot. Default false. }
+      bins: { type: integer, description: Number of histogram bins (a count). Leave out to let numpy choose. }
+      title: { type: string, description: Title above the plot. }
+      file_name: { type: string, description: "Name of the PNG and SVG files, without the extension. Default: the kind and the y column." }
     required: [path, kind, y, y_label]
 
 map:

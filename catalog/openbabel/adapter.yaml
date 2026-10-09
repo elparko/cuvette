@@ -3,7 +3,7 @@ adapter:
   field: chemistry
   file_types: [".smi", ".sdf", ".mol", ".mol2"]
   title: Open Babel format conversion and descriptors
-  version: 0.1.0
+  version: 0.1.1
   description: Converts molecule files between formats and writes descriptor values with Open Babel.
   authors: [onboarding agent]
   status: draft
@@ -14,6 +14,10 @@ program:
   docs:
     - https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html
     - https://open-babel.readthedocs.io/en/latest/Descriptors/descriptors.html
+  install: >
+    Install Open Babel with Homebrew. The adapter reads the GA_OBABEL variable, then obabel on the PATH,
+    /opt/homebrew/bin, /usr/local/bin and /usr/bin.
+    brew install open-babel
 connection:
   kind: cli
 locate:
@@ -22,6 +26,7 @@ locate:
   paths: ["/opt/homebrew/bin/obabel", "/usr/local/bin/obabel", "/usr/bin/obabel"]
   version_command: ["{program_path}", "-V"]
   version_pattern: "Open Babel (\\S+)"
+  identity: 'Open Babel \d'
 decisions:
   - key: descriptor_set
     label: Descriptors to append

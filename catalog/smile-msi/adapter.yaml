@@ -3,7 +3,7 @@ adapter:
   field: mass spectrometry imaging
   file_types: [".imzml", ".ibd"]
   title: SMILE MSI
-  version: 0.1.0
+  version: 0.1.1
   description: MALDI mass spectrometry imaging of lipids. The agent uses the SMILE MSI engine through its MCP server. Each
     step has a route in the SMILE MSI program.
 program:
@@ -11,6 +11,12 @@ program:
   version: 2.0.0
   tested_versions:
     - 2.0.0
+  homepage: https://github.com/elparko/SMILE-MSI
+  install: >
+    The adapter uses the Python environment of a SMILE MSI source folder at ~/Code/SMILE-MSI,
+    or the python that SMILE_MSI_PYTHON names. Put the source in that folder (the public source URL is not confirmed;
+    the README links releases at https://github.com/elparko/SMILE-MSI). Then add the engine and the MCP extra:
+    cd ~/Code/SMILE-MSI && uv venv && uv pip install -e '.[mcp]'
 connection:
   kind: mcp
   transport: stdio
@@ -27,10 +33,9 @@ locate:
     - ~/Code/SMILE-MSI/.venv/bin/python
     - ~/code/SMILE-MSI/.venv/bin/python
     - ~/Code/SMILE-MSI/.venv/Scripts/python.exe
-  version_command:
-    - "{program_path}"
-    - -c
-    - import smile_msi; print(smile_msi.__version__)
+  version_command: ["{program_path}", "-c", "import smile_msi; print('smile_msi', smile_msi.__version__)"]
+  version_pattern: 'smile_msi (\S+)'
+  identity: 'smile_msi \d'
 module: adapter.ts
 decisions:
   - key: replicate
@@ -120,7 +125,7 @@ decisions:
       args:
         step_id: discriminating_features
       options: [ tic, rms, none ]
-      compare: [ n_rows, n_q_pass, n_q_auc_pass ]
+      compare: [ metrics.n_rows, metrics.n_q_pass, metrics.n_q_auc_pass ]
       max_runs: 3
   - key: reduce
     label: Reduce (m/z window)

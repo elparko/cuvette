@@ -3,7 +3,7 @@ adapter:
   field: genomics
   file_types: [".fastq", ".fq", ".fastq.gz", ".fq.gz"]
   title: FastQC
-  version: 0.1.1
+  version: 0.1.2
   spec: "1"
   description: >
     Checks the quality of a sequencing read file with FastQC. The tool runs FastQC on one file and
@@ -19,6 +19,10 @@ program:
   docs:
     - https://www.bioinformatics.babraham.ac.uk/projects/fastqc/Help/
     - https://www.bioinformatics.babraham.ac.uk/projects/fastqc/Help/3%20Analysis%20Modules/
+  install: >
+    Install FastQC with Homebrew. Homebrew also installs the Java runtime that FastQC needs. The adapter
+    reads the FASTQC variable, then /opt/homebrew/bin, /usr/local/bin, ~/.local/bin and the PATH.
+    brew install fastqc
 
 connection:
   kind: cli
@@ -30,6 +34,7 @@ locate:
   which: [fastqc]
   version_command: ["{program_path}", "--version"]
   version_pattern: "FastQC v(\\S+)"
+  identity: 'FastQC v\d'
 
 decisions:
   - key: encoding

@@ -106,7 +106,7 @@ def inspect_fcs(path, ignore_offset_error=False):
     try:
         s = _sample(path, ignore_offset_error)
     except Exception as e:
-        return _fail(str(e))
+        return _fail("cannot read the FCS file %s: %s" % (path, e))
     raw = s.get_events(source="raw")
     rows = []
     for i, (n, label) in enumerate(zip(s.pnn_labels, s.pns_labels)):
@@ -137,7 +137,7 @@ def apply_compensation(path, compensation="fcs", matrix_path=None, gating_file=N
         else:
             matrix = _matrix(s, compensation, matrix_path)
     except Exception as e:
-        return _fail(str(e))
+        return _fail("cannot read the FCS file %s or its compensation matrix (compensation %s): %s" % (path, compensation, e))
     raw = s.get_events(source="raw").copy()
     idx = list(s.fluoro_indices)
     if matrix is None:
@@ -175,7 +175,7 @@ def transform_channels(path, transform="logicle", transform_t=262144.0, transfor
         xf = _transform(transform, transform_t, transform_w, transform_m, transform_a)
         matrix = _matrix(s, compensation, matrix_path)
     except Exception as e:
-        return _fail(str(e))
+        return _fail("cannot read the FCS file %s, the %s transform or the compensation matrix (compensation %s): %s" % (path, transform, compensation, e))
     if matrix is not None:
         s.apply_compensation(matrix)
     names = [c.strip() for c in str(channels).split(",") if c.strip()] if channels else None
@@ -184,7 +184,7 @@ def transform_channels(path, transform="logicle", transform_t=262144.0, transfor
             try:
                 s.apply_transform({n: xf for n in names})
             except Exception as e:
-                return _fail(str(e))
+                return _fail("cannot transform the channels %s of %s: %s" % (", ".join(names), path, e))
         else:
             s.apply_transform(xf, include_scatter=bool(include_scatter))
     before = s.get_events(source="comp" if matrix is not None else "raw")
@@ -193,7 +193,7 @@ def transform_channels(path, transform="logicle", transform_t=262144.0, transfor
         try:
             idx = [s.get_channel_index(n) for n in names]
         except Exception as e:
-            return _fail(str(e))
+            return _fail("cannot find the channels %s in %s: %s" % (", ".join(names), path, e))
     else:
         idx = list(s.scatter_indices) + list(s.fluoro_indices) if include_scatter else list(s.fluoro_indices)
     rows = []
@@ -324,7 +324,7 @@ def count_gates(path, gating_file, sample_id=None, compensation="gating_file", m
             cid = None
             _, _, _, _, control = _run_gating(control_path, gating_file, cid, compensation, matrix_path, ignore_offset_error)
     except Exception as e:
-        return _fail(str(e))
+        return _fail("cannot run the gates of %s on %s%s: %s" % (gating_file, path, " or the control " + str(control_path) if control_path else "", e))
     frame = _gate_table(results.report, flowjo)
     if control is not None:
         cr = control.report
@@ -374,7 +374,7 @@ def compare_compensation(path, gating_file, sample_id=None, modes="gating_file,n
             gs, sample, sid, flowjo, results = _run_gating(path, gating_file, sample_id, m, matrix_path, ignore_offset_error)
             frames[m] = _gate_table(results.report, flowjo)
     except Exception as e:
-        return _fail(str(e))
+        return _fail("cannot run the gates of %s on %s with compensation %s: %s" % (gating_file, path, m, e))
     base = frames[names[0]][["gate", "path", "type", "ambiguous"]].copy()
     for m in names:
         base["count_" + m] = frames[m]["count"].values
@@ -431,7 +431,7 @@ def list_gates(gating_file, sample_id=None):
         xforms = list(gs.transforms.keys()) if hasattr(gs, "transforms") else []
         mats = list(gs.comp_matrices.keys()) if hasattr(gs, "comp_matrices") else []
     except Exception as e:
-        return _fail(str(e))
+        return _fail("cannot read the gates of %s: %s" % (gating_file, e))
     csv = _table(frame, "gates")
     summary = "%d gates in %s%s. Transforms: %d. Compensation matrices: %d." % (len(frame), os.path.basename(gf), " for sample " + sid if sid else "", len(xforms), len(mats))
     return {"ok": True, "summary": summary, "metrics": {"n_gates": len(frame), "n_transforms": len(xforms), "n_matrices": len(mats), "n_samples": len(samples)},
@@ -509,7 +509,7 @@ def plot_gate(path, gating_file, gate_name, sample_id=None, compensation="gating
         sub = events[mask]
         member = inside[mask]
     except Exception as e:
-        return _fail(str(e))
+        return _fail("cannot draw the gate %s of %s on %s: %s" % (gate_name, gating_file, path, e))
     plot = _dot_plot(sub, dims, member, gate, "%s: %d of %d parent events (%.2f%%)" % (gate_name, count, parent_n, 100.0 * count / max(parent_n, 1)), "gate_" + _safe(gate_name))
     summary = "Drew gate %s on %s: %d of %d parent events inside (%.2f%%). Compensation %s." % (gate_name, " and ".join(dims), count, parent_n, 100.0 * count / max(parent_n, 1), compensation)
     return {"ok": True, "summary": summary, "metrics": {"count": count, "parent_count": parent_n, "percent_of_parent": 100.0 * count / max(parent_n, 1)}, "outputs": [_out(plot)]}
@@ -542,7 +542,7 @@ def count_rectangle(path, x_channel, x_min=None, x_max=None, y_channel=None, y_m
         inside = results.get_gate_membership("rectangle")
         events = gs._preprocess_sample_events(s, gate)
     except Exception as e:
-        return _fail(str(e))
+        return _fail("cannot count the rectangle gate on %s in %s: %s" % (x_channel, path, e))
     count = int(inside.sum())
     pct = 100.0 * count / s.event_count
     ids = [d.id for d in dims]

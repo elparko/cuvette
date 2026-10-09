@@ -49,8 +49,13 @@ const mod: AdapterModule = {
       inputSchema: {
         type: "object",
         properties: {
-          tables: { type: "array", items: { type: "object", properties: { path: { type: "string" }, sheet: { type: "string" } }, required: ["path"] } },
-          file_name: { type: "string", default: "tables" },
+          tables: {
+            type: "array",
+            minItems: 1,
+            description: "Tables to write, one sheet each: a list of {path, sheet}. path is a CSV or TSV file. sheet is the sheet name; the default is the file name.",
+            items: { type: "object", properties: { path: { type: "string" }, sheet: { type: "string" } }, required: ["path"] },
+          },
+          file_name: { type: "string", default: "tables", description: "Name of the xlsx file, without the extension." },
         },
         required: ["tables"],
       },

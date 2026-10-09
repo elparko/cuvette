@@ -3,7 +3,7 @@ adapter:
   field: statistics
   file_types: [".csv", ".tsv"]
   title: Biostatistics (statsmodels, pingouin, lifelines)
-  version: 0.1.1
+  version: 0.1.2
   spec: "1"
   description: >
     Runs classical tests, ANOVA, regression, mixed models and survival analysis on a CSV file.
@@ -22,6 +22,11 @@ program:
     - https://pingouin-stats.org/build/html/index.html
     - https://lifelines.readthedocs.io/en/latest/Survival%20Regression.html
     - https://lifelines.readthedocs.io/en/latest/Survival%20analysis%20with%20lifelines.html
+  install: >
+    The adapter uses a Python environment in ~/.guided-analysis/envs/biostats. Make it and install the packages
+    that ga_biostats.py imports:
+    uv venv ~/.guided-analysis/envs/biostats && uv pip install --python ~/.guided-analysis/envs/biostats/bin/python
+    statsmodels pingouin lifelines scipy pandas matplotlib
 
 connection:
   kind: python
@@ -35,8 +40,9 @@ locate:
     - ~/.guided-analysis/envs/biostats/bin/python
     - ~/.guided-analysis/envs/biostats/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import lifelines; print(lifelines.__version__)"]
-  version_pattern: '(\d+\.\d+\.\d+)'
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import lifelines; print('lifelines', lifelines.__version__)"]
+  version_pattern: 'lifelines (\S+)'
+  identity: 'lifelines \d'
 
 data_rules:
   cloud_visibility: summaries
@@ -392,9 +398,9 @@ tools:
       path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
       duration: { type: string, description: Column of follow-up time. }
       event: { type: string, description: "Column that is 1 if the event happened and 0 if the subject was censored." }
-      covariates: { type: string, description: Covariate column names, separated by commas. }
+      covariates: { type: string, description: "Covariate column names, separated by commas." }
       ties: { type: string, enum: [efron, breslow], default: efron, description: How to handle tied event times. }
-      strata: { type: string, description: Column names to stratify by, separated by commas. }
+      strata: { type: string, description: "Column names to stratify by, separated by commas." }
       alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level for the confidence intervals. }
     required: [path, duration, event, covariates]
     outputs:

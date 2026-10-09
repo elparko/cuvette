@@ -30,7 +30,13 @@ emit <- function(x) {
 fail <- function(msg) emit(list(ok = FALSE, error = msg))
 
 run_tool <- function(body) {
-  tryCatch(body(), error = function(e) fail(conditionMessage(e)))
+  tryCatch(body(), error = function(e) {
+    step <- sub("\\.R$", "", basename(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])))
+    p <- tryCatch(read_params(), error = function(e2) list())
+    input <- Filter(Negate(is.null), p[c("path", "image", "peaks", "model")])
+    where <- if (length(input)) paste0(" on ", names(input)[1], " = ", input[[1]]) else ""
+    fail(paste0("Cardinal step ", step, where, " stopped: ", conditionMessage(e)))
+  })
 }
 
 out_path <- function(key) Sys.getenv(paste0("GA_OUTPUT_", toupper(key)))

@@ -3,7 +3,7 @@ adapter:
   field: mass spectrometry imaging
   file_types: []
   title: METASPACE public annotations
-  version: 0.1.5
+  version: 0.1.6
   spec: "1"
   description: Searches public METASPACE datasets, reads their metadata, lists annotations at an FDR level and database, counts annotations at FDR 5, 10 and 20 percent, and saves one ion image as a PNG file. Read only. No upload and no private data.
   authors: [onboarding agent]
@@ -17,6 +17,10 @@ program:
     - https://metaspace2020.org/help
     - https://metaspace2.readthedocs.io/en/latest/content/examples/fetch-dataset-annotations.html
     - https://github.com/metaspace2020/metaspace/tree/master/metaspace/python-client
+  install: >
+    The adapter uses the Python environment at ~/.guided-analysis/envs/metaspace, or the python that GA_METASPACE_PYTHON names.
+    Make it and add the METASPACE client. The tools need network access and no API key:
+    uv venv ~/.guided-analysis/envs/metaspace && uv pip install --python ~/.guided-analysis/envs/metaspace/bin/python metaspace2020
 
 connection:
   kind: python
@@ -26,8 +30,9 @@ connection:
 locate:
   env: GA_METASPACE_PYTHON
   paths: ["~/.guided-analysis/envs/metaspace/bin/python"]
-  version_command: ["{program_path}", "-c", "import importlib.metadata as m; print(m.version('metaspace2020'))"]
-  version_pattern: "(\\S+)"
+  version_command: ["{program_path}", "-c", "import importlib.metadata as m; print('metaspace2020', m.version('metaspace2020'))"]
+  version_pattern: 'metaspace2020 (\S+)'
+  identity: 'metaspace2020 \d'
 
 data_rules:
   cloud_visibility: all
@@ -114,10 +119,10 @@ tools:
       polarity: { type: string, enum: [Positive, Negative] }
       submitter: { type: string, description: Part of the name of the submitter. The tool checks only the newest 1500 datasets that fit the other filters. Add group or organism to narrow the search. }
       group: { type: string, description: Part of the name of the lab group. }
-      maldi_matrix: { type: string }
+      maldi_matrix: { type: string, description: "MALDI matrix name as the dataset metadata writes it. The matrix column of a search result shows the names." }
       analyzer_type: { type: string, description: "Analyzer such as Orbitrap, FTICR or TOF." }
       ionisation_source: { type: string, description: "Such as MALDI or DESI." }
-      limit: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      limit: { type: integer, minimum: 1, maximum: 100, default: 20, description: Largest count of datasets that the search returns. }
 
   - name: get_dataset_info
     title: Read dataset information

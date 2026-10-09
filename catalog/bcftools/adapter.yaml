@@ -3,7 +3,7 @@ adapter:
   field: genomics
   file_types: [".vcf", ".vcf.gz", ".bcf"]
   title: bcftools
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Counts, filters and normalizes variants in a VCF file with bcftools. Each tool runs one
@@ -19,6 +19,10 @@ program:
     - https://samtools.github.io/bcftools/bcftools.html
     - https://samtools.github.io/bcftools/howtos/filtering.html
     - https://doi.org/10.1093/gigascience/giab008
+  install: >
+    Install bcftools with Homebrew. The adapter reads the BCFTOOLS variable, then /opt/homebrew/bin,
+    /usr/local/bin, /usr/bin, ~/.local/bin and the PATH.
+    brew install bcftools
 
 connection:
   kind: cli
@@ -30,6 +34,7 @@ locate:
   which: [bcftools]
   version_command: ["{program_path}", "--version"]
   version_pattern: "bcftools (\\S+)"
+  identity: 'bcftools \d'
 
 decisions:
   - key: reference
@@ -186,8 +191,8 @@ tools:
       by type of the new file. Use vcf in later steps.
     params:
       path: { type: string, minLength: 1, description: Absolute path of the VCF or BCF file. }
-      min_qual: { type: number, minimum: 0, description: Smallest QUAL to keep (QUAL>=value). }
-      min_depth: { type: integer, minimum: 0, description: Smallest INFO/DP to keep (INFO/DP>=value). }
+      min_qual: { type: number, minimum: 0, description: Smallest QUAL to keep (QUAL>=value). QUAL is a Phred-scaled quality score. }
+      min_depth: { type: integer, minimum: 0, description: "Smallest INFO/DP to keep (INFO/DP>=value). INFO/DP is a read depth, a count of reads." }
       variant_types: { type: string, enum: [all, snps, indels, mnps, other], description: Variant type to keep (bcftools view -v). }
       filter_status: { type: string, enum: [any, PASS], description: "PASS keeps only sites with FILTER PASS or . (bcftools view -f)." }
       region: { type: string, description: "Region such as chr1:1-35. Leave out for the whole file." }

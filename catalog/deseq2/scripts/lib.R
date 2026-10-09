@@ -30,7 +30,11 @@ emit <- function(x) {
 fail <- function(msg) emit(list(ok = FALSE, error = msg))
 
 run_tool <- function(body) {
-  tryCatch(body(), error = function(e) fail(conditionMessage(e)))
+  script <- basename(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1]))
+  tryCatch(body(), error = function(e) {
+    p <- tryCatch(read_params(), error = function(x) list())
+    fail(sprintf("%s stopped on the counts input %s: %s", script, pick(p, "counts", "(not given)"), conditionMessage(e)))
+  })
 }
 
 out_path <- function(key) Sys.getenv(paste0("GA_OUTPUT_", toupper(key)))

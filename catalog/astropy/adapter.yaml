@@ -3,7 +3,7 @@ adapter:
   field: astronomy
   file_types: [".fits", ".fit", ".fts"]
   title: Astropy and photutils
-  version: 0.1.1
+  version: 0.1.2
   spec: "1"
   description: >
     Reads a FITS image, measures the background, finds sources and measures aperture fluxes with
@@ -23,6 +23,10 @@ program:
     - https://photutils.readthedocs.io/en/stable/user_guide/aperture.html
     - https://docs.astropy.org/en/stable/stats/robust.html
     - https://docs.astropy.org/en/stable/wcs/index.html
+  install: >
+    The adapter uses its own Python environment at ~/.guided-analysis/envs/astropy, or the Python in GA_ASTROPY_PYTHON.
+    Make the environment and install astropy, photutils and the libraries that the adapter imports:
+    uv venv ~/.guided-analysis/envs/astropy && uv pip install --python ~/.guided-analysis/envs/astropy/bin/python astropy photutils scipy pandas matplotlib
 
 connection:
   kind: python
@@ -36,8 +40,9 @@ locate:
     - ~/.guided-analysis/envs/astropy/bin/python
     - ~/.guided-analysis/envs/astropy/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import astropy; print(astropy.__version__)"]
-  version_pattern: '(\d+\.\d+\.\d+)'
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import astropy; print('astropy', astropy.__version__)"]
+  version_pattern: 'astropy (\S+)'
+  identity: 'astropy \d'
 
 data_rules:
   cloud_visibility: summaries
@@ -326,7 +331,7 @@ tools:
       clip_sigma: { type: number, minimum: 1, maximum: 10, default: 3.0, description: Clip level in standard deviations. }
       clip_maxiters: { type: integer, minimum: 1, maximum: 100, default: 10, description: Maximum number of clipping passes. }
       box_size: { type: integer, minimum: 8, maximum: 2000, default: 50, description: Side of a background box in pixels (background2d). }
-      filter_size: { type: integer, minimum: 1, maximum: 15, default: 3, description: "Side of the median filter over the box map, in boxes (background2d)." }
+      filter_size: { type: integer, minimum: 1, maximum: 15, default: 3, description: "Side of the median filter over the box map, as a count of boxes (background2d)." }
       estimator: { type: string, enum: [sextractor, median, mean, mmm], default: sextractor, description: Statistic in each box (background2d). }
       mask_sources: { type: boolean, default: false, description: Leave out detected sources before the estimate. }
     required: [path]
@@ -390,8 +395,8 @@ tools:
     params:
       path: { type: string, minLength: 1, description: Absolute path of the FITS file. }
       hdu: { type: integer, minimum: 0, default: 0, description: Index of the image HDU. }
-      x: { type: array, items: { type: number }, description: x positions in pixels. }
-      y: { type: array, items: { type: number }, description: y positions in pixels. }
+      x: { type: array, items: { type: number }, minItems: 1, description: x positions in pixels. }
+      y: { type: array, items: { type: number }, minItems: 1, description: y positions in pixels. }
     required: [path, x, y]
     outputs:
       sky: { kind: table, ext: csv, description: Pixel and sky positions. }
@@ -445,8 +450,8 @@ map:
       - { arg: mask_sources, label: mask, ui_default: false }
     fidelity: close
     difference: >
-      A direct Background2D call with the same settings gives the same median background (5.0933) and
-      noise (2.1023) without a mask. With mask_sources the mask comes from the tool's own first
+      A direct Background2D call with the same settings gives the same median background and
+      noise without a mask. With mask_sources the mask comes from the tool's own first
       detection (3 sigma, 5 pixels, grown by 11 pixels). A mask that you build gives other numbers.
     evidence: { source: docs, test: background2d-masked }
 

@@ -18,7 +18,8 @@ if re.fullmatch(r"\s*\d+\s+\d+\s*", first):
     sys.exit("error: this file is a PHYLIP file, so the sequences are already aligned. Do not align it. Give the path to infer_tree.")
 proc = subprocess.run([mafft, "--quiet", "--thread", threads, *flags, src], capture_output=True, text=True)
 if proc.returncode != 0 or not proc.stdout.strip():
-    sys.exit("error: mafft failed: " + proc.stderr.strip()[-400:])
+    reason = proc.stderr.strip()[-400:] or f"exit code {proc.returncode} and no alignment output"
+    sys.exit(f"error: mafft could not align the input file {src}. Reason: {reason}")
 open(out, "w").write(proc.stdout)
 in_names, in_seqs = read_fasta(src)
 names, seqs = read_fasta(out)

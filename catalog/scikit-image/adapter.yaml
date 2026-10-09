@@ -3,7 +3,7 @@ adapter:
   field: microscopy
   file_types: [".tif", ".tiff", ".png", ".jpg"]
   title: scikit-image
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Finds and counts objects such as nuclei in an image or a folder of images with scikit-image
@@ -21,6 +21,10 @@ program:
     - https://scikit-image.org/docs/stable/api/skimage.filters.html
     - https://scikit-image.org/docs/stable/api/skimage.measure.html
     - https://scikit-image.org/docs/stable/auto_examples/applications/plot_thresholding_guide.html
+  install: >
+    The adapter uses its own Python environment at ~/.guided-analysis/envs/skimage, or the Python in SKIMAGE_PYTHON.
+    Make the environment and install scikit-image:
+    uv venv ~/.guided-analysis/envs/skimage && uv pip install --python ~/.guided-analysis/envs/skimage/bin/python scikit-image
 
 connection:
   kind: python
@@ -32,8 +36,9 @@ locate:
   paths:
     - ~/.guided-analysis/envs/skimage/bin/python
     - ~/.guided-analysis/envs/skimage/Scripts/python.exe
-  version_command: ["{program_path}", "-c", "import skimage; print(skimage.__version__)"]
-  version_pattern: "([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"
+  version_command: ["{program_path}", "-c", "import skimage; print('skimage', skimage.__version__)"]
+  version_pattern: 'skimage (\S+)'
+  identity: 'skimage \d'
 
 data_rules:
   cloud_visibility: summaries
@@ -180,7 +185,7 @@ tools:
     read_only: true
     function: "skimage_tools:inspect_image"
     params:
-      path: { type: string, minLength: 1, description: Path of an image file, or of a folder of images. }
+      path: { type: string, minLength: 1, description: "Path of an image file, or of a folder of images." }
     required: [path]
 
   - name: threshold_image
@@ -188,12 +193,12 @@ tools:
     description: Make a binary mask from one image channel with a threshold method. Writes the mask as TIFF and PNG. Use label_objects next.
     function: "skimage_tools:threshold_image"
     params:
-      path: { type: string, minLength: 1, description: Path of an image file, or of a folder of images. }
+      path: { type: string, minLength: 1, description: "Path of an image file, or of a folder of images." }
       stain_channel: { type: string, enum: [gray, hematoxylin, eosin, red, green, blue], default: gray }
       threshold_method: { type: string, enum: [otsu, li, triangle, isodata, yen, mean, minimum, manual], default: otsu }
-      threshold_value: { type: number, description: Cutoff value. Only for method manual. }
+      threshold_value: { type: number, description: "Cutoff value, in the intensity units of the chosen channel: raw pixel values for a gray image file and for red, green or blue; 0 to 1 for gray made from a color image; stain density for hematoxylin and eosin. Only for method manual." }
       object_polarity: { type: string, enum: [bright, dark], default: bright }
-      fill_holes: { type: boolean, default: false }
+      fill_holes: { type: boolean, default: false, description: True to fill the holes inside the objects of the mask. }
     required: [path]
     outputs:
       mask: { kind: image, ext: tif, description: Binary mask. }
@@ -204,10 +209,10 @@ tools:
     function: "skimage_tools:label_objects"
     params:
       mask: { type: string, minLength: 1, description: Path of the mask file from threshold_image. }
-      min_object_size: { type: integer, minimum: 0, default: 0, description: Smallest object to keep, in pixels. }
-      exclude_border_objects: { type: boolean, default: false }
-      split_touching: { type: boolean, default: false }
-      min_distance: { type: integer, minimum: 1, default: 7, description: Smallest distance between watershed centers, in pixels. }
+      min_object_size: { type: integer, minimum: 0, default: 0, description: "Smallest object to keep, in pixels." }
+      exclude_border_objects: { type: boolean, default: false, description: True to remove the objects that touch the image border. }
+      split_touching: { type: boolean, default: false, description: True to split touching objects with a watershed on the distance map. }
+      min_distance: { type: integer, minimum: 1, default: 7, description: "Smallest distance between watershed centers, in pixels." }
       pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
       intensity_image: { type: string, description: Optional image for the outline picture. }
     required: [mask]
@@ -215,23 +220,24 @@ tools:
   - name: count_objects
     title: Count objects
     description: >-
-      Threshold, label and count the objects in one image, or in all images of a folder. For a folder, give the folder as the path (use "." for the current folder), a pattern, and optionally a truth folder to score each image with Dice. Folder example: path ".", pattern "*/tissue images/*.png", truth_folder ".", truth_match "label masks". Writes label images, outlines and CSV files.
+      Threshold, label and count the objects in one image, or in all images of a folder. For a folder, give the folder as the path (the current folder is "."), a pattern, and optionally a truth folder to score each image with Dice. Folder example: path ".", pattern "*/tissue images/*.png", truth_folder ".", truth_match "label masks". Writes label images, outlines and CSV files.
     function: "skimage_tools:count_objects"
+    batch: false
     params:
-      path: { type: string, minLength: 1, description: Path of one image file, or of a folder of images. }
-      pattern: { type: string, default: "*", description: For a folder. File pattern under the folder, such as "*/tissue images/*.png". The default takes all image files directly in the folder. }
+      path: { type: string, minLength: 1, description: "Path of one image file, or of a folder of images." }
+      pattern: { type: string, default: "*", description: 'For a folder. File pattern under the folder, such as "*/tissue images/*.png". The default takes all image files directly in the folder.' }
       only_listed_in: { type: string, description: "For a folder. Path of a text file with one image file name for each line. Only these images are used. Always give it when the scientist names a list of images, such as a test set." }
       truth_folder: { type: string, description: For a folder. Folder with the hand-drawn masks. The mask has the same file name stem as the image. }
-      truth_match: { type: string, default: "", description: For a folder. Text that the mask folder path must contain, such as "label masks". }
+      truth_match: { type: string, default: "", description: 'For a folder. Text that the mask folder path must contain, such as "label masks".' }
       stain_channel: { type: string, enum: [gray, hematoxylin, eosin, red, green, blue], default: gray }
       threshold_method: { type: string, enum: [otsu, li, triangle, isodata, yen, mean, minimum, manual], default: otsu }
-      threshold_value: { type: number, description: Cutoff value. Only for method manual. }
+      threshold_value: { type: number, description: "Cutoff value, in the intensity units of the chosen channel: raw pixel values for a gray image file and for red, green or blue; 0 to 1 for gray made from a color image; stain density for hematoxylin and eosin. Only for method manual." }
       object_polarity: { type: string, enum: [bright, dark], default: bright }
-      fill_holes: { type: boolean, default: false }
-      min_object_size: { type: integer, minimum: 0, default: 0, description: Smallest object to keep, in pixels. }
-      exclude_border_objects: { type: boolean, default: false }
-      split_touching: { type: boolean, default: false }
-      min_distance: { type: integer, minimum: 1, default: 7 }
+      fill_holes: { type: boolean, default: false, description: True to fill the holes inside the objects of the mask. }
+      min_object_size: { type: integer, minimum: 0, default: 0, description: "Smallest object to keep, in pixels." }
+      exclude_border_objects: { type: boolean, default: false, description: True to remove the objects that touch the image border. }
+      split_touching: { type: boolean, default: false, description: True to split touching objects with a watershed on the distance map. }
+      min_distance: { type: integer, minimum: 1, default: 7, description: "Smallest distance between watershed centers, in pixels. Used only when split_touching is true." }
       pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
     required: [path]
 

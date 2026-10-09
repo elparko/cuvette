@@ -3,7 +3,7 @@ adapter:
   field: single-cell transcriptomics
   file_types: [".h5ad", ".h5", "matrix.mtx", "matrix.mtx.gz"]
   title: Scanpy
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Clusters single-cell RNA data with scanpy. Each tool does one scanpy step on a cell-by-gene
@@ -21,6 +21,9 @@ program:
     - https://scanpy.readthedocs.io/en/stable/tutorials/basics/clustering-2017.html
     - https://scanpy.readthedocs.io/en/stable/api/preprocessing.html
     - https://scanpy.readthedocs.io/en/stable/api/tools.html
+  install: >
+    The adapter uses the Python environment at ~/.guided-analysis/envs/scanpy. Make it and add scanpy and igraph:
+    uv venv ~/.guided-analysis/envs/scanpy && uv pip install --python ~/.guided-analysis/envs/scanpy/bin/python scanpy igraph
 
 connection:
   kind: python
@@ -34,8 +37,9 @@ locate:
     - ~/.guided-analysis/envs/scanpy/bin/python
     - ~/.guided-analysis/envs/scanpy/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import scanpy; print(scanpy.__version__)"]
-  version_pattern: '(\d+\.\d+\.\d+)'
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import scanpy; print('scanpy', scanpy.__version__)"]
+  version_pattern: 'scanpy (\S+)'
+  identity: 'scanpy \d'
 
 data_rules:
   cloud_visibility: summaries
@@ -234,8 +238,8 @@ tools:
   - name: load_data
     title: Load 10x or h5ad data
     description: >
-      Read a 10x matrix folder (matrix.mtx, genes.tsv or features.tsv, barcodes.tsv), a 10x .h5 file,
-      or an .h5ad file. Returns a handle and saves loaded.h5ad.
+      Read a 10x matrix folder, a 10x .h5 file or an .h5ad file. The 10x folder holds matrix.mtx,
+      genes.tsv or features.tsv, and barcodes.tsv. Returns a handle and saves loaded.h5ad.
     function: "ga_scanpy:load_data"
     params:
       path: { type: string, minLength: 1, description: "Absolute path of the 10x folder, the .h5 file or the .h5ad file." }
@@ -252,7 +256,7 @@ tools:
     function: "ga_scanpy:calculate_qc"
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
-      mito_prefix: { type: string, default: "MT-", description: Gene names that start with this text count as mitochondrial. Use MT- for human and mt- for mouse. }
+      mito_prefix: { type: string, default: "MT-", description: Gene names that start with this text count as mitochondrial. MT- is only for human genes. Mouse genes use mt-. Other species can use a different prefix. }
     required: [adata]
     outputs:
       plot: { kind: image, ext: png, description: Violin plots of the QC metrics. }
@@ -278,7 +282,7 @@ tools:
       min_genes: { type: integer, minimum: 0, description: Minimum genes per cell. }
       max_genes: { type: integer, minimum: 1, description: Cells with this many genes or more are removed. }
       max_pct_mito: { type: number, minimum: 0, maximum: 100, description: Cells with this percent mitochondrial counts or more are removed. }
-      mito_prefix: { type: string, default: "MT-" }
+      mito_prefix: { type: string, default: "MT-", description: Gene names that start with this text count as mitochondrial. MT- is only for human genes. Mouse genes use mt-. Other species can use a different prefix. }
     required: [adata]
 
   - name: normalize_log
@@ -301,9 +305,9 @@ tools:
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
       n_top_genes: { type: integer, minimum: 0, description: Number of genes to keep. 0 means use the cutoffs. }
-      min_mean: { type: number, default: 0.0125 }
-      max_mean: { type: number, default: 3 }
-      min_disp: { type: number, default: 0.5 }
+      min_mean: { type: number, default: 0.0125, description: "Lowest mean expression of a gene to keep, on the log scale of the normalized data. Used only if n_top_genes is 0." }
+      max_mean: { type: number, default: 3, description: "Highest mean expression of a gene to keep, on the log scale of the normalized data. Used only if n_top_genes is 0." }
+      min_disp: { type: number, default: 0.5, description: Lowest normalized dispersion of a gene to keep. Unitless. Scanpy scales the dispersion within bins of genes with a similar mean. Used only if n_top_genes is 0. }
       flavor: { type: string, enum: [seurat, cell_ranger], default: seurat }
     required: [adata]
     outputs:
@@ -320,7 +324,7 @@ tools:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
       regress_out: { type: string, description: 'Comma-separated obs columns such as "total_counts,pct_counts_mt", or "none".' }
       max_value: { type: number, default: 10, description: Clip scaled values at this value. }
-      subset_to_hvg: { type: boolean, default: true }
+      subset_to_hvg: { type: boolean, default: true, description: "If true, keep only the highly variable genes before the scaling. If false, scale all genes." }
     required: [adata]
 
   - name: run_pca
@@ -329,7 +333,7 @@ tools:
     function: "ga_scanpy:run_pca"
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
-      random_state: { type: integer, minimum: 0 }
+      random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
     required: [adata]
     outputs:
       plot: { kind: image, ext: png, description: Log variance ratio for each component. }
@@ -343,7 +347,7 @@ tools:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
       n_neighbors: { type: integer, minimum: 2, description: Number of neighbors. }
       n_pcs: { type: integer, minimum: 2, description: Number of principal components to use. }
-      random_state: { type: integer, minimum: 0 }
+      random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
     required: [adata]
 
   - name: run_umap
@@ -353,8 +357,8 @@ tools:
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
       color: { type: [string, array], default: leiden, description: "An obs column or a gene name, or a list of them. Columns that do not exist are skipped." }
-      random_state: { type: integer, minimum: 0 }
-      min_dist: { type: number, default: 0.5 }
+      random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
+      min_dist: { type: number, default: 0.5, description: Smallest distance between points in the embedding. Unitless. Smaller values pack the points of a cluster closer together. }
       n_components: { type: integer, minimum: 2, maximum: 3, default: 2, description: Number of embedding dimensions. The plot shows the first two. }
     required: [adata]
     outputs:
@@ -369,7 +373,7 @@ tools:
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
       resolution: { type: number, minimum: 0.01, description: Higher values give more clusters. }
-      random_state: { type: integer, minimum: 0 }
+      random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
     required: [adata]
     outputs:
       sizes: { kind: table, ext: csv, description: Cells in each cluster. }
@@ -378,14 +382,14 @@ tools:
   - name: find_markers
     title: Marker genes for each group
     description: >
-      Rank the genes of each group against all other cells with rank_genes_groups. Uses the
-      log-normalized values of all genes. Saves the top 25 genes of each group.
+      Rank the marker genes of each group against all other cells. The tool calls scanpy
+      rank_genes_groups on the log-normalized values of all genes. Saves the top 25 genes of each group.
     function: "ga_scanpy:find_markers"
     params:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
       groupby: { type: string, default: leiden, description: The obs column that holds the groups. }
       method: { type: string, enum: [t-test, t-test_overestim_var, wilcoxon, logreg], description: The test. }
-      n_genes: { type: integer, minimum: 1, default: 25 }
+      n_genes: { type: integer, minimum: 1, default: 25, description: Number of top genes of each group to rank and save in the table. }
       n_top: { type: integer, minimum: 1, default: 3, description: Genes of each group to show in the table preview. }
     required: [adata]
     outputs:
@@ -401,7 +405,7 @@ tools:
       adata: { type: [object, string], description: A handle or an .h5ad path. }
       genes: { type: [array, string], description: Gene names. }
       kind: { type: string, enum: [umap, dotplot, violin], default: umap }
-      groupby: { type: string, default: leiden }
+      groupby: { type: string, default: leiden, description: The obs column that holds the groups. The dot plot and the violin plots use it. The UMAP plot uses it for color if no genes are given. }
     required: [adata]
     outputs:
       plot: { kind: image, ext: png, description: The plot. }

@@ -1,1 +1,1 @@
-print("version=" + getVersion());
+print("ImageJ version=" + getVersion());

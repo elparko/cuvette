@@ -3,7 +3,7 @@ adapter:
   field: mass spectrometry imaging
   file_types: [".imzml", ".ibd"]
   title: Cardinal (mass spectrometry imaging)
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Reads a mass spectrometry imaging run in R, picks peaks, splits the image into segments with
@@ -21,6 +21,10 @@ program:
     - https://bioconductor.org/packages/release/bioc/html/Cardinal.html
     - https://bioconductor.org/packages/release/data/experiment/vignettes/CardinalWorkflows/inst/doc/MSI-segmentation.html
     - https://doi.org/10.1093/bioinformatics/btv146
+  install: >
+    Install R (brew install r on macOS). Then install the Bioconductor package Cardinal and jsonlite into a library folder
+    that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages("BiocManager", repos = "https://cloud.r-project.org"); BiocManager::install(c("Cardinal", "jsonlite"))'
 
 connection:
   kind: script
@@ -39,6 +43,7 @@ locate:
   which: [Rscript]
   version_command: ["{program_path}", "--version"]
   version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first
@@ -379,7 +384,7 @@ tools:
       .rda file. Save it as an R object for the next tools. Returns the number of spectra, the
       number of m/z values and the m/z range.
     params:
-      path: { type: string, description: Path of the .imzML, .rds, .rda or .RData file. }
+      path: { type: string, description: "Path of the .imzML, .rds, .rda or .RData file." }
       object: { type: string, description: "For an .rda file. Name of the object in the file. If absent, the first object." }
     required: [path]
     read_only: true

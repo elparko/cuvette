@@ -3,7 +3,7 @@ adapter:
   field: phylogenetics
   file_types: [".fasta", ".fa", ".phy", ".aln"]
   title: MAFFT and IQ-TREE
-  version: 0.1.1
+  version: 0.1.2
   spec: "1"
   description: >
     Aligns DNA or protein sequences with MAFFT and builds maximum-likelihood trees with IQ-TREE.
@@ -19,6 +19,10 @@ program:
     - http://www.iqtree.org/doc/Tutorial
     - http://www.iqtree.org/doc/Command-Reference
     - https://mafft.cbrc.jp/alignment/software/manual/manual.html
+  install: >
+    Install IQ-TREE and MAFFT with Homebrew. The adapter reads the IQTREE variable, then iqtree3 or iqtree2 in
+    /opt/homebrew/bin, /usr/local/bin, ~/.local/bin and the PATH. It finds MAFFT through the MAFFT variable or the PATH.
+    brew install iqtree3 mafft
 
 connection:
   kind: cli
@@ -30,6 +34,7 @@ locate:
   which: [iqtree3, iqtree2]
   version_command: ["{program_path}", "--version"]
   version_pattern: "IQ-TREE (?:\\S+ )*version (\\S+)"
+  identity: 'IQ-TREE .*version \d'
 
 decisions:
   - key: algorithm
@@ -206,12 +211,12 @@ tools:
   - name: select_model
     title: Choose a substitution model with ModelFinder
     description: >
-      Run IQ-TREE ModelFinder on an alignment (IQ-TREE option -m MF). It tests many substitution models and
+      Run IQ-TREE ModelFinder on an alignment to choose a substitution model. The IQ-TREE option is -m MF. It tests many substitution models and
       reports the best model by BIC and by AIC. It does not report a final tree. Use infer_tree with model MFP
       to choose a model and build the tree in one run.
     read_only: true
     params:
-      path: { type: string, minLength: 1, description: Absolute path of the alignment. FASTA, PHYLIP or NEXUS format. }
+      path: { type: string, minLength: 1, description: "Absolute path of the alignment. FASTA, PHYLIP or NEXUS format." }
       seed: { type: integer, minimum: 1, description: Random seed. }
     required: [path]
     command: ["/bin/sh", "{adapter_dir}/scripts/iqtree.sh", "{program_path}", "select", "--alignment", "{path}", "--seed", "{seed}"]
@@ -225,7 +230,7 @@ tools:
       (treefile) and the path of the report. With a bootstrap, treefile has the support values on the
       maximum-likelihood tree.
     params:
-      path: { type: string, minLength: 1, description: Absolute path of the alignment. FASTA, PHYLIP or NEXUS format. }
+      path: { type: string, minLength: 1, description: "Absolute path of the alignment. FASTA, PHYLIP or NEXUS format." }
       model: { type: string, description: "Substitution model name, or MFP to let ModelFinder choose." }
       bootstrap_type: { type: string, enum: [none, ufboot, standard], description: Bootstrap type. }
       replicates: { type: integer, minimum: 100, maximum: 10000, description: Number of bootstrap replicates. }

@@ -3,7 +3,7 @@ adapter:
   field: microscopy
   file_types: [".tif", ".tiff", ".png", ".jpg"]
   title: ImageJ
-  version: 0.1.0
+  version: 0.1.1
   spec: "1"
   description: >
     Counts and measures objects in microscope images with ImageJ. Each tool opens its input file,
@@ -22,6 +22,10 @@ program:
     - https://imagej.net/ij/docs/guide/146.html
     - https://imagej.net/ij/developer/macro/macros.html
     - https://imagej.net/ij/developer/macro/functions.html
+  install: >
+    Download ImageJ 1.x or Fiji from https://imagej.net and install Java, because the adapter starts ij.jar with java.
+    The adapter reads the jar from IMAGEJ_JAR, or from /Applications/ImageJ.app/Contents/Java/ij.jar or Fiji.app/jars/ij-*.jar:
+    export IMAGEJ_JAR=/Applications/ImageJ.app/Contents/Java/ij.jar
 
 connection:
   kind: macro
@@ -50,6 +54,9 @@ locate:
     - C:\ImageJ\ij.jar
     - C:\Fiji.app\jars\ij-*.jar
     - C:\Program Files\Fiji.app\jars\ij-*.jar
+  version_command: ["java", "-Dapple.awt.UIElement=true", "-jar", "{program_path}", "-batch", "{adapter_dir}/version.ijm"]
+  version_pattern: "version=(\\S+)"
+  identity: "ImageJ version="
 
 module: adapter.ts
 
@@ -395,6 +402,7 @@ checks:
 
 tests:
   - id: blobs_info
+    gui: true
     description: The sample image blobs.gif is 256 by 254 pixels, 8 bit, with an inverting LUT.
     data: [data/blobs.gif]
     calls:
@@ -410,6 +418,7 @@ tests:
       - { path: metrics.saturated_fraction, equals: 0 }
 
   - id: blobs_count_default
+    gui: true
     description: The classic result. The Default threshold finds 64 particles in blobs.gif. Edges are not excluded.
     data: [data/blobs.gif]
     manual_route_checked: true
@@ -426,6 +435,7 @@ tests:
       - { path: metrics.area_fraction, approx: 0.34207, rel: 0.0001 }
 
   - id: blobs_threshold_steps
+    gui: true
     description: The threshold step on blobs.gif gives the limits 126 and 255.
     data: [data/blobs.gif]
     calls:
@@ -437,6 +447,7 @@ tests:
       - { path: metrics.foreground_fraction, approx: 0.34207, rel: 0.0001 }
 
   - id: blobs_exclude_edges
+    gui: true
     description: With Exclude on edges, 46 of the 64 particles remain.
     data: [data/blobs.gif]
     calls:
@@ -447,6 +458,7 @@ tests:
       - { path: metrics.mean_area, approx: 384.478, rel: 0.00001 }
 
   - id: blobs_triangle
+    gui: true
     description: The Triangle threshold gives a very different count than Default. The count depends on the method.
     data: [data/blobs.gif]
     calls:
@@ -456,6 +468,7 @@ tests:
       - { path: metrics.count, equals: 119 }
 
   - id: discs_count
+    gui: true
     description: Twelve discs of radius 10 on a dark background. Each disc has 317 pixels.
     data: [data/discs.png]
     calls:
@@ -468,6 +481,7 @@ tests:
       - { path: metrics.area_fraction, approx: 0.05804, rel: 0.0001 }
 
   - id: discs_touching
+    gui: true
     description: Six pairs of touching discs. Without the watershed, each pair counts as one object.
     data: [data/discs_touching.png]
     calls:
@@ -478,6 +492,7 @@ tests:
       - { path: metrics.mean_area, equals: 573 }
 
   - id: discs_touching_watershed
+    gui: true
     description: The watershed splits the six pairs into twelve objects.
     data: [data/discs_touching.png]
     calls:
@@ -488,6 +503,7 @@ tests:
       - { path: metrics.mean_area, equals: 279 }
 
   - id: discs_gradient_raw
+    gui: true
     description: Twelve discs on a background with a gradient. Without background subtraction the count is wrong.
     data: [data/discs_gradient.png]
     calls:
@@ -497,6 +513,7 @@ tests:
       - { path: metrics.count, equals: 116 }
 
   - id: discs_gradient_subtracted
+    gui: true
     description: A rolling ball with radius 25 removes the gradient and the count is 12.
     data: [data/discs_gradient.png]
     calls:
@@ -510,6 +527,7 @@ tests:
       - { path: metrics.mean_area, equals: 317 }
 
   - id: discs_noisy_blurred
+    gui: true
     description: Twelve discs with noise. A blur with sigma 2 gives 12 objects.
     data: [data/discs_noisy.png]
     calls:
@@ -523,6 +541,7 @@ tests:
       - { path: metrics.mean_area, approx: 331.917, rel: 0.0001 }
 
   - id: discs_calibrated
+    gui: true
     description: A scale of 0.5 micrometer for each pixel makes each area 79.25 square micrometers.
     data: [data/discs.png]
     calls:
@@ -537,6 +556,7 @@ tests:
       - { path: data.values.area_unit, equals: um }
 
   - id: discs_measure
+    gui: true
     description: The mean of the whole synthetic image.
     data: [data/discs.png]
     calls:
@@ -548,6 +568,7 @@ tests:
       - { path: metrics.max, equals: 200 }
 
   - id: discs_saturated
+    gui: true
     description: The saturated version has 5.8 percent of pixels at 255.
     data: [data/discs_saturated.png]
     calls:
@@ -557,6 +578,7 @@ tests:
       - { path: metrics.saturated_fraction, approx: 0.05804, rel: 0.001 }
 
   - id: discs_gradient_info
+    gui: true
     description: open_image flags the uneven background.
     data: [data/discs_gradient.png]
     calls:
@@ -566,6 +588,7 @@ tests:
       - { path: metrics.background_variation, min: 0.3 }
 
   - id: discs_run_command
+    gui: true
     description: A generic menu command gives the same pixels as the named tool.
     data: [data/discs.png]
     calls:
@@ -585,6 +608,7 @@ tests:
       - { path: metrics.integrated_density, equals: 1994960 }
 
   - id: folder_counts
+    gui: true
     description: Counts for each image in the data folder.
     data: [data/discs.png, data/discs_touching.png, data/discs_gradient.png, data/discs_noisy.png, data/discs_saturated.png]
     calls:
@@ -635,7 +659,7 @@ tools:
     params:
       input: { type: string, description: Path of the input image. }
       distance_px: { type: number, exclusiveMinimum: 0, description: Distance in pixels. }
-      known_distance: { type: number, exclusiveMinimum: 0, description: The real length of that distance. }
+      known_distance: { type: number, exclusiveMinimum: 0, description: "The real length of that distance, in the unit that the unit argument names." }
       unit: { type: string, default: um, description: "Unit of length, such as um, mm or nm." }
     required: [input, distance_px, known_distance]
     outputs:
@@ -746,7 +770,7 @@ tools:
       each object and a PNG with the outlines.
     params:
       mask: { type: string, description: Path of the binary mask from threshold or watershed. }
-      min_size: { type: number, minimum: 0, default: 0, description: Smallest area to count, in calibrated units. }
+      min_size: { type: number, minimum: 0, default: 0, description: "Smallest area to count, in calibrated units." }
       max_size: { type: number, minimum: 0, default: 0, description: Largest area to count. 0 means no limit. }
       min_circularity: { type: number, minimum: 0, maximum: 1, default: 0, description: Smallest circularity to count. }
       exclude_edges: { type: boolean, default: false, description: True to leave out objects that touch the image edge. }
@@ -820,7 +844,7 @@ tools:
       light_background: { type: boolean, default: false, description: True for the rolling ball if the background is light. }
       sigma: { type: number, minimum: 0, default: 0, description: Gaussian blur sigma in pixels. 0 means no blur. }
       watershed: { type: boolean, default: false, description: True to split touching objects. }
-      min_size: { type: number, minimum: 0, default: 0, description: Smallest area to count, in calibrated units. }
+      min_size: { type: number, minimum: 0, default: 0, description: "Smallest area to count, in calibrated units." }
       max_size: { type: number, minimum: 0, default: 0, description: Largest area to count. 0 means no limit. }
       min_circularity: { type: number, minimum: 0, maximum: 1, default: 0, description: Smallest circularity to count. }
       exclude_edges: { type: boolean, default: false, description: True to leave out objects that touch the image edge. }
@@ -856,11 +880,12 @@ tools:
       light_background: { type: boolean, default: false, description: True for the rolling ball if the background is light. }
       sigma: { type: number, minimum: 0, default: 0, description: Gaussian blur sigma in pixels. 0 means no blur. }
       watershed: { type: boolean, default: false, description: True to split touching objects. }
-      min_size: { type: number, minimum: 0, default: 0, description: Smallest area to count, in calibrated units. }
+      min_size: { type: number, minimum: 0, default: 0, description: "Smallest area to count, in calibrated units." }
       max_size: { type: number, minimum: 0, default: 0, description: Largest area to count. 0 means no limit. }
       min_circularity: { type: number, minimum: 0, maximum: 1, default: 0, description: Smallest circularity to count. }
       exclude_edges: { type: boolean, default: false, description: True to leave out objects that touch the image edge. }
     required: [folder]
+    batch: true
     outputs:
       per_image: { kind: table, ext: .csv, description: One row for each image. }
     parse: keyvalue
@@ -921,7 +946,7 @@ tools:
       in the form that the Macro Recorder writes, such as "radius=2". Use list_commands to find names.
     params:
       input: { type: string, description: Path of the input image. }
-      command: { type: string, description: Exact menu command name, such as "Median...". }
+      command: { type: string, description: 'Exact menu command name, such as "Median...".' }
       options: { type: string, default: "", description: "Dialog fields, such as radius=2." }
     required: [input, command]
     outputs:
