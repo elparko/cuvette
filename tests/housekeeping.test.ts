@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { activity, role, roleInRecord, stepNumbers } from "../src/core/housekeeping.ts";
+import { activity, makesNode, role, roleInRecord, stepNumbers } from "../src/core/housekeeping.ts";
 import type { Entry, Node } from "../src/core/types.ts";
 
 let id = 0;
@@ -66,4 +66,18 @@ test("the activity text says what the call does in plain words, never only a too
   expect(activity("list_adapters", {})).toBe("Checking the adapter list");
   expect(activity("compare_two_groups", { file: "/d/sleep.csv", paired: true }, "Compare two groups")).toBe("Compare two groups: sleep.csv");
   expect(activity("fit_mixed_model", {})).toBe("Fit mixed model");
+});
+
+test("a script that writes no file and gives no number to cite makes no result node", () => {
+  const script = { name: "run_script", source: "harness" };
+  const list = { purpose: "Find the image sets", does: "Lists the folders in LDL and the files in each one." };
+  expect(makesNode(script, list, { ok: true, outputs: [], text: "LDL/Set 1 ['20X_CH1.tif']" })).toBe(false);
+  expect(makesNode(script, {}, { ok: true, outputs: [], text: "done" })).toBe(false);
+  expect(makesNode(script, { does: "Measures the mean intensity of each image." }, { ok: true, outputs: [], text: "mean 76.9" })).toBe(true);
+  expect(makesNode(script, list, { ok: true, outputs: [{ path: "/w/files.csv" }], text: "" })).toBe(true);
+  expect(makesNode(script, {}, { ok: true, outputs: [], text: "t = 4.06, p = 0.0028" })).toBe(true);
+  expect(makesNode(script, list, { ok: false, outputs: [{ path: "/w/files.csv" }] })).toBe(false);
+  expect(makesNode({ name: "compare_two_groups", source: "adapter" }, {}, { ok: true })).toBe(true);
+  expect(makesNode({ name: "calculate", source: "harness" }, {}, { ok: true })).toBe(true);
+  expect(makesNode({ name: "list_dir", source: "generic" }, {}, { ok: true })).toBe(false);
 });

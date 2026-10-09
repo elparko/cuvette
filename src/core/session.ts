@@ -27,7 +27,7 @@ import { definitionsOf } from "./plan.ts";
 import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
-import { activity, PURPOSE, stepNumbers } from "./housekeeping.ts";
+import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
 import { AnalysisRecord } from "./record.ts";
 import { Findings, referee, runChecks } from "./review.ts";
@@ -1115,7 +1115,7 @@ export class Session {
     let node: string | undefined;
     const argStrings = stringsIn(args);
     const sensitivityOf = meta.sensitivityOf || this.record.nodes().find((n) => n.sensitivityOf && n.outputs.some((o) => argStrings.includes(o.path)))?.sensitivityOf || undefined;
-    const makesNode = output.ok && (tool.source === "adapter" || tool.name === "run_script" || tool.name === "calculate");
+    const makesNode = makesNodeFor(tool, args, output);
     const nodeId = makesNode ? `n${this.record.nodes().length + 1}` : undefined;
     this.record.append(
       "tool_result",

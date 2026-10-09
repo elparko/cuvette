@@ -281,22 +281,38 @@ describe("cards", () => {
 
   test("setup card edits a field and saves", async () => {
     const { h, s } = start({ autoSetup: true });
+    const card = () => {
+      const t = h.all();
+      return t.slice(t.lastIndexOf("Setup: your choices"));
+    };
     await until(() => h.all().includes("Setup: your choices for this analysis"));
+    for (let i = 0; ; i++) {
+      h.type("\r");
+      try {
+        await until(() => !card().includes("One sentence."), 2000);
+        break;
+      } catch (e) {
+        if (i === 4) throw e;
+      }
+    }
+    h.type("Does X differ?");
+    await until(() => card().includes("asking?: Does X differ?"));
     h.type("\r");
-    await sleep(600);
-    await type(h, "Does X differ?");
+    await until(() => card().includes("One sentence."));
+    h.type("\x1b[B");
+    await until(() => card().includes("▸ Mass tolerance (ppm)"));
     h.type("\r");
-    await sleep(600);
-    await type(h, "\x1b[B");
+    await until(() => !card().includes("How far apart"));
+    h.type("\x7f");
+    await until(() => !/Mass tolerance \(ppm\): 5/.test(card()));
+    h.type("12");
+    await until(() => card().includes("Mass tolerance (ppm): 12"));
     h.type("\r");
-    await sleep(600);
-    await type(h, "\x7f");
-    await type(h, "12");
-    h.type("\r");
-    await sleep(600);
-    for (let i = 0; i < 6; i++) {
-      await type(h, "\x1b[B");
-      await sleep(60);
+    await until(() => card().includes("How far apart"));
+    for (let i = 0; i < 12 && !card().includes("▸ Save setup and start"); i++) {
+      const before = card();
+      h.type("\x1b[B");
+      await until(() => card() !== before);
     }
     h.type("\r");
     await until(() => s.record.entries(["setup"]).length === 1);
@@ -528,6 +544,14 @@ describe("quiet view", () => {
     expect(activityText("running", undefined, "read_file")).toBe("Running read file");
     expect(activityText("waiting")).toBe("Waiting for your answer");
     expect(activityText("thinking")).toBe("Thinking about the next step");
+  });
+
+  test("scripts that only looked at folders join the dim line", () => {
+    const { log } = feed((s) => {
+      s.record.append("tool_result", { callId: "a", tool: "run_script", ok: true, summary: "x", effectiveArgs: { code: "x", purpose: "find the images", does: "Lists the folders in LDL." } });
+      s.record.append("tool_result", { callId: "b", tool: "list_dir", ok: true, summary: "x", effectiveArgs: { path: "/d/LDL" } });
+    });
+    expect(texts(mainView(log, true).settled)).toEqual(["· Listed folders with a script; Looked at 1 folder (LDL)"]);
   });
 
   test("held lines show in the live area until the next main line", () => {

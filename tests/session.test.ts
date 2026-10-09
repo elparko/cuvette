@@ -927,3 +927,17 @@ test("pilot: a held-back reference is hidden from the agent, and the harness com
   expect(session.record.entries(["reference"]).at(-1)!.data).toMatchObject({ mode: "blind", revealed: true });
   expect(toolTexts(provider).at(-1)).toContain("Now you can read the reference.");
 });
+
+test("a script that only lists files makes no result node; a script that saves a table does", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "ga-cwd-"));
+  writeFileSync(join(cwd, "sleep.csv"), "extra,group\n0.7,1\n1.9,2\n");
+  const look = { purpose: "Find the data", does: "Lists the files in the project folder.", code: "import os\nprint(sorted(os.listdir('.')))" };
+  const mean = { purpose: "Mean extra sleep", does: "Reads sleep.csv and saves the mean extra sleep of each group.", code: "import csv\nrows=list(csv.DictReader(open('sleep.csv')))\nsave_table('means', [{'group': r['group'], 'extra': float(r['extra'])} for r in rows])" };
+  const provider = new FakeProvider([{ calls: [{ name: "run_script", args: look }] }, { calls: [{ name: "run_script", args: mean }] }, { text: "ok" }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, permissionMode: "bypass" } });
+  await session.send("mean extra sleep");
+  const results = session.record.entries(["tool_result"]);
+  expect(results.map((e) => e.data.ok)).toEqual([true, true]);
+  expect(results.map((e) => e.node)).toEqual([undefined, "n1"]);
+  expect(session.record.nodes().map((n) => n.tool)).toEqual(["run_script"]);
+});

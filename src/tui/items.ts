@@ -261,6 +261,10 @@ export function housekeepingText(entries: Entry[], argsOf: (e: Entry) => Record<
     if (k !== "#compare" && failed === n && canMakeNode(list[0]!.data)) return `Tried ${k} again after ${plural(n, "error", "errors")}`;
     const tail = failed ? `, ${failed} failed` : "";
     switch (k) {
+      case "run_script": {
+        const folders = a.some((x) => /folder|director/i.test(`${x.does ?? ""} ${x.purpose ?? ""}`));
+        return `${folders ? "Listed folders" : "Looked at files"} with ${n === 1 ? "a script" : `${n} scripts`}${tail}`;
+      }
       case "list_dir": return `Looked at ${plural(n, "folder", "folders")}${names(a.map((x) => base(x.path)))}${tail}`;
       case "read_file": return `Read ${plural(n, "file", "files")}${names(a.map((x) => base(x.path)))}${tail}`;
       case "write_file": return `Wrote ${plural(n, "file", "files")}${names(a.map((x) => base(x.path)))}${tail}`;

@@ -10,6 +10,23 @@ export function canMakeNode(d: Record<string, unknown>): boolean {
   return Boolean(d.adapter) || NODE_TOOLS.has(String(d.tool));
 }
 
+const LOOKS_AT = /\b(folders?|director(y|ies)|files?|file names?|columns?|headers?|names?|paths?|sheets?|format|shape|types?|sizes?|rows?)\b/i;
+const MEASURES = /\b(measur|mean|median|average|test|fit|model|regress|correlat|comput|calculat|estimat|segment|threshold|normali|statistic|p-value|effect|ratio|area|intensit|cells?|nuclei|differen|plot|figure|summar)/i;
+
+export function scriptLooksOnly(args: Record<string, unknown>, out: { outputs?: unknown[]; images?: unknown[]; text?: string; metrics?: unknown; table?: unknown }): boolean {
+  if (out.outputs?.length || out.images?.length || out.table) return false;
+  if (out.metrics && Object.keys(out.metrics as object).length) return false;
+  if (!/\d/.test(String(out.text ?? ""))) return true;
+  const does = `${String(args.does ?? "")} ${String(args.purpose ?? "")}`;
+  return LOOKS_AT.test(does) && !MEASURES.test(does);
+}
+
+export function makesNode(tool: { name: string; source?: string }, args: Record<string, unknown>, out: { ok: boolean; outputs?: unknown[]; images?: unknown[]; text?: string; metrics?: unknown; table?: unknown }): boolean {
+  if (!out.ok) return false;
+  if (tool.name === "run_script") return !scriptLooksOnly(args, out);
+  return tool.source === "adapter" || NODE_TOOLS.has(tool.name);
+}
+
 export function retried(e: Entry, later: Entry[]): boolean {
   for (const x of later) {
     if (x.kind === "user" && !x.data.during) return false;
