@@ -3,11 +3,6 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
-## Unreleased: work in progress on 8 and 9 October 2026
-
-These items are being built and are not on main yet:
-- New analyses: electrophysiology.
-
 ## 9 October 2026
 
 ### Adapters from others
