@@ -12,7 +12,8 @@ export type Card =
   | { t: "question"; q: Question }
   | { t: "instruction"; step: number; tool: string; text: string }
   | { t: "findings"; list: Finding[] }
-  | { t: "key"; reason?: string };
+  | { t: "key"; reason?: string }
+  | { t: "config" };
 
 export function show(v: unknown): string {
   if (v === undefined || v === null || v === "") return "not set";

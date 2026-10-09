@@ -30,6 +30,9 @@ Usage
   ga adapter approve <name|dir> --by <name>
   ga onboard <program> --model <model> [--docs <url>] [--kind cli]
   ga models                            list the models
+  ga config                            show each setting, its value and where it comes from
+  ga config get <name>                 show one setting
+  ga config set <name> <value> [--user|--project]   save a setting (default: user settings)
   ga spend                             Claude spend by day and model (set GA_BUDGET_USD to stop at a limit)
   ga key [status|remove|workspace <id>] save, show or remove your Claude API key
   ga eln setup [--url <address>]       save your eLabFTW address and API key
@@ -80,6 +83,8 @@ const { values: o, positionals: pos } = parseArgs({
     out: { type: "string" },
     style: { type: "string" },
     "dry-run": { type: "boolean" },
+    user: { type: "boolean" },
+    project: { type: "boolean" },
     "run-tests": { type: "boolean" },
     generic: { type: "boolean" },
     "bypass-permissions": { type: "boolean" },
@@ -253,6 +258,37 @@ async function main() {
       const b = budgetUsd();
       console.log(`Total: $${total.toFixed(2)} (list prices, from ${spendFile()})${b ? `. Budget: $${b.toFixed(2)} (GA_BUDGET_USD).` : ""}`);
       return;
+    }
+    case "config": {
+      const st = await import("./core/settings.ts");
+      const ctx = { cwd: process.cwd() };
+      const rows = st.describe(ctx);
+      const line = (r: (typeof rows)[number]) => `${r.def.name.padEnd(16)} ${r.value.padEnd(40)} ${r.source ? st.scopeLabel(r.source) : ""}`.trimEnd();
+      if (!a1) {
+        let group = "";
+        for (const r of rows) {
+          if (r.def.group !== group) console.log(`${group ? "\n" : ""}${(group = r.def.group)}`);
+          console.log(`  ${line(r)}`);
+        }
+        return console.log(`\nUser settings: ${st.settingsPath("user", ctx.cwd)}\nProject settings: ${st.settingsPath("project", ctx.cwd)}`);
+      }
+      if (a1 === "get") {
+        const r = rows.find((x) => x.def.name === a2);
+        if (!r) return fail(`No setting named ${a2}. Type ga config to see the names.`);
+        return console.log([line(r), r.def.help, ...(r.def.details?.(ctx) ?? []).map((d) => `  ${d}`)].join("\n"));
+      }
+      if (a1 === "set") {
+        if (!a2 || a3 === undefined) return fail("usage: ga config set <name> <value> [--user|--project]");
+        const scope = o.project ? "project" : "user";
+        try {
+          const r = await st.changeSetting(ctx, a2, a3, scope);
+          console.log(`${a2}: ${st.show(r.old)} -> ${st.show(r.value)} (${st.scopeLabel(scope)}, ${st.settingsPath(scope, ctx.cwd)})${r.note ? `\n${r.note}` : ""}`);
+        } catch (e) {
+          fail((e as Error).message);
+        }
+        return;
+      }
+      return fail("usage: ga config [get <name> | set <name> <value> [--user|--project]]");
     }
     case "models": {
       const { listModels } = await import("./providers/index.ts");

@@ -1,5 +1,6 @@
 import { activity, canMakeNode, purposeOf, role } from "../core/housekeeping.ts";
 import type { Entry, Fidelity } from "../core/types.ts";
+import { scopeLabel, type Scope } from "../core/settings.ts";
 import type { SessionLike } from "./types.ts";
 
 export interface OutputRef {
@@ -142,6 +143,8 @@ export class Mapper {
         return line("✓", `Finding ${d.fid}: ${d.action}`, "green");
       case "mode":
         return line("▸", `Mode: ${d.old} → ${d.new}`, "cyan");
+      case "setting":
+        return line("⚙", d.change ? `Setting ${d.name} changed (${scopeLabel(d.scope as Scope)})` : `Setting ${d.name}: ${show(d.old)} → ${show(d.new)} (${scopeLabel(d.scope as Scope)})`, "cyan");
       case "follow_step": {
         const diffs = Array.isArray(d.differences) ? (d.differences as unknown[]).map(show) : [];
         if (d.status === "waiting") return [];

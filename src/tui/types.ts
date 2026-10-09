@@ -24,6 +24,9 @@ export interface SessionLike {
   id: string;
   dir: string;
   workDir: string;
+  cwd?: string;
+  settings?: Record<string, unknown>;
+  applySetting?(name: string, value: unknown): Promise<void>;
   mode: Mode;
   permissionMode: "ask" | "bypass";
   busy: boolean;

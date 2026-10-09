@@ -582,3 +582,20 @@ test("harness and generic tools take an optional purpose; the status line says i
   expect(session.record.entries(["tool_call"])[0]!.data.args).toMatchObject({ purpose: "write down the steps before the blur" });
   expect(session.record.entries(["tool_result"])[0]!.data.ok).toBe(true);
 });
+
+test("applySetting changes the model, the referee and the mode of a running session", async () => {
+  session = await Session.create({ adapters: [], model: "fake:", cwd: mkdtempSync(join(tmpdir(), "ga-cwd-")) });
+  const first = session.provider;
+  expect(session.refereeProvider).toBe(first);
+  await session.applySetting("referee", "none");
+  expect(session.refereeProvider).toBeUndefined();
+  await session.applySetting("model", "fake:");
+  expect(session.provider).not.toBe(first);
+  expect(session.settings.model).toBe("fake:");
+  await session.applySetting("referee", "same");
+  expect(session.refereeProvider).toBe(session.provider);
+  await expect(session.applySetting("model", "nope:x")).rejects.toThrow(/Unknown model spec/);
+  expect(session.settings.model).toBe("fake:");
+  await session.applySetting("mode", "plan");
+  expect(session.mode).toBe("plan");
+});

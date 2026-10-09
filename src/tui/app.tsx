@@ -11,6 +11,8 @@ import { Collapser, Mapper, mainView, type Item, type Logged } from "./items.ts"
 import type { SessionLike, TuiOptions } from "./types.ts";
 import { Header, ItemView, RunningLine, StatusLine, activityText, type StaticItem } from "./view.tsx";
 import { Markdown } from "./markdown.tsx";
+import { ConfigPanel } from "./config-panel.tsx";
+import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 
 const MODE_ORDER: Mode[] = ["watch", "follow", "teach", "plan"];
 const MAX_SUGGESTIONS = 8;
@@ -140,6 +142,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         return;
       }
       const path = saveClaudeKey(key);
+      recordSetting(session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
       line("✓", `${r.text} Saved to ${path}.`, "green");
       if (env.ANTHROPIC_API_KEY) line("!", "ANTHROPIC_API_KEY is also set in this shell. The harness uses that one first.", "yellow");
     },
@@ -411,7 +414,17 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
             if (problem) return line("✗", problem, "red");
             popCard();
             line("✓", `Saved the eLabFTW address and key ${maskKey(key)} to ${saveElabftw(url, key)}.`, "green");
+            recordSetting(session as unknown as SettingSession, find("elabftw_key")!, undefined, undefined, "user");
           }}
+        />
+      ) : null}
+      {card?.t === "config" ? (
+        <ConfigPanel
+          key="config"
+          ctx={{ cwd: session.cwd ?? process.cwd(), env, session: session as unknown as SettingSession, ui: { details: () => details.current, toggleDetails } }}
+          busy={status.state !== "idle"}
+          onClose={() => (popCard(), refresh())}
+          onEdit={(t) => setCards((x) => [t === "key" ? { t: "key" } : { t: "eln" }, ...x.slice(1)])}
         />
       ) : null}
       {card?.t === "key" ? <KeyCard key="key" card={card} path={credentialsPath()} onSubmit={(k) => void submitKey(k)} onCancel={popCard} /> : null}

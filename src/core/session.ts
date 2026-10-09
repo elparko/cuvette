@@ -1349,6 +1349,23 @@ export class Session {
     this.permissionMode = m;
   }
 
+  async applySetting(name: string, value: unknown): Promise<void> {
+    if (name === "mode") return this.setMode(value as Mode);
+    const next = { ...this.settings, [name]: value } as Settings;
+    const provider = name === "model" || name === "effort" ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think }) : this.provider;
+    const referee = ["model", "referee", "effort"].includes(name)
+      ? next.referee === "same"
+        ? provider
+        : next.referee && next.referee !== "none"
+          ? await makeProvider(next.referee, { effort: next.effort })
+          : undefined
+      : this.refereeProvider;
+    this.settings = next;
+    this.provider = provider;
+    this.refereeProvider = referee;
+    if (name === "model") this.system = this.buildSystem();
+  }
+
   setMode(mode: Mode): void {
     if (mode === this.mode) return;
     this.record.append("mode", { old: this.mode, new: mode });

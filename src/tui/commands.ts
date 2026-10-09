@@ -5,6 +5,7 @@ import type { Mode, Owner, Question } from "../core/types.ts";
 import { gaHome } from "../adapters/manifest.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
+import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import type { Card } from "./cards.tsx";
 import { show } from "./cards.tsx";
 import type { OutputRef } from "./items.ts";
@@ -191,6 +192,7 @@ export const commands: Command[] = [
     },
   },
   { name: "setup", help: "Open the setup card for your choices.", run: (_, ctx) => openSetup(ctx) },
+  { name: "config", help: "Show and change the settings.", run: (_, ctx) => ctx.openCard({ t: "config" }) },
   {
     name: "decisions",
     args: "[agent|me]",
@@ -360,7 +362,11 @@ export const commands: Command[] = [
         if (k.from === "file") return ctx.notice(`The key ${maskKey(k.key!)} comes from ${credentialsPath()}.${ws}`);
         return ctx.notice("No Claude API key is set. Type /key to add one.");
       }
-      if (sub === "remove") return ctx.notice(removeClaudeKey() ? `Removed the saved key from ${credentialsPath()}.` : "No key was saved.");
+      if (sub === "remove") {
+        if (!removeClaudeKey()) return ctx.notice("No key was saved.");
+        recordSetting(ctx.session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
+        return ctx.notice(`Removed the saved key from ${credentialsPath()}.`);
+      }
       if (sub === "workspace") {
         saveClaudeWorkspace(args[1] ?? "");
         return ctx.notice(args[1] ? `Saved the workspace ID ${args[1]}. Each request now sends it.` : "Removed the workspace ID.");
@@ -380,7 +386,11 @@ export const commands: Command[] = [
         const c = elabftwConfig();
         return ctx.notice(c ? `eLabFTW: ${c.url}, key ${maskKey(c.key)}, saved in ${credentialsPath()}.` : "eLabFTW is not set up. Type /eln setup.");
       }
-      if (sub === "remove") return ctx.notice(removeElabftw() ? "Removed the eLabFTW address and key." : "No eLabFTW key was saved.");
+      if (sub === "remove") {
+        if (!removeElabftw()) return ctx.notice("No eLabFTW key was saved.");
+        recordSetting(ctx.session as unknown as SettingSession, find("elabftw_key")!, undefined, undefined, "user");
+        return ctx.notice("Removed the eLabFTW address and key.");
+      }
       if (sub === "push") {
         if (!s.elnPush) return unavailable(ctx);
         try {

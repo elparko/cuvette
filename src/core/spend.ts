@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { gaHome } from "../adapters/manifest.ts";
 import type { Usage } from "./types.ts";
 
 const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
@@ -44,14 +45,26 @@ export function totalSpend(since?: string): number {
   return readSpend().filter((e) => !since || e.t >= since).reduce((s, e) => s + (Number(e.usd) || 0), 0);
 }
 
-export function budgetUsd(): number | undefined {
-  const v = Number(process.env.GA_BUDGET_USD);
-  return Number.isFinite(v) && v > 0 ? v : undefined;
+export function monthStart(now = new Date()): string {
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+}
+
+function userBudget(): number | undefined {
+  try {
+    return Number(JSON.parse(readFileSync(join(gaHome(), "settings.json"), "utf8")).budgetUsd);
+  } catch {
+    return undefined;
+  }
+}
+
+export function budgetUsd(env: Record<string, string | undefined> = process.env): number | undefined {
+  for (const v of [Number(env.GA_BUDGET_USD), userBudget()]) if (v !== undefined && Number.isFinite(v) && v > 0) return v;
+  return undefined;
 }
 
 export function budgetProblem(): string | undefined {
   const budget = budgetUsd();
   if (budget === undefined) return undefined;
-  const spent = totalSpend(process.env.GA_BUDGET_SINCE);
-  return spent >= budget ? `The Claude budget of $${budget.toFixed(2)} is used up ($${spent.toFixed(2)} spent). Raise GA_BUDGET_USD to continue.` : undefined;
+  const spent = totalSpend(process.env.GA_BUDGET_SINCE || monthStart());
+  return spent >= budget ? `The Claude budget of $${budget.toFixed(2)} for this month is used up ($${spent.toFixed(2)} spent). Raise GA_BUDGET_USD or the budgetUsd setting to continue.` : undefined;
 }

@@ -59,6 +59,8 @@ export class FakeSession implements SessionLike {
   mode: Mode;
   permissionMode: "ask" | "bypass" = "ask";
   busy = false;
+  cwd: string;
+  settings: Record<string, unknown> = { model: "fake:", referee: "same", effort: "high", mode: "watch" };
   model: ModelInfo = { provider: "fake", model: "fake-model", contextWindow: 200000, vision: true, small: false };
   adapterInfo = [
     { name: "smile-msi", title: "SMILE MSI", version: "0.1.0", programVersion: "2.4.0" },
@@ -78,6 +80,7 @@ export class FakeSession implements SessionLike {
 
   constructor(opts: FakeOptions = {}) {
     this.dir = opts.dir ?? mkdtempSync(join(tmpdir(), "ga-fake-"));
+    this.cwd = this.dir;
     this.workDir = join(this.dir, "work");
     this.mode = opts.mode ?? "watch";
     this.delay = opts.delayMs ?? 250;

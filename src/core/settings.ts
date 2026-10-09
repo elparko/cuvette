@@ -1,0 +1,345 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { CATALOG_DIR, gaHome } from "../adapters/manifest.ts";
+import { CLAUDE_MODELS } from "../providers/index.ts";
+import { DEFAULTS } from "./config.ts";
+import { claudeKey, elabftwConfig } from "./credentials.ts";
+import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
+
+export type Scope = "session" | "user" | "project";
+export type Source = "default" | "user" | "project" | "session" | "env" | "";
+
+export interface SettingSession {
+  mode: string;
+  permissionMode?: string;
+  setPermissionMode?(m: never): void;
+  busy: boolean;
+  settings?: Record<string, unknown>;
+  adapterInfo: { name: string; version: string }[];
+  record: { append(kind: "setting", data: Record<string, unknown>): unknown };
+  setMode(mode: never): void;
+  applySetting?(name: string, value: unknown): Promise<void> | void;
+}
+
+export interface SettingCtx {
+  cwd: string;
+  env?: Record<string, string | undefined>;
+  session?: SettingSession;
+  ui?: { details(): boolean; toggleDetails(): void };
+}
+
+export interface SettingDef {
+  name: string;
+  group: string;
+  label: string;
+  help: string;
+  scopes: Scope[];
+  choices?: () => string[];
+  free?: boolean;
+  number?: boolean;
+  def?: unknown;
+  lockedInTurn?: boolean;
+  secret?: boolean;
+  edit?: "key" | "eln";
+  shown?: (ctx: SettingCtx) => boolean;
+  read?: (ctx: SettingCtx) => { value: string; source: Source };
+  details?: (ctx: SettingCtx) => string[];
+}
+
+export interface SettingRow {
+  def: SettingDef;
+  value: string;
+  source: Source;
+  locked: boolean;
+}
+
+const ALL: Scope[] = ["session", "user", "project"];
+const MODELS = () => CLAUDE_MODELS.map((m) => m.spec);
+export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+
+export const SETTINGS: SettingDef[] = [
+  {
+    name: "model",
+    group: "Model",
+    label: "Model",
+    help: "The model that does the analysis. The change starts with the next message.",
+    scopes: ALL,
+    choices: MODELS,
+    free: true,
+    lockedInTurn: true,
+  },
+  {
+    name: "referee",
+    group: "Model",
+    label: "Referee model",
+    help: "The model that checks each final answer. \"same\" uses the analysis model. \"none\" stops the check.",
+    scopes: ALL,
+    choices: () => ["same", "none", ...MODELS()],
+    free: true,
+    lockedInTurn: true,
+  },
+  {
+    name: "effort",
+    group: "Model",
+    label: "Effort",
+    help: "How much the Claude model thinks before it acts. More effort costs more.",
+    scopes: ALL,
+    choices: () => EFFORTS,
+    lockedInTurn: true,
+    shown: (ctx) => String(resolve(find("model")!, ctx).value).startsWith("claude"),
+  },
+  {
+    name: "mode",
+    group: "Session",
+    label: "Mode",
+    help: "watch: the agent runs the steps. follow: you run each step. teach: you run the steps and the agent explains. plan: the agent plans only.",
+    scopes: ALL,
+    choices: () => ["watch", "follow", "teach", "plan"],
+  },
+  {
+    name: "details",
+    group: "Session",
+    label: "Show details",
+    help: "on: the transcript shows each housekeeping step, such as a file read. off: these steps collapse into one dim line. Ctrl+O does the same.",
+    scopes: ["session"],
+    choices: () => ["on", "off"],
+    shown: (ctx) => !!ctx.ui,
+    read: (ctx) => (ctx.ui!.details() ? { value: "on", source: "session" } : { value: "off", source: "default" }),
+  },
+  {
+    name: "output_folder",
+    group: "Session",
+    label: "Save results in",
+    help: "The folder in the project folder for outputs and session records. You cannot change it yet.",
+    scopes: [],
+    def: "cuvette",
+  },
+  {
+    name: "permissionMode",
+    group: "Permissions",
+    label: "Permission mode",
+    help: "ask: a card asks before each tool call that needs permission. bypass: the harness allows these calls without a card. Deny rules still deny.",
+    scopes: ALL,
+    choices: () => ["ask", "bypass"],
+  },
+  {
+    name: "permissions",
+    group: "Permissions",
+    label: "Allow and deny rules",
+    help: "Rules that allow, ask for or deny a tool. Edit them in the settings file.",
+    scopes: [],
+    read: (ctx) => {
+      const rules = permissionRules(ctx.cwd);
+      const n = (r: string) => rules.filter((x) => x.rule === r).length;
+      const parts = [`${n("allow")} allow`, `${n("deny")} deny`, ...(n("ask") ? [`${n("ask")} ask`] : [])];
+      const from = [...new Set(rules.map((r) => r.source))];
+      return { value: parts.join(", "), source: from.length === 1 ? from[0]! : from.length ? "project" : "default" };
+    },
+    details: (ctx) => [
+      ...permissionRules(ctx.cwd).map((r) => `${r.rule.padEnd(6)}${r.pattern}  (${scopeLabel(r.source)})`),
+      `Edit: ${settingsPath("project", ctx.cwd)} or ${settingsPath("user", ctx.cwd)}`,
+    ],
+  },
+  {
+    name: "adapters",
+    group: "Adapters",
+    label: "Loaded adapters",
+    help: "The programs that this session controls. Load more with --adapter, or the agent asks to load one.",
+    scopes: [],
+    shown: (ctx) => !!ctx.session,
+    read: (ctx) => ({ value: ctx.session!.adapterInfo.map((a) => `${a.name} ${a.version}`).join(", ") || "none", source: "session" }),
+  },
+  {
+    name: "adapter_folders",
+    group: "Adapters",
+    label: "Adapter folders",
+    help: "The folders where the harness looks for adapters, in this order.",
+    scopes: [],
+    read: (ctx) => ({ value: `${adapterFolders(ctx.cwd).filter((f) => existsSync(f)).length} of ${adapterFolders(ctx.cwd).length} folders exist`, source: "default" }),
+    details: (ctx) => adapterFolders(ctx.cwd).map((f) => `${f}${existsSync(f) ? "" : "  (missing)"}`),
+  },
+  {
+    name: "claude_key",
+    group: "Account and spend",
+    label: "Claude API key",
+    help: "The key for the Claude API. The screen never shows it. Enter opens the key card. On the command line: ga key.",
+    scopes: [],
+    secret: true,
+    edit: "key",
+    read: (ctx) => {
+      const k = claudeKey(ctx.env ?? process.env);
+      return k.from === "env" ? { value: "set in ANTHROPIC_API_KEY", source: "env" } : k.from === "file" ? { value: "saved", source: "user" } : { value: "not set", source: "" };
+    },
+  },
+  {
+    name: "budgetUsd",
+    group: "Account and spend",
+    label: "Budget per month",
+    help: "The harness stops Claude requests when the spend this month reaches this limit, in US dollars. GA_BUDGET_USD wins over the setting. Type off to remove it.",
+    scopes: ["user"],
+    number: true,
+    read: (ctx) => {
+      const env = ctx.env ?? process.env;
+      const b = budgetUsd(env);
+      if (b === undefined) return { value: "no limit", source: "" };
+      return { value: `$${b.toFixed(2)}`, source: Number(env.GA_BUDGET_USD) > 0 ? "env" : "user" };
+    },
+  },
+  {
+    name: "spend_month",
+    group: "Account and spend",
+    label: "Spent this month",
+    help: "Claude spend since the first day of this month, at list prices. ga spend shows each day.",
+    scopes: [],
+    read: () => ({ value: `$${totalSpend(monthStart()).toFixed(2)}`, source: "" }),
+  },
+  {
+    name: "elabftw_url",
+    group: "Lab notebook",
+    label: "eLabFTW address",
+    help: "The address of your eLabFTW server. Enter opens the eLabFTW card. On the command line: ga eln setup.",
+    scopes: [],
+    edit: "eln",
+    read: () => ({ value: elabftwConfig()?.url ?? "not set", source: elabftwConfig() ? "user" : "" }),
+  },
+  {
+    name: "elabftw_key",
+    group: "Lab notebook",
+    label: "eLabFTW API key",
+    help: "The key for eLabFTW. The screen never shows it. Enter opens the eLabFTW card.",
+    scopes: [],
+    secret: true,
+    edit: "eln",
+    read: () => ({ value: elabftwConfig() ? "saved" : "not set", source: elabftwConfig() ? "user" : "" }),
+  },
+];
+
+export function find(name: string): SettingDef | undefined {
+  return SETTINGS.find((d) => d.name === name);
+}
+
+export function settingsPath(scope: "user" | "project", cwd: string): string {
+  return scope === "user" ? join(gaHome(), "settings.json") : join(cwd, ".ga", "settings.json");
+}
+
+function readJson(path: string): Record<string, unknown> {
+  if (!existsSync(path)) return {};
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch (e) {
+    throw new Error(`settings file ${path} is not valid JSON: ${(e as Error).message}`);
+  }
+}
+
+function layers(cwd: string): [Source, Record<string, unknown>][] {
+  const paths = [settingsPath("user", cwd), settingsPath("project", cwd), join(cwd, ".ga", "settings.local.json")];
+  return paths.map((p, i) => {
+    const { permissions, ...rest } = readJson(p);
+    const layer = typeof permissions === "string" ? { ...rest, permissionMode: permissions } : permissions === undefined ? rest : { ...rest, permissions };
+    return [i ? "project" : "user", layer];
+  });
+}
+
+export function adapterFolders(cwd: string): string[] {
+  return [join(cwd, ".ga", "adapters"), join(gaHome(), "adapters"), CATALOG_DIR];
+}
+
+export function permissionRules(cwd: string): { pattern: string; rule: string; source: Source }[] {
+  const out = new Map<string, { pattern: string; rule: string; source: Source }>();
+  for (const [source, layer] of layers(cwd))
+    for (const [pattern, rule] of Object.entries((layer.permissions as Record<string, string>) ?? {})) out.set(pattern, { pattern, rule, source });
+  return [...out.values()];
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+export function show(v: unknown): string {
+  if (v === undefined || v === null || v === "") return "not set";
+  return typeof v === "string" ? v : JSON.stringify(v);
+}
+
+function fileValue(d: SettingDef, cwd: string): { value: unknown; source: Source } {
+  let value = d.def ?? (DEFAULTS as unknown as Record<string, unknown>)[d.name];
+  let source: Source = "default";
+  for (const [s, layer] of layers(cwd))
+    if (d.name in layer) {
+      value = layer[d.name];
+      source = s;
+    }
+  return { value, source };
+}
+
+export function resolve(d: SettingDef, ctx: SettingCtx): { value: unknown; source: Source } {
+  if (d.read) return d.read(ctx);
+  const f = fileValue(d, ctx.cwd);
+  const s = ctx.session;
+  const live = !s ? undefined : d.name === "mode" || d.name === "permissionMode" ? s[d.name] : s.settings && d.name in s.settings ? s.settings[d.name] : undefined;
+  if (live !== undefined && !same(live, f.value)) return { value: live, source: "session" };
+  return f;
+}
+
+export function describe(ctx: SettingCtx): SettingRow[] {
+  return SETTINGS.filter((d) => !d.shown || d.shown(ctx)).map((d) => {
+    const r = resolve(d, ctx);
+    return { def: d, value: show(r.value), source: r.source, locked: !!(d.lockedInTurn && ctx.session?.busy) };
+  });
+}
+
+export function parseValue(d: SettingDef, raw: unknown): unknown {
+  if (d.number) {
+    if (raw === "off" || raw === undefined) return undefined;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) throw new Error(`${d.label} must be a number above 0, or off.`);
+    return n;
+  }
+  const v = String(raw ?? "").trim();
+  if (!v) throw new Error(`${d.label} needs a value.`);
+  const choices = d.choices?.() ?? [];
+  if (!d.free && choices.length && !choices.includes(v)) throw new Error(`${d.label} must be one of: ${choices.join(", ")}.`);
+  return v;
+}
+
+function writeSetting(path: string, name: string, value: unknown): void {
+  const data = readJson(path);
+  if (name === "permissionMode" && typeof data.permissions === "string") delete data.permissions;
+  if (value === undefined) delete data[name];
+  else data[name] = value;
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+}
+
+export function recordSetting(session: SettingSession | undefined, d: SettingDef, old: unknown, value: unknown, scope: Scope): void {
+  session?.record.append("setting", d.secret ? { name: d.name, scope, change: "changed" } : { name: d.name, old: old ?? null, new: value ?? null, scope });
+}
+
+export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown, scope: Scope): Promise<{ old: unknown; value: unknown; note?: string }> {
+  const d = find(name);
+  if (!d) throw new Error(`No setting named ${name}. Type ga config to see the names.`);
+  if (d.secret || !d.scopes.length) throw new Error(`${d.label} cannot change here. ${d.help}`);
+  if (!d.scopes.includes(scope)) throw new Error(`${d.label} can be saved only in: ${d.scopes.map(scopeLabel).join(", ")}.`);
+  if (d.lockedInTurn && ctx.session?.busy) throw new Error(`${d.label} is locked until the turn ends.`);
+  const value = parseValue(d, raw);
+  const old = name === "details" ? d.read!(ctx).value : d.read ? fileValue(d, ctx.cwd).value : resolve(d, ctx).value;
+  const s = ctx.session;
+  if (name === "details" && value !== old) ctx.ui?.toggleDetails();
+  if (s && !d.read) {
+    if (name === "mode") s.setMode(value as never);
+    else if (name === "permissionMode" && s.setPermissionMode) s.setPermissionMode(value as never);
+    else if (s.applySetting) await s.applySetting(name, value);
+    else if (s.settings) s.settings[name] = value;
+  }
+  if (scope !== "session") writeSetting(settingsPath(scope, ctx.cwd), name, value);
+  recordSetting(s, d, old, value, scope);
+  const after = d.read ? undefined : fileValue(d, ctx.cwd);
+  const env = name === "budgetUsd" && Number((ctx.env ?? process.env).GA_BUDGET_USD) > 0;
+  const note = env
+    ? "GA_BUDGET_USD in this shell still wins."
+    : scope !== "session" && after && !same(after.value, value)
+      ? `The ${after.source} setting (${show(after.value)}) still wins in new sessions in this folder.`
+      : undefined;
+  return { old, value, note };
+}
+
+export function scopeLabel(scope: Scope | Source): string {
+  return scope === "session" ? "this session only" : scope === "user" ? "user settings" : scope === "project" ? "project settings" : scope === "env" ? "environment" : scope;
+}
