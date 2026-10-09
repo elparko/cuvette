@@ -9,9 +9,12 @@ These items are being built and are not on main yet:
 - A desktop app for macOS (Tauri), about one third the size of an Electron app.
 - New analyses: ELISA standard curves, dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
 - A map of proprietary lab software and the open-source alternatives that Cuvette supports.
-- A warning before likely patient identifiers go to a cloud model, and the session cost in the status line.
 
 ## 9 October 2026
+
+### Patient data and cost
+- Before content goes to a cloud model, Cuvette looks for likely patient identifiers (names, record numbers, dates of birth, contact data and similar, after the HIPAA Safe Harbor list). A card shows what it found, masked, and you choose: send, mask the values, use a local model, or stop. Local models skip the card. The check is a help, not a guarantee; see `docs/patient-data.md`.
+- The status line shows the session cost and how full the model context is. `/usage` shows the cost of each turn.
 
 ### Citations
 - Every adapter carries the citation that its program authors ask for, and each tool cites the published methods it uses: 174 citations, each with a DOI or a URL that was checked.
