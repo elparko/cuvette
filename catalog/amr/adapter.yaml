@@ -347,6 +347,7 @@ tests:
     description: >
       EUCAST breakpoint table v 14.0 (2024), Enterobacterales ciprofloxacin: S at or below 0.25 mg/L and R above 0.5 mg/L.
       Gentamicin: S at or below 2 mg/L and R above 2 mg/L.
+      The EUCAST file was not reachable (HTTP 403), so these values are not checked against the source file.
     calls:
       - tool: show_breakpoints
         args: { organism: Escherichia coli, drugs: [ciprofloxacin, gentamicin], guideline: EUCAST 2024 }
