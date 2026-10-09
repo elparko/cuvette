@@ -16,9 +16,11 @@ These items are being built and are not on main yet:
 - A package lock for each session, more reasons for "out of date", `/status`, and a before-and-after table.
 - A warning before likely patient identifiers go to a cloud model, and the session cost in the status line.
 - Rewind, branches and method templates.
-- Image decks: compile figures and QC images into a PowerPoint file or a PDF.
 
 ## 9 October 2026
+
+### Outputs
+- Image decks: `/export images` compiles figures and QC images into a PowerPoint file or a PDF, one per page or in grids of 2, 4, 6 or 9. Each image has an editable caption from the record. The last page lists the methods and the record hash. The app has a "Make an image deck" button.
 
 ### Data handling
 - A data check runs when the agent first reads a table or a folder: missing values, duplicates, mixed types, missing channels, names spelled two ways, and files that differ. Problems that need a choice become question cards.
