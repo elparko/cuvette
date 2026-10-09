@@ -29,3 +29,19 @@ for (bgname in c("measured genes in the gene sets", "measured genes")) {
     fisher.test(matrix(c(res$overlap[1], length(q) - res$overlap[1], res$set_size[1] - res$overlap[1],
       length(universe) - length(q) - res$set_size[1] + res$overlap[1]), 2), alternative = "greater")$p.value))
 }
+
+cat("\n## The Enrichr rule: a background of 20000 genes, no size limit\n")
+q <- intersect(query, rnk$V1)
+res <- do.call(rbind, lapply(names(sets), function(n) {
+  s <- unique(sets[[n]])
+  x <- length(intersect(q, s))
+  if (x < 1) return(NULL)
+  data.frame(term = n, overlap = x, set_size = length(s),
+             p = phyper(x - 1, length(s), 20000 - length(s), length(q), lower.tail = FALSE),
+             odds = x * (20000 - length(s) - length(q) + x) / max((length(s) - x) * (length(q) - x), 1))
+}))
+res$padj <- p.adjust(res$p, method = "BH")
+res <- res[order(res$p, res$term), ]
+cat("list", length(q), "terms with an overlap", nrow(res), "\n")
+for (i in 1:3) cat(sprintf("%s overlap %d/%d p %.10g padj %.10g odds %.10g\n",
+  res$term[i], res$overlap[i], res$set_size[i], res$p[i], res$padj[i], res$odds[i]))

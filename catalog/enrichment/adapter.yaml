@@ -41,7 +41,7 @@ locate:
     - ~/.guided-analysis/envs/enrichment/bin/python
     - ~/.guided-analysis/envs/enrichment/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import importlib.metadata as m; print('gseapy', m.version('gseapy'))"]
+  version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('gseapy', m.version('gseapy'))"]
   version_pattern: 'gseapy (\S+)'
   identity: 'gseapy \d'
 
@@ -67,12 +67,13 @@ decisions:
   - key: background
     label: Background (universe) for over-representation
     kind: choice
-    choices: [measured genes, measured genes in the gene sets, all genes in the gene sets]
+    choices: [measured genes, measured genes in the gene sets, all genes in the gene sets, "20000 genes (the Enrichr default)"]
     group: Over-representation
     help: >
       The genes that could be on the list. The first choice is every gene in the table, as in gseapy and Enrichr with a background.
       The second choice also removes the genes in no gene set, as in clusterProfiler and DAVID.
       The third choice ignores the measurement and gives p values that are too small.
+      The fourth choice is the fixed number that the Enrichr web site uses. Pick it to repeat an Enrichr result.
       The choice can change p values by several orders of magnitude.
     essential: true
     owner: human
@@ -80,10 +81,10 @@ decisions:
     links:
       - { tool: run_ora, arg: background }
     sensitivity:
-      options: [measured genes, measured genes in the gene sets, all genes in the gene sets]
+      options: [measured genes, measured genes in the gene sets, all genes in the gene sets, "20000 genes (the Enrichr default)"]
       tool: run_ora
       compare: [metrics.background_size, metrics.top_p_adjusted, metrics.n_sets_significant]
-      max_runs: 3
+      max_runs: 4
 
   - key: de_padj_max
     label: Adjusted p cutoff for a differentially expressed gene
@@ -238,7 +239,7 @@ tools:
       path: { type: string, minLength: 1, description: "Absolute path of the full table of measured genes (all genes, not only the significant ones)." }
       gene_sets: { type: string, description: Absolute path of a GMT file. }
       id_column: { type: string, description: Column with the gene IDs. They must be the same ID type as in the GMT file. }
-      background: { type: string, enum: [measured genes, measured genes in the gene sets, all genes in the gene sets], description: The universe of the test. }
+      background: { type: string, enum: [measured genes, measured genes in the gene sets, all genes in the gene sets, "20000 genes (the Enrichr default)"], description: The universe of the test. }
       padj_column: { type: string, description: Column of adjusted p values. }
       padj_max: { type: number, minimum: 0, maximum: 1, description: "A gene is on the list if its adjusted p is below this value (probability)." }
       lfc_column: { type: string, description: Column of log2 fold changes. }
@@ -449,6 +450,34 @@ tests:
       - { path: metrics.top_overlap, equals: 45 }
       - { path: metrics.top_p_value, approx: 2.87805e-17, rel: 0.0001 }
       - { path: metrics.top_p_adjusted, approx: 1.04185e-14, rel: 0.0001 }
+
+  - id: ora-enrichr-background
+    description: >
+      The same gene list with the Enrichr rule: a background of 20000 genes and no size limit. R phyper
+      (checks/ora_phyper.R, output checks/ora_phyper.out) gives the top set 5990980_Cell_Cycle, overlap 45 of
+      505 genes, p 2.862919941e-20, BH adjusted 1.534525089e-17 and the Enrichr odds ratio 6.524116848. The
+      odds ratio is the uncorrected form that Enrichr prints, not the Haldane-Anscombe form of gseapy.
+    data: [data/fgsea_exampleRanks.rnk, data/fgsea_examplePathways.gmt]
+    calls:
+      - tool: run_ora
+        args:
+          path: "{adapter_dir}/data/fgsea_exampleRanks.rnk"
+          gene_sets: "{adapter_dir}/data/fgsea_examplePathways.gmt"
+          id_column: gene
+          background: 20000 genes (the Enrichr default)
+          lfc_column: score
+          lfc_min: 15
+          direction: up
+          min_size: 1
+          max_size: 100000
+    expect:
+      - { path: metrics.background_size, equals: 20000 }
+      - { path: metrics.n_sets_with_overlap, equals: 536 }
+      - { path: metrics.top_overlap, equals: 45 }
+      - { path: metrics.top_set_size, equals: 505 }
+      - { path: metrics.top_p_value, approx: 2.862919941e-20, rel: 0.0001 }
+      - { path: metrics.top_p_adjusted, approx: 1.534525089e-17, rel: 0.0001 }
+      - { path: metrics.top_odds_ratio, approx: 6.524116848, rel: 0.000001 }
 
   - id: wrong-id-type
     description: Gene symbols against a GMT file of Entrez IDs give no overlap. The error names both ID types.

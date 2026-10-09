@@ -44,7 +44,7 @@ locate:
     - ~/.guided-analysis/envs/cloning/bin/python
     - ~/.guided-analysis/envs/cloning/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import importlib.metadata as m; print('biopython', m.version('biopython'), 'primer3', m.version('primer3-py'))"]
+  version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('biopython', m.version('biopython'), 'primer3', m.version('primer3-py'))"]
   version_pattern: 'biopython (\S+)'
   identity: 'biopython \d.*primer3 \d'
 

@@ -80,7 +80,7 @@ locate:
     - ~/.guided-analysis/envs/biostats/bin/python
     - ~/.guided-analysis/envs/biostats/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import importlib.metadata as m; print('lifelines', m.version('lifelines'), 'scikit-posthocs', m.version('scikit-posthocs'))"]
+  version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('lifelines', m.version('lifelines'), 'scikit-posthocs', m.version('scikit-posthocs'))"]
   version_pattern: 'lifelines (\S+)'
   identity: 'lifelines \d'
 

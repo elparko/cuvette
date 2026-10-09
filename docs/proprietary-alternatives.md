@@ -127,7 +127,41 @@ The status of each one is in "Results" below.
 
 ## Results
 
-Not yet filled in. This section gets the test results and the benchmark papers.
+This work finished all four parts. `ga adapter check <name> --run-tests` passes with no error for each one.
+
+| Part | Adapter | Tools | Known-answer tests | Benchmark paper |
+| --- | --- | --- | --- | --- |
+| Pathways | `enrichment` | 4 | 6 | Wang 2023, DOI 10.3390/biom13010127 |
+| Sequences and cloning | `cloning` | 6 | 12 | Klindworth 2013, DOI 10.1093/nar/gks808 |
+| Chromatography | `chromatography` | 5 | 6 | Chure 2024, DOI 10.21105/joss.06270 |
+| Prism and SPSS statistics | `biostats` (5 new tools) | 5 new | 6 new | Oreshkova 2024, DOI 10.1371/journal.pone.0292500 |
+
+Where each test value comes from:
+
+- `cloning`: the primer3 test suite, with 33 rows of `test/oligotm.txt` and the Primer3web settings output.
+  Also the Biopython test suite and docs, the New England Biolabs lambda EcoRI fragment sizes, and the
+  published 16S primer positions.
+- `enrichment`: the fgsea vignette (enrichment score and leading edge), and R `phyper`, `fisher.test` and
+  `p.adjust` for the hypergeometric p values (`checks/ora_phyper.R`).
+- `chromatography`: the hplc-py test suite ground truth, R `lm` for the calibration
+  (`checks/calibration_r.R`), and a trapezoid integral that shows what the hplc-py area means
+  (`checks/area_units.py`).
+- `biostats`: R 4.6.1 `aov`, `TukeyHSD`, `kruskal.test`, `FSA::dunnTest`, `friedman.test` and `wilcox.test`
+  (`checks/anova_r.R`).
+
+Two faults that the benchmark papers found, now fixed:
+
+- `gseapy.get_library` drops a gene set line whose first gene field is empty. That changes the
+  Benjamini-Hochberg denominator and every adjusted p value. `fetch_gene_sets` now reads the raw library file.
+- The Enrichr web site uses a fixed background of 20000 genes, and prints an odds ratio with no
+  Haldane-Anscombe correction. `run_ora` now offers that background and gives both odds ratios.
+
+What stays open:
+
+- No open paper found so far prints a preranked GSEA enrichment score with a frozen ranked list, so the
+  benchmark covers over-representation only. The GSEA tool has the fgsea vignette as its known answer.
+- No paper found that prints HPLC-UV peak areas with open traces under a license on the list. The
+  chromatography benchmark uses the hplc-py paper itself, whose figure prints two significant figures.
 
 ## Sources
 
@@ -182,7 +216,12 @@ Not yet filled in. This section gets the test results and the benchmark papers.
 - REDCap terms: https://projectredcap.org/join/termsofuse/
 - PyCap: https://github.com/redcap-tools/PyCap
 
-Facts not checked on the web: the vendor names of Imaris, MetaMorph, NIS-Elements, ZEN, LAS X,
-ImageQuant TL, SoftMax Pro, Gen5, MetaCore, Chromeleon, Empower, OpenLab, MassHunter, Xcalibur,
-Spectronaut, Proteome Discoverer, PEAKS and NVivo. The free or paid state of the CFX Maestro,
-QuantStudio, Seahorse Wave, 2100 Expert and TapeStation downloads is not confirmed.
+The vendor names of these programs come from general knowledge, not from a web check:
+
+- microscopy and gels: Imaris, MetaMorph, NIS-Elements, ZEN, LAS X, ImageQuant TL.
+- plate readers and pathways: SoftMax Pro, Gen5, MetaCore.
+- chromatography and mass spectrometry: Chromeleon, Empower, OpenLab, MassHunter, Xcalibur, Spectronaut,
+  Proteome Discoverer, PEAKS.
+- qualitative work: NVivo.
+No web source confirmed whether these downloads are free or paid: CFX Maestro, QuantStudio,
+Seahorse Wave, 2100 Expert and TapeStation.

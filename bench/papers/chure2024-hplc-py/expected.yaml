@@ -1,0 +1,29 @@
+tool: hplc-py (Python), through the chromatography adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/chure2024-hplc-py/sample.txt
+  - /Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/
+decisions:
+  baseline: "SNIP, peak width 5"
+  prominence: 0.01
+  time_window: "10 to 20 minutes"
+  calibration: "a line with an intercept, no weighting"
+expected:
+  - {description: "Number of peaks between 10 and 20 minutes", value: 6, tolerance: 0, source: "published"}
+  - {description: "Retention time of the first peak, in minutes", value: 10.90, tolerance: 0.005, source: "published"}
+  - {description: "Area of the first peak", value: 2.8e6, tolerance: 0.05e6, source: "published"}
+  - {description: "Fitted amplitude of the first peak", value: 2.3e4, tolerance: 0.05e4, source: "published"}
+  - {description: "Fitted scale of the first peak", value: 0.16, tolerance: 0.005, source: "published"}
+  - {description: "Fitted skew of the first peak", value: 0.70, tolerance: 0.005, source: "published"}
+  - {description: "Retention time of the third peak, in minutes", value: 14.45, tolerance: 0.005, source: "published"}
+  - {description: "Area of the first peak, full precision", value: 2805655.43, tolerance: 300, source: "published"}
+  - {description: "Calibration slope, area per mM", value: 156586.74, tolerance: 160, source: "published"}
+  - {description: "Calibration intercept, in area units", value: 14624.94, tolerance: 150, source: "published"}
+  - {description: "R squared of the calibration", value: 0.99887, tolerance: 0.00005, source: "published"}
+  - {description: "Concentration of the unknown lactose sample, in mM", value: 1.8994, tolerance: 0.005, source: "published"}
+  - {description: "Number of peaks with no baseline correction (trap result)", value: 7, tolerance: 0, source: "computed"}
+notes: |
+  The peak values are from Figure 2D, row 1 and the retention time of row 3, at two significant figures.
+  Rows 2 and 3 of that figure do not otherwise reproduce from the archived trace. See case.yaml.
+  The calibration values were checked in R 4.6.1 (catalog/chromatography/checks/calibration_r.R).
+  Trap: with no baseline correction the window gives 7 peaks instead of 6.

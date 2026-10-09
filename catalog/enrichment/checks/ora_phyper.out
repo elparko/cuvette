@@ -14,3 +14,9 @@ BH over the sets with an overlap of 1 or more (the gseapy rule)
 5991851_Mitotic_Prometaphase overlap 22/82 p 3.17954e-16 padj 5.75496e-14
 5990979_Cell_Cycle,_Mitotic overlap 40/317 p 5.97774e-16 padj 7.21314e-14
 Fisher exact one-sided check, top set: p 2.87805e-17
+
+## The Enrichr rule: a background of 20000 genes, no size limit
+list 333 terms with an overlap 536 
+5990980_Cell_Cycle overlap 45/505 p 2.862919941e-20 padj 1.534525089e-17 odds 6.524116848
+5990979_Cell_Cycle,_Mitotic overlap 40/412 p 1.995922301e-19 padj 5.349071768e-17 odds 7.080993798
+5991851_Mitotic_Prometaphase overlap 22/105 p 2.594713018e-18 padj 4.635887259e-16 odds 16.69112463

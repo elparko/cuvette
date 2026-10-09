@@ -1,0 +1,35 @@
+tool: statsmodels and SciPy (Python), through the biostats adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/qmp_pooled_data.csv
+  - /Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/hpg_data.csv
+decisions:
+  ss_type: "type I sums of squares, as R aov gives"
+  posthoc: none
+  rank_correction: bonferroni
+  alpha: 0.05
+expected:
+  - {description: "Abdominal protein, F for age", value: 35.693, tolerance: 0.001, source: "published"}
+  - {description: "Abdominal protein, F for QMP treatment", value: 0.032, tolerance: 0.0005, source: "published"}
+  - {description: "Abdominal protein, F for replicate", value: 36.000, tolerance: 0.001, source: "published"}
+  - {description: "Abdominal protein, p for age", value: 0.0000001356, tolerance: 0.0000001, source: "published"}
+  - {description: "Abdominal protein, p for QMP treatment", value: 0.8596, tolerance: 0.0001, source: "published"}
+  - {description: "Abdominal protein, F for age by treatment", value: 1.057, tolerance: 0.001, source: "published"}
+  - {description: "Abdominal protein, F for age by replicate", value: 2.809, tolerance: 0.001, source: "published"}
+  - {description: "Residual degrees of freedom of the three-way ANOVA", value: 60, tolerance: 0, source: "published"}
+  - {description: "Acini area, F for age", value: 27.780, tolerance: 0.001, source: "published"}
+  - {description: "Acini area, F for QMP treatment", value: 29.156, tolerance: 0.001, source: "published"}
+  - {description: "Acini area, F for replicate", value: 6.853, tolerance: 0.001, source: "published"}
+  - {description: "Acini area, p for replicate", value: 0.00209, tolerance: 0.00001, source: "published"}
+  - {description: "Acini area, F for age by treatment by replicate", value: 4.457, tolerance: 0.001, source: "published"}
+  - {description: "Acini area, p for age by treatment by replicate", value: 0.01568, tolerance: 0.00001, source: "published"}
+  - {description: "Kruskal-Wallis chi-squared for the four treatment groups", value: 9.3498, tolerance: 0.0001, source: "published"}
+  - {description: "Kruskal-Wallis degrees of freedom", value: 3, tolerance: 0, source: "published"}
+  - {description: "Kruskal-Wallis p for the four treatment groups", value: 0.02498, tolerance: 0.00001, source: "published"}
+  - {description: "Dunn adjusted p, the only significant pair", value: 0.0397, tolerance: 0.0001, source: "published"}
+  - {description: "Kruskal-Wallis chi-squared for the three replicates", value: 23.87, tolerance: 0.005, source: "published"}
+  - {description: "Acini area, F for age with type III sums of squares (trap result)", value: 26.528, tolerance: 0.001, source: "computed"}
+notes: |
+  Values are from Results sections 3.2, 3.3 and 3.4 of the paper, checked in R 4.6.1 (check_anova.R).
+  Trap: the acini design is unbalanced, so type III sums of squares give 26.528 for age instead of 27.780.
+  The paper prints the mean square (0.962) in place of one F statistic. That term is not an item.

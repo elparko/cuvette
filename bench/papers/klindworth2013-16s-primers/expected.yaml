@@ -1,0 +1,26 @@
+tool: Biopython and primer3-py, through the cloning adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/klindworth2013-16s-primers/ecoli_rrnb.fasta
+decisions:
+  min_anneal_bp: 13
+  topology: linear
+  tm_method: "primer3, SantaLucia 1998"
+  buffer: "50 mM monovalent, 1.5 mM magnesium, 0.6 mM dNTP, 200 nM primer"
+expected:
+  - {description: "Number of products from pair 1", value: 1, tolerance: 0, source: "published"}
+  - {description: "Start of the pair 1 product on J01695.2", value: 1608, tolerance: 0, source: "published"}
+  - {description: "End of the pair 1 product on J01695.2", value: 2072, tolerance: 0, source: "published"}
+  - {description: "Length of the pair 1 product, first to last base", value: 465, tolerance: 0, source: "published"}
+  - {description: "Start of the pair 1 forward primer in the E. coli 16S numbering", value: 341, tolerance: 0, source: "published"}
+  - {description: "Number of products from pair 2", value: 1, tolerance: 0, source: "published"}
+  - {description: "Start of the pair 2 product on J01695.2", value: 1275, tolerance: 0, source: "published"}
+  - {description: "End of the pair 2 product on J01695.2", value: 2193, tolerance: 0, source: "published"}
+  - {description: "Length of the pair 2 product, first to last base", value: 919, tolerance: 0, source: "published"}
+  - {description: "Start of the pair 2 forward primer in the E. coli 16S numbering", value: 8, tolerance: 0, source: "published"}
+  - {description: "Melting temperature of CCTACGGGAGGCAGCAG, in degrees C", value: 61.39, tolerance: 0.01, source: "published"}
+  - {description: "Difference of the two primer start positions in the E. coli numbering (the published amplicon size)", value: 464, tolerance: 0, source: "published"}
+notes: |
+  The 464 bp of the paper is the difference of the two primer start positions in the E. coli numbering.
+  The tool counts 465 bases from the first to the last base of the product. Both describe the same product.
+  The positions were checked with a plain regular expression search (catalog/cloning/checks/pcr_16s_string_search.py).

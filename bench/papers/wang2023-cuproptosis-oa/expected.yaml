@@ -1,0 +1,29 @@
+tool: gseapy (Python), through the enrichment adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/hub_genes.csv
+  - /Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/DSigDB.gmt
+decisions:
+  background: "20000 genes, the Enrichr default"
+  gene_set_size: "no limit"
+  correction: "Benjamini-Hochberg over the terms with an overlap"
+expected:
+  - {description: "Genes of the list in the top term", value: 3, tolerance: 0, source: "published"}
+  - {description: "Size of the top term", value: 1578, tolerance: 0, source: "published"}
+  - {description: "Raw p of the top term", value: 0.0018453476993364856, tolerance: 0.000001, source: "published"}
+  - {description: "Adjusted p of the top term", value: 0.11186607610867805, tolerance: 0.00001, source: "published"}
+  - {description: "Odds ratio of the top term", value: 35.08761904761905, tolerance: 0.001, source: "published"}
+  - {description: "Size of the second term", value: 24, tolerance: 0, source: "published"}
+  - {description: "Raw p of the second term", value: 0.004791660011821214, tolerance: 0.000001, source: "published"}
+  - {description: "Size of the third term", value: 30, tolerance: 0, source: "published"}
+  - {description: "Raw p of the third term", value: 0.0059868860535258585, tolerance: 0.000001, source: "published"}
+  - {description: "Size of the fourth term", value: 649, tolerance: 0, source: "published"}
+  - {description: "Raw p of the fourth term", value: 0.0060396749482483575, tolerance: 0.000001, source: "published"}
+  - {description: "Size of the fifth term", value: 37, tolerance: 0, source: "published"}
+  - {description: "Raw p of the fifth term", value: 0.007379956522320185, tolerance: 0.000001, source: "published"}
+  - {description: "Number of gene sets tested", value: 4026, tolerance: 0, source: "published"}
+  - {description: "Raw p of the top term with the genes of the library as the background (trap result)", value: 0.0019842229, tolerance: 0.0000001, source: "computed"}
+notes: |
+  Values are from Table 1 of the paper, checked with scipy.stats.hypergeom (check_hypergeom.py).
+  Trap: with the genes of the library as the background the top p is 0.00198, not 0.00185.
+  The printed and the computed p values agree to about 5 significant figures. Enrichr has its own code.

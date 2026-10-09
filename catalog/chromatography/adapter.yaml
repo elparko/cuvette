@@ -42,7 +42,7 @@ locate:
     - ~/.guided-analysis/envs/chromatography/bin/python
     - ~/.guided-analysis/envs/chromatography/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import importlib.metadata as m; print('hplc-py', m.version('hplc-py'))"]
+  version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('hplc-py', m.version('hplc-py'))"]
   version_pattern: 'hplc-py (\S+)'
   identity: 'hplc-py \d'
 
