@@ -1,0 +1,8 @@
+spots 2688, edges 7790, neighbors per spot: median 6, minimum 1, maximum 6
+Moran's I of the first 100 genes, top 6:
+3110035E14Rik 0.665133
+Resp18 0.649583
+1500015O10Rik 0.605939
+Ecel1 0.570321
+2010300C02Rik 0.539474
+Scg2 0.476060

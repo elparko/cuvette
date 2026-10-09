@@ -1,0 +1,721 @@
+adapter:
+  name: squidpy
+  field: spatial transcriptomics
+  file_types: [".h5", ".h5ad", "tissue_positions_list.txt", "tissue_positions.csv"]
+  title: Squidpy spatial statistics
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Analyzes spatial transcriptomics data (Visium spots or single cells with coordinates) with
+    Squidpy. It builds a neighbor graph of the spots and ranks spatially variable genes by Moran's I.
+    It tests which cell types lie next to each other, and it finds spatial domains.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: squidpy
+  version: ""
+  tested_versions: ["1.8.3"]
+  homepage: https://squidpy.readthedocs.io
+  docs:
+    - https://squidpy.readthedocs.io/en/stable/notebooks/examples/graph/compute_moran.html
+    - https://squidpy.readthedocs.io/en/stable/notebooks/examples/graph/compute_spatial_neighbors.html
+    - https://squidpy.readthedocs.io/en/stable/notebooks/examples/graph/compute_nhood_enrichment.html
+  install: >
+    The adapter uses the Python environment at ~/.guided-analysis/envs/squidpy. Make it and add squidpy:
+    uv venv --python 3.12 ~/.guided-analysis/envs/squidpy && uv pip install --python ~/.guided-analysis/envs/squidpy/bin/python squidpy igraph leidenalg
+  citation:
+    - text: "Palla, G., Spitzer, H., Klein, M., Fischer, D., Schaar, A. C., Kuemmerle, L. B., Rybakov, S., Ibarra, I. L., Holmberg, O., Virshup, I., Lotfollahi, M., Richter, S., & Theis, F. J. (2022). Squidpy: a scalable framework for spatial omics analysis. Nature Methods, 19(2), 171-178. https://doi.org/10.1038/s41592-021-01358-2"
+      doi: 10.1038/s41592-021-01358-2
+      bibtex: |
+        @article{palla2022squidpy,
+          author  = {Palla, Giovanni and Spitzer, Hannah and Klein, Michal and Fischer, David and Schaar, Anna Christina and Kuemmerle, Louis Benedikt and Rybakov, Sergei and Ibarra, Ignacio L. and Holmberg, Olle and Virshup, Isaac and Lotfollahi, Mohammad and Richter, Sabrina and Theis, Fabian J.},
+          title   = {Squidpy: a scalable framework for spatial omics analysis},
+          journal = {Nature Methods},
+          year    = {2022},
+          volume  = {19},
+          number  = {2},
+          pages   = {171--178},
+          doi     = {10.1038/s41592-021-01358-2}
+        }
+    - text: "Wolf, F. A., Angerer, P., & Theis, F. J. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biology, 19(1), 15. https://doi.org/10.1186/s13059-017-1382-0"
+      doi: 10.1186/s13059-017-1382-0
+      bibtex: |
+        @article{wolf2018scanpy,
+          author  = {Wolf, F. Alexander and Angerer, Philipp and Theis, Fabian J.},
+          title   = {{SCANPY}: large-scale single-cell gene expression data analysis},
+          journal = {Genome Biology},
+          year    = {2018},
+          volume  = {19},
+          number  = {1},
+          pages   = {15},
+          doi     = {10.1186/s13059-017-1382-0}
+        }
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 180
+  call_timeout_s: 1800
+
+locate:
+  env: GA_SQUIDPY_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/squidpy/bin/python
+    - ~/.guided-analysis/envs/squidpy/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import importlib.metadata as m; print('squidpy', m.version('squidpy'))"]
+  version_pattern: 'squidpy (\S+)'
+  identity: 'squidpy \d'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and small PNG previews. It never sees the spot-by-gene matrix or the tissue image.
+
+decisions:
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - spots or cells in one tissue section (descriptive only)
+      - tissue sections, donors or animals
+    default: tissue sections, donors or animals
+    group: Design
+    help: >
+      Neighboring spots are not independent. Spots from one section are not replicates. Use sections,
+      donors or animals to compare conditions. Use spots only to describe one section.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: min_umi_per_gene
+    label: Minimum UMI counts per gene in a spot (to count the spot)
+    kind: int
+    default: 3
+    lo: 1
+    hi: 100
+    group: Gene filter
+    help: A spot counts for a gene only if it has at least this many UMI (unique molecular identifier) counts of the gene.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_genes_by_spots, arg: min_counts }
+
+  - key: min_spot_fraction
+    label: Minimum fraction of spots that must count for a gene
+    kind: float
+    default: 0.005
+    lo: 0.0001
+    hi: 1
+    group: Gene filter
+    help: A gene stays if enough spots count for it. The value 0.005 means 0.5 percent of the spots. Genes below it are mostly noise.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_genes_by_spots, arg: min_spot_fraction }
+
+  - key: exclude_gene_prefix
+    label: Prefix of genes to remove (mitochondrial genes)
+    kind: text
+    default: "MT-"
+    group: Gene filter
+    help: Genes with this name prefix leave the analysis. Human mitochondrial genes start with MT-. Mouse genes start with mt-. Give none to keep them.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: filter_genes_by_spots, arg: exclude_prefix }
+
+  - key: target_sum
+    label: Counts per spot after normalization
+    kind: float
+    default: 10000
+    lo: 1
+    hi: 1000000
+    group: Normalization
+    help: The tool scales each spot to this total, then applies log1p. A common choice is 10000.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: normalize_expression, arg: target_sum }
+
+  - key: coord_type
+    label: How the spots lie
+    kind: choice
+    choices: [grid, generic]
+    default: grid
+    group: Spatial graph
+    help: Use grid for Visium (a hexagonal grid with 6 neighbors). Use generic for single cells or free coordinates. Generic builds a nearest-neighbor graph.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: build_spatial_graph, arg: coord_type }
+
+  - key: n_neighbors
+    label: Number of neighbors of a spot
+    kind: int
+    default: 6
+    lo: 2
+    hi: 200
+    group: Spatial graph
+    help: Visium has 6. A larger number links farther spots and smooths the result. For grid, only 4 and 6 are valid.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: build_spatial_graph, arg: n_neighs }
+    sensitivity:
+      options: [6, 12, 36]
+      tool: build_spatial_graph
+      args: { coord_type: generic }
+      compare: [metrics.mean_neighbors]
+      max_runs: 3
+
+  - key: n_perms
+    label: Number of permutations for the enrichment test
+    kind: int
+    default: 1000
+    lo: 100
+    hi: 100000
+    group: Enrichment
+    help: The test shuffles the group labels this many times. More permutations give a steadier z score. 1000 is common.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: nhood_enrichment, arg: n_perms }
+
+  - key: cluster_key
+    label: Column of the cell table that holds the cell types or domains
+    kind: text
+    group: Enrichment
+    help: The enrichment test compares these groups. Choose the cell types or the domains. Do not choose a column that has one value per spot.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: nhood_enrichment, arg: cluster_key }
+
+  - key: domain_resolution
+    label: Resolution for the spatial domains
+    kind: float
+    default: 0.5
+    lo: 0.01
+    hi: 5
+    group: Spatial domains
+    help: A higher value gives more and smaller domains. The number of domains depends on this value.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_spatial_domains, arg: resolution }
+
+  - key: spatial_weight
+    label: Weight of the spatial graph for the domains
+    kind: float
+    default: 0.3
+    lo: 0
+    hi: 1
+    group: Spatial domains
+    help: The value 0 clusters on expression only. The value 1 clusters on position only. A higher value gives smoother, more connected domains.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_spatial_domains, arg: spatial_weight }
+
+  - key: random_seed
+    label: Random seed
+    kind: int
+    default: 0
+    lo: 0
+    hi: 2147483647
+    group: Reproducibility
+    help: The permutation tests and the clustering start from a random state. The same seed gives the same result.
+    owner: agent
+    stage: setup
+    changes_conclusion: false
+    links:
+      - { tool: spatial_autocorr, arg: random_state }
+      - { tool: nhood_enrichment, arg: random_state }
+      - { tool: find_spatial_domains, arg: random_state }
+
+tools:
+  - name: load_spatial
+    title: Load Visium or spatial data
+    description: >
+      Read spatial data. Give one of three inputs. The inputs are a Space Ranger outs folder, a 10x .h5 file
+      with a positions file, and an .h5ad file with coordinates in obsm['spatial']. Removes spots outside the tissue. Saves loaded.h5ad.
+    function: "ga_squidpy:load_spatial"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the Space Ranger outs folder, the filtered_feature_bc_matrix.h5 file or the .h5ad file." }
+      positions: { type: string, description: "Absolute path of tissue_positions_list.txt or tissue_positions.csv. Needed for a .h5 file. A folder needs it only if the file is not in the folder spatial." }
+      var_names: { type: string, enum: [gene_symbols, gene_ids], default: gene_symbols, description: Use gene symbols or gene ids as gene names. }
+    required: [path]
+    read_only: false
+
+  - name: filter_genes_by_spots
+    title: Filter genes by the spots that express them
+    description: >
+      Keep the genes that have at least min_counts counts in at least min_spot_fraction of the spots.
+      Optionally remove the genes with a name prefix, such as mitochondrial genes. Run this on raw counts.
+    function: "ga_squidpy:filter_genes_by_spots"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      min_counts: { type: integer, minimum: 1, description: "Counts of the gene that a spot needs to count, in UMI." }
+      min_spot_fraction: { type: number, exclusiveMinimum: 0, maximum: 1, description: "Fraction of spots that must count, from above 0 to 1. The value 0.005 is 0.5 percent." }
+      exclude_prefix: { type: string, description: "The tool removes genes with this name prefix, such as MT-. Leave empty to keep all." }
+    required: [adata, min_counts, min_spot_fraction]
+
+  - name: normalize_expression
+    title: Normalize and log-transform
+    description: >
+      Scale each spot to target_sum total counts, then apply log1p. Keeps the raw counts in
+      layers['counts']. Refuses data that are not raw counts.
+    function: "ga_squidpy:normalize_expression"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      target_sum: { type: number, minimum: 1, description: Counts per spot after scaling. }
+    required: [adata]
+
+  - name: build_spatial_graph
+    title: Build the spatial neighbor graph
+    description: >
+      Link each spot to its neighbors. Use grid with 6 neighbors for Visium. Use generic with a
+      neighbor number, a radius, or Delaunay triangulation for single cells. Saves the graph in obsp.
+    function: "ga_squidpy:build_spatial_graph"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. The object needs obsm spatial. }
+      coord_type: { type: string, enum: [grid, generic], description: "grid for a Visium hexagonal grid, generic for free coordinates." }
+      n_neighs: { type: integer, minimum: 2, description: "Number of neighbors. For grid, 4 or 6. For generic, the number of nearest neighbors." }
+      n_rings: { type: integer, minimum: 1, default: 1, description: "Rings of neighbors around a spot, for grid only. 1 gives the direct neighbors." }
+      radius: { type: number, exclusiveMinimum: 0, description: "Distance in the unit of the coordinates (pixels for Visium). For generic only. If given, it replaces n_neighs." }
+      delaunay: { type: boolean, default: false, description: "Use Delaunay triangulation to link the spots. For generic only." }
+    required: [adata]
+    citations:
+      - text: "Palla, G., Spitzer, H., Klein, M., Fischer, D., Schaar, A. C., Kuemmerle, L. B., Rybakov, S., Ibarra, I. L., Holmberg, O., Virshup, I., Lotfollahi, M., Richter, S., & Theis, F. J. (2022). Squidpy: a scalable framework for spatial omics analysis. Nature Methods, 19(2), 171-178. https://doi.org/10.1038/s41592-021-01358-2"
+        doi: 10.1038/s41592-021-01358-2
+
+  - name: spatial_autocorr
+    title: Spatially variable genes by Moran's I
+    description: >
+      Rank genes by Moran's I (or Geary's C), a measure of how similar a gene is between neighboring
+      spots. A high I means that the gene follows the tissue structure. Run it on log-normalized values
+      with the spatial graph. The p values treat spots as independent. They are descriptive.
+    function: "ga_squidpy:spatial_autocorr"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. The object needs the spatial graph. }
+      mode: { type: string, enum: [moran, geary], default: moran, description: "moran gives I (1 means similar neighbors). geary gives C (below 1 means similar neighbors)." }
+      n_perms: { type: integer, minimum: 0, default: 0, description: "Permutations for the p value. 0 uses the normal approximation, which is fast." }
+      random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
+      top_n: { type: integer, minimum: 1, default: 20, description: Number of top genes to show in the table preview. }
+      report_genes: { type: [array, string], description: "Gene names. The tool reports the rank of each, also if it is not in the top genes." }
+      genes: { type: [array, string], description: "Gene names to test. The default is all genes." }
+      rank_cutoff: { type: integer, minimum: 1, default: 100, description: "Rank limit, as a count. The tool counts how many of report_genes have this rank or a better rank." }
+    required: [adata]
+    outputs:
+      table: { kind: table, ext: csv, description: "Rank, gene, statistic and adjusted p value of each gene." }
+    citations:
+      - text: "Moran, P. A. P. (1950). Notes on continuous stochastic phenomena. Biometrika, 37(1/2), 17-23. https://doi.org/10.2307/2332142"
+        doi: 10.2307/2332142
+        when:
+          mode: moran
+      - text: "Geary, R. C. (1954). The contiguity ratio and statistical mapping. The Incorporated Statistician, 5(3), 115-146. https://doi.org/10.2307/2986645"
+        doi: 10.2307/2986645
+        when:
+          mode: geary
+
+  - name: nhood_enrichment
+    title: Neighborhood enrichment of cell types
+    description: >
+      Count the neighbor pairs of each two groups and compare with random shuffles of the labels. A
+      positive z score means the groups lie next to each other more than by chance. A negative score
+      means they are apart. Needs the spatial graph and a column of groups.
+    function: "ga_squidpy:nhood_enrichment"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. The object needs the spatial graph. }
+      cluster_key: { type: string, description: The column of the cell table that holds the groups. }
+      n_perms: { type: integer, minimum: 10, description: Number of random shuffles of the labels. }
+      random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
+      top_pairs: { type: integer, minimum: 1, default: 10, description: Number of group pairs to show in the table preview. }
+    required: [adata, cluster_key]
+    outputs:
+      table: { kind: table, ext: csv, description: z score and edge count of each pair of groups. }
+      plot: { kind: image, ext: png, description: Heat map of the z scores. }
+
+  - name: find_spatial_domains
+    title: Find spatial domains
+    description: >
+      Cluster the spots into domains with the Leiden algorithm. The graph joins the expression
+      neighbors and the spatial neighbors, weighted by spatial_weight. Needs normalized values and the
+      spatial graph.
+    function: "ga_squidpy:find_spatial_domains"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. The object needs the spatial graph. }
+      resolution: { type: number, minimum: 0.01, description: "Leiden resolution, unitless. Higher values give more domains." }
+      spatial_weight: { type: number, minimum: 0, maximum: 1, description: "Weight of the spatial graph. 0 uses expression only. 1 uses position only." }
+      n_top_genes: { type: integer, minimum: 2, default: 2000, description: Number of highly variable genes for the principal components. }
+      n_pcs: { type: integer, minimum: 2, default: 15, description: Number of principal components. }
+      n_neighbors: { type: integer, minimum: 2, default: 15, description: Number of expression neighbors of a spot. }
+      random_state: { type: integer, minimum: 0, description: Random seed. The same seed gives the same result. }
+      compare_to: { type: string, description: "Optional column of the cell table with known labels. The tool then gives the adjusted Rand index (1 means equal, 0 means chance)." }
+    required: [adata]
+    outputs:
+      sizes: { kind: table, ext: csv, description: Spots in each domain. }
+      plot: { kind: image, ext: png, description: The domains on the tissue coordinates. }
+    citations:
+      - text: "Traag, V. A., Waltman, L., & van Eck, N. J. (2019). From Louvain to Leiden: guaranteeing well-connected communities. Scientific Reports, 9(1), 5233. https://doi.org/10.1038/s41598-019-41695-z"
+        doi: 10.1038/s41598-019-41695-z
+
+  - name: plot_spatial
+    title: Plot genes or groups on the tissue
+    description: Draw genes or columns of the cell table on the spot coordinates.
+    read_only: true
+    function: "ga_squidpy:plot_spatial"
+    params:
+      adata: { type: [object, string], description: A handle or an .h5ad path. }
+      color: { type: [array, string], description: "Gene names or columns of the cell table." }
+      point_size: { type: number, exclusiveMinimum: 0, description: "Size of a point in the plot, unitless." }
+    required: [adata, color]
+    outputs:
+      plot: { kind: image, ext: png, description: The plot. }
+
+map:
+  - tool: load_spatial
+    route: |
+      adata = sc.read_visium(path)    # Space Ranger outs folder
+      adata = sq.read.visium(path)    # the same, with the tissue image
+      # an .h5ad file: adata = sc.read_h5ad(path)
+    params:
+      - { arg: path, label: path }
+      - { arg: positions, label: files in the folder spatial }
+      - { arg: var_names, label: var_names, ui_default: gene_symbols }
+    fidelity: close
+    difference: The tool reads the coordinates from the positions file and keeps no tissue image. It removes the spots that the file marks as outside the tissue.
+    evidence: { source: docs, test: load-visium-tiny }
+
+  - tool: filter_genes_by_spots
+    route: |
+      keep = (adata.X >= 3).sum(axis=0).A1 >= 0.005 * adata.n_obs
+      adata = adata[:, keep & ~adata.var_names.str.startswith("MT-")].copy()
+    params:
+      - { arg: min_counts, label: counts per spot, ui_default: null, note: The nnSVG paper uses 3. }
+      - { arg: min_spot_fraction, label: fraction of spots, ui_default: null, note: The nnSVG paper uses 0.005. }
+      - { arg: exclude_prefix, label: gene prefix, ui_default: null }
+    fidelity: exact
+    evidence: { source: docs, test: filter-genes-by-spots, note: The kept genes equal a numpy calculation without scanpy (checks/filter_check.py). }
+
+  - tool: normalize_expression
+    route: |
+      adata.layers["counts"] = adata.X.copy()
+      sc.pp.normalize_total(adata, target_sum=1e4)
+      sc.pp.log1p(adata)
+    params:
+      - { arg: target_sum, label: target_sum, ui_default: null, note: Scanpy scales to the median total if you give none. }
+    fidelity: exact
+    evidence: { source: docs, test: filter-genes-by-spots }
+
+  - tool: build_spatial_graph
+    route: |
+      sq.gr.spatial_neighbors(adata, coord_type="grid", n_neighs=6)       # Visium
+      sq.gr.spatial_neighbors(adata, coord_type="generic", n_neighs=10)   # single cells
+    params:
+      - { arg: coord_type, label: coord_type, ui_default: null }
+      - { arg: n_neighs, label: n_neighs, ui_default: 6 }
+      - { arg: n_rings, label: n_rings, ui_default: 1 }
+      - { arg: radius, label: radius, ui_default: null }
+      - { arg: delaunay, label: delaunay, ui_default: false }
+    fidelity: exact
+    evidence: { source: docs, test: graph-visium-hne }
+
+  - tool: spatial_autocorr
+    route: |
+      sq.gr.spatial_autocorr(adata, mode="moran", genes=genes, n_perms=100, n_jobs=1)
+      adata.uns["moranI"].head(10)
+    params:
+      - { arg: mode, label: mode, ui_default: moran }
+      - { arg: n_perms, label: n_perms, ui_default: null, note: Squidpy uses the normal approximation if you give none. }
+      - { arg: random_state, label: seed, ui_default: null }
+      - { arg: genes, label: genes, ui_default: null }
+      - { arg: rank_cutoff, label: rank limit, ui_default: null, note: The tool counts the reported genes within this rank. Squidpy has no such argument. }
+    fidelity: exact
+    evidence: { source: docs, test: moran-hne, note: "The values equal the Squidpy documentation (3110035E14Rik 0.665132) and a numpy calculation without Squidpy (checks/moran_check.py)." }
+
+  - tool: nhood_enrichment
+    route: |
+      sq.gr.nhood_enrichment(adata, cluster_key="cell type", n_perms=1000, seed=0)
+      sq.pl.nhood_enrichment(adata, cluster_key="cell type")
+    params:
+      - { arg: cluster_key, label: cluster_key }
+      - { arg: n_perms, label: n_perms, ui_default: 1000 }
+      - { arg: random_state, label: seed, ui_default: null }
+    fidelity: exact
+    evidence: { source: docs, test: nhood-imc, note: "The pair counts equal a numpy calculation without Squidpy (checks/nhood_check.py). The z scores agree within the error of the permutations." }
+
+  - tool: find_spatial_domains
+    route: |
+      sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor="seurat")
+      sc.pp.scale(adata); sc.pp.pca(adata, n_comps=15); sc.pp.neighbors(adata, n_neighbors=15)
+      graph = 0.7 * expression_graph + 0.3 * adata.obsp["spatial_connectivities"]
+      sc.tl.leiden(adata, resolution=0.5, obsp="domain_graph")
+    params:
+      - { arg: resolution, label: resolution, ui_default: null }
+      - { arg: spatial_weight, label: weight of the spatial graph, ui_default: null }
+      - { arg: n_top_genes, label: n_top_genes, ui_default: 2000 }
+      - { arg: n_pcs, label: n_comps, ui_default: 15 }
+      - { arg: n_neighbors, label: n_neighbors, ui_default: 15 }
+      - { arg: random_state, label: random_state, ui_default: 0 }
+      - { arg: compare_to, label: labels for adjusted_rand_score, ui_default: null }
+    fidelity: close
+    difference: Squidpy and scanpy have no function for this graph. The tool joins the two graphs by a weighted sum. Other methods for spatial domains (BayesSpace, SpaGCN, STAGATE) give other domains.
+    evidence: { source: docs, test: domains-hne }
+
+  - tool: plot_spatial
+    route: 'sq.pl.spatial_scatter(adata, color=["MOBP", "cluster"], shape=None)'
+    params:
+      - { arg: color, label: color }
+      - { arg: point_size, label: size, ui_default: null }
+    fidelity: close
+    difference: The tool draws the points with scanpy on the spot coordinates and no tissue image.
+    evidence: { source: docs, test: plot-spatial }
+
+checks:
+  - id: spots_as_replicates
+    severity: error
+    description: Spots or cells are used as replicates to compare conditions, and p values are reported.
+    text: >
+      Neighboring spots are not independent, and spots of one section are not replicates. If the
+      answer compares conditions, donors or sections, and reports p values with each spot as one
+      observation, flag it as an error. The p values of spatial_autocorr treat spots as independent.
+      The answer must call them descriptive. A comparison of conditions must count sections or
+      donors as n.
+  - id: graph_not_reported
+    severity: warning
+    description: The answer gives a spatial statistic without the definition of the neighbor graph.
+    text: >
+      Moran's I and the neighborhood enrichment depend on the neighbor graph. The answer must give the
+      coord_type, the number of neighbors or the radius, and the number of permutations and the seed
+      for the enrichment. Flag the answer if one is missing, or if it differs from the tool call.
+  - id: spatial_gene_filter_not_reported
+    severity: warning
+    description: The answer gives a number of genes or ranks without the gene filter.
+    text: >
+      A rank or a count of spatially variable genes depends on the gene filter. The answer must give
+      the minimum counts, the minimum fraction of spots, the prefix of removed genes and the number
+      of genes that stayed. Flag the answer if one is missing.
+  - id: moran_not_a_test_of_domains
+    severity: warning
+    description: A high Moran's I is called a proof of spatial domains or of a biological function.
+    text: >
+      A high Moran's I says only that neighboring spots are similar. It does not name a domain and it
+      does not show function. Flag the answer if it calls a gene a marker of a domain from Moran's I
+      alone, or if it states p values of Moran's I as a test between conditions.
+  - id: domains_depend_on_resolution
+    severity: warning
+    description: The answer gives a number of spatial domains as a fixed property of the tissue.
+    text: >
+      The number of domains changes with the resolution and with the spatial weight. The answer must
+      give both values and the seed with the number of domains. Flag the answer if it treats the
+      number as fixed.
+
+tests:
+  - id: load-visium-tiny
+    description: >
+      A tiny synthetic Visium sample (300 spots on a 20 by 15 grid and 400 genes, made by
+      data/make_test_data.py with seed 0). The positions file marks 5 spots as outside the tissue.
+      The 295 spots inside stay.
+    data: [data/visium_tiny.h5, data/visium_tiny_positions.txt]
+    calls:
+      - tool: load_spatial
+        args: { path: "{adapter_dir}/data/visium_tiny.h5", positions: "{adapter_dir}/data/visium_tiny_positions.txt" }
+    expect:
+      - { path: metrics.n_spots, equals: 295 }
+      - { path: metrics.n_outside_tissue, equals: 5 }
+      - { path: metrics.n_genes, equals: 400 }
+      - { path: metrics.x_is_counts, equals: 1 }
+
+  - id: filter-genes-by-spots
+    description: >
+      Numpy check, no scanpy (checks/filter_check.py, output checks/filter_check.out): in the 295 spots
+      inside the tissue, 163 of the 400 genes have at least 3 counts in at least 0.5 percent of the
+      spots (1.475 spots, so 2 spots). 9 of them start with MT-, so 154 genes stay and 237 genes fail
+      the cutoffs.
+    data: [data/visium_tiny.h5, data/visium_tiny_positions.txt]
+    calls:
+      - tool: load_spatial
+        args: { path: "{adapter_dir}/data/visium_tiny.h5", positions: "{adapter_dir}/data/visium_tiny_positions.txt" }
+        save_as: a
+      - tool: filter_genes_by_spots
+        args: { adata: { handle: "{saved.a.data.adata.handle}" }, min_counts: 3, min_spot_fraction: 0.005, exclude_prefix: "MT-" }
+        save_as: f
+      - tool: normalize_expression
+        args: { adata: { handle: "{saved.f.data.adata.handle}" }, target_sum: 10000 }
+    expect:
+      - { path: saved.f.metrics.n_genes_after, equals: 154 }
+      - { path: saved.f.metrics.n_excluded_prefix, equals: 9 }
+      - { path: saved.f.metrics.n_low_expression, equals: 237 }
+      - { path: metrics.n_spots, equals: 295 }
+      - { path: metrics.n_genes, equals: 154 }
+
+  - id: graph-visium-hne
+    description: >
+      The Visium mouse brain sample of the Squidpy documentation (2688 spots, 100 genes, see
+      data/SOURCES.md). The hexagonal grid has 7790 edges, and the spots at the border have fewer
+      than 6 neighbors (checks/moran_check.out, a SciPy calculation without Squidpy).
+    data: [data/visium_hne_100hvg.h5ad]
+    calls:
+      - tool: build_spatial_graph
+        args: { adata: "{adapter_dir}/data/visium_hne_100hvg.h5ad", coord_type: grid, n_neighs: 6 }
+    expect:
+      - { path: metrics.n_spots, equals: 2688 }
+      - { path: metrics.n_edges, equals: 7790 }
+      - { path: metrics.max_neighbors, equals: 6 }
+      - { path: metrics.min_neighbors, equals: 1 }
+
+  - id: moran-hne
+    description: >
+      The Squidpy documentation example (Moran's I of the first 100 highly variable genes of the
+      Visium mouse brain sample, grid graph with 6 neighbors) prints 0.665132 for 3110035E14Rik,
+      0.649582 for Resp18, 0.605940 for 1500015O10Rik, 0.570304 for Ecel1 and 0.539469 for
+      2010300C02Rik. The numpy calculation checks/moran_check.py gives 0.665133, 0.649583, 0.605939,
+      0.570321 and 0.539474.
+    data: [data/visium_hne_100hvg.h5ad]
+    calls:
+      - tool: build_spatial_graph
+        args: { adata: "{adapter_dir}/data/visium_hne_100hvg.h5ad", coord_type: grid, n_neighs: 6 }
+        save_as: g
+      - tool: spatial_autocorr
+        args: { adata: { handle: "{saved.g.data.adata.handle}" }, mode: moran, n_perms: 0, report_genes: [Resp18, Ecel1], top_n: 5 }
+    expect:
+      - { path: metrics.n_genes, equals: 100 }
+      - { path: "table.rows[0][1]", equals: 3110035E14Rik }
+      - { path: "table.rows[0][2]", approx: 0.665132, abs: 0.0001 }
+      - { path: "table.rows[1][1]", equals: Resp18 }
+      - { path: "table.rows[1][2]", approx: 0.649582, abs: 0.0001 }
+      - { path: "table.rows[2][2]", approx: 0.605940, abs: 0.0001 }
+      - { path: "table.rows[3][2]", approx: 0.570304, abs: 0.0001 }
+      - { path: "table.rows[4][2]", approx: 0.539469, abs: 0.0001 }
+      - { path: metrics.rank_Resp18, equals: 2 }
+      - { path: metrics.rank_Ecel1, equals: 4 }
+      - { path: metrics.n_report_genes_within_cutoff, equals: 2 }
+      - { path: summary, contains: "2 of 2 reported genes are within the top 100" }
+
+  - id: nhood-imc
+    description: >
+      Imaging mass cytometry sample of the Squidpy data sets (4668 cells, 11 cell types, see
+      data/SOURCES.md), nearest-neighbor graph with 10 neighbors. checks/nhood_check.py counts the
+      neighbor links and the z scores with its own code and 1000 permutations (output
+      checks/nhood_check.out). It finds 46680 links, of which 28409 join cells of the same group,
+      and 195 links between T cells and endothelial cells. The z scores agree within the error of
+      the permutations (the check gives a highest z of 20.28 and a lowest of -34.87, the tool 21.21
+      and -33.17).
+    data: [data/imc_cells.h5ad]
+    calls:
+      - tool: build_spatial_graph
+        args: { adata: "{adapter_dir}/data/imc_cells.h5ad", coord_type: generic, n_neighs: 10 }
+        save_as: g
+      - tool: nhood_enrichment
+        args: { adata: { handle: "{saved.g.data.adata.handle}" }, cluster_key: cell type, n_perms: 1000, random_state: 0 }
+    expect:
+      - { path: saved.g.metrics.n_links, equals: 46680 }
+      - { path: saved.g.metrics.n_edges, equals: 25757 }
+      - { path: metrics.n_groups, equals: 11 }
+      - { path: metrics.n_links, equals: 46680 }
+      - { path: metrics.n_links_same_group, equals: 28409 }
+      - { path: "table.rows[0][3]", equals: 195 }
+      - { path: metrics.max_zscore_pair, approx: 20.28, abs: 2.0 }
+      - { path: metrics.min_zscore_pair, approx: -34.87, abs: 3.0 }
+
+  - id: domains-hne
+    description: >
+      Spatial domains of the Visium mouse brain sample (100 genes) at resolution 0.5, spatial weight
+      0.6 and seed 0. The domain sizes, the share of neighbor pairs in one domain and the adjusted
+      Rand index with the 15 clusters in the sample are from a run of this tool with squidpy 1.8.3
+      and scanpy 1.12.4 (stability test, not published numbers). scikit-learn and numpy give the
+      same index and share from the saved result (checks/domains_check.py, output checks/domains_check.out).
+    data: [data/visium_hne_100hvg.h5ad]
+    calls:
+      - tool: build_spatial_graph
+        args: { adata: "{adapter_dir}/data/visium_hne_100hvg.h5ad", coord_type: grid, n_neighs: 6 }
+        save_as: g
+      - tool: find_spatial_domains
+        args: { adata: { handle: "{saved.g.data.adata.handle}" }, resolution: 0.5, spatial_weight: 0.6, n_top_genes: 100, random_state: 0, compare_to: cluster }
+    expect:
+      - { path: metrics.n_domains, equals: 5 }
+      - { path: metrics.largest_domain, equals: 1038 }
+      - { path: metrics.smallest_domain, equals: 295 }
+      - { path: metrics.spatial_coherence, approx: 0.8223, abs: 0.001 }
+      - { path: metrics.adjusted_rand_index, approx: 0.3021, abs: 0.001 }
+      - { path: data.checkpoint, contains: spatial_domains.h5ad }
+
+  - id: normalized-input
+    description: Normalizing data that are not raw counts fails, and the error says what X holds.
+    data: [data/visium_hne_100hvg.h5ad]
+    calls:
+      - tool: normalize_expression
+        args: { adata: "{adapter_dir}/data/visium_hne_100hvg.h5ad", target_sum: 10000 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "does not hold raw counts" }
+
+  - id: handle-as-json-text
+    description: A handle can arrive as JSON text, and a list can arrive as JSON text. The tools read both.
+    data: [data/visium_hne_100hvg.h5ad]
+    calls:
+      - tool: build_spatial_graph
+        args: { adata: "{adapter_dir}/data/visium_hne_100hvg.h5ad", coord_type: grid, n_neighs: 6 }
+        save_as: g
+      - tool: plot_spatial
+        args: { adata: '{"handle": "{saved.g.data.adata.handle}"}', color: '["cluster", "Resp18"]' }
+    expect:
+      - { path: metrics.n_plotted, equals: 2 }
+      - { path: metrics.n_missing, equals: 0 }
+
+  - id: plot-spatial
+    description: The plot tool draws a gene and a column on the spot coordinates, and names the names that it did not find.
+    data: [data/visium_hne_100hvg.h5ad]
+    calls:
+      - tool: plot_spatial
+        args: { adata: "{adapter_dir}/data/visium_hne_100hvg.h5ad", color: [cluster, Resp18, NOT_A_GENE] }
+    expect:
+      - { path: metrics.n_plotted, equals: 2 }
+      - { path: metrics.n_missing, equals: 1 }
+      - { path: summary, contains: "Not found: NOT_A_GENE" }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: missing-file
+    description: A data path that does not exist fails, and the error names the path.
+    calls:
+      - { tool: load_spatial, args: { path: "{adapter_dir}/data/no_such_file.h5" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "path not found" }
+      - { path: error, contains: "no_such_file.h5" }
+
+  - id: missing-positions
+    description: A 10x h5 file with no positions file fails, and the error names the argument to give.
+    data: [data/visium_tiny.h5]
+    calls:
+      - { tool: load_spatial, args: { path: "{adapter_dir}/data/visium_tiny.h5" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "No positions file found" }
+      - { path: error, contains: "positions" }
+
+  - id: no-graph
+    description: Moran's I without a spatial graph fails, and the error names the tool to run.
+    data: [data/visium_hne_100hvg.h5ad]
+    calls:
+      - { tool: spatial_autocorr, args: { adata: "{adapter_dir}/data/visium_hne_100hvg.h5ad" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "No spatial graph" }
+      - { path: error, contains: build_spatial_graph }
+
+  - id: grid-neighbors
+    description: A grid graph with 8 neighbors fails, because a grid has 4 or 6.
+    data: [data/visium_hne_100hvg.h5ad]
+    calls:
+      - { tool: build_spatial_graph, args: { adata: "{adapter_dir}/data/visium_hne_100hvg.h5ad", coord_type: grid, n_neighs: 8 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "n_neighs 8 does not fit coord_type grid" }

@@ -1,0 +1,5 @@
+spots 2688, domains 5
+domain sizes: 1038, 510, 430, 415, 295
+neighbor pairs in the same domain: 0.8223
+adjusted Rand index with the 15 clusters of the sample (scikit-learn): 0.3021
+neighbor pairs in the same known cluster: 0.7637

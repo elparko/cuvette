@@ -1,0 +1,26 @@
+tool: squidpy
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/weber2023-nnsvg-dlpfc/151673/151673_filtered_feature_bc_matrix.h5
+  - /Volumes/T7/guided-analysis/data/weber2023-nnsvg-dlpfc/151673/tissue_positions_list.txt
+decisions:
+  min_umi_per_gene: 3
+  min_spot_fraction: 0.005
+  exclude_gene_prefix: "MT-"
+  normalization: "normalize_total target_sum 1e4, then log1p"
+  graph: "Visium grid, 6 neighbors"
+  statistic: "Moran's I with row-normalized weights"
+expected:
+  - {description: "spots in the tissue", value: 3639, tolerance: 0, source: "Weber 2023, Results, DLPFC section; 3639 by check_svg.py"}
+  - {description: "number of the two layer genes MOBP and SNAP25 within the top 100 genes by Moran's I", value: 2, tolerance: 0, source: "Weber 2023, Results: both are within the top 100 for all four methods; ranks 4 and 19 by check_svg.py"}
+  - {description: "Moran's I rank of MOBP", value: 4, tolerance: 2, source: "computed: check_svg.py gives 4; the paper says within the top 100"}
+  - {description: "Moran's I rank of SNAP25", value: 19, tolerance: 3, source: "computed: check_svg.py gives 19; the paper says within the top 100"}
+  - {description: "Genes that pass the filter (paper count)", value: 3396, tolerance: 0, source: "Weber 2023, Results; check_svg.py gives 3322 (3309 without MT- genes)"}
+notes: |
+  The paper reads "3396 out of 21,803 genes passed the filtering threshold". The file has 21,842 genes with a count. The paper does not say how it got 21,803.
+  Moran's I in the paper ranks the layer genes MOBP and SNAP25 in the top 100, as the grid of 6 neighbors does (ranks 4 and 19).
+  The paper also says that PCP4 is around rank 100 (check_svg.py: 66) and that the three blood and immune genes HBB, IGKC and NPY are at roughly 100 to 1000
+  (check_svg.py: 54, 33 and 260). These four values are not in the benchmark: a rank range cannot be scored without false matches
+  between genes. The paper does not state the neighbor graph of its Moran's I. A graph of 36 nearest neighbors gives 132, 87 and 646 for the three genes
+  (squidpy run, 3322 genes, mitochondrial genes kept).
+  Trap: the human mitochondrial genes (MT-) have high Moran's I. Genes with the prefix mt- do not match in mouse data.

@@ -1,0 +1,34 @@
+adapters: [squidpy]
+prompt: |
+  I have one 10x Visium sample of the human dorsolateral prefrontal cortex (sample 151673). The counts are in {data}/weber2023-nnsvg-dlpfc/151673/151673_filtered_feature_bc_matrix.h5 and the spot positions are in {data}/weber2023-nnsvg-dlpfc/151673/tissue_positions_list.txt . Find the spatially variable genes. Remove the genes that few spots express, normalize, link the spots on the Visium grid, and rank the genes by Moran's I. Tell me how many spots are in the tissue and how many genes pass the filter. Two genes mark cortical layers: MOBP and SNAP25. Tell me the Moran's I rank of each, and how many of the two are within the top 100 genes. Write every number in the answer text.
+setup: {}
+answers:
+  replicate: "spots or cells in one tissue section (descriptive only)"
+  min_umi_per_gene: 3
+  min_spot_fraction: 0.005
+  exclude_gene_prefix: "MT-"
+  target_sum: 10000
+  coord_type: grid
+  n_neighbors: 6
+  random_seed: 0
+allow: all
+timeout_s: 1500
+data:
+  - weber2023-nnsvg-dlpfc/151673/151673_filtered_feature_bc_matrix.h5
+  - weber2023-nnsvg-dlpfc/151673/tissue_positions_list.txt
+items:
+  # Source: Weber 2023, Results, DLPFC section: "This sample contains transcriptome-wide gene expression measurements at
+  # 3639 spots overlapping with the tissue area." check_svg.py (h5py, SciPy, no scanpy) counts 3639 spots with in_tissue 1.
+  - {key: spots_in_tissue, description: "Spots in the tissue", value: 3639, exact: true, tool: load_spatial}
+  # Source: Results: "All four methods [nnSVG, SPARK-X, HVGs, Moran's I] successfully identified two out of the three cortical
+  # layer-associated SVGs (MOBP and SNAP25) within the top 100 ranked genes." Both genes are within the top 100, so the count is 2.
+  - {key: layer_genes_in_top_100, description: "Number of the two layer genes MOBP and SNAP25 within the top 100 genes by Moran's I", value: 2, exact: true, tool: spatial_autocorr}
+  # The paper gives no exact rank. check_svg.py (SciPy Moran's I with row-normalized weights on the hexagonal grid) gives rank 4
+  # for MOBP and rank 19 for SNAP25. Squidpy with a grid of 6 neighbors, a graph of 6 nearest neighbors and a graph of 36 nearest
+  # neighbors give ranks 4 and 19 or 20. The tolerances are set from these three graphs.
+  - {key: mobp_rank, description: "Moran's I rank of MOBP", value: 4, tolerance: 2, tool: spatial_autocorr}
+  - {key: snap25_rank, description: "Moran's I rank of SNAP25", value: 19, tolerance: 3, tool: spatial_autocorr}
+  # Reference only. The paper reports that 3396 of 21,803 genes pass the filter (at least 3 UMI counts in at least 0.5 percent of
+  # the spots). The file gives 21,842 genes with a count and 3322 that pass (3309 without the mitochondrial genes).
+  # The paper does not say which spots or genes it dropped before the filter.
+  - {key: genes_pass_filter, description: "Genes that pass the filter (paper count)", value: 3396, exact: true, reference: true, tool: filter_genes_by_spots}

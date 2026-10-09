@@ -1,0 +1,11 @@
+spots in the tissue: 3639 (of 3639 in the file), genes in the file: 33538
+genes with at least one count: 21842
+genes with at least 3 counts in at least 0.5 percent of the spots: 3322 (3309 without MT- genes)
+hexagonal grid: 10562 edges, neighbors per spot: median 6, minimum 0, maximum 6
+Moran's I of 3309 genes. Top 5: MBP 0.771, SCGB2A2 0.693, PLP1 0.656, MOBP 0.609, GFAP 0.573
+MOBP: rank 4, I 0.609
+SNAP25: rank 19, I 0.433
+PCP4: rank 66, I 0.288
+HBB: rank 54, I 0.310
+IGKC: rank 33, I 0.372
+NPY: rank 260, I 0.143

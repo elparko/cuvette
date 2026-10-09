@@ -1,0 +1,5 @@
+spots in the file 300, outside the tissue 5, inside 295, genes 400
+a spot counts for a gene with at least 3 counts; the gene needs 1.475 spots
+genes that pass: 163 (of them with the prefix MT-: 9)
+genes that stay after the prefix filter: 154
+with 5 counts in at least 20 percent of the spots (59.0 spots): 5 genes pass, 0 with the prefix MT-, 5 stay after the prefix filter

@@ -1,0 +1,14 @@
+cells 4668, groups 11, directed neighbor links 46680
+groups: CK low HR low tumor cell, CK+ HR+ tumor cell, T cells, apoptotic tumor cell, ...
+observed pair counts of the links, first 3 x 3:
+[[ 18  11  34]
+ [  8  50  23]
+ [ 31  22 776]]
+z score, first 3 x 3:
+[[ 4.42  1.48  0.84]
+ [ 0.36  9.36 -3.23]
+ [ 0.27 -3.42 34.92]]
+largest z score between two different groups: 20.28 (T cells and endothelial)
+smallest z score between two different groups: -34.87 (T cells and apoptotic tumor cell)
+links between cells of the same group: 28409 of 46680
+links between T cells and endothelial cells: 195

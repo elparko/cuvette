@@ -1,0 +1,96 @@
+kind: research paper
+short: Weber 2023
+field: Genomics and transcriptomics
+program: Squidpy (Python), through the squidpy adapter
+citation:
+  authors: Weber LM, Saha A, Datta A, Hansen KD, Hicks SC
+  title: nnSVG for the scalable identification of spatially variable genes using nearest-neighbor Gaussian processes
+  venue: Nature Communications 14:4059
+  year: 2023
+  doi: 10.1038/s41467-023-39748-z
+related:
+  - text: "Maynard KR et al. Transcriptome-scale spatial gene expression in the human dorsolateral prefrontal cortex. Nat Neurosci 24:425-436 (2021). Source of the Visium sample 151673."
+    doi: 10.1038/s41593-020-00787-0
+  - text: "Palla G et al. Squidpy: a scalable framework for spatial omics analysis. Nat Methods 19:171-178 (2022). The Moran's I function of the tool."
+    doi: 10.1038/s41592-021-01358-2
+measured: >-
+  The paper presents nnSVG, a method that ranks genes by how much their expression follows the position in a tissue. It
+  compares nnSVG with the highly variable genes, SPARK-X and Moran's I on a Visium sample of the human prefrontal cortex.
+  The sample has 3639 spots in the tissue. The paper checks that known layer genes (MOBP and SNAP25) rank in the top 100 for
+  every method. The gene filter and the neighbor graph decide the ranks.
+instruction: >-
+  I have one Visium sample of the human prefrontal cortex. Rank the genes by how well they follow the tissue structure
+  (Moran's I). How many spots are in the tissue, how many genes pass the filter, and what is the rank of the layer genes
+  MOBP and SNAP25?
+instruction_basis: >-
+  The DLPFC section of the Results of Weber 2023, with the gene filter of its Methods (at least 3 UMI counts in at least 0.5
+  percent of the spots, mitochondrial genes removed). The paper does not state the neighbor graph of its Moran's I. The
+  benchmark uses the Visium grid of 6 neighbors.
+answers:
+  replicate:
+    decision: What is the unit of replication?
+    value: spots or cells in one tissue section (descriptive only)
+    source: The paper analyzes one section. The ranks describe this section.
+  min_umi_per_gene:
+    decision: Minimum UMI counts per gene in a spot
+    value: 3
+    source: Paper, Methods. Genes with at least 3 UMI counts in at least 0.5 percent of the spots stay.
+  min_spot_fraction:
+    decision: Minimum fraction of spots
+    value: 0.005
+    source: Paper, Methods. 0.5 percent of the spatial locations.
+  exclude_gene_prefix:
+    decision: Prefix of genes to remove
+    value: MT-
+    source: Paper, Methods. "Next, we filter out low-expressed genes and mitochondrial genes."
+  target_sum:
+    decision: Counts per spot after normalization
+    value: 10000
+    source: Not in the paper. The paper uses the library size factors of scran. The benchmark uses 10000 counts per spot and log1p.
+  coord_type:
+    decision: How the spots lie
+    value: grid
+    source: Not in the paper. Visium spots lie on a hexagonal grid.
+  n_neighbors:
+    decision: Number of neighbors of a spot
+    value: 6
+    source: Not in the paper. A Visium spot has 6 direct neighbors.
+  random_seed:
+    decision: Random seed
+    value: 0
+    source: Not in the paper. Moran's I with the normal approximation has no random step.
+items:
+  spots_in_tissue:
+    source: published
+    where: Results, DLPFC section. "3639 spots overlapping with the tissue area."
+    independence: independent
+    check: check_svg.py counts the rows of the positions file that are in the tissue and in the matrix with h5py and pandas. It gives 3639.
+  layer_genes_in_top_100:
+    source: published
+    where: Results, DLPFC section. All four methods, Moran's I among them, rank MOBP and SNAP25 within the top 100.
+    independence: independent
+    check: check_svg.py computes Moran's I with its own SciPy code, a hexagonal grid found from the spot distances and row-normalized weights. MOBP has rank 4 and SNAP25 has rank 19, so both are within the top 100.
+  mobp_rank:
+    source: computed
+    tool: squidpy 1.8.3
+    where: The paper gives no exact rank. The value is the rank of the independent calculation.
+    independence: independent
+    check: check_svg.py gives rank 4. Squidpy gives rank 4 for a grid of 6 neighbors, for 6 nearest neighbors and for 36 nearest neighbors.
+  snap25_rank:
+    source: computed
+    tool: squidpy 1.8.3
+    where: The paper gives no exact rank. The value is the rank of the independent calculation.
+    independence: independent
+    check: check_svg.py gives rank 19. Squidpy gives rank 19 or 20 for the three graphs.
+  genes_pass_filter:
+    source: published
+    where: Results, DLPFC section. "3396 out of 21,803 genes passed the filtering threshold."
+    independence: independent
+    check: check_svg.py gives 3322 genes (3309 without the mitochondrial genes) from 21,842 genes with a count. The count does not reproduce.
+data:
+  source: Human dorsolateral prefrontal cortex Visium sample 151673 of the spatialLIBD project (Maynard 2021), filtered feature-barcode matrix and tissue positions list
+  url: https://spatial-dlpfc.s3.us-east-2.amazonaws.com/h5/151673_filtered_feature_bc_matrix.h5
+  license: >-
+    Not stated for the data. The software spatialLIBD has the license Artistic-2.0. The project page says the data are public.
+    The paper of Maynard 2021 is open access. The files hold barcodes and counts only.
+  size: 12.9 MB matrix, 0.19 MB positions, 3639 spots by 33538 genes
