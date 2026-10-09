@@ -5,7 +5,7 @@ import { Box, Text, useInput } from "ink";
 import { Field } from "./input-box.tsx";
 import type { Question } from "../core/types.ts";
 import {
-  CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
+  CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, canGoBack, SEQ_START, seqAnswered, seqBack, seqProgress, seqView, type QuestionSeq, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
   choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, phiView, pilotGate, pilotQuestion, planHint, planInit,
   planQuestions, planReduce, planResolve, planTitle, programSwitches, recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, setupValues, show,
   REWIND_HELP, REWIND_TITLE, type Card, type PlanAction, type PlanState,
@@ -149,6 +149,7 @@ export function QuestionCard(props: {
   progress?: string;
   note?: string;
   title?: string;
+  escText?: string;
 }) {
   const q = props.card.q;
   const free = !q.options.length;
@@ -220,7 +221,7 @@ export function QuestionCard(props: {
           />
         ) : (
           <Text dimColor>
-            ↑↓ choose · Enter accepts · a number answers at once{props.onBack ? " · ← back" : ""} · Esc {props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions"}
+            ↑↓ choose · Enter accepts · a number answers at once{props.onBack ? " · ← back" : ""} · Esc {props.escText ?? (props.progress ? "leaves the questions (they stay open: /questions)" : "answers later with /questions")}
           </Text>
         )}
       </Box>
@@ -515,17 +516,26 @@ export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string
 
 export function ClarifyCard(props: { card: Extract<Card, { t: "clarify" }>; session: SessionLike }) {
   const { card } = props;
+  const [seq, setSeq] = useState<QuestionSeq>(SEQ_START);
   const [, setTick] = useState(0);
   const open = clarifyOpen(card, props.session.questions.open());
-  const q = open[0];
-  const answer = (value: unknown, note?: string) => void props.session.answer(q!.qid, value, note).then(() => setTick((x) => x + 1));
+  const v = seqView(seq, open);
+  const answer = (value: unknown, note?: string) => {
+    if (!v) return;
+    setSeq(seqAnswered(seq, v.q, value));
+    const done = v.changing ? props.session.changeAnswer?.(v.q.qid, value, note) : props.session.answer(v.q.qid, value, note);
+    void Promise.resolve(done).then(
+      () => setTick((x) => x + 1),
+      () => setSeq((s) => ({ ...s, done: s.done.filter((x) => x.q.qid !== v.q.qid) })),
+    );
+  };
   return (
     <Frame title={CLARIFY_TITLE} color="magenta">
       {card.found ? <Text>{card.found}</Text> : null}
       {card.check ? (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>{DATA_CHECK_TITLE}</Text>
-          {checkLines(card, q && !q.title.startsWith(DATA_CHECK_TITLE) ? 1 : 14).map((l, i) => (
+          {checkLines(card, v && !v.q.title.startsWith(DATA_CHECK_TITLE) ? 1 : 14).map((l, i) => (
             <Text key={i} dimColor={!l.startsWith("- ")}>{l}</Text>
           ))}
         </Box>
@@ -539,10 +549,19 @@ export function ClarifyCard(props: { card: Extract<Card, { t: "clarify" }>; sess
         </Box>
       ) : null}
       {card.skipped.length ? <Text dimColor>Not asked, because your request answers it: {card.skipped.map((x) => x.split(" The request says:")[0]).join(" ")}</Text> : null}
-      {q ? (
+      {v ? (
         <Box flexDirection="column" marginTop={1}>
-          <Text dimColor>{clarifyProgress(card, props.session.questions.open())}. Esc skips it.</Text>
-          <QuestionCard key={q.qid} card={{ t: "question", q }} onAnswer={answer} onDismiss={() => answer(CLARIFY_SKIP_ANSWER)} />
+          <QuestionCard
+            key={`${v.q.qid}${v.changing ? "back" : ""}`}
+            card={{ t: "question", q: v.q }}
+            title={v.q.title}
+            current={v.current}
+            progress={`${seqProgress({ ...v, total: card.qids.length })}`}
+            onAnswer={answer}
+            onBack={canGoBack(seq) ? () => setSeq(seqBack(seq)) : undefined}
+            onDismiss={() => answer(CLARIFY_SKIP_ANSWER)}
+            escText="skips this question"
+          />
         </Box>
       ) : (
         <Text dimColor>The agent now proposes the metrics.</Text>

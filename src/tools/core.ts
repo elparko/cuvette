@@ -72,7 +72,7 @@ const PLAN_FULL = {
           tool: { type: "string", description: "The tool that runs the step, for example compare_two_groups or run_script." },
           settings: {
             type: "array",
-            description: "The settings of the step, each with its value filled in and who set it: default, from your answer, or agent. Leave value out only if you cannot pick a sensible value (at most two in the whole plan).",
+            description: "The settings of the step, each with its value filled in and who set it: default, from your answer, or agent. Every setting has a value; the scientist can change it in the card.",
             items: { type: "object", properties: { key: { type: "string", description: "The decision key from the decision record, when the setting has one (for example threshold_method). The harness then uses this value at run time and does not ask again." }, label: { type: "string" }, value: {}, by: { type: "string", enum: ["default", "from your answer", "agent"] }, options: { type: "array", items: { type: "string" } }, recommendation: { type: "string" } }, required: ["label"] },
           },
           status: { type: "string", enum: ["todo", "doing", "done", "waiting", "skipped"] },

@@ -161,12 +161,16 @@ export function planText(p: Partial<AnalysisPlan>, o: PlanTextOptions = {}): str
       out.push("", "Steps");
       p.steps.forEach((s, i) => {
         const mark = s.status === "done" ? " [done]" : s.status === "skipped" ? " [skipped]" : "";
+        const set = (s.decisions ?? []).map((x) => `${n(++item)}${settingLine(x)}`);
+        if (view === "compact") {
+          out.push(`${i + 1}. ${s.step}${mark}${set.length ? `: ${set.join(" · ")}` : ""}`);
+          if (s.reason) out.push(`   Reason: ${s.reason}`);
+          return;
+        }
         out.push(`${i + 1}. ${s.step}${mark}`);
         if (view === "full" && s.method) out.push(`   Method: ${s.method}`);
         if (view === "full" && s.tool) out.push(`   Tool: ${s.tool}`);
-        const set = (s.decisions ?? []).map((x) => `${n(++item)}${settingLine(x)}`);
-        if (view === "compact" && set.length) out.push(`   ${set.join(" · ")}`);
-        else for (const x of set) out.push(`   - ${x}`);
+        for (const x of set) out.push(`   - ${x}`);
         if (s.reason) out.push(`   Reason: ${s.reason}`);
       });
     }
@@ -309,7 +313,7 @@ export function planView(record: AnalysisRecord): { approved: boolean; version: 
   return {
     approved: true,
     version: Math.max(a.version, ...a.updates.map((u) => u.version)),
-    text: (a.updates.length && now ? planText(now) : a.text) + (a.pilot ? `\n\nPilot\n${pilotText(a.pilot)}` : ""),
+    text: (a.updates.length && now ? planText(now) : a.text) + (a.pilot ? `\n\nDemonstration on a sample\n${pilotText(a.pilot)}` : ""),
     updates: a.updates.map((u) => ({ version: u.version, reason: u.reason })),
   };
 }

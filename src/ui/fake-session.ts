@@ -368,6 +368,24 @@ export class FakeSession implements SessionLike {
     }
   }
 
+  askMany(questions: Question[]): void {
+    for (const q of questions) {
+      this.qs.push(q);
+      this.record.append("question", q as unknown as Record<string, unknown>);
+    }
+    for (const q of questions) this.bus.emit({ type: "question", question: q });
+  }
+
+  async changeAnswer(qid: string, value: unknown, note?: string): Promise<string[]> {
+    const q = this.qs.find((x) => x.qid === qid);
+    if (!q) throw new Error(`No question ${qid}`);
+    if (q.status === "open") return (await this.answer(qid, value, note), []);
+    const old = q.answer;
+    q.answer = value;
+    this.record.append("answer", { qid, value, note: note ?? "", by: "human", changed: true, old: old ?? null });
+    return q.decisionKey ? this.setDecision(q.decisionKey, value, `changed answer to ${qid}`) : [];
+  }
+
   respondPermission(rid: string, ok: boolean, note?: string, _always?: boolean): void {
     this.waiters.get(rid)?.({ ok, value: note });
     this.waiters.delete(rid);

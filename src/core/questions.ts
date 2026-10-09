@@ -91,6 +91,24 @@ export class QuestionQueue {
     return q;
   }
 
+  change(qid: string, value: unknown, note?: string): Question {
+    const q = this.questions.get(qid);
+    if (!q) throw new Error(`No question ${qid}.`);
+    if (q.status === "open") return this.answer(qid, value, note);
+    const chosen = this.match(q, value);
+    const old = q.answer;
+    q.status = "answered";
+    q.answer = chosen;
+    q.answered = new Date().toISOString();
+    this.record.append("answer", { qid, value: chosen, note: note ?? "", by: "human", changed: true, old: old ?? null });
+    upsert(q);
+    return q;
+  }
+
+  answered(): Question[] {
+    return [...this.questions.values()].filter((q) => q.status !== "open");
+  }
+
   match(q: Question, value: unknown): unknown {
     if (!q.options.length) return value;
     const text = String(value).trim().toLowerCase();

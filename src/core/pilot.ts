@@ -33,6 +33,7 @@ export interface PilotRun {
   sample: string;
   values: Record<string, number>;
   images: string[];
+  legend?: string;
   check: string;
   comparison: string[];
   reference?: { path: string; mode: string; values?: Record<string, number> };
@@ -55,7 +56,7 @@ export function pilotState(record: AnalysisRecord): { approved?: Entry; stale?: 
 }
 
 export function pilotText(p: Omit<PilotRun, "entry">): string {
-  const lines = [`Pilot sample: ${p.sample}`, "", "Numbers"];
+  const lines = [`Sample: ${p.sample}`, "", "Numbers"];
   for (const [k, v] of Object.entries(p.values)) {
     const def = p.definitions.find((d) => d.measure.toLowerCase() === k.toLowerCase());
     lines.push(`- ${k}: ${v}${def ? `. ${def.definition}` : ""}`);
@@ -63,7 +64,7 @@ export function pilotText(p: Omit<PilotRun, "entry">): string {
   if (p.comparison.length) lines.push("", "Against the reference", ...p.comparison.map((c) => `- ${c}`));
   else if (p.reference?.mode === "blind") lines.push("", "The reference is held back for the blind test. The harness compares every sample after the batch.");
   else lines.push("", "No reference to compare with. Judge the method from the QC images. A quick hand count of this sample is a good check.");
-  if (p.images.length) lines.push("", "QC images (opened on screen)", ...p.images.map((i) => `- ${i}`));
+  if (p.images.length) lines.push("", "QC images", ...p.images.map((i) => `- ${i}`), ...(p.legend ? [`Legend: ${p.legend}`] : []));
   if (p.check) lines.push("", `The agent's check: ${p.check}`);
   return lines.join("\n");
 }

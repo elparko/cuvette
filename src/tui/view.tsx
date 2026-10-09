@@ -277,7 +277,7 @@ export function StatusLine(props: {
       ) : (
         line
       )}
-      <Text dimColor wrap="truncate-end">{props.hint || (props.busy ? busyHint(props.state, props.queue, props.esc) : props.details ? "Ctrl+O: short view" : "Ctrl+O: all steps")}</Text>
+      <Text dimColor wrap="truncate-end">{props.hint || (props.busy ? busyHint(props.state, props.queue, props.esc) : props.details ? "Ctrl+O: short view · /change: change an answer" : "Ctrl+O: all steps")}</Text>
       {props.keys ? <Text dimColor wrap="truncate-end">{props.keys}</Text> : null}
     </Box>
   );

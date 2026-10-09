@@ -9,7 +9,7 @@ import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { listSessions, sessionLine } from "../core/sessions.ts";
 import { groupSummary, sheetTable } from "../core/samples.ts";
 import { dollars, kTokens, percentText, priceLine, usageLong, type UsageSummary } from "../core/spend.ts";
-import { applyRewind, choiceLabel, choiceValue, show, type Card } from "./cards.ts";
+import { applyRewind, changeCard, changePicker, changeRows, choiceLabel, choiceValue, findChange, show, type Card } from "./cards.ts";
 import { rewindPoints } from "../core/rewind.ts";
 import { branchesText } from "../core/branch.ts";
 import { listMethods, methodText } from "../core/methods.ts";
@@ -314,12 +314,18 @@ export const commands: Command[] = [
   },
   {
     name: "change",
-    args: "<key> <value>",
-    help: "Change the value of a decision. Steps that used the old value become out of date.",
+    args: "[question or decision] [value]",
+    help: "Change an answer or a decision. /change lists them; /change <id> opens one; /change <key> <value> sets it. Steps that used the old value become out of date.",
     run([key, ...rest], ctx) {
       const raw = rest.join(" ").trim();
+      if (!key || !raw) {
+        const rows = changeRows(ctx.session);
+        if (!rows.length) return ctx.notice("No answer or decision to change yet.");
+        if (!key) return ctx.openCard(changePicker(rows));
+        const row = findChange(rows, key);
+        return row ? ctx.openCard(changeCard(row)) : ctx.error(`No answer or decision named ${key}. Type /change to see the list.`);
+      }
       const f = ctx.session.decisions.fields().find((x) => x.key === key);
-      if (!key || !raw) return ctx.error("Use: /change <key> <value>");
       if (!f) return ctx.error(`No decision named ${key}. See /decisions.`);
       if (f.owner === "fixed") return ctx.error(`${f.label} is fixed by the lab profile.`);
       let value: unknown;
@@ -951,7 +957,14 @@ export const commands: Command[] = [
   { name: "quit", help: "Leave the program.", run: (_, ctx) => ctx.quit() },
 ];
 
-export function suggestions(input: string): Command[] {
+export function suggestions(input: string, session?: SessionLike): Command[] {
+  const arg = /^\/change (\S*)$/.exec(input);
+  if (arg && session) {
+    const t = arg[1]!.toLowerCase();
+    return changeRows(session)
+      .filter((r) => [r.id, r.key ?? "", r.label].some((x) => x.toLowerCase().startsWith(t)) || r.label.toLowerCase().includes(t))
+      .map((r) => ({ name: `change ${r.id}`, help: `${r.label}: ${r.value}`, run: () => {} }));
+  }
   if (!input.startsWith("/") || input.includes(" ")) return [];
   const q = input.slice(1).toLowerCase();
   return commands.filter((c) => c.name.startsWith(q));

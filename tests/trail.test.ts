@@ -244,7 +244,7 @@ test("the html report shows the confirmed analysis with its pilot and the valida
   expect(section).toContain("<td>Set 1</td><td>296</td><td>530</td><td>-234</td><td>-44.2</td><td>yes</td>");
   expect(section).toContain("Bland-Altman plot.");
   const md = readFileSync(exportMarkdown(r, [], join(dir, "t.md")), "utf8");
-  expect(md).toContain("### Demonstration on a sample\n\nPilot sample: Set 1");
+  expect(md).toContain("### Demonstration on a sample\n\nSample: Set 1");
   expect(md).toContain("| Set 2 | 400 | 410 | -10 | -2.4 |  |");
 });
 

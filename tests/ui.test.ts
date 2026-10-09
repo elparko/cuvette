@@ -178,3 +178,54 @@ describe("the program choice", () => {
     expect(setupValues(fields, { t: "setup", profiles: [] })).toEqual({ alpha: 0.05 });
   });
 });
+
+describe("question sequence and /change in the shared layer", () => {
+  test("one question at a time with a count; answers move forward; Back and Next move inside the answered ones; Esc leaves", async () => {
+    const { SEQ_START, seqView, seqAnswered, seqBack, seqNext, seqProgress, seqPending, seqLeave, canGoBack, reopenQuestions } = await import("../src/ui/cards.ts");
+    const cards: Card[] = [{ t: "question", q: q("q1") }, { t: "question", q: q("q2") }, { t: "question", q: q("q3") }];
+    let seq = SEQ_START;
+    let v = seqView(seq, seqPending(cards))!;
+    expect([v.q.qid, seqProgress(v), v.changing]).toEqual(["q1", "Question 1 of 3", false]);
+    expect(canGoBack(seq)).toBe(false);
+    seq = seqAnswered(seq, v.q, 1);
+    v = seqView(seq, seqPending(cards.slice(1)))!;
+    expect([v.q.qid, seqProgress(v)]).toEqual(["q2", "Question 2 of 3"]);
+    seq = seqBack(seq);
+    v = seqView(seq, seqPending(cards.slice(1)))!;
+    expect([v.q.qid, seqProgress(v), v.changing, v.current]).toEqual(["q1", "Question 1 of 3", true, 1]);
+    expect(canGoBack(seq)).toBe(false);
+    seq = seqAnswered(seq, v.q, 2);
+    expect(seq).toEqual({ done: [{ q: q("q1"), value: 2 }], back: -1 });
+    expect(seqNext(seqBack(seq))).toEqual(seq);
+    expect(seqLeave([plan(), ...cards]).map((c) => c.t)).toEqual(["plan"]);
+    expect(reopenQuestions([], [q("q2"), q("q3")]).map((c) => (c as { q: { qid: string } }).q.qid)).toEqual(["q2", "q3"]);
+  });
+
+  test("/change rows are newest first; a decision change is logged with its out-of-date steps; after a demonstration the card asks to run it again", async () => {
+    const { changeRows, changeCard, findChange, respondQuestion, changePicker } = await import("../src/ui/cards.ts");
+    const s = new FakeSession({ delayMs: 0 });
+    s.decisions.applySetup({ question: "Do cells eat more?" });
+    s.askMany([{ ...q("q1"), title: "One n", decisionKey: "", options: [{ value: "set", label: "one Set" }, { value: "field", label: "one field" }] }]);
+    await s.answer("q1", "set");
+    s.record.append("pilot_run", { sample: "control/field1" });
+    const rows = changeRows(s);
+    expect(rows[0]).toMatchObject({ id: "q1", label: "One n", value: "one Set", kind: "question", note: "The demonstration used the old value. Run it again?", rerun: "control/field1" });
+    expect(rows.slice(1).every((r) => r.kind === "decision")).toBe(true);
+    expect(rows.length).toBeGreaterThan(1);
+    expect(findChange(rows, "one n")?.id).toBe("q1");
+    const picker = changePicker(rows);
+    expect(picker.t === "question" && picker.q.options[0]!.label).toBe("One n: one Set");
+    const r1 = await respondQuestion(s, picker as never, "q1");
+    expect(r1.next).toEqual(changeCard(rows[0]!));
+    const r2 = await respondQuestion(s, r1.next as never, "field");
+    expect(r2.line).toBe("One n is now one field.");
+    expect(s.record.entries(["answer"]).at(-1)!.data).toMatchObject({ qid: "q1", value: "field", changed: true, old: "set" });
+    expect(r2.next && r2.next.t === "question" && r2.next.q.text).toBe("You changed One n. The demonstration used the old value. Run it again?");
+    await respondQuestion(s, r2.next as never, "yes");
+    expect(s.sent.at(-1)).toBe("The scientist changed One n. Run the demonstration again on control/field1 with the new value, then call pilot_result.");
+    const dec = rows.find((r) => r.kind === "decision")!;
+    const r3 = await respondQuestion(s, changeCard(dec) as never, "something new");
+    expect(r3.line!.startsWith(`${dec.label} is now something new.`)).toBe(true);
+    expect(s.record.entries(["decision"]).at(-1)!.data).toMatchObject({ key: dec.key, new: "something new", reason: "changed with /change" });
+  });
+});

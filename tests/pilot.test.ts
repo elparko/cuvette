@@ -41,12 +41,12 @@ test("a pilot is out of date after a decision changes or a program loads, not af
   expect(pilotState(r).stale).toBe("the program changed (cellpose loaded) after the pilot");
 });
 
-test("the pilot text gives the numbers with their definitions, the reference comparison, the images and the agent's check", () => {
-  const base = { sample: "Set 1", values: { "positive cells": 296 }, images: ["/f/qc.png"], check: "Clumps are left out.", definitions: [{ measure: "positive cells", definition: "A cell with at least 1 red pixel inside its outline." }] };
+test("the demonstration text gives the numbers with their definitions, the reference comparison, the images with a plain legend and the agent's check", () => {
+  const base = { sample: "Set 1", values: { "positive cells": 296 }, images: ["/f/qc.png"], legend: "yellow = counted as positive; cyan = counted as negative.", check: "Clumps are left out.", definitions: [{ measure: "positive cells", definition: "A cell with at least 1 red pixel inside its outline." }] };
   const text = pilotText({ ...base, comparison: ['positive cells: the agent got 296; the reference "Red dots" says 530 (56% of the reference).'] });
   expect(text).toBe(
     [
-      "Pilot sample: Set 1",
+      "Sample: Set 1",
       "",
       "Numbers",
       "- positive cells: 296. A cell with at least 1 red pixel inside its outline.",
@@ -54,8 +54,9 @@ test("the pilot text gives the numbers with their definitions, the reference com
       "Against the reference",
       '- positive cells: the agent got 296; the reference "Red dots" says 530 (56% of the reference).',
       "",
-      "QC images (opened on screen)",
+      "QC images",
       "- /f/qc.png",
+      "Legend: yellow = counted as positive; cyan = counted as negative.",
       "",
       "The agent's check: Clumps are left out.",
     ].join("\n"),

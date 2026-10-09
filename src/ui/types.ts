@@ -49,6 +49,7 @@ export interface SessionLike {
     values(): Record<string, unknown>;
   };
   questions: { open(): Question[] };
+  changeAnswer?(qid: string, value: unknown, note?: string): Promise<string[]>;
   findings: { list(status?: Finding["status"]): Finding[]; resolve(fid: string, action: "accept" | "reject" | "fix", reason?: string): void };
   send(text: string, opts?: { internal?: boolean; plan?: boolean }): Promise<string>;
   steer?(text: string, now?: boolean): void;

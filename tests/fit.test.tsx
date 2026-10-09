@@ -239,3 +239,56 @@ describe("bottom of the terminal", () => {
     expect(row()).toBe(idle);
   });
 });
+
+describe("the proposed metrics card in a 40-row terminal", () => {
+  test("the efferocytosis plan fits without scrolling: every metric, action and program is one line, and the details stay folded", async () => {
+    const { planText, settingsOf } = await import("../src/core/plan.ts");
+    const plan = {
+      restatement: "You want: the percent of macrophages that ate red apoptotic cells, control against treated, with one Set as one n.",
+      definitions: [
+        { measure: "n", definition: "one Set (4 per group); the fields of a Set are pooled." },
+        { measure: "cell", definition: "an object in CH1 (brightfield) of 300 to 15,000 px, outlined with Cellpose cyto3." },
+        { measure: "positive cell", definition: "a cell with at least 1 red pixel (CH3, Otsu threshold per image) inside its outline." },
+        { measure: "efferocytosis index", definition: "positive cells / all cells x 100 for each n." },
+      ],
+      exclusions: [{ what: "Cells that touch the image edge.", effect: "About 6% of the cells." }],
+      data: { files: ["images/ (6 groups, 139 fields)"], row: "One cell.", replicate: "One Set.", n: "4 Sets per group." },
+      programs: [{ part: "Cell outlines", adapter: "cellpose", program: "Cellpose", why: "It outlines cells in brightfield.", alternatives: ["imagej"] }, { part: "Statistics", adapter: "biostats", program: "SciPy", why: "It compares the groups.", alternatives: [] }],
+      steps: [
+        { step: "Outline the cells in CH1", status: "todo", decisions: [{ label: "Cell model", value: "cyto3", by: "default" }, { label: "Cell size (px)", value: "300 to 15,000", by: "agent" }] },
+        { step: "Find red in CH3", status: "todo", decisions: [{ label: "Red threshold", value: "Otsu per image", by: "agent" }] },
+        { step: "Count positive cells per Set", status: "todo", decisions: [{ label: "Positive", value: "at least 1 red pixel", by: "from your answer" }] },
+        { step: "Compare control and treated", status: "todo", decisions: [{ label: "Test", value: "Welch t test", by: "agent" }, { label: "Error bars", value: "SD", by: "default" }] },
+      ],
+      pilot: { sample: "control/Set 1/field 1" },
+      outputs: ["A table per cell", "A bar plot per group", "QC images"],
+      checks: [{ check: "The outlines match the cells in 3 fields.", if_fails: "Change the cell size." }],
+    };
+    const { h, s } = start(100, 40);
+    await until(() => h.all().includes("Type /plan"));
+    s.bus.emit({
+      type: "plan",
+      stage: "plan",
+      version: 1,
+      text: planText(plan as never, { view: "compact", numbered: true }),
+      details: planText(plan as never, { view: "details", numbered: true }),
+      update: false,
+      qids: [],
+      programs: plan.programs.map((g) => ({ ...g })),
+      mode: "watch",
+      definitions: plan.definitions,
+      settings: settingsOf(plan as never).map((x, i) => ({ index: i, step: x.step, label: x.setting.label, value: x.setting.value, by: x.setting.by })),
+      pilot: plan.pilot.sample,
+    } as never);
+    await until(() => h.term.view().includes("run the demonstration") && !h.term.view().includes(" of ?"));
+    await sleep(200);
+    const view = h.term.view();
+    const rows = view.split("\n");
+    expect(rows.length).toBeLessThanOrEqual(40);
+    expect(view).not.toMatch(/scroll · lines/);
+    for (const part of ["Proposed metrics, version 1", "[1] n: one Set", "[4] efferocytosis index", "1. Outline the cells in CH1: [5] Cell model: cyto3 (default)", "[6] Cell size (px): 300 to 15,000", "[12] Statistics: SciPy through biostats (agent)", "r run the demonstration on control/Set 1/field 1"])
+      expect(view).toContain(part);
+    expect(view).not.toContain("What I will leave out");
+    expect(view).not.toContain("Unit of replication");
+  });
+});

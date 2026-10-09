@@ -15,6 +15,7 @@ import { ConfigPanel } from "./config-panel.tsx";
 import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
 import { changeSetting, type SettingSession } from "../core/settings.ts";
+import { canGoBack, isPlainQuestion, reopenQuestions, respondQuestion, SEQ_START, seqAnswered, seqBack, seqLeave, seqPending, seqProgress, seqView, type QuestionSeq } from "../ui/cards.ts";
 import { applyRewind, applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
 import { inputPlaceholder, nextQueued, routeMessage, stopTurn, usageFields } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
@@ -54,6 +55,10 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   const [live, setLive] = useState("");
   const [status, setStatus] = useState<{ state: string; tool?: string; purpose?: string; since?: number }>({ state: "idle" });
   const [cards, setCards] = useState<Card[]>([]);
+  const [seq, setSeq] = useState<QuestionSeq>(SEQ_START);
+  useEffect(() => {
+    if (seq.done.length && !seqPending(cards).length) setSeq(SEQ_START);
+  }, [cards, seq]);
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState(-1);
@@ -284,7 +289,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
     }
   };
 
-  const sugg = cards.length ? [] : suggestions(input).slice(0, MAX_SUGGESTIONS);
+  const sugg = cards.length ? [] : suggestions(input, session).slice(0, MAX_SUGGESTIONS);
   const selected = sugg[Math.min(sel, sugg.length - 1)];
 
   const setText = (v: string) => setInput(v);
@@ -301,6 +306,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
     setInput("");
     setSel(0);
     if (text.startsWith("/")) return void runCommand(text);
+    setCards((x) => reopenQuestions(x, session.questions.open()));
     const r = routeMessage(session, text, status.state !== "idle");
     if (r.t === "none") return;
     if (r.t === "queue") return updateQueue([...queueRef.current, r.text]);
@@ -416,7 +422,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
       )}
       {card ? (
         <CardRows.Provider value={fit.card}>
-          {(cardViews({ session, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: running, program, programs: opts.programs, setInput })[card.t] as (c: Card) => React.ReactNode)(card)}
+          {(cardViews({ session, cards, seq, setSeq, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: running, program, programs: opts.programs, setInput })[card.t] as (c: Card) => React.ReactNode)(card)}
         </CardRows.Provider>
       ) : null}
       {fit.inputBox ? <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
@@ -479,6 +485,9 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
 
 interface CardDeps {
   session: SessionLike;
+  cards: Card[];
+  seq: QuestionSeq;
+  setSeq: React.Dispatch<React.SetStateAction<QuestionSeq>>;
   env: Record<string, string | undefined>;
   popCard(): void;
   setCards: React.Dispatch<React.SetStateAction<Card[]>>;
@@ -523,20 +532,58 @@ function cardViews(d: CardDeps): CardViews {
       />
     ),
     phi: (card) => <PhiCard key={card.rid} card={card} onAction={(a) => (respondPhi(session, card, a), popCard())} />,
-    question: (card) => (
-      <QuestionCard
-        key={card.q.qid}
-        card={card}
-        onAnswer={(value, note) => {
-          popCard();
-          session.answer(card.q.qid, value, note).catch((e: Error) => {
-            d.line("✗", `${e.message} Try again.`, "red");
-            d.setCards((x) => (x.some((c) => c.t === "question" && c.q.qid === card.q.qid) ? x : [card, ...x]));
-          });
-        }}
-        onDismiss={popCard}
-      />
-    ),
+    question: (card) => {
+      const failed = (e: Error, again: Card) => {
+        d.line("✗", `${e.message} Try again.`, "red");
+        d.setCards((x) => (x.some((c) => c.t === "question" && c.q.qid === card.q.qid) ? x : [again, ...x]));
+      };
+      if (card.act) {
+        const act = card.act;
+        return (
+          <QuestionCard
+            key={`${card.q.qid}${act.kind}`}
+            card={card}
+            title={act.kind === "change" ? `Change: ${card.q.title}` : card.q.title}
+            current={act.kind === "change" ? act.current : undefined}
+            note={act.kind === "change" ? act.note : undefined}
+            onAnswer={(value, note) => {
+              popCard();
+              respondQuestion(session, card, value, note)
+                .then((r) => {
+                  if (r.line) d.line("✓", r.line, "green");
+                  if (r.next) d.setCards((x) => [r.next!, ...x]);
+                })
+                .catch((e: Error) => failed(e, card));
+            }}
+            onDismiss={popCard}
+          />
+        );
+      }
+      const v = seqView(d.seq, seqPending(d.cards)) ?? { q: card.q, n: 1, total: 1, changing: false };
+      return (
+        <QuestionCard
+          key={`${v.q.qid}${v.changing ? "back" : ""}`}
+          card={{ t: "question", q: v.q }}
+          current={v.current}
+          progress={v.total > 1 ? seqProgress(v) : undefined}
+          onBack={canGoBack(d.seq) ? () => d.setSeq(seqBack(d.seq)) : undefined}
+          onAnswer={(value, note) => {
+            d.setSeq(seqAnswered(d.seq, v.q, value));
+            if (v.changing) return void session.changeAnswer?.(v.q.qid, value, note).catch((e: Error) => d.line("✗", e.message, "red"));
+            d.setCards((x) => x.filter((c) => !(isPlainQuestion(c) && c.q.qid === v.q.qid)));
+            session.answer(v.q.qid, value, note).catch((e: Error) => {
+              d.setSeq((s) => ({ ...s, done: s.done.filter((x) => x.q.qid !== v.q.qid) }));
+              failed(e, { t: "question", q: v.q });
+            });
+          }}
+          onDismiss={() => {
+            d.setCards(seqLeave);
+            d.setSeq(SEQ_START);
+            d.line("▸", "The questions stay open. They come back with your next message or with /questions.", undefined, true);
+          }}
+        />
+      );
+    },
     instruction: (card) => (
       <InstructionCard
         key={card.step}

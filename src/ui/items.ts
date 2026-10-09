@@ -1,5 +1,6 @@
 import { activity, canMakeNode, purposeOf, role } from "../core/housekeeping.ts";
-import type { Entry, Fidelity } from "../core/types.ts";
+import type { Entry, Fidelity, Question } from "../core/types.ts";
+import { answerLine, optionLabel } from "./cards.ts";
 import { scopeLabel, type Scope } from "../core/settings.ts";
 import { pilotText } from "../core/pilot.ts";
 import { rerunBody, rerunTitle, type RerunData } from "../core/status.ts";
@@ -77,6 +78,7 @@ export class Mapper {
   outputs: OutputRef[] = [];
   tokens = { input: 0, output: 0 };
   private titles = new Map<string, string>();
+  private options = new Map<string, Question["options"]>();
   private calls = new Map<string, Record<string, unknown>>();
   private said = false;
   constructor(private session: SessionLike) {}
@@ -134,10 +136,13 @@ export class Mapper {
       }
       case "question":
         this.titles.set(String(d.qid), String(d.title ?? ""));
+        this.options.set(String(d.qid), (d.options as Question["options"]) ?? []);
         return line("?", `Question ${d.qid ?? ""}: ${d.title ?? ""}`, "magenta");
       case "answer": {
-        const title = this.titles.get(String(d.qid));
-        return line("✓", title ? `${title}${title.endsWith("?") ? "" : ":"} ${show(d.value)}` : `Answer to ${d.qid}: ${show(d.value)}`, "green");
+        const qid = String(d.qid);
+        const q = { qid, title: this.titles.get(qid) ?? `Answer to ${qid}`, options: this.options.get(qid) ?? [] };
+        if (d.changed) return line("✎", `Changed ${q.title.replace(/[?:]$/, "")}: ${optionLabel(q, d.old)} → ${optionLabel(q, d.value)} · /change ${qid}`, "cyan");
+        return line("✓", answerLine(q, d.value), "green");
       }
       case "sensitivity":
         return [{ key, t: "block", title: `Sensitivity check: ${d.decisionKey}`, text: String(d.table ?? "") }];
@@ -167,7 +172,7 @@ export class Mapper {
       case "pilot_rejected":
         return line("✎", `Demonstration on ${d.sample} not confirmed: ${d.reason}`, "cyan");
       case "reference":
-        return d.mode === "none" ? [] : line("▸", d.revealed ? `The reference ${d.path} is now visible to the agent.` : `Reference: ${d.path} (${d.mode === "blind" ? "held back for a blind test" : "compared in the pilot"})`, "cyan");
+        return d.mode === "none" ? [] : line("▸", d.revealed ? `The reference ${d.path} is now visible to the agent.` : `Reference: ${d.path} (${d.mode === "blind" ? "held back for a blind test" : "compared in the demonstration"})`, "cyan");
       case "validation":
         return [{ key, t: "block", title: "Validation against the reference", text: ((d.summary as string[]) ?? []).join("\n") + (d.plot ? `\nBland-Altman plot: ${d.plot}` : "") }];
       case "plan":
@@ -343,7 +348,7 @@ export class Collapser {
       this.planShown = true;
     }
     if (e.kind === "tool_call") this.args.set(String(e.data.callId), (e.data.args ?? {}) as Record<string, unknown>);
-    if (e.kind === "decision" && /^answer to /.test(String(e.data.reason ?? ""))) return [];
+    if (e.kind === "decision" && /^(changed )?answer to /.test(String(e.data.reason ?? ""))) return [];
     if (e.kind === "answer") {
       this.answered.add(String(e.data.qid));
       const open = (h: Logged) => String(h.e!.data.qid ?? "").split(",").some((q) => !this.answered.has(q));

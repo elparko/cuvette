@@ -11,7 +11,7 @@ export type Card =
   | { t: "setup"; profiles: { name: string; version: number }[]; proposed?: Record<string, unknown>; proposedFrom?: string }
   | { t: "eln" }
   | { t: "permission"; rid: string; tool: string; args: Record<string, unknown>; code?: string; touches: string; search?: { root: string; purpose: string } }
-  | { t: "question"; q: Question }
+  | { t: "question"; q: Question; act?: QuestionAct }
   | { t: "instruction"; step: number; tool: string; text: string }
   | { t: "findings"; list: Finding[] }
   | { t: "key"; reason?: string }
@@ -199,8 +199,188 @@ export function questionStartText(q: Question, current?: unknown): string {
   return v === undefined || v === null ? "" : typeof v === "string" ? v : JSON.stringify(v);
 }
 
-export function localQuestion(qid: string, title: string, text: string, options: { value: string; label: string }[], rec?: string): Question {
-  return { qid, session: "", decisionKey: "", title, text, options, recommendation: rec ? { value: rec, reason: "" } : undefined, evidence: "", status: "open", created: "" };
+// ---------------------------------------------------------------- question sequence
+
+export type QuestionAct =
+  | { kind: "pick"; rows: ChangeRow[] }
+  | { kind: "change"; key?: string; current?: unknown; note?: string; rerun?: string }
+  | { kind: "rerun"; text: string };
+
+export interface QuestionSeq {
+  done: { q: Question; value: unknown }[];
+  back: number;
+}
+
+export const SEQ_START: QuestionSeq = { done: [], back: -1 };
+
+export interface SeqView {
+  q: Question;
+  n: number;
+  total: number;
+  changing: boolean;
+  current?: unknown;
+}
+
+export const isPlainQuestion = (c: Card): c is Extract<Card, { t: "question" }> => c.t === "question" && !c.act;
+
+export function seqPending(cards: Card[]): Question[] {
+  return cards.filter(isPlainQuestion).map((c) => c.q);
+}
+
+export function seqView(seq: QuestionSeq, pending: Question[]): SeqView | undefined {
+  const total = seq.done.length + pending.length;
+  const d = seq.back >= 0 ? seq.done[seq.back] : undefined;
+  if (d && pending.length) return { q: d.q, n: seq.back + 1, total, changing: true, current: d.value };
+  const q = pending[0];
+  return q ? { q, n: seq.done.length + 1, total, changing: false } : undefined;
+}
+
+export function seqProgress(v: SeqView): string {
+  return `Question ${v.n} of ${v.total}`;
+}
+
+export function seqAnswered(seq: QuestionSeq, q: Question, value: unknown): QuestionSeq {
+  if (seq.back >= 0) {
+    const done = seq.done.map((d, i) => (i === seq.back ? { q: d.q, value } : d));
+    return { done, back: seq.back + 1 < done.length ? seq.back + 1 : -1 };
+  }
+  return { done: [...seq.done, { q, value }], back: -1 };
+}
+
+export function seqBack(seq: QuestionSeq): QuestionSeq {
+  if (!seq.done.length || seq.back === 0) return seq;
+  return { ...seq, back: seq.back < 0 ? seq.done.length - 1 : seq.back - 1 };
+}
+
+export function seqNext(seq: QuestionSeq): QuestionSeq {
+  if (seq.back < 0) return seq;
+  return { ...seq, back: seq.back + 1 < seq.done.length ? seq.back + 1 : -1 };
+}
+
+export const canGoBack = (seq: QuestionSeq) => seq.done.length > 0 && seq.back !== 0;
+
+export function seqLeave(cards: Card[]): Card[] {
+  return cards.filter((c) => !isPlainQuestion(c));
+}
+
+export function reopenQuestions(cards: Card[], open: Question[]): Card[] {
+  let list = cards;
+  for (const q of open) list = pushCard(list, { t: "question", q });
+  return list;
+}
+
+export function optionLabel(q: Pick<Question, "options">, value: unknown): string {
+  return q.options.find((o) => sameValue(o.value, value))?.label ?? show(value);
+}
+
+export function answerLine(q: Pick<Question, "qid" | "title" | "options">, value: unknown): string {
+  return `${q.title}${q.title.endsWith("?") ? "" : ":"} ${optionLabel(q, value)} · /change ${q.qid}`;
+}
+
+// ---------------------------------------------------------------- change an answer or a decision
+
+export interface ChangeRow {
+  id: string;
+  label: string;
+  value: string;
+  kind: "question" | "decision";
+  q: Question;
+  current: unknown;
+  key?: string;
+  rerun?: string;
+  note?: string;
+}
+
+const DEMO_NOTE = "The demonstration used the old value. Run it again?";
+
+function demoAfter(session: SessionLike, setAt: number): { sample: string } | undefined {
+  const run = session.record.entries(["pilot_run"]).filter((e) => e.id > setAt).at(-1);
+  return run ? { sample: String(run.data.sample ?? "the same sample") } : undefined;
+}
+
+export function changeRows(session: SessionLike): ChangeRow[] {
+  const asked = new Map<string, Question>();
+  for (const e of session.record.entries(["question"])) asked.set(String(e.data.qid), e.data as unknown as Question);
+  const last = new Map<string, { value: unknown; id: number }>();
+  for (const e of session.record.entries(["answer"])) last.set(String(e.data.qid), { value: e.data.value, id: e.id });
+  const rows: (ChangeRow & { at: number })[] = [];
+  const keys = new Set<string>();
+  for (const [qid, a] of last) {
+    const q = asked.get(qid);
+    if (!q || q.decisionKey === "adapter") continue;
+    if (q.decisionKey) keys.add(q.decisionKey);
+    const demo = demoAfter(session, a.id);
+    rows.push({ id: qid, label: q.title, value: optionLabel(q, a.value), kind: "question", q: { ...q, status: "open" }, current: a.value, key: q.decisionKey || undefined, at: a.id, ...(demo ? { note: DEMO_NOTE, rerun: demo.sample } : {}) });
+  }
+  const setAt = new Map<string, number>();
+  for (const e of session.record.entries(["setup", "decision"])) {
+    if (e.kind === "decision") setAt.set(String(e.data.key), e.id);
+    else for (const k of Object.keys((e.data.values as object) ?? {})) setAt.set(k, e.id);
+  }
+  for (const f of session.decisions.fields()) {
+    if (!f.set || keys.has(f.key) || f.owner === "fixed") continue;
+    const at = setAt.get(f.key) ?? 0;
+    const demo = demoAfter(session, at);
+    rows.push({ id: f.key, label: f.label, value: show(f.value), kind: "decision", q: decisionQuestion(f), current: f.value, key: f.key, at, ...(demo ? { note: DEMO_NOTE, rerun: demo.sample } : {}) });
+  }
+  return rows.sort((a, b) => b.at - a.at).map(({ at: _at, ...r }) => r);
+}
+
+export function decisionQuestion(f: DecisionFieldLike): Question {
+  const opts = (f.choices ?? []).map((c) => ({ value: choiceValue(c), label: choiceLabel(c) }));
+  return localQuestion(`decision:${f.key}`, f.label, f.help || `The value of ${f.label}.`, kind(f) === "bool" ? [{ value: true, label: "yes" }, { value: false, label: "no" }] : opts);
+}
+
+const kind = (f: DecisionFieldLike) => fieldKind(f);
+
+export function findChange(rows: ChangeRow[], id: string): ChangeRow | undefined {
+  const t = id.trim().toLowerCase();
+  return rows.find((r) => r.id.toLowerCase() === t) ?? rows.find((r) => r.key?.toLowerCase() === t) ?? rows.find((r) => r.label.toLowerCase() === t) ?? rows.find((r) => r.label.toLowerCase().startsWith(t));
+}
+
+export function changePicker(rows: ChangeRow[]): Card {
+  return { t: "question", q: localQuestion("change", "Change an answer", "Choose the answer or decision to change. Newest first.", rows.map((r) => ({ value: r.id, label: `${r.label}: ${r.value}` }))), act: { kind: "pick", rows } };
+}
+
+export function changeCard(row: ChangeRow): Card {
+  return { t: "question", q: row.q, act: { kind: "change", key: row.kind === "decision" ? row.key : undefined, current: row.current, note: row.note, rerun: row.rerun } };
+}
+
+export function rerunCard(label: string, sample: string): Card {
+  return {
+    t: "question",
+    q: localQuestion("rerun", "Run the demonstration again?", `You changed ${label}. ${DEMO_NOTE}`, [{ value: "yes", label: `Yes. Run it again on ${sample}` }, { value: "no", label: "No, not now" }], "yes"),
+    act: { kind: "rerun", text: `The scientist changed ${label}. Run the demonstration again on ${sample} with the new value, then call pilot_result.` },
+  };
+}
+
+export interface QuestionResult {
+  next?: Card;
+  line?: string;
+}
+
+export async function respondQuestion(session: SessionLike, card: Extract<Card, { t: "question" }>, value: unknown, note?: string): Promise<QuestionResult> {
+  const act = card.act;
+  if (!act) {
+    await session.answer(card.q.qid, value, note);
+    return {};
+  }
+  if (act.kind === "pick") {
+    const row = act.rows.find((r) => r.id === value) ?? findChange(act.rows, String(value));
+    return row ? { next: changeCard(row) } : {};
+  }
+  if (act.kind === "rerun") {
+    if (value === "yes") void session.send(act.text).catch(() => {});
+    return {};
+  }
+  const stale = act.key ? session.setDecision(act.key, value, "changed with /change") : session.changeAnswer ? await session.changeAnswer(card.q.qid, value, note) : [];
+  const same = sameValue(act.current, value);
+  const line = same ? `${card.q.title} stays ${optionLabel(card.q, value)}.` : `${card.q.title} is now ${optionLabel(card.q, value)}.${stale.length ? ` ${stale.length} ${stale.length === 1 ? "step is" : "steps are"} out of date. /rerun runs them again.` : ""}`;
+  return { line, next: !same && act.rerun ? rerunCard(card.q.title, act.rerun) : undefined };
+}
+
+export function localQuestion(qid: string, title: string, text: string, options: { value: unknown; label: string }[], rec?: unknown): Question {
+  return { qid, session: "", decisionKey: "", title, text, options, recommendation: rec !== undefined ? { value: rec, reason: "" } : undefined, evidence: "", status: "open", created: "" };
 }
 
 // ---------------------------------------------------------------- setup
@@ -400,13 +580,13 @@ export function referenceQuestion(card: PlanCard): Question {
   const r = card.reference!;
   const c = r.candidates[0];
   const opts = c
-    ? [{ value: "compare", label: "Yes. Compare in the pilot" }, { value: "blind", label: "Yes. Hold it back (blind test)" }, { value: "none", label: "No, it is not a reference" }]
+    ? [{ value: "compare", label: "Yes. Compare in the demonstration" }, { value: "blind", label: "Yes. Hold it back (blind test)" }, { value: "none", label: "No, it is not a reference" }]
     : [{ value: "none", label: "No reference" }, { value: "have", label: "Yes, I have one" }];
   return localQuestion("reference", "Reference", r.question, opts, c ? "compare" : "none");
 }
 
 export function refModeQuestion(st: PlanState): Question {
-  return localQuestion("refmode", "Reference", `How does the agent use ${st.ref?.path ?? "the reference"}?`, [{ value: "compare", label: "Compare in the pilot" }, { value: "blind", label: "Hold it back (blind test)" }], "compare");
+  return localQuestion("refmode", "Reference", `How does the agent use ${st.ref?.path ?? "the reference"}?`, [{ value: "compare", label: "Compare in the demonstration" }, { value: "blind", label: "Hold it back (blind test)" }], "compare");
 }
 
 export function pilotQuestion(): Question {
@@ -418,7 +598,7 @@ export function pilotQuestion(): Question {
 }
 
 export function referenceLine(ref: ReferenceChoice | undefined): string | undefined {
-  return ref && ref.mode !== "none" ? `Reference: ${ref.path} (${ref.mode === "blind" ? "held back for a blind test" : "compared in the pilot"})` : undefined;
+  return ref && ref.mode !== "none" ? `Reference: ${ref.path} (${ref.mode === "blind" ? "held back for a blind test" : "compared in the demonstration"})` : undefined;
 }
 
 export const REFERENCE_PATH_LABEL = "File; sheet; value columns (for example /data/counts.xlsx; Set 1; Red dots, Total cells):";
@@ -539,5 +719,5 @@ export function planReduce(card: PlanCard, st: PlanState, act: PlanAction): { st
 }
 
 export function planHint(card: PlanCard): string {
-  return pilotGate(card) ? "The method runs on the pilot sample only. You check the result before the other samples run." : "No analysis step runs before you approve.";
+  return pilotGate(card) ? "No step runs on the other samples before you confirm." : "No analysis step runs before you approve.";
 }

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
@@ -19,7 +20,7 @@ import { folderHasNoPatientData, groupHits, isCloud, isLocal, Masker, phiOn, sca
 import { contextWarning, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
 import { loadSettings, xlsxOn, type Settings } from "./config.ts";
 import { outputDir, savedLine, writeResults, type Saved } from "./results.ts";
-import type { Dirs } from "../adapters/kinds/common.ts";
+import { outputFile, type Dirs } from "../adapters/kinds/common.ts";
 import { ADAPTER_DECISION, decisionHook, DecisionRecord } from "./decisions.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
@@ -31,6 +32,7 @@ import { definitionsOf } from "./plan.ts";
 import { goalOnly, settingsOf } from "./plan.ts";
 import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
 import { citationStyle, type CitationStyle } from "./citations.ts";
+import { absentStains, groundQuestions, inspectData, type Inspection } from "./inspect.ts";
 import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
@@ -108,7 +110,7 @@ const MODE_NOTE: Record<Mode, string> = {
   plan: "Mode is now plan: write a plan with the plan tool. Run only read-only tools.",
 };
 
-const PLAN_NOTE = "Plan first, in two phases. Phase 1, clarifying questions: look at the data with read-only tools, at most three calls. Then call clarify once. In found, tell the scientist in one or two sentences what you see, with counts (for example: I see 6 groups, 139 fields, 2 channels plus an overlay in each field). In questions, ask at most 5 questions about meaning only: what to measure and what counts as one (for example a red-positive cell or a red spot), which groups to compare, what one replicate is, whether earlier results or hand counts exist, and what the output is for. Give options from the data. Leave out a question that the request already answers, and say in answered_by_request what the request says. Never ask about technical settings such as thresholds, segmentation models, size filters, error bars, test families or alpha: you choose those in phase 2. Phase 2, proposed metrics: after the answers, call plan. In definitions, turn the answers into concrete metrics and how each is measured, with the setting values, one short line each (what counts as one n, what counts as one object, what counts as positive, the metric). restatement: only the scientific goal, starting with 'You want:'. Answer setup questions (is the program ready, where the results go) briefly in your message, not in the plan. steps: one line each in plain words, the actions you will run, with every setting filled in: its value and who set it (default, from your answer, or agent). Leave a setting open only if you cannot pick a sensible value, and at most two. Also give exclusions with their effects, pilot (if the method runs on more than one sample), outputs, programs, data, checks and out_of_scope. Write for a scientist: short sentences, plain words. No analysis step runs before the scientist confirms the proposed analysis.";
+const PLAN_NOTE = "Plan first, in two phases. Phase 1, clarifying questions: first call inspect_data on the data that the request names (a folder or a file; . for the project folder). The harness refuses clarify before it. Use at most three read-only calls. Then call clarify once. In found, say plainly what the inspection shows, with counts and the real channel names (for example: Each field has 3 images: CH1 is brightfield, CH3 is red fluorescence, and Overlay combines them. There is no nuclear stain.). Ground every question in the inspection: options come from the real channel names, groups, folders and columns. Never ask about a stain, a channel, a group or a column that the inspection did not find. If something is unclear, say what you saw (for example: CH1 looks like brightfield. Is that right?). In questions, ask at most 5 questions about meaning only: what to measure and what counts as one (for example a red-positive cell or a red spot), which groups to compare, what one replicate is, whether earlier results or hand counts exist, and what the output is for. Give options from the data. Leave out a question that the request already answers, and say in answered_by_request what the request says. Never ask about technical settings such as thresholds, segmentation models, size filters, error bars, test families or alpha: you choose those in phase 2. Phase 2, proposed metrics: after the answers, call plan. In definitions, turn the answers into concrete metrics and how each is measured, with the setting values, one short line each (what counts as one n, what counts as one object, what counts as positive, the metric). restatement: only the scientific goal, starting with 'You want:'. Answer setup questions (is the program ready, where the results go) briefly in your message, not in the plan. steps: one line each in plain words, the actions you will run, with every setting filled in: its value and who set it (default, from your answer, or agent). Leave no setting open: if you are not sure, choose a sensible value (agent); the demonstration checks it and the scientist can change it. Also give exclusions with their effects, pilot (the sample for the demonstration, if the method runs on more than one sample), outputs, programs, data, checks and out_of_scope. Write for a scientist: short sentences, plain words. No analysis step runs before the scientist confirms the proposed analysis.";
 const DATA_CHECK_NOTE = "When you first read a table or list a data folder, the harness checks the data (missing values, copies, mixed columns, group sizes, extreme values, channels, names, bit depths) and makes a sample sheet. The harness asks the scientist about these problems and the sample sheet in the Questions stage. Do not ask about them in clarify.";
 const PLAN_UPDATE_NOTE = "This is a new request in a session with an approved plan. If the request needs analysis steps that are not in the plan, call plan with only what changes: the new steps and the changed sections. The scientist approves the update before a new step runs. If the request needs no new step, answer directly.";
 const PILOT_NOTE = "Pilot: before the first step that changes or counts things, say in one sentence how you will check the method on one sample first. A step that processes many files does not run until the scientist approves a pilot: run the method on one sample, save QC images with outlines of what was counted and what was left out, and call pilot_result.";
@@ -254,6 +256,7 @@ export class Session {
   private clarified = false;
   private checked = new Set<string>();
   private sheet?: SampleSheet;
+  inspection?: Inspection;
   reference?: Reference;
   private hidden: string[] = [];
   private refCandidates: Candidate[] = [];
@@ -416,6 +419,7 @@ export class Session {
     if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.pipeline(t, a, id, sig) }));
     if (this.pilotOn()) extra.push(...this.pilotTools());
     if (this.planFirst || this.interactive) extra.push(this.clarifyTool());
+    extra.push(this.inspectTool());
     for (const t of extra) if (!this.tools.has(t.name)) this.tools.set(t.name, t);
     this.chooseActiveTools();
 
@@ -1382,7 +1386,8 @@ export class Session {
     const post = await this.hooks.post({ event: "PostToolUse", session: this.id, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args: eff, output: out.output, node: out.node });
     for (const f of post.findings ?? []) this.findings.add(f, "hook");
     const r = this.render(tool, out.output);
-    const checked = depth === 0 && tool.readOnly && tool.source !== "harness" && out.output.ok ? this.checkData(tool.remoteName ?? tool.name, eff, out.output) : "";
+    const inspected = tool.name === "inspect_data" ? { path: resolve(this.cwd, String(eff.path ?? ".")) } : undefined;
+    const checked = depth === 0 && tool.readOnly && (tool.source !== "harness" || inspected) && out.output.ok ? this.checkData(tool.remoteName ?? tool.name, inspected ?? eff, out.output) : "";
     const extra = [keptNote, post.additionalContext, checked].filter(Boolean).join("\n");
     return { text: extra ? `${r.text}\n\nNote: ${extra}` : r.text, images: r.images, isError: !out.output.ok, output: out.output };
   }
@@ -2014,6 +2019,20 @@ export class Session {
     if (!this.busy && this.settings.autoResume && this.history.length) void this.send("Continue the analysis with this answer.", { internal: true }).catch(() => {});
   }
 
+  async changeAnswer(qid: string, value: unknown, note = ""): Promise<string[]> {
+    const q = this.questions.get(qid);
+    if (!q) throw new Error(`No question ${qid}.`);
+    if (q.status === "open") return (await this.answer(qid, value, note), []);
+    const chosen = this.questions.match(q, value);
+    if (q.decisionKey) this.decisions.validate(q.decisionKey, chosen);
+    const old = q.answer;
+    if (JSON.stringify(old) === JSON.stringify(chosen)) return [];
+    this.questions.change(qid, chosen, note);
+    const stale = q.decisionKey ? this.decisions.change(q.decisionKey, chosen, { by: "human", reason: `changed answer to ${qid}` }) : [];
+    this.notes.push(`The scientist changed the answer to ${qid} (${q.title}): ${JSON.stringify(old)} -> ${JSON.stringify(chosen)}.${stale.length ? ` Results that used the old value are out of date: ${stale.join(", ")}.` : ""} Use the new answer from now on.`);
+    return stale;
+  }
+
   setDecision(key: string, value: unknown, reason = ""): string[] {
     const stale = this.decisions.change(key, value, { by: "human", reason });
     this.notes.push(`The scientist changed "${key}" to ${JSON.stringify(value)}.${stale.length ? ` Results that used the old value are out of date: ${stale.join(", ")}. Run those steps again if they matter.` : ""}`);
@@ -2064,6 +2083,7 @@ export class Session {
     this.planning = true;
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
+    this.inspection = undefined;
     this.clarified = !this.tools.has("clarify");
     this.modeBefore = this.mode === "plan" ? "watch" : this.mode;
     this.refCandidates = this.findReferenceFiles(request);
@@ -2117,6 +2137,7 @@ export class Session {
             sample: { type: "string", description: "The pilot sample, for example the file name." },
             values: { type: "object", description: "One number for each measure, named as in the plan, for example {\"positive cells\": 296, \"all cells\": 530}." },
             images: { type: "array", items: { type: "string" }, description: "Paths of the QC images." },
+            legend: { type: "string", description: "The legend of the QC images in plain words, for example: yellow outline = counted as positive; cyan outline = counted as negative; magenta = red that is not in a cell; orange = left out (too small or at the edge)." },
             check: { type: "string", description: "Your own plain check: what looks wrong or uncertain." },
           },
           required: ["sample", "values", "check"],
@@ -2224,7 +2245,7 @@ export class Session {
   private referenceQuestion(): { question: string; candidates: { path: string; sheet?: string; columns: string[]; label: string }[] } {
     const c = this.refCandidates;
     return {
-      question: c.length ? `I found ${describeCandidate(c[0]!)}. Is this an earlier analysis of these images? Should the pilot compare with it?` : "Do you have hand counts or an earlier analysis to check against?",
+      question: c.length ? `I found ${describeCandidate(c[0]!)}. Is this an earlier analysis of these images? Should the demonstration compare with it?` : "Do you have hand counts or an earlier analysis to check against?",
       candidates: c.map((x) => ({ path: x.path, sheet: x.sheet, columns: x.columns, label: describeCandidate(x) })),
     };
   }
@@ -2232,7 +2253,7 @@ export class Session {
   private approvePlan(plan: AnalysisPlan, version: number, target: Mode, answers: string[], pilot?: PilotRun): number {
     const text = planText(plan);
     this.plan = structuredClone(plan);
-    this.approvedEntry = this.record.append("plan_approved", { version, text, plan: structuredClone(plan), mode: target, update: this.planUpdate, answers, ...(pilot ? { pilot } : {}) }).id;
+    this.approvedEntry = this.record.append("plan_approved", { phase: "Confirmed", version, text, plan: structuredClone(plan), mode: target, update: this.planUpdate, answers, ...(pilot ? { pilot } : {}) }).id;
     this.planWarned.clear();
     return this.approvedEntry;
   }
@@ -2267,8 +2288,8 @@ export class Session {
         });
       } else if (!comparison.length) comparison.push(`The reference has no row for ${sample}.`);
     }
-    const run = { sample, values, images, check: String(a.check ?? ""), comparison, reference: this.reference ? { path: this.reference.path, mode: this.reference.mode, values: refValues } : undefined, definitions };
-    const entry = this.record.append("pilot_run", run as unknown as Record<string, unknown>).id;
+    const run = { sample, values, images, legend: String(a.legend ?? "").trim() || undefined, check: String(a.check ?? ""), comparison, reference: this.reference ? { path: this.reference.path, mode: this.reference.mode, values: refValues } : undefined, definitions };
+    const entry = this.record.append("pilot_run", { phase: "Demonstration on a sample", ...run } as unknown as Record<string, unknown>).id;
     this.showImages(images);
     const pending = this.pilotPlan;
     const shownPlan = pending?.plan ?? this.plan;
@@ -2413,6 +2434,13 @@ export class Session {
           d.value = this.decisions.value(f.key);
           d.by = f.owner === "fixed" ? "fixed" : this.whoSet(f.key);
         } else if (d.value !== undefined) d.by ??= "agent";
+        else if (d.recommendation) {
+          d.value = (d.options ?? f?.choices.map(String) ?? []).find((o) => o.toLowerCase() === d.recommendation!.toLowerCase()) ?? d.recommendation;
+          d.by = "agent";
+        } else if (f && f.default !== undefined && f.default !== null && f.default !== "") {
+          d.value = f.default;
+          d.by = "default";
+        }
       }
   }
 
@@ -2495,10 +2523,10 @@ export class Session {
     if (this.sheet && !this.planUpdate) this.planFromSheet(plan);
     for (const g of plan.programs ?? []) g.program ??= this.adapterList().find((x) => x.name === g.adapter)?.program;
     const open = openDecisions(plan);
-    if (open.length > 2) return { ok: false, error: `Too many open settings: ${open.map((x) => x.decision.label).join("; ")}. Fill in a sensible value for each technical setting (a default, or from the answers, or your choice checked in the pilot), and say who set it. Leave at most two open, only when you cannot choose.` };
+    if (open.length) return { ok: false, error: `Open settings: ${open.map((x) => x.decision.label).join("; ")}. Fill in every setting with a value and say who set it: default, from your answer (a setting about meaning, such as what one n is or what counts as positive, comes from the answers in Questions), or agent (your choice; the demonstration checks it). The scientist can change each one in the card.` };
     let version = ++this.planVersion;
     const part = this.planUpdate ? { ...given, steps: addedSteps(this.plan!, plan) } : plan;
-    this.record.append("plan", { action: this.planUpdate ? "update_proposed" : "proposed", phase: "Proposed analysis", version, text: planText(part), full: planText(plan), plan: structuredClone(plan) });
+    this.record.append("plan", { action: this.planUpdate ? "update_proposed" : "proposed", phase: "Proposed metrics", version, text: planText(part), full: planText(plan), plan: structuredClone(plan) });
     const qids = await this.askPlanDecisions(plan);
     const programs = (plan.programs ?? []).map((g) => ({ part: g.part, adapter: g.adapter, alternatives: g.alternatives ?? [], program: g.program, why: g.why }));
     let r: PlanResponse | undefined;
@@ -2526,7 +2554,7 @@ export class Session {
       target.value = typeof old === "number" && typeof raw === "string" && raw.trim() !== "" && Number.isFinite(Number(raw)) ? Number(raw) : raw;
       target.by = "you";
       version = ++this.planVersion;
-      this.record.append("plan", { action: "setting_changed", phase: "Proposed analysis", version, label: target.label, key: target.key, old: old ?? null, new: target.value, text: planText(plan), plan: structuredClone(plan) });
+      this.record.append("plan", { action: "setting_changed", phase: "Proposed metrics", version, label: target.label, key: target.key, old: old ?? null, new: target.value, text: planText(plan), plan: structuredClone(plan) });
     }
     if (!r) return { ok: false, error: "the scientist stopped the turn before answering the proposed analysis" };
     if (r.action === "change") {
@@ -2552,14 +2580,14 @@ export class Session {
     if ((r.action === "pilot" || methodPilot) && plan.pilot) {
       this.pilotPlan = { plan: structuredClone(plan), version, target, answers };
       this.pilotStage = true;
-      this.record.append("plan", { action: "pilot_requested", phase: "Pilot", version, sample: plan.pilot.sample });
+      this.record.append("plan", { action: "pilot_requested", phase: "Demonstration on a sample", version, sample: plan.pilot.sample });
       this.endPlanning(target);
       return {
         ok: true,
         summary: [
           `The scientist wants the pilot first. Mode is now ${target}.`,
           answers.length ? `The scientist set: ${answers.join("; ")}.` : "",
-          `Run the method on ${plan.pilot.sample} only, with the settings of the proposed analysis. Save QC images: outlines of what was counted and what was left out, with a legend in plain words (for example yellow = counted as positive, cyan = counted as negative, magenta = red that is not counted, orange = left out).`,
+          `Run the method on ${plan.pilot.sample} only, with the settings of the proposed analysis. Save QC images: outlines of what was counted and what was left out. Give the legend in plain words in legend (for example yellow = counted as positive, cyan = counted as negative, magenta = red that is not counted, orange = left out).`,
           "Then call pilot_result with the sample, the numbers (one for each measure in What I will count), the QC image paths and your own plain check: what looks wrong or uncertain. Do not run the other samples yet.",
           refNote,
         ].filter(Boolean).join(" "),
@@ -2580,6 +2608,28 @@ export class Session {
     };
   }
 
+  private inspectTool(): Tool {
+    return {
+      name: "inspect_data",
+      title: "Look at the data",
+      description:
+        "Look at a data file or folder before you ask the scientist anything. A relative path starts in the project folder. For images: the channels and what each one is (brightfield, or fluorescence and its color), the names from the files (CH1, CH3, Overlay), the size, the bit depth, intensity statistics and a small preview. For tables: the rows, the columns and the values of group columns. For folders: the groups, the file counts and a few sample names. Read-only.",
+      inputSchema: { type: "object", properties: { path: { type: "string", description: "The file or folder, for example images/ or counts.csv." } }, required: ["path"] },
+      source: "harness",
+      readOnly: true,
+      permission: "allow",
+      execute: async (a, ctx) => {
+        const path = resolve(this.cwd, String(a.path ?? ".").replace(/^~(?=[\\/]|$)/, homedir()));
+        const insp = await inspectData(path, join(this.workDir, "inspect"), ctx.signal);
+        if (!insp.ok) return { ok: false, error: insp.error ?? "The inspection failed." };
+        this.inspection = insp;
+        this.record.append("inspection", { path, kind: insp.kind, summary: insp.summary, colors: insp.colors, kinds: insp.kinds, groups: (insp.groups ?? []).map((g) => g.name), columns: (insp.columns ?? []).map((c) => c.name) });
+        const { previews, ...rest } = insp;
+        return { ok: true, summary: insp.summary, text: JSON.stringify(rest).slice(0, 8000), outputs: previews.map((p) => outputFile(p)) };
+      },
+    };
+  }
+
   private clarifyTool(): Tool {
     return {
       name: "clarify",
@@ -2587,14 +2637,14 @@ export class Session {
       inputSchema: {
         type: "object",
         properties: {
-          found: { type: "string", description: "One or two sentences on what you see in the data, with counts." },
+          found: { type: "string", description: "One to three plain sentences on what inspect_data found, with counts and the real channel names, for example: Each field has 3 images: CH1 is brightfield, CH3 is red fluorescence, and Overlay combines them. There is no nuclear stain." },
           questions: {
             type: "array",
             items: {
               type: "object",
               properties: {
                 question: { type: "string" },
-                options: { type: "array", items: { type: "string" }, description: "Options from the data." },
+                options: { type: "array", items: { type: "string" }, description: "Options from the data: the real channel names, groups, folders or columns that inspect_data found." },
                 recommendation: { type: "string" },
                 key: { type: "string", description: "The decision key, if the decision record has one for this meaning, for example replicate." },
                 answered_by_request: { type: "string", description: "If the request already answers this question, quote it here. The harness then skips the question." },
@@ -2614,7 +2664,13 @@ export class Session {
 
   private async clarify(a: Args): Promise<ToolOutput> {
     if (!this.planning || this.planUpdate) return { ok: false, error: "clarify is for the start of a new request, before the proposed metrics." };
-    const found = String(a.found ?? "").trim();
+    if (!this.inspection) return { ok: false, error: "Look at the data first: call inspect_data on the data folder or file of the request (or . for the project folder). Then call clarify, with questions that fit what you found." };
+    let found = String(a.found ?? "").trim();
+    const wrong = absentStains(found, this.inspection);
+    if (!found || wrong.length) {
+      if (found) this.record.append("clarify", { action: "found_replaced", phase: "Questions", found, reason: `The data has no ${wrong.join(" or ")} channel or stain.` });
+      found = this.inspection.summary;
+    }
     const raw = (Array.isArray(a.questions) ? a.questions : []).filter((q: any) => q && typeof q.question === "string" && q.question.trim());
     const skipped: string[] = [];
     const technical: string[] = [];
@@ -2634,7 +2690,9 @@ export class Session {
       });
       kept.splice(0, kept.length, ...saved);
     }
-    const asked = kept.slice(0, 5 + fromMethod.size);
+    const grounded = groundQuestions(kept, this.inspection);
+    if (grounded.dropped.length) this.record.append("clarify", { action: "dropped", phase: "Questions", dropped: grounded.dropped });
+    const asked = grounded.kept.slice(0, 5 + fromMethod.size);
     const c = this.refCandidates[0];
     const refAsked = c && !asked.some((q) => /hand count|earlier (analysis|result)|reference|previous (analysis|result)/i.test(q.question));
     this.record.append("clarify", { action: "asked", phase: "Questions", found, questions: asked.map((q) => q.question), skipped, technical, reference: refAsked ? c.path : undefined, ...(fromMethod.size ? { method: this.method!.name, fromMethod: [...fromMethod] } : {}) });
@@ -2686,6 +2744,8 @@ export class Session {
     };
     const stopped = { ok: false, error: "the scientist stopped the turn before answering the questions" };
     for (const q of [...qs]) if (!(await take(q))) return stopped;
+    const last = (qid: string) => this.record.entries(["answer"]).filter((e) => e.data.qid === qid).at(-1);
+    answers.splice(0, answers.length, ...qs.filter((q) => !q.item).map((q) => `${q.question} -> ${String(last(q.qid)?.data.value ?? "")}${last(q.qid)?.data.note ? ` (${String(last(q.qid)!.data.note)})` : ""}`));
     if (!stops.length && this.sheet) {
       if (!(await this.askSheet(qs, emit))) return stopped;
       n ??= this.decisions.isSet("replicate") ? String(this.decisions.value("replicate")) : undefined;
@@ -2716,6 +2776,7 @@ export class Session {
         notes.length ? `Design notes from the sample sheet: ${notes.join(" ")}` : "",
         skipped.length ? `Skipped because the request answers them: ${skipped.join("; ")}.` : "",
         technical.length ? `These are technical settings, not questions for the scientist: ${technical.join("; ")}. Choose a sensible value for each and show it as a setting in the proposed metrics.` : "",
+        grounded.dropped.length ? `The harness did not ask these, because the data does not have what they assume: ${grounded.dropped.map((d) => `${d.question} (${d.reason.split(". ")[0]}.)`).join("; ")}` : "",
         this.reference ? (this.reference.mode === "blind" ? `The reference ${basename(this.reference.path)} is held back for a blind test. Do not read it.` : `The demonstration compares with the reference ${basename(this.reference.path)}.`) : "",
         "Now call plan with the proposed metrics: each measure defined in plain words with its setting values, and the actions.",
       ].filter(Boolean).join(" "),

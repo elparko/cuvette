@@ -25,6 +25,8 @@ async function type(h: Harness, text: string) {
   await sleep(40);
 }
 
+const settle = () => sleep(250);
+
 async function submit(h: Harness, text: string) {
   await type(h, text);
   await type(h, "\r");
@@ -506,7 +508,7 @@ describe("quiet view", () => {
       s.record.append("question", { qid: "q2", title: "Alpha" });
       s.record.append("answer", { qid: "q2", value: 0.05, by: "human" });
     });
-    expect(texts(mainView(log, true).settled)).toEqual(["· Read 1 file (sleep.csv)", "✓ Which test? Welch", "✓ Alpha: 0.05"]);
+    expect(texts(mainView(log, true).settled)).toEqual(["· Read 1 file (sleep.csv)", "✓ Which test? Welch · /change q1", "✓ Alpha: 0.05 · /change q2"]);
   });
 
   test("several questions at once stay one line for each answer, and the decision lines go to the details view", () => {
@@ -520,7 +522,7 @@ describe("quiet view", () => {
       s.record.append("decision", { key: "alternative", old: null, new: "two-sided", by: "human", reason: "answer to q2" });
       s.record.append("tool_result", { callId: "a", tool: "compare_two_groups", adapter: "biostats", ok: true, summary: "Paired t test" }, { node: "n1" });
     });
-    expect(texts(mainView(log, true).settled)).toEqual(["✓ Paired test: true", "✓ Sidedness: two-sided", "Step 1 Paired t test"]);
+    expect(texts(mainView(log, true).settled)).toEqual(["✓ Paired test: true · /change q1", "✓ Sidedness: two-sided · /change q2", "Step 1 Paired t test"]);
     expect(log.flatMap((l) => l.items).some((i) => i.t === "line" && i.text.startsWith("Decision: paired"))).toBe(true);
   });
 
@@ -881,5 +883,126 @@ describe("proposed analysis card", () => {
     await type(h, "1");
     await until(() => s.planResponses.length === 2);
     expect(s.planResponses[1]).toEqual({ action: "confirm" });
+  });
+});
+
+describe("question sequence", () => {
+  const mk = (s: FakeSession, qid: string, title: string, options: string[], rec?: string, decisionKey = "") => ({ qid, session: s.id, decisionKey, title, text: `${title} (text)`, options: options.map((o) => ({ value: o, label: o })), recommendation: rec ? { value: rec, reason: "" } : undefined, evidence: "", status: "open" as const, created: "" });
+  const three = (s: FakeSession) => s.askMany([mk(s, "q1", "One n", ["one Set", "one field"], "one Set"), mk(s, "q2", "Positive cell", ["any red", "most red"], "most red"), mk(s, "q3", "Groups", ["all six", "two"])]);
+  const yourCards = (h: Harness) => (h.term.view().match(/Your decision:/g) ?? []).length;
+
+  test("the first question opens at once with a count; Enter accepts the recommendation and the next opens by itself; arrows choose", async () => {
+    const { h, s } = start();
+    await until(() => h.all().includes("Type /plan"));
+    three(s);
+    await until(() => h.term.view().includes("Question 1 of 3"));
+    expect(h.term.view()).toContain("Your decision: One n");
+    expect(yourCards(h)).toBe(1);
+    expect(h.term.view()).toMatch(/▸ 1 one Set \(recommended\)/);
+    h.type("\r");
+    await until(() => h.term.view().includes("Question 2 of 3"));
+    expect(s.record.entries(["answer"])[0]!.data).toMatchObject({ qid: "q1", value: "one Set" });
+    await until(() => h.all().includes("✓ One n: one Set · /change q1"));
+    expect(h.term.view()).toMatch(/▸ 2 most red \(recommended\)/);
+    h.type("\x1b[A");
+    await until(() => /▸ 1 any red/.test(h.term.view()));
+    await settle();
+    h.type("\r");
+    await until(() => h.term.view().includes("Question 3 of 3"));
+    expect(s.record.entries(["answer"])[1]!.data).toMatchObject({ qid: "q2", value: "any red" });
+    expect(h.term.view()).toContain("There is no recommendation for Groups. Choose one of the options.");
+    await type(h, "2");
+    await until(() => s.questions.open().length === 0);
+    await until(() => !h.term.view().includes("Your decision:"));
+    expect(s.record.entries(["answer"]).map((e) => e.data.value)).toEqual(["one Set", "any red", "two"]);
+  });
+
+  test("Back opens the previous question with its answer selected and changes it; Esc leaves, and the next message brings the questions back", async () => {
+    const { h, s } = start();
+    await until(() => h.all().includes("Type /plan"));
+    three(s);
+    await until(() => h.term.view().includes("Question 1 of 3"));
+    await settle();
+    await type(h, "2");
+    await until(() => h.term.view().includes("Question 2 of 3"));
+    await settle();
+    h.type("\x1b[D");
+    await until(() => h.term.view().includes("Question 1 of 3"));
+    expect(h.term.view()).toMatch(/▸ 2 one field/);
+    await type(h, "1");
+    await until(() => h.term.view().includes("Question 2 of 3"));
+    expect(s.record.entries(["answer"]).at(-1)!.data).toMatchObject({ qid: "q1", value: "one Set", changed: true, old: "one field" });
+    await until(() => h.all().includes("Changed One n: one field → one Set · /change q1"));
+    await settle();
+    h.type("\x1b");
+    await until(() => !h.term.view().includes("Your decision:"));
+    expect(h.all()).toContain("The questions stay open. They come back with your next message or with /questions.");
+    expect(s.questions.open().map((q) => q.qid)).toEqual(["q2", "q3"]);
+    await submit(h, "hello");
+    await until(() => h.term.view().includes("Your decision: Positive cell"));
+    expect(h.term.view()).toContain("Question 1 of 2");
+  });
+});
+
+describe("/change", () => {
+  test("/change lists the answers newest first; Enter opens one with its value selected; a new value is logged", async () => {
+    const { h, s } = start();
+    await until(() => h.all().includes("Type /plan"));
+    s.askMany([{ qid: "q1", session: s.id, decisionKey: "", title: "One n", text: "What is one n?", options: [{ value: "one Set", label: "one Set" }, { value: "one field", label: "one field" }], evidence: "", status: "open", created: "" }]);
+    await until(() => h.term.view().includes("Your decision: One n"));
+    await settle();
+    await type(h, "2");
+    await until(() => s.questions.open().length === 0);
+    await until(() => !h.term.view().includes("Your decision:"));
+    await settle();
+    await submit(h, "/change");
+    await until(() => h.term.view().includes("Change an answer"));
+    expect(h.term.view()).toMatch(/▸ 1 One n: one field/);
+    h.type("\r");
+    await until(() => h.term.view().includes("Change: One n"));
+    expect(h.term.view()).toMatch(/▸ 2 one field/);
+    await type(h, "1");
+    await until(() => s.record.entries(["answer"]).some((e) => e.data.changed));
+    expect(s.record.entries(["answer"]).at(-1)!.data).toMatchObject({ qid: "q1", value: "one Set", old: "one field" });
+    await until(() => h.all().includes("One n is now one Set."));
+  });
+
+  test("/change <id> opens one directly, and Tab completion suggests the ids with their labels", async () => {
+    const { h, s } = start();
+    await until(() => h.all().includes("Type /plan"));
+    s.askMany([{ qid: "q1", session: s.id, decisionKey: "", title: "One n", text: "What is one n?", options: [{ value: "one Set", label: "one Set" }, { value: "one field", label: "one field" }], evidence: "", status: "open", created: "" }]);
+    await until(() => h.term.view().includes("Your decision: One n"));
+    await settle();
+    await type(h, "1");
+    await until(() => !h.term.view().includes("Your decision:"));
+    expect(suggestions("/change q", s).map((c) => [c.name, c.help])).toEqual([["change q1", "One n: one Set"]]);
+    expect(suggestions("/change one", s).map((c) => c.name)).toEqual(["change q1"]);
+    await type(h, "/change q");
+    await until(() => h.term.view().includes("/change q1"));
+    await settle();
+    h.type("\t");
+    await sleep(40);
+    h.type("\r");
+    await until(() => h.term.view().includes("Change: One n"));
+  });
+});
+
+describe("Questions stage", () => {
+  test("Back in the Questions card opens the previous question and changes its answer", async () => {
+    const { h, s } = start();
+    await until(() => h.all().includes("Type /plan"));
+    const mk = (qid: string, text: string, options: string[]) => ({ qid, session: s.id, decisionKey: "", title: text, text, options: options.map((o) => ({ value: o, label: o })), evidence: "", status: "open" as const, created: "" });
+    s.clarify("Each field has 2 images: CH1 is brightfield, CH3 is red fluorescence.", [mk("q1", "What counts as one n?", ["One Set", "One field"]), mk("q2", "What counts as a positive cell?", ["Any red", "Most red"])]);
+    await until(() => h.term.view().includes("Question 1 of 2"));
+    await settle();
+    await type(h, "1");
+    await until(() => h.term.view().includes("Question 2 of 2"));
+    await settle();
+    h.type("\x1b[D");
+    await until(() => h.term.view().includes("Question 1 of 2"));
+    expect(h.term.view()).toMatch(/▸ 1 One Set/);
+    await type(h, "2");
+    await until(() => h.term.view().includes("Question 2 of 2"));
+    expect(s.record.entries(["answer"]).at(-1)!.data).toMatchObject({ qid: "q1", value: "One field", changed: true });
   });
 });
