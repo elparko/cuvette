@@ -1,0 +1,56 @@
+name: Adapter request
+description: Ask for an adapter for a science program.
+labels: [adapter request]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        You can build the adapter yourself with `cuvette onboard <program>`. See CONTRIBUTING.md.
+  - type: input
+    id: program
+    attributes:
+      label: Program name and version
+      placeholder: seqkit 2.8.2
+    validations:
+      required: true
+  - type: input
+    id: field
+    attributes:
+      label: Field
+      placeholder: genomics, microscopy, mass spectrometry
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link to the program
+      description: The home page or the documentation.
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: How the program runs
+      options:
+        - Command line
+        - Python library
+        - R, Julia or MATLAB code
+        - REST API
+        - Desktop program with a macro language
+        - MCP server
+        - Desktop program with no API
+        - I do not know
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: The analysis steps that you want the agent to do in the program.
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Sample data
+      description: A link to small public data, with its license. Give a published result for the data if one exists.
+    validations:
+      required: true

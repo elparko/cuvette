@@ -409,3 +409,13 @@ agent's prompt.
   open-source alternative for each one, and the adapter that runs it.
 - [docs/adapter-spec.md](docs/adapter-spec.md) and [docs/onboarding-guide.md](docs/onboarding-guide.md).
 - [docs/adapter-registry.md](docs/adapter-registry.md): install an adapter from others, the trust labels and the registry.
+
+## License
+
+SPDX-License-Identifier: AGPL-3.0-only
+
+The core is under the GNU Affero General Public License, version 3 only. See [LICENSE](LICENSE).
+Each adapter author can choose any license that the Open Source Initiative (OSI) approves for
+their own adapter folder. An adapter in `catalog/` that names no license is under
+AGPL-3.0-only. Contributions to the core need the [Contributor License Agreement](CLA.md). See
+[CONTRIBUTING.md](CONTRIBUTING.md).

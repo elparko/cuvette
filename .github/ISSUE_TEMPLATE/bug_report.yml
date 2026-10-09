@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a problem in Cuvette or in a catalog adapter.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report a security problem here. See SECURITY.md.
+        The session log can contain your data, file paths and results. Remove private data before you paste it.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Give the result that you got and the result that you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: Give the commands and the requests that cause the problem, in order.
+      placeholder: |
+        1. cuvette --adapter imagej --model claude
+        2. Count the cells in blobs.gif.
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Cuvette version or commit
+      placeholder: 0.1.0 or a97a893
+    validations:
+      required: true
+  - type: input
+    id: adapter
+    attributes:
+      label: Adapter and program version
+      placeholder: imagej, ImageJ 1.54f
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      placeholder: claude:claude-sonnet-5-5 or ollama:qwen3:8b
+  - type: input
+    id: system
+    attributes:
+      label: Operating system and Node.js version
+      placeholder: macOS 15.6, Node.js 22.12
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The part of ~/.cuvette/sessions/<id>/log.jsonl or the terminal output that shows the problem.
+      render: text
