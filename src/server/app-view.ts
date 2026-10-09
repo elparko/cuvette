@@ -3,7 +3,7 @@ import type { BusEvent, Entry, Mode, PlanResponse } from "../core/types.ts";
 import type { SettingSession } from "../core/settings.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import {
-  applyRewind, applySetup, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
+  applyRewind, applySetup, canGoBack, respondQuestion, SEQ_START, seqAnswered, seqBack, seqNext, seqPending, seqProgress, seqView, type QuestionSeq, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
   respondPermission, respondPhi, saveEln, saveKey, startCards, type Card, type PlanAction, type Say,
 } from "../ui/cards.ts";
 import { commands, openPanels, openSetup, type CommandCtx } from "../ui/commands.ts";
@@ -32,6 +32,7 @@ export class WebView {
   private settled: Item[] = [];
   private pending: Item[] = [];
   slots: Slot[] = [];
+  private seq: QuestionSeq = SEQ_START;
   private nextId = 1;
   private counter = 0;
   status: { state: string; tool?: string; purpose?: string; since?: number } = { state: "idle" };
@@ -125,13 +126,22 @@ export class WebView {
   }
 
   cardsHtml(): string {
+    const pending = seqPending(this.slots.map((sl) => sl.card));
+    if (this.seq.done.length && !pending.length) this.seq = SEQ_START;
     const qs = this.slots.filter((sl) => sl.card.t === "question");
     const rest = qs.length - 1;
     return this.slots
       .map((sl) => {
         if (sl.card.t !== "question") return cardHtml(this.c(), sl);
         if (sl !== qs[0]) return "";
-        return cardHtml(this.c(), sl) + (rest > 0 ? `<p class="dim small queued">${rest} more ${rest === 1 ? "question waits" : "questions wait"}. The next one opens after you answer this one.</p>` : "");
+        let shown = sl;
+        let waiting = rest;
+        if (!sl.card.act) {
+          const v = seqView(this.seq, pending)!;
+          shown = { ...sl, card: { t: "question", q: v.q }, seq: { progress: v.total > 1 ? seqProgress(v) : undefined, back: canGoBack(this.seq), next: this.seq.back >= 0, current: v.current } };
+          if (v.changing) waiting = qs.length;
+        }
+        return cardHtml(this.c(), shown) + (waiting > 0 ? `<p class="dim small queued">${waiting} more ${waiting === 1 ? "question waits" : "questions wait"}. The next one opens after you answer this one.</p>` : "");
       })
       .join("");
   }
@@ -379,18 +389,45 @@ export class WebView {
         respondPhi(s, card, a);
         break;
       case "question": {
-        if (a === "later") break;
-        const value = a === "sheet" ? { rows: sheetRows(f, card.q) } : a === "answer" ? card.q.options[Number(body.value)]?.value : a === "recommend" ? card.q.recommendation?.value : str("other");
+        if (a === "back" || a === "next") {
+          this.seq = (a === "back" ? seqBack : seqNext)(this.seq);
+          return this.keep(slot);
+        }
+        const act = card.act;
+        const v = act ? undefined : seqView(this.seq, seqPending(this.slots.map((x) => x.card)));
+        const q = v?.q ?? card.q;
+        if (a === "later") {
+          if (v?.changing) {
+            this.seq = SEQ_START;
+            return this.keep(slot);
+          }
+          break;
+        }
+        const value = a === "sheet" ? { rows: sheetRows(f, q) } : a === "answer" ? q.options[Number(body.value)]?.value : a === "recommend" ? q.recommendation?.value : str("other");
         if (value === undefined || value === "") return this.keep(slot, "Choose an answer or type one.");
+        const before = this.seq;
+        if (v?.changing) {
+          this.seq = seqAnswered(this.seq, q, value);
+          await s.changeAnswer?.(q.qid, value).catch((e: Error) => this.line("✗", e.message, "red"));
+          this.sendCards();
+          return { ok: true };
+        }
+        if (!act) this.seq = seqAnswered(this.seq, q, value);
         this.drop(slot);
         this.sendCards();
-        await s.answer(card.q.qid, value).catch((e: Error) => {
-          this.line("✗", `${e.message} Try again.`, "red");
-          if (!this.slots.some((x) => x.card.t === "question" && x.card.q.qid === card.q.qid)) {
-            this.slots = [{ ...slot, msg: `${e.message} Try again.` }, ...this.slots];
-            this.sendCards();
-          }
-        });
+        await respondQuestion(s, { t: "question", q, act }, value)
+          .then((r) => {
+            if (r.line) this.line("✓", r.line, "green");
+            if (r.next) this.openCard(r.next);
+          })
+          .catch((e: Error) => {
+            this.seq = before;
+            this.line("✗", `${e.message} Try again.`, "red");
+            if (!this.slots.some((x) => x.card.t === "question" && x.card.q.qid === q.qid)) {
+              this.slots = [{ ...slot, msg: `${e.message} Try again.` }, ...this.slots];
+              this.sendCards();
+            }
+          });
         return { ok: true };
       }
       case "instruction":

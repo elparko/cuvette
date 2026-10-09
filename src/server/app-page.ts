@@ -559,6 +559,9 @@ document.addEventListener("keydown", (e) => {
   let i = Number(card.dataset.sel || 0);
   if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) { const chip = [...card.querySelectorAll("button.num")].find((b) => b.textContent === e.key); if (chip) { e.preventDefault(); chip.click(); } return; }
   if (/^[1-9]$/.test(e.key)) { const b = bs[Number(e.key) - 1]; if (b) { e.preventDefault(); markSel(card, Number(e.key) - 1); b.click(); } return; }
+  const nav = (act) => card.querySelector('[data-act="' + act + '"]');
+  if (e.key === "ArrowLeft" && nav("back")) { e.preventDefault(); nav("back").click(); return; }
+  if (e.key === "ArrowRight" && nav("next")) { e.preventDefault(); nav("next").click(); return; }
   if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); markSel(card, (i + 1) % bs.length); return; }
   if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); markSel(card, (i + bs.length - 1) % bs.length); return; }
   if (e.key === "Enter" && bs[i]) { e.preventDefault(); bs[i].click(); return; }
@@ -715,6 +718,8 @@ document.addEventListener("click", async (e) => {
     show("session");
     return;
   }
+  const chg = t.closest("[data-change]");
+  if (chg) { send("/change " + chg.dataset.change, false); return; }
   const ds = t.closest("[data-decision-save]");
   if (ds) {
     const row = ds.closest("[data-decision]");

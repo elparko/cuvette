@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { startApp, type AppHandle } from "../src/server/app.ts";
-import { cardHtml, sessionsHtml, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
+import { cardHtml, decisionsHtml, sessionsHtml, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
 import { WebView } from "../src/server/app-view.ts";
 import { planInit, type Card } from "../src/ui/cards.ts";
 import { CARDS, COMMANDS } from "../src/ui/parity.ts";
@@ -208,6 +208,94 @@ test("a refused answer opens the question card again with the reason", async () 
   await view.act(id, { act: "other", fields: { other: "abc" } });
   expect(view.cardsHtml()).toContain("Answer must be a number. Try again.");
   view.close();
+});
+
+describe("question sequence and /change in the app", () => {
+  const mk = (s: FakeSession, qid: string, title: string, rec = 2): Question => ({ qid, session: s.id, decisionKey: "", title, text: "", options: [{ value: 1, label: "one" }, { value: 2, label: "two" }, { value: 3, label: "three" }], recommendation: { value: rec, reason: "r" }, evidence: "", status: "open", created: "" });
+  const setup = () => {
+    const s = new FakeSession();
+    const view = new WebView(s, { token: "t", env, url: (p) => p, quit: async () => {} });
+    const qs = [mk(s, "q1", "First"), mk(s, "q2", "Second"), mk(s, "q3", "Third")];
+    s.askMany(qs);
+    return { s, view };
+  };
+  const first = (view: WebView) => view.slots.find((x) => x.card.t === "question")!.id;
+
+  test("shows one question at a time with progress and the recommendation pre-selected", async () => {
+    const { s, view } = setup();
+    let html = view.cardsHtml();
+    expect(html).toContain("Question 1 of 3");
+    expect(html).toContain("Your decision: First");
+    expect(html).not.toContain("Your decision: Second");
+    expect(html).toMatch(/btn primary" data-act="answer" data-value="1">two \(recommended\)/);
+    expect(html).not.toContain('data-act="back"');
+    await view.act(first(view), { act: "recommend", fields: {} });
+    html = view.cardsHtml();
+    expect(html).toContain("Question 2 of 3");
+    expect(html).toContain("Your decision: Second");
+    expect(html).toContain('data-act="back"');
+    expect(s.questions.open().map((q) => q.qid)).toEqual(["q2", "q3"]);
+    view.close();
+  });
+
+  test("Back reopens the earlier answer, Next goes forward, and a changed answer is recorded as a change", async () => {
+    const { s, view } = setup();
+    await view.act(first(view), { act: "answer", value: "0", fields: {} });
+    await view.act(first(view), { act: "recommend", fields: {} });
+    await view.act(first(view), { act: "back", fields: {} });
+    let html = view.cardsHtml();
+    expect(html).toContain("Question 2 of 3");
+    expect(html).toContain("Your decision: Second");
+    expect(html).toContain('data-act="next"');
+    await view.act(first(view), { act: "back", fields: {} });
+    html = view.cardsHtml();
+    expect(html).toContain("Question 1 of 3");
+    expect(html).toMatch(/btn primary" data-act="answer" data-value="0">one/);
+    expect(html).not.toContain('data-act="back"');
+    await view.act(first(view), { act: "next", fields: {} });
+    expect(view.cardsHtml()).toContain("Your decision: Second");
+    await view.act(first(view), { act: "back", fields: {} });
+    await view.act(first(view), { act: "answer", value: "2", fields: {} });
+    expect(s.record.entries(["answer"]).at(-1)!.data).toMatchObject({ qid: "q1", value: 3, changed: true, old: 1 });
+    expect(view.cardsHtml()).toContain("Question 2 of 3");
+    await view.act(first(view), { act: "next", fields: {} });
+    expect(view.cardsHtml()).toContain("Question 3 of 3");
+    expect(view.cardsHtml()).toContain("Your decision: Third");
+    view.close();
+  });
+
+  test("the app page sends the arrow keys to Back and Next and Change buttons to /change", async () => {
+    app = await startApp({ session: new FakeSession(), env });
+    const html = await (await client(app).get("")).text();
+    expect(html).toContain('e.key === "ArrowLeft" && nav("back")');
+    expect(html).toContain('e.key === "ArrowRight" && nav("next")');
+    expect(html).toContain('send("/change " + chg.dataset.change');
+  });
+
+  test("the Change button is on the answer line and /change opens a card that works", async () => {
+    const s = new FakeSession();
+    const view = new WebView(s, { token: "t", env, url: (p) => p, quit: async () => {} });
+    s.askMany([{ ...mk(s, "q1", "Which cutoff?"), decisionKey: "min_auc" }]);
+    await view.act(first(view), { act: "answer", value: "0", fields: {} });
+    expect(view.recordHtml()).toContain('data-change="q1"');
+    await view.runCommand("/change q1");
+    const html = view.cardsHtml();
+    expect(html).toContain("Change: Which cutoff?");
+    expect(html).toMatch(/btn primary" data-act="answer" data-value="0">one/);
+    expect(html).toContain("Cancel");
+    await view.act(first(view), { act: "answer", value: "2", fields: {} });
+    expect(view.slots.length).toBe(0);
+    expect(view.recordHtml()).toContain("Which cutoff? is now three.");
+    expect(s.decisions.fields().find((f) => f.key === "min_auc")?.value ?? 3).toBe(3);
+    view.close();
+  });
+
+  test("the Decisions tab has a Change button on each row", () => {
+    const s = new FakeSession();
+    const rows = s.decisions.fields().filter((f) => f.owner !== "fixed");
+    const html = decisionsHtml({ token: "t", session: s }, rows.map((f) => [f.key, f.label, f.owner, "default"]));
+    for (const f of rows) expect(html).toContain(`data-change="${f.key}"`);
+  });
 });
 
 describe("parity of the browser app with the terminal", () => {

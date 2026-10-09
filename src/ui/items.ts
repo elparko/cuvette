@@ -31,7 +31,7 @@ export type Item =
       code?: string;
       why?: string;
     }
-  | { key: string; t: "line"; sym: string; color?: string; text: string; dim?: boolean; group?: number[] }
+  | { key: string; t: "line"; sym: string; color?: string; text: string; dim?: boolean; group?: number[]; change?: string }
   | { key: string; t: "block"; title?: string; text: string };
 
 const MAX_SETTINGS = 5;
@@ -142,7 +142,7 @@ export class Mapper {
         const qid = String(d.qid);
         const q = { qid, title: this.titles.get(qid) ?? `Answer to ${qid}`, options: this.options.get(qid) ?? [] };
         if (d.changed) return line("✎", `Changed ${q.title.replace(/[?:]$/, "")}: ${optionLabel(q, d.old)} → ${optionLabel(q, d.value)} · /change ${qid}`, "cyan");
-        return line("✓", answerLine(q, d.value), "green");
+        return [{ key, t: "line", sym: "✓", color: "green", text: answerLine(q, d.value), change: qid }];
       }
       case "sensitivity":
         return [{ key, t: "block", title: `Sensitivity check: ${d.decisionKey}`, text: String(d.table ?? "") }];
