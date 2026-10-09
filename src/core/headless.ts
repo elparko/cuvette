@@ -15,6 +15,7 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
     }
     if (e.type === "permission") s.respondPermission(e.rid, allow.has("all") || allow.has(e.tool), allow.size ? "" : "headless mode denies by default; pass --allow");
     if (e.type === "instruction") s.followDone(e.step, "", true);
+    if (e.type === "plan") setTimeout(() => s.respondPlan({ action: "approve" }), 0);
   });
   s.settings.autoResume = false;
 }

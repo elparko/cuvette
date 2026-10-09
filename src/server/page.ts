@@ -221,7 +221,7 @@ const TOKEN = __TOKEN__;
 __LAYOUT__
 const BOX_W = 224, BOX_H = 84;
 const HARNESS = new Set(["plan", "note", "calculate", "task", "load_skill", "find_tools", "ask_scientist", "propose_lab_rule", "propose_change", "compare_options"]);
-const TABS = [["trail", "Trail"], ["decisions", "Decisions"], ["questions", "Questions"], ["findings", "Findings"]];
+const TABS = [["plan", "Plan"], ["trail", "Trail"], ["decisions", "Decisions"], ["questions", "Questions"], ["findings", "Findings"]];
 const IMG_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
 const OWNER = { human: "you", agent: "agent", fixed: "fixed" };
 const ICON_PATHS = {
@@ -623,6 +623,17 @@ function drawQuestions(box) {
   }
 }
 
+function drawPlan(box) {
+  const p = state.plan;
+  if (!p) { box.append(h("p", { class: "empty" }, "No analysis plan yet.")); return; }
+  box.append(h("h3", {}, p.approved ? "Approved plan, version " + p.version : "Plan proposal, version " + p.version + " (waits for your approval)"));
+  box.append(h("pre", { class: "wrap" }, p.text));
+  if (p.updates && p.updates.length) {
+    box.append(h("h3", {}, "Changes after approval"));
+    for (const u of p.updates) box.append(h("p", {}, "Version " + u.version + ": " + (u.reason || "no reason given")));
+  }
+}
+
 function drawFindings(box) {
   if (!state.findings.length) { box.append(h("p", { class: "empty" }, "No findings.")); return; }
   for (const sev of ["error", "warning", "info"]) {
@@ -644,7 +655,7 @@ function drawSide() {
   const tabs = document.getElementById("tabs");
   tabs.replaceChildren();
   const open = state.findings.filter((f) => f.status === "open").length;
-  const counts = { trail: state.trail.filter((l) => !l.request).length, decisions: state.decisions.filter((d) => d.changed).length, questions: state.questions.length, findings: open };
+  const counts = { plan: state.plan ? "v" + state.plan.version : "", trail: state.trail.filter((l) => !l.request).length, decisions: state.decisions.filter((d) => d.changed).length, questions: state.questions.length, findings: open };
   const alerts = { questions: counts.questions > 0, findings: state.findings.some((f) => f.status === "open" && f.severity === "error") };
   for (const [id, name] of TABS) {
     const b = h("button", { type: "button", role: "tab", id: "tab-" + id, "aria-selected": tab === id ? "true" : "false", "aria-controls": "sidebody", tabindex: tab === id ? "0" : "-1" },
@@ -665,7 +676,7 @@ function drawSide() {
   if (document.activeElement && document.activeElement.tagName === "INPUT" && body.contains(document.activeElement)) return;
   const top = body.scrollTop;
   body.replaceChildren();
-  ({ trail: drawTrail, decisions: drawDecisions, questions: drawQuestions, findings: drawFindings })[tab](body);
+  ({ plan: drawPlan, trail: drawTrail, decisions: drawDecisions, questions: drawQuestions, findings: drawFindings })[tab](body);
   body.scrollTop = top;
 }
 

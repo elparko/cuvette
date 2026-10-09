@@ -254,3 +254,15 @@ test("a sentence that says comparison is not a misreport and its numbers are not
   expect(bad.some((f) => f.check === "decision_misreported")).toBe(true);
   expect(bad.some((f) => f.check === "number_from_comparison")).toBe(true);
 });
+
+test("the review gets the approved plan: the referee reads it and the rule checks compare the steps with it", async () => {
+  const plan = { steps: [{ step: "Paired t test", tool: "compare_two_groups", status: "todo" }] };
+  const record = makeRecord([{ kind: "plan_approved", data: { version: 1, text: "Question: Does drug 2 help?\n\nSteps\n1. Paired t test\n   Tool: compare_two_groups", plan } }], [{ id: "n1", entry: 2, tool: "fit_ols", outputs: [], result: {} }]);
+  const { system, text } = refereePrompt(ctx(record, "The answer."));
+  expect(system).toContain("Check the final answer against it");
+  expect(text).toContain("APPROVED PLAN (version 1)\nQuestion: Does drug 2 help?");
+  expect(text).toContain("#1 the scientist approved plan version 1");
+  const found = await runChecks(ctx(record, "The answer."));
+  expect(found.filter((f) => f.check.startsWith("plan_")).map((f) => f.check)).toEqual(["plan_step_missing", "plan_step_extra"]);
+  expect(refereePrompt(ctx(makeRecord(), "x")).text).not.toContain("APPROVED PLAN");
+});

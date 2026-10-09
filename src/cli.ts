@@ -8,8 +8,8 @@ import type { Mode } from "./core/types.ts";
 const HELP = `ga - a guided analysis agent for science programs
 
 Usage
-  ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume <id>] [--bypass-permissions]
-  ga -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json]
+  ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume <id>] [--bypass-permissions] [--no-plan]
+  ga -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json] [--plan]
 
   With no --adapter, the agent calls list_adapters and asks to load the adapter that fits
   the request with use_adapter. The program is your decision: accept or change it on the
@@ -50,6 +50,9 @@ Usage
   ga bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]
   ga mcp [--adapter <name>]            run the harness as an MCP server on stdio (no --adapter: the client loads adapters with use_adapter)
 
+Plan first: in an interactive session the agent writes an analysis plan, and you approve it before any step runs.
+  --no-plan, /plan off, or "planFirst": false in settings.json skips it. --plan turns it on for a -p run.
+
 Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
 
 const argv = process.argv.slice(2);
@@ -88,6 +91,8 @@ const { values: o, positionals: pos } = parseArgs({
     "run-tests": { type: "boolean" },
     generic: { type: "boolean" },
     "bypass-permissions": { type: "boolean" },
+    plan: { type: "boolean" },
+    "no-plan": { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -98,6 +103,7 @@ function fail(msg: string): never {
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+const planSetting = () => (o.plan ? { planFirst: true } : o["no-plan"] ? { planFirst: false } : {});
 const readJson = (p?: string) => (p ? JSON.parse(readFileSync(p, "utf8")) : undefined);
 const bypass = () => (o["bypass-permissions"] ? { permissionMode: "bypass" as const } : {});
 
@@ -106,7 +112,7 @@ async function headless(prompt: string) {
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = str(o.output) ?? "text";
-  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: { headless: true, ...bypass() } });
+  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: { headless: true, ...bypass(), ...planSetting() } });
   attachHeadless(s, { answers, allow });
   s.bus.on((e) => {
     if (out === "stream-json") process.stdout.write(JSON.stringify(e) + "\n");
@@ -126,8 +132,8 @@ async function interactive() {
   const adapters = (o.adapter as string[]) ?? [];
   if (!adapters.length && !o.resume) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
   const s = o.resume
-    ? await Session.resume(str(o.resume)!, { model: str(o.model), settings: bypass() })
-    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: bypass() });
+    ? await Session.resume(str(o.resume)!, { model: str(o.model), interactive: true, settings: { ...bypass(), ...planSetting() } })
+    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, interactive: true, settings: { ...bypass(), ...planSetting() } });
   await runTui(s as never, {});
   await s.close();
 }

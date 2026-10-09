@@ -1,3 +1,4 @@
+import { planMarkdown } from "./plan.ts";
 import { existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { isAbsolute } from "node:path";
@@ -132,7 +133,7 @@ function programNames(adapters: LoadedAdapter[], nodes: Node[]): string {
 export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
   const info = sessionInfo(record);
   const nodes = mainNodes(record);
-  const lines = ["# Protocol", "", `Session ${info.id}, ${info.date}.`, ""];
+  const lines = ["# Protocol", "", `Session ${info.id}, ${info.date}.`, "", ...planMarkdown(record)];
   const setup = Object.entries(setupValues(record));
   lines.push("## Decision record", "");
   if (setup.length) {

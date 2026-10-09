@@ -11,7 +11,7 @@ export type EntryKind =
   | "decision" | "owner_change" | "deviation" | "blocked" | "permission" | "permission_mode"
   | "question" | "answer" | "sensitivity"
   | "finding" | "finding_resolution" | "claim_check"
-  | "mode" | "follow_step" | "lab_memory"
+  | "mode" | "follow_step" | "lab_memory" | "plan" | "plan_approved"
   | "eln_push" | "eln_link" | "setting" | "note" | "notice" | "error" | "usage" | "compaction" | "correction" | "adapter";
 
 export interface Entry {
@@ -309,4 +309,7 @@ export type BusEvent =
   | { type: "status"; state: "idle" | "thinking" | "running" | "waiting"; tool?: string; purpose?: string; since?: number }
   | { type: "permission"; rid: string; tool: string; args: Args; code?: string; touches: string; search?: { root: string; purpose: string } }
   | { type: "question"; question: Question }
-  | { type: "instruction"; step: number; tool: string; text: string };
+  | { type: "instruction"; step: number; tool: string; text: string }
+  | { type: "plan"; version: number; text: string; update: boolean; qids: string[]; programs: { part: string; adapter: string; alternatives: string[] }[]; mode: Mode };
+
+export type PlanResponse = { action: "approve"; mode?: Mode } | { action: "change"; text: string } | { action: "cancel" };

@@ -19,6 +19,7 @@ export interface Settings {
   networkForScripts: boolean;
   askWaits: boolean;
   headless: boolean;
+  planFirst?: boolean | "on" | "off";
   permissions: Record<string, "allow" | "ask" | "deny">;
   permissionMode: "ask" | "bypass";
   hooks: Partial<Record<HookEvent, { matcher?: string; command: string[] }[]>>;

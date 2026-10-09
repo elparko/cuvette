@@ -7,6 +7,7 @@ import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import type { BusEvent, Mode, Question } from "../core/types.ts";
 import { roleInRecord, stepNumbers } from "../core/housekeeping.ts";
+import { planView } from "../core/plan.ts";
 import { parseRoute, shortReason, trail } from "../core/trail.ts";
 import { panelHtml } from "./panel-page.ts";
 import { setWindowUrl } from "./notify.ts";
@@ -192,6 +193,7 @@ export async function stateOf(session: WindowSession) {
     questions,
     decisions: decisionRows(session),
     findings: findingRows(session),
+    plan: planView(record) ?? null,
     busy: session.busy,
   };
 }

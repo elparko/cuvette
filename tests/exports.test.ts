@@ -165,3 +165,11 @@ test("protocol step numbers match the step numbers of the nodes when a step repe
   expect(md).toContain("2. Repeat step 1 for `/w/2.tif`, `/w/3.tif` (steps 2 to 3).");
   expect(md).toContain("4. fit");
 });
+
+test("protocol puts the approved plan at the top", () => {
+  const r = new AnalysisRecord(join(dir, "plan"), "20260101-000000-plan");
+  r.append("session", { adapters: [{ name: "fake", version: "0.1.0", programVersion: "1.0" }], model: "m" });
+  r.append("plan_approved", { version: 1, text: "Question: Does drug 2 help?", plan: { steps: [] } });
+  const text = readFileSync(exportProtocol(r, [adapter], join(dir, "plan-protocol.md")), "utf8");
+  expect(text).toMatch(/^# Protocol\n\nSession .*\n\n## Analysis plan \(version 1, approved .*\)\n\nQuestion: Does drug 2 help\?\n/);
+});

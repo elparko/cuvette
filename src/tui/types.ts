@@ -1,6 +1,6 @@
 import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
-import type { Entry, Finding, Mode, ModelInfo, Owner, Question } from "../core/types.ts";
+import type { Entry, Finding, Mode, ModelInfo, Owner, PlanResponse, Question } from "../core/types.ts";
 
 export interface DecisionFieldLike {
   key: string;
@@ -43,7 +43,10 @@ export interface SessionLike {
   };
   questions: { open(): Question[] };
   findings: { list(status?: Finding["status"]): Finding[]; resolve(fid: string, action: "accept" | "reject" | "fix", reason?: string): void };
-  send(text: string): Promise<string>;
+  send(text: string, opts?: { internal?: boolean; plan?: boolean }): Promise<string>;
+  planFirst?: boolean;
+  respondPlan?(r: PlanResponse): void;
+  setPlanFirst?(on: boolean): void;
   interrupt(): void;
   respondPermission(rid: string, ok: boolean, note?: string, always?: boolean): void;
   answer(qid: string, value: unknown, note?: string): Promise<void>;

@@ -603,3 +603,62 @@ describe("bypass permissions", () => {
     expect(s.decisions.owner("seed")).toBe("fixed");
   });
 });
+
+describe("plan card", () => {
+  const question = (sid: string) => ({
+    qid: "q9",
+    session: sid,
+    decisionKey: "alpha",
+    title: "Significance level",
+    text: "Step 2 of the plan needs this decision.",
+    options: [{ value: 0.05, label: "0.05" }, { value: 0.01, label: "0.01" }],
+    recommendation: { value: 0.05, reason: "The agent recommends it in the plan." },
+    evidence: "",
+    status: "open" as const,
+    created: "",
+  });
+
+  test("the hint, then the plan with its open decision in the question card style; m sets the mode and a approves", async () => {
+    const { h, s } = start();
+    await until(() => h.all().includes("Type /plan to get an analysis plan before any step runs."));
+    s.proposePlan("Question: Does drug 2 help?\n\nSteps\n1. Paired t test", [question(s.id)]);
+    await until(() => h.all().includes("Analysis plan, version 1"));
+    expect(h.all()).toContain("Question: Does drug 2 help?");
+    await until(() => h.all().includes("Your decision: Significance level"));
+    expect(h.all()).toContain("Open decision 1 of 1.");
+    await type(h, "2");
+    await until(() => h.all().includes("approve and start in watch mode"));
+    expect(s.record.entries(["answer"])[0]!.data.value).toBe(0.01);
+    await type(h, "m");
+    await until(() => h.all().includes("approve and start in follow mode"));
+    await type(h, "a");
+    await until(() => s.planResponses.length === 1);
+    expect(s.planResponses[0]).toEqual({ action: "approve", mode: "follow" });
+  });
+
+  test("c sends a change, p offers the other program, x cancels", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    const programs = [{ part: "Statistics", adapter: "biostats", alternatives: ["lme4"] }];
+    s.proposePlan("Question: Q1", [], programs);
+    await until(() => h.all().includes("p change a program"));
+    await type(h, "c");
+    await until(() => h.all().includes("What must change?"));
+    await type(h, "Use a Wilcoxon test.");
+    h.type("\r");
+    await until(() => s.planResponses.length === 1);
+    expect(s.planResponses[0]).toEqual({ action: "change", text: "Use a Wilcoxon test." });
+    s.proposePlan("Question: Q2", [], programs);
+    await sleep(100);
+    await type(h, "p");
+    await until(() => h.all().includes("1 Use lme4 for Statistics, not biostats."));
+    await type(h, "1");
+    await until(() => s.planResponses.length === 2);
+    expect(s.planResponses[1]).toEqual({ action: "change", text: "Use lme4 for Statistics, not biostats." });
+    s.proposePlan("Question: Q3");
+    await sleep(100);
+    await type(h, "x");
+    await until(() => s.planResponses.length === 3);
+    expect(s.planResponses[2]).toEqual({ action: "cancel" });
+  });
+});

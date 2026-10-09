@@ -11,7 +11,61 @@ export interface CoreDeps {
   compare: (spec: { key: string; values: unknown[] }) => Promise<ToolOutput>;
   proposeLab: (adapter: string, kind: string, payload: Record<string, unknown>, reason: string) => ToolOutput;
   log: (kind: "note", data: Record<string, unknown>) => void;
+  plan?: (args: Args) => Promise<ToolOutput>;
+  fullPlan?: () => boolean;
 }
+
+const PLAN_STEPS_SHORT = {
+  type: "array",
+  items: { type: "object", properties: { step: { type: "string" }, status: { type: "string", enum: ["todo", "doing", "done", "waiting", "skipped"] } }, required: ["step"] },
+};
+
+const PLAN_FULL = {
+  type: "object",
+  properties: {
+    question: { type: "string", description: "The question, in one sentence." },
+    data: {
+      type: "object",
+      description: "The data.",
+      properties: {
+        files: { type: "array", items: { type: "string" } },
+        row: { type: "string", description: "What one row or one file is." },
+        replicate: { type: "string", description: "The unit of replication, for example one patient." },
+        n: { type: "string", description: "The sample sizes, for example 10 patients, 2 drugs each." },
+      },
+    },
+    programs: {
+      type: "array",
+      description: "The program and adapter for each part of the work, and why.",
+      items: { type: "object", properties: { part: { type: "string" }, adapter: { type: "string" }, why: { type: "string" }, alternatives: { type: "array", items: { type: "string" }, description: "Other adapters that can do this part." } }, required: ["part", "adapter"] },
+    },
+    steps: {
+      type: "array",
+      description: "The steps, in order.",
+      items: {
+        type: "object",
+        properties: {
+          step: { type: "string", description: "What the step does, in a few words." },
+          method: { type: "string", description: "The method, for example a paired t test." },
+          tool: { type: "string", description: "The tool that runs the step, for example compare_two_groups or run_script." },
+          decisions: {
+            type: "array",
+            description: "The decisions the step needs. Give value for a decision that the setup or the request already sets. Leave value out for a decision that the scientist must answer.",
+            items: { type: "object", properties: { key: { type: "string", description: "The decision key, if the decision record has one." }, label: { type: "string" }, value: {}, options: { type: "array", items: { type: "string" } }, recommendation: { type: "string" } }, required: ["label"] },
+          },
+          status: { type: "string", enum: ["todo", "doing", "done", "waiting", "skipped"] },
+          reason: { type: "string", description: "Why the step was skipped or added." },
+        },
+        required: ["step"],
+      },
+    },
+    outputs: { type: "array", items: { type: "string" }, description: "The numbers, tables and figures that the answer gives." },
+    checks: { type: "array", description: "The assumptions to test.", items: { type: "object", properties: { check: { type: "string" }, if_fails: { type: "string", description: "What you do if the check fails." } }, required: ["check"] } },
+    out_of_scope: { type: "array", items: { type: "string" }, description: "What this analysis does not do." },
+    reason: { type: "string", description: "Why the plan changes. Give it when you add, remove or skip a step after the scientist approved the plan." },
+  },
+  required: ["steps"],
+};
 
 function tool(name: string, description: string, properties: Record<string, unknown>, required: string[], execute: (a: Args) => Promise<ToolOutput> | ToolOutput): Tool {
   return {
@@ -113,22 +167,29 @@ export function coreTools(d: CoreDeps): Tool[] {
       ["key"],
       (a) => d.compare({ key: String(a.key), values: Array.isArray(a.values) ? a.values : [] }),
     ),
-    tool(
-      "plan",
-      "Write or update the analysis plan: a short list of steps. The scientist sees it in the trail.",
-      {
-        steps: {
-          type: "array",
-          items: { type: "object", properties: { step: { type: "string" }, status: { type: "string", enum: ["todo", "doing", "done", "waiting", "skipped"] } }, required: ["step"] },
+    {
+      ...tool(
+        "plan",
+        "",
+        { steps: PLAN_STEPS_SHORT },
+        ["steps"],
+        (a) => {
+          if (d.plan && d.fullPlan?.()) return d.plan(a);
+          const steps = a.steps;
+          const list = Array.isArray(steps) ? steps.map((s: any) => ({ step: String(s.step ?? s), status: String(s.status ?? "todo") })) : [];
+          d.log("note", { text: "Plan:\n" + list.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`).join("\n"), plan: list, by: "agent" });
+          return { ok: true, summary: `Plan with ${list.length} steps.` };
         },
+      ),
+      get description() {
+        return d.fullPlan?.()
+          ? "Write or update the analysis plan for the scientist. The scientist reads it and approves it before any analysis step runs. Write short sentences in plain words."
+          : "Write or update the analysis plan: a short list of steps. The scientist sees it in the trail.";
       },
-      ["steps"],
-      ({ steps }) => {
-        const list = Array.isArray(steps) ? steps.map((s: any) => ({ step: String(s.step ?? s), status: String(s.status ?? "todo") })) : [];
-        d.log("note", { text: "Plan:\n" + list.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`).join("\n"), plan: list, by: "agent" });
-        return { ok: true, summary: `Plan with ${list.length} steps.` };
+      get inputSchema() {
+        return d.fullPlan?.() ? PLAN_FULL : { type: "object", properties: { steps: PLAN_STEPS_SHORT }, required: ["steps"] };
       },
-    ),
+    },
     tool(
       "note",
       "Write an observation in the trail, for example a quality problem that you see in an image.",

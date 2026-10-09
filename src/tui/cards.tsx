@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import type { Finding, Question } from "../core/types.ts";
+import type { Finding, Mode, Question } from "../core/types.ts";
 import { codeOf, plainOf } from "./items.ts";
 import type { DecisionFieldLike, SessionLike } from "./types.ts";
 
@@ -13,7 +13,9 @@ export type Card =
   | { t: "instruction"; step: number; tool: string; text: string }
   | { t: "findings"; list: Finding[] }
   | { t: "key"; reason?: string }
-  | { t: "config" };
+  | { t: "config" }
+
+  | { t: "plan"; version: number; text: string; update: boolean; qids: string[]; programs: { part: string; adapter: string; alternatives: string[] }[]; mode: Mode };
 
 export function show(v: unknown): string {
   if (v === undefined || v === null || v === "") return "not set";
@@ -441,6 +443,82 @@ export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string
         <TextInput value={v} onChange={setV} onSubmit={(k) => props.onSubmit(k.trim())} mask="*" />
       </Box>
       <Text dimColor>Enter saves · Esc cancels</Text>
+    </Frame>
+  );
+}
+
+const RUN_MODES: Mode[] = ["watch", "follow", "teach"];
+
+export function PlanCard(props: {
+  card: Extract<Card, { t: "plan" }>;
+  session: SessionLike;
+  onApprove: (mode: Mode) => void;
+  onChange: (text: string) => void;
+  onCancel: () => void;
+}) {
+  const { card } = props;
+  const [later, setLater] = useState<string[]>([]);
+  const [mode, setMode] = useState<Mode>(RUN_MODES.includes(card.mode) ? card.mode : "watch");
+  const [stage, setStage] = useState<"actions" | "change" | "program">("actions");
+  const [, setTick] = useState(0);
+  const open = props.session.questions.open().filter((q) => card.qids.includes(q.qid) && !later.includes(q.qid));
+  const q = open[0];
+  const switches = card.programs.flatMap((g) => g.alternatives.map((alt) => `Use ${alt} for ${g.part}, not ${g.adapter}.`));
+  useInput(
+    (input, key) => {
+      if (stage === "program") {
+        const n = Number(input);
+        if (Number.isInteger(n) && n >= 1 && n <= switches.length) props.onChange(switches[n - 1]!);
+        else if (key.escape) setStage("actions");
+        return;
+      }
+      if (input === "a" || key.return) props.onApprove(mode);
+      else if (input === "c") setStage("change");
+      else if (input === "x" || key.escape) props.onCancel();
+      else if (input === "m") setMode((m) => RUN_MODES[(RUN_MODES.indexOf(m) + 1) % RUN_MODES.length]!);
+      else if (input === "p" && switches.length) setStage("program");
+    },
+    { isActive: !q && stage !== "change" },
+  );
+  return (
+    <Frame title={`${card.update ? "Plan update" : "Analysis plan"}, version ${card.version}`} color="cyan">
+      <Text>{card.text}</Text>
+      {q ? (
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>
+            Open decision {card.qids.length - open.length + 1} of {card.qids.length - later.length}. Answer it here, or press Esc to answer later.
+          </Text>
+          <QuestionCard
+            key={q.qid}
+            card={{ t: "question", q }}
+            onAnswer={(value, note) => void props.session.answer(q.qid, value, note).then(() => setTick((x) => x + 1))}
+            onDismiss={() => setLater((x) => [...x, q.qid])}
+          />
+        </Box>
+      ) : stage === "change" ? (
+        <Prompt label="What must change?" onSubmit={(v) => (v.trim() ? props.onChange(v.trim()) : setStage("actions"))} onCancel={() => setStage("actions")} />
+      ) : stage === "program" ? (
+        <Box flexDirection="column" marginTop={1}>
+          {switches.map((t, i) => (
+            <Text key={i}>
+              <Text color="cyan">{i + 1}</Text> {t}
+            </Text>
+          ))}
+          <Text dimColor>Press a number to ask the agent for this change. Esc goes back.</Text>
+        </Box>
+      ) : (
+        <Box flexDirection="column" marginTop={1}>
+          <Text>
+            <Text color="green">a</Text> approve and start in {mode} mode · <Text color="cyan">c</Text> change · <Text color="red">x</Text> cancel · <Text color="cyan">m</Text> mode
+            {switches.length ? (
+              <Text>
+                {" "}· <Text color="cyan">p</Text> change a program
+              </Text>
+            ) : null}
+          </Text>
+          <Text dimColor>No analysis step runs before you approve.</Text>
+        </Box>
+      )}
     </Frame>
   );
 }

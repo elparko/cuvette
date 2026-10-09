@@ -1,5 +1,6 @@
 import type { AdapterCheckContext, LoadedAdapter } from "../adapters/manifest.ts";
 import type { DecisionRecord } from "./decisions.ts";
+import { approvedPlan, currentPlan, planFindings, planText } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Claim, Entry, Finding, FindingIn, Node, Provider } from "./types.ts";
 
@@ -306,6 +307,7 @@ export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
     ...unsourcedNumbers(ctx),
     ...staleUsed(ctx),
     ...openQuestions(ctx),
+    ...planFindings(ctx.record),
     ...ruleChecks(ctx),
     ...(await moduleChecks(ctx)),
   ];
@@ -357,6 +359,9 @@ export function logText(record: AnalysisRecord): string {
     else if (e.kind === "blocked") lines.push(`${id} blocked ${d.tool}: ${clip(d.reason)}`);
     else if (e.kind === "question") lines.push(`${id} question ${d.qid}: ${clip(d.title)} - ${clip(d.text)}`);
     else if (e.kind === "answer") lines.push(`${id} answer to ${d.qid}: ${clip(d.value)} by ${d.by}`);
+    else if (e.kind === "plan_approved") lines.push(`${id} the scientist approved plan version ${d.version}`);
+    else if (e.kind === "plan" && d.action === "updated") lines.push(`${id} plan changed to version ${d.version}: ${clip(d.reason)}`);
+    else if (e.kind === "notice" && d.plan) lines.push(`${id} ${clip(d.text)}`);
     else if (e.kind === "stale") lines.push(`${id} stale nodes ${clip(d.nodes)} because ${clip(d.reason)}`);
   }
   return lines.join("\n");
@@ -390,7 +395,14 @@ export function refereePrompt(ctx: ReviewContext): { system: string; text: strin
   if (textChecks.length) system += `\n\nChecks from the adapter. Apply each one:\n${textChecks.join("\n")}`;
   if (standards.length) system += `\n\nStandards of the program:\n${standards.join("\n\n")}`;
   const claims = ctx.claims.map((c) => `- ${c.value ?? "(no number)"} [${c.label}${c.node ? " " + c.node : ""}] ${clip(c.text, 160)}`).join("\n");
-  const text = `LOG\n${logText(ctx.record)}\n\nFINAL ANSWER\n${ctx.answer}\n\nCLAIMS\n${claims || "(none)"}`;
+  const plan = approvedPlan(ctx.record);
+  let text = `LOG\n${logText(ctx.record)}\n\nFINAL ANSWER\n${ctx.answer}\n\nCLAIMS\n${claims || "(none)"}`;
+  if (plan) {
+    const now = currentPlan(ctx.record);
+    system += "\n\nThe scientist approved an analysis plan before the analysis. Check the final answer against it: does the answer give the outputs of the plan and report its checks? Is each step that is not in the plan, or that was skipped, explained?";
+    text += `\n\nAPPROVED PLAN (version ${plan.version})\n${plan.text}`;
+    if (plan.updates.length && now) text += `\n\nPLAN NOW, AFTER CHANGES\n${planText(now)}\nReasons: ${plan.updates.map((u) => u.reason).join("; ")}`;
+  }
   return { system, text };
 }
 

@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Mode, Owner, Question } from "../core/types.ts";
 import { gaHome } from "../adapters/manifest.ts";
+import { planView } from "../core/plan.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
@@ -246,6 +247,27 @@ export const commands: Command[] = [
       if (!MODES.includes(m as Mode)) return ctx.error("Use: /mode <watch|follow|teach|plan>");
       ctx.session.setMode(m as Mode);
       ctx.refresh();
+    },
+  },
+  {
+    name: "plan",
+    args: "[on|off|<request>]",
+    help: "Show the analysis plan, or plan a request before any step runs. /plan off skips the plan for later requests.",
+    run(args, ctx) {
+      const s = ctx.session;
+      const sub = args.join(" ").trim();
+      if (sub === "on" || sub === "off") {
+        if (!s.setPlanFirst) return unavailable(ctx);
+        s.setPlanFirst(sub === "on");
+        return ctx.refresh();
+      }
+      if (!sub) {
+        const v = planView(s.record);
+        if (v) return ctx.print(v.text, v.approved ? `Approved plan, version ${v.version}` : `Plan proposal, version ${v.version}`);
+        return ctx.notice(s.planFirst ? "No plan yet. Type your request. The agent writes a plan first." : "No plan yet. Type /plan <request>.");
+      }
+      if (s.busy) return ctx.error("The agent is busy. Wait, then type /plan again.");
+      void s.send(sub, { plan: true }).catch((e: Error) => ctx.error(`The agent stopped: ${e.message}`));
     },
   },
   {

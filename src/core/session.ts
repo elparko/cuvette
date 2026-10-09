@@ -17,6 +17,7 @@ import { ADAPTER_DECISION, decisionHook, DecisionRecord } from "./decisions.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
 import { compareNote, instruction, teachReview, type TeachSummary } from "./modes.ts";
+import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
 import { activity, PURPOSE } from "./housekeeping.ts";
@@ -35,6 +36,7 @@ import {
   type ModelInfo,
   type Owner,
   type Part,
+  type PlanResponse,
   type Provider,
   type Question,
   type Tool,
@@ -55,6 +57,7 @@ export interface SessionOptions {
   refereeProvider?: Provider;
   generic?: boolean;
   pick?: boolean;
+  interactive?: boolean;
 }
 
 interface Pending<T> {
@@ -74,6 +77,15 @@ const MODE_NOTE: Record<Mode, string> = {
   teach: "Mode is now teach: the scientist works in the program. Run only read-only tools. When the scientist says a step is finished, call review_my_steps. It reads the steps that the scientist did and compares them with the decision record. Then explain each difference and why it matters.",
   plan: "Mode is now plan: write a plan with the plan tool. Run only read-only tools.",
 };
+
+const PLAN_NOTE = "Plan first. Before any analysis step, write the analysis plan for this request with the plan tool. First look at the data with read-only tools, at most three calls. Then call plan once with these sections: question (one sentence), data (files, what one row is, the unit of replication, the sample sizes), programs (the adapter for each part and why, with other choices), steps (in order; each with the method, the tool and the decisions it needs), outputs, checks (each assumption to test and what you do if it fails), and out_of_scope. For each decision, give the value if the setup or the request sets it. Leave the value out if the scientist must decide; the harness asks the scientist. Write for a scientist: short sentences, plain words. If the request is short and simple, write a short plan of two or three lines. No analysis step runs before the scientist approves the plan.";
+const PLAN_UPDATE_NOTE = "This is a new request in a session with an approved plan. If the request needs analysis steps that are not in the plan, call plan with only what changes: the new steps and the changed sections. The scientist approves the update before a new step runs. If the request needs no new step, answer directly.";
+const CONTINUE = /^(continue|go on|go ahead|proceed|yes|ok|okay|next|carry on)\b[\s\S]{0,40}$/i;
+
+function lastSentence(text: string): string {
+  const s = text.trim().split(/(?<=[.!?])\s+/).filter(Boolean).at(-1) ?? "";
+  return s.length > 200 ? s.slice(0, 197) + "..." : s;
+}
 
 function newId(): string {
   const d = new Date();
@@ -189,6 +201,19 @@ export class Session {
   private lastAnswer = "";
   private waitedQids = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
+  planFirst = false;
+  planning = false;
+  plan?: AnalysisPlan;
+  private planUpdate = false;
+  private planVersion = 0;
+  private approvedEntry = 0;
+  private planWait?: Pending<PlanResponse>;
+  private planQids = new Map<string, PlanDecision>();
+  private modeBefore: Mode = "watch";
+  private planLooks = 0;
+  private planWarned = new Set<string>();
+  private stopTurn = false;
+  private lastSaid = "";
 
   private constructor(id: string, cwd: string, settings: Settings) {
     this.id = id;
@@ -238,6 +263,14 @@ export class Session {
     for (const a of this.adapters) await this.startOne(a);
 
     this.decisions = new DecisionRecord(this.adapters, this.record, this.pick ? [ADAPTER_DECISION] : []);
+    const pf = this.settings.planFirst;
+    this.planFirst = pf === undefined ? !!opts.interactive : pf === true || pf === "on";
+    const approved = approvedPlan(this.record);
+    if (approved) {
+      this.approvedEntry = approved.entry;
+      this.plan = structuredClone(currentPlan(this.record));
+    }
+    this.planVersion = Math.max(0, ...this.record.entries(["plan", "plan_approved"]).map((e) => Number(e.data.version) || 0));
     let notify: ((q: Question) => Promise<void>) | undefined;
     if (this.settings.notify.ntfy) {
       try {
@@ -274,6 +307,8 @@ export class Session {
           return { ok: true, summary: `Proposed lab rule ${c.pid}. The scientist approves it with /lab.` };
         },
         log: (kind, data) => this.record.append(kind, data),
+        plan: (a) => this.planTool(a),
+        fullPlan: () => this.planFirst || this.planning || this.approvedEntry > 0,
       }),
     );
     if (this.adapters.some((a) => a.manifest.connection.history_tool)) extra.push(this.reviewTool());
@@ -348,6 +383,7 @@ export class Session {
     const have = (n: string) => this.adapters.some((a) => a.name === n);
     const already = (n: string) => ({ ok: true, summary: `The adapter ${n} is already loaded. Nothing changed.` });
     if (have(name)) return already(name);
+    if (this.planning) return { ok: false, error: "Plan first: name the adapter in the programs section of the plan. When the scientist approves the plan, call use_adapter. The approval covers the adapters that the plan names." };
     let a: LoadedAdapter;
     try {
       a = applyOverlay(findAdapter(name, this.cwd));
@@ -391,6 +427,10 @@ export class Session {
     if (owner === "agent") {
       this.decisions.change(key, value(a.name), { by: "agent", reason });
       return { load: [a.name], by: "agent" };
+    }
+    if (this.planApproves(a.name)) {
+      this.decisions.change(key, value(a.name), { by: "human", reason: `the scientist approved plan version ${this.planVersion}, which names ${a.name}` });
+      return { load: [a.name], by: "human", text: `The approved plan names ${a.name}, so the plan approval covers this load.` };
     }
     const list = this.adapterList();
     const request = String(this.record.entries(["user"]).at(-1)?.data.text ?? "");
@@ -530,7 +570,7 @@ export class Session {
 
   // ------------------------------------------------------------- turn
 
-  async send(text: string): Promise<string> {
+  async send(text: string, opts: { internal?: boolean; plan?: boolean } = {}): Promise<string> {
     if (this.busy) throw new Error("the agent is busy; wait or press Esc to stop it");
     this.busy = true;
     this.abort = new AbortController();
@@ -544,6 +584,7 @@ export class Session {
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode]);
+      if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning();
       this.chooseActiveTools(text);
       if (this.pick) {
         const hint = fileTypeHint(text, this.adapterList(), this.cwd, this.adapters.map((a) => a.name));
@@ -569,6 +610,13 @@ export class Session {
         if (thinking) this.record.append("thinking", { text: thinking });
         const said = res.message.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n").trim();
         const calls = res.message.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
+        this.lastSaid = said;
+        if (!calls.length && this.planning && !this.planUpdate && nudges < 2 && !forceAnswer) {
+          nudges++;
+          if (said) this.record.append("assistant", { text: said, final: false });
+          this.push({ role: "user", parts: [{ type: "text", text: "[Notes from the harness]\n- Write the analysis plan with the plan tool now. No step runs before the scientist approves it." }] });
+          continue;
+        }
         if (!calls.length && !said && nudges < 2) {
           nudges++;
           const names = this.activeSchemas().map((t) => t.name).join(", ");
@@ -585,7 +633,8 @@ export class Session {
           const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
           const noWork = this.settings.headless && this.adapters.length > 0 && !ranStep;
-          const plan = this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1)?.data.plan as { step: string; status: string }[] | undefined;
+          const plan = (this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1)?.data.plan as { step: string; status: string }[] | undefined) ??
+            (this.plan && this.approvedEntry > turnStart && !this.planning ? this.plan.steps.filter((p) => p.tool) : undefined);
           const open = (plan ?? []).filter((p) => p.status === "todo" || p.status === "doing");
           if (promise || asksLeave || noWork || open.length) {
             nudges++;
@@ -632,6 +681,11 @@ export class Session {
         const pending = this.drainNotes();
         if (pending) results.push({ type: "text", text: pending } as Part);
         this.push({ role: "user", parts: results });
+        if (this.stopTurn) {
+          this.stopTurn = false;
+          this.record.append("notice", { text: "You cancelled the plan. No analysis step ran." });
+          return "";
+        }
         if (signal.aborted) {
           this.record.append("notice", { text: "Stopped. The results so far are kept." });
           return "";
@@ -653,6 +707,8 @@ export class Session {
       }
       return "";
     } finally {
+      if (this.planning) this.endPlanning();
+      this.stopTurn = false;
       this.busy = false;
       this.bus.emit({ type: "status", state: "idle" });
       await this.hooks.event("Stop", { session: this.id }).catch(() => {});
@@ -703,6 +759,7 @@ export class Session {
     }
     const pre = await this.hooks.preAnswer({ event: "PreAnswer", session: this.id, answer: text });
     const answer = pre.answer ?? text;
+    this.noteSkippedSteps();
     const claims = checkAnswer(answer, this.record);
     let kept: string | undefined;
     let keptClaims: typeof claims | undefined;
@@ -807,8 +864,9 @@ export class Session {
       return error(blind.message);
     }
     if (tool.source === "generic" && !this.pathAllowed(args)) return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
+    if (this.planning && depth === 0 && tool.readOnly && tool.name !== "plan" && ++this.planLooks === 4) this.notes.push("You have looked at the data enough. Call plan now.");
     if ((this.mode === "plan" || this.mode === "teach") && !tool.readOnly)
-      return error(this.mode === "plan" ? "Plan mode: the agent plans and runs only read-only tools. Switch to watch mode to run steps." : "Teach mode: the scientist runs the steps and the agent runs only read-only tools.");
+      return error(this.planning ? "Plan first: no analysis step runs before the scientist approves the plan. Call plan now." : this.mode === "plan" ? "Plan mode: the agent plans and runs only read-only tools. Switch to watch mode to run steps." : "Teach mode: the scientist runs the steps and the agent runs only read-only tools.");
     const pre = await this.hooks.pre({ event: "PreToolUse", session: this.id, mode: this.mode, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args, readOnly: tool.readOnly } as never);
     let eff = (pre.updatedArgs ?? args) as Args;
     if (pre.deviations?.length) this.record.append("deviation", { callId, tool: tool.name, deviations: pre.deviations });
@@ -848,6 +906,7 @@ export class Session {
       ? `The harness used the recorded decision${many ? "s" : ""}: ${kept.map((d) => `${d.arg} = ${JSON.stringify(d.setup)} (you gave ${JSON.stringify(d.requested)})`).join("; ")}. This result is for the recorded ${many ? "values" : "value"}, not for the ${many ? "values" : "value"} you gave. Do not report it as the result for ${many ? "those values" : "that value"}. To see the result for ${many ? "other values" : "another value"}, call compare_options. To change the record, call propose_change. The scientist owns ${many ? "these values" : "this value"}.`
       : "";
     const out = await this.execute(tool, eff, callId, signal, { applied: pre.applied ?? {} });
+    if (out.node) this.checkPlanned(tool);
     const post = await this.hooks.post({ event: "PostToolUse", session: this.id, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args: eff, output: out.output, node: out.node });
     for (const f of post.findings ?? []) this.findings.add(f, "hook");
     const r = this.render(tool, out.output);
@@ -1329,7 +1388,7 @@ export class Session {
     if (q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by: "human", reason: `answer to ${qid}` });
     if (waited) return;
     this.notes.push(`The scientist answered ${qid} (${q.title}): ${String(q.answer)}${note ? ` - ${note}` : ""}.`);
-    if (!this.busy && this.settings.autoResume && this.history.length) void this.send("Continue the analysis with this answer.").catch(() => {});
+    if (!this.busy && this.settings.autoResume && this.history.length) void this.send("Continue the analysis with this answer.", { internal: true }).catch(() => {});
   }
 
   setDecision(key: string, value: unknown, reason = ""): string[] {
@@ -1351,6 +1410,7 @@ export class Session {
 
   async applySetting(name: string, value: unknown): Promise<void> {
     if (name === "mode") return this.setMode(value as Mode);
+    if (name === "planFirst") this.planFirst = value === true || value === "on";
     const next = { ...this.settings, [name]: value } as Settings;
     const provider = name === "model" || name === "effort" ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think }) : this.provider;
     const referee = ["model", "referee", "effort"].includes(name)
@@ -1371,6 +1431,193 @@ export class Session {
     this.record.append("mode", { old: this.mode, new: mode });
     this.mode = mode;
     this.notes.push(MODE_NOTE[mode]);
+  }
+
+  // ------------------------------------------------------------- analysis plan
+
+  private startPlanning() {
+    this.planning = true;
+    this.planUpdate = this.approvedEntry > 0 && !!this.plan;
+    this.planLooks = 0;
+    this.modeBefore = this.mode === "plan" ? "watch" : this.mode;
+    if (this.mode !== "plan") {
+      this.record.append("mode", { old: this.mode, new: "plan", reason: "plan first" });
+      this.mode = "plan";
+    }
+    this.notes.push(this.planUpdate ? PLAN_UPDATE_NOTE : PLAN_NOTE);
+  }
+
+  private endPlanning(target?: Mode) {
+    this.planning = false;
+    const to = target ?? this.modeBefore;
+    if (this.mode === to) return;
+    this.record.append("mode", { old: this.mode, new: to, reason: target ? "plan approved" : "plan ended" });
+    this.mode = to;
+  }
+
+  private fillDecisions(plan: AnalysisPlan) {
+    const fields = this.decisions.fields();
+    for (const step of plan.steps)
+      for (const d of step.decisions ?? []) {
+        const f = d.key ? fields.find((x) => x.key === d.key) : undefined;
+        const qid = [...this.planQids].find(([, x]) => x === d)?.[0];
+        const answered = qid ? this.record.entries(["answer"]).filter((e) => e.data.qid === qid).at(-1) : undefined;
+        if (answered) {
+          d.value = f && this.decisions.hasValue(f.key) ? this.decisions.value(f.key) : answered.data.value;
+          d.by = "you";
+        } else if (f && f.set && this.decisions.hasValue(f.key)) {
+          d.value = this.decisions.value(f.key);
+          d.by = f.owner === "fixed" ? "fixed" : "decision record";
+        } else if (f && f.owner === "human" && d.value !== undefined && d.by !== "you") {
+          d.recommendation ??= String(d.value);
+          delete d.value;
+        }
+      }
+  }
+
+  private async askPlanDecisions(plan: AnalysisPlan): Promise<string[]> {
+    const fields = this.decisions.fields();
+    const qids: string[] = [];
+    this.planQids.clear();
+    for (const { step, decision: d } of openDecisions(plan)) {
+      const f = d.key ? fields.find((x) => x.key === d.key) : undefined;
+      if (f && f.owner !== "human") continue;
+      let q = this.questions.open().find((x) => (f ? x.decisionKey === f.key : !x.decisionKey && x.title === d.label));
+      if (!q) {
+        const options = (f?.choices.length ? f.choices : (d.options ?? [])).map((v) => ({ value: v, label: String(v) }));
+        const rec = d.recommendation ? (options.find((o) => String(o.value).toLowerCase() === d.recommendation!.toLowerCase())?.value ?? d.recommendation) : f?.default;
+        q = await this.questions.ask({
+          decisionKey: f?.key ?? "",
+          title: f?.label ?? d.label,
+          text: `${f?.help || d.label} Step ${step} of the plan needs this decision.`,
+          options,
+          recommendation: rec !== undefined ? { value: rec, reason: d.recommendation ? "The agent recommends it in the plan." : "This is the adapter default." } : undefined,
+          evidence: "",
+          default: f?.default,
+        });
+        this.bus.emit({ type: "question", question: q });
+      }
+      qids.push(q.qid);
+      this.planQids.set(q.qid, d);
+    }
+    return qids;
+  }
+
+  private async planTool(a: Args): Promise<ToolOutput> {
+    const given = readPlan(a, false);
+    const reason = typeof a.reason === "string" ? a.reason.trim() : "";
+    if (!this.planning) {
+      if (!this.plan || !this.approvedEntry) {
+        const draft = { steps: [], ...readPlan(a) } as AnalysisPlan;
+        this.record.append("note", { text: `Plan:\n${planText(draft)}`, plan: draft.steps.map((x) => ({ step: x.step, status: x.status })), by: "agent" });
+        return { ok: true, summary: `Plan with ${draft.steps.length} steps.` };
+      }
+      const prev = this.plan;
+      const next = mergePlan(prev, given);
+      const added = addedSteps(prev, next);
+      const skipped = next.steps.filter((x) => x.status === "skipped" && prev.steps.find((p) => p.step.toLowerCase() === x.step.toLowerCase())?.status !== "skipped");
+      const sections = (["question", "data", "programs", "outputs", "checks", "out_of_scope"] as const).some((k) => given[k] !== undefined);
+      const changed = added.length > 0 || skipped.length > 0 || sections;
+      if (changed && !reason && ![...added, ...skipped].every((x) => x.reason)) return { ok: false, error: "Give the reason for this change of the approved plan in reason. The scientist sees it." };
+      const ran = this.record.nodes().filter((n) => n.entry > this.approvedEntry && !n.sensitivityOf).map((n) => n.tool);
+      for (const x of added) if (x.status === "todo" && ran.some((t) => matchStep({ steps: [x] }, t) === 0)) x.status = "done";
+      this.plan = next;
+      if (changed) this.planVersion++;
+      this.record.append("plan", { action: changed ? "updated" : "status", version: this.planVersion, reason: reason || [...added, ...skipped].map((x) => x.reason).join(" "), text: planText(next), plan: structuredClone(next) });
+      for (const x of skipped) this.record.append("notice", { text: `Skipped from the approved plan: ${x.step}. Reason: ${x.reason || reason}`, plan: "skipped" });
+      for (const x of added) this.record.append("notice", { text: `Added to the approved plan: ${x.step}. Reason: ${x.reason || reason}`, plan: "added" });
+      return { ok: true, summary: changed ? `The plan is now version ${this.planVersion}. The scientist sees the change and the reason.` : "Plan status saved." };
+    }
+    const plan = this.planUpdate && this.plan ? mergePlan(this.plan, given) : ({ steps: [], ...readPlan(a) } as AnalysisPlan);
+    this.fillDecisions(plan);
+    const version = ++this.planVersion;
+    const shown = planText(this.planUpdate ? { ...given, steps: addedSteps(this.plan!, plan) } : plan);
+    this.record.append("plan", { action: this.planUpdate ? "update_proposed" : "proposed", version, text: shown, full: planText(plan), plan: structuredClone(plan) });
+    const qids = await this.askPlanDecisions(plan);
+    const wait = new Promise<PlanResponse>((resolve) => (this.planWait = { resolve }));
+    const programs = (plan.programs ?? []).map((g) => ({ part: g.part, adapter: g.adapter, alternatives: g.alternatives ?? [] }));
+    this.bus.emit({ type: "plan", version, text: shown, update: this.planUpdate, qids, programs, mode: this.modeBefore });
+    this.bus.emit({ type: "status", state: "waiting", tool: "plan" });
+    let r: PlanResponse;
+    try {
+      r = await abortable(wait, this.abort?.signal);
+    } catch {
+      return { ok: false, error: "the scientist stopped the turn before answering the plan" };
+    } finally {
+      this.planWait = undefined;
+    }
+    if (r.action === "change") {
+      this.record.append("plan", { action: "change_requested", version, text: r.text });
+      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Revise the plan and call plan again${this.planUpdate ? " with only what changes" : " with the full plan"}. Do not run steps yet.` };
+    }
+    if (r.action === "cancel") {
+      this.record.append("plan", { action: "cancelled", version });
+      this.endPlanning();
+      this.stopTurn = true;
+      return { ok: true, summary: "The scientist cancelled the plan. No step runs. Stop now." };
+    }
+    this.fillDecisions(plan);
+    const target: Mode = r.mode && r.mode !== "plan" ? r.mode : this.modeBefore;
+    const answers = [...this.planQids.values()].filter((d) => d.by === "you").map((d) => `${d.label} = ${String(d.value)}`);
+    const text = planText(plan);
+    this.plan = structuredClone(plan);
+    this.approvedEntry = this.record.append("plan_approved", { version, text, plan: structuredClone(plan), mode: target, update: this.planUpdate, answers }).id;
+    this.planWarned.clear();
+    this.endPlanning(target);
+    const first = plan.steps.findIndex((x) => x.status !== "done" && x.status !== "skipped") + 1;
+    const open = openDecisions(plan).map((x) => x.decision.label);
+    return {
+      ok: true,
+      summary: [
+        `The scientist approved plan version ${version}. Mode is now ${target}.`,
+        answers.length ? `The scientist answered: ${answers.join("; ")}.` : "",
+        open.length ? `Still open: ${open.join("; ")}. The harness asks the scientist when a step needs one.` : "",
+        `Start with step ${first || 1} now. If you run a step that is not in the plan, or skip one, call plan with the reason.`,
+      ].filter(Boolean).join(" "),
+    };
+  }
+
+  private checkPlanned(tool: Tool) {
+    if (!this.plan || this.planning || !this.approvedEntry) return;
+    const name = tool.remoteName ?? tool.name;
+    if (name === "calculate") return;
+    const i = matchStep(this.plan, name);
+    if (i >= 0) {
+      if (this.plan.steps[i]!.status !== "skipped") this.plan.steps[i]!.status = "done";
+      return;
+    }
+    if (this.planWarned.has(name)) return;
+    this.planWarned.add(name);
+    this.record.append("notice", { text: `Not in the approved plan: ${name}. Reason: ${lastSentence(this.lastSaid) || "the agent gave none yet."}`, plan: "deviation", tool: name });
+    this.notes.push(`${name} is not in the approved plan. Call plan now to add it as a step, with the reason.`);
+  }
+
+  private noteSkippedSteps() {
+    if (!this.plan || this.planning || !this.approvedEntry) return;
+    const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
+    if (this.approvedEntry < turnStart) return;
+    for (const x of this.plan.steps) {
+      if (!x.tool || x.status === "done" || x.status === "skipped" || this.planWarned.has(`skip:${x.step}`)) continue;
+      this.planWarned.add(`skip:${x.step}`);
+      this.record.append("notice", { text: `Not done from the approved plan: ${x.step}. Reason: none given.`, plan: "skipped" });
+    }
+  }
+
+  respondPlan(r: PlanResponse): void {
+    this.planWait?.resolve(r);
+  }
+
+  pendingPlan(): boolean {
+    return !!this.planWait;
+  }
+
+  setPlanFirst(on: boolean): void {
+    this.planFirst = on;
+    this.record.append("notice", { text: on ? "Plan first is on. The agent writes a plan before any step runs." : "Plan first is off. Type /plan <request> to get a plan first." });
+  }
+
+  planApproves(adapter: string): boolean {
+    return this.approvedEntry > 0 && !this.planning && plannedAdapters(this.plan).includes(adapter);
   }
 
   async review(): Promise<Finding[]> {

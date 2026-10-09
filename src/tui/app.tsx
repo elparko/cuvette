@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Box, Static, Text, render, useApp, useInput, useStdout } from "ink";
 import TextInput from "ink-text-input";
 import type { BusEvent, Mode } from "../core/types.ts";
-import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
+import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { claudeKey, credentialsPath, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from "./commands.ts";
@@ -93,7 +93,8 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
   const addCard = useCallback(
     (c: Card) =>
       setCards((x) => {
-        if (c.t === "question" && x.some((y) => y.t === "question" && y.q.qid === c.q.qid)) return x;
+        if (c.t === "question" && x.some((y) => (y.t === "question" && y.q.qid === c.q.qid) || (y.t === "plan" && y.qids.includes(c.q.qid)))) return x;
+        if (c.t === "plan") return [...x.filter((y) => !(y.t === "question" && c.qids.includes(y.q.qid)) && y.t !== "plan"), c];
         if (c.t === "setup" && x.some((y) => y.t === "setup")) return x;
         if (c.t === "key") return x.some((y) => y.t === "key") ? x : [c, ...x];
         return [...x, c];
@@ -120,6 +121,8 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
 
   useEffect(() => {
     for (const q of session.questions.open()) addCard({ t: "question", q });
+    if (session.planFirst) line("▸", "The agent writes an analysis plan first. You approve it before any step runs.", undefined, true);
+    else line("▸", "Type /plan to get an analysis plan before any step runs.", undefined, true);
     if (opts.firstMessage) session.send(opts.firstMessage).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
     if (opts.autoSetup !== false && session.decisions.fields().some((f) => f.essential && !f.set)) {
       void openSetup({ openCard: addCard } as CommandCtx);
@@ -168,6 +171,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           if (en.kind === "answer") dropCard((c) => c.t === "question" && c.q.qid === en.data.qid);
           if (en.kind === "permission") dropCard((c) => c.t === "permission" && c.rid === en.data.rid);
           if (en.kind === "follow_step") dropCard((c) => c.t === "instruction" && c.step === en.data.step);
+          if (en.kind === "plan_approved" || (en.kind === "plan" && (en.data.action === "change_requested" || en.data.action === "cancelled"))) dropCard((c) => c.t === "plan");
           if (en.kind === "mode" || en.kind === "permission_mode" || en.kind === "question" || en.kind === "answer") refresh();
           break;
         }
@@ -197,6 +201,9 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           break;
         case "instruction":
           addCard({ t: "instruction", step: e.step, tool: e.tool, text: e.text });
+          break;
+        case "plan":
+          addCard({ t: "plan", version: e.version, text: e.text, update: e.update, qids: e.qids, programs: e.programs, mode: e.mode });
           break;
       }
     });
@@ -401,6 +408,16 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           onDone={() => (popCard(), void session.followDone(card.step))}
           onInterrupt={() => (session.interrupt(), popCard())}
           onAgent={() => (popCard(), void session.followDone(card.step, "", true))}
+        />
+      ) : null}
+      {card?.t === "plan" ? (
+        <PlanCard
+          key={`plan${card.version}`}
+          card={card}
+          session={session}
+          onApprove={(m) => (popCard(), session.respondPlan?.({ action: "approve", mode: m }))}
+          onChange={(text) => (popCard(), session.respondPlan?.({ action: "change", text }))}
+          onCancel={() => (popCard(), session.respondPlan?.({ action: "cancel" }))}
         />
       ) : null}
       {card?.t === "findings" ? <FindingsCard key="findings" card={card} session={session} onClose={popCard} /> : null}

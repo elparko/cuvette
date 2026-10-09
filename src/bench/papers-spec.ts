@@ -37,6 +37,7 @@ export const PaperSpec = z
     allow: z.union([z.literal("all"), z.array(z.string())]).default("all"),
     timeout_s: z.number().int().positive().default(900),
     data: z.array(z.string()).default([]),
+    plan: z.boolean().default(false),
     items: z.array(Item).min(1),
   })
   .refine((s) => new Set(s.items.map((i) => i.key)).size === s.items.length, { message: "item keys must be unique" });

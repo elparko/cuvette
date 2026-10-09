@@ -142,9 +142,16 @@ export class Mapper {
       case "finding_resolution":
         return line("✓", `Finding ${d.fid}: ${d.action}`, "green");
       case "mode":
-        return line("▸", `Mode: ${d.old} → ${d.new}`, "cyan");
+        return d.reason ? [] : line("▸", `Mode: ${d.old} → ${d.new}`, "cyan");
       case "setting":
         return line("⚙", d.change ? `Setting ${d.name} changed (${scopeLabel(d.scope as Scope)})` : `Setting ${d.name}: ${show(d.old)} → ${show(d.new)} (${scopeLabel(d.scope as Scope)})`, "cyan");
+      case "plan_approved":
+        return [{ key, t: "block", title: `You approved the plan, version ${d.version}. Mode: ${d.mode}.`, text: String(d.text ?? "") }];
+      case "plan":
+        if (d.action === "change_requested") return line("✎", `You asked to change the plan: ${d.text}`, "cyan");
+        if (d.action === "cancelled") return line("✗", "You cancelled the plan. No step ran.", "yellow");
+        if (d.action === "updated") return line("✎", `Plan changed to version ${d.version}. Reason: ${d.reason || "none given"}`, "cyan");
+        return [];
       case "follow_step": {
         const diffs = Array.isArray(d.differences) ? (d.differences as unknown[]).map(show) : [];
         if (d.status === "waiting") return [];
@@ -166,7 +173,7 @@ export class Mapper {
       case "note":
         return line("▸", String(d.text ?? ""), undefined, true);
       case "notice":
-        return line("▸", String(d.text ?? d.message ?? ""));
+        return d.plan ? line("⚠", String(d.text ?? ""), "yellow") : line("▸", String(d.text ?? d.message ?? ""));
       case "adapter":
         return line("+", `Loaded the adapter ${d.name} ${d.version ?? ""}${d.programVersion ? ` (program ${d.programVersion})` : ""}${d.reason ? `: ${d.reason}` : ""}`, "cyan");
       case "error":

@@ -97,6 +97,15 @@ export const SETTINGS: SettingDef[] = [
     choices: () => ["watch", "follow", "teach", "plan"],
   },
   {
+    name: "planFirst",
+    group: "Session",
+    label: "Plan first",
+    help: "on: in an interactive session the agent writes an analysis plan, and you approve it before any step runs. off: the agent starts at once; /plan <request> still plans one request.",
+    scopes: ALL,
+    choices: () => ["on", "off"],
+    def: "on",
+  },
+  {
     name: "details",
     group: "Session",
     label: "Show details",

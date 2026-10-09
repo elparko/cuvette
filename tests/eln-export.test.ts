@@ -88,3 +88,12 @@ test("the content covers the question, answer, decisions, steps, findings, figur
   expect(exp.keywords).toBe("guided-analysis, lab");
   expect(exp.variableMeasured.length).toBeGreaterThan(0);
 });
+
+test("the archive has the approved plan as plan.md and at the top of the body", async () => {
+  s.record.append("plan_approved", { version: 1, text: "Question: How many particles?", plan: { steps: [] } });
+  const { files, top } = await exported();
+  expect(files.get(`${top}analysis/plan.md`)!.toString()).toMatch(/^# Analysis plan \(version 1, approved .*\)\n\nQuestion: How many particles\?/);
+  expect(files.get(`${top}analysis/protocol.md`)!.toString()).toContain("## Analysis plan (version 1");
+  const { collect } = await import("../src/eln/export.ts");
+  expect(collect(s).bodyHtml.startsWith("<h2>Analysis plan (version 1)</h2><pre>Question: How many particles?</pre>")).toBe(true);
+});

@@ -599,3 +599,124 @@ test("applySetting changes the model, the referee and the mode of a running sess
   await session.applySetting("mode", "plan");
   expect(session.mode).toBe("plan");
 });
+
+const LAB = join(__dirname, "fixtures/lab");
+const PLAN = {
+  question: "How does a blur change a.tif?",
+  data: { files: ["/data/a.tif"], row: "One image.", replicate: "One image.", n: "1 image." },
+  programs: [{ part: "Image work", adapter: "lab", why: "It has the blur.", alternatives: ["imagej"] }],
+  steps: [{ step: "Blur the image", method: "Gaussian blur", tool: "blur", decisions: [{ key: "method", label: "Threshold method", recommendation: "Otsu" }] }],
+  outputs: ["The blurred image"],
+  checks: [{ check: "The image opens.", if_fails: "Stop and tell the scientist." }],
+  out_of_scope: ["Particle counts"],
+};
+const blur = { name: "blur", args: { input: "/data/a.tif", sigma: 2 } };
+
+function toolTexts(p: FakeProvider): string[] {
+  return p.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((x) => x.type === "tool_result").map((x) => (x as { text: string }).text);
+}
+
+test("plan first: no step runs before approval; approve logs plan_approved and starts step 1 in watch mode", async () => {
+  const provider = new FakeProvider([{ calls: [blur] }, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true });
+  session.decisions.applySetup({});
+  const seen: string[][] = [];
+  session.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "Triangle"), 0);
+    if (e.type === "plan") {
+      seen.push(e.qids);
+      setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+    }
+  });
+  expect(Object.keys((session.allTools().find((t) => t.name === "plan")!.inputSchema as { properties: object }).properties)).toContain("out_of_scope");
+  await session.send("Blur a.tif and tell me what changes");
+
+  const results = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "blur");
+  expect(results[0]!.data.ok).toBe(false);
+  expect(String(results[0]!.data.error)).toMatch(/^Plan first: no analysis step runs before the scientist approves the plan/);
+  expect(session.record.nodes().map((n) => n.tool)).toEqual(["blur"]);
+  expect(seen).toEqual([["q1"]]);
+  const approved = session.record.entries(["plan_approved"]);
+  expect(approved).toHaveLength(1);
+  expect(approved[0]!.data).toMatchObject({ version: 1, mode: "watch" });
+  expect(String(approved[0]!.data.text)).toContain("Question: How does a blur change a.tif?");
+  expect(String(approved[0]!.data.text)).toContain("- Set: Threshold method = Triangle (you)");
+  expect(approved[0]!.id).toBeLessThan(session.record.nodes()[0]!.entry);
+  expect(session.mode).toBe("watch");
+  expect(session.decisions.value("method")).toBe("Triangle");
+  expect(toolTexts(provider).some((t) => t.includes("The scientist approved plan version 1. Mode is now watch."))).toBe(true);
+});
+
+test("plan first: Change sends the request back and the agent revises; Cancel ends the turn with no step", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "plan", args: PLAN }] }, { calls: [{ name: "plan", args: { ...PLAN, out_of_scope: [] } }] }, { calls: [blur] }, { text: "Blurred." }, { text: "Blurred." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true, mode: "follow" });
+  session.decisions.applySetup({ method: "Otsu" });
+  let n = 0;
+  const modes: string[] = [];
+  session.bus.on((e) => {
+    if (e.type !== "plan") return;
+    modes.push(e.mode);
+    setTimeout(() => session!.respondPlan(n++ === 0 ? { action: "change", text: "Also count the particles." } : { action: "approve", mode: "watch" }), 0);
+  });
+  await session.send("Blur a.tif");
+  expect(modes).toEqual(["follow", "follow"]);
+  expect(session.record.entries(["plan"]).map((e) => e.data.action)).toEqual(["proposed", "change_requested", "proposed"]);
+  expect(session.record.entries(["plan"])[1]!.data.text).toBe("Also count the particles.");
+  expect(session.record.entries(["plan_approved"])[0]!.data).toMatchObject({ version: 2, mode: "watch" });
+  expect(String(session.record.entries(["plan_approved"])[0]!.data.text)).toContain("- Set: Threshold method = Otsu (decision record)");
+  expect(session.mode).toBe("watch");
+
+  const p2 = new FakeProvider([{ calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }]);
+  const s2 = await Session.create({ adapters: [LAB], provider: p2, cwd: tmpdir(), interactive: true });
+  s2.decisions.applySetup({});
+  s2.bus.on((e) => {
+    if (e.type === "plan") setTimeout(() => s2.respondPlan({ action: "cancel" }), 0);
+  });
+  expect(await s2.send("Blur a.tif")).toBe("");
+  expect(s2.record.entries(["plan"]).map((e) => e.data.action)).toEqual(["proposed", "cancelled"]);
+  expect(s2.record.entries(["notice"]).some((e) => e.data.text === "You cancelled the plan. No analysis step ran.")).toBe(true);
+  expect(s2.record.nodes()).toHaveLength(0);
+  expect(s2.mode).toBe("watch");
+  expect(p2.requests).toHaveLength(1);
+  await s2.close();
+});
+
+test("a step that is not in the approved plan gets a visible note, and the agent adds it with a reason", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: PLAN }] },
+    { calls: [blur] },
+    { text: "I also count the particles to check the blur.", calls: [{ name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 5 } }] },
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", tool: "count" }] } }] },
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", tool: "count" }], reason: "The count checks the blur." } }] },
+    { text: "Blurred with sigma 2. The count is 41." },
+    { text: "Blurred with sigma 2. The count is 41." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true });
+  session.decisions.applySetup({ method: "Otsu" });
+  session.bus.on((e) => {
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Blur a.tif");
+  const notices = session.record.entries(["notice"]).filter((e) => e.data.plan).map((e) => e.data.text);
+  expect(notices).toEqual(["Not in the approved plan: count. Reason: I also count the particles to check the blur.", "Added to the approved plan: Count the particles. Reason: The count checks the blur."]);
+  const planResults = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "plan");
+  expect(planResults.some((e) => /Give the reason/.test(String(e.data.error)))).toBe(true);
+  expect(session.record.entries(["plan"]).at(-1)!.data).toMatchObject({ action: "updated", version: 2, reason: "The count checks the blur." });
+  expect(session.findings.list().filter((f) => f.check.startsWith("plan_"))).toEqual([]);
+});
+
+test("headless runs do not plan unless asked; with planFirst the headless runner approves the plan", async () => {
+  session = await Session.create({ adapters: [LAB], provider: new FakeProvider([]), cwd: tmpdir(), settings: { headless: true } });
+  expect(session.planFirst).toBe(false);
+  expect(Object.keys((session.allTools().find((t) => t.name === "plan")!.inputSchema as { properties: object }).properties)).toEqual(["steps"]);
+  await session.close();
+
+  const { attachHeadless } = await import("../src/core/headless.ts");
+  const provider = new FakeProvider([{ calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), settings: { headless: true, planFirst: true } });
+  attachHeadless(session, { answers: { method: "Default" }, allow: new Set(["all"]) });
+  session.decisions.applySetup({});
+  await session.send("Blur a.tif");
+  expect(session.record.entries(["plan_approved"])).toHaveLength(1);
+  expect(session.record.nodes().map((n) => n.tool)).toEqual(["blur"]);
+});

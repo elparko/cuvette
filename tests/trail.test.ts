@@ -209,3 +209,19 @@ test("the trail leaves out housekeeping calls and numbers only the analysis step
   const t = trail(r, 1, [adapter]);
   expect(t.map((x) => [x.line, x.step])).toEqual([["You asked: go", undefined], ["Opened a.tif", 1], ["Failed: missing", undefined]]);
 });
+
+test("the html and md exports put the approved plan at the top, with its changes", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ga-trail-plan-"));
+  const r = new AnalysisRecord(join(dir, "s"), "20260101-000000-plan");
+  r.append("session", { adapters: [{ name: "fake", version: "0.1.0", programVersion: "1.0" }], model: "m" });
+  r.append("plan_approved", { version: 1, text: "Question: Does drug 2 help?\n\nSteps\n1. Paired t test", plan: { steps: [{ step: "Paired t test", status: "todo" }] } });
+  r.append("plan", { action: "updated", version: 2, reason: "A <plot> helps.", text: "x", plan: { steps: [] } });
+  const html = readFileSync(exportHtml(r, [], join(dir, "t.html")), "utf8");
+  expect(html.indexOf('<section class="plan" id="plan"><h2>Analysis plan (version 1')).toBeGreaterThan(html.indexOf("<h1>Analysis trail</h1>"));
+  expect(html).toContain("Question: Does drug 2 help?\n\nSteps\n1. Paired t test</pre>");
+  expect(html).toContain("<li>Version 2: A &lt;plot&gt; helps.</li>");
+  const md = readFileSync(exportMarkdown(r, [], join(dir, "t.md")), "utf8");
+  expect(md.indexOf("## Analysis plan (version 1")).toBeLessThan(md.indexOf("## Steps"));
+  expect(md).toContain("- Version 2: A <plot> helps.");
+  expect(trail(r, 1).map((l) => l.line)).toEqual(["You approved the analysis plan, version 1", "Plan changed to version 2. Reason: A <plot> helps."]);
+});

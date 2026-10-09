@@ -1,3 +1,4 @@
+import { approvedPlan, planMarkdown } from "./plan.ts";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -297,6 +298,15 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       return { icon: "finding", line: `Finding ${show(d.fid)} ${show(d.action)}${d.reason ? `: ${clip(show(d.reason))}` : ""}`, technical: tech() };
     case "note":
       return { icon: "note", line: clip(show(d.text)), technical: tech() };
+    case "plan_approved":
+      return { icon: "setup", line: `You approved the analysis plan, version ${show(d.version)}`, details: { text: d.text, mode: d.mode, answers: d.answers }, technical: tech() };
+    case "plan":
+      if (d.action === "updated") return { icon: "decision", line: `Plan changed to version ${show(d.version)}. Reason: ${clip(show(d.reason || "none given"))}`, details: { text: d.text }, technical: tech() };
+      if (d.action === "change_requested") return { icon: "note", line: `You asked to change the plan: ${clip(show(d.text))}`, technical: tech() };
+      if (d.action === "cancelled") return { icon: "note", line: "You cancelled the plan. No step ran.", technical: tech() };
+      return undefined;
+    case "notice":
+      return d.plan ? { icon: "deviation", line: clip(show(d.text)), technical: tech() } : undefined;
     case "user":
       return { icon: "note", line: `You asked: ${clip(show(d.text))}`, request: true, details: { text: d.text }, technical: tech() };
     case "assistant":
@@ -612,6 +622,13 @@ function stepHtml(record: AnalysisRecord, t: TrailLine): string {
   return `<article class="${classes}" id="s${t.n}"><div class="head">${iconSvg(t.icon)}<span class="n">${t.step ? `Step ${t.step}` : ""}</span><span class="t">${esc(t.line)}</span>${badges}</div>${imageFigures(record, (d.images as string[] | undefined) ?? [])}${more}${tech}</article>`;
 }
 
+function planHtml(record: AnalysisRecord): string {
+  const p = approvedPlan(record);
+  if (!p) return "";
+  const updates = p.updates.length ? `<h3>Changes after approval</h3><ul>${p.updates.map((u) => `<li>Version ${u.version}: ${esc(u.reason || "no reason given")}</li>`).join("")}</ul>` : "";
+  return `<section class="plan" id="plan"><h2>Analysis plan (version ${p.version}, approved ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2><pre style="white-space:pre-wrap;font:inherit">${esc(p.text)}</pre>${updates}</section>`;
+}
+
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
   const m = meta(record);
   const labels = new Map<string, string>();
@@ -640,6 +657,7 @@ export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], pa
 <h1>Analysis trail</h1>
 ${title ? `<p class="question"><b>Question</b> ${esc(title)}</p>` : ""}
 <p class="meta"><b>Session</b> ${esc(m.id)} &middot; <b>Adapters</b> ${esc(m.adapters)} &middot; <b>Model</b> ${esc(m.model)} &middot; <b>Date</b> ${esc(m.date)}</p>
+${planHtml(record)}
 ${settingRowsHtml ? `<h3>Settings</h3><div class="scroll"><table><thead><tr><th>Decision</th><th>Value</th><th>Set by</th></tr></thead><tbody>${settingRowsHtml}</tbody></table></div>` : ""}
 ${sections.join("\n")}
 </main></body></html>
@@ -697,6 +715,7 @@ function markdownText(record: AnalysisRecord, adapters: LoadedAdapter[]): string
     `- Model: ${m.model}`,
     `- Date: ${m.date}`,
     "",
+    ...planMarkdown(record),
   ];
   const setup = Object.entries(m.setup);
   if (setup.length) {

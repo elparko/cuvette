@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { activity } from "../core/housekeeping.ts";
 import { Bus } from "../core/bus.ts";
 import { AnalysisRecord } from "../core/record.ts";
-import type { Args, Fidelity, Finding, Mode, ModelInfo, Owner, Question } from "../core/types.ts";
+import type { Args, Fidelity, Finding, Mode, ModelInfo, Owner, PlanResponse, Question } from "../core/types.ts";
 import type { DecisionFieldLike, SessionLike } from "./types.ts";
 
 const PNG_1X1 = Buffer.from(
@@ -303,6 +303,20 @@ export class FakeSession implements SessionLike {
     this.aborted = true;
     for (const fn of this.waiters.values()) fn({ ok: false });
     this.waiters.clear();
+  }
+
+  planResponses: PlanResponse[] = [];
+
+  respondPlan(r: PlanResponse): void {
+    this.planResponses.push(r);
+  }
+
+  proposePlan(text: string, questions: Question[] = [], programs: { part: string; adapter: string; alternatives: string[] }[] = []): void {
+    for (const q of questions) {
+      this.qs.push(q);
+      this.bus.emit({ type: "question", question: q });
+    }
+    this.bus.emit({ type: "plan", version: 1, text, update: false, qids: questions.map((q) => q.qid), programs, mode: this.mode });
   }
 
   respondPermission(rid: string, ok: boolean, note?: string, _always?: boolean): void {
