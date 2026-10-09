@@ -740,6 +740,7 @@ describe("plan card", () => {
     const programs = [{ part: "Statistics", adapter: "biostats", alternatives: ["lme4"] }];
     s.proposePlan("Question: Q1", [], programs);
     await until(() => h.all().includes("p program"));
+    await sleep(50);
     await type(h, "c");
     await until(() => h.all().includes("What must change?"));
     await type(h, "Use a Wilcoxon test.");
