@@ -160,3 +160,10 @@ test("locate: env var, paths with ~ and globs, then which", async () => {
   const d = await locate(manifest({ which: ["nope-not-a-program"], version_command: ["{program_path}", "-v"] }, "fallback"));
   expect(d).toMatchObject({ path: undefined, version: "fallback" });
 });
+
+test("locate: the version command runs in the temporary folder, so a blind run that denies the repository does not stop it", async () => {
+  if (process.platform === "win32") return;
+  const r = await locate(manifest({ which: ["sh"], version_command: ["{program_path}", "-c", "echo cwd $(pwd -P)"], version_pattern: "cwd (\\S+)", identity: "cwd /" }));
+  const { realpathSync } = await import("node:fs");
+  expect(r.version).toBe(realpathSync(tmpdir()));
+});

@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, delimiter, dirname, join, sep } from "node:path";
 import { accessOf } from "./access.ts";
 import { adapterDirs, type Manifest } from "./manifest.ts";
@@ -80,7 +80,7 @@ async function versionRun(m: Manifest, path: string | undefined, adapterDir: str
   const uses = l.version_command.some((a) => a.includes("{program_path}"));
   if (uses && !path) return { timedOut: false };
   const argv = l.version_command.map((a) => a.replaceAll("{program_path}", path ?? "").replaceAll("{adapter_dir}", adapterDir));
-  const r = await runProcess(argv, { timeoutMs: VERSION_TIMEOUT_MS });
+  const r = await runProcess(argv, { timeoutMs: VERSION_TIMEOUT_MS, cwd: tmpdir() });
   return { text: `${r.stdout}\n${r.stderr}`, timedOut: r.timedOut };
 }
 
