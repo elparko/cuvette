@@ -62,7 +62,7 @@ function results(p: FakeProvider): { text: string; isError?: boolean }[] {
 }
 
 async function bypassSession(provider: FakeProvider, settings: Record<string, unknown> = {}, mode?: Mode) {
-  const s = await Session.create({ adapters: [lab], provider, cwd: tmpdir(), mode, settings: { permissionMode: "bypass", ...settings } });
+  const s = await Session.create({ adapters: [lab], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), mode, settings: { permissionMode: "bypass", ...settings } });
   s.decisions.applySetup({});
   s.decisions.change("method", "Default");
   return s;
@@ -101,7 +101,7 @@ test("bypass keeps deny rules", async () => {
 
 test("bypass does not answer decision questions", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "x", method: "Otsu" } }] }, { text: "ok" }, { text: "ok" }]);
-  session = await Session.create({ adapters: [lab], provider, cwd: tmpdir(), settings: { permissionMode: "bypass", askWaits: false, autoResume: false } });
+  session = await Session.create({ adapters: [lab], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { permissionMode: "bypass", askWaits: false, autoResume: false } });
   session.decisions.applySetup({ question: "How many?" });
   const questions: string[] = [];
   session.bus.on((e) => e.type === "question" && questions.push(e.question.decisionKey ?? ""));
@@ -120,7 +120,7 @@ test.each(["plan", "teach"] as Mode[])("bypass does not change %s mode", async (
 
 test("/permissions turns bypass on and off and the record shows each change", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "x", method: "Default" } }] }, { text: "ok" }]);
-  session = await Session.create({ adapters: [lab], provider, cwd: tmpdir(), settings: { permissions: { count: "ask" } } });
+  session = await Session.create({ adapters: [lab], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { permissions: { count: "ask" } } });
   session.decisions.applySetup({});
   session.decisions.change("method", "Default");
   expect(session.permissionMode).toBe("ask");

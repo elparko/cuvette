@@ -8,8 +8,9 @@ import type { Mode } from "./core/types.ts";
 const HELP = `ga - a guided analysis agent for science programs
 
 Usage
-  ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume [<id>]]
+  ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume [<id>|<folder>]] [--output <folder>]
   ga resume [<id>]                     pick one of the last 10 sessions and continue it [--bypass-permissions]
+  ga open [<folder>]                   continue a session from its folder or from the project folder (default: this folder)
   ga -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json]
 
   With no --adapter, the agent calls list_adapters and asks to load the adapter that fits
@@ -30,6 +31,15 @@ Usage
   ga adapter check <name|dir> [--run-tests]
   ga adapter approve <name|dir> --by <name>
   ga onboard <program> --model <model> [--docs <url>] [--kind cli]
+  Each session saves its work in the folder where you start ga, in cuvette/<date>-<title>/:
+  tables, figures, scripts, exports and index.html (open it in a browser). The record is in
+  .record/ in that folder. To continue later, run "ga open <that folder>", or run
+  "ga --resume" with no value in the session folder or the project folder.
+  --output <folder> or the setting output_folder changes "cuvette": a name is a folder in the
+  project folder, an absolute path (a lab share, a results drive) is used as given. A project
+  setting wins over a user setting. If the folder is read-only, the session folder goes to
+  ~/.guided-analysis/projects/.
+
   ga models                            list the models
   ga config                            show each setting, its value and where it comes from
   ga config get <name>                 show one setting
@@ -40,7 +50,7 @@ Usage
   ga eln status|remove                 show or remove the saved eLabFTW key
   ga eln push <session>                send a session to eLabFTW after you approve the list
   ga eln link <session> <id>           read an eLabFTW experiment and propose setup values
-  ga sessions                          list the sessions, newest first: folder, age, first request
+  ga sessions                          list the sessions, newest first: folder, age, first request ("moved" if a folder is gone)
   ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx
   ga replay <flow.json> [--input name=path ...] [--session <id>]
   ga run-step <adapter> <tool> '<json args>'
@@ -106,13 +116,18 @@ function fail(msg: string): never {
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 const planSetting = () => (o.plan ? { planFirst: true } : o["no-plan"] ? { planFirst: false } : {});
 const readJson = (p?: string) => (p ? JSON.parse(readFileSync(p, "utf8")) : undefined);
-const bypass = () => (o["bypass-permissions"] ? { permissionMode: "bypass" as const } : {});
+const FORMATS = new Set(["text", "json", "stream-json"]);
+const outputFolder = () => {
+  const v = str(o.output);
+  return v && !FORMATS.has(v) ? { output_folder: v } : {};
+};
+const bypass = () => ({ ...(o["bypass-permissions"] ? { permissionMode: "bypass" as const } : {}), ...outputFolder() });
 
 async function headless(prompt: string) {
   const { Session } = await import("./core/session.ts");
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
-  const out = str(o.output) ?? "text";
+  const out = FORMATS.has(str(o.output) ?? "") ? str(o.output)! : "text";
   const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: { headless: true, ...bypass(), ...planSetting() } });
   attachHeadless(s, { answers, allow });
   s.bus.on((e) => {
@@ -123,7 +138,7 @@ async function headless(prompt: string) {
   applyHeadlessSetup(s, readJson(str(o.setup)) as Record<string, unknown> | undefined, answers);
   const answer = await s.send(prompt);
   if (out === "json") console.log(JSON.stringify({ session: s.id, dir: s.dir, answer, findings: s.findings.list() }, null, 1));
-  else if (out === "text") console.log(`${answer}\n\nSession: ${s.id}\nRecord: ${join(s.dir, "log.jsonl")}`);
+  else if (out === "text") console.log(`${answer}\n\nSession: ${s.id}\nFolder: ${s.workDir}\nRecord: ${join(s.dir, "log.jsonl")}`);
   await s.close();
 }
 
@@ -155,7 +170,7 @@ async function interactive(resumeId?: string) {
   if (o.resume !== undefined && !resumeId) resumeId = str(o.resume) || (await chooseSession(false));
   if (!adapters.length && !resumeId) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
   const s = resumeId
-    ? await Session.resume(resumeId, { model: str(o.model), interactive: true, settings: { ...bypass(), ...planSetting() } })
+    ? await Session.resume(resumeId, { model: str(o.model), interactive: true, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See ga sessions.`))
     : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, interactive: true, settings: { ...bypass(), ...planSetting() } });
   await runTui(s as never, {});
   await s.close();
@@ -333,6 +348,8 @@ async function main() {
       for (const s of list) console.log(sessionLine(s));
       return;
     }
+    case "open":
+      return interactive(a1 ?? ".");
     case "export": {
       const { Session } = await import("./core/session.ts");
       const s = await Session.resume(a1, { model: "fake:" });
@@ -342,7 +359,8 @@ async function main() {
     case "replay": {
       const { replayFlow } = await import("./core/replay.ts");
       const inputs = Object.fromEntries(((o.input as string[]) ?? []).map((kv) => kv.split("=", 2)));
-      const sessionDir = o.session ? join(gaHome(), "sessions", str(o.session)!) : undefined;
+      const { findPlace } = await import("./core/places.ts");
+      const sessionDir = o.session ? (findPlace(str(o.session)!)?.recordDir ?? fail(`no session ${str(o.session)}`)) : undefined;
       const r = await replayFlow(a1, inputs, { sessionDir });
       for (const st of r.steps) console.log(`${st.ok ? "●" : "✗"} ${st.tool} ${st.diffs.length ? "differs: " + st.diffs.join("; ") : "same"}`);
       return;

@@ -1,18 +1,38 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { appendFileSync, closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { extname, isAbsolute, join, relative } from "node:path";
+import { COPY_LIMIT_BYTES, local, portable } from "./places.ts";
 import { extractNumbers } from "./claims.ts";
 import type { Entry, EntryKind, Message, Node, NodeIn } from "./types.ts";
 
 const MAX_NUMBERS_PER_NODE = 2000;
 const MAX_FILE_BYTES = 1_000_000;
 
+export interface RecordPlaces {
+  workDir?: string;
+  exportDir?: string;
+  project?: string;
+}
+
+function sha256File(path: string): string {
+  const h = createHash("sha256");
+  const fd = openSync(path, "r");
+  const buf = Buffer.alloc(1 << 20);
+  try {
+    for (let n; (n = readSync(fd, buf, 0, buf.length, null)) > 0; ) h.update(buf.subarray(0, n));
+  } finally {
+    closeSync(fd);
+  }
+  return h.digest("hex");
+}
+
 export class AnalysisRecord {
-  readonly dir: string;
-  readonly workDir: string;
-  readonly blobDir: string;
-  readonly exportDir: string;
-  readonly logPath: string;
+  dir: string;
+  workDir: string;
+  blobDir: string;
+  exportDir: string;
+  logPath: string;
+  project?: string;
   onAppend?: (e: Entry) => void;
   private log: Entry[] = [];
   private nodeList: Node[] = [];
@@ -20,14 +40,23 @@ export class AnalysisRecord {
   private staleIds = new Set<string>();
   private nextNode = 1;
 
-  constructor(sessionDir: string, private sessionId: string) {
+  constructor(sessionDir: string, readonly sessionId: string, places: RecordPlaces = {}) {
     this.dir = sessionDir;
-    this.workDir = join(sessionDir, "work");
+    this.workDir = places.workDir ?? join(sessionDir, "work");
     this.blobDir = join(sessionDir, "blobs");
-    this.exportDir = join(sessionDir, "exports");
+    this.exportDir = places.exportDir ?? join(sessionDir, "exports");
     this.logPath = join(sessionDir, "log.jsonl");
+    this.project = places.project;
     for (const d of [this.dir, this.workDir, this.blobDir, this.exportDir]) mkdirSync(d, { recursive: true });
     if (existsSync(this.logPath)) this.load();
+  }
+
+  moveTo(sessionDir: string, places: RecordPlaces = {}): void {
+    this.dir = sessionDir;
+    this.workDir = places.workDir ?? join(sessionDir, "work");
+    this.blobDir = join(sessionDir, "blobs");
+    this.exportDir = places.exportDir ?? join(sessionDir, "exports");
+    this.logPath = join(sessionDir, "log.jsonl");
   }
 
   private load(): void {
@@ -35,7 +64,7 @@ export class AnalysisRecord {
       if (!line.trim()) continue;
       let e: Entry;
       try {
-        e = JSON.parse(line) as Entry;
+        e = local(JSON.parse(line), this.project) as Entry;
       } catch {
         continue;
       }
@@ -66,7 +95,7 @@ export class AnalysisRecord {
       ...(opts.node ? { node: opts.node } : {}),
       data,
     };
-    appendFileSync(this.logPath, JSON.stringify(e) + "\n");
+    appendFileSync(this.logPath, JSON.stringify(portable(e, this.project)) + "\n");
     this.log.push(e);
     this.index(e);
     this.onAppend?.(e);
@@ -86,6 +115,16 @@ export class AnalysisRecord {
   }
 
   putBlob(src: string | Buffer, ext?: string): string {
+    if (typeof src === "string") {
+      const st = statSync(src);
+      const rel = relative(this.workDir, src);
+      const made = rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+      if (st.size > COPY_LIMIT_BYTES && !made) {
+        const sha = sha256File(src);
+        if (!this.blobPath(sha)) writeFileSync(join(this.blobDir, `${sha}.ref.json`), JSON.stringify(portable({ path: src, size: st.size, mtime: st.mtime.toISOString(), sha256: sha }, this.project)));
+        return sha;
+      }
+    }
     const buf = typeof src === "string" ? readFileSync(src) : src;
     const sha = createHash("sha256").update(buf).digest("hex");
     const suffix = ext ?? (typeof src === "string" ? extname(src) : "");
@@ -97,11 +136,18 @@ export class AnalysisRecord {
     return sha;
   }
 
+  blobRef(sha: string): { path: string; size: number; mtime: string; sha256: string } | undefined {
+    const ref = join(this.blobDir, `${sha}.ref.json`);
+    return existsSync(ref) ? (local(JSON.parse(readFileSync(ref, "utf8")), this.project) as { path: string; size: number; mtime: string; sha256: string }) : undefined;
+  }
+
   blobPath(sha: string): string | undefined {
     const bare = join(this.blobDir, sha);
     if (existsSync(bare)) return bare;
-    const hit = readdirSync(this.blobDir).find((f) => f.startsWith(sha));
-    return hit ? join(this.blobDir, hit) : undefined;
+    const hit = readdirSync(this.blobDir).find((f) => f.startsWith(sha) && !f.endsWith(".ref.json"));
+    if (hit) return join(this.blobDir, hit);
+    const ref = this.blobRef(sha);
+    return ref && existsSync(ref.path) ? ref.path : undefined;
   }
 
   addNode(n: NodeIn): Node {

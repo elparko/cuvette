@@ -51,6 +51,16 @@ test("read_file and list_dir", async () => {
   expect((l.data as { entries: { name: string }[] }).entries.map((e) => e.name)).toContain("work");
 });
 
+test("write_file writes an absolute path in the project folder that the scientist names", async () => {
+  const project = mkdtempSync(join(tmpdir(), "ga-generic-proj-"));
+  const write = genericTools({ ...dirs, projectDir: project }).find((t) => t.name === "write_file")!;
+  expect((await write.execute({ name: join(project, "results", "table.csv"), text: "a\n1\n" }, ctx())).ok).toBe(true);
+  expect(readFileSync(join(project, "results", "table.csv"), "utf8")).toBe("a\n1\n");
+  expect((await write.execute({ name: "rel.txt", text: "x" }, ctx())).ok).toBe(true);
+  expect(existsSync(join(dirs.workDir, "rel.txt"))).toBe(true);
+  expect((await write.execute({ name: join(project, "..", "escape.txt"), text: "x" }, ctx())).ok).toBe(false);
+});
+
 test("write_file writes only inside the work folder", async () => {
   const ok = await tools.write_file.execute({ name: "sub/out.txt", text: "hello" }, ctx());
   expect(ok.ok).toBe(true);
@@ -58,7 +68,7 @@ test("write_file writes only inside the work folder", async () => {
   expect(ok.outputs?.[0].name).toBe("out.txt");
   for (const name of ["../escape.txt", "/tmp/ga-abs.txt", "..", "sub/../../escape2.txt"]) {
     const r = await tools.write_file.execute({ name, text: "x" }, ctx());
-    expect(r).toMatchObject({ ok: false, error: "the path is outside the session work folder" });
+    expect(r).toMatchObject({ ok: false, error: expect.stringMatching(/^the path is outside the session folder /) });
   }
   symlinkSync(root, join(dirs.workDir, "link"));
   expect((await tools.write_file.execute({ name: "link/escape3.txt", text: "x" }, ctx())).ok).toBe(false);

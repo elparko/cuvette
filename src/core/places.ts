@@ -1,0 +1,248 @@
+import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { gaHome } from "../adapters/manifest.ts";
+
+export const COPY_LIMIT_BYTES = 20 * 1024 * 1024;
+export const PROJECT_MARK = "{project}";
+
+export interface Place {
+  id: string;
+  recordDir: string;
+  outDir: string;
+  project: string;
+  title: string;
+  created: string;
+  legacy: boolean;
+  fallback: boolean;
+}
+
+interface Meta {
+  id: string;
+  title: string;
+  created: string;
+  fromProject?: string;
+  project?: string;
+  fallback?: boolean;
+}
+
+export interface IndexRow {
+  id: string;
+  project: string;
+  folder: string;
+  title: string;
+  date: string;
+}
+
+const README = "This folder holds one Cuvette analysis session: results, figures, scripts, exports, and the record in .record.\nTo continue the session, run \"ga open .\" in this folder.\nTo read it without Cuvette, open index.html in a browser.\n";
+
+export function indexPath(): string {
+  return join(gaHome(), "sessions-index.json");
+}
+
+export function readIndex(): IndexRow[] {
+  try {
+    return JSON.parse(readFileSync(indexPath(), "utf8")) as IndexRow[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveIndexRow(p: Place): void {
+  if (p.legacy) return;
+  const row: IndexRow = { id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created };
+  const rows = readIndex().filter((r) => r.id !== p.id);
+  mkdirSync(gaHome(), { recursive: true });
+  writeFileSync(indexPath(), JSON.stringify([...rows, row], null, 1));
+}
+
+export function slug(text: string, max = 40): string {
+  const stop = new Set(["a", "an", "the", "can", "could", "we", "you", "i", "me", "my", "please", "to", "of", "in", "on", "for", "these", "this", "that", "is", "are", "do", "with", "and", "want", "would", "like", "us", "our", "let", "lets"]);
+  const words = text.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, " ").split(/[\s_]+/).filter((w) => w && !stop.has(w));
+  let out = "";
+  for (const w of words) {
+    if (out && (out + "-" + w).length > max) break;
+    out = out ? `${out}-${w}` : w.slice(0, max);
+  }
+  return out;
+}
+
+function writable(dir: string): boolean {
+  try {
+    accessSync(dir, constants.W_OK);
+    const probe = join(dir, `.cuvette-probe-${process.pid}`);
+    writeFileSync(probe, "");
+    rmSync(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function inGitRepo(dir: string): boolean {
+  for (let d = resolve(dir); ; d = dirname(d)) {
+    if (existsSync(join(d, ".git"))) return true;
+    if (dirname(d) === d) return false;
+  }
+}
+
+export function inProject(p: Place): boolean {
+  return !p.legacy && !outside(p.outDir, p.project);
+}
+
+export function outputRoot(project: string, outputFolder: string): string {
+  const v = outputFolder.trim().replace(/^~(?=[\\/]|$)/, homedir());
+  return isAbsolute(v) ? v : join(project, v);
+}
+
+function writeMeta(p: Place): void {
+  const meta: Meta = { id: p.id, title: p.title, created: p.created, ...(p.fallback ? { fallback: true } : {}), ...(inProject(p) ? { fromProject: relative(p.project, p.outDir).split(sep).join("/") } : { project: p.project }) };
+  writeFileSync(join(p.recordDir, "meta.json"), JSON.stringify(meta, null, 1));
+}
+
+export function newPlace(project: string, outputFolder: string, id: string): Place {
+  const created = new Date().toISOString();
+  let root = outputRoot(project, outputFolder);
+  let fallback = false;
+  try {
+    mkdirSync(root, { recursive: true });
+  } catch {}
+  if (!existsSync(root) || !writable(root)) {
+    root = join(gaHome(), "projects", slug(basename(project)) || "project");
+    fallback = true;
+  }
+  const outDir = join(root, `.new-${id}`);
+  const p: Place = { id, recordDir: join(outDir, ".record"), outDir, project, title: "", created, legacy: false, fallback };
+  mkdirSync(p.recordDir, { recursive: true });
+  if (inProject(p) && inGitRepo(project) && !existsSync(join(root, ".gitignore"))) writeFileSync(join(root, ".gitignore"), ".record/\n");
+  writeMeta(p);
+  saveIndexRow(p);
+  return p;
+}
+
+export function legacyPlace(id: string, project: string): Place {
+  const recordDir = join(gaHome(), "sessions", id);
+  return { id, recordDir, outDir: join(recordDir, "work"), project, title: "", created: "", legacy: true, fallback: false };
+}
+
+export function provisional(p: Place): boolean {
+  return !p.legacy && basename(p.outDir).startsWith(".new-");
+}
+
+export function titlePlace(p: Place, request: string, keepOldName: boolean): Place {
+  const title = request.trim().split("\n")[0]!.slice(0, 120);
+  const d = p.created ? new Date(p.created) : new Date();
+  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const base = `${day}-${slug(title) || p.id}`;
+  let name = base;
+  for (let i = 2; existsSync(join(dirname(p.outDir), name)); i++) name = `${base}-${i}`;
+  const outDir = join(dirname(p.outDir), name);
+  renameSync(p.outDir, outDir);
+  if (keepOldName) {
+    try {
+      symlinkSync(name, p.outDir);
+    } catch {}
+  }
+  const next: Place = { ...p, outDir, recordDir: join(outDir, ".record"), title };
+  writeMeta(next);
+  writeFileSync(join(outDir, "README.txt"), README);
+  saveIndexRow(next);
+  return next;
+}
+
+export function placeAt(recordDir: string): Place | undefined {
+  const metaPath = join(recordDir, "meta.json");
+  if (!existsSync(metaPath)) return undefined;
+  const m = JSON.parse(readFileSync(metaPath, "utf8")) as Meta;
+  const outDir = dirname(recordDir);
+  const project = m.project ?? (m.fromProject ? resolve(outDir, ...m.fromProject.split("/").map(() => "..")) : dirname(dirname(outDir)));
+  return { id: m.id, recordDir, outDir, project, title: m.title, created: m.created, legacy: false, fallback: !!m.fallback };
+}
+
+function sessionsIn(folder: string): Place[] {
+  if (!existsSync(folder) || !statSync(folder).isDirectory()) return [];
+  return readdirSync(folder)
+    .filter((d) => !lstatSync(join(folder, d)).isSymbolicLink())
+    .map((d) => placeAt(join(folder, d, ".record")))
+    .filter((p): p is Place => !!p);
+}
+
+function findUp(start: string, outputFolder: string): Place | undefined {
+  for (let d = start; ; d = dirname(d)) {
+    if (basename(d) === ".record") {
+      const p = placeAt(d);
+      if (p) return p;
+    }
+    const here = placeAt(join(d, ".record"));
+    if (here) return here;
+    const latest = d === start ? sessionsIn(outputRoot(d, outputFolder)).filter((p) => resolve(p.project) === resolve(d)).sort((a, b) => b.created.localeCompare(a.created))[0] : undefined;
+    if (latest) return latest;
+    if (dirname(d) === d) return undefined;
+  }
+}
+
+export function findPlace(ref: string, opts: { cwd?: string; outputFolder?: string } = {}): Place | undefined {
+  const cwd = opts.cwd ?? process.cwd();
+  const path = resolve(cwd, ref.replace(/^~(?=\/|$)/, process.env.HOME ?? "~"));
+  if (ref.includes("/") || ref === "." || ref === ".." || isAbsolute(ref) || (existsSync(path) && statSync(path).isDirectory())) {
+    if (!existsSync(path)) return undefined;
+    if (existsSync(join(path, "log.jsonl")) && !existsSync(join(path, "meta.json"))) return legacyPlace(basename(path), cwd);
+    const p = findUp(path, opts.outputFolder ?? "cuvette");
+    if (p) saveIndexRow(p);
+    return p;
+  }
+  const row = readIndex().find((r) => r.id === ref);
+  if (row) {
+    const p = placeAt(join(row.folder, ".record"));
+    if (p) return p;
+  }
+  if (existsSync(join(gaHome(), "sessions", ref, "log.jsonl"))) return legacyPlace(ref, cwd);
+  return undefined;
+}
+
+export interface Listed extends IndexRow {
+  moved: boolean;
+  legacy: boolean;
+}
+
+export function listPlaces(): Listed[] {
+  const rows: Listed[] = readIndex().map((r) => ({ ...r, moved: !existsSync(join(r.folder, ".record", "log.jsonl")) && !existsSync(join(r.folder, ".record", "meta.json")), legacy: false }));
+  const old = join(gaHome(), "sessions");
+  if (existsSync(old)) {
+    for (const id of readdirSync(old)) {
+      if (rows.some((r) => r.id === id) || !existsSync(join(old, id, "log.jsonl"))) continue;
+      rows.push({ id, project: "", folder: join(old, id), title: "", date: "", moved: false, legacy: true });
+    }
+  }
+  return rows.sort((a, b) => (a.date || a.id).localeCompare(b.date || b.id));
+}
+
+export function portable(v: unknown, root: string | undefined): unknown {
+  if (!root) return v;
+  if (typeof v === "string") {
+    if (!isAbsolute(v) || v.length > 4096 || v.includes("\n")) return v;
+    const rel = relative(root, v);
+    if (rel === "") return PROJECT_MARK;
+    if (rel.startsWith("..") || isAbsolute(rel)) return v;
+    return `${PROJECT_MARK}/${rel.split(sep).join("/")}`;
+  }
+  if (Array.isArray(v)) return v.map((x) => portable(x, root));
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, portable(x, root)]));
+  return v;
+}
+
+export function local(v: unknown, root: string | undefined): unknown {
+  if (!root) return v;
+  if (typeof v === "string") {
+    if (v === PROJECT_MARK) return root;
+    return v.startsWith(`${PROJECT_MARK}/`) ? join(root, ...v.slice(PROJECT_MARK.length + 1).split("/")) : v;
+  }
+  if (Array.isArray(v)) return v.map((x) => local(x, root));
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, local(x, root)]));
+  return v;
+}
+
+export function outside(path: string, project: string): boolean {
+  const rel = relative(project, path);
+  return rel.startsWith("..") || isAbsolute(rel);
+}

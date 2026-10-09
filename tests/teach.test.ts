@@ -17,7 +17,7 @@ afterEach(async () => {
 const LAB_TEACH = join(__dirname, "fixtures/lab-teach");
 
 async function open(provider = new FakeProvider([{ text: "ok" }]), adapters = [LAB_TEACH]) {
-  session = await Session.create({ adapters, provider, cwd: tmpdir(), mode: "teach" });
+  session = await Session.create({ adapters, provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), mode: "teach" });
   session.decisions.applySetup({});
   return session;
 }

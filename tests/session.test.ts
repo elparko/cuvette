@@ -29,7 +29,7 @@ test("a scientist-owned decision blocks, runs the sensitivity check, and resumes
     { text: "There are 66 particles with the Triangle method (step 2). Also 999 cells." },
     { text: "There are 66 particles with the Triangle method (step 2). Also 999 cells." },
   ]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.bus.on((e) => {
     if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "Triangle"), 0);
   });
@@ -58,7 +58,7 @@ test("a scientist-owned decision blocks, runs the sensitivity check, and resumes
 
 test("follow mode shows the manual route and checks the scientist's numbers", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", method: "Default" } }] }, { text: "done" }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), mode: "follow" });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), mode: "follow" });
   session.decisions.applySetup({});
   session.decisions.change("method", "Default");
   let instruction = "";
@@ -77,7 +77,7 @@ test("follow mode shows the manual route and checks the scientist's numbers", as
 
 test("permission ask waits for the scientist and a denial goes back to the model", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "x", method: "Default" } }] }, { text: "ok" }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { permissions: { count: "ask" } } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { permissions: { count: "ask" } } });
   session.decisions.applySetup({});
   session.decisions.change("method", "Default");
   session.bus.on((e) => {
@@ -89,17 +89,17 @@ test("permission ask waits for the scientist and a denial goes back to the model
 
 test("resume rebuilds the history from the log", async () => {
   const provider = new FakeProvider([{ text: "hello" }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false } });
   await session.send("hi");
   const id = session.id;
   await session.close();
-  session = await Session.resume(id, { provider: new FakeProvider([{ text: "again" }]), cwd: tmpdir() });
+  session = await Session.resume(id, { provider: new FakeProvider([{ text: "again" }]), cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   expect(session.history.length).toBe(2);
 });
 
 test("a promise of an action with no tool call gets one nudge", async () => {
   const provider = new FakeProvider([{ text: "I will now count the particles." }, { calls: [{ name: "state", args: {} }] }, { text: "The program is open." }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false, headless: true } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false, headless: true } });
   const answer = await session.send("go");
   expect(answer).toBe("The program is open.");
   expect(provider.requests.length).toBe(3);
@@ -108,7 +108,7 @@ test("a promise of an action with no tool call gets one nudge", async () => {
 test("a nudge that leads to a tool call does not use up the nudges for later steps", async () => {
   const steps = [0, 1, 2, 3].flatMap((i) => [{ text: `Step ${i} done. Next, I will run the next step.` }, { calls: [{ name: "state", args: { i } }] }]);
   const provider = new FakeProvider([...steps, { text: "All four steps are done." }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false, headless: true } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false, headless: true } });
   expect(await session.send("go")).toBe("All four steps are done.");
   expect(provider.requests.length).toBe(9);
 });
@@ -127,7 +127,7 @@ test("generic file tools stay inside the folders of the analysis", async () => {
 test("three identical calls in a row end in a forced final answer", async () => {
   const same = { calls: [{ name: "note", args: { text: "x" } }] };
   const provider = new FakeProvider([same, same, same, { text: "Final." }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false } });
   expect(await session.send("go")).toBe("Final.");
   expect(provider.requests.at(-1)!.tools.length).toBe(0);
 });
@@ -140,7 +140,7 @@ test("a turn that stops during the revision keeps the first answer", async () =>
     session!.interrupt();
     throw new Error("aborted");
   };
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { headless: true, referee: "none" } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { headless: true, referee: "none" } });
   const answer = await session.send("go");
   expect(answer).toBe("The fold change was 3.7 in group B.");
   const final = session.record.entries(["assistant"]).filter((e) => e.data.final === true);
@@ -151,7 +151,7 @@ test("a turn that stops during the revision keeps the first answer", async () =>
 test("after a forced final answer the harness does not ask for a tool call", async () => {
   const same = { calls: [{ name: "note", args: { text: "x" } }] };
   const provider = new FakeProvider([same, same, same, { text: "The count is 64. I will now give the final answer." }, { text: "other" }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false, headless: true } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false, headless: true } });
   expect(await session.send("go")).toBe("The count is 64. I will now give the final answer.");
   expect(provider.requests.length).toBe(4);
 });
@@ -165,7 +165,7 @@ test("propose_change asks the scientist, and an agreed change updates the record
     { calls: [{ name: "propose_change", args: { key: "nope", value: 1, reason: "x" } }] },
     { text: "done" },
   ]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   const asked: { key: string; options: string[] }[] = [];
   session.bus.on((e) => {
     if (e.type !== "question") return;
@@ -197,7 +197,7 @@ test("compare_options reruns the last step with other values as comparison runs 
     { calls: [{ name: "compare_options", args: { key: "method", values: ["Otsu", "Triangle"] } }] },
     { text: "done" },
   ]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   await session.send("Count, then check other methods");
 
@@ -224,7 +224,7 @@ test("a step that uses the output of a comparison run is also a comparison run",
     }
     return { text: "done" };
   });
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   await session.send("Blur, compare, then count the comparison output");
   const last = session.record.nodes().at(-1)!;
@@ -239,7 +239,7 @@ test("a calculate result is a logged step that claims can cite", async () => {
     { text: "The ratio is 0.938." },
     { text: "The ratio is 0.938." },
   ]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   await session.send("What is the ratio?");
   const node = session.record.nodes().find((n) => n.tool === "calculate")!;
@@ -255,7 +255,7 @@ test("an answer while plan steps are open gets one reminder to finish them", asy
     { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", status: "done" }, { step: "Blur the image", status: "skipped" }] } }] },
     { text: "Done." },
   ]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   const answer = await session.send("Count and blur");
   const notes = provider.requests.flatMap((r) => r.messages).flatMap((m) => m.parts).filter((p) => p.type === "text" && /Your plan still has steps that are not done: Blur the image/.test((p as { text: string }).text));
@@ -269,7 +269,7 @@ test("a revision that loses results and fixes nothing is replaced by the first a
     { text: "There are 64 particles. Also 999 cells." },
     { text: "There are 999 cells." },
   ]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   const answer = await session.send("Count");
   expect(answer).toMatch(/There are 64 particles/);
@@ -282,7 +282,7 @@ test("the answer gets a list of step results that it does not mention", async ()
     { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
     { text: "I counted the particles and blurred the image." },
   ]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   await session.send("Count and blur");
   const last = session.record.entries(["assistant"]).at(-1)!.data as { text: string; results?: string };
@@ -293,7 +293,7 @@ test("the answer gets a list of step results that it does not mention", async ()
 
 test("an answer that still ends with a promise after three nudges is marked unfinished", async () => {
   const provider = new FakeProvider(() => ({ text: "I will now run the count." }));
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   await session.send("Count");
   expect(session.findings.list().some((f) => f.check === "answer_unfinished")).toBe(true);
@@ -314,7 +314,7 @@ test("an answer that says it needs to run a tool is an announced step", () => {
 });
 
 test("a result shows the text and the main files before the long list of pictures", async () => {
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "x" }]), cwd: tmpdir(), settings: { guidance: false } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "x" }]), cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false } });
   const tool = session.allTools().find((t) => t.name === "count")!;
   const outputs = [...Array.from({ length: 40 }, (_, i) => ({ name: `p${i}.png`, kind: "image" as const, path: `/w/p${i}.png` })), { name: "data.txt", kind: "file" as const, path: "/w/data.txt" }];
   const out = (session as any).render(tool, { ok: true, summary: "s", metrics: { n: 1 }, text: "data_file=/w/data.txt", outputs });
@@ -327,7 +327,7 @@ test("a result shows the text and the main files before the long list of picture
 test("a result shows the program reply once, with the whole table", async () => {
   const provider = new FakeProvider([{ text: "x" }]);
   provider.info = { ...provider.info, small: true };
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false } });
   const tool = session.allTools().find((t) => t.name === "count")!;
   const table = { columns: ["gate", "count"], rows: Array.from({ length: 14 }, (_, i) => [`g${i}`, i * 10]), n_rows: 14 };
   const data = { ok: true, summary: "14 gates", metrics: { n_gates: 14 }, n_gates: 14, warning: "two gates share a name", table };
@@ -340,7 +340,7 @@ test("a result shows the program reply once, with the whole table", async () => 
 });
 
 test("a result keeps data that differs from the table and a text that is not the data", async () => {
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "x" }]), cwd: tmpdir(), settings: { guidance: false } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([{ text: "x" }]), cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false } });
   const tool = session.allTools().find((t) => t.name === "count")!;
   const table = { columns: ["a"], rows: Array.from({ length: 20 }, (_, i) => [i]), n_rows: 20 };
   const out = (session as any).render(tool, { ok: true, summary: "s", metrics: { n: 1 }, text: "log line", data: { other: [1, 2] }, table });
@@ -352,7 +352,7 @@ test("a result keeps data that differs from the table and a text that is not the
 
 test("a result that used the recorded value says so to the model", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", min_size: 99 } }] }, { text: "done" }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "How many?", method: "Default", min_size: 5 });
   await session.send("Count");
   const results = provider.requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === "tool_result") as { text: string }[];
@@ -362,7 +362,7 @@ test("a result that used the recorded value says so to the model", async () => {
 
 test("comparison runs before a question wait for the other open decisions of the same call", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "fit", args: { data: "/data/x.csv", terms: "A + B", perms: 999 } }] }, { text: "done" }, { text: "done" }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/model")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/model")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   const asked: string[] = [];
   session.bus.on((e) => {
     if (e.type !== "question") return;
@@ -385,7 +385,7 @@ test("comparison runs before a question wait for the other open decisions of the
 
 test("without a wait for answers, the comparison names the missing argument and does not run", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "fit", args: { data: "/data/x.csv", terms: "A", perms: 999 } }] }, { text: "done" }, { text: "done" }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/model")], provider, cwd: tmpdir(), settings: { askWaits: false, autoResume: false } });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/model")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { askWaits: false, autoResume: false } });
   session.decisions.applySetup({ question: "Does A change the outcome?" });
   await session.send("Fit the model");
 
@@ -397,7 +397,7 @@ test("without a wait for answers, the comparison names the missing argument and 
 
 test("an empty answer keeps the agent's argument in the comparison runs and in the held call", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "fit", args: { data: "/data/x.csv", terms: "A + B", perms: 999 } }] }, { text: "done" }, { text: "done" }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/model")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/model")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.bus.on((e) => {
     if (e.type !== "question") return;
     setTimeout(() => session!.answer(e.question.qid, e.question.decisionKey === "terms" ? "" : 999), 0);
@@ -536,7 +536,7 @@ test("blind mode adds a mid-session adapter folder to the allow list and hides i
 });
 
 test("with --adapter, the session has no adapter tools and no program decision", async () => {
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   expect(session.pick).toBe(false);
   expect(session.allTools().map((t) => t.name)).not.toContain("use_adapter");
   expect(session.decisions.has("adapter")).toBe(false);
@@ -569,7 +569,7 @@ test("harness and generic tools take an optional purpose; the status line says i
     { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
     { text: "Done." },
   ]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "q" });
   const texts: string[] = [];
   session.bus.on((e) => { if (e.type === "status" && e.state === "running") texts.push(e.purpose ?? ""); });
@@ -618,7 +618,7 @@ function toolTexts(p: FakeProvider): string[] {
 
 test("plan first: no step runs before approval; approve logs plan_approved and starts step 1 in watch mode", async () => {
   const provider = new FakeProvider([{ calls: [blur] }, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
-  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true });
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), interactive: true });
   session.decisions.applySetup({});
   const seen: string[][] = [];
   session.bus.on((e) => {
@@ -649,7 +649,7 @@ test("plan first: no step runs before approval; approve logs plan_approved and s
 
 test("plan first: Change sends the request back and the agent revises; Cancel ends the turn with no step", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "plan", args: PLAN }] }, { calls: [{ name: "plan", args: { ...PLAN, out_of_scope: [] } }] }, { calls: [blur] }, { text: "Blurred." }, { text: "Blurred." }]);
-  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true, mode: "follow" });
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), interactive: true, mode: "follow" });
   session.decisions.applySetup({ method: "Otsu" });
   let n = 0;
   const modes: string[] = [];
@@ -667,7 +667,7 @@ test("plan first: Change sends the request back and the agent revises; Cancel en
   expect(session.mode).toBe("watch");
 
   const p2 = new FakeProvider([{ calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }]);
-  const s2 = await Session.create({ adapters: [LAB], provider: p2, cwd: tmpdir(), interactive: true });
+  const s2 = await Session.create({ adapters: [LAB], provider: p2, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), interactive: true });
   s2.decisions.applySetup({});
   s2.bus.on((e) => {
     if (e.type === "plan") setTimeout(() => s2.respondPlan({ action: "cancel" }), 0);
@@ -691,7 +691,7 @@ test("a step that is not in the approved plan gets a visible note, and the agent
     { text: "Blurred with sigma 2. The count is 41." },
     { text: "Blurred with sigma 2. The count is 41." },
   ]);
-  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true });
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), interactive: true });
   session.decisions.applySetup({ method: "Otsu" });
   session.bus.on((e) => {
     if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
@@ -706,14 +706,14 @@ test("a step that is not in the approved plan gets a visible note, and the agent
 });
 
 test("headless runs do not plan unless asked; with planFirst the headless runner approves the plan", async () => {
-  session = await Session.create({ adapters: [LAB], provider: new FakeProvider([]), cwd: tmpdir(), settings: { headless: true } });
+  session = await Session.create({ adapters: [LAB], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { headless: true } });
   expect(session.planFirst).toBe(false);
   expect(Object.keys((session.allTools().find((t) => t.name === "plan")!.inputSchema as { properties: object }).properties)).toEqual(["steps"]);
   await session.close();
 
   const { attachHeadless } = await import("../src/core/headless.ts");
   const provider = new FakeProvider([{ calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
-  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), settings: { headless: true, planFirst: true } });
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { headless: true, planFirst: true } });
   attachHeadless(session, { answers: { method: "Default" }, allow: new Set(["all"]) });
   session.decisions.applySetup({});
   await session.send("Blur a.tif");
@@ -727,7 +727,7 @@ test("a message typed during a turn goes in after the current step, with the ste
     { text: "Done." },
     { text: "Done with the log scale." },
   ]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
   session.decisions.applySetup({ question: "q" });
   let sent = false;
   session.bus.on((e) => {
@@ -748,7 +748,7 @@ test("a message typed during a turn goes in after the current step, with the ste
 
 test("a message that comes while the agent writes its answer starts one more step, not a new turn", async () => {
   const provider = new FakeProvider([{ text: "First answer." }, { text: "Second answer, with your note." }]);
-  session = await Session.create({ adapters: [], provider, cwd: tmpdir(), settings: { guidance: false } });
+  session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false } });
   session.bus.on((e) => {
     if (e.type === "status" && e.state === "thinking" && provider.requests.length === 0) session!.steer("Also give the median.");
   });
@@ -763,7 +763,7 @@ test("a message with send now stops the running tool and the agent reads it next
     { calls: [{ name: "run_command", args: { purpose: "wait", does: "Waits 20 seconds.", argv: ["sleep", "20"] } }, { name: "list_dir", args: { path: "." } }] },
     { text: "Stopped as you asked." },
   ]);
-  session = await Session.create({ adapters: [], provider, cwd: tmpdir(), settings: { guidance: false, permissionMode: "bypass" } });
+  session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false, permissionMode: "bypass" } });
   session.bus.on((e) => {
     if (e.type === "status" && e.state === "running" && e.tool === "run_command") setTimeout(() => session!.steer("Stop, wrong folder.", true), 300);
   });
@@ -779,7 +779,8 @@ test("a message with send now stops the running tool and the agent reads it next
 test("a turn with results writes results.xlsx in the output folder and one saved line; export_xlsx off writes none", async () => {
   const run = async (settings: Record<string, unknown>) => {
     const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", method: "Default" } }] }, { text: "The count is 64 (step 1)." }]);
-    session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false, ...settings } });
+    const cwd = mkdtempSync(join(tmpdir(), "ga-proj-"));
+    session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd, settings: { guidance: false, ...settings } });
     session.decisions.applySetup({ method: "Default" });
     await session.send("Count the particles in a.tif");
     const s = session;
@@ -790,7 +791,7 @@ test("a turn with results writes results.xlsx in the output folder and one saved
     return out;
   };
   const on = await run({});
-  expect(on.dir).toBe(join(process.env.GA_HOME!, "sessions", on.dir.split("/").at(-2)!, "work"));
+  expect(on.dir).toMatch(/\/ga-proj-[^/]+\/cuvette\/\d{4}-\d\d-\d\d-count-particles-tif$/);
   expect(readFileSync(on.xlsx).subarray(0, 2).toString()).toBe("PK");
   expect(on.saved.map((e) => e.data.text)).toEqual([expect.stringMatching(/^Saved: results\.xlsx \(4 sheets\)\. Folder: /)]);
   const off = await run({ export_xlsx: "off" });

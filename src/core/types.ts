@@ -31,6 +31,15 @@ export interface OutputFile {
   kind: "image" | "table" | "file";
   name?: string;
   sha?: string;
+  outside?: boolean;
+}
+
+export interface InputFile {
+  path: string;
+  size: number;
+  mtime: string;
+  sha256: string;
+  outside?: boolean;
 }
 
 export interface TablePreview {
@@ -50,6 +59,7 @@ export interface NodeIn {
   decisions: Record<string, unknown>;
   codeHash: string;
   inputHashes: string[];
+  inputFiles?: InputFile[];
   outputs: OutputFile[];
   result: unknown;
   parents: string[];

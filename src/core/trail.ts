@@ -191,7 +191,8 @@ function stepBuilt(record: AnalysisRecord, e: Entry, node: Node | undefined, ada
   const adapterName = show(d.adapter ?? node?.adapter);
   const args = asRecord(d.effectiveArgs ?? node?.args);
   const isStale = !!node && stale.has(node.id);
-  let line = clip(show(d.summary || node?.summary || `Ran ${tool}`));
+  const plain = typeof args.does === "string" && args.does.trim() ? `${typeof args.purpose === "string" ? `${args.purpose.trim().replace(/\.$/, "")}: ` : ""}${args.does.trim()}` : "";
+  let line = clip(plain || show(d.summary || node?.summary || `Ran ${tool}`));
   const failed = d.ok === false;
   if (failed) line = `Failed: ${shortReason(d.error ?? d.text ?? line)}`;
 

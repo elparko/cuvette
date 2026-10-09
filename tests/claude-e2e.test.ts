@@ -130,7 +130,7 @@ const lab = join(__dirname, "fixtures/lab");
 const SIG = "EqQBCkYIBxgCKkDsignature+/==";
 
 async function labSession(extra: Record<string, unknown> = {}) {
-  session = await Session.create({ adapters: [lab], model: "claude", referee: "none", cwd: tmpdir(), ...extra });
+  session = await Session.create({ adapters: [lab], model: "claude", referee: "none", cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), ...extra });
   session.bus.on((e) => {
     if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "Triangle"), 0);
   });
@@ -232,7 +232,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     const { FakeProvider } = await import("../src/providers/fake.ts");
     replies = [{ blocks: [{ type: "text", text: "[]" }] }];
     const referee = new ClaudeProvider("claude-sonnet-5-5");
-    session = await Session.create({ adapters: [lab], provider: new FakeProvider([{ text: "Nothing to count." }]), refereeProvider: referee, cwd: tmpdir() });
+    session = await Session.create({ adapters: [lab], provider: new FakeProvider([{ text: "Nothing to count." }]), refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
     session.decisions.applySetup({});
     await session.send("hello");
     expect(captured.at(-1)!.body.model).toBe("claude-sonnet-5-5");

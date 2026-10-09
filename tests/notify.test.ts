@@ -52,7 +52,7 @@ async function blockedSession() {
   session = await Session.create({
     adapters: [join(__dirname, "fixtures/lab")],
     provider,
-    cwd: tmpdir(),
+    cwd: mkdtempSync(join(tmpdir(), "ga-proj-")),
     settings: { notify: { ntfy: topic }, askWaits: false, autoResume: false },
   });
   session.decisions.applySetup({ question: "How many particles?" });

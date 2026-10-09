@@ -112,7 +112,7 @@ export function genericTools(dirs: Dirs): Tool[] {
     make({
       name: "write_file",
       title: "Write a file",
-      description: `Write a text file in the session work folder ${dirs.workDir}. A relative name starts there. Paths outside the work folder are refused.`,
+      description: `Write a text file. A relative name goes to the session folder ${dirs.workDir}. An absolute path in the project folder ${project} is also allowed, for a place that the scientist names. Other paths are refused.`,
       inputSchema: {
         type: "object",
         properties: { name: { type: "string", minLength: 1 }, text: { type: "string" } },
@@ -120,8 +120,9 @@ export function genericTools(dirs: Dirs): Tool[] {
         additionalProperties: false,
       },
       run(a) {
-        const target = insideWorkDir(dirs.workDir, String(a.name));
-        if (!target) return { ok: false, error: "the path is outside the session work folder" };
+        const name = String(a.name);
+        const target = insideWorkDir(dirs.workDir, name) ?? (dirs.projectDir && isAbsolute(name) ? insideWorkDir(dirs.projectDir, name) : undefined);
+        if (!target) return { ok: false, error: `the path is outside the session folder ${dirs.workDir} and the project folder ${project}` };
         writeFileSync(target, String(a.text));
         return { ok: true, summary: `Wrote ${Buffer.byteLength(String(a.text))} bytes to ${target}.`, outputs: [outputFile(target)] };
       },

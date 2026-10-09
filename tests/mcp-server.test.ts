@@ -22,6 +22,7 @@ async function connect(adapter?: string) {
     command: "node",
     args: [ga, "mcp", ...(adapter ? ["--adapter", adapter] : [])],
     env: { ...(process.env as Record<string, string>), GA_HOME: home },
+    cwd: home,
     stderr: "pipe",
   });
   transport.onerror = (e) => transportErrors.push(e);
@@ -148,7 +149,7 @@ test("ga_eln_push refuses because the MCP client cannot approve, and ga_export o
 });
 
 test("stdout carries only protocol lines", async () => {
-  const child = spawn("node", [ga, "mcp", "--adapter", lab], { env: { ...process.env, GA_HOME: home }, stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn("node", [ga, "mcp", "--adapter", lab], { cwd: home, env: { ...process.env, GA_HOME: home }, stdio: ["pipe", "pipe", "pipe"] });
   let out = "";
   child.stdout.on("data", (d) => (out += d));
   const send = (m: unknown) => child.stdin.write(JSON.stringify(m) + "\n");

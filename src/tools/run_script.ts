@@ -129,7 +129,7 @@ _install()
 
 const FIGURES_PY = readFileSync(fileURLToPath(new URL("../adapters/kinds/ga_figures.py", import.meta.url)), "utf8");
 
-const BOOT = "import sys,runpy;d,s=sys.argv[1:3];sys.path.insert(0,d);import ga_api;sys.argv=[s];runpy.run_path(s,run_name='__main__')";
+const BOOT = "import sys,runpy;d,s=sys.argv[1:3];sys.path.insert(0,d);import ga_api;sys.argv=[s];runpy.run_path(s,init_globals={k:getattr(ga_api,k) for k in ('call','save_table','save_figure','ToolError')},run_name='__main__')";
 
 type SandboxState = "unknown" | "on" | "off";
 let sandbox: SandboxState = "unknown";
@@ -152,7 +152,7 @@ export function describeLimits(network: boolean): string {
   const net = network ? "The script can use the network." : "The script cannot use the network.";
   if (process.platform === "darwin") {
     if (sandbox === "off") return `The operating system sandbox is not available. The script can read and write any file that your user account can. ${network ? "The script can use the network." : "The network is not blocked."}`;
-    return `The script runs in an operating system sandbox. It can read files on this computer. It can write only in the session work folder and in temporary folders. ${net}`;
+    return `The script runs in an operating system sandbox. It can read files on this computer. It can write only in the project folder, in the session folder and in temporary folders. ${net}`;
   }
   if (process.platform === "linux") {
     const files = "The script can read and write any file that your user account can.";
@@ -166,12 +166,13 @@ function sbString(s: string): string {
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
-function wrap(argv: string[], workDir: string, network: boolean): string[] {
+function wrap(argv: string[], workDir: string, network: boolean, project?: string): string[] {
   if (sandbox !== "on") return argv;
   const blind = blindPolicy();
   if (process.platform === "darwin") {
     const real = realpathSync(workDir);
-    const subs = [real, workDir, "/private/var/folders", "/private/tmp", "/dev"].map((p) => `(subpath ${sbString(p)})`).join("");
+    const extra = project && !blind && existsSync(project) ? [project, realpathSync(project)] : [];
+    const subs = [real, workDir, ...extra, "/private/var/folders", "/private/tmp", "/dev"].map((p) => `(subpath ${sbString(p)})`).join("");
     const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${blind ? sandboxReadRules(agentRules(blind)) : ""}`;
     return ["/usr/bin/sandbox-exec", "-p", profile, ...argv];
   }
@@ -220,7 +221,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
     get description() {
       return "Run Python 3 code for statistics and plots. " +
       `The script runs in the project folder ${project}, so a relative path reads from there, the same as in list_dir and read_file. ` +
-      `A relative path that the script opens for writing goes to the session work folder ${dirs.workDir}; new files there are returned. ` +
+      `A relative path that the script opens for writing goes to the session folder ${dirs.workDir}; new files there are returned. Write to another place in the project folder only if the scientist names it, with an absolute path. ` +
       "os.environ['PROJECT_DIR'], os.environ['WORK_DIR'] and os.environ['OUTPUT_DIR'] give the folders. Do not search the home folder, / or /Volumes for files: use the paths from earlier results or ask the scientist. " +
       "Give purpose and does in plain language: the scientist sees them, not the code. " +
       "Use `from ga_api import call, save_table, save_figure`. `call(tool, **args)` runs another tool and returns its result as a dict. " +
@@ -245,7 +246,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       writeFileSync(join(scriptDir, "ga_figures.py"), FIGURES_PY);
       const before = snapshot(dirs.workDir, scriptDir);
       const python = scriptPython();
-      const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network);
+      const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network, dirs.projectDir);
 
       const child = spawn(argv[0], argv.slice(1), {
         cwd: existsSync(project) ? project : dirs.workDir,

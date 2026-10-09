@@ -24,6 +24,7 @@ export interface SessionLike {
   id: string;
   dir: string;
   workDir: string;
+  folderLine?: string;
   cwd?: string;
   settings?: Record<string, unknown>;
   applySetting?(name: string, value: unknown): Promise<void>;

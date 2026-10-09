@@ -55,7 +55,7 @@ export function foldersText(f: Folders): string {
   return [
     "# Folders",
     `- The project folder is ${f.project}. A relative path in read_file, list_dir, run_script and run_command starts there.`,
-    `- Files that scripts write go to the session work folder ${f.work}.`,
+    `- Files that scripts write go to the session folder ${f.work}. If the scientist names another place in the project folder, save there with an absolute path.`,
     `- The output folder is ${out}. ${outputRules({ output: out, figureFormats: f.figureFormats ?? "png,svg", xlsx: f.xlsx ?? true })}`,
     "- Use the absolute paths from earlier tool results. Never search the whole disk for a file. If you cannot find a file, ask the scientist for the path.",
     "- For run_script and run_command, give purpose (one short line) and does (what the code does, in plain words for a scientist, with no code terms).",

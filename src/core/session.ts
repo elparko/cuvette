@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { allowAdapter, BLIND_REASON, blindCheck } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
 import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
@@ -9,6 +9,7 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
+import { findPlace, inProject, legacyPlace, local, newPlace, outputRoot, outside, provisional, titlePlace, type Place } from "./places.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
 import { compact, needsCompaction, summaryMessage } from "./compaction.ts";
@@ -60,6 +61,8 @@ export interface SessionOptions {
   generic?: boolean;
   pick?: boolean;
   interactive?: boolean;
+  home?: boolean;
+  place?: Place;
 }
 
 interface Pending<T> {
@@ -167,6 +170,7 @@ export class Session {
   dir: string;
   workDir: string;
   cwd: string;
+  place: Place;
   mode: Mode;
   permissionMode: Settings["permissionMode"];
   busy = false;
@@ -217,15 +221,16 @@ export class Session {
   private stopTurn = false;
   private lastSaid = "";
 
-  private constructor(id: string, cwd: string, settings: Settings) {
+  private constructor(id: string, cwd: string, settings: Settings, place: Place) {
     this.id = id;
     this.cwd = cwd;
     this.settings = settings;
     this.mode = settings.mode;
     this.permissionMode = settings.permissionMode;
-    this.dir = join(gaHome(), "sessions", id);
+    this.place = place;
+    this.dir = place.recordDir;
     mkdirSync(this.dir, { recursive: true });
-    this.record = new AnalysisRecord(this.dir, id);
+    this.record = new AnalysisRecord(this.dir, id, place.legacy ? {} : { workDir: place.outDir, exportDir: place.outDir, project: inProject(place) ? place.project : undefined });
     this.workDir = this.record.workDir;
     this.record.onAppend = (entry: Entry) => this.bus.emit({ type: "entry", entry });
   }
@@ -241,6 +246,11 @@ export class Session {
 
   private sharedDirs?: Dirs;
 
+  get folderLine(): string {
+    if (this.place.legacy) return `Results: ${this.workDir}`;
+    return provisional(this.place) ? `Results go to ${dirname(this.place.outDir)}/<date>-<title>/` : `Results: ${this.place.outDir}`;
+  }
+
   get model(): ModelInfo {
     return this.provider.info;
   }
@@ -248,20 +258,26 @@ export class Session {
   static async create(opts: SessionOptions): Promise<Session> {
     const cwd = opts.cwd ?? process.cwd();
     const settings = loadSettings(cwd, { ...(opts.settings ?? {}), mode: opts.mode, model: opts.model, referee: opts.referee });
-    const s = new Session(opts.id ?? newId(), cwd, settings);
+    const id = opts.place?.id ?? opts.id ?? newId();
+    const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
+    const s = new Session(id, cwd, settings, place);
     await s.init(opts);
+    if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
     return s;
   }
 
-  static async resume(id: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
-    const log = join(gaHome(), "sessions", id, "log.jsonl");
-    if (!existsSync(log)) throw new Error(`no session ${id}`);
-    const entries = readFileSync(log, "utf8").split("\n").map((l) => (l ? JSON.parse(l) : null));
+  static async resume(ref: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
+    const place = findPlace(ref, { cwd: opts.cwd, outputFolder: loadSettings(opts.cwd ?? process.cwd(), opts.settings ?? {}).output_folder });
+    if (!place) throw new Error(`no session ${ref}`);
+    const log = join(place.recordDir, "log.jsonl");
+    if (!existsSync(log)) throw new Error(`no session ${ref}`);
+    const id = place.id;
+    const entries = readFileSync(log, "utf8").split("\n").map((l) => (l ? local(JSON.parse(l), inProject(place) ? place.project : undefined) : null)) as any[];
     const first = entries.find((e) => e?.kind === "session");
     const loaded = entries.filter((e) => e?.kind === "adapter").map((e) => e.data);
     const adapters = opts.adapters ?? [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded].map((a) => (a.path && existsSync(a.path) ? a.path : a.name));
-    const cwd = opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
-    return Session.create({ ...opts, cwd, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? first?.data.mode, pick: opts.pick ?? !!first?.data.pick });
+    const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
+    return Session.create({ ...opts, cwd, place, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? first?.data.mode, pick: opts.pick ?? !!first?.data.pick });
   }
 
   private async init(opts: SessionOptions) {
@@ -296,16 +312,8 @@ export class Session {
     this.permissions = new Permissions(this.settings.permissions);
 
     const extra: Tool[] = [];
-    try {
-      const { genericTools } = await import("../tools/generic.ts");
-      const generic = genericTools({ workDir: this.workDir, sessionDir: this.dir, projectDir: this.cwd });
-      const always = new Set(["read_file", "list_dir"]);
-      extra.push(...generic.filter((t) => opts.generic || this.pick || this.adapters.length === 0 || always.has(t.name)));
-    } catch {}
-    try {
-      const { runScriptTool } = await import("../tools/run_script.ts");
-      extra.push(runScriptTool(this.dirs(), { network: this.settings.networkForScripts }));
-    } catch {}
+    const always = new Set(["read_file", "list_dir"]);
+    extra.push(...(await this.fileTools()).filter((t) => t.name === "run_script" || opts.generic || this.pick || this.adapters.length === 0 || always.has(t.name)));
     extra.push((await import("../tools/calculate.ts")).calculateTool());
     extra.push(
       ...coreTools({
@@ -365,6 +373,40 @@ export class Session {
       if (q.status === "defaulted" && q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by: "human", reason: `default after the time limit of ${q.qid}` });
       this.notes.push(q.status === "defaulted" ? `Question ${q.qid} reached its time limit. The default ${String(q.answer)} applies.` : `Question ${q.qid} reached its time limit with no answer. That branch stays stopped.`);
     }
+  }
+
+  private async fileTools(): Promise<Tool[]> {
+    const out: Tool[] = [];
+    try {
+      const { genericTools } = await import("../tools/generic.ts");
+      out.push(...genericTools(this.dirs()));
+    } catch {}
+    try {
+      const { runScriptTool } = await import("../tools/run_script.ts");
+      out.push(runScriptTool(this.dirs(), { network: this.settings.networkForScripts }));
+    } catch {}
+    return out;
+  }
+
+  private async nameFolder(request: string) {
+    if (!provisional(this.place)) return;
+    const next = titlePlace(this.place, request, this.runtimes.length > 0);
+    this.place = next;
+    this.dir = next.recordDir;
+    this.workDir = next.outDir;
+    this.record.moveTo(next.recordDir, { workDir: next.outDir, exportDir: next.outDir });
+    Object.assign(this.dirs(), { workDir: next.outDir, sessionDir: next.recordDir });
+    for (const t of await this.fileTools()) if (this.tools.has(t.name) && this.tools.get(t.name)!.source === t.source) this.tools.set(t.name, t);
+    this.system = this.buildSystem();
+    this.record.append("notice", { text: `This session saves its results in ${next.outDir}.` });
+  }
+
+  private async writeReport() {
+    if (this.place.legacy || provisional(this.place)) return;
+    try {
+      const trail = await import("./trail.ts");
+      trail.exportHtml(this.record, this.adapters, join(this.place.outDir, "index.html"));
+    } catch {}
   }
 
   private buildSystem(): string {
@@ -595,6 +637,7 @@ export class Session {
     let forceAnswer = false;
     const turnStart = this.record.entries().length;
     try {
+      await this.nameFolder(text);
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode]);
@@ -735,6 +778,7 @@ export class Session {
       this.stopTurn = false;
       this.saveResults(turnStart);
       this.busy = false;
+      await this.writeReport();
       this.bus.emit({ type: "status", state: "idle" });
       await this.hooks.event("Stop", { session: this.id }).catch(() => {});
     }
@@ -1032,7 +1076,7 @@ export class Session {
     for (const img of output.images ?? []) if (!fileList.some((o) => o.path === img)) fileList.push({ path: img, kind: "image" });
     const outputs = fileList
       .filter((o) => existsSync(o.path) && statSync(o.path).isFile())
-      .map((o) => ({ ...o, sha: this.record.putBlob(o.path, extOf(o.path)) }));
+      .map((o) => ({ ...o, sha: this.record.putBlob(o.path, extOf(o.path)), ...(!this.place.legacy && outside(o.path, this.cwd) ? { outside: true } : {}) }));
     const images = outputs.filter((o) => o.kind === "image" && /\.(png|jpe?g)$/i.test(o.path));
     const summary = output.summary ?? (output.ok ? `Ran ${remote}.` : `Failed: ${output.error ?? "unknown error"}`);
     let node: string | undefined;
@@ -1066,6 +1110,14 @@ export class Session {
       const strings = stringsIn(args);
       const inputs = strings.filter((s) => s.length < 1024 && (s.startsWith("/") || /^[A-Za-z]:\\/.test(s)) && existsSync(s) && statSync(s).isFile());
       const parents = this.record.nodes().filter((n) => n.outputs.some((o) => strings.includes(o.path) || (o.sha && strings.some((s) => s.includes(o.sha!))))).map((n) => n.id);
+      const inputFiles = await Promise.all(
+        inputs
+          .filter((p) => !this.record.nodes().some((x) => x.outputs.some((o) => o.path === p)))
+          .map(async (p) => {
+            const st = statSync(p);
+            return { path: p, size: st.size, mtime: st.mtime.toISOString(), sha256: await fileSha(p), ...(!this.place.legacy && outside(p, this.cwd) ? { outside: true } : {}) };
+          }),
+      );
       const n = this.record.addNode({
         entry: this.record.entries(["tool_result"]).at(-1)!.id,
         adapter: tool.adapter ?? "",
@@ -1075,7 +1127,8 @@ export class Session {
         args,
         decisions: meta.applied ?? {},
         codeHash: createHash("sha256").update(`${adapter?.name}@${adapter?.manifest.adapter.version}:${remote}:${JSON.stringify(entry ?? {})}`).digest("hex"),
-        inputHashes: await Promise.all(inputs.filter((p) => !this.record.nodes().some((x) => x.outputs.some((o) => o.path === p))).map(fileSha)),
+        inputHashes: inputFiles.map((f) => f.sha256),
+        inputFiles,
         outputs,
         result: { ok: output.ok, summary, metrics: output.metrics ?? {}, table: output.table, data: output.data },
         parents,
@@ -1720,7 +1773,7 @@ export class Session {
   }
 
   async exportAs(fmt: ExportFormat): Promise<string> {
-    const out = join(this.dir, "exports");
+    const out = this.record.exportDir;
     mkdirSync(out, { recursive: true });
     const trail = await import("./trail.ts");
     const ex = await import("./exports.ts");

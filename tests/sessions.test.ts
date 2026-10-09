@@ -48,3 +48,24 @@ test("ga sessions prints the newest first", () => {
   expect(lines.map((l) => l.slice(0, 20))).toEqual(["20261008-100000-bbbb", "20261007-100000-cccc", "20261001-090000-aaaa"]);
   expect(lines[0]).toContain("12 min ago");
 });
+
+test("sessions in project folders come from the home index; a missing folder is moved", () => {
+  const h = mkdtempSync(join(tmpdir(), "ga-sessions-index-"));
+  const project = mkdtempSync(join(tmpdir(), "ga-sessions-proj-"));
+  const folder = join(project, "cuvette", "2026-10-08-count-cells");
+  mkdirSync(join(folder, ".record"), { recursive: true });
+  writeFileSync(join(folder, ".record", "log.jsonl"), [{ id: 1, kind: "session", data: { cwd: "{project}" } }, { id: 2, kind: "user", data: { text: "Count the cells" } }].map((l) => JSON.stringify(l)).join("\n") + "\n");
+  const rows = [
+    { id: "20261008-100000-dddd", project, folder, title: "Count the cells", date: new Date().toISOString() },
+    { id: "20261008-090000-eeee", project: "/gone", folder: "/gone/cuvette/x", title: "Old request", date: new Date(Date.now() - 3600_000).toISOString() },
+  ];
+  writeFileSync(join(h, "sessions-index.json"), JSON.stringify(rows));
+  const list = listSessions(h);
+  expect(list.map((s) => [s.id, s.cwd, s.ask, !!s.moved])).toEqual([
+    ["20261008-100000-dddd", project, "Count the cells", false],
+    ["20261008-090000-eeee", "/gone", "Old request", true],
+  ]);
+  expect(sessionLine(list[1]!)).toContain("moved: run ga open <new folder>");
+  expect(defaultSession(list, join(folder, "figures"))?.info.id).toBe("20261008-100000-dddd");
+  expect(defaultSession(list, project)).toMatchObject({ here: true, info: { id: "20261008-100000-dddd" } });
+});

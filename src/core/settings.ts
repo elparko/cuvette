@@ -127,8 +127,9 @@ export const SETTINGS: SettingDef[] = [
     name: "output_folder",
     group: "Session",
     label: "Save results in",
-    help: "The folder in the project folder for outputs and session records. You cannot change it yet.",
-    scopes: [],
+    help: "Where each session saves its results, report and record. A name, such as cuvette, is a folder in the project folder. An absolute path, such as a lab share, is used as given. A project setting wins over a user setting. The change applies to the next session.",
+    scopes: ["user", "project"],
+    free: true,
     def: "cuvette",
   },
   {
@@ -352,6 +353,7 @@ export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown,
   if (d.secret || !d.scopes.length) throw new Error(`${d.label} cannot change here. ${d.help}`);
   if (!d.scopes.includes(scope)) throw new Error(`${d.label} can be saved only in: ${d.scopes.map(scopeLabel).join(", ")}.`);
   if (d.lockedInTurn && ctx.session?.busy) throw new Error(`${d.label} is locked until the turn ends.`);
+  if (name === "output_folder" && (typeof raw !== "string" || !raw.trim())) throw new Error(`${d.label} must be a folder: a name in the project folder, such as cuvette, or an absolute path.`);
   const value = parseValue(d, raw);
   const old = name === "details" ? d.read!(ctx).value : d.read ? fileValue(d, ctx.cwd).value : resolve(d, ctx).value;
   const s = ctx.session;

@@ -5,6 +5,7 @@ import { loadAdapter } from "../adapters/manifest.ts";
 import { Bus } from "../core/bus.ts";
 import { DecisionRecord } from "../core/decisions.ts";
 import { AnalysisRecord } from "../core/record.ts";
+import { findPlace, inProject } from "../core/places.ts";
 import { QuestionQueue } from "../core/questions.ts";
 import { startWindow, type WindowSession } from "./window.ts";
 
@@ -15,7 +16,8 @@ if (!id) {
   process.exit(1);
 }
 const port = Number(args[args.indexOf("--port") + 1]) || 0;
-const source = join(process.env.GA_HOME || join(homedir(), ".guided-analysis"), "sessions", id);
+const place = findPlace(id);
+const source = place?.recordDir ?? join(process.env.GA_HOME || join(homedir(), ".guided-analysis"), "sessions", id);
 if (!existsSync(join(source, "log.jsonl"))) {
   console.error(`No session ${id}.`);
   process.exit(1);
@@ -28,7 +30,7 @@ mkdirSync(dir, { recursive: true });
 cpSync(join(source, "log.jsonl"), join(dir, "log.jsonl"));
 symlinkSync(join(source, "blobs"), join(dir, "blobs"));
 
-const record = new AnalysisRecord(dir, id);
+const record = new AnalysisRecord(dir, id, place && inProject(place) ? { project: place.project } : {});
 const first = record.entries(["session"])[0];
 const adapters = ((first?.data.adapters ?? []) as { name: string; path?: string }[])
   .filter((a) => a.path && existsSync(a.path))

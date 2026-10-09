@@ -27,6 +27,7 @@ export interface Settings {
   notify: { ntfy?: string };
   export_xlsx: "on" | "off" | boolean;
   figure_formats: string;
+  output_folder: string;
 }
 
 export const DEFAULTS: Settings = {
@@ -52,6 +53,7 @@ export const DEFAULTS: Settings = {
   notify: {},
   export_xlsx: "on",
   figure_formats: "png,svg",
+  output_folder: "cuvette",
 };
 
 export function xlsxOn(s: Pick<Settings, "export_xlsx">): boolean {

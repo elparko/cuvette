@@ -124,7 +124,8 @@ test("bad values, read-only rows, scopes and locked rows are refused", async () 
   const ctx = { cwd, env: {}, session: s };
   await expect(changeSetting(ctx, "mode", "fast", "session")).rejects.toThrow(/one of: watch, follow, teach, plan/);
   await expect(changeSetting(ctx, "nope", "x", "user")).rejects.toThrow(/No setting named nope/);
-  await expect(changeSetting(ctx, "output_folder", "out", "user")).rejects.toThrow(/cannot change here/);
+  await expect(changeSetting(ctx, "output_folder", " ", "user")).rejects.toThrow(/must be a folder/);
+  await expect(changeSetting(ctx, "output_folder", "out", "session")).rejects.toThrow(/only in: user settings, project settings/);
   await expect(changeSetting(ctx, "budgetUsd", "50", "project")).rejects.toThrow(/only in: user settings/);
   s.busy = true;
   await expect(changeSetting(ctx, "model", "claude:claude-haiku-5-5", "session")).rejects.toThrow(/locked until the turn ends/);

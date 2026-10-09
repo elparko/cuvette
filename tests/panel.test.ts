@@ -21,7 +21,7 @@ afterEach(async () => {
 });
 
 async function open(provider: FakeProvider, extra: Record<string, unknown> = {}) {
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false }, ...extra });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false }, ...extra });
   session.decisions.applySetup({});
   session.decisions.change("method", "Default");
   const w = await startWindow(session, { port: 0 });

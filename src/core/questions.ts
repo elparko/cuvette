@@ -41,7 +41,7 @@ export class QuestionQueue {
   private session: string;
 
   constructor(private record: AnalysisRecord, private opts: { notify?: (q: Question) => Promise<void> } = {}) {
-    this.session = basename(record.dir);
+    this.session = record.sessionId;
     for (const e of record.entries(["question", "answer"])) {
       const d = e.data as any;
       if (e.kind === "question") {

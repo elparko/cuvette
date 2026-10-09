@@ -199,3 +199,10 @@ test("purpose and does are required", async () => {
   expect((await tool.execute({ code: "print(1)" }, ctx)).ok).toBe(false);
   expect(tool.description).toContain("not the code");
 });
+
+test("save_table and save_figure work without an import", async () => {
+  const { run, dirs } = setup();
+  const r = await run("save_table('counts', [{'condition': 'LDL', 'n': 2}])");
+  expect(r.ok).toBe(true);
+  expect(readFileSync(join(dirs.workDir, "counts.csv"), "utf8")).toContain("condition,n");
+});

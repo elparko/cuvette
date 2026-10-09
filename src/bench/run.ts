@@ -38,6 +38,7 @@ export async function runScenario(id: string, opts: RunOptions): Promise<RunResu
       mode: "watch",
       cwd,
       settings: { guidance: opts.guidance, headless: true } as any,
+      home: true,
     });
     session.bus.on((e) => {
       if (e.type === "permission") return void setTimeout(() => session.respondPermission(e.rid, true, "simulated scientist: allowed (scripts run in the sandbox)"), 0);

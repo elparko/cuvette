@@ -24,6 +24,7 @@ export function Header({ session }: { session: SessionLike }) {
     <Box flexDirection="column" marginBottom={1}>
       <Text bold>guided-analysis</Text>
       <Text>Adapters: {adapters || "none"}</Text>
+      {session.folderLine ? <Text>{session.folderLine}</Text> : null}
       <Text>
         Model: {session.model.model} · Mode: {session.mode} · Session: {session.id}
       </Text>
