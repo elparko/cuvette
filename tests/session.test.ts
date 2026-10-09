@@ -562,3 +562,23 @@ test("a script that walks a large folder asks first, even after always allow", a
   expect(lastToolText(provider)).toMatch(/did not allow a search of \/Volumes/);
   expect(session.record.entries(["permission"]).map((e) => e.data.search)).toEqual([undefined, "/Volumes"]);
 });
+
+test("harness and generic tools take an optional purpose; the status line says it, and the tool does not get it", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: { steps: [{ step: "blur" }], purpose: "write down the steps before the blur" } }] },
+    { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+    { text: "Done." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "q" });
+  const texts: string[] = [];
+  session.bus.on((e) => { if (e.type === "status" && e.state === "running") texts.push(e.purpose ?? ""); });
+  await session.send("Blur a.tif");
+  const tools = provider.requests[0]!.tools as unknown as { name: string; inputSchema: { properties: Record<string, unknown> } }[];
+  expect(tools.find((t) => t.name === "plan")!.inputSchema.properties.purpose).toBeDefined();
+  expect(tools.find((t) => t.name === "blur")?.inputSchema.properties.purpose).toBeUndefined();
+  expect(texts[0]).toBe("Write down the steps before the blur");
+  expect(texts[1]).toMatch(/a\.tif/);
+  expect(session.record.entries(["tool_call"])[0]!.data.args).toMatchObject({ purpose: "write down the steps before the blur" });
+  expect(session.record.entries(["tool_result"])[0]!.data.ok).toBe(true);
+});

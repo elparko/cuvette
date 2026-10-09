@@ -8,7 +8,7 @@ import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 import { renderGraph, suggestions } from "../src/tui/commands.ts";
 import React from "react";
 import { render } from "ink";
-import { ItemView, runningText } from "../src/tui/view.tsx";
+import { ItemView, activityText, runningText } from "../src/tui/view.tsx";
 
 let live: { h: Harness; s: FakeSession; done: Promise<void> } | undefined;
 
@@ -442,6 +442,28 @@ describe("quiet view", () => {
       s.record.append("answer", { qid: "q2", value: 0.05, by: "human" });
     });
     expect(texts(mainView(log, true).settled)).toEqual(["· Read 1 file (sleep.csv)", "✓ Which test? Welch", "✓ Alpha: 0.05"]);
+  });
+
+  test("a step with no agent text before it shows its purpose; code never shows in the settings", () => {
+    const { log } = feed((s) => {
+      const args = { code: "import x\nprint(1)", purpose: "count nuclei in 24 images", does: "Opens 24 images, finds the nuclei and saves counts.csv." };
+      s.record.append("tool_call", { callId: "a", tool: "run_script", args });
+      s.record.append("tool_result", { callId: "a", tool: "run_script", ok: true, summary: "The script finished and wrote 1 new file(s).", effectiveArgs: { ...args, timeout_s: 60 } }, { node: "n1" });
+      s.record.append("assistant", { text: "Next I compare the groups.", final: false });
+      s.record.append("tool_call", { callId: "b", tool: "compare", args: { file: "/d/c.csv" } });
+      s.record.append("tool_result", { callId: "b", tool: "compare", adapter: "biostats", ok: true, summary: "Welch t test", effectiveArgs: { file: "/d/c.csv" } }, { node: "n2" });
+    });
+    const steps = mainView(log, true).settled.filter((i) => i.t === "step") as Extract<Item, { t: "step" }>[];
+    expect(steps[0]).toMatchObject({ n: 1, summary: "Opens 24 images, finds the nuclei and saves counts.csv.", why: "count nuclei in 24 images", settings: "timeout s 60" });
+    expect(steps[1]).toMatchObject({ n: 2, summary: "Welch t test" });
+    expect(steps[1]!.why).toBeUndefined();
+  });
+
+  test("the activity line names the state in plain words", () => {
+    expect(activityText("running", "Reading sleep.csv", "read_file")).toBe("Reading sleep.csv");
+    expect(activityText("running", undefined, "read_file")).toBe("Running read file");
+    expect(activityText("waiting")).toBe("Waiting for your answer");
+    expect(activityText("thinking")).toBe("Thinking about the next step");
   });
 
   test("held lines show in the live area until the next main line", () => {

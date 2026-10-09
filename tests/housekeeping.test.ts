@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { role, roleInRecord, stepNumbers } from "../src/core/housekeeping.ts";
+import { activity, role, roleInRecord, stepNumbers } from "../src/core/housekeeping.ts";
 import type { Entry, Node } from "../src/core/types.ts";
 
 let id = 0;
@@ -54,4 +54,16 @@ test("harness notes and allowed permissions are housekeeping; the rest stays in 
 test("step numbers count the result nodes and skip comparison runs", () => {
   const nodes = [{ id: "n1" }, { id: "n2", sensitivityOf: "sigma" }, { id: "n3" }] as Node[];
   expect([...stepNumbers(nodes)]).toEqual([["n1", 1], ["n3", 2]]);
+});
+
+test("the activity text says what the call does in plain words, never only a tool name", () => {
+  expect(activity("list_dir", { path: "/data/LDL/", purpose: "look at the folders in LDL to find the image sets" })).toBe("Look at the folders in LDL to find the image sets");
+  expect(activity("list_dir", { path: "/data/LDL/" })).toBe("Looking at the folder LDL");
+  expect(activity("read_file", { path: "/d/sleep.csv" })).toBe("Reading sleep.csv");
+  expect(activity("run_script", { code: "x", purpose: "measure nuclei in 24 images." })).toBe("Running a script: measure nuclei in 24 images");
+  expect(activity("run_script", { code: "print(1)" })).toBe("Running a script");
+  expect(activity("run_command", { argv: ["/bin/ls", "-l"] })).toBe("Running the command ls");
+  expect(activity("list_adapters", {})).toBe("Checking the adapter list");
+  expect(activity("compare_two_groups", { file: "/d/sleep.csv", paired: true }, "Compare two groups")).toBe("Compare two groups: sleep.csv");
+  expect(activity("fit_mixed_model", {})).toBe("Fit mixed model");
 });

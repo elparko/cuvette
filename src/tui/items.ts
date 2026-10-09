@@ -1,4 +1,4 @@
-import { canMakeNode, role } from "../core/housekeeping.ts";
+import { activity, canMakeNode, purposeOf, role } from "../core/housekeeping.ts";
 import type { Entry, Fidelity } from "../core/types.ts";
 import type { SessionLike } from "./types.ts";
 
@@ -25,6 +25,7 @@ export type Item =
       outputs: OutputRef[];
       purpose?: string;
       code?: string;
+      why?: string;
     }
   | { key: string; t: "line"; sym: string; color?: string; text: string; dim?: boolean }
   | { key: string; t: "block"; title?: string; text: string };
@@ -37,7 +38,7 @@ function show(v: unknown): string {
   return JSON.stringify(v);
 }
 
-const NOT_SETTINGS = new Set(["purpose", "does", "code", "argv"]);
+const NOT_SETTINGS = new Set(["purpose", "does", "code", "argv", "script", "macro", "description"]);
 
 export function codeOf(args: Record<string, unknown>): string | undefined {
   if (typeof args.code === "string") return args.code;
@@ -55,7 +56,7 @@ export function plainOf(args: Record<string, unknown>): { purpose?: string; does
 export function settingsLine(args: unknown): string {
   if (!args || typeof args !== "object") return "";
   const parts = Object.entries(args as Record<string, unknown>)
-    .filter(([k, v]) => !NOT_SETTINGS.has(k) && v !== undefined && v !== null && typeof v !== "object")
+    .filter(([k, v]) => !NOT_SETTINGS.has(k) && v !== undefined && v !== null && typeof v !== "object" && !(typeof v === "string" && (v.includes("\n") || v.length > 80)))
     .slice(0, MAX_SETTINGS)
     .map(([k, v]) => `${k.replace(/_/g, " ")} ${show(v)}`);
   return parts.join(" · ");
@@ -73,6 +74,8 @@ export class Mapper {
   outputs: OutputRef[] = [];
   tokens = { input: 0, output: 0 };
   private titles = new Map<string, string>();
+  private calls = new Map<string, Record<string, unknown>>();
+  private said = false;
   constructor(private session: SessionLike) {}
 
   map(e: Entry): Item[] {
@@ -85,9 +88,23 @@ export class Mapper {
       case "user":
         return [{ key, t: "user", text: String(d.text ?? "") }];
       case "assistant":
+        if (String(d.text ?? "").trim()) this.said = true;
         return d.text ? [{ key, t: "assistant", text: String(d.text) }] : [];
-      case "tool_result":
-        return [this.stepItem(key, d, role(e) === "analysis")];
+      case "tool_call":
+        this.calls.set(String(d.callId), (d.args ?? {}) as Record<string, unknown>);
+        return [];
+      case "tool_result": {
+        const analysis = role(e) === "analysis";
+        const it = this.stepItem(key, d, analysis);
+        if (analysis && it.t === "step") {
+          if (!this.said) {
+            const args = this.calls.get(String(d.callId)) ?? {};
+            it.why = purposeOf(args) || activity(String(d.tool), args);
+          }
+          this.said = false;
+        }
+        return [it];
+      }
       case "deviation": {
         const devs = (d.deviations as { arg: string; key?: string; setup: unknown; used: unknown; requested?: unknown; overwritten?: boolean }[] | undefined) ?? [];
         return devs.map((v, i) => ({

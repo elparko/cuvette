@@ -75,7 +75,7 @@ function AssistantView({ text }: { text: string }) {
 }
 
 function StepView({ item }: { item: Extract<Item, { t: "step" }> }) {
-  const label = item.purpose ?? (item.n ? `Step ${item.n}` : item.tool);
+  const label = item.n ? `Step ${item.n}` : (item.purpose ?? item.tool);
   const detail = [item.route, item.settings].filter(Boolean).join(" · ");
   const fid = fidelityLabel(item.fidelity);
   return (
@@ -89,6 +89,7 @@ function StepView({ item }: { item: Extract<Item, { t: "step" }> }) {
           <Text color="red">✗</Text> <Text bold>{label}</Text>  <Text color="red">{item.error ?? item.summary}</Text>
         </Text>
       )}
+      {item.why ? <Text dimColor>  Purpose: {item.why}</Text> : null}
       {detail ? <Text dimColor>  ▸ {detail}</Text> : null}
       {fid ? <Text color="yellow">  ◇ {fid}</Text> : null}
       {item.outputs.map((o) => (
@@ -99,6 +100,12 @@ function StepView({ item }: { item: Extract<Item, { t: "step" }> }) {
       ))}
     </Box>
   );
+}
+
+export function activityText(state: string, purpose?: string, tool?: string): string {
+  if (state === "running") return purpose || (tool ? `Running ${tool.replace(/_/g, " ")}` : "Working");
+  if (state === "waiting") return "Waiting for your answer";
+  return "Thinking about the next step";
 }
 
 export function elapsedText(s: number): string {
@@ -153,7 +160,7 @@ export function StatusLine(props: {
   if (props.busy) {
     parts.push(
       <Text key="b">
-        <Spinner /> {props.tool ? props.purpose ?? `running ${props.tool}` : props.state === "waiting" ? "waiting for you" : "thinking"}
+        <Spinner /> {props.state === "waiting" ? "waiting for you" : props.state === "running" ? "working" : "thinking"}
       </Text>,
     );
   }

@@ -1,6 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { activity } from "../core/housekeeping.ts";
 import { Bus } from "../core/bus.ts";
 import { AnalysisRecord } from "../core/record.ts";
 import type { Args, Fidelity, Finding, Mode, ModelInfo, Owner, Question } from "../core/types.ts";
@@ -123,9 +124,9 @@ export class FakeSession implements SessionLike {
     return this.delay === 0 ? Promise.resolve() : wait(ms);
   }
 
-  private status(state: "idle" | "thinking" | "running" | "waiting", tool?: string) {
+  private status(state: "idle" | "thinking" | "running" | "waiting", tool?: string, args?: Args) {
     this.busy = state !== "idle";
-    this.bus.emit({ type: "status", state, tool });
+    this.bus.emit({ type: "status", state, tool, purpose: state === "running" && tool ? activity(tool, args) : undefined, since: Date.now() });
   }
 
   private async stream(text: string) {
@@ -138,7 +139,7 @@ export class FakeSession implements SessionLike {
 
   private async runTool(tool: string, args: Args, out: ToolOut) {
     const callId = `c${this.record.entries(["tool_call"]).length + 1}`;
-    this.status("running", tool);
+    this.status("running", tool, args);
     this.record.append("tool_call", { callId, tool, adapter: "smile-msi", args });
     await this.sleep();
     if (this.aborted) return undefined;
@@ -188,7 +189,7 @@ export class FakeSession implements SessionLike {
 
   private async look(tool: string, args: Args, summary: string) {
     const callId = `c${this.record.entries(["tool_call"]).length + 1}`;
-    this.status("running", tool);
+    this.status("running", tool, args);
     this.record.append("tool_call", { callId, tool, args });
     await this.sleep();
     this.record.append("tool_result", { callId, tool, ok: true, summary, effectiveArgs: args, fidelity: "none" });

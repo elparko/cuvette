@@ -19,6 +19,7 @@ import { applyOverlay, labText, propose } from "./labmemory.ts";
 import { compareNote, instruction, teachReview, type TeachSummary } from "./modes.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
+import { activity, PURPOSE } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
 import { AnalysisRecord } from "./record.ts";
 import { Findings, referee, runChecks } from "./review.ts";
@@ -58,6 +59,13 @@ export interface SessionOptions {
 
 interface Pending<T> {
   resolve: (v: T) => void;
+}
+
+const ownPurpose = (t: Tool) => Boolean((t.inputSchema.properties as Record<string, unknown> | undefined)?.purpose);
+
+function withPurpose(t: Tool): Record<string, unknown> {
+  if (t.source === "adapter" || ownPurpose(t)) return t.inputSchema;
+  return { ...t.inputSchema, properties: { ...((t.inputSchema.properties as object) ?? {}), purpose: PURPOSE } };
 }
 
 const MODE_NOTE: Record<Mode, string> = {
@@ -672,7 +680,7 @@ export class Session {
   }
 
   private activeSchemas() {
-    return [...this.tools.values()].filter((t) => this.active.has(t.name)).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
+    return [...this.tools.values()].filter((t) => this.active.has(t.name)).map((t) => ({ name: t.name, description: t.description, inputSchema: withPurpose(t) }));
   }
 
   private async maybeCompact(signal: AbortSignal, force = false) {
@@ -778,12 +786,12 @@ export class Session {
   private async runCall(call: Extract<Part, { type: "tool_call" }>, signal: AbortSignal): Promise<Part> {
     const tool = this.findTool(call.name);
     this.record.append("tool_call", { callId: call.id, tool: call.name, adapter: tool?.adapter, args: call.args as Record<string, unknown> });
-    const purpose = (call.args as Args | undefined)?.purpose;
-    this.bus.emit({ type: "status", state: "running", tool: call.name, purpose: typeof purpose === "string" ? purpose : undefined, since: Date.now() });
+    this.bus.emit({ type: "status", state: "running", tool: call.name, purpose: activity(call.name, (call.args ?? {}) as Args, tool?.source === "adapter" ? tool.title : undefined), since: Date.now() });
     if (call.parseError) return this.fail(call.id, call.name, `the arguments are not valid JSON: ${call.parseError}`);
     if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use find_tools to search.`);
     if (!this.active.has(tool.name)) this.active.add(tool.name);
     const args = dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema);
+    if (!ownPurpose(tool)) delete args.purpose;
     const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
     return { type: "tool_result", callId: call.id, name: call.name, text: r.text, images: r.images, isError: r.isError };
   }
@@ -1211,7 +1219,7 @@ export class Session {
     this.permissionWaits.delete(rid);
     if (res.ok && res.always && !search) this.sessionAllow.add(tool.name);
     this.record.append("permission", { rid, tool: tool.name, decision: res.ok ? "allowed" : "denied", by: "scientist", note: res.note, always: res.always && !search, sha256, ...(search ? { search: search.root } : {}) });
-    if (res.ok) this.bus.emit({ type: "status", state: "running", tool: tool.name, purpose: typeof args.purpose === "string" ? args.purpose : undefined, since: Date.now() });
+    if (res.ok) this.bus.emit({ type: "status", state: "running", tool: tool.name, purpose: activity(tool.name, args, tool.source === "adapter" ? tool.title : undefined), since: Date.now() });
     return res;
   }
 

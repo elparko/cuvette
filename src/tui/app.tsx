@@ -9,7 +9,7 @@ import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from ".
 import { imageProtocol, inlineImage } from "./image.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "./items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
-import { Header, ItemView, RunningLine, StatusLine, type StaticItem } from "./view.tsx";
+import { Header, ItemView, RunningLine, StatusLine, activityText, type StaticItem } from "./view.tsx";
 import { Markdown } from "./markdown.tsx";
 
 const MODE_ORDER: Mode[] = ["watch", "follow", "teach", "plan"];
@@ -352,7 +352,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           <Markdown text={live} width={((stdout as unknown as { columns?: number })?.columns ?? 80) - 1} />
         </Box>
       ) : null}
-      {status.tool ? <RunningLine key={`${status.tool}${status.since ?? ""}`} tool={status.tool} purpose={status.purpose} since={status.since} /> : null}
+      {status.state !== "idle" ? <RunningLine key={`${status.state}${status.tool ?? ""}${status.since ?? ""}`} tool={status.tool ?? ""} purpose={activityText(status.state, status.purpose, status.tool)} since={status.since} /> : null}
       {card?.t === "setup" ? (
         <SetupCard
           key="setup"
