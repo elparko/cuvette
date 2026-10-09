@@ -1,0 +1,40 @@
+adapters: [growthcurver]
+prompt: |
+  I grew an E. coli host strain (DA49828, streptomycin resistant) and the same host with each of 12 clinical plasmids in a Bioscreen plate reader at 32 °C and read the OD600 every 4 minutes for 36 hours. The file {data}/nair2024-plasmid-growth/strr_od.csv has the column time (hours) and one column for each of the 84 wells, W01 to W84. The file strr_design.csv in the same folder gives for each well the host, the plasmid (Host for the plasmid-free strain) and the block: a plate column with the plasmid-free host in its topmost well and plasmid-carrying strains below it. Fit a logistic growth curve to each well with growthcurver to get the exponential growth rate r. Divide the r of each well by the r of the host well of the same block. For each plasmid, give the mean relative growth rate with its 95% confidence interval and the p value of a two-sided one-sample t test against 1. Give the mean of the 12 plasmid means. Does any plasmid lower the growth rate of this host? Write every number in your final answer text.
+answers:
+  bg_correct: min
+  blank_wells: none
+  t_trim: 0
+  time_unit: h
+  exclude_wells: "W10, W11, W12, W13, W14, W15, W16, W17, W18, W80, W81, W82, W83, W84"
+  easylinear_points: 5
+  reference_group: Host
+  relative_to: same block
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data:
+  - nair2024-plasmid-growth/strr_od.csv
+  - nair2024-plasmid-growth/strr_design.csv
+items:
+  - {key: n_wells, description: "Wells fitted", value: 70, exact: true, in_answer: false, tool: fit_growth_curves}
+  - {key: r_w01, description: "Growth rate r of well W01 (host, block 1), per hour", value: 0.371065, tolerance: 0.000005, in_answer: false, tool: fit_growth_curves}
+  - {key: r_w24, description: "Growth rate r of well W24 (P5, block 3), per hour", value: 0.479446, tolerance: 0.000005, in_answer: false, tool: fit_growth_curves}
+  - {key: rel_p1, description: "Mean relative growth rate, P1", value: 1.005299, tolerance: 0.0005}
+  - {key: rel_p2, description: "Mean relative growth rate, P2", value: 1.027756, tolerance: 0.0005}
+  - {key: rel_p3, description: "Mean relative growth rate, P3", value: 1.032948, tolerance: 0.0005}
+  - {key: rel_p4, description: "Mean relative growth rate, P4", value: 0.965689, tolerance: 0.0005}
+  - {key: rel_p5, description: "Mean relative growth rate, P5", value: 1.072459, tolerance: 0.0005}
+  - {key: rel_p6, description: "Mean relative growth rate, P6", value: 1.008294, tolerance: 0.0005}
+  - {key: rel_p7, description: "Mean relative growth rate, P7", value: 0.961198, tolerance: 0.0005}
+  - {key: rel_p8, description: "Mean relative growth rate, P8", value: 0.975450, tolerance: 0.0005}
+  - {key: rel_p9, description: "Mean relative growth rate, P9", value: 1.042573, tolerance: 0.0005}
+  - {key: rel_p10, description: "Mean relative growth rate, P10", value: 0.990162, tolerance: 0.0005}
+  - {key: rel_p11, description: "Mean relative growth rate, P11", value: 0.946554, tolerance: 0.0005}
+  - {key: rel_p14, description: "Mean relative growth rate, P14", value: 1.082055, tolerance: 0.0005}
+  - {key: ci_low_p11, description: "95% CI lower bound of the relative growth rate, P11", value: 0.742365, tolerance: 0.0005}
+  - {key: ci_high_p11, description: "95% CI upper bound of the relative growth rate, P11", value: 1.150742, tolerance: 0.0005}
+  - {key: p_p5, description: "p value of the one-sample t test against 1, P5", value: 0.243208, tolerance: 0.0005}
+  - {key: p_p11, description: "p value of the one-sample t test against 1, P11", value: 0.507637, tolerance: 0.0005}
+  - {key: mean_of_means, description: "Mean of the 12 plasmid means", value: 1.009203, tolerance: 0.0005}
+  - {key: mean_printed, description: "Average relative growth rate of STR-R as printed in the Results (does not reproduce from the source data; computed 1.0092)", value: 0.996, tolerance: 0.0005, reference: true}

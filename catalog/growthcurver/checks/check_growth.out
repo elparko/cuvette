@@ -1,0 +1,3 @@
+growthdata A1, min corrected: k 0.335869 n0 1.823104e-05 r 1.118673 t_gen 0.619615 sigma 0.004685978 auc_e 5.151667
+bactgrowth D_0_1, no correction: k 0.099626 n0 0.017483 r 0.200071
+bactgrowth D_0_1, easylinear: windows [2, 3], mumax 0.2048985 y0_lm 0.0123482 lag 1.8392607

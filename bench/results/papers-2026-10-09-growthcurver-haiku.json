@@ -1,0 +1,733 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "nair2024-plasmid-growth",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 142.285,
+   "session": "20261008-232644-b347",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/nair2024-plasmid-growth/run1/home/sessions/20261008-232644-b347",
+   "answer": "## Result: this test does not show that any plasmid lowers the growth rate\n\nThe data do not show a reduction in growth rate for any plasmid. No plasmid has a p value below 0.05. This does not prove that the plasmids have no effect. Several confidence intervals are wide and include values well below 1.\n\nI also removed a wavelength number that I had written without a tool result behind it.\n\n## What I did\n\n1. Fit a logistic growth curve to each well with growthcurver 4.6.1. The input was the time column and the optical density (OD) wells, in hours.\n2. Used these settings, from your decisions:\n   - Background correction: min.\n   - Blank wells: none.\n   - Last time point: 0, which means all points.\n   - Time unit: h.\n   - Excluded wells: W10 to W18 and W80 to W84. These are all wells of blocks 2 and 12.\n   - Lag time: not calculated, because you did not ask for it.\n3. Divided the r of each well by the r of the Host well of the same block. The reference rule was same block.\n4. Tested each plasmid mean against 1 with a two-sided one-sample t test.\n5. Calculated the mean of the 12 plasmid relative means.\n\nThe fit gave 70 wells with no growthcurver note. I looked at the plot. In most wells, the red fitted curve follows the grey readings closely.\n\n## Results\n\nHost r was 0.3805 per h (n = 10, one Host well per block; SD 0.0092 per h).\n\nEach plasmid has n = 5 blocks. The relative rate is the r of the plasmid well divided by the r of the Host well of the same block.\n\n| Plasmid | Mean relative rate | 95% CI | p value (against 1) |\n|---|---|---|---|\n| P1 | 1.0053 | 0.9079 to 1.1027 | 0.887 |\n| P2 | 1.0278 | 0.9192 to 1.1364 | 0.517 |\n| P3 | 1.0329 | 0.9183 to 1.1476 | 0.470 |\n| P4 | 0.9657 | 0.7957 to 1.1357 | 0.605 |\n| P5 | 1.0725 | 0.9254 to 1.2195 | 0.243 |\n| P6 | 1.0083 | 0.8973 to 1.1193 | 0.846 |\n| P7 | 0.9612 | 0.8129 to 1.1095 | 0.508 |\n| P8 | 0.9754 | 0.8915 to 1.0594 | 0.463 |\n| P9 | 1.0426 | 0.8602 to 1.2249 | 0.552 |\n| P10 | 0.9902 | 0.8293 to 1.1510 | 0.873 |\n| P11 | 0.9466 | 0.7424 to 1.1507 | 0.508 |\n| P14 | 1.0821 | 0.8864 to 1.2777 | 0.309 |\n\n- Every 95% CI includes 1.\n- The lowest p value is 0.243 (P5). P5 has a mean above 1.\n- Five plasmid means are below 1: P4 (0.9657), P7 (0.9612), P8 (0.9754), P10 (0.9902) and P11 (0.9466).\n- For these five plasmids, the data are compatible with a lower rate. Their CIs reach values below 1. The lowest lower limits are 0.7424 for P11 and 0.7957 for P4.\n- The mean of the 12 plasmid means is 1.0092. The calculate step gave this value from the 12 relative means in the table.\n\nSteps that gave these numbers: the compare step gave the table, the 95% CIs and the p values. The calculate step gave the mean of the 12 means.\n\n## Uncertain\n\n- The CIs are wide. For several plasmids, the data cannot rule out a substantial reduction in growth rate. A large reduction is compatible with these results.\n- Each plasmid has only 5 blocks. The record does not say whether each block is an independent culture. If blocks are technical replicates, the number of independent replicates is smaller.\n- Twelve tests were run. I did not correct the p values for multiple testing. No p value is near 0.05, so a correction would not change which tests are significant.\n- The record gives no reason for excluding blocks 2 and 12. Excluding these blocks removes both Host and plasmid wells from the comparison.\n- I did not test lag time or maximum growth rate.\n\n## Files\n\n- Fit plot: fit_growth_curves-3/plot.png\n- Comparison table: compare_growth-3/groups.csv\n- Comparison plot: compare_growth-3/plot.png\n\n## Waiting for you\n\n- Confirm the reason for excluding blocks 2 and 12. The fit and the comparison used this exclusion.\n- Decide whether a larger number of replicate cultures per plasmid is needed before you make a claim about any plasmid's effect on growth.\n\nSettings used, from the decision record: Background correction: min · Medium-only wells for the blank: none · Last time point of the fit: 0 · Unit of the time column: h · Wells that you exclude: W10, W11, W12, W13, W14, W15, W16, W17, W18, W80, W81, W82, W83, W84 · Points in each window of the lag time method: 5 · Reference strain or condition: Host · Divide by the reference mean or by the reference well of the same block: same block.",
+   "items": [
+    {
+     "key": "n_wells",
+     "description": "Wells fitted",
+     "expected": 70,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 70,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.n_wells",
+      "entry": 49
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 126,
+      "text": null
+     }
+    },
+    {
+     "key": "r_w01",
+     "description": "Growth rate r of well W01 (host, block 1), per hour",
+     "expected": 0.371065,
+     "tolerance": 0.000005,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.371065210154729,
+      "diff": 2.1015472900787202e-7,
+      "node": "n3",
+      "path": "metrics.r_W01",
+      "entry": 49
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 126,
+      "text": null
+     }
+    },
+    {
+     "key": "r_w24",
+     "description": "Growth rate r of well W24 (P5, block 3), per hour",
+     "expected": 0.479446,
+     "tolerance": 0.000005,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.479445749721007,
+      "diff": 2.5027899297480616e-7,
+      "node": "n3",
+      "path": "metrics.r_W24",
+      "entry": 49
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 126,
+      "text": null
+     }
+    },
+    {
+     "key": "rel_p1",
+     "description": "Mean relative growth rate, P1",
+     "expected": 1.005299,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.00529927196038,
+      "diff": 2.719603799938852e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P1",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.0053,
+      "diff": 0.000001000000000139778,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P1 | 1.0053 | 0.9079 to 1.1027 | 0.887 |"
+     }
+    },
+    {
+     "key": "rel_p2",
+     "description": "Mean relative growth rate, P2",
+     "expected": 1.027756,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0277564527245,
+      "diff": 4.5272450011069054e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P2",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.0278,
+      "diff": 0.000044000000000155026,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P2 | 1.0278 | 0.9192 to 1.1364 | 0.517 |"
+     }
+    },
+    {
+     "key": "rel_p3",
+     "description": "Mean relative growth rate, P3",
+     "expected": 1.032948,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.03294849572922,
+      "diff": 4.957292201179797e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P3",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.0329,
+      "diff": 0.000048000000000048004,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P3 | 1.0329 | 0.9183 to 1.1476 | 0.470 |"
+     }
+    },
+    {
+     "key": "rel_p4",
+     "description": "Mean relative growth rate, P4",
+     "expected": 0.965689,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.965689057211602,
+      "diff": 5.721160201144215e-8,
+      "node": "n4",
+      "path": "metrics.rel_mean_P4",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.9657,
+      "diff": 0.000010999999999983245,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P4 | 0.9657 | 0.7957 to 1.1357 | 0.605 |"
+     }
+    },
+    {
+     "key": "rel_p5",
+     "description": "Mean relative growth rate, P5",
+     "expected": 1.072459,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.07245851464993,
+      "diff": 4.853500701340607e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P5",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.0725,
+      "diff": 0.00004099999999995774,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P5 | 1.0725 | 0.9254 to 1.2195 | 0.243 |"
+     }
+    },
+    {
+     "key": "rel_p6",
+     "description": "Mean relative growth rate, P6",
+     "expected": 1.008294,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.00829369984683,
+      "diff": 3.001531700963511e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P6",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.0083,
+      "diff": 0.000005999999999950489,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P6 | 1.0083 | 0.8973 to 1.1193 | 0.846 |"
+     }
+    },
+    {
+     "key": "rel_p7",
+     "description": "Mean relative growth rate, P7",
+     "expected": 0.961198,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.961197646324256,
+      "diff": 3.5367574402478397e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P7",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.9612,
+      "diff": 0.0000020000000000575113,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P7 | 0.9612 | 0.8129 to 1.1095 | 0.508 |"
+     }
+    },
+    {
+     "key": "rel_p8",
+     "description": "Mean relative growth rate, P8",
+     "expected": 0.97545,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.97544958631466,
+      "diff": 4.1368533998387136e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P8",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.9754,
+      "diff": 0.00004999999999999449,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P8 | 0.9754 | 0.8915 to 1.0594 | 0.463 |"
+     }
+    },
+    {
+     "key": "rel_p9",
+     "description": "Mean relative growth rate, P9",
+     "expected": 1.042573,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.04257336072486,
+      "diff": 3.6072485998239756e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P9",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.0426,
+      "diff": 0.000026999999999999247,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P9 | 1.0426 | 0.8602 to 1.2249 | 0.552 |"
+     }
+    },
+    {
+     "key": "rel_p10",
+     "description": "Mean relative growth rate, P10",
+     "expected": 0.990162,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.990162399509675,
+      "diff": 3.995096750086802e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P10",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.9902,
+      "diff": 0.00003799999999998249,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P10 | 0.9902 | 0.8293 to 1.1510 | 0.873 |"
+     }
+    },
+    {
+     "key": "rel_p11",
+     "description": "Mean relative growth rate, P11",
+     "expected": 0.946554,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.946553549040921,
+      "diff": 4.5095907896808285e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P11",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.9466,
+      "diff": 0.00004599999999999049,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P11 | 0.9466 | 0.7424 to 1.1507 | 0.508 |"
+     }
+    },
+    {
+     "key": "rel_p14",
+     "description": "Mean relative growth rate, P14",
+     "expected": 1.082055,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.08205527766807,
+      "diff": 2.776680700922185e-7,
+      "node": "n4",
+      "path": "metrics.rel_mean_P14",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.0821,
+      "diff": 0.00004500000000007276,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P14 | 1.0821 | 0.8864 to 1.2777 | 0.309 |"
+     }
+    },
+    {
+     "key": "ci_low_p11",
+     "description": "95% CI lower bound of the relative growth rate, P11",
+     "expected": 0.742365,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.742364888075139,
+      "diff": 1.1192486104594224e-7,
+      "node": "n4",
+      "path": "table.rows[11][8]",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.7424,
+      "diff": 0.000034999999999896225,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P11 | 0.9466 | 0.7424 to 1.1507 | 0.508 |"
+     }
+    },
+    {
+     "key": "ci_high_p11",
+     "description": "95% CI upper bound of the relative growth rate, P11",
+     "expected": 1.150742,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.1507422100067,
+      "diff": 2.1000670002990773e-7,
+      "node": "n4",
+      "path": "table.rows[11][9]",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.1507,
+      "diff": 0.00004199999999987547,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P11 | 0.9466 | 0.7424 to 1.1507 | 0.508 |"
+     }
+    },
+    {
+     "key": "p_p5",
+     "description": "p value of the one-sample t test against 1, P5",
+     "expected": 0.243208,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.243208221350772,
+      "diff": 2.213507719894814e-7,
+      "node": "n4",
+      "path": "metrics.p_P5",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.243,
+      "diff": 0.00020800000000001373,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P5 | 1.0725 | 0.9254 to 1.2195 | 0.243 |"
+     }
+    },
+    {
+     "key": "p_p11",
+     "description": "p value of the one-sample t test against 1, P11",
+     "expected": 0.507637,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.507636679426205,
+      "diff": 3.205737949540932e-7,
+      "node": "n4",
+      "path": "metrics.p_P11",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.508,
+      "diff": 0.0003630000000000022,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P7 | 0.9612 | 0.8129 to 1.1095 | 0.508 |"
+     }
+    },
+    {
+     "key": "mean_of_means",
+     "description": "Mean of the 12 plasmid means",
+     "expected": 1.009203,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0092031093087421,
+      "diff": 1.0930874205783425e-7,
+      "node": "n5",
+      "path": "metrics.mean_of_12_plasmid_rel_means",
+      "entry": 104
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.0092,
+      "diff": 0.0000029999999999752447,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 126,
+      "text": "- The mean of the 12 plasmid means is 1.0092."
+     }
+    },
+    {
+     "key": "mean_printed",
+     "description": "Average relative growth rate of STR-R as printed in the Results (does not reproduce from the source data; computed 1.0092)",
+     "expected": 0.996,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 1,
+      "diff": 0.0040000000000000036,
+      "node": "n4",
+      "path": "metrics.rel_mean_Host",
+      "entry": 96
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.9902,
+      "diff": 0.005800000000000027,
+      "via": null,
+      "node": "n4",
+      "claimEntry": 126,
+      "text": "| P10 | 0.9902 | 0.8293 to 1.1510 | 0.873 |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 11,
+    "inputTokens": 28,
+    "outputTokens": 12552,
+    "cacheRead": 302799,
+    "cacheWrite": 48281,
+    "toolCalls": 11,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 3,
+     "error": 3
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/nair2024-plasmid-growth/run1/home/sessions/20261008-232644-b347/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/nair2024-plasmid-growth",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/nair2024-plasmid-growth/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a51ed8c6dc01aa8e2/catalog/growthcurver",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a51ed8c6dc01aa8e2/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a51ed8c6dc01aa8e2/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a51ed8c6dc01aa8e2/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a51ed8c6dc01aa8e2/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a51ed8c6dc01aa8e2",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a51ed8c6dc01aa8e2/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a51ed8c6dc01aa8e2/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a51ed8c6dc01aa8e2/catalog/growthcurver"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/nair2024-plasmid-growth/strr_design.csv",
+     "/Volumes/T7/guided-analysis/data/nair2024-plasmid-growth/strr_od.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/nair2024-plasmid-growth/run1/home/sessions/20261008-232644-b347/work",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/nair2024-plasmid-growth/run1/home/sessions/20261008-232644-b347/work/fit_growth_curves-3",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/nair2024-plasmid-growth/run1/home/sessions/20261008-232644-b347/work/fit_growth_curves-3/.params.json",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/nair2024-plasmid-growth/run1/home/sessions/20261008-232644-b347/work/fit_growth_curves-3/results.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-growthcurver-haiku.md",
+  "json": "bench/results/papers-2026-10-09-growthcurver-haiku.json"
+ },
+ "summary": {
+  "cells": {
+   "nair2024-plasmid-growth": {
+    "claude:claude-haiku-5-5": {
+     "computed": 20,
+     "computedOf": 20,
+     "reported": 17,
+     "reportedOf": 17,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 20,
+    "computedOf": 20,
+    "reported": 17,
+    "reportedOf": 17,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 142.285,
+    "requests": 11,
+    "inputTokens": 28,
+    "outputTokens": 12552,
+    "cacheRead": 302799,
+    "cacheWrite": 48281,
+    "toolCalls": 11,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings_info": 3,
+    "findings_warning": 3,
+    "findings_error": 3,
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   }
+  },
+  "skipped": []
+ }
+}

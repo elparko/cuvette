@@ -1,0 +1,40 @@
+tool: growthcurver (R), fit_growth_curves and compare_growth of the growthcurver adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/nair2024-plasmid-growth/strr_od.csv
+  - /Volumes/T7/guided-analysis/data/nair2024-plasmid-growth/strr_design.csv
+decisions:
+  bg_correct: "min (the growthcurver default; it gives the published r of each well)"
+  t_trim: "0 (all readings)"
+  exclude_wells: "W10 to W18 and W80 to W84 (the wells that the source data leave out)"
+  reference_group: Host
+  relative_to: "same block (the topmost well of each plate column)"
+expected:
+  - {description: "wells fitted", value: 70, tolerance: 0, source: "source data Figure_1_2.xlsx, sheet STR-R: 70 rows"}
+  - {description: "r of W01", value: 0.371065, tolerance: 0.000005, source: "Figure_1_2.xlsx: 0.371065208"}
+  - {description: "r of W24", value: 0.479446, tolerance: 0.000005, source: "Figure_1_2.xlsx: 0.479446"}
+  - {description: "mean relative growth rate P1", value: 1.005299, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P2", value: 1.027756, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P3", value: 1.032948, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P4", value: 0.965689, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P5", value: 1.072459, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P6", value: 1.008294, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P7", value: 0.961198, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P8", value: 0.975450, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P9", value: 1.042573, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P10", value: 0.990162, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P11", value: 0.946554, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "mean relative growth rate P14", value: 1.082055, tolerance: 0.0005, source: "mean of the published rel_r (check.py)"}
+  - {description: "95% CI lower bound P11", value: 0.742365, tolerance: 0.0005, source: "t interval of the published rel_r (check.py)"}
+  - {description: "95% CI upper bound P11", value: 1.150742, tolerance: 0.0005, source: "t interval of the published rel_r (check.py)"}
+  - {description: "p of the one-sample t test, P5", value: 0.243208, tolerance: 0.0005, source: "SciPy ttest_1samp on the published rel_r (check.py)"}
+  - {description: "p of the one-sample t test, P11", value: 0.507637, tolerance: 0.0005, source: "SciPy ttest_1samp on the published rel_r (check.py)"}
+  - {description: "mean of the 12 plasmid means", value: 1.009203, tolerance: 0.0005, source: "check.py"}
+  - {description: "average relative growth rate STR-R, as printed", value: 0.996, tolerance: 0.0005, source: "paper, Results: STR-R = 0.996; reference only, computed 1.0092"}
+notes: |
+  The paper used growthcurver 0.3.1 in R. The source data file Figure_1_2.xlsx gives r and rel_r of each well. With bg_correct min and all readings, growthcurver gives each of the 70 published r values of the sheet STR-R within 1e-6, and a SciPy logistic fit gives them within 1.4e-6 (check.py, check.out).
+  rel_r is r divided by the r of the host well at the top of the same block (plate column). This gives each published rel_r within 1e-8.
+  The source data leave out two blocks: W10 to W18 (block 2, host and P1 to P8) and W80 to W84 (block 12, host and P9 to P14). These wells grew normally. The paper gives no reason. The answers exclude them, so the items match the published values.
+  The paper prints average relative growth rates of 0.936 (susceptible), 1.017 (NIT-R), 1.033 (CIP-R) and 0.996 (STR-R). From the source data, the means of all plasmid wells are 0.934, 1.017, 1.042 and 1.009. Only NIT-R matches. The printed STR-R value is a reference item.
+  The supplement (Tables S1 to S3) is behind a bot check on the ASM and PMC sites, so its per-plasmid p values could not be checked.
+  Trap: a division by the mean of all host wells (reference mean) changes the plasmid means in the third digit.

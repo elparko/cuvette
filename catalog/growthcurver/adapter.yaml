@@ -1,0 +1,416 @@
+adapter:
+  name: growthcurver
+  field: microbial growth curves
+  file_types: [".csv", ".tsv"]
+  title: growthcurver (bacterial and cell growth curves)
+  version: 0.1.1
+  spec: "1"
+  description: >
+    Fits a logistic growth curve to each well of a plate reader file with the R package growthcurver. It gives the
+    growth rate, the doubling time, the carrying capacity and the area under the curve. It can also give the lag time.
+    It compares strains or conditions relative to a reference strain.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: growthcurver
+  version: "0.3.1"
+  tested_versions: []
+  homepage: https://cran.r-project.org/package=growthcurver
+  docs:
+    - https://cran.r-project.org/web/packages/growthcurver/vignettes/Growthcurver-vignette.html
+    - https://doi.org/10.1186/s12859-016-1016-7
+    - https://cran.r-project.org/web/packages/growthrates/vignettes/Introduction.html
+  install: >
+    Install R (brew install r on macOS). Then install the R packages growthcurver, growthrates, svglite and jsonlite into
+    a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("growthcurver", "growthrates", "svglite", "jsonlite"), repos = "https://cloud.r-project.org")'
+  citation:
+    - text: "Sprouffske K (2020). growthcurver: Simple Metrics to Summarize Growth Curves. R package version 0.3.1."
+      doi: 10.32614/CRAN.package.growthcurver
+    - text: "Sprouffske K, Wagner A (2016). Growthcurver: an R package for obtaining interpretable metrics from microbial growth curves. BMC Bioinformatics 17: 172."
+      doi: 10.1186/s12859-016-1016-7
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that exists
+  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library. The
+  program version in this adapter is the version of the R package growthcurver, not of R. The lag time comes from the
+  R package growthrates.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return the growth metrics of each well and the group means. The plot shows the OD readings.
+
+decisions:
+  - key: bg_correct
+    label: Background correction
+    kind: choice
+    choices: [min, blank, none]
+    default: min
+    group: Growth curve
+    help: >
+      min subtracts the lowest reading of each well from all its readings. This is the growthcurver default. blank
+      subtracts the mean of the medium-only wells at each time point. none fits the readings as they are.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_growth_curves, arg: bg_correct }
+    sensitivity:
+      options: [min, none]
+      tool: fit_growth_curves
+      compare: [metrics.n_wells, metrics.n_with_note]
+      max_runs: 2
+
+  - key: blank_wells
+    label: Medium-only wells for the blank
+    kind: text
+    default: none
+    group: Plate
+    help: >
+      Name the wells that hold medium with no cells, such as H11, H12. The tool uses their mean only if the background
+      correction is blank. It does not fit these wells. Write none if the plate has no blank wells.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_growth_curves, arg: blank_wells }
+
+  - key: t_trim
+    label: Last time point of the fit
+    kind: float
+    default: 0
+    lo: 0
+    hi: 10000
+    group: Growth curve
+    help: >
+      The fit uses the readings up to this time, in the time unit of the file. 0 uses all readings. Use the same value
+      for all plates if you compare the area under the curve. A late decline phase can bias the logistic fit.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_growth_curves, arg: t_trim }
+
+  - key: time_unit
+    label: Unit of the time column
+    kind: choice
+    choices: [h, min, s, d]
+    default: h
+    group: Plate
+    help: >
+      The unit of the time column. The growth rate is per this unit, and the doubling time is in this unit. The tool does
+      not convert the time.
+    owner: human
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: fit_growth_curves, arg: time_unit }
+
+  - key: exclude_wells
+    label: Wells that you exclude
+    kind: text
+    default: none
+    group: Plate
+    help: >
+      Name each well that you exclude and the reason, such as contamination, an empty well or a bubble. Write none to keep
+      all wells. Decide before you see the growth rates.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_growth_curves, arg: exclude }
+
+  - key: easylinear_points
+    label: Points in each window of the lag time method
+    kind: int
+    default: 5
+    lo: 3
+    hi: 30
+    group: Lag time
+    help: >
+      The easylinear method fits a line to the log OD in windows of this many readings and keeps the steepest part. More
+      points give a smoother result for noisy data. The growthrates default is 5.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_growth_curves, arg: easylinear_points }
+
+  - key: reference_group
+    label: Reference strain or condition
+    kind: text
+    group: Comparison
+    help: >
+      The tool divides the growth of each group by the growth of this reference, such as the plasmid-free host or the wild
+      type. Give the value as it is in the design file.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_growth, arg: reference }
+
+  - key: relative_to
+    label: Divide by the reference mean or by the reference well of the same block
+    kind: choice
+    choices: [reference mean, same block]
+    default: reference mean
+    group: Comparison
+    help: >
+      reference mean divides each well by the mean of the reference wells. same block divides each well by the reference
+      well of its block. A block is a plate column with its own control well.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_growth, arg: relative_to }
+
+checks:
+  - id: notes_ignored
+    description: The answer reports a growth rate of a well that growthcurver marked with a note.
+    severity: warning
+    text: >
+      Report the answer if the results of fit_growth_curves have a note for a well and the answer gives the metrics of that
+      well with no word about the note.
+  - id: wells_as_replicates
+    description: The answer treats wells from one culture as independent replicates.
+    severity: warning
+    text: >
+      Report the answer if it gives a p value or a confidence interval and it does not say what one replicate is, such as
+      an independent culture or a separate colony.
+  - id: auc_without_trim
+    description: The answer compares the area under the curve between plates with different run times.
+    severity: warning
+    text: Report the answer if it compares auc_e or auc_l between files with different last time points and t_trim is 0.
+  - id: unit_named
+    description: The answer gives a growth rate or a doubling time with no time unit.
+    severity: warning
+    text: Report the answer if it gives a growth rate or a doubling time and does not name the time unit.
+
+map:
+  - tool: fit_growth_curves
+    route: "library(growthcurver); d <- read.csv(\"plate.csv\"); SummarizeGrowth(d$time, d$A1, t_trim = 0, bg_correct = \"min\")$vals"
+    steps:
+      - "R: run SummarizeGrowth(time, well, t_trim, bg_correct) for each well, or SummarizeGrowthByPlate(d) for a plate."
+      - "R, lag time: growthrates::fit_easylinear(time, od, h = 5), then coef() gives mumax and lag."
+      - "Prism: XY table with time as X and the wells as Y. Analyze, Nonlinear regression, Exponential, Logistic growth. YM is k, Y0 is n0, K is r."
+      - "Gen5: kinetic read of OD600. Data Reduction, Kinetic Analysis, Max V and Lag time. Gen5 gives the steepest slope, not a logistic fit."
+      - "Excel: subtract the minimum of each well. Fit the logistic formula with Solver, or use SLOPE of LN(OD) over the exponential phase."
+    params:
+      - { arg: bg_correct, label: "bg_correct of SummarizeGrowth()", ui_default: min }
+      - { arg: t_trim, label: "t_trim of SummarizeGrowth()", ui_default: 0 }
+      - { arg: easylinear_points, label: "h of fit_easylinear()", ui_default: 5 }
+    fidelity: close
+    difference: >
+      The R route is the same model and the same functions as the tool. Prism Logistic growth has the same equation, but
+      Prism does not subtract the background. Gen5 Max V is the slope of a window, so it differs from the logistic r. The
+      Prism, Gen5 and Excel routes were not run.
+    evidence:
+      source: docs
+      test: vignette-a1
+      note: The growthcurver vignette prints the fit of well A1 and two plate tables. A SciPy fit gives the same values.
+
+  - tool: compare_growth
+    route: "d <- merge(read.csv(\"results.csv\"), read.csv(\"design.csv\")); d$rel <- d$r / <reference r>; aggregate(rel ~ plasmid, d, mean); t.test(d$rel[d$plasmid == \"P1\"], mu = 1)"
+    steps:
+      - "R: merge the per-well results with the design file, divide each r by the reference r, then use aggregate() and t.test(mu = 1)."
+      - "Prism: Column table with one column for each group of relative rates. Analyze, One sample t and Wilcoxon test, hypothetical value 1. Use One-way ANOVA for the group means."
+      - "Excel: divide each rate by the reference rate. Use AVERAGE and STDEV.S for each group, and T.DIST.2T for the one-sample t test."
+    params:
+      - { arg: reference, label: "the reference group (denominator)" }
+      - { arg: relative_to, label: "mean of the reference wells, or the reference well of the same column" }
+    fidelity: close
+    difference: >
+      The tool uses a two-sided one-sample t test against 1 and a t interval for each group. The ANOVA uses the group means
+      as observations. The Prism and Excel routes were not run.
+    evidence:
+      source: docs
+      test: strr-relative-growth
+      note: The plasmid paper source data give the relative rate of each well; a SciPy script gives the group statistics.
+
+tests:
+  - id: vignette-a1
+    description: >
+      growthcurver vignette, well A1 of growthdata, background correction min. The vignette prints k 0.336, r 1.119,
+      doubling time 0.62, auc_l 5.11, auc_e 5.15 and sigma 0.004685978. A SciPy fit gives the same values
+      (checks/check_growth.py and checks/check_growth.out).
+    data: [data/growthdata.csv]
+    calls:
+      - tool: fit_growth_curves
+        args: { data: "{adapter_dir}/data/growthdata.csv", wells: [A1], bg_correct: min, t_trim: 0 }
+    expect:
+      - { path: metrics.k, approx: 0.336, abs: 0.0005 }
+      - { path: metrics.r, approx: 1.119, abs: 0.0005 }
+      - { path: metrics.t_gen, approx: 0.62, abs: 0.005 }
+      - { path: metrics.auc_l, approx: 5.11, abs: 0.005 }
+      - { path: metrics.auc_e, approx: 5.15, abs: 0.005 }
+      - { path: metrics.sigma, approx: 0.004685978, abs: 0.000000001 }
+      - { path: "outputs[0].path", contains: ".png" }
+      - { path: "outputs[1].path", contains: ".svg" }
+
+  - id: vignette-plate
+    description: >
+      All 96 wells of growthdata. The vignette table of SummarizeGrowthByPlate prints C1 r 0.9865605 and E1 k 0.3700136,
+      r 1.1968446 and auc_e 5.780758.
+    data: [data/growthdata.csv]
+    calls:
+      - tool: fit_growth_curves
+        args: { data: "{adapter_dir}/data/growthdata.csv", bg_correct: min, t_trim: 0 }
+    expect:
+      - { path: metrics.n_wells, equals: 96 }
+      - { path: metrics.r_C1, approx: 0.9865605, abs: 0.00001 }
+      - { path: metrics.k_E1, approx: 0.3700136, abs: 0.000001 }
+      - { path: metrics.r_E1, approx: 1.1968446, abs: 0.00001 }
+      - { path: metrics.auc_e_E1, approx: 5.780758, abs: 0.000001 }
+
+  - id: vignette-plate-trim
+    description: >
+      The vignette loop with t_trim 20 and the minimum subtracted. It prints B1 r 1.02383, doubling time 0.67701, auc_l
+      4.06000 and auc_e 4.03270, and D1 k 0.38262.
+    data: [data/growthdata.csv]
+    calls:
+      - tool: fit_growth_curves
+        args: { data: "{adapter_dir}/data/growthdata.csv", wells: [B1, D1], bg_correct: min, t_trim: 20 }
+    expect:
+      - { path: metrics.r_B1, approx: 1.02383, abs: 0.00001 }
+      - { path: metrics.t_gen_B1, approx: 0.67701, abs: 0.00001 }
+      - { path: metrics.auc_e_B1, approx: 4.03270, abs: 0.00001 }
+      - { path: metrics.k_D1, approx: 0.38262, abs: 0.00001 }
+
+  - id: growthrates-lag
+    description: >
+      growthrates vignette, first bactgrowth experiment (strain D, concentration 0, replicate 1). The easylinear fit prints
+      mumax 0.2048985 and lag 1.8392607. The logistic fit in the same vignette (grow_logistic, an other optimizer) prints
+      K 0.09962612, mumax 0.20006908 and y0 0.01748268. A NumPy version of the easylinear method gives the same mumax and lag
+      (checks/check_growth.py and .out).
+    data: [data/bactgrowth_D_0_1.csv]
+    calls:
+      - tool: fit_growth_curves
+        args: { data: "{adapter_dir}/data/bactgrowth_D_0_1.csv", bg_correct: none, lag: true, easylinear_points: 5 }
+    expect:
+      - { path: metrics.mumax, approx: 0.2048985, abs: 0.0000001 }
+      - { path: metrics.lag, approx: 1.8392607, abs: 0.0000001 }
+      - { path: metrics.k, approx: 0.09962612, abs: 0.000001 }
+      - { path: metrics.r, approx: 0.20006908, abs: 0.00001 }
+      - { path: metrics.n0, approx: 0.01748268, abs: 0.000001 }
+
+  - id: strr-relative-growth
+    description: >
+      Nair et al. 2024 (Microbiology Spectrum, CC BY 4.0), sheet STR-R, with the 14 wells that the source data leave out
+      excluded. The source data file Figure_1_2.xlsx gives r 0.371065 for well W01 and r 0.479446 for W24. The plasmid
+      means of rel_r, the p values and the mean of the means come from the published per-well rel_r with SciPy
+      (bench/papers/nair2024-plasmid-growth/check.py and check.out). group_cols arrives as JSON text, as a model sent it.
+    data: [data/strr_od.csv, data/strr_design.csv]
+    calls:
+      - tool: fit_growth_curves
+        args: { data: "{adapter_dir}/data/strr_od.csv", bg_correct: min, exclude: "W10, W11, W12, W13, W14, W15, W16, W17, W18, W80, W81, W82, W83, W84" }
+        save_as: fit
+      - tool: compare_growth
+        args: { results: "{saved.fit.data.results_file}", design: "{adapter_dir}/data/strr_design.csv", group_cols: "[\"host\", \"plasmid\"]", reference_col: plasmid, reference: Host, relative_to: same block, block_col: block }
+    expect:
+      - { path: saved.fit.metrics.n_wells, equals: 70 }
+      - { path: saved.fit.metrics.r_W01, approx: 0.371065, abs: 0.000002 }
+      - { path: saved.fit.metrics.r_W24, approx: 0.479446, abs: 0.000002 }
+      - { path: metrics.rel_mean_DA49828_P5, approx: 1.072459, abs: 0.000005 }
+      - { path: metrics.rel_mean_DA49828_P11, approx: 0.946554, abs: 0.000005 }
+      - { path: metrics.p_DA49828_P5, approx: 0.243208, abs: 0.000005 }
+      - { path: metrics.rel_mean_by_DA49828, approx: 1.009203, abs: 0.000005 }
+
+  - id: blank-without-wells
+    description: Background correction blank with no blank wells fails, and the error names the cause and the choices.
+    data: [data/growthdata.csv]
+    calls:
+      - tool: fit_growth_curves
+        args: { data: "{adapter_dir}/data/growthdata.csv", bg_correct: blank, blank_wells: none }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "blank_wells is empty" }
+
+  - id: missing-file
+    description: A data file that does not exist fails, and the error names the file.
+    calls:
+      - tool: fit_growth_curves
+        args: { data: "{adapter_dir}/data/no_such_plate.csv" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_plate.csv" }
+
+tools:
+  - name: fit_growth_curves
+    title: Fit growth curves
+    description: >
+      Fit a logistic growth curve to each well of a plate reader file. For each well it returns k (carrying capacity), n0,
+      r (growth rate), t_mid, the doubling time, the areas under the curve and sigma. With lag true, it also
+      gives the lag time and the maximum rate by the easylinear method. Saves a plot of all wells as PNG and SVG.
+    params:
+      data: { type: string, description: "Path of a CSV file. Wide layout: a time column and one column for each well. Long layout: give well_col and value_col." }
+      time_col: { type: string, description: "Column with the time of each reading. Default time, or the first column." }
+      well_col: { type: string, description: "Long layout only: the column with the well name." }
+      value_col: { type: string, description: "Long layout only: the column with the OD reading. Default od." }
+      wells: { type: [array, string], items: { type: string }, description: "Wells to fit, as a list or as comma text. Leave out to fit all wells." }
+      bg_correct: { type: string, enum: [min, blank, none], description: "Leave out. The harness sets it from the decision record." }
+      blank_wells: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Medium-only wells, as a list or as comma text." }
+      t_trim: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Last time point of the fit, in the time unit of the file. 0 uses all." }
+      time_unit: { type: string, enum: [h, min, s, d], description: "Leave out. The harness sets it from the decision record. Unit of the time column." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Wells to drop, as a list or as comma text. none keeps all wells." }
+      lag: { type: boolean, description: "true adds the lag time and the maximum growth rate by the easylinear method of the R package growthrates." }
+      easylinear_points: { type: integer, minimum: 3, description: "Leave out. The harness sets it from the decision record. Count of readings in each window." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      results: { kind: table, ext: .csv, description: One row for each well with the growth metrics. }
+      plot: { kind: image, ext: .png, description: The readings and the logistic fit of each well. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    citations:
+      - text: "Hall BG, Acar H, Nandipati A, Barlow M (2014). Growth rates made easy. Molecular Biology and Evolution 31(1): 232-238."
+        doi: 10.1093/molbev/mst187
+        when: { lag: true }
+      - text: "Petzoldt T (2025). growthrates: Estimate Growth Rates from Experimental Data. R package version 0.8.5."
+        doi: 10.32614/CRAN.package.growthrates
+        kind: program
+        when: { lag: true }
+    script: scripts/fit_growth_curves.R
+    parse: json
+
+  - name: compare_growth
+    title: Compare growth between groups
+    description: >
+      Compare the growth metric of groups of wells, such as strains or plasmids, with a design file. Divides each well by a
+      reference group and gives the mean, the 95% interval and a one-sample t test against 1 for each group. It also gives
+      the mean of the group means for each level of summary_by, with a one-way ANOVA. Saves a plot as PNG and SVG.
+    params:
+      results: { type: string, description: "The results_file of fit_growth_curves (CSV with the column well)." }
+      design: { type: string, description: "CSV file with the column well and one column for each factor, such as strain, plasmid or block." }
+      group_cols: { type: [array, string], minItems: 1, items: { type: string }, description: "Design columns that define a group, such as host, plasmid. The last one holds the reference." }
+      metric: { type: string, enum: [r, k, t_gen, t_mid, auc_e, auc_l, lag, mumax], description: "The metric to compare. Default r, the growth rate." }
+      reference_col: { type: string, description: "The group column that holds the reference value. Default the last of group_cols." }
+      reference: { type: string, description: "Leave out. The harness sets it from the decision record. The reference value, such as Host or WT." }
+      relative_to: { type: string, enum: [reference mean, same block], description: "Leave out. The harness sets it from the decision record." }
+      block_col: { type: string, description: "Design column with the plate column or block of each well. Needed for same block." }
+      summary_by: { type: string, description: "A group column. The tool gives the mean of the group means for each of its values. Default the first of two or more group_cols." }
+      exclude: { type: [array, string], items: { type: string }, description: "Wells to drop from the comparison, as a list or as comma text." }
+    required: [results, group_cols]
+    read_only: true
+    batch: false
+    outputs:
+      groups: { kind: table, ext: .csv, description: One row for each group. }
+      wells: { kind: table, ext: .csv, description: One row for each well with the relative value. }
+      plot: { kind: image, ext: .png, description: The relative value of each well with the group mean and interval. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    script: scripts/compare_growth.R
+    parse: json

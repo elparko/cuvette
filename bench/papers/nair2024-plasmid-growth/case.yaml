@@ -1,0 +1,192 @@
+kind: research paper
+short: Nair 2024
+field: Microbial growth curves
+program: growthcurver (R), through the growthcurver adapter
+citation:
+  authors: Nair RR, Andersson DI, Warsi OM
+  title: "Antibiotic resistance begets more resistance: chromosomal resistance mutations mitigate fitness costs conferred by multi-resistant clinical plasmids"
+  venue: Microbiology Spectrum 12(5):e0420623
+  year: 2024
+  doi: 10.1128/spectrum.04206-23
+related:
+  - text: "Data: Nair RR, Andersson DI, Warsi OM. Source data on figshare, CC BY 4.0. fetch.sh downloads Bioscreen_data.xlsx (raw OD) and Figure_1_2.xlsx (published r and rel_r, to the reference folder)."
+    doi: 10.6084/m9.figshare.25400194
+measured: >-
+  The study put 13 multi-resistant clinical plasmids into a susceptible E. coli strain and three resistant strains. It
+  measured the OD600 of each strain in a Bioscreen reader every 4 minutes. growthcurver gave the exponential growth rate r
+  of each well. The rate of each plasmid well divided by the rate of the plasmid-free host well at the top of its plate
+  column gives the relative growth rate. Figure 2 shows the mean relative rate of each plasmid in each host with a 95%
+  interval and a one-sample t test against 1. This benchmark uses the streptomycin-resistant host (sheet STR-R, 12 plasmids).
+instruction: >-
+  Fit a logistic curve to each well with growthcurver. Divide the rate of each well by the rate of the host well of the
+  same block. Give the mean relative rate of each plasmid with its 95% interval and the p value against 1, and the mean
+  of the plasmid means.
+instruction_basis: >-
+  Methods (Growth measurements: Bioscreen C, growthcurver, the topmost well of each column as the control; Statistics),
+  Results (average relative growth rates for each host), the legend of Figure 2, and the ReadME of the figshare record.
+answers:
+  bg_correct:
+    decision: Background correction
+    value: min
+    source: Not in the paper. min is the growthcurver default, and it gives each published r within 1e-6 (check.out).
+  blank_wells:
+    decision: Medium-only wells for the blank
+    value: none
+    source: The data have no medium-only wells.
+  t_trim:
+    decision: Last time point of the fit
+    value: 0
+    source: Not in the paper. All readings give the published r.
+  time_unit:
+    decision: Unit of the time column
+    value: h
+    source: ReadME of the figshare record. "Hours – Timepoint (in hours)".
+  exclude_wells:
+    decision: Wells that you exclude
+    value: W10 to W18 and W80 to W84
+    source: >-
+      The source data file Figure_1_2.xlsx has no rows for these 14 wells (block 2 and block 12). The paper gives no
+      reason. The wells grew normally.
+  easylinear_points:
+    decision: Points in each window of the lag time method
+    value: 5
+    source: Not used. The paper gives no lag time.
+  reference_group:
+    decision: Reference strain or condition
+    value: Host
+    source: Methods. "dividing the respective values for each plasmid-bearing strain with that obtained for the respective host strain".
+  relative_to:
+    decision: Divide by the reference mean or by the reference well of the same block
+    value: same block
+    source: Methods. "The topmost well in each column of the plate was inoculated with control strains and the exponential growth rate from that well was used to calculate the relative growth rate for all the wells below it."
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text, so that the record of decisions stays the only source of the settings.
+items:
+  n_wells:
+    source: published
+    where: Figure_1_2.xlsx, sheet STR-R, 70 rows with r.
+    check: check.py matches 70 wells.
+  r_w01:
+    source: published
+    where: Figure_1_2.xlsx, sheet STR-R, first row (DA49828 Host). 0.371065208.
+    check: SciPy logistic fit (check.py) within 1.4e-6.
+  r_w24:
+    source: published
+    where: Figure_1_2.xlsx, sheet STR-R (DA49828 P5, block 3). 0.479446.
+    check: SciPy logistic fit (check.py) within 1.4e-6.
+  mean_printed:
+    source: published
+    where: Results. "average relative exponential growth rates in- NIT-R = 1.017, CIP-R = 1.033, STR-R = 0.996". It does not reproduce from the source data (1.0092).
+    check: check.py gives 1.009203 for the mean of the plasmid means and for the mean of all plasmid wells.
+  rel_p1:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P1 wells is 1.005299.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p2:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P2 wells is 1.027756.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p3:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P3 wells is 1.032948.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p4:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P4 wells is 0.965689.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p5:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P5 wells is 1.072459.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p6:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P6 wells is 1.008294.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p7:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P7 wells is 0.961198.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p8:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P8 wells is 0.975450.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p9:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P9 wells is 1.042573.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p10:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P10 wells is 0.990162.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p11:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P11 wells is 0.946554.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  rel_p14:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed as a number. Figure 2D plots this mean. The source data give rel_r of each well; the mean of the five P14 wells is 1.082055.
+    independence: independent
+    check: pandas mean of the published rel_r in Figure_1_2.xlsx (check.py).
+  ci_low_p11:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: 95% t interval of the published rel_r of P11. Figure 2D plots the interval.
+    independence: independent
+    check: SciPy t interval (check.py) gives 0.742365.
+  ci_high_p11:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: 95% t interval of the published rel_r of P11. Figure 2D plots the interval.
+    independence: independent
+    check: SciPy t interval (check.py) gives 1.150742.
+  p_p5:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed in the article. The test is in the legend of Figure 2 (Welch one-sample two-sided t test against 1).
+    independence: independent
+    check: SciPy ttest_1samp on the published rel_r (check.py) gives 0.243208.
+  p_p11:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed in the article. The test is in the legend of Figure 2.
+    independence: independent
+    check: SciPy ttest_1samp on the published rel_r (check.py) gives 0.507637.
+  mean_of_means:
+    source: computed
+    tool: compare_growth of the growthcurver adapter
+    where: Not printed. The Results print 0.996 for STR-R, which does not reproduce.
+    independence: independent
+    check: check.py gives 1.009203 from the published rel_r.
+data:
+  source: >-
+    figshare record 10.6084/m9.figshare.25400194, file Bioscreen_data.xlsx, sheet STR-R. fetch.sh writes strr_od.csv
+    (time in hours and the OD600 of 84 wells, W01 to W84, in the order of the sheet) and strr_design.csv (the block, the
+    host and the plasmid of each well). Figure_1_2.xlsx goes to the reference folder.
+  url: https://figshare.com/articles/dataset/25400194
+  license: CC BY 4.0, from the figshare record. The paper is CC BY 4.0.
+  size: 939 KB Excel workbook with 3 sheets. strr_od.csv has 541 readings of 84 wells.
