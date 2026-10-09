@@ -1,0 +1,31 @@
+tool: cytof (FlowSOM, diffcyt, lme4 in R)
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/nowicka2019-cytof-bcrxl/fcs
+  - /Volumes/T7/guided-analysis/data/nowicka2019-cytof-bcrxl/sample_table.csv
+decisions:
+  markers: "CD3, CD45, CD4, CD20, CD33, CD123, CD14, IgM, HLA-DR, CD7"
+  cofactor: 5
+  grid: "10 x 10"
+  n_metaclusters: 20
+  seed: 1234
+  population_column: label
+  condition: "BCR-XL against Reference"
+  pair_by: patient_id
+  da_method: glmm
+  fdr: 0.05
+expected:
+  - {description: "Cells in the file of donor 2 with BCR-XL", value: 16675, tolerance: 0, source: "Nowicka 2019, printed n_cells; check_bcrxl.py"}
+  - {description: "Cells in the file of donor 1 Reference", value: 2739, tolerance: 0, source: "Nowicka 2019, printed n_cells; check_bcrxl.py"}
+  - {description: "Percent of NK cells in the Reference file of donor 1", value: 14.3, tolerance: 0.05, source: "Nowicka 2019, topTable props_Ref1; check_bcrxl.py"}
+  - {description: "Percent of CD4 T-cells in the Reference file of donor 1", value: 44.7, tolerance: 0.05, source: "Nowicka 2019, topTable props_Ref1; check_bcrxl.py"}
+  - {description: "p value of the NK cells, paired model", value: 4.5e-13, tolerance: 1.0e-14, source: "Nowicka 2019, topTable; check_glmm.R gives 4.474e-13"}
+  - {description: "p value of the B-cells IgM-, paired model", value: 2.2e-11, tolerance: 1.0e-12, source: "Nowicka 2019, topTable; check_glmm.R gives 2.202e-11"}
+  - {description: "Adjusted p value of the CD8 T-cells, paired model", value: 0.0019, tolerance: 0.0001, source: "Nowicka 2019, topTable; check_glmm.R gives 0.001914"}
+  - {description: "Cell types with adjusted p at or below 0.05, paired model", value: 6, tolerance: 0, source: "Nowicka 2019, TRUE = 6; check_glmm.R"}
+  - {description: "Cell types with adjusted p at or below 0.05, model without the pairing", value: 3, tolerance: 0, source: "Nowicka 2019, TRUE = 3; check_glmm.R"}
+  - {description: "p value of the B-cells IgM+, model without the pairing", value: 0.0135, tolerance: 0.0005, source: "Nowicka 2019, rowData of the first GLMM; check_glmm.R gives 0.01348"}
+notes: |
+  Trap: the paired and the unpaired model give different counts of significant cell types (6 and 3).
+  Trap: the p values are for samples as replicates. A test on cells would give p values that are much too small.
+  The workflow merges 20 FlowSOM metaclusters into 8 cell types by hand. The benchmark uses the 8 published cell types from the channel population_id, so the clustering step does not change the scored numbers.

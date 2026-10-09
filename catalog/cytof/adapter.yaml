@@ -1,0 +1,779 @@
+adapter:
+  name: cytof
+  field: mass cytometry
+  file_types: [".fcs"]
+  title: Mass cytometry clustering and population frequencies (FlowSOM, diffcyt)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Clusters mass cytometry or flow cytometry FCS files with arcsinh and FlowSOM. It counts the cells of each
+    population in each sample. It tests the population frequencies between two conditions with diffcyt.
+    It replaces the clustering and abundance tests of Cytobank and OMIQ.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: FlowSOM
+  version: "2.20.0"
+  tested_versions: []
+  homepage: https://bioconductor.org/packages/FlowSOM
+  docs:
+    - https://bioconductor.org/packages/release/bioc/vignettes/FlowSOM/inst/doc/FlowSOM.html
+    - https://bioconductor.org/packages/release/bioc/vignettes/diffcyt/inst/doc/diffcyt_workflow.html
+    - https://bioconductor.org/packages/release/bioc/vignettes/flowCore/inst/doc/HowTo-flowCore.pdf
+  install: >
+    Install R (brew install r on macOS). Then install FlowSOM, flowCore, diffcyt, SummarizedExperiment, lme4 and
+    jsonlite from CRAN and Bioconductor into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER,
+    /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
+    Rscript -e 'install.packages("BiocManager"); BiocManager::install(c("FlowSOM", "flowCore", "diffcyt", "SummarizedExperiment"), lib = "~/.guided-analysis/R-library")'
+  citation:
+    - text: "Van Gassen, S., Callebaut, B., Van Helden, M. J., Lambrecht, B. N., Demeester, P., Dhaene, T., & Saeys, Y. (2015). FlowSOM: Using self-organizing maps for visualization and interpretation of cytometry data. Cytometry Part A, 87(7), 636-645. https://doi.org/10.1002/cyto.a.22625"
+      doi: 10.1002/cyto.a.22625
+      bibtex: |
+        @article{vangassen2015flowsom,
+          author  = {Van Gassen, Sofie and Callebaut, Britt and Van Helden, Mary J. and Lambrecht, Bart N. and Demeester, Piet and Dhaene, Tom and Saeys, Yvan},
+          title   = {{FlowSOM}: Using self-organizing maps for visualization and interpretation of cytometry data},
+          journal = {Cytometry Part A},
+          year    = {2015},
+          volume  = {87},
+          number  = {7},
+          pages   = {636--645},
+          doi     = {10.1002/cyto.a.22625}
+        }
+    - text: "Weber, L. M., Nowicka, M., Soneson, C., & Robinson, M. D. (2019). diffcyt: Differential discovery in high-dimensional cytometry via high-resolution clustering. Communications Biology, 2, 183. https://doi.org/10.1038/s42003-019-0415-5"
+      doi: 10.1038/s42003-019-0415-5
+      bibtex: |
+        @article{weber2019diffcyt,
+          author  = {Weber, Lukas M. and Nowicka, Malgorzata and Soneson, Charlotte and Robinson, Mark D.},
+          title   = {diffcyt: Differential discovery in high-dimensional cytometry via high-resolution clustering},
+          journal = {Communications Biology},
+          year    = {2019},
+          volume  = {2},
+          pages   = {183},
+          doi     = {10.1038/s42003-019-0415-5}
+        }
+    - text: "Hahne, F., LeMeur, N., Brinkman, R. R., Ellis, B., Haaland, P., Sarkar, D., Spidlen, J., Strain, E., & Gentleman, R. (2009). flowCore: a Bioconductor package for high throughput flow cytometry. BMC Bioinformatics, 10, 106. https://doi.org/10.1186/1471-2105-10-106"
+      doi: 10.1186/1471-2105-10-106
+      bibtex: |
+        @article{hahne2009flowcore,
+          author  = {Hahne, Florian and LeMeur, Nolwenn and Brinkman, Ryan R. and Ellis, Byron and Haaland, Perry and Sarkar, Deepayan and Spidlen, Josef and Strain, Errol and Gentleman, Robert},
+          title   = {{flowCore}: a {Bioconductor} package for high throughput flow cytometry},
+          journal = {BMC Bioinformatics},
+          year    = {2009},
+          volume  = {10},
+          pages   = {106},
+          doi     = {10.1186/1471-2105-10-106}
+        }
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first
+  folder that exists of these: GA_R_LIBS, R_LIBS_USER,
+  /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library. The program version in this
+  adapter is the version of the R package FlowSOM, not of R. The arcsinh transform runs inside cluster_cells.
+  The tool never changes the FCS files.
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees cell counts, population tables, test results and small PNG previews. It never sees the cell by marker matrix.
+
+decisions:
+  - key: question
+    label: What question do you ask with these samples?
+    kind: text
+    group: Question
+    help: Example - Does the share of one cell population change after a stimulation?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - samples from different donors (one FCS file for each donor and condition)
+      - technical repeats of one donor
+      - cells
+    default: samples from different donors (one FCS file for each donor and condition)
+    group: Design
+    help: >
+      The tests treat each sample as one replicate. Cells of one sample are not independent
+      replicates. A test on cells gives p values that are much too small.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: markers
+    label: Markers to cluster on
+    kind: text
+    group: Clustering
+    help: >
+      Name the channels or markers that define cell types, such as surface markers. Leave out markers that you compare between conditions, such as phospho-proteins. Leave out the DNA, bead and time channels. The cell types depend on this list.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: cluster_cells, arg: markers }
+
+  - key: cofactor
+    label: Cofactor of the arcsinh transform
+    kind: float
+    lo: 0.1
+    hi: 100000
+    group: Clustering
+    help: >
+      The transform is asinh of the value divided by the cofactor. A small cofactor spreads the low
+      values and a large cofactor keeps them near zero. Mass cytometry data use a small cofactor.
+      Fluorescence flow cytometry data use a larger one. Check the histogram of one marker.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: cluster_cells, arg: cofactor }
+    sensitivity:
+      options: [2, 5, 10]
+      tool: cluster_cells
+      compare: [metrics.max_metacluster_cells, metrics.min_metacluster_cells]
+      max_runs: 3
+
+  - key: grid_x
+    label: Width of the FlowSOM grid
+    kind: int
+    default: 10
+    lo: 2
+    hi: 30
+    group: Clustering
+    help: >
+      The grid width and height give the number of nodes (small clusters). More nodes find smaller
+      populations. Each node needs enough cells. Record both numbers.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: cluster_cells, arg: xdim }
+
+  - key: grid_y
+    label: Height of the FlowSOM grid
+    kind: int
+    default: 10
+    lo: 2
+    hi: 30
+    group: Clustering
+    help: See the width of the grid.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: cluster_cells, arg: ydim }
+
+  - key: n_metaclusters
+    label: Number of metaclusters (cell populations)
+    kind: int
+    lo: 2
+    hi: 100
+    group: Clustering
+    help: >
+      FlowSOM merges the nodes into this number of metaclusters. Choose the number before you see
+      the result. A number that is too small merges different cell types. A number that is too large
+      splits one cell type. Check the median heatmap with known markers.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: cluster_cells, arg: n_metaclusters }
+    sensitivity:
+      options: [8, 12, 20]
+      tool: cluster_cells
+      compare: [metrics.max_metacluster_cells, metrics.min_metacluster_cells]
+      max_runs: 3
+
+  - key: seed
+    label: Random seed
+    kind: int
+    default: 1
+    lo: 0
+    hi: 1000000
+    group: Reproducibility
+    help: The seed fixes the start of the FlowSOM grid and of the metaclustering. Record it. A repeat run with the same seed gives the same clusters.
+    owner: agent
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: cluster_cells, arg: seed }
+
+  - key: population_column
+    label: Column that defines the populations
+    kind: choice
+    choices: [metacluster, cluster, label]
+    default: metacluster
+    group: Populations
+    help: >
+      Metacluster is the merged FlowSOM cluster. Cluster is the grid node. Label is a column that you
+      gave in the label channel, such as manual gating or published cell types.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: population_frequencies, arg: population_column }
+
+  - key: condition
+    label: Column of the sample table that holds the condition
+    kind: text
+    group: Test
+    help: The column must have exactly two levels, such as treated and control.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: condition }
+
+  - key: reference
+    label: Reference level of the condition
+    kind: text
+    group: Test
+    help: This is the level that the test uses as the base. The sign of the log ratio depends on it.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: reference }
+
+  - key: pair_by
+    label: Column that pairs the samples of one donor
+    kind: text
+    default: none
+    group: Test
+    help: >
+      Name the column that holds the donor when each donor gives a sample in each condition. The model then compares each donor with itself. Write none for samples without pairs. A wrong choice changes the p values a lot.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: pair_by }
+    sensitivity:
+      options: [none]
+      tool: differential_abundance
+      compare: [metrics.n_significant, metrics.min_p]
+      max_runs: 1
+
+  - key: da_method
+    label: Test for differences in population frequency
+    kind: choice
+    choices: [glmm, edgeR, voom]
+    default: glmm
+    group: Test
+    help: >
+      GLMM is a binomial mixed model with a random effect for each sample. It adds a random effect for each donor if you pair. edgeR and voom are count models with a design matrix. Choose before you see the result.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: method }
+    sensitivity:
+      options: [glmm, edgeR, voom]
+      tool: differential_abundance
+      compare: [metrics.n_significant, metrics.min_p]
+      max_runs: 3
+
+  - key: fdr
+    label: Adjusted p value limit
+    kind: float
+    default: 0.05
+    lo: 0.001
+    hi: 0.5
+    group: Test
+    help: Populations with a Benjamini-Hochberg adjusted p value at or below this limit count as different.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: fdr }
+
+  - key: exclusions
+    label: Samples, cells or markers that you exclude
+    kind: text
+    default: none
+    group: Design
+    help: Name each excluded sample, gate or marker and the reason, such as debris, dead cells or beads. Write none if you exclude nothing.
+    owner: human
+    stage: setup
+
+checks:
+  - id: cells_as_replicates
+    description: The scientist treats cells as replicates.
+    severity: error
+    text: >
+      Report the answer if the scientist said that the unit of replication is cells, or if the
+      answer tests cells or clusters of cells as independent replicates.
+
+  - id: unpaired_design_of_paired_samples
+    description: The samples come in pairs of one donor and the test ignores the pairs.
+    severity: warning
+    text: >
+      Report the answer if the sample table has a donor column with two samples for each donor and the
+      differential abundance ran with pair_by none.
+
+  - id: clusters_chosen_after_result
+    description: The number of metaclusters changed after the test result.
+    severity: warning
+    text: >
+      Report the answer if the log shows a run of differential_abundance, then a new run of
+      cluster_cells with another number of metaclusters, and the answer reports only the new result.
+
+  - id: functional_markers_clustered
+    description: A marker that the scientist compares between conditions is also a clustering marker.
+    severity: warning
+    text: >
+      Report the answer if the clustering markers include phospho-proteins or other markers that the
+      question compares between conditions.
+
+  - id: seed_not_reported
+    description: The answer gives clusters and does not name the seed, the grid and the cofactor.
+    severity: warning
+    text: Report the answer if it gives cluster results and does not say the seed, the grid size and the arcsinh cofactor.
+
+map:
+  - tool: inspect_fcs
+    route: "Cytobank: Experiment > Panels shows the channels and Experiment > Samples shows the event count of each file. FlowJo: select the sample group, then Table Editor with the Count statistic."
+    steps:
+      - "Cytobank: upload the FCS files and open Experiment Setup."
+      - "Check the channel names and the event count of each file."
+      - "FlowJo: add the files to the workspace and read the count of each file."
+    fidelity: close
+    difference: >
+      The tool reads the FCS files with flowCore and also lists the channels with their range and the
+      channels that look like labels. A person has not compared the counts with Cytobank or FlowJo.
+    evidence:
+      source: docs
+      test: inspect_synthetic
+      note: flowCore documentation.
+    summary: "{summary}"
+
+  - tool: cluster_cells
+    route: "Cytobank: Experiment > Panels, set the scale to arcsinh with the cofactor. Then Analyses > New FlowSOM, choose the channels, the number of metaclusters and the seed. OMIQ: Tasks > FlowSOM."
+    steps:
+      - "Cytobank: set the scale of each channel to arcsinh with the cofactor that you chose."
+      - "Cytobank: start a FlowSOM analysis on all files with the clustering channels."
+      - "Set the number of metaclusters, the grid size and the seed. Run it."
+      - "OMIQ: scale the channels with arcsinh, then run the FlowSOM task with the same settings."
+    params:
+      - { arg: cofactor, label: "arcsinh cofactor", ui_default: "5 for mass cytometry" }
+      - { arg: xdim, label: "grid width", ui_default: 10 }
+      - { arg: ydim, label: "grid height", ui_default: 10 }
+      - { arg: n_metaclusters, label: "number of metaclusters", ui_default: "none" }
+      - { arg: seed, label: "seed", ui_default: "random" }
+    fidelity: close
+    difference: >
+      Cytobank and OMIQ run their own FlowSOM build and their own random numbers. The same seed can
+      give other clusters. The tool uses the R package FlowSOM. Cluster numbers and borders can differ
+      between programs and versions. The cell counts and the transform are the same.
+    evidence:
+      source: docs
+      test: cluster_synthetic
+      note: FlowSOM vignette. The arcsinh medians were checked with numpy.
+
+  - tool: population_frequencies
+    route: "Cytobank: Experiment > Illustrations > Bar chart or the population table of the FlowSOM analysis. FlowJo: Table Editor with the frequency of parent for each population and sample."
+    steps:
+      - "Cytobank: open the FlowSOM result and export the cell counts of each metacluster and file."
+      - "FlowJo: gate or assign the populations, then export the Count of each population for each sample."
+      - "Divide each count by the total cells of the sample and multiply by 100."
+    fidelity: close
+    difference: >
+      The tool counts the cells of each population in each file and divides by the cells of the file. This
+      is the same count as the table of Cytobank or FlowJo.
+    evidence:
+      source: docs
+      test: frequencies_bcrxl
+      note: The Nowicka workflow prints the same table.
+
+  - tool: differential_abundance
+    route: "Cytobank: Citrus or the statistics of the FlowSOM analysis. FlowJo: no test. Export the counts and test them in R or in GraphPad Prism."
+    steps:
+      - "Export the cell counts of each population and sample."
+      - "Make a table of the samples with the condition and the donor."
+      - "Fit a binomial mixed model for each population: counts of the population and of the other cells ~ condition + (1 | sample) + (1 | donor)."
+      - "Adjust the p values with Benjamini-Hochberg."
+    params:
+      - { arg: method, label: "test", ui_default: "none" }
+      - { arg: pair_by, label: "donor column", ui_default: "none" }
+      - { arg: fdr, label: "adjusted p limit", ui_default: 0.05 }
+    fidelity: close
+    difference: >
+      The tool calls diffcyt. The GLMM is the model of lme4::glmer with a binomial family. The numbers
+      equal a direct glmer fit (checks/check_glmm.R). Cytobank has no equal test.
+    evidence:
+      source: docs
+      test: da_bcrxl_paired
+      note: The diffcyt vignette and the Nowicka workflow print the same model.
+
+tests:
+  - id: inspect_synthetic
+    description: >
+      Six synthetic FCS files that data/make_synthetic.py writes, with 4 markers and a label channel.
+      The cell counts are the sizes that the script writes (checks/check_synthetic.py, output in
+      checks/check_synthetic.out).
+    data: [data/synthetic]
+    calls:
+      - tool: inspect_fcs
+        args: { files: "{adapter_dir}/data/synthetic" }
+    expect:
+      - { path: metrics.n_files, equals: 6 }
+      - { path: metrics.n_cells_total, equals: 1990 }
+      - { path: metrics.n_channels, equals: 5 }
+      - { path: metrics.min_cells, equals: 295 }
+      - { path: metrics.max_cells, equals: 370 }
+      - { path: data.cells_per_file.p2_ref, equals: 295 }
+      - { path: data.label_channels, equals: truth }
+
+  - id: cluster_synthetic
+    description: >
+      FlowSOM with 3 metaclusters on the synthetic files. The three populations are far apart, so
+      the metaclusters equal the true populations. The sizes and the medians of the arcsinh values
+      come from numpy on the true labels (checks/check_synthetic.py and checks/check_synthetic.out).
+      Metacluster 1 is the population with the high third marker.
+    data: [data/synthetic]
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/synthetic", markers: "CD3,CD19,CD14,pErk", cofactor: 5, xdim: 5, ydim: 5, n_metaclusters: 3, seed: 1 }
+    expect:
+      - { path: metrics.n_cells, equals: 1990 }
+      - { path: metrics.n_metaclusters, equals: 3 }
+      - { path: metrics.min_metacluster_cells, equals: 460 }
+      - { path: metrics.max_metacluster_cells, equals: 960 }
+      - { path: "table.rows[0][1]", equals: 570 }
+      - { path: "table.rows[0][6]", approx: 1.443635, abs: 0.000001 }
+      - { path: "table.rows[0][5]", approx: 5.077710, abs: 0.000001 }
+      - { path: "table.rows[1][4]", approx: 4.621140, abs: 0.000001 }
+      - { path: "table.rows[2][3]", approx: 4.787561, abs: 0.000001 }
+
+  - id: cofactor_changes_medians
+    description: >
+      The same clustering with the cofactor 50 gives other medians. The median of the third marker
+      in the population with a high value is asinh(x / 50) with the median x of the population. This
+      shows that the cofactor choice changes the transformed values.
+    data: [data/synthetic]
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/synthetic", markers: "CD3,CD19,CD14,pErk", cofactor: 50, xdim: 5, ydim: 5, n_metaclusters: 3, seed: 1 }
+    expect:
+      - { path: metrics.cofactor, equals: 50 }
+      - { path: "table.rows[0][5]", approx: 2.7766, abs: 0.02 }
+
+  - id: frequencies_synthetic
+    description: >
+      Population counts from the true label channel of the synthetic files. The counts for each file
+      are the sizes that make_synthetic.py writes (checks/check_synthetic.out).
+    data: [data/synthetic]
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/synthetic", markers: "CD3,CD19,CD14,pErk", cofactor: 5, xdim: 5, ydim: 5, n_metaclusters: 3, seed: 1, label_channel: truth }
+        save_as: run
+      - tool: population_frequencies
+        args: { cells: "{saved.run.data.cells_file}", population_column: label }
+    expect:
+      - { path: metrics.n_populations, equals: 3 }
+      - { path: metrics.n_samples, equals: 6 }
+      - { path: metrics.n_cells, equals: 1990 }
+      - { path: "table.rows[0][1]", approx: 40, abs: 0.000001 }
+      - { path: "table.rows[1][2]", approx: 19.444444, abs: 0.00001 }
+
+  - id: frequencies_bcrxl
+    description: >
+      The Bodenmiller BCR-XL mass cytometry data (16 samples, 8 donors, each donor with a reference and a BCR-XL
+      sample). The cells of each sample are the cell counts that the Nowicka workflow prints (F1000Research 6:748,
+      version 3). The population column is the label that the HDCytoData package gives. Reference sample 1 has
+      14.3 percent of population 7 (the NK cells in the paper table, 14.3). The independent count is in
+      checks/check_bcrxl.py with the output checks/check_bcrxl.out.
+    data: [data/bcrxl]
+    fetch: data/fetch.sh
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/bcrxl", markers: "CD3,CD45,CD4,CD20,CD33,CD123,CD14,IgM,HLA-DR,CD7", cofactor: 5, xdim: 10, ydim: 10, n_metaclusters: 20, seed: 1234, label_channel: population_id }
+        save_as: run
+      - tool: population_frequencies
+        args: { cells: "{saved.run.data.cells_file}", population_column: label }
+    expect:
+      - { path: metrics.n_cells, equals: 172791 }
+      - { path: metrics.n_samples, equals: 16 }
+      - { path: metrics.n_populations, equals: 8 }
+      - { path: metrics.min_sample_cells, equals: 2739 }
+      - { path: metrics.max_sample_cells, equals: 16725 }
+      - { path: data.cells_per_sample.PBMC8_30min_patient1_Reference, equals: 2739 }
+      - { path: "table.rows[6][2]", approx: 14.3, abs: 0.05 }
+
+  - id: da_bcrxl_paired
+    description: >
+      Binomial GLMM with a random effect for the sample and for the donor on the 8 labelled populations of the
+      BCR-XL data. The Nowicka workflow prints p 4.5e-13 for population 7 (NK cells), 2.2e-11 for
+      population 1, 3.5e-08 for population 2 and 7.1e-05 for population 5, with 6 populations at adjusted p 0.05 or
+      below. A direct lme4 fit gives the same values (checks/check_glmm.R and checks/check_glmm.out).
+    data: [data/bcrxl, data/bcrxl_metadata.csv]
+    fetch: data/fetch.sh
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/bcrxl", markers: "CD3,CD45,CD4,CD20,CD33,CD123,CD14,IgM,HLA-DR,CD7", cofactor: 5, xdim: 10, ydim: 10, n_metaclusters: 20, seed: 1234, label_channel: population_id }
+        save_as: run
+      - tool: population_frequencies
+        args: { cells: "{saved.run.data.cells_file}", population_column: label }
+        save_as: freq
+      - tool: differential_abundance
+        args: { counts: "{saved.freq.data.counts_file}", metadata: "{adapter_dir}/data/bcrxl_metadata.csv", condition: condition, reference: Reference, pair_by: patient_id, method: glmm, fdr: 0.05 }
+    expect:
+      - { path: metrics.n_significant, equals: 6 }
+      - { path: metrics.min_p, approx: 4.474e-13, rel: 0.01 }
+      - { path: "table.rows[0][0]", equals: "7" }
+      - { path: "table.rows[1][4]", approx: 2.2e-11, rel: 0.02 }
+      - { path: "table.rows[2][4]", approx: 3.45e-08, rel: 0.02 }
+      - { path: "table.rows[3][4]", approx: 7.11e-05, rel: 0.02 }
+
+  - id: da_bcrxl_unpaired
+    description: >
+      The same populations with a random effect for the sample only. The Nowicka workflow prints p 0.0055 for
+      population 1, 0.0135 for population 2 and 0.0153 for population 4, with 3 populations at adjusted p 0.05
+      or below (GLMM without the pairing). A direct lme4 fit gives the same values (checks/check_glmm.out).
+    data: [data/bcrxl, data/bcrxl_metadata.csv]
+    fetch: data/fetch.sh
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/bcrxl", markers: "CD3,CD45,CD4,CD20,CD33,CD123,CD14,IgM,HLA-DR,CD7", cofactor: 5, xdim: 10, ydim: 10, n_metaclusters: 20, seed: 1234, label_channel: population_id }
+        save_as: run
+      - tool: population_frequencies
+        args: { cells: "{saved.run.data.cells_file}", population_column: label }
+        save_as: freq
+      - tool: differential_abundance
+        args: { counts: "{saved.freq.data.counts_file}", metadata: "{adapter_dir}/data/bcrxl_metadata.csv", condition: condition, reference: Reference, pair_by: none, method: glmm, fdr: 0.05 }
+    expect:
+      - { path: metrics.n_significant, equals: 3 }
+      - { path: metrics.min_p, approx: 0.005541, rel: 0.01 }
+      - { path: "table.rows[1][4]", approx: 0.01348, rel: 0.01 }
+      - { path: "table.rows[2][4]", approx: 0.01535, rel: 0.01 }
+
+  - id: da_edger_bcrxl
+    description: >
+      The edgeR test with the donor in the design on the same counts. These values are from diffcyt 1.32.1
+      (stability values). The count of significant populations is 6 at the limit 0.05.
+    data: [data/bcrxl, data/bcrxl_metadata.csv]
+    fetch: data/fetch.sh
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/bcrxl", markers: "CD3,CD45,CD4,CD20,CD33,CD123,CD14,IgM,HLA-DR,CD7", cofactor: 5, xdim: 10, ydim: 10, n_metaclusters: 20, seed: 1234, label_channel: population_id }
+        save_as: run
+      - tool: population_frequencies
+        args: { cells: "{saved.run.data.cells_file}", population_column: label }
+        save_as: freq
+      - tool: differential_abundance
+        args: { counts: "{saved.freq.data.counts_file}", metadata: "{adapter_dir}/data/bcrxl_metadata.csv", condition: condition, reference: Reference, pair_by: patient_id, method: edgeR, fdr: 0.05 }
+    expect:
+      - { path: metrics.n_significant, equals: 6 }
+      - { path: metrics.n_populations, equals: 8 }
+
+  - id: missing-folder
+    description: A folder that does not exist fails, and the error names the folder.
+    calls:
+      - { tool: inspect_fcs, args: { files: "{adapter_dir}/data/no_such_folder" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "not found" }
+      - { path: error, contains: "no_such_folder" }
+
+  - id: missing-cofactor
+    description: A clustering call without a cofactor fails, and the error says that the scientist chooses it.
+    data: [data/synthetic]
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/synthetic", markers: "CD3,CD19", n_metaclusters: 3 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "cofactor" }
+
+  - id: unknown-marker
+    description: A marker that is not in the files fails, and the error lists the channels.
+    data: [data/synthetic]
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/synthetic", markers: "CD3,CD99", cofactor: 5, n_metaclusters: 3 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "CD99" }
+      - { path: error, contains: "Channels" }
+
+  - id: too-many-metaclusters
+    description: More metaclusters than grid nodes fails, and the error names both numbers.
+    data: [data/synthetic]
+    calls:
+      - tool: cluster_cells
+        args: { files: "{adapter_dir}/data/synthetic", markers: "CD3,CD19", cofactor: 5, xdim: 2, ydim: 2, n_metaclusters: 9 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "grid nodes" }
+
+tools:
+  - name: inspect_fcs
+    title: Inspect FCS files
+    description: >
+      Read FCS files. Return the cells in each file, the channels with their range, and the channels that look like integer labels. It changes no file.
+    params:
+      files: { type: string, description: "Path of a folder with .fcs files, or a comma list of .fcs paths. All files must have the same channels." }
+    required: [files]
+    read_only: true
+    batch: false
+    outputs:
+      table: { kind: table, ext: .csv, description: One row for each file with the number of cells. }
+    script: scripts/inspect_fcs.R
+    parse: json
+
+  - name: cluster_cells
+    title: Transform and cluster cells with FlowSOM
+    description: >
+      Cluster the cells of all files together with FlowSOM on arcsinh values. Return the median of each marker in each metacluster, a heatmap, and the cluster of each cell.
+    params:
+      files: { type: string, description: "Path of a folder with .fcs files, or a comma list of .fcs paths. All files must have the same channels." }
+      markers: { type: string, description: "Leave out. The harness sets it from the decision record. Comma list of channel names or marker names to cluster on." }
+      cofactor: { type: number, minimum: 0.1, maximum: 100000, description: "Leave out. The harness sets it from the decision record. Cofactor of the arcsinh transform, in the units of the FCS values." }
+      xdim: { type: integer, minimum: 2, maximum: 30, description: "Leave out. The harness sets it from the decision record. Width of the FlowSOM grid, as a count of nodes." }
+      ydim: { type: integer, minimum: 2, maximum: 30, description: "Leave out. The harness sets it from the decision record. Height of the FlowSOM grid, as a count of nodes." }
+      n_metaclusters: { type: integer, minimum: 2, maximum: 100, description: "Leave out. The harness sets it from the decision record. Number of metaclusters, as a count." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed (unitless)." }
+      label_channel: { type: string, description: "Optional. Channel of the FCS files that holds an integer population label, such as a manual gate or a published cell type. The cells table keeps it in the column label." }
+    required: [files]
+    batch: false
+    outputs:
+      cells: { kind: table, ext: .csv, description: "One row for each cell with sample_id, cluster, metacluster and label." }
+      medians: { kind: table, ext: .csv, description: "Median of each marker in each metacluster." }
+      plot: { kind: image, ext: .png, description: Heatmap of the metacluster medians. }
+    script: scripts/cluster_cells.R
+    parse: json
+    citations:
+      - text: "Van Gassen, S., Callebaut, B., Van Helden, M. J., Lambrecht, B. N., Demeester, P., Dhaene, T., & Saeys, Y. (2015). FlowSOM: Using self-organizing maps for visualization and interpretation of cytometry data. Cytometry Part A, 87(7), 636-645. https://doi.org/10.1002/cyto.a.22625"
+        doi: 10.1002/cyto.a.22625
+      - text: "Wilkerson, M. D., & Hayes, D. N. (2010). ConsensusClusterPlus: a class discovery tool with confidence assessments and item tracking. Bioinformatics, 26(12), 1572-1573. https://doi.org/10.1093/bioinformatics/btq170"
+        doi: 10.1093/bioinformatics/btq170
+        bibtex: |
+          @article{wilkerson2010consensusclusterplus,
+            author  = {Wilkerson, Matthew D. and Hayes, D. Neil},
+            title   = {{ConsensusClusterPlus}: a class discovery tool with confidence assessments and item tracking},
+            journal = {Bioinformatics},
+            year    = {2010},
+            volume  = {26},
+            number  = {12},
+            pages   = {1572--1573},
+            doi     = {10.1093/bioinformatics/btq170}
+          }
+      - text: "Nowicka, M., Krieg, C., Crowell, H. L., Weber, L. M., Hartmann, F. J., Guglietta, S., Becher, B., Levesque, M. P., & Robinson, M. D. (2019). CyTOF workflow: differential discovery in high-throughput high-dimensional cytometry datasets. F1000Research, 6, 748. https://doi.org/10.12688/f1000research.11622.3"
+        doi: 10.12688/f1000research.11622.3
+        bibtex: |
+          @article{nowicka2019cytof,
+            author  = {Nowicka, Malgorzata and Krieg, Carsten and Crowell, Helena L. and Weber, Lukas M. and Hartmann, Felix J. and Guglietta, Silvia and Becher, Burkhard and Levesque, Mitchell P. and Robinson, Mark D.},
+            title   = {{CyTOF} workflow: differential discovery in high-throughput high-dimensional cytometry datasets},
+            journal = {F1000Research},
+            year    = {2019},
+            volume  = {6},
+            pages   = {748},
+            doi     = {10.12688/f1000research.11622.3}
+          }
+
+  - name: population_frequencies
+    title: Count the cells of each population in each sample
+    description: >
+      Count the cells of each population in each sample, from the cells table that the clustering tool wrote. Return the counts, the percent of each sample, and a bar plot.
+    params:
+      cells: { type: string, description: "Path of the cells table (CSV) that cluster_cells wrote. It has the columns sample_id, cluster, metacluster and, with a label channel, label." }
+      population_column: { type: string, enum: [metacluster, cluster, label], description: "Leave out. The harness sets it from the decision record. Column of the cells table that defines the populations." }
+    required: [cells]
+    read_only: true
+    outputs:
+      counts: { kind: table, ext: .csv, description: "Cell counts. One row for each population, one column for each sample." }
+      percent: { kind: table, ext: .csv, description: Percent of the cells of each sample. }
+      plot: { kind: image, ext: .png, description: Stacked bar plot of the populations in each sample. }
+    script: scripts/population_frequencies.R
+    parse: json
+
+  - name: differential_abundance
+    title: Test for differences in population frequency
+    description: >
+      Test each population for a difference in frequency between two conditions with diffcyt. Return the mean percent in each condition, p values and adjusted p values. The unit of the test is the sample.
+    params:
+      counts: { type: string, description: "Path of the counts table (CSV) that population_frequencies wrote. One row for each population, one column for each sample." }
+      metadata: { type: string, description: "Path of the sample table (CSV). The first column is sample_id and must match the sample names in the counts table. The other columns hold the condition and, if the samples come in pairs, the donor." }
+      condition: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the sample table with exactly two levels." }
+      reference: { type: string, description: "Leave out. The harness sets it from the decision record. Level of the condition that is the reference. If empty, the first level in alphabetical order." }
+      pair_by: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the sample table that holds the donor, or none." }
+      method: { type: string, enum: [glmm, edgeR, voom], description: "Leave out. The harness sets it from the decision record. Test for the counts." }
+      fdr: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. Adjusted p value limit for the count of significant populations." }
+    required: [counts, metadata]
+    read_only: true
+    outputs:
+      table: { kind: table, ext: .csv, description: "One row for each population with the means, p and adjusted p." }
+    script: scripts/differential_abundance.R
+    parse: json
+    citations:
+      - text: "Weber, L. M., Nowicka, M., Soneson, C., & Robinson, M. D. (2019). diffcyt: Differential discovery in high-dimensional cytometry via high-resolution clustering. Communications Biology, 2, 183. https://doi.org/10.1038/s42003-019-0415-5"
+        doi: 10.1038/s42003-019-0415-5
+      - text: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society B, 57(1), 289-300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x"
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+        bibtex: |
+          @article{benjamini1995controlling,
+            author  = {Benjamini, Yoav and Hochberg, Yosef},
+            title   = {Controlling the false discovery rate: a practical and powerful approach to multiple testing},
+            journal = {Journal of the Royal Statistical Society: Series B},
+            year    = {1995},
+            volume  = {57},
+            number  = {1},
+            pages   = {289--300},
+            doi     = {10.1111/j.2517-6161.1995.tb02031.x}
+          }
+      - text: "Bates, D., Maechler, M., Bolker, B., & Walker, S. (2015). Fitting linear mixed-effects models using lme4. Journal of Statistical Software, 67(1), 1-48. https://doi.org/10.18637/jss.v067.i01"
+        doi: 10.18637/jss.v067.i01
+        when: { method: glmm }
+        bibtex: |
+          @article{bates2015fitting,
+            author  = {Bates, Douglas and Maechler, Martin and Bolker, Ben and Walker, Steve},
+            title   = {Fitting linear mixed-effects models using {lme4}},
+            journal = {Journal of Statistical Software},
+            year    = {2015},
+            volume  = {67},
+            number  = {1},
+            pages   = {1--48},
+            doi     = {10.18637/jss.v067.i01}
+          }
+      - text: "Robinson, M. D., McCarthy, D. J., & Smyth, G. K. (2010). edgeR: a Bioconductor package for differential expression analysis of digital gene expression data. Bioinformatics, 26(1), 139-140. https://doi.org/10.1093/bioinformatics/btp616"
+        doi: 10.1093/bioinformatics/btp616
+        when: { method: edgeR }
+        bibtex: |
+          @article{robinson2010edger,
+            author  = {Robinson, Mark D. and McCarthy, Davis J. and Smyth, Gordon K.},
+            title   = {{edgeR}: a {Bioconductor} package for differential expression analysis of digital gene expression data},
+            journal = {Bioinformatics},
+            year    = {2010},
+            volume  = {26},
+            number  = {1},
+            pages   = {139--140},
+            doi     = {10.1093/bioinformatics/btp616}
+          }
+      - text: "Law, C. W., Chen, Y., Shi, W., & Smyth, G. K. (2014). voom: precision weights unlock linear model analysis tools for RNA-seq read counts. Genome Biology, 15(2), R29. https://doi.org/10.1186/gb-2014-15-2-r29"
+        doi: 10.1186/gb-2014-15-2-r29
+        when: { method: voom }
+        bibtex: |
+          @article{law2014voom,
+            author  = {Law, Charity W. and Chen, Yunshun and Shi, Wei and Smyth, Gordon K.},
+            title   = {voom: precision weights unlock linear model analysis tools for {RNA-seq} read counts},
+            journal = {Genome Biology},
+            year    = {2014},
+            volume  = {15},
+            number  = {2},
+            pages   = {R29},
+            doi     = {10.1186/gb-2014-15-2-r29}
+          }

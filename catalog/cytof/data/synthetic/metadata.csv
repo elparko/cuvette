@@ -1,0 +1,7 @@
+sample_id,condition,patient_id
+p1_ref,ref,p1
+p1_stim,stim,p1
+p2_ref,ref,p2
+p2_stim,stim,p2
+p3_ref,ref,p3
+p3_stim,stim,p3

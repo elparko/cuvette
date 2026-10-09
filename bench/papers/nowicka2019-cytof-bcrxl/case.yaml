@@ -1,0 +1,154 @@
+kind: research paper
+short: Nowicka 2019
+field: Flow cytometry
+program: FlowSOM, diffcyt and lme4 (R), through the cytof adapter
+citation:
+  authors: Nowicka M, Krieg C, Crowell HL, Weber LM, Hartmann FJ, Guglietta S, Becher B, Levesque MP, Robinson MD
+  title: "CyTOF workflow: differential discovery in high-throughput high-dimensional cytometry datasets"
+  venue: F1000Research 6:748, version 3
+  year: 2019
+  doi: 10.12688/f1000research.11622.3
+related:
+  - text: "Weber LM, Nowicka M, Soneson C, Robinson MD. diffcyt: Differential discovery in high-dimensional cytometry via high-resolution clustering. Commun Biol 2:183 (2019). Source of the differential abundance methods."
+    doi: 10.1038/s42003-019-0415-5
+  - text: "Bodenmiller B et al. Multiplexed mass cytometry profiling of cellular states perturbed by small-molecule regulators. Nat Biotechnol 30:858-867 (2012). Source of the mass cytometry data."
+    doi: 10.1038/nbt.2317
+measured: >-
+  The workflow analyses a mass cytometry experiment on peripheral blood cells of 8 healthy donors. Each donor has
+  a Reference sample and a sample stimulated through the B cell receptor and the Fc receptor (BCR-XL). The paper
+  clusters the cells with FlowSOM, merges the clusters into 8 cell types, counts the cells of each cell type in each
+  sample, and tests each cell type for a difference in frequency with a binomial mixed model (GLMM) from the diffcyt
+  package. The model with a random effect for the donor compares each donor with itself. The model without it
+  ignores the pairs. The two models give different numbers of significant cell types.
+instruction: >-
+  I have mass cytometry data of blood cells from 8 donors, each unstimulated and stimulated through the B cell
+  receptor. Count the cells of each cell type in each sample and test each cell type for a difference in frequency,
+  with each donor compared with itself. How many cell types differ, and how many differ if the pairing is ignored?
+instruction_basis: >-
+  The differential abundance section of the workflow. The first GLMM has a random effect for the sample. The second
+  GLMM adds the donor. The workflow prints both result tables.
+answers:
+  question:
+    decision: Research question
+    value: Does the frequency of any cell type change after B cell receptor stimulation?
+    source: The differential abundance section tests each of the 8 cell types between the BCR-XL and Reference samples.
+  replicate:
+    decision: Unit of replication
+    value: samples from different donors, one file for each donor and condition
+    source: The workflow has 16 samples from 8 patients, each unstimulated and stimulated.
+  markers:
+    decision: Markers to cluster on
+    value: CD3, CD45, CD4, CD20, CD33, CD123, CD14, IgM, HLA-DR, CD7
+    source: The workflow clusters on the 10 lineage markers (cell surface markers) and tests the 14 signaling markers later.
+  cofactor:
+    decision: Cofactor of the arcsinh transform
+    value: 5
+    source: The workflow states the arcsinh transform with cofactor 5 for mass cytometry and notes that 150 has been promoted for flow cytometry.
+  grid_x:
+    decision: Width of the FlowSOM grid
+    value: 10
+    source: The workflow call sets xdim = 10.
+  grid_y:
+    decision: Height of the FlowSOM grid
+    value: 10
+    source: The workflow call sets ydim = 10.
+  n_metaclusters:
+    decision: Number of metaclusters
+    value: 20
+    source: The workflow call sets maxK = 20. It merges these 20 metaclusters by hand into 8 cell types.
+  seed:
+    decision: Random seed
+    value: 1234
+    source: The workflow call sets seed = 1234.
+  population_column:
+    decision: Column that defines the populations
+    value: label
+    source: >-
+      The workflow tests the 8 merged cell types. The data package stores them in the channel population_id. The
+      benchmark uses this channel because the hand merging of the 20 metaclusters cannot be repeated from the text.
+  condition:
+    decision: Column of the sample table with the condition
+    value: condition
+    source: The workflow design has the condition BCRXL against Reference.
+  reference:
+    decision: Reference level
+    value: Reference
+    source: The workflow tests BCRXL against the unstimulated samples.
+  pair_by:
+    decision: Column that pairs the samples of one donor
+    value: patient_id
+    source: The second GLMM of the workflow adds a random effect for the patient.
+  da_method:
+    decision: Test for differences in frequency
+    value: glmm
+    source: The workflow tests differential abundance with the GLMM of diffcyt.
+  fdr:
+    decision: Adjusted p value limit
+    value: 0.05
+    source: The workflow sets FDR_cutoff to 0.05.
+  exclusions:
+    decision: Samples, cells or markers to exclude
+    value: none
+    source: The workflow uses all 16 samples and all cells.
+items:
+  cells_donor2_bcrxl:
+    source: published
+    where: >-
+      Workflow, section Data preparation. The printed n_cells output lists 2838, 2739, 16675, 16725 and 12 more
+      values in the order of the sample table (donor 1 BCR-XL, donor 1 Reference, donor 2 BCR-XL, and so on).
+    independence: independent
+    check: check_bcrxl.py counts the events of each FCS file with flowio and gives 16675.
+  cells_donor1_reference:
+    source: published
+    where: Workflow, section Data preparation. The second printed n_cells value is 2739.
+    independence: independent
+    check: check_bcrxl.py gives 2739.
+  nk_percent_donor1_reference:
+    source: published
+    where: >-
+      Workflow, differential abundance, topTable of the second GLMM with show_props. The NK cells row, column
+      props_Ref1, prints 14.3.
+    independence: independent
+    check: check_bcrxl.py gives 14.3 (392 of 2739 cells).
+  cd4_percent_donor1_reference:
+    source: published
+    where: Workflow, the same table. The CD4 T-cells row, column props_Ref1, prints 44.7.
+    independence: independent
+    check: check_bcrxl.py gives 44.7 (1225 of 2739 cells).
+  p_nk_paired:
+    source: published
+    where: Workflow, topTable of the second GLMM. The NK cells row prints p_val 4.5e-13 and p_adj 3.6e-12.
+    independence: independent
+    check: >-
+      check_glmm.R fits glmer from lme4 directly, with the model cbind(y, n - y) ~ condition + (1 | patient) +
+      (1 | sample) and the binomial family. It gives p 4.474e-13 (check_glmm.out).
+  p_bcells_igm_neg_paired:
+    source: published
+    where: Workflow, topTable of the second GLMM. The B-cells IgM- row prints p_val 2.2e-11.
+    independence: independent
+    check: check_glmm.R gives 2.202e-11.
+  padj_cd8_paired:
+    source: published
+    where: Workflow, topTable of the second GLMM. The CD8 T-cells row prints p_adj 0.0019.
+    independence: independent
+    check: check_glmm.R gives 0.001914 after the Benjamini-Hochberg adjustment of the 8 p values.
+  n_different_paired:
+    source: published
+    where: "Workflow, after the second topTable. \"Significant clusters at FDR cutoff: FALSE = 2, TRUE = 6\"."
+    independence: independent
+    check: check_glmm.R gives 6 populations at the adjusted p value 0.05 or below.
+  n_different_unpaired:
+    source: published
+    where: "Workflow, first GLMM, without the patient. \"Significant clusters at FDR cutoff: FALSE = 5, TRUE = 3\"."
+    independence: independent
+    check: check_glmm.R gives 3 populations at the adjusted p value 0.05 or below.
+  p_bcells_igm_pos_unpaired:
+    source: published
+    where: Workflow, rowData of the first GLMM. The B-cells IgM+ row prints p_val 0.0134820784148451.
+    independence: independent
+    check: check_glmm.R gives 0.01348.
+data:
+  source: Bodenmiller_BCR_XL_flowSet of the Bioconductor package HDCytoData (ExperimentHub record EH2255), written to 16 FCS files by the benchmark fetch script
+  url: https://experimenthub.bioconductor.org/fetch/2255
+  license: The package HDCytoData is MIT. The data are from Bodenmiller et al. 2012 (Cytobank, public). No license text for the files was found, so the files are not committed. Healthy donors, no personal data.
+  size: 16 FCS files, 29 MB. 172,791 cells, 24 protein markers plus four label channels.

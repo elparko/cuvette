@@ -1,0 +1,17 @@
+sample_id,condition,patient_id
+PBMC8_30min_patient1_Reference,Reference,patient1
+PBMC8_30min_patient1_BCR-XL,BCR-XL,patient1
+PBMC8_30min_patient2_Reference,Reference,patient2
+PBMC8_30min_patient2_BCR-XL,BCR-XL,patient2
+PBMC8_30min_patient3_Reference,Reference,patient3
+PBMC8_30min_patient3_BCR-XL,BCR-XL,patient3
+PBMC8_30min_patient4_Reference,Reference,patient4
+PBMC8_30min_patient4_BCR-XL,BCR-XL,patient4
+PBMC8_30min_patient5_Reference,Reference,patient5
+PBMC8_30min_patient5_BCR-XL,BCR-XL,patient5
+PBMC8_30min_patient6_Reference,Reference,patient6
+PBMC8_30min_patient6_BCR-XL,BCR-XL,patient6
+PBMC8_30min_patient7_Reference,Reference,patient7
+PBMC8_30min_patient7_BCR-XL,BCR-XL,patient7
+PBMC8_30min_patient8_Reference,Reference,patient8
+PBMC8_30min_patient8_BCR-XL,BCR-XL,patient8

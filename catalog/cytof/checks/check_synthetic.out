@@ -1,0 +1,23 @@
+cells per file
+p1_ref 300
+p1_stim 360
+p2_ref 295
+p2_stim 355
+p3_ref 310
+p3_stim 370
+total 1990
+cells per true population (all files)
+pop1 960
+pop2 460
+pop3 570
+median of asinh(x / 5) per true population
+pop1 CD3=4.787561 CD19=0.568825 CD14=0.294363 pErk=2.094713
+pop2 CD3=0.732668 CD19=4.621140 CD14=0.732668 pErk=2.776472
+pop3 CD3=0.198690 CD19=0.881374 CD14=5.077710 pErk=1.443635
+cells per true population per file
+p1_ref 120 80 100
+p1_stim 200 70 90
+p2_ref 110 90 95
+p2_stim 190 85 80
+p3_ref 130 75 105
+p3_stim 210 60 100
