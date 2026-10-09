@@ -1,0 +1,12 @@
+injection MEDI3902: LL.3 IC50 0.117250 µg/mL (117.250 ng/mL), b 0.9268, top 1.0155, n 42
+injection 30-B8: LL.3 IC50 0.021307 µg/mL (21.307 ng/mL), b 0.9313, top 0.9947, n 45
+injection P3D6: LL.3 IC50 3.653446 µg/mL (3653.446 ng/mL), b 0.8579, top 1.0343, n 42
+cytotox MEDI3902: LL.3 IC50 720337.338088 µg/mL (720337338.088 ng/mL), b 0.0941, top 1.0045, n 50
+cytotox 30-B8: LL.3 IC50 6.699558 µg/mL (6699.558 ng/mL), b 0.1972, top 1.0359, n 73
+cytotox P3D6: LL.3 IC50 11.791837 µg/mL (11791.837 ng/mL), b 0.4382, top 0.9514, n 54
+variants_30b8 V1: LL.3 IC50 0.021307 µg/mL (21.307 ng/mL), b 0.9313, top 0.9947, n 45
+variants_30b8 V2: LL.3 IC50 0.012782 µg/mL (12.782 ng/mL), b 0.7223, top 0.9899, n 45
+variants_30b8 V3: LL.3 IC50 0.011202 µg/mL (11.202 ng/mL), b 0.7563, top 0.9873, n 44
+variants_30b8 V4: LL.3 IC50 0.013050 µg/mL (13.050 ng/mL), b 0.7543, top 0.9954, n 45
+variants_30b8 V5: LL.3 IC50 0.010452 µg/mL (10.452 ng/mL), b 0.7760, top 1.0007, n 45
+cytotox 30-B8: LL.4 IC50 0.045178 µg/mL (45.178 ng/mL), bottom 0.4624

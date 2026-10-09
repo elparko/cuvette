@@ -1,0 +1,15 @@
+tool: drc (R), fit_enzyme_kinetics of the drc adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/aledo2022-renz-onpg/onpg_table2.csv
+decisions:
+  kinetic_model: michaelis-menten
+expected:
+  - {description: "Km, nonlinear fit", value: 2.4793, tolerance: 0.005, source: "paper, Case study and Fig 4b: Km 2.5 mM (renz dir.MM prints 2.479)"}
+  - {description: "Vmax, nonlinear fit", value: 0.18407, tolerance: 0.0005, source: "paper, Case study and Fig 4b: Vmax 0.18 mM/min (renz dir.MM prints 0.184)"}
+  - {description: "Km, unweighted Lineweaver-Burk (trap)", value: 5.6, tolerance: 0.1, source: "paper: 5.6 mM, the biased double-reciprocal estimate"}
+  - {description: "Vmax, unweighted Lineweaver-Burk (trap)", value: 0.34, tolerance: 0.005, source: "paper: 0.34 mM/min, the biased double-reciprocal estimate"}
+notes: |
+  Table 2 of the paper is replicate v6 of the ONPG data set in renz 0.2.1. The paper prints the rates in µM/min (times 1000) and the fitted Vmax in mM/min. The CSV keeps mM/min.
+  renz dir.MM gives Km 2.479 and Vmax 0.184; SciPy gives 2.479262 and 0.184074 (check.py). The paper prints 2.5 and 0.18.
+  Trap: a straight line through 1/v against 1/S gives Km 5.6 and Vmax 0.34 (the paper shows this as the biased result). SciPy gives 5.64 and 0.344; renz lb() prints 5.58 and 0.34.

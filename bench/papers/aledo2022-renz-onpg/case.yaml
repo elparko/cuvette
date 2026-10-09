@@ -1,0 +1,51 @@
+kind: research paper
+short: Aledo 2022
+field: Enzyme kinetics
+program: drc (R), through the drc adapter. The paper used the R package renz.
+citation:
+  authors: Aledo JC
+  title: "renz: An R package for the analysis of enzyme kinetic data"
+  venue: BMC Bioinformatics 23:182
+  year: 2022
+  doi: 10.1186/s12859-022-04729-4
+related:
+  - text: "Data: data set ONPG of the R package renz 0.2.1 (GPL >= 2), replicate v6, which is Table 2 of the paper. fetch.sh takes it from the CRAN source package."
+    url: https://cran.r-project.org/package=renz
+measured: >-
+  The initial rate of the hydrolysis of ONPG by beta-galactosidase was measured at ten substrate concentrations from 0.05
+  to 30 mM. The case study of the paper compares a Lineweaver-Burk line, a weighted double-reciprocal line and a nonlinear
+  fit of the Michaelis-Menten equation to one replicate.
+instruction: >-
+  Fit the Michaelis-Menten model to the rates of Table 2 by nonlinear least squares and give Km and Vmax.
+instruction_basis: Case study section and Fig 4 of the paper.
+answers:
+  kinetic_model:
+    decision: Enzyme kinetic model
+    value: michaelis-menten
+    source: Case study. The data have no inhibitor; the paper fits the Michaelis-Menten equation.
+  "*":
+    decision: Free questions of the model
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with the values above.
+items:
+  km:
+    source: published
+    where: Case study and Fig 4b. Km 2.5 mM.
+    check: SciPy gives 2.479262 (check.py); renz dir.MM prints 2.479.
+  vmax:
+    source: published
+    where: Case study and Fig 4b. Vmax 0.18 mM/min.
+    check: SciPy gives 0.184074 (check.py); renz dir.MM prints 0.184.
+  km_lineweaver_burk:
+    source: published
+    where: Case study. Km 5.6 mM from the double-reciprocal line, shown as the biased estimate.
+    check: SciPy gives 5.636 (check.py).
+  vmax_lineweaver_burk:
+    source: published
+    where: Case study. Vmax 0.34 mM/min from the double-reciprocal line.
+    check: SciPy gives 0.3436 (check.py).
+data:
+  source: Data set ONPG of renz 0.2.1, column v6, written to CSV by fetch.sh.
+  url: https://cran.r-project.org/package=renz
+  license: GPL (>= 2), the license of renz. The article is CC BY 4.0 and prints the same values in Table 2.
+  size: 10 rows and 2 columns.

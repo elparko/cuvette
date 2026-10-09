@@ -1,0 +1,34 @@
+adapters: [drc]
+prompt: |
+  We ran a cell-free split-luciferase assay on ten 384-well plates, each with positive wells (SmKRAS with LgRBD) and negative wells (SmKRAS with the LgRBD-DM mutant) at two reaction volumes. The file {data}/cooley2020-splitluc-zprime/splitluc_plates.csv has one row for each well of the first read: plate (1 to 10), well, type (pos_10ul, neg_10ul, pos_20ul, neg_20ul or blank), volume_ul and signal (luminescence). For each plate and each volume, give the mean and the SD of the positive and the negative wells and the Z' factor. Write every number in your final answer text.
+answers:
+  normalization: percent_activity
+  zprime_stat: mean_sd
+  exclude_wells: none
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1200
+data:
+  - cooley2020-splitluc-zprime/splitluc_plates.csv
+items:
+  - {key: z10_p1, description: "Z' plate 1, 10 µl", value: 0.5413, tolerance: 0.004}
+  - {key: z10_p2, description: "Z' plate 2, 10 µl", value: 0.6102, tolerance: 0.004}
+  - {key: z10_p3, description: "Z' plate 3, 10 µl", value: 0.7275, tolerance: 0.004}
+  - {key: z10_p4, description: "Z' plate 4, 10 µl", value: 0.7302, tolerance: 0.002}
+  - {key: z10_p5, description: "Z' plate 5, 10 µl", value: 0.6643, tolerance: 0.004}
+  - {key: z10_p6, description: "Z' plate 6, 10 µl", value: 0.6319, tolerance: 0.004}
+  - {key: z10_p7, description: "Z' plate 7, 10 µl", value: 0.7666, tolerance: 0.004}
+  - {key: z10_p8, description: "Z' plate 8, 10 µl", value: 0.7415, tolerance: 0.004}
+  - {key: z10_p9, description: "Z' plate 9, 10 µl", value: 0.6210, tolerance: 0.004}
+  - {key: z10_p10, description: "Z' plate 10, 10 µl", value: 0.7217, tolerance: 0.004}
+  - {key: z20_p2, description: "Z' plate 2, 20 µl", value: 0.5219, tolerance: 0.004}
+  - {key: z20_p4, description: "Z' plate 4, 20 µl", value: 0.7865, tolerance: 0.004}
+  - {key: z20_p6, description: "Z' plate 6, 20 µl", value: 0.6430, tolerance: 0.004}
+  - {key: z20_p7, description: "Z' plate 7, 20 µl", value: 0.6709, tolerance: 0.004}
+  - {key: z20_p8, description: "Z' plate 8, 20 µl", value: 0.6850, tolerance: 0.004}
+  - {key: z20_p9, description: "Z' plate 9, 20 µl", value: 0.8005, tolerance: 0.004}
+  - {key: z20_p10, description: "Z' plate 10, 20 µl", value: 0.7282, tolerance: 0.004}
+  - {key: mean_pos10_p1, description: "Mean of the positive wells, plate 1, 10 µl", value: 2471.2, tolerance: 0.6}
+  - {key: sd_pos10_p1, description: "SD of the positive wells, plate 1, 10 µl", value: 268.1, tolerance: 0.6}
+  - {key: z20_p3_printed, description: "Z' plate 3, 20 µl, as printed (does not reproduce; computed 0.746)", value: 0.65, tolerance: 0.005, reference: true}
+  - {key: z20_p5_printed, description: "Z' plate 5, 20 µl, as printed (does not reproduce; computed 0.852)", value: 0.83, tolerance: 0.005, reference: true}

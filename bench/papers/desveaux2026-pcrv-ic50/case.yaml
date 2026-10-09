@@ -1,0 +1,95 @@
+kind: research paper
+short: Desveaux 2026
+field: Dose-response (cell assays)
+program: drc (R), through the drc adapter. The paper used R 4.3.2 with drc.
+citation:
+  authors: Desveaux JM, Faudry E, Contreras-Martel C, Cretin F, Dergan-Dylon LS, Amen A, Bally I, Tardivy-Casemajor V, Chenavier F, Fouquenet D, Caspar Y, Attree I, Dessen A, Poignard P
+  title: Neutralizing human monoclonal antibodies that target the PcrV component of the type III secretion system of Pseudomonas aeruginosa act through distinct mechanisms
+  venue: eLife 14:RP105195
+  year: 2026
+  doi: 10.7554/eLife.105195
+related:
+  - text: "Data: Figure 6 source data 1 of the article (Excel), CC BY 4.0. fetch.sh downloads it from the eLife CDN."
+    url: https://cdn.elifesciences.org/articles/105195/elife-105195-fig6-data1-v1.xlsx
+measured: >-
+  The study isolated human monoclonal antibodies against PcrV and compared them with MEDI3902 and 30-B8. The injection
+  assay measures ExoS-Bla injection into A549 cells; the cytotoxicity assay measures macrophage death. Each assay has three
+  experiments with three technical replicates, from 0.001 or 0.01 to 100 µg/mL. The response is normalized to the
+  no-antibody and the non-infected controls. drc fits a three-parameter log-logistic curve and gives the IC50.
+instruction: >-
+  Fit a three-parameter log-logistic curve to the normalized response for each antibody in the injection assay, for P3D6
+  and 30-B8 in the cytotoxicity assay, and for 30-B8 against each PcrV variant. Give each IC50 with a 95% confidence interval.
+instruction_basis: >-
+  Methods (statistical analysis: drc, three-parameter log-logistic model), Results (IC50 values of Figure 6A and Figure 4B),
+  and the legend of Figure 6 supplement 1 (IC50 values of 30-B8 against the variants).
+answers:
+  dr_model:
+    decision: Dose-response model
+    value: 3PL
+    source: Methods. "Dose-response fitting was performed using the drc package based on a three-parameter log-logistic model."
+  ic50_type:
+    decision: Relative or absolute IC50
+    value: relative
+    source: Not in the paper. drc ED(fit, 50) gives the relative IC50 by default. With a lower limit of 0 the relative IC50 is the dose at half of the fitted top.
+  ci_method:
+    decision: Confidence interval of the IC50
+    value: delta
+    source: Not in the paper. The drc default for ED().
+  weighting:
+    decision: Weighting of the fit
+    value: none
+    source: Not in the paper. The drc default.
+  "*":
+    decision: Free questions of the model
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with the values above.
+items:
+  ic50_medi3902:
+    source: published
+    where: Results and Figure 6A. 117 ng/mL.
+    check: SciPy gives 0.117250 µg/mL (check.py).
+  ic50_30b8:
+    source: published
+    where: Results and Figure 6A. 21.3 ng/mL.
+    check: SciPy gives 0.021307 µg/mL (check.py).
+  ic50_p3d6:
+    source: published
+    where: Results. 3.65 µg/mL (3.7 µg/mL in the Figure 3 supplement).
+    check: SciPy gives 3.653446 µg/mL (check.py).
+  ic50_p3d6_cytotox:
+    source: published
+    where: Results and Figure 4B. 11.8 µg/mL.
+    check: SciPy gives 11.791837 µg/mL (check.py).
+  ic50_30b8_v2:
+    source: published
+    where: Legend of Figure 6 supplement 1. 12.8 ng/mL.
+    check: SciPy gives 0.012782 µg/mL (check.py).
+  ic50_30b8_v3:
+    source: published
+    where: Legend of Figure 6 supplement 1. 11.2 ng/mL.
+    check: SciPy gives 0.011202 µg/mL (check.py).
+  ic50_30b8_v4:
+    source: published
+    where: Legend of Figure 6 supplement 1. 13.0 ng/mL.
+    check: SciPy gives 0.013050 µg/mL (check.py).
+  ic50_30b8_v5:
+    source: published
+    where: Legend of Figure 6 supplement 1. 10.5 ng/mL.
+    check: SciPy gives 0.010452 µg/mL (check.py).
+  ic50_30b8_cytotox_3pl:
+    source: computed
+    tool: drc adapter fit_dose_response (drc 4.0.0 LL.3)
+    where: Not in the paper.
+    independence: independent
+    check: SciPy gives 6.699558 µg/mL (check.py).
+  ic50_30b8_cytotox_printed:
+    source: published
+    where: Results. 45.2 ng/mL. It does not reproduce with the three-parameter model; a four-parameter fit gives 45.18 ng/mL.
+    check: SciPy LL.4 gives 0.045178 µg/mL (check.py).
+data:
+  source: >-
+    Figure 6 source data 1, sheets Medi3902, 30-B8, P3D6 and Fig_supp. fetch.sh writes three CSV files with one row for each
+    well. The no-antibody wells of each sheet get the antibody name of the sheet and dose 0.
+  url: https://elifesciences.org/articles/105195
+  license: CC BY 4.0, the license of the article and its source data.
+  size: 43 KB Excel file. The CSV files have 129, 177 and 224 rows.

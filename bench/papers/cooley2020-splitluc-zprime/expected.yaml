@@ -1,0 +1,35 @@
+tool: drc adapter, normalize_plate (arithmetic in R)
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/cooley2020-splitluc-zprime/splitluc_plates.csv
+decisions:
+  zprime_stat: "mean_sd (Zhang et al. 1999)"
+  exclude_wells: none
+expected:
+  - {description: "Z' plate 1, 10 µl", value: 0.5413, tolerance: 0.004, source: "All plates analysis.csv (OSF): 0.54"}
+  - {description: "Z' plate 2, 10 µl", value: 0.6102, tolerance: 0.004, source: "0.61"}
+  - {description: "Z' plate 3, 10 µl", value: 0.7275, tolerance: 0.004, source: "0.73"}
+  - {description: "Z' plate 4, 10 µl", value: 0.7302, tolerance: 0.002, source: "0.73"}
+  - {description: "Z' plate 5, 10 µl", value: 0.6643, tolerance: 0.004, source: "0.66"}
+  - {description: "Z' plate 6, 10 µl", value: 0.6319, tolerance: 0.004, source: "0.63"}
+  - {description: "Z' plate 7, 10 µl", value: 0.7666, tolerance: 0.004, source: "0.77"}
+  - {description: "Z' plate 8, 10 µl", value: 0.7415, tolerance: 0.004, source: "0.74"}
+  - {description: "Z' plate 9, 10 µl", value: 0.6210, tolerance: 0.004, source: "0.62"}
+  - {description: "Z' plate 10, 10 µl", value: 0.7217, tolerance: 0.004, source: "0.72"}
+  - {description: "Z' plate 2, 20 µl", value: 0.5219, tolerance: 0.004, source: "0.52"}
+  - {description: "Z' plate 4, 20 µl", value: 0.7865, tolerance: 0.004, source: "0.79"}
+  - {description: "Z' plate 6, 20 µl", value: 0.6430, tolerance: 0.004, source: "0.64"}
+  - {description: "Z' plate 7, 20 µl", value: 0.6709, tolerance: 0.004, source: "0.67"}
+  - {description: "Z' plate 8, 20 µl", value: 0.6850, tolerance: 0.004, source: "0.69"}
+  - {description: "Z' plate 9, 20 µl", value: 0.8005, tolerance: 0.004, source: "0.80"}
+  - {description: "Z' plate 10, 20 µl", value: 0.7282, tolerance: 0.004, source: "0.73"}
+  - {description: "mean positive, plate 1, 10 µl", value: 2471.2, tolerance: 0.6, source: "2471"}
+  - {description: "SD positive, plate 1, 10 µl", value: 268.1, tolerance: 0.6, source: "268"}
+  - {description: "Z' plate 3, 20 µl, as printed", value: 0.65, tolerance: 0.005, source: "0.65; computed 0.746; reference"}
+  - {description: "Z' plate 5, 20 µl, as printed", value: 0.83, tolerance: 0.005, source: "0.83; computed 0.852; reference"}
+notes: |
+  The printed values are in "All plates analysis.csv" of the OSF registration (Figure 5F-G). The summary table goes to the reference folder.
+  All ten 10 µl plates reproduce from the first read. At 20 µl, plates 2, 4, 6, 7, 8, 9 and 10 reproduce.
+  Plate 1, 20 µl: the printed mean is 1327 (computed 1337.4); the printed Z' 0.73 is close to the computed 0.736, so it is not an item.
+  Plates 3 and 5, 20 µl: the printed means (1434 and 1629) are not the means of the five positive wells (1728.8 and 1689.6). The Z' values (0.65 and 0.83) do not reproduce. They are reference items.
+  Z' does not change with a blank subtraction, because the blank shifts both means by the same amount.

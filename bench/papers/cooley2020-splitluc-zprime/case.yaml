@@ -1,0 +1,67 @@
+kind: research paper
+short: Cooley 2020
+field: Plate assay quality (Z' factor)
+program: drc adapter, normalize_plate (R arithmetic). The paper used Excel.
+citation:
+  authors: Cooley R, Kara N, Hui NS, Tart J, Roustan C, George R, Hancock DC, Binkowski BF, Wood KV, Ismail M, Downward J
+  title: Development of a cell-free split-luciferase biochemical assay as a tool for screening for inhibitors of challenging protein-protein interaction targets
+  venue: Wellcome Open Research 5:20
+  year: 2020
+  doi: 10.12688/wellcomeopenres.15675.1
+related:
+  - text: "Data: OSF registration MGKQV, CC BY 4.0. fetch.sh downloads the ten plate files of Figure 5F-G and the summary table."
+    doi: 10.17605/OSF.IO/MGKQV
+measured: >-
+  The study built a cell-free split-luciferase assay for the KRAS and RAF-RBD interaction. To test the plate-to-plate
+  quality, ten 384-well plates each had five positive wells (SmKRAS with LgRBD) and five negative wells (SmKRAS with the
+  LgRBD-DM mutant that does not bind) at 10 µl and at 20 µl reaction volume. The Z' factor of each plate and volume is in
+  Figure 5F-G and in the summary table on OSF.
+instruction: >-
+  For each plate and each volume, give the mean and the SD of the positive and the negative wells and the Z' factor.
+instruction_basis: Figure 5F-G of the paper and the file "All plates analysis.csv" of the OSF data.
+answers:
+  normalization:
+    decision: Normalization of the plate signal
+    value: percent_activity
+    source: Not in the paper. The normalization does not change Z'.
+  zprime_stat:
+    decision: Statistics for the Z' factor
+    value: mean_sd
+    source: The summary table gives the mean and the SD of each control and Z' = 1 - 3 (SD_pos + SD_neg) / |mean_pos - mean_neg|.
+  exclude_wells:
+    decision: Wells that you exclude as outliers
+    value: none
+    source: The summary table uses all five wells of each control for the 10 µl plates.
+  "*":
+    decision: Free questions of the model
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with the values above.
+items:
+  z10_p1: {source: published, where: "All plates analysis.csv, 10 µl, plate 1: 0.54", check: "pandas gives 0.5413 (check.py)"}
+  z10_p2: {source: published, where: "10 µl, plate 2: 0.61", check: "pandas gives 0.6102 (check.py)"}
+  z10_p3: {source: published, where: "10 µl, plate 3: 0.73", check: "pandas gives 0.7275 (check.py)"}
+  z10_p4: {source: published, where: "10 µl, plate 4: 0.73", check: "pandas gives 0.7302 (check.py)"}
+  z10_p5: {source: published, where: "10 µl, plate 5: 0.66", check: "pandas gives 0.6643 (check.py)"}
+  z10_p6: {source: published, where: "10 µl, plate 6: 0.63", check: "pandas gives 0.6319 (check.py)"}
+  z10_p7: {source: published, where: "10 µl, plate 7: 0.77", check: "pandas gives 0.7666 (check.py)"}
+  z10_p8: {source: published, where: "10 µl, plate 8: 0.74", check: "pandas gives 0.7415 (check.py)"}
+  z10_p9: {source: published, where: "10 µl, plate 9: 0.62", check: "pandas gives 0.6210 (check.py)"}
+  z10_p10: {source: published, where: "10 µl, plate 10: 0.72", check: "pandas gives 0.7217 (check.py)"}
+  z20_p2: {source: published, where: "20 µl, plate 2: 0.52", check: "pandas gives 0.5219 (check.py)"}
+  z20_p4: {source: published, where: "20 µl, plate 4: 0.79", check: "pandas gives 0.7865 (check.py)"}
+  z20_p6: {source: published, where: "20 µl, plate 6: 0.64", check: "pandas gives 0.6430 (check.py)"}
+  z20_p7: {source: published, where: "20 µl, plate 7: 0.67", check: "pandas gives 0.6709 (check.py)"}
+  z20_p8: {source: published, where: "20 µl, plate 8: 0.69", check: "pandas gives 0.6850 (check.py)"}
+  z20_p9: {source: published, where: "20 µl, plate 9: 0.80", check: "pandas gives 0.8005 (check.py)"}
+  z20_p10: {source: published, where: "20 µl, plate 10: 0.73", check: "pandas gives 0.7282 (check.py)"}
+  mean_pos10_p1: {source: published, where: "10 µl, plate 1, positive control average: 2471", check: "pandas gives 2471.2 (check.py)"}
+  sd_pos10_p1: {source: published, where: "10 µl, plate 1, positive control SD: 268", check: "pandas gives 268.1 (check.py)"}
+  z20_p3_printed: {source: published, where: "20 µl, plate 3: 0.65. It does not reproduce; the printed mean 1434 is not the mean of the five wells.", check: "pandas gives 0.7462 (check.py)"}
+  z20_p5_printed: {source: published, where: "20 µl, plate 5: 0.83. It does not reproduce; the printed mean 1629 is not the mean of the five wells.", check: "pandas gives 0.8524 (check.py)"}
+data:
+  source: >-
+    OSF registration MGKQV, files "Figure 5 F-G Plate1" to "Plate10" (PHERAstar exports). fetch.sh reads the first grid of
+    the first read and writes one row for each well. The summary table goes to the reference folder.
+  url: https://osf.io/mgkqv/
+  license: CC BY 4.0, the license of the OSF registration and the article.
+  size: Ten files of 2 to 20 KB. The CSV has 240 rows.

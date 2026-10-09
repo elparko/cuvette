@@ -1,0 +1,15 @@
+adapters: [drc]
+prompt: |
+  I measured the initial rate of beta-galactosidase at ten concentrations of the substrate ONPG. The file {data}/aledo2022-renz-onpg/onpg_table2.csv has the columns onpg_mM (substrate concentration in mM) and rate_mM_per_min (initial rate in mM/min). There is no inhibitor. Give Km and Vmax of the Michaelis-Menten model with their 95% confidence intervals. Write every number in your final answer text.
+answers:
+  kinetic_model: michaelis-menten
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 900
+data:
+  - aledo2022-renz-onpg/onpg_table2.csv
+items:
+  - {key: km, description: "Km (mM), nonlinear fit", value: 2.4793, tolerance: 0.005}
+  - {key: vmax, description: "Vmax (mM/min), nonlinear fit", value: 0.18407, tolerance: 0.0005}
+  - {key: km_lineweaver_burk, description: "Km from an unweighted Lineweaver-Burk line (biased)", value: 5.6, tolerance: 0.1, trap: true}
+  - {key: vmax_lineweaver_burk, description: "Vmax from an unweighted Lineweaver-Burk line (biased)", value: 0.34, tolerance: 0.005, trap: true}

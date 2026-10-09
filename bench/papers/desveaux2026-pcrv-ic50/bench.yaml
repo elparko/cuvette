@@ -1,0 +1,27 @@
+adapters: [drc]
+prompt: |
+  We tested human monoclonal antibodies against PcrV of Pseudomonas aeruginosa in two cell assays. The folder {data}/desveaux2026-pcrv-ic50 has three CSV files with one row for each well: pcrv_injection.csv (ExoS-Bla injection into A549 cells for the antibodies MEDI3902, 30-B8 and P3D6), pcrv_cytotox.csv (macrophage cytotoxicity for the same three antibodies) and pcrv_variants_30b8.csv (injection assay of 30-B8 against the PcrV variants V1 to V5). The columns are antibody, variant (only in the variants file), control (1 for a well without antibody), experiment, conc_ug_ml (antibody concentration in µg/mL, 0 for the wells without antibody), raw, mean_no_igg, mean_noninfected and norm (the normalized response that we computed from raw and the two control means). Fit a dose-response curve to norm for each antibody in the injection assay, for P3D6 and 30-B8 in the cytotoxicity assay, and for each variant in the variants file. Give each IC50 in µg/mL with its 95% confidence interval and the Hill slope. Write every number in your final answer text.
+answers:
+  dr_model: 3PL
+  ic50_type: relative
+  ci_method: delta
+  response_level: 50
+  weighting: none
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data:
+  - desveaux2026-pcrv-ic50/pcrv_injection.csv
+  - desveaux2026-pcrv-ic50/pcrv_cytotox.csv
+  - desveaux2026-pcrv-ic50/pcrv_variants_30b8.csv
+items:
+  - {key: ic50_medi3902, description: "IC50 of MEDI3902, injection assay (µg/mL)", value: 0.11725, tolerance: 0.0006}
+  - {key: ic50_30b8, description: "IC50 of 30-B8, injection assay (µg/mL)", value: 0.021307, tolerance: 0.0001}
+  - {key: ic50_p3d6, description: "IC50 of P3D6, injection assay (µg/mL)", value: 3.6534, tolerance: 0.006}
+  - {key: ic50_p3d6_cytotox, description: "IC50 of P3D6, cytotoxicity assay (µg/mL)", value: 11.792, tolerance: 0.06}
+  - {key: ic50_30b8_v2, description: "IC50 of 30-B8 against variant V2 (µg/mL)", value: 0.012782, tolerance: 0.00006}
+  - {key: ic50_30b8_v3, description: "IC50 of 30-B8 against variant V3 (µg/mL)", value: 0.011202, tolerance: 0.00006}
+  - {key: ic50_30b8_v4, description: "IC50 of 30-B8 against variant V4 (µg/mL)", value: 0.013050, tolerance: 0.00006}
+  - {key: ic50_30b8_v5, description: "IC50 of 30-B8 against variant V5 (µg/mL)", value: 0.010452, tolerance: 0.00006}
+  - {key: ic50_30b8_cytotox_3pl, description: "IC50 of 30-B8, cytotoxicity assay, three-parameter model (µg/mL)", value: 6.6996, tolerance: 0.05, in_answer: false}
+  - {key: ic50_30b8_cytotox_printed, description: "IC50 of 30-B8, cytotoxicity assay, as printed (µg/mL; reproduces only with a 4PL)", value: 0.0452, tolerance: 0.0002, reference: true}

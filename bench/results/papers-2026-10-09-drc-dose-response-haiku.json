@@ -1,0 +1,439 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "desveaux2026-pcrv-ic50",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 237.318,
+   "session": "20261009-005138-9691",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691",
+   "answer": "**Final answer (corrected)**\n\nI fitted ten dose-response curves with the chosen model, 3PL. The bottom is fixed at 0. The IC50 is the relative IC50, the midpoint of the fitted curve. The CI is the 95% delta-method interval. The response is the `norm` column. I did not renormalize it. No wells were excluded.\n\n**Injection assay (ExoS-Bla, A549)**\n- MEDI3902: IC50 0.1173 µg/mL (95% CI 0.08531 to 0.1492), Hill slope −0.927.\n- 30-B8: IC50 0.02131 µg/mL (95% CI 0.01616 to 0.02645), Hill slope −0.931.\n- P3D6: IC50 3.653 µg/mL (95% CI 2.725 to 4.581), Hill slope −0.858.\n\n**Macrophage cytotoxicity (chosen setting, 3PL)**\n- 30-B8: IC50 6.700 µg/mL (95% CI −0.7381 to 14.14), Hill slope −0.197. The CI includes negative doses, so it is not valid. The 3PL lack-of-fit p is 9.87e-05.\n- P3D6: IC50 11.79 µg/mL (95% CI 6.894 to 16.69), Hill slope −0.438. The 3PL lack-of-fit p is 2.23e-05.\n\n**PcrV variants with 30-B8 (injection, 3PL)**\n- V1: IC50 0.02131 µg/mL (95% CI 0.01616 to 0.02645), Hill slope −0.931. V1 has the same values as the 30-B8 injection data.\n- V2: IC50 0.01278 µg/mL (95% CI 0.007742 to 0.01782), Hill slope −0.722.\n- V3: IC50 0.01120 µg/mL (95% CI 0.006055 to 0.01635), Hill slope −0.756.\n- V4: IC50 0.01305 µg/mL (95% CI 0.007421 to 0.01868), Hill slope −0.754.\n- V5: IC50 0.01045 µg/mL (95% CI 0.008060 to 0.01284), Hill slope −0.776.\n\nAll IC50 values lie inside the tested doses. None is extrapolated.\n\n**Comparison run only (not the chosen setting)**\nA comparison run used the 4PL model for the cytotoxicity data. The record still uses 3PL. This number is not a result of the chosen setting. For 30-B8 cytotoxicity, the 4PL comparison gave IC50 0.04518 µg/mL (95% CI 0.003765 to 0.08659), Hill slope −0.5689, bottom 0.4624. For P3D6 cytotoxicity, the 4PL comparison gave no estimable IC50.\n\n**Model checks**\nChecks compare 3PL with 4PL (F test and lack of fit). They do not change the result. The 3PL model shows lack of fit for several curves. The 4PL model fits better for MEDI3902 (F test p 0.000136), injection 30-B8 (p 0.000573), cytotoxicity 30-B8 (p 1.03e-05), V1 (p 0.000573) and V5 (p 0.0312).\n\n**Uncertain**\n- The 3PL model fixes the bottom at 0. Several curves fit better with a free bottom, so their IC50 values carry model error.\n- The 30-B8 cytotoxicity IC50 under the chosen setting is not valid, because its CI includes negative doses.\n- P3D6 cytotoxicity does not fit well under either model.\n- V1 repeats the 30-B8 injection data (all 45 wells).\n- The injection and variant assays for 30-B8 stop at 1 µg/mL. The top plateau is fitted, not measured.\n- I do not state a drc version here. The adapter lists drc 4.6.1, but no logged step confirms the installed version. The version must be checked before the report.\n\n**Waiting for you**\n- Decide whether to accept the 3PL result for 30-B8 cytotoxicity. Or approve a 4PL fit for that curve only, which I would run as a new, chosen analysis.\n- Confirm the installed drc version.\n- Confirm that V1 is the wild-type reference, not a separate variant.\n\nFiles: dr_results_3PL.csv (chosen setting). Plots: fit_dose_response-1 (injection), -2 (cytotoxicity), -3 (variants).\n\nStep results that the answer does not mention, from the record:\n- n1 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691/work and wrote 3 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691/work.\n- n17 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691/work.\n\nSettings used, from the decision record: Weighting of the standard curve fit: none · Dose-response model: 3PL · Relative or absolute IC50: relative · Response level of an absolute IC50: 50 · Confidence interval of the IC50: delta.",
+   "items": [
+    {
+     "key": "ic50_medi3902",
+     "description": "IC50 of MEDI3902, injection assay (µg/mL)",
+     "expected": 0.11725,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.11725,
+      "diff": 0,
+      "node": "n17",
+      "path": "stdout",
+      "entry": 145
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.1173,
+      "diff": 0.00005000000000000837,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 192,
+      "text": "- MEDI3902: IC50 0.1173 µg/mL (95% CI 0.08531 to 0.1492), Hill slope −0.927."
+     }
+    },
+    {
+     "key": "ic50_30b8",
+     "description": "IC50 of 30-B8, injection assay (µg/mL)",
+     "expected": 0.021307,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.021307,
+      "diff": 0,
+      "node": "n17",
+      "path": "stdout",
+      "entry": 145
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.02131,
+      "diff": 0.000002999999999999531,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 192,
+      "text": "- 30-B8: IC50 0.02131 µg/mL (95% CI 0.01616 to 0.02645), Hill slope −0.931."
+     }
+    },
+    {
+     "key": "ic50_p3d6",
+     "description": "IC50 of P3D6, injection assay (µg/mL)",
+     "expected": 3.6534,
+     "tolerance": 0.006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.653446,
+      "diff": 0.00004600000000021254,
+      "node": "n17",
+      "path": "stdout",
+      "entry": 145
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.653,
+      "diff": 0.00039999999999995595,
+      "via": "tolerance",
+      "node": "n17",
+      "claimEntry": 192,
+      "text": "- P3D6: IC50 3.653 µg/mL (95% CI 2.725 to 4.581), Hill slope −0.858."
+     }
+    },
+    {
+     "key": "ic50_p3d6_cytotox",
+     "description": "IC50 of P3D6, cytotoxicity assay (µg/mL)",
+     "expected": 11.792,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 11.7918404023274,
+      "diff": 0.00015959767259943192,
+      "node": "n3",
+      "path": "metrics.P3D6_ic50",
+      "entry": 68
+     },
+     "reported": {
+      "pass": true,
+      "value": 11.79,
+      "diff": 0.002000000000000668,
+      "via": "tolerance",
+      "node": "n17",
+      "claimEntry": 192,
+      "text": "- P3D6: IC50 11.79 µg/mL (95% CI 6.894 to 16.69), Hill slope −0.438."
+     }
+    },
+    {
+     "key": "ic50_30b8_v2",
+     "description": "IC50 of 30-B8 against variant V2 (µg/mL)",
+     "expected": 0.012782,
+     "tolerance": 0.00006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.012782,
+      "diff": 0,
+      "node": "n17",
+      "path": "stdout",
+      "entry": 145
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.01278,
+      "diff": 0.0000020000000000002655,
+      "via": "tolerance",
+      "node": "n17",
+      "claimEntry": 192,
+      "text": "- V2: IC50 0.01278 µg/mL (95% CI 0.007742 to 0.01782), Hill slope −0.722."
+     }
+    },
+    {
+     "key": "ic50_30b8_v3",
+     "description": "IC50 of 30-B8 against variant V3 (µg/mL)",
+     "expected": 0.011202,
+     "tolerance": 0.00006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.011202,
+      "diff": 0,
+      "node": "n17",
+      "path": "stdout",
+      "entry": 145
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0112,
+      "diff": 0.0000020000000000002655,
+      "via": "tolerance",
+      "node": "n17",
+      "claimEntry": 192,
+      "text": "- V3: IC50 0.01120 µg/mL (95% CI 0.006055 to 0.01635), Hill slope −0.756."
+     }
+    },
+    {
+     "key": "ic50_30b8_v4",
+     "description": "IC50 of 30-B8 against variant V4 (µg/mL)",
+     "expected": 0.01305,
+     "tolerance": 0.00006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.01305,
+      "diff": 0,
+      "node": "n17",
+      "path": "stdout",
+      "entry": 145
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.01305,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n17",
+      "claimEntry": 192,
+      "text": "- V4: IC50 0.01305 µg/mL (95% CI 0.007421 to 0.01868), Hill slope −0.754."
+     }
+    },
+    {
+     "key": "ic50_30b8_v5",
+     "description": "IC50 of 30-B8 against variant V5 (µg/mL)",
+     "expected": 0.010452,
+     "tolerance": 0.00006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.010452,
+      "diff": 0,
+      "node": "n17",
+      "path": "stdout",
+      "entry": 145
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.01045,
+      "diff": 0.0000020000000000002655,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 192,
+      "text": "- V5: IC50 0.01045 µg/mL (95% CI 0.008060 to 0.01284), Hill slope −0.776."
+     }
+    },
+    {
+     "key": "ic50_30b8_cytotox_3pl",
+     "description": "IC50 of 30-B8, cytotoxicity assay, three-parameter model (µg/mL)",
+     "expected": 6.6996,
+     "tolerance": 0.05,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6.699555,
+      "diff": 0.00004500000000007276,
+      "node": "n17",
+      "path": "stdout",
+      "entry": 145
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 192,
+      "text": null
+     }
+    },
+    {
+     "key": "ic50_30b8_cytotox_printed",
+     "description": "IC50 of 30-B8, cytotoxicity assay, as printed (µg/mL; reproduces only with a 4PL)",
+     "expected": 0.0452,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0450812050679973,
+      "diff": 0.0001187949320026957,
+      "node": "n13",
+      "path": "metrics.lack_of_fit_p_3PL",
+      "entry": 118
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.04518,
+      "diff": 0.000019999999999999185,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 192,
+      "text": "For 30-B8 cytotoxicity, the 4PL comparison gave IC50 0.04518 µg/mL (95% CI 0.003765 to 0.08659), Hill slope −0.5689, bottom 0.4624."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 17,
+    "inputTokens": 42,
+    "outputTokens": 32028,
+    "cacheRead": 1339841,
+    "cacheWrite": 135267,
+    "toolCalls": 25,
+    "failedToolCalls": 1,
+    "nudges": 1,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 7,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 16
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/desveaux2026-pcrv-ic50",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/catalog/drc",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/node_modules",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/catalog/drc"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/desveaux2026-pcrv-ic50",
+     "/Volumes/T7/guided-analysis/data/desveaux2026-pcrv-ic50/pcrv_cytotox.csv",
+     "/Volumes/T7/guided-analysis/data/desveaux2026-pcrv-ic50/pcrv_injection.csv",
+     "/Volumes/T7/guided-analysis/data/desveaux2026-pcrv-ic50/pcrv_variants_30b8.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691/work",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691/work/dr_cytotox.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691/work/dr_injection.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/desveaux2026-pcrv-ic50/run1/home/sessions/20261009-005138-9691/work/dr_variants.csv"
+    ],
+    "outside": [],
+    "blocked": 1,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-drc-dose-response-haiku.md",
+  "json": "bench/results/papers-2026-10-09-drc-dose-response-haiku.json"
+ },
+ "summary": {
+  "cells": {
+   "desveaux2026-pcrv-ic50": {
+    "claude:claude-haiku-5-5": {
+     "computed": 9,
+     "computedOf": 9,
+     "reported": 8,
+     "reportedOf": 8,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 9,
+    "computedOf": 9,
+    "reported": 8,
+    "reportedOf": 8,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 237.318,
+    "requests": 17,
+    "inputTokens": 42,
+    "outputTokens": 32028,
+    "cacheRead": 1339841,
+    "cacheWrite": 135267,
+    "toolCalls": 25,
+    "failedToolCalls": 1,
+    "nudges": 1,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings_info": 2,
+    "findings_warning": 7,
+    "findings_error": 2,
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 16
+   }
+  },
+  "skipped": []
+ }
+}

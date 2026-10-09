@@ -1,0 +1,27 @@
+tool: drc (R), fit_dose_response of the drc adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/desveaux2026-pcrv-ic50/pcrv_injection.csv
+  - /Volumes/T7/guided-analysis/data/desveaux2026-pcrv-ic50/pcrv_cytotox.csv
+  - /Volumes/T7/guided-analysis/data/desveaux2026-pcrv-ic50/pcrv_variants_30b8.csv
+decisions:
+  dr_model: "3PL (drc LL.3, lower limit 0)"
+  response: "norm, with the no-antibody wells at dose 0"
+  ic50_type: relative
+expected:
+  - {description: "IC50 MEDI3902, injection", value: 0.11725, tolerance: 0.0006, source: "paper, Results and Figure 6A: 117 ng/mL"}
+  - {description: "IC50 30-B8, injection", value: 0.021307, tolerance: 0.0001, source: "paper, Results and Figure 6A: 21.3 ng/mL"}
+  - {description: "IC50 P3D6, injection", value: 3.6534, tolerance: 0.006, source: "paper, Results: 3.65 µg/mL (3.7 µg/mL in Figure 3)"}
+  - {description: "IC50 P3D6, cytotoxicity", value: 11.792, tolerance: 0.06, source: "paper, Figure 4B and Results: 11.8 µg/mL"}
+  - {description: "IC50 30-B8, variant V2", value: 0.012782, tolerance: 0.00006, source: "paper, Figure 6 supplement 1: 12.8 ng/mL"}
+  - {description: "IC50 30-B8, variant V3", value: 0.011202, tolerance: 0.00006, source: "paper, Figure 6 supplement 1: 11.2 ng/mL"}
+  - {description: "IC50 30-B8, variant V4", value: 0.013050, tolerance: 0.00006, source: "paper, Figure 6 supplement 1: 13.0 ng/mL"}
+  - {description: "IC50 30-B8, variant V5", value: 0.010452, tolerance: 0.00006, source: "paper, Figure 6 supplement 1: 10.5 ng/mL"}
+  - {description: "IC50 30-B8, cytotoxicity, LL.3", value: 6.6996, tolerance: 0.05, source: "computed (check.py); not printed"}
+  - {description: "IC50 30-B8, cytotoxicity, as printed", value: 0.0452, tolerance: 0.0002, source: "paper, Results: 45.2 ng/mL; only a four-parameter fit gives it; reference"}
+notes: |
+  The paper fits with R drc and "a three-parameter log-logistic model" (Methods). drc LL.3 fixes the lower limit at 0. The fits use the normalized column and the no-antibody wells at dose 0, as the source data of Figure 6 hold them.
+  The variant V1 data of Figure 6 supplement 1 are the same wells as the 30-B8 injection data of Figure 6A (21.3 ng/mL). V1 is therefore not a separate item.
+  Does not reproduce with the stated model: the 30-B8 cytotoxicity IC50 (45.2 ng/mL). LL.3 gives 6.70 µg/mL. LL.4 gives 45.18 ng/mL with a bottom of 0.46. The paper probably used LL.4 for this one curve.
+  MEDI3902 in the cytotoxicity assay has no dose-response (the paper says so). LL.3 gives an IC50 far outside the tested doses; the tool warns.
+  The P5B3 and variant data of Figure 3 are not in the benchmark: the P5B3 IC50 values (96 to 426 µg/mL) are above the highest dose.
