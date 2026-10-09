@@ -1,0 +1,272 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "ollama:qwen3:8b"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "astapova2021-deseq2-kgn",
+   "model": "ollama:qwen3:8b",
+   "run": 1,
+   "status": "answer",
+   "durationS": 282.695,
+   "session": "20261008-193409-d2f6",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/ollama_qwen3_8b/astapova2021-deseq2-kgn/run1/home/sessions/20261008-193409-d2f6",
+   "answer": "Dihydrotestosterone (DHT) significantly changes gene expression in KGN human granulosa cells. Here are the results:\n\n- **Total genes tested:** 59,087\n- **Significant genes (padj < 0.05):** 173\n  - **Upregulated genes (log2FoldChange > 0):** 125\n  - **Downregulated genes (log2FoldChange < 0):** 48\n\n### Top 20 Genes with Fold Change and Adjusted p Value\n| Gene ID     | Base Mean | Log2 Fold Change | Adjusted p Value |\n|-------------|-----------|------------------|------------------|\n| CCN2        | 42705.75  | 0.3676           | 1.55198e-28      |\n| TMTC1       | 732.86    | 0.6939           | 3.05543e-22      |\n| PLAT        | 11012.62  | 0.2890           | 5.36389e-20      |\n| ERFFI1      | 3969.19   | 0.3471           | 2.29892e-19      |\n| VCAM1       | 936.02    | 0.5757           | 1.15375e-18      |\n| GCNT1       | 1651.87   | 0.3727           | 9.07908e-13      |\n| DDIT4       | 13598.17  | 0.2284           | 3.62641e-10      |\n| NCAM1       | 11282.86  | 0.2269           | 4.23553e-10      |\n| B4GALT5     | 11393.07  | 0.2003           | 1.36909e-09      |\n| CXCL8       | 1518.65   | 0.4223           | 4.53336e-09      |\n| KRT18       | 80775.23  | -0.1984          | 5.96531e-09      |\n| MGP         | 3605.33   | 0.2692           | 1.38024e-08      |\n| EPB41L2     | 6853.36   | 0.2109           | 8.79327e-08      |\n| EGR1        | 2907.78   | 0.2709           | 2.03599e-07      |\n| CD55        | 5680.30   | 0.2222           | 5.02829e-07      |\n| NNMT        | 3536.99   | 0.2187           | 5.22615e-07      |\n| DNMBP       | 7816.21   | 0.1934           | 1.48475e-06      |\n| MEG3        | 1805.26   | 0.3250           | 1.94381e-06      |\n| THBS1       | 247952.16 | 0.1589           | 1.98196e-06      |\n| FPR3        | 1759.37   | 0.2712           | 2.23292e-06      |\n\nThese results indicate that DHT treatment leads to significant changes in gene expression, with a mix of upregulated and downregulated genes. The top genes listed show the most significant changes in expression levels.\n\nSettings used, from the decision record: Input type: count matrix · Design formula: ~ experiment + treatment · Variable of interest: treatment · Reference level: VEH · Test level: DHT · Minimum count for a gene to count as detected: 0 · Minimum number of samples with a detected gene: 1 · False discovery rate cutoff (padj): 0.05 · Log2 fold change threshold: 0.",
+   "items": [
+    {
+     "key": "significant_padj_005",
+     "description": "Genes with padj < 0.05, DHT vs vehicle, paired design",
+     "expected": 173,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 173,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_significant",
+      "entry": 44
+     },
+     "reported": {
+      "pass": true,
+      "value": 173,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 59,
+      "text": "- **Significant genes (padj < 0.05):** 173"
+     }
+    },
+    {
+     "key": "up_padj_005",
+     "description": "Genes up with DHT at padj < 0.05",
+     "expected": 125,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 125,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_up",
+      "entry": 44
+     },
+     "reported": {
+      "pass": true,
+      "value": 125,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 59,
+      "text": "- **Upregulated genes (log2FoldChange > 0):** 125"
+     }
+    },
+    {
+     "key": "down_padj_005",
+     "description": "Genes down with DHT at padj < 0.05",
+     "expected": 48,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 48,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_down",
+      "entry": 44
+     },
+     "reported": {
+      "pass": true,
+      "value": 48,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 59,
+      "text": "- **Downregulated genes (log2FoldChange < 0):** 48"
+     }
+    },
+    {
+     "key": "genes_in_table",
+     "description": "Genes in the count table",
+     "expected": 59087,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 59087,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_genes",
+      "entry": 8
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 59,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 4,
+    "inputTokens": 32873,
+    "outputTokens": 1283,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings": {
+     "info": 2,
+     "warning": 1,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/ollama_qwen3_8b/astapova2021-deseq2-kgn/run1/home/sessions/20261008-193409-d2f6/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/ollama_qwen3_8b/astapova2021-deseq2-kgn/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add39c08c958cae10/catalog/deseq2",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add39c08c958cae10/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add39c08c958cae10/node_modules",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add39c08c958cae10/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add39c08c958cae10/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add39c08c958cae10",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add39c08c958cae10/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add39c08c958cae10/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add39c08c958cae10/catalog/deseq2"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_counts.csv",
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_samples.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/ollama_qwen3_8b/astapova2021-deseq2-kgn/run1/home/sessions/20261008-193409-d2f6/work/run_deseq-6/results.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/new-astapova2021-deseq2-kgn-check.md",
+  "json": "bench/results/new-astapova2021-deseq2-kgn-check.json"
+ },
+ "summary": {
+  "cells": {
+   "astapova2021-deseq2-kgn": {
+    "ollama:qwen3:8b": {
+     "computed": 4,
+     "computedOf": 4,
+     "reported": 3,
+     "reportedOf": 3,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "ollama:qwen3:8b": {
+    "computed": 4,
+    "computedOf": 4,
+    "reported": 3,
+    "reportedOf": 3,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "ollama:qwen3:8b": {
+    "runs": 1,
+    "durationS": 282.695,
+    "requests": 4,
+    "inputTokens": 32873,
+    "outputTokens": 1283,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings_info": 2,
+    "findings_warning": 1,
+    "findings_error": 0,
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   }
+  },
+  "skipped": []
+ }
+}

@@ -87,7 +87,10 @@ Adapter route with no model (`ga run-step`, 2026-10-08):
 - scanpy load_data and filter_cells with prefix mt-: pulse 10608 to 9612, chase 10046 to 8887. With the default prefix MT-, chase keeps 9859 (the trap value).
 - phylo infer_tree with TIM2e+I+G4, ultrafast bootstrap 1000 and the outgroup: 55 sequences, 2375 sites, log-likelihood -15895.4825.
 
-Local model runs (ollama qwen3:8b): not done yet. The run of astapova2021-deseq2-kgn started and stopped when the GPU was needed for other work. It wrote no result.
+Local model runs (ollama qwen3:8b, blind mode, one run each):
+- astapova2021-deseq2-kgn (2026-10-08): answer in 283 s. Computed 4/4, reported 3/3. Leak check: 3 paths read, 0 outside the allow list, 0 blocked, 0 unsourced. Report: bench/results/new-astapova2021-deseq2-kgn-check.md.
+- liao2025-scanpy-bone-marrow: not run. The run was stopped before it started because the computer was needed for other work.
+- kanetis2022-iqtree-sporocadaceae: not run, for the same reason.
 
 ### Rejected
 - Li 2025 EMBO Rep (scanpy): the control count matches, but the knockout count (8711) needs "more than 750 genes", and the text says "fewer than 750 removed" (8712). A second scanpy QC case also adds little to Liao 2025.
