@@ -217,13 +217,35 @@ test("the html and md exports put the approved plan at the top, with its changes
   r.append("plan_approved", { version: 1, text: "Question: Does drug 2 help?\n\nSteps\n1. Paired t test", plan: { steps: [{ step: "Paired t test", status: "todo" }] } });
   r.append("plan", { action: "updated", version: 2, reason: "A <plot> helps.", text: "x", plan: { steps: [] } });
   const html = readFileSync(exportHtml(r, [], join(dir, "t.html")), "utf8");
-  expect(html.indexOf('<section class="plan" id="plan"><h2>Analysis plan (version 1')).toBeGreaterThan(html.indexOf("<h1>Analysis trail</h1>"));
+  expect(html.indexOf('<section class="plan" id="plan"><h2>Confirmed analysis (version 1')).toBeGreaterThan(html.indexOf("<h1>Analysis trail</h1>"));
   expect(html).toContain("Question: Does drug 2 help?\n\nSteps\n1. Paired t test</pre>");
   expect(html).toContain("<li>Version 2: A &lt;plot&gt; helps.</li>");
   const md = readFileSync(exportMarkdown(r, [], join(dir, "t.md")), "utf8");
-  expect(md.indexOf("## Analysis plan (version 1")).toBeLessThan(md.indexOf("## Steps"));
+  expect(md.indexOf("## Confirmed analysis (version 1")).toBeLessThan(md.indexOf("## Steps"));
   expect(md).toContain("- Version 2: A <plot> helps.");
-  expect(trail(r, 1).map((l) => l.line)).toEqual(["You approved the analysis plan, version 1", "Plan changed to version 2. Reason: A <plot> helps."]);
+  expect(trail(r, 1).map((l) => l.line)).toEqual(["You confirmed the analysis, version 1", "Plan changed to version 2. Reason: A <plot> helps."]);
+});
+
+test("the html report shows the confirmed analysis with its pilot and the validation as one unit", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ga-trail-pilot-"));
+  const r = new AnalysisRecord(join(dir, "s"), "20260101-000000-pilt");
+  r.append("session", { adapters: [], model: "m" });
+  const pilot = { sample: "Set 1", values: { "positive cell": 296 }, images: [], check: "Clumps are left out.", comparison: ['positive cell: the agent got 296; the reference "Red dots" says 530 (56% of the reference).'], definitions: [{ measure: "positive cell", definition: "At least 1 red pixel." }] };
+  const run = r.append("pilot_run", pilot);
+  r.append("pilot_approved", { run: run.id, sample: "Set 1" });
+  r.append("plan_approved", { version: 1, text: "You want: red-positive cells.", plan: { steps: [] }, pilot: { entry: run.id, ...pilot } });
+  r.append("validation", { pairs: [{ sample: "Set 1", ours: 296, ref: 530, pilot: true }, { sample: "Set 2", ours: 400, ref: 410, pilot: false }], summary: ["All samples: 2 samples."], plot: join(dir, "missing.png") });
+  const html = readFileSync(exportHtml(r, [], join(dir, "t.html")), "utf8");
+  const section = html.slice(html.indexOf('<section class="plan"'), html.indexOf("</section>", html.indexOf('<section class="plan"')));
+  expect(section).toContain("<h2>Confirmed analysis (version 1, confirmed");
+  expect(section).toContain("<h3>Pilot: Set 1</h3>");
+  expect(section).toContain("positive cell: the agent got 296; the reference &quot;Red dots&quot; says 530 (56% of the reference).");
+  expect(section).toContain("<h3>Validation against the reference</h3>");
+  expect(section).toContain("<td>Set 1</td><td>296</td><td>530</td><td>-234</td><td>-44.2</td><td>yes</td>");
+  expect(section).toContain("Bland-Altman plot.");
+  const md = readFileSync(exportMarkdown(r, [], join(dir, "t.md")), "utf8");
+  expect(md).toContain("### Pilot\n\nPilot sample: Set 1");
+  expect(md).toContain("| Set 2 | 400 | 410 | -10 | -2.4 |  |");
 });
 
 test("a message typed during a turn is a note in the same group, with the step it came after", () => {

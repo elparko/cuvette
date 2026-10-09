@@ -1,3 +1,4 @@
+import { pilotText, validationRows, type PilotRun } from "./pilot.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { FindingIn } from "./types.ts";
 
@@ -26,8 +27,18 @@ export interface PlanProgram {
   alternatives?: string[];
 }
 
+export interface PlanDefinition {
+  measure: string;
+  definition: string;
+}
+
 export interface AnalysisPlan {
+  restatement?: string;
   question?: string;
+  definitions?: PlanDefinition[];
+  exclusions?: { what: string; effect?: string }[];
+  pilot?: { sample: string; shows?: string[] };
+  reference?: { path?: string; sheet?: string; sample_column?: string; columns?: string[]; question?: string };
   data?: { files?: string[]; row?: string; replicate?: string; n?: string };
   programs?: PlanProgram[];
   steps: PlanStep[];
@@ -53,7 +64,18 @@ function decisionOf(o: Record<string, unknown>): PlanDecision {
 
 export function readPlan(a: Record<string, unknown>, statusDefault = true): Partial<AnalysisPlan> {
   const p: Partial<AnalysisPlan> = {};
+  if (a.restatement) p.restatement = str(a.restatement);
   if (a.question) p.question = str(a.question);
+  if (a.definitions) p.definitions = objs(a.definitions).map((o) => ({ measure: str(o.measure), definition: str(o.definition) })).filter((d) => d.measure && d.definition);
+  if (a.exclusions) p.exclusions = objs(a.exclusions).map((o) => ({ what: str(o.what ?? o.step), effect: str(o.effect) || undefined })).filter((x) => x.what);
+  if (a.pilot && typeof a.pilot === "object" && str((a.pilot as Record<string, unknown>).sample)) {
+    const o = a.pilot as Record<string, unknown>;
+    p.pilot = { sample: str(o.sample), shows: list(o.shows) };
+  }
+  if (a.reference && typeof a.reference === "object") {
+    const o = a.reference as Record<string, unknown>;
+    p.reference = { path: str(o.path) || undefined, sheet: str(o.sheet) || undefined, sample_column: str(o.sample_column) || undefined, columns: list(o.columns), question: str(o.question) || undefined };
+  }
   if (a.data && typeof a.data === "object") {
     const d = a.data as Record<string, unknown>;
     p.data = { files: list(d.files), row: str(d.row), replicate: str(d.replicate), n: str(d.n) };
@@ -99,6 +121,7 @@ function decisionLine(d: PlanDecision): string {
 
 export function planText(p: Partial<AnalysisPlan>): string {
   const out: string[] = [];
+  if (p.restatement) out.push(`You want: ${p.restatement.replace(/^you want:?\s*/i, "")}`, "");
   if (p.question) out.push(`Question: ${p.question}`);
   const d = p.data;
   if (d && (d.files?.length || d.row || d.replicate || d.n)) {
@@ -107,6 +130,14 @@ export function planText(p: Partial<AnalysisPlan>): string {
     if (d.row) out.push(`- One row: ${d.row}`);
     if (d.replicate) out.push(`- Unit of replication: ${d.replicate}`);
     if (d.n) out.push(`- Sample size: ${d.n}`);
+  }
+  if (p.definitions?.length) {
+    out.push("", "What I will count");
+    p.definitions.forEach((d, i) => out.push(`${i + 1}) ${d.measure}: ${d.definition}`));
+  }
+  if (p.exclusions?.length) {
+    out.push("", "What I will leave out, and what it does");
+    for (const x of p.exclusions) out.push(`- ${x.what}${x.effect ? ` Effect: ${x.effect}` : ""}`);
   }
   if (p.programs?.length) {
     out.push("", "Programs");
@@ -122,6 +153,12 @@ export function planText(p: Partial<AnalysisPlan>): string {
       for (const x of s.decisions ?? []) out.push(`   - ${decisionLine(x)}`);
       if (s.reason) out.push(`   Reason: ${s.reason}`);
     });
+  }
+  if (p.pilot) out.push("", "Pilot", `- First sample: ${p.pilot.sample}. The method runs on this sample only. You check the result before the other samples run.`, ...(p.pilot.shows ?? []).map((x) => `- You will see: ${x}`));
+  if (p.reference?.path || p.reference?.question) {
+    out.push("", "Reference");
+    if (p.reference.path) out.push(`- ${p.reference.path}${p.reference.sheet ? `, sheet ${p.reference.sheet}` : ""}${p.reference.columns?.length ? `, columns ${p.reference.columns.join(", ")}` : ""}`);
+    if (p.reference.question) out.push(`- ${p.reference.question}`);
   }
   if (p.outputs?.length) out.push("", "Outputs", ...p.outputs.map((x) => `- ${x}`));
   if (p.checks?.length) out.push("", "Checks", ...p.checks.map((c) => `- ${c.check}${c.if_fails ? ` If it fails: ${c.if_fails}` : ""}`));
@@ -157,6 +194,7 @@ export interface ApprovedPlan {
   plan: AnalysisPlan;
   ts: string;
   entry: number;
+  pilot?: PilotRun;
   updates: { version: number; reason: string; text: string; ts: string }[];
 }
 
@@ -167,7 +205,7 @@ export function approvedPlan(record: AnalysisRecord): ApprovedPlan | undefined {
     .entries(["plan"])
     .filter((e) => e.id > a.id && e.data.action === "updated")
     .map((e) => ({ version: Number(e.data.version), reason: str(e.data.reason), text: str(e.data.text), ts: e.ts }));
-  return { version: Number(a.data.version), text: str(a.data.text), plan: a.data.plan as unknown as AnalysisPlan, ts: a.ts, entry: a.id, updates };
+  return { version: Number(a.data.version), text: str(a.data.text), plan: a.data.plan as unknown as AnalysisPlan, ts: a.ts, entry: a.id, updates, pilot: (a.data.pilot as PilotRun | undefined) ?? undefined };
 }
 
 export function currentPlan(record: AnalysisRecord): AnalysisPlan | undefined {
@@ -180,11 +218,17 @@ export function currentPlan(record: AnalysisRecord): AnalysisPlan | undefined {
 export function planMarkdown(record: AnalysisRecord): string[] {
   const a = approvedPlan(record);
   if (!a) return [];
-  const out = [`## Analysis plan (version ${a.version}, approved ${a.ts.slice(0, 16).replace("T", " ")})`, "", a.text, ""];
+  const out = [`## Confirmed analysis (version ${a.version}, confirmed ${a.ts.slice(0, 16).replace("T", " ")})`, "", a.text, ""];
+  if (a.pilot) out.push("### Pilot", "", pilotText(a.pilot), "");
   if (a.updates.length) {
-    out.push("### Changes after approval", "");
+    out.push("### Changes after confirmation", "");
     for (const u of a.updates) out.push(`- Version ${u.version}: ${u.reason || "no reason given"}`);
     out.push("");
+  }
+  const v = validationRows(record);
+  if (v) {
+    out.push("### Validation against the reference", "", ...v.summary.map((x) => `- ${x}`), "", `| ${v.columns.join(" | ")} |`, `| ${v.columns.map(() => "---").join(" | ")} |`, ...v.rows.map((r) => `| ${r.join(" | ")} |`), "");
+    if (v.plot) out.push(`Bland-Altman plot: ${v.plot}. Each dot is one sample: the mean of the two values (across) against the agent minus the reference (up). The dark line is the mean difference; the dashed lines are the mean plus and minus 1.96 SD. The gray dot is the pilot sample.`, "");
   }
   return out;
 }
@@ -217,7 +261,37 @@ export function planView(record: AnalysisRecord): { approved: boolean; version: 
   return {
     approved: true,
     version: Math.max(a.version, ...a.updates.map((u) => u.version)),
-    text: a.updates.length && now ? planText(now) : a.text,
+    text: (a.updates.length && now ? planText(now) : a.text) + (a.pilot ? `\n\nPilot\n${pilotText(a.pilot)}` : ""),
     updates: a.updates.map((u) => ({ version: u.version, reason: u.reason })),
   };
 }
+
+export function definitionsOf(record: AnalysisRecord): PlanDefinition[] {
+  return currentPlan(record)?.definitions ?? [];
+}
+
+const words = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3);
+
+export function definitionFindings(record: AnalysisRecord, answer: string): FindingIn[] {
+  const defs = definitionsOf(record);
+  const out: FindingIn[] = [];
+  const sentences = answer.split(/(?<=[.!?\n])\s+/);
+  const rx = (m: string) => new RegExp(`\\b${m.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`, "g");
+  for (const d of defs) {
+    const longer = defs.filter((x) => x.measure.length > d.measure.length && x.measure.toLowerCase().includes(d.measure.toLowerCase()));
+    const about = sentences.filter((s) => {
+      let t = s.toLowerCase();
+      for (const x of longer) t = t.replace(rx(x.measure), " ");
+      return rx(d.measure).test(t);
+    });
+    if (!about.length) continue;
+    const want = words(d.definition);
+    const has = about.some((s) => {
+      const got = new Set(words(s));
+      return want.filter((w) => got.has(w)).length >= Math.max(2, Math.ceil(want.length / 3));
+    });
+    if (!has) out.push({ check: "measure_without_definition", severity: "warning", message: `The answer reports ${d.measure} but does not say what it counts. Add the definition: ${d.definition}` });
+  }
+  return out;
+}
+

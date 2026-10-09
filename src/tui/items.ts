@@ -1,6 +1,7 @@
 import { activity, canMakeNode, purposeOf, role } from "../core/housekeeping.ts";
 import type { Entry, Fidelity } from "../core/types.ts";
 import { scopeLabel, type Scope } from "../core/settings.ts";
+import { pilotText } from "../core/pilot.ts";
 import type { SessionLike } from "./types.ts";
 
 export interface OutputRef {
@@ -147,7 +148,17 @@ export class Mapper {
       case "setting":
         return line("⚙", d.change ? `Setting ${d.name} changed (${scopeLabel(d.scope as Scope)})` : `Setting ${d.name}: ${show(d.old)} → ${show(d.new)} (${scopeLabel(d.scope as Scope)})`, "cyan");
       case "plan_approved":
-        return [{ key, t: "block", title: `You approved the plan, version ${d.version}. Mode: ${d.mode}.`, text: String(d.text ?? "") }];
+        return [{ key, t: "block", title: `Confirmed analysis, version ${d.version}. Mode: ${d.mode}.`, text: String(d.text ?? "") }];
+      case "pilot_run":
+        return [{ key, t: "block", title: `Pilot result: ${d.sample}`, text: pilotText(d as never) }];
+      case "pilot_approved":
+        return line("✓", `You confirmed the pilot on ${d.sample}.`, "green");
+      case "pilot_rejected":
+        return line("✎", `Pilot on ${d.sample} not confirmed: ${d.reason}`, "cyan");
+      case "reference":
+        return d.mode === "none" ? [] : line("▸", d.revealed ? `The reference ${d.path} is now visible to the agent.` : `Reference: ${d.path} (${d.mode === "blind" ? "held back for a blind test" : "compared in the pilot"})`, "cyan");
+      case "validation":
+        return [{ key, t: "block", title: "Validation against the reference", text: ((d.summary as string[]) ?? []).join("\n") + (d.plot ? `\nBland-Altman plot: ${d.plot}` : "") }];
       case "plan":
         if (d.action === "change_requested") return line("✎", `You asked to change the plan: ${d.text}`, "cyan");
         if (d.action === "cancelled") return line("✗", "You cancelled the plan. No step ran.", "yellow");

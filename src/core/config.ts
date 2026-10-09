@@ -20,6 +20,8 @@ export interface Settings {
   askWaits: boolean;
   headless: boolean;
   planFirst?: boolean | "on" | "off";
+  pilot?: boolean | "on" | "off";
+  referenceMode?: "compare" | "blind";
   permissions: Record<string, "allow" | "ask" | "deny">;
   permissionMode: "ask" | "bypass";
   messages: "after-step" | "queue";

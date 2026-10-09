@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planFindings, planMarkdown, planText, planView, readPlan, type AnalysisPlan } from "../src/core/plan.ts";
+import { addedSteps, approvedPlan, currentPlan, definitionFindings, matchStep, mergePlan, openDecisions, planFindings, planMarkdown, planText, planView, readPlan, type AnalysisPlan } from "../src/core/plan.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 
 export const SLEEP_PLAN = {
@@ -85,7 +85,7 @@ test("the approved plan, its changes and the review findings come from the recor
   expect(a.updates).toEqual([expect.objectContaining({ version: 2, reason: "The scientist asked for survival." })]);
   expect(currentPlan(r)!.steps).toHaveLength(3);
   expect(planView(r)).toMatchObject({ approved: true, version: 2 });
-  expect(planMarkdown(r).join("\n")).toMatch(/## Analysis plan \(version 1, approved .*\)\n\nQuestion: Does drug 2[\s\S]*### Changes after approval\n\n- Version 2: The scientist asked for survival\./);
+  expect(planMarkdown(r).join("\n")).toMatch(/## Confirmed analysis \(version 1, confirmed .*\)\n\nQuestion: Does drug 2[\s\S]*### Changes after confirmation\n\n- Version 2: The scientist asked for survival\./);
   const missing = planFindings(r);
   expect(missing.map((f) => f.check)).toEqual(["plan_step_missing", "plan_step_missing"]);
   expect(missing[0]!.message).toContain("step 2 (Compare the two drugs)");
@@ -100,4 +100,37 @@ test("a step that ran after approval and is not in the plan is a finding; the lo
   node("compare_two_groups");
   node("fit_ols");
   expect(planFindings(r)).toEqual([expect.objectContaining({ check: "plan_step_extra", message: "The step fit_ols is not in the approved plan, and the plan was not updated with a reason." })]);
+});
+
+const CELLS = {
+  restatement: "You want: for each field, the number of cells that took up red particles, and the number of all cells.",
+  question: "How many cells in each field took up red particles?",
+  definitions: [
+    { measure: "cell", definition: "An object in the brightfield image between 300 and 15,000 pixels." },
+    { measure: "positive cell", definition: "A cell with at least 1 red pixel inside its outline." },
+  ],
+  exclusions: [{ what: "Clumps over 15,000 px are left out.", effect: "On the pilot field this leaves out about 40% of the area with cells, and the red inside it." }],
+  pilot: { sample: "Set 1", shows: ["The overlay image with a legend", "The counts for Set 1"] },
+  reference: { path: "/p/Analysis.xlsx", sheet: "Ox-LDL", columns: ["Red dots", "Total cells"], question: "The reference counts 'Red dots'. Is that the number of red-positive cells, or the number of red spots?" },
+  steps: [{ step: "Count the cells in each field", tool: "count" }],
+};
+
+test("the restatement opens the proposed analysis; the definitions, exclusions with effects, pilot and reference have their own sections", () => {
+  const text = planText(readPlan(CELLS));
+  expect(text.split("\n")[0]).toBe("You want: for each field, the number of cells that took up red particles, and the number of all cells.");
+  expect(text).toContain("What I will count\n1) cell: An object in the brightfield image between 300 and 15,000 pixels.\n2) positive cell: A cell with at least 1 red pixel inside its outline.");
+  expect(text).toContain("What I will leave out, and what it does\n- Clumps over 15,000 px are left out. Effect: On the pilot field this leaves out about 40% of the area with cells, and the red inside it.");
+  expect(text).toContain("Pilot\n- First sample: Set 1. The method runs on this sample only. You check the result before the other samples run.\n- You will see: The overlay image with a legend");
+  expect(text).toContain("Reference\n- /p/Analysis.xlsx, sheet Ox-LDL, columns Red dots, Total cells\n- The reference counts 'Red dots'. Is that the number of red-positive cells, or the number of red spots?");
+});
+
+test("the review flags a reported measure that has no definition in the answer", () => {
+  const r = record();
+  const plan = readPlan(CELLS) as AnalysisPlan;
+  r.append("plan_approved", { version: 1, text: planText(plan), plan });
+  expect(definitionFindings(r, "Set 1 has 296 positive cells.")).toEqual([
+    { check: "measure_without_definition", severity: "warning", message: "The answer reports positive cell but does not say what it counts. Add the definition: A cell with at least 1 red pixel inside its outline." },
+  ]);
+  expect(definitionFindings(r, "Set 1 has 296 positive cells (a positive cell has at least 1 red pixel inside its outline).")).toEqual([]);
+  expect(definitionFindings(r, "The mean is 3.")).toEqual([]);
 });

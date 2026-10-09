@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import type { Finding, Mode, Question } from "../core/types.ts";
+import type { Finding, Mode, PlanEvent, PlanResponse, Question, ReferenceChoice } from "../core/types.ts";
 import { codeOf, plainOf } from "./items.ts";
 import type { DecisionFieldLike, SessionLike } from "./types.ts";
 
@@ -15,7 +15,7 @@ export type Card =
   | { t: "key"; reason?: string }
   | { t: "config" }
 
-  | { t: "plan"; version: number; text: string; update: boolean; qids: string[]; programs: { part: string; adapter: string; alternatives: string[] }[]; mode: Mode };
+  | ({ t: "plan" } & Omit<PlanEvent, "type">);
 
 export function show(v: unknown): string {
   if (v === undefined || v === null || v === "") return "not set";
@@ -449,41 +449,121 @@ export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string
 
 const RUN_MODES: Mode[] = ["watch", "follow", "teach"];
 
-export function PlanCard(props: {
-  card: Extract<Card, { t: "plan" }>;
-  session: SessionLike;
-  onApprove: (mode: Mode) => void;
-  onChange: (text: string) => void;
-  onCancel: () => void;
-}) {
+type PlanStep = "restate" | "decisions" | "reference" | "refpath" | "refmode" | "actions" | "change" | "correct" | "program" | "definition";
+
+function fakeQuestion(qid: string, title: string, text: string, options: { value: string; label: string }[], rec?: string): Question {
+  return { qid, session: "", decisionKey: "", title, text, options, recommendation: rec ? { value: rec, reason: "" } : undefined, evidence: "", status: "open", created: "" };
+}
+
+export function parseReference(raw: string): ReferenceChoice | undefined {
+  const [path = "", sheet = "", cols = ""] = raw.split(";").map((x) => x.trim());
+  if (!path) return undefined;
+  return { mode: "compare", path, sheet: sheet || undefined, columns: cols ? cols.split(",").map((c) => c.trim()).filter(Boolean) : undefined };
+}
+
+export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: SessionLike; onRespond: (r: PlanResponse) => void }) {
   const { card } = props;
+  const respond = props.onRespond;
   const [later, setLater] = useState<string[]>([]);
   const [mode, setMode] = useState<Mode>(RUN_MODES.includes(card.mode) ? card.mode : "watch");
-  const [stage, setStage] = useState<"actions" | "change" | "program">("actions");
+  const [step, setStep] = useState<PlanStep>(card.stage === "plan" && card.restatement ? "restate" : "decisions");
+  const [ref, setRef] = useState<ReferenceChoice | undefined>();
+  const [defIndex, setDefIndex] = useState(-1);
   const [, setTick] = useState(0);
   const open = props.session.questions.open().filter((q) => card.qids.includes(q.qid) && !later.includes(q.qid));
-  const q = open[0];
+  const q = step === "decisions" ? open[0] : undefined;
+  const after = () => setStep(card.reference && card.stage === "plan" ? "reference" : "actions");
+  if (step === "decisions" && !q && card.stage === "plan") after();
   const switches = card.programs.flatMap((g) => g.alternatives.map((alt) => `Use ${alt} for ${g.part}, not ${g.adapter}.`));
+  const defs = card.definitions ?? [];
+  const pilot = card.stage === "plan" && card.pilot;
   useInput(
     (input, key) => {
-      if (stage === "program") {
-        const n = Number(input);
-        if (Number.isInteger(n) && n >= 1 && n <= switches.length) props.onChange(switches[n - 1]!);
-        else if (key.escape) setStage("actions");
+      if (step === "restate") {
+        if (input === "y" || key.return) setStep("decisions");
+        else if (input === "n") setStep("correct");
         return;
       }
-      if (input === "a" || key.return) props.onApprove(mode);
-      else if (input === "c") setStage("change");
-      else if (input === "x" || key.escape) props.onCancel();
+      if (step === "program") {
+        const n = Number(input);
+        if (Number.isInteger(n) && n >= 1 && n <= switches.length) respond({ action: "change", text: switches[n - 1]! });
+        else if (key.escape) setStep("actions");
+        return;
+      }
+      const n = Number(input);
+      if (Number.isInteger(n) && n >= 1 && n <= defs.length) {
+        setDefIndex(n - 1);
+        setStep("definition");
+      } else if (input === (pilot ? "r" : "a") || key.return) respond({ action: pilot ? "pilot" : "approve", mode, reference: ref });
+      else if (input === "c") setStep("change");
+      else if (input === "x" || key.escape) respond({ action: "cancel" });
       else if (input === "m") setMode((m) => RUN_MODES[(RUN_MODES.indexOf(m) + 1) % RUN_MODES.length]!);
-      else if (input === "p" && switches.length) setStage("program");
+      else if (input === "p" && switches.length) setStep("program");
     },
-    { isActive: !q && stage !== "change" },
+    { isActive: card.stage === "plan" && (step === "restate" || step === "actions" || step === "program") },
   );
+  const title = card.stage === "pilot" ? "Proposed analysis: pilot result" : `${card.update ? "Proposed change to the analysis" : "Proposed analysis"}, version ${card.version}`;
+  const refQ = () => {
+    const r = card.reference!;
+    const c = r.candidates[0];
+    const opts = c
+      ? [{ value: "compare", label: "Yes. Compare in the pilot" }, { value: "blind", label: "Yes. Hold it back (blind test)" }, { value: "none", label: "No, it is not a reference" }]
+      : [{ value: "none", label: "No reference" }, { value: "have", label: "Yes, I have one" }];
+    return (
+      <QuestionCard
+        key="ref"
+        card={{ t: "question", q: fakeQuestion("reference", "Reference", r.question, opts, c ? "compare" : "none") }}
+        onAnswer={(v) => {
+          const s = String(v);
+          if (s === "have") return setStep("refpath");
+          if (s === "none") return (setRef({ mode: "none" }), setStep("actions"));
+          if (s === "compare" || s === "blind") return (setRef({ mode: s, path: c!.path, sheet: c!.sheet }), setStep("actions"));
+          const typed = parseReference(s);
+          if (typed) (setRef(typed), setStep("refmode"));
+        }}
+        onDismiss={() => setStep("actions")}
+      />
+    );
+  };
   return (
-    <Frame title={`${card.update ? "Plan update" : "Analysis plan"}, version ${card.version}`} color="cyan">
-      <Text>{card.text}</Text>
-      {q ? (
+    <Frame title={title} color="cyan">
+      {step === "restate" ? (
+        <Box flexDirection="column">
+          <Text bold>You want: {card.restatement!.replace(/^you want:?\s*/i, "")}</Text>
+          <Text>
+            Is that right? <Text color="green">y</Text> yes · <Text color="cyan">n</Text> correct it
+          </Text>
+        </Box>
+      ) : (
+        <Text>{card.text}</Text>
+      )}
+      {card.stage === "pilot" ? (
+        step === "change" ? (
+          <Prompt label="What must change?" onSubmit={(v) => (v.trim() ? respond({ action: "change", text: v.trim() }) : setStep("decisions"))} onCancel={() => setStep("decisions")} />
+        ) : (
+          <QuestionCard
+            key="pilot"
+            card={{
+              t: "question",
+              q: fakeQuestion("pilot", "Confirm the plan and run all?", "Does this look right?", [
+                { value: "confirm", label: "Confirm the plan and run all" },
+                { value: "change", label: "Change the method" },
+                { value: "another", label: "Try another sample" },
+              ]),
+            }}
+            onAnswer={(v) => {
+              const s = String(v);
+              if (s === "confirm") respond({ action: "confirm" });
+              else if (s === "another") respond({ action: "another" });
+              else if (s === "change") setStep("change");
+              else respond({ action: "change", text: s });
+            }}
+            onDismiss={() => {}}
+          />
+        )
+      ) : step === "correct" ? (
+        <Prompt label="What do you want?" onSubmit={(v) => (v.trim() ? respond({ action: "change", text: `The scientist corrects the request. The scientist wants: ${v.trim()}` }) : setStep("restate"))} onCancel={() => setStep("restate")} />
+      ) : q ? (
         <Box flexDirection="column" marginTop={1}>
           <Text dimColor>
             Open decision {card.qids.length - open.length + 1} of {card.qids.length - later.length}. Answer it here, or press Esc to answer later.
@@ -495,9 +575,30 @@ export function PlanCard(props: {
             onDismiss={() => setLater((x) => [...x, q.qid])}
           />
         </Box>
-      ) : stage === "change" ? (
-        <Prompt label="What must change?" onSubmit={(v) => (v.trim() ? props.onChange(v.trim()) : setStage("actions"))} onCancel={() => setStage("actions")} />
-      ) : stage === "program" ? (
+      ) : step === "reference" ? (
+        refQ()
+      ) : step === "refpath" ? (
+        <Prompt label="File; sheet; value columns (for example /data/counts.xlsx; Set 1; Red dots, Total cells):" onSubmit={(v) => { const r = parseReference(v); if (r) (setRef(r), setStep("refmode")); else setStep("actions"); }} onCancel={() => setStep("actions")} />
+      ) : step === "refmode" ? (
+        <QuestionCard
+          key="refmode"
+          card={{ t: "question", q: fakeQuestion("refmode", "Reference", `How does the agent use ${ref?.path ?? "the reference"}?`, [{ value: "compare", label: "Compare in the pilot" }, { value: "blind", label: "Hold it back (blind test)" }], "compare") }}
+          onAnswer={(v) => (setRef((r) => (r ? { ...r, mode: String(v) === "blind" ? "blind" : "compare" } : r)), setStep("actions"))}
+          onDismiss={() => setStep("actions")}
+        />
+      ) : step === "change" ? (
+        <Prompt label="What must change?" onSubmit={(v) => (v.trim() ? respond({ action: "change", text: v.trim() }) : setStep("actions"))} onCancel={() => setStep("actions")} />
+      ) : step === "definition" && defs[defIndex] ? (
+        <Prompt
+          label={`New definition of ${defs[defIndex]!.measure} (now: ${defs[defIndex]!.definition}):`}
+          onSubmit={(v) => {
+            const d = defs[defIndex]!;
+            if (!v.trim() || v.trim() === d.definition) return setStep("actions");
+            respond({ action: "change", text: `Change the definition of ${d.measure} to: ${v.trim()}`, definition: { measure: d.measure, old: d.definition, new: v.trim() } });
+          }}
+          onCancel={() => setStep("actions")}
+        />
+      ) : step === "program" ? (
         <Box flexDirection="column" marginTop={1}>
           {switches.map((t, i) => (
             <Text key={i}>
@@ -506,19 +607,30 @@ export function PlanCard(props: {
           ))}
           <Text dimColor>Press a number to ask the agent for this change. Esc goes back.</Text>
         </Box>
-      ) : (
+      ) : step === "actions" ? (
         <Box flexDirection="column" marginTop={1}>
+          {ref && ref.mode !== "none" ? <Text dimColor>Reference: {ref.path} ({ref.mode === "blind" ? "held back for a blind test" : "compared in the pilot"})</Text> : null}
+          {defs.length ? <Text dimColor>Each definition is accepted unless you change it: press its number (1 to {defs.length}).</Text> : null}
           <Text>
-            <Text color="green">a</Text> approve and start in {mode} mode · <Text color="cyan">c</Text> change · <Text color="red">x</Text> cancel · <Text color="cyan">m</Text> mode
+            {pilot ? (
+              <Text>
+                <Text color="green">r</Text> run the pilot on {card.pilot} in {mode} mode
+              </Text>
+            ) : (
+              <Text>
+                <Text color="green">a</Text> approve and start in {mode} mode
+              </Text>
+            )}{" "}
+            · <Text color="cyan">c</Text> change · <Text color="red">x</Text> cancel · <Text color="cyan">m</Text> mode
             {switches.length ? (
               <Text>
                 {" "}· <Text color="cyan">p</Text> change a program
               </Text>
             ) : null}
           </Text>
-          <Text dimColor>No analysis step runs before you approve.</Text>
+          <Text dimColor>{pilot ? "The method runs on the pilot sample only. You check the result before the other samples run." : "No analysis step runs before you approve."}</Text>
         </Box>
-      )}
+      ) : null}
     </Frame>
   );
 }

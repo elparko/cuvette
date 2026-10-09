@@ -221,7 +221,7 @@ const TOKEN = __TOKEN__;
 __LAYOUT__
 const BOX_W = 224, BOX_H = 84;
 const HARNESS = new Set(["plan", "note", "calculate", "task", "load_skill", "find_tools", "ask_scientist", "propose_lab_rule", "propose_change", "compare_options"]);
-const TABS = [["plan", "Plan"], ["trail", "Trail"], ["decisions", "Decisions"], ["questions", "Questions"], ["findings", "Findings"]];
+const TABS = [["plan", "Analysis"], ["trail", "Trail"], ["decisions", "Decisions"], ["questions", "Questions"], ["findings", "Findings"]];
 const IMG_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
 const OWNER = { human: "you", agent: "agent", fixed: "fixed" };
 const ICON_PATHS = {
@@ -625,11 +625,11 @@ function drawQuestions(box) {
 
 function drawPlan(box) {
   const p = state.plan;
-  if (!p) { box.append(h("p", { class: "empty" }, "No analysis plan yet.")); return; }
-  box.append(h("h3", {}, p.approved ? "Approved plan, version " + p.version : "Plan proposal, version " + p.version + " (waits for your approval)"));
+  if (!p) { box.append(h("p", { class: "empty" }, "No proposed analysis yet.")); return; }
+  box.append(h("h3", {}, p.approved ? "Confirmed analysis, version " + p.version : "Proposed analysis, version " + p.version + " (waits for you)"));
   box.append(h("pre", { class: "wrap" }, p.text));
   if (p.updates && p.updates.length) {
-    box.append(h("h3", {}, "Changes after approval"));
+    box.append(h("h3", {}, "Changes after confirmation"));
     for (const u of p.updates) box.append(h("p", {}, "Version " + u.version + ": " + (u.reason || "no reason given")));
   }
 }

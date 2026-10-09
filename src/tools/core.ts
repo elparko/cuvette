@@ -23,7 +23,29 @@ const PLAN_STEPS_SHORT = {
 const PLAN_FULL = {
   type: "object",
   properties: {
+    restatement: { type: "string", description: "What the scientist wants, in the scientist's own terms, as one sentence that starts with 'You want:'. For example: You want: for each field, the number of cells that took up red particles, and the number of all cells." },
     question: { type: "string", description: "The question, in one sentence." },
+    definitions: {
+      type: "array",
+      description: "What I will count: an operational definition of each measure, in plain words, with the numbers. For example: measure 'positive cell', definition 'A cell is an object in the brightfield image between 300 and 15,000 pixels. A cell is positive when at least 1 red pixel lies inside its outline.'",
+      items: { type: "object", properties: { measure: { type: "string" }, definition: { type: "string" } }, required: ["measure", "definition"] },
+    },
+    exclusions: {
+      type: "array",
+      description: "What I will leave out, and what it does: every filter or exclusion (size limits, edge objects, clumps, background), with its expected effect in plain numbers when you can estimate it.",
+      items: { type: "object", properties: { what: { type: "string" }, effect: { type: "string" } }, required: ["what"] },
+    },
+    pilot: {
+      type: "object",
+      description: "Give a pilot when the method runs on more than one sample: the sample that runs first, and what the scientist will see (the QC image with outlines, the numbers, the settings). Leave it out for one sample, or when no step counts or changes data.",
+      properties: { sample: { type: "string" }, shows: { type: "array", items: { type: "string" } } },
+      required: ["sample"],
+    },
+    reference: {
+      type: "object",
+      description: "An earlier analysis or hand count of the same data, if one exists: the file, the sheet, the sample column and the value columns. In question, state the reference's measure in its own terms and ask if it is the same as yours, for example: The reference counts 'Red dots'. Is that the number of red-positive cells, or the number of red spots?",
+      properties: { path: { type: "string" }, sheet: { type: "string" }, sample_column: { type: "string" }, columns: { type: "array", items: { type: "string" } }, question: { type: "string" } },
+    },
     data: {
       type: "object",
       description: "The data.",
@@ -183,7 +205,7 @@ export function coreTools(d: CoreDeps): Tool[] {
       ),
       get description() {
         return d.fullPlan?.()
-          ? "Write or update the analysis plan for the scientist. The scientist reads it and approves it before any analysis step runs. Write short sentences in plain words."
+          ? "Write or update the proposed analysis for the scientist. The scientist reads it and confirms it before any analysis step runs. Write short sentences in plain words."
           : "Write or update the analysis plan: a short list of steps. The scientist sees it in the trail.";
       },
       get inputSchema() {

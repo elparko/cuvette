@@ -331,7 +331,7 @@ export class FakeSession implements SessionLike {
       this.qs.push(q);
       this.bus.emit({ type: "question", question: q });
     }
-    this.bus.emit({ type: "plan", version: 1, text, update: false, qids: questions.map((q) => q.qid), programs, mode: this.mode });
+    this.bus.emit({ type: "plan", stage: "plan", version: 1, text, update: false, qids: questions.map((q) => q.qid), programs, mode: this.mode });
   }
 
   respondPermission(rid: string, ok: boolean, note?: string, _always?: boolean): void {

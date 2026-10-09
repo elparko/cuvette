@@ -1,3 +1,4 @@
+import { pilotText } from "../core/pilot.ts";
 import { approvedPlan, planMarkdown } from "../core/plan.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -120,7 +121,7 @@ export function collect(src: ElnSource): ElnContent {
   const logBuf = readFileSync(join(record.dir, "log.jsonl"));
   const plan = planMarkdown(record);
   const files: ElnFile[] = [
-    ...(plan.length ? [file("plan.md", `${plan.join("\n").replace(/^## /, "# ")}\n`, "The analysis plan that the scientist approved before the analysis")] : []),
+    ...(plan.length ? [file("plan.md", `${plan.join("\n").replace(/^## /, "# ")}\n`, "The confirmed analysis, with its pilot, that the scientist confirmed before the analysis")] : []),
     file("question.md", `# Question\n\n${question || "No question was recorded."}\n`),
     file("answer.md", `# Final answer\n\n${answer || "No final answer was recorded."}\n${settings ? `\nSettings: ${settings}\n` : ""}`),
     file("protocol.md", readFileSync(protocolPath), "Protocol with the manual route for each step"),
@@ -156,7 +157,7 @@ export function collect(src: ElnSource): ElnContent {
   const adapterNames = [...new Set(record.nodes().map((n) => n.adapter))];
   const approved = approvedPlan(record);
   const html = [
-    ...(approved ? [`<h2>Analysis plan (version ${approved.version})</h2><pre>${esc(approved.text)}</pre>`] : []),
+    ...(approved ? [`<h2>Confirmed analysis (version ${approved.version})</h2><pre>${esc(approved.text)}</pre>${approved.pilot ? `<h3>Pilot</h3><pre>${esc(pilotText(approved.pilot))}</pre>` : ""}`] : []),
     `<h2>Question</h2><p>${esc(question)}</p>`,
     `<h2>Final answer</h2><p>${esc(answer).replace(/\n/g, "<br>")}</p>`,
     `<h2>Decisions</h2>${decisionRows.length ? table(["Decision", "Value", "Owner", "Set by"], decisionRows.map((r) => [r.label, r.value, r.owner, r.setBy])) : "<p>No setup values were recorded.</p>"}`,

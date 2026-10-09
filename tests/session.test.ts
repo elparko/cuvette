@@ -6,6 +6,8 @@ import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts
 import { applyHeadlessSetup, attachHeadless } from "../src/core/headless.ts";
 import { Session, announcesStep, endsWithPromise } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
+import { unzip } from "./fixtures/unzip.ts";
+import { writeXlsx } from "./fixtures/xlsx.ts";
 
 let session: Session | undefined;
 beforeEach(() => {
@@ -797,4 +799,131 @@ test("a turn with results writes results.xlsx in the output folder and one saved
   const off = await run({ export_xlsx: "off" });
   expect(off.saved).toEqual([]);
   expect(existsSync(off.xlsx)).toBe(false);
+});
+
+function pilotProject() {
+  const root = mkdtempSync(join(tmpdir(), "ga-pilotproj-"));
+  const proj = join(root, "oxldl");
+  const images = join(proj, "images");
+  mkdirSync(images, { recursive: true });
+  for (const s of ["Set 1", "Set 2", "Set 3"]) writeFileSync(join(images, `${s}.tif`), "x");
+  const ref = writeXlsx(join(root, "Analysis.xlsx"), [{ name: "Ox-LDL", rows: [["Field", "Red dots", "Total cells"], ["Set 1", 530, 900], ["Set 2", 410, 800], ["Set 3", 300, 700]] }]);
+  const qc = join(root, "qc.png");
+  writeFileSync(qc, Buffer.from("89504e470d0a1a0a", "hex"));
+  return { root, proj, images, ref, qc };
+}
+
+const CELL_PLAN = (images: string) => ({
+  restatement: "You want: for each field, the number of cells that took up red particles.",
+  question: "How many cells in each field took up red particles?",
+  definitions: [{ measure: "positive cell", definition: "A cell with at least 1 red pixel inside its outline." }],
+  exclusions: [{ what: "Clumps over 15,000 px are left out.", effect: "About 40% of the area with cells." }],
+  pilot: { sample: "Set 1", shows: ["The overlay image"] },
+  steps: [{ step: "Count the cells in each field", tool: "count" }],
+  data: { files: [images] },
+});
+
+test("pilot: the plan card runs the pilot, the gate blocks the batch until the scientist confirms, and the plan is confirmed with its pilot", async () => {
+  const { proj, images, ref, qc } = pilotProject();
+  const folder = { name: "count", args: { input: images, method: "Otsu", min_size: 5 } };
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: CELL_PLAN(images) }] },
+    { text: "I count all fields at once.", calls: [folder] },
+    { calls: [{ name: "count", args: { input: join(images, "Set 1.tif"), method: "Otsu", min_size: 5 } }] },
+    { calls: [{ name: "pilot_result", args: { sample: "Set 1", values: { "positive cell": 41 }, images: [qc], check: "Clumps are left out." } }] },
+    { calls: [folder] },
+    { calls: [{ name: "batch_results", args: { measure: "positive cell", values: [{ sample: "Set 1", value: 41 }, { sample: "Set 2", value: 400 }, { sample: "Set 3", value: 290 }] } }] },
+    { text: "Set 1 has 41 positive cells (a positive cell has at least 1 red pixel inside its outline)." },
+    { text: "Set 1 has 41 positive cells (a positive cell has at least 1 red pixel inside its outline)." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true });
+  session.decisions.applySetup({ method: "Otsu" });
+  const events: any[] = [];
+  session.bus.on((e) => {
+    if (e.type !== "plan") return;
+    events.push(e);
+    const c = e.reference?.candidates[0];
+    setTimeout(() => session!.respondPlan(e.stage === "plan" ? { action: "pilot", reference: { mode: "compare", path: c!.path, sheet: c!.sheet } } : { action: "confirm" }), 0);
+  });
+  await session.send(`Count the red-positive cells in ${images}`);
+
+  expect(events.map((e) => e.stage)).toEqual(["plan", "pilot"]);
+  expect(events[0].restatement).toBe("You want: for each field, the number of cells that took up red particles.");
+  expect(events[0].pilot).toBe("Set 1");
+  expect(events[0].reference.question).toBe("I found Analysis.xlsx (sheet Ox-LDL: Field, Red dots, Total cells). Is this an earlier analysis of these images? Should the pilot compare with it?");
+  expect(events[0].text).toContain("What I will count\n1) positive cell: A cell with at least 1 red pixel inside its outline.");
+  expect(events[0].text).toContain("What I will leave out, and what it does\n- Clumps over 15,000 px are left out. Effect: About 40% of the area with cells.");
+  const counts = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "count");
+  expect(counts.map((e) => e.data.ok)).toEqual([false, true, true]);
+  expect(String(counts[0]!.data.error)).toBe(`Pilot first: count gets the folder ${images}. This step processes many files, so it waits for a pilot. Run the method on one sample only, save QC images with outlines of what was counted and what was left out, and call pilot_result. The scientist approves the pilot before the batch runs.`);
+  const run = session.record.entries(["pilot_run"])[0]!;
+  expect(run.data.comparison).toEqual(['positive cell: the agent got 41; the reference "Red dots" says 530 (8% of the reference).']);
+  expect(run.data.images).toEqual([join(session.workDir, "figures", "pilot-set1-qc.png")]);
+  expect(existsSync(join(session.workDir, "figures", "pilot-set1-qc.png"))).toBe(true);
+  expect(JSON.stringify(provider.requests[0]!.messages[0])).toContain("Pilot: before the first step that changes or counts things, say in one sentence how you will check the method on one sample first.");
+  expect(events[1].text).toContain("Against the reference");
+  const kinds = session.record.entries(["reference", "pilot_run", "pilot_approved", "plan_approved", "validation"]).map((e) => e.kind);
+  expect(kinds).toEqual(["reference", "pilot_run", "pilot_approved", "plan_approved", "validation"]);
+  const approved = session.record.entries(["plan_approved"])[0]!;
+  expect((approved.data.pilot as { sample: string }).sample).toBe("Set 1");
+  const v = session.record.entries(["validation"])[0]!.data as { pairs: { sample: string; ours: number; ref: number; pilot: boolean }[]; summary: string[]; plot: string };
+  expect(v.pairs).toEqual([{ sample: "Set 1", ours: 41, ref: 530, pilot: true }, { sample: "Set 2", ours: 400, ref: 410, pilot: false }, { sample: "Set 3", ours: 290, ref: 300, pilot: false }]);
+  expect(v.summary[2]).toBe("Without the pilot sample: 2 samples. Mean difference (agent minus reference) -10 (-2.886%). Correlation r = not defined.");
+  expect(existsSync(v.plot)).toBe(true);
+  const final = session.record.entries(["assistant"]).filter((e) => e.data.final).at(-1)!;
+  expect(String(final.data.text)).toContain("Definitions, from the confirmed analysis:\n- positive cell: A cell with at least 1 red pixel inside its outline.");
+  const book = unzip(readFileSync(join(session.workDir, "results.xlsx")));
+  const workbook = book.get("xl/workbook.xml")!.toString();
+  expect(workbook).toMatch(/name="Summary".*name="Pilot".*name="Validation"/s);
+  const sheetText = [...book.entries()].filter(([k]) => k.startsWith("xl/worksheets/")).map(([, v]) => v.toString()).join("\n");
+  expect(sheetText).toContain("Definition");
+  expect(sheetText).toContain("A cell with at least 1 red pixel inside its outline.");
+  expect(sheetText).toContain("Without the pilot sample: 2 samples.");
+
+  session.planFirst = false;
+  session.setDecision("min_size", 9);
+  const p2 = new FakeProvider([{ calls: [folder] }, { text: "Waiting for a new pilot." }, { text: "Waiting for a new pilot." }]);
+  session.provider = p2;
+  await session.send("Count all fields again");
+  const last = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "count").at(-1)!;
+  expect(String(last.data.error)).toMatch(/^Pilot first: count gets the folder .*The pilot is out of date: min_size changed to 9 after the pilot\./);
+});
+
+test("pilot: a held-back reference is hidden from the agent, and the harness compares every sample after the batch", async () => {
+  const { proj, images, ref } = pilotProject();
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: CELL_PLAN(images) }] },
+    { calls: [{ name: "plan", args: { ...CELL_PLAN(images), definitions: [{ measure: "positive cell", definition: "A cell with at least 5 red pixels inside its outline." }] } }] },
+    { calls: [{ name: "read_file", args: { path: ref } }] },
+    { calls: [{ name: "run_script", args: { code: "import pandas as pd\nprint(pd.read_excel('Analysis.xlsx'))" } }] },
+    { calls: [{ name: "count", args: { input: join(images, "Set 1.tif"), method: "Otsu" } }] },
+    { calls: [{ name: "pilot_result", args: { sample: "Set 1", values: { "positive cell": 41 }, images: [], check: "" } }] },
+    { calls: [{ name: "count", args: { input: images, method: "Otsu" } }] },
+    { calls: [{ name: "batch_results", args: { measure: "positive cell", values: [{ sample: "Set 1", value: 41 }, { sample: "Set 2", value: 400 }] } }] },
+    { text: "Done. Set 2 has 400 positive cells (a positive cell has at least 5 red pixels inside its outline)." },
+    { text: "Done." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { permissionMode: "bypass" } as never });
+  session.decisions.applySetup({ method: "Otsu" });
+  let n = 0;
+  const texts: string[] = [];
+  session.bus.on((e) => {
+    if (e.type !== "plan") return;
+    texts.push(e.text);
+    const c = e.reference?.candidates[0];
+    const r = e.stage === "pilot" ? { action: "confirm" as const } : n++ === 0 ? { action: "change" as const, text: "Use 5 red pixels.", definition: { measure: "positive cell", old: "A cell with at least 1 red pixel inside its outline.", new: "A cell with at least 5 red pixels inside its outline." } } : { action: "pilot" as const, reference: { mode: "blind" as const, path: c?.path ?? ref, sheet: "Ox-LDL" } };
+    setTimeout(() => session!.respondPlan(r), 0);
+  });
+  await session.send(`Count the red-positive cells in ${images}`);
+
+  expect(session.record.entries(["decision"]).find((e) => e.data.key === "definition:positive cell")!.data).toMatchObject({ old: "A cell with at least 1 red pixel inside its outline.", new: "A cell with at least 5 red pixels inside its outline.", by: "human" });
+  const blocked = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "read_file" || e.data.tool === "run_script");
+  expect(blocked.map((e) => e.data.error)).toEqual(["Analysis.xlsx is held back for the blind test. The harness compares it with your results after the batch. Do not read it.", "Analysis.xlsx is held back for the blind test. The harness compares it with your results after the batch. Do not read it."]);
+  expect(session.record.entries(["pilot_run"])[0]!.data.comparison).toEqual([]);
+  expect(texts[2]).toContain("The reference is held back for the blind test.");
+  const v = session.record.entries(["validation"])[0]!.data as { mode: string; pairs: { ref: number }[] };
+  expect(v.mode).toBe("blind");
+  expect(v.pairs.map((p) => p.ref)).toEqual([530, 410]);
+  expect(session.record.entries(["reference"]).at(-1)!.data).toMatchObject({ mode: "blind", revealed: true });
+  expect(toolTexts(provider).at(-1)).toContain("Now you can read the reference.");
 });

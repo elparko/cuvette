@@ -152,6 +152,7 @@ export const ToolDef = z.strictObject({
   params: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
   required: z.array(z.string()).default([]),
   read_only: z.boolean().default(false),
+  batch: z.boolean().default(false),
   approval: z.boolean().default(false),
   outputs: z.record(z.string(), OutputSpec).default({}),
   command: z.array(z.string()).default([]),

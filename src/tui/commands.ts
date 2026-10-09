@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import type { Mode, Owner, Question } from "../core/types.ts";
+import { pilotText } from "../core/pilot.ts";
 import { planView } from "../core/plan.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
@@ -240,7 +241,7 @@ export const commands: Command[] = [
   {
     name: "plan",
     args: "[on|off|<request>]",
-    help: "Show the analysis plan, or plan a request before any step runs. /plan off skips the plan for later requests.",
+    help: "Show the proposed analysis, or propose one for a request before any step runs. /plan off skips it for later requests. Also /proposal.",
     run(args, ctx) {
       const s = ctx.session;
       const sub = args.join(" ").trim();
@@ -251,11 +252,49 @@ export const commands: Command[] = [
       }
       if (!sub) {
         const v = planView(s.record);
-        if (v) return ctx.print(v.text, v.approved ? `Approved plan, version ${v.version}` : `Plan proposal, version ${v.version}`);
-        return ctx.notice(s.planFirst ? "No plan yet. Type your request. The agent writes a plan first." : "No plan yet. Type /plan <request>.");
+        if (v) return ctx.print(v.text, v.approved ? `Confirmed analysis, version ${v.version}` : `Proposed analysis, version ${v.version}`);
+        return ctx.notice(s.planFirst ? "No proposed analysis yet. Type your request. The agent proposes the analysis first." : "No proposed analysis yet. Type /plan <request>.");
       }
       if (s.busy) return ctx.error("The agent is busy. Wait, then type /plan again.");
       void s.send(sub, { plan: true }).catch((e: Error) => ctx.error(`The agent stopped: ${e.message}`));
+    },
+  },
+  {
+    name: "proposal",
+    args: "[on|off|<request>]",
+    help: "The same as /plan.",
+    run(args, ctx) {
+      const s = ctx.session;
+      const sub = args.join(" ").trim();
+      if (sub === "on" || sub === "off") {
+        if (!s.setPlanFirst) return unavailable(ctx);
+        s.setPlanFirst(sub === "on");
+        return ctx.refresh();
+      }
+      if (!sub) {
+        const v = planView(s.record);
+        if (v) return ctx.print(v.text, v.approved ? `Confirmed analysis, version ${v.version}` : `Proposed analysis, version ${v.version}`);
+        return ctx.notice(s.planFirst ? "No proposed analysis yet. Type your request. The agent proposes the analysis first." : "No proposed analysis yet. Type /plan <request>.");
+      }
+      if (s.busy) return ctx.error("The agent is busy. Wait, then type /plan again.");
+      void s.send(sub, { plan: true }).catch((e: Error) => ctx.error(`The agent stopped: ${e.message}`));
+    },
+  },
+  {
+    name: "pilot",
+    args: "[on|off]",
+    help: "Show the last pilot, or turn the pilot gate on or off. With the gate on, a step that processes many files waits for a pilot on one sample.",
+    run([sub], ctx) {
+      const s = ctx.session;
+      if (sub === "on" || sub === "off") {
+        if (!s.setPilot) return unavailable(ctx);
+        s.setPilot(sub === "on");
+        return ctx.refresh();
+      }
+      const run = s.record.entries(["pilot_run"]).at(-1);
+      if (!run) return ctx.notice("No pilot yet.");
+      const done = s.record.entries(["pilot_approved"]).some((e) => e.data.run === run.id);
+      ctx.print(pilotText(run.data as never), `Pilot on ${String(run.data.sample)}${done ? ", confirmed" : ""}`);
     },
   },
   {

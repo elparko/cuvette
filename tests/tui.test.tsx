@@ -694,9 +694,9 @@ describe("plan card", () => {
 
   test("the hint, then the plan with its open decision in the question card style; m sets the mode and a approves", async () => {
     const { h, s } = start();
-    await until(() => h.all().includes("Type /plan to get an analysis plan before any step runs."));
+    await until(() => h.all().includes("Type /plan to get a proposed analysis before any step runs."));
     s.proposePlan("Question: Does drug 2 help?\n\nSteps\n1. Paired t test", [question(s.id)]);
-    await until(() => h.all().includes("Analysis plan, version 1"));
+    await until(() => h.all().includes("Proposed analysis, version 1"));
     expect(h.all()).toContain("Question: Does drug 2 help?");
     await until(() => h.all().includes("Your decision: Significance level"));
     expect(h.all()).toContain("Open decision 1 of 1.");
@@ -734,5 +734,68 @@ describe("plan card", () => {
     await type(h, "x");
     await until(() => s.planResponses.length === 3);
     expect(s.planResponses[2]).toEqual({ action: "cancel" });
+  });
+});
+
+describe("proposed analysis card", () => {
+  const plan = (s: FakeSession, extra: Record<string, unknown>) =>
+    s.bus.emit({ type: "plan", stage: "plan", version: 1, text: "Question: Q", update: false, qids: [], programs: [], mode: "watch", ...extra } as never);
+
+  test("the restatement comes first; n corrects it", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    plan(s, { restatement: "You want: the number of red-positive cells in each field." });
+    await until(() => h.all().includes("Proposed analysis, version 1"));
+    expect(h.all()).toContain("You want: the number of red-positive cells in each field.");
+    expect(h.all()).toContain("Is that right?");
+    await type(h, "n");
+    await until(() => h.all().includes("What do you want?"));
+    await type(h, "red spots, not cells");
+    h.type("\r");
+    await until(() => s.planResponses.length === 1);
+    expect(s.planResponses[0]).toEqual({ action: "change", text: "The scientist corrects the request. The scientist wants: red spots, not cells" });
+  });
+
+  test("the reference question, a changed definition, and Run the pilot", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    const reference = { question: "I found Analysis.xlsx (sheet Ox-LDL: Red dots). Is this an earlier analysis of these images? Should the pilot compare with it?", candidates: [{ path: "/p/Analysis.xlsx", sheet: "Ox-LDL", columns: ["Red dots"], label: "Analysis.xlsx" }] };
+    const definitions = [{ measure: "positive cell", definition: "At least 1 red pixel." }];
+    plan(s, { reference, definitions, pilot: "Set 1" });
+    await until(() => h.all().includes("Should the pilot compare with it?"));
+    expect(h.all()).toContain("2 Yes. Hold it back (blind test)");
+    await type(h, "2");
+    await until(() => h.all().includes("r run the pilot on Set 1 in watch mode"));
+    expect(h.all()).toContain("Reference: /p/Analysis.xlsx (held back for a blind test)");
+    await type(h, "r");
+    await until(() => s.planResponses.length === 1);
+    expect(s.planResponses[0]).toEqual({ action: "pilot", mode: "watch", reference: { mode: "blind", path: "/p/Analysis.xlsx", sheet: "Ox-LDL" } });
+
+    plan(s, { definitions, pilot: "Set 1", version: 2 });
+    await until(() => h.all().includes("Proposed analysis, version 2"));
+    await sleep(150);
+    await type(h, "1");
+    await until(() => h.all().includes("New definition of positive cell (now: At least 1 red pixel.):"));
+    await type(h, "At least 5 red pixels.");
+    h.type("\r");
+    await until(() => s.planResponses.length === 2);
+    expect(s.planResponses[1]).toEqual({ action: "change", text: "Change the definition of positive cell to: At least 5 red pixels.", definition: { measure: "positive cell", old: "At least 1 red pixel.", new: "At least 5 red pixels." } });
+  });
+
+  test("the pilot result asks: Confirm the plan and run all?", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "plan", stage: "pilot", version: 1, text: "Pilot sample: Set 1\n\nNumbers\n- positive cell: 296", update: false, qids: [], programs: [], mode: "watch" });
+    await until(() => h.all().includes("Confirm the plan and run all?"));
+    expect(h.all()).toContain("Proposed analysis: pilot result");
+    expect(h.all()).toContain("3 Try another sample");
+    await type(h, "3");
+    await until(() => s.planResponses.length === 1);
+    expect(s.planResponses[0]).toEqual({ action: "another" });
+    s.bus.emit({ type: "plan", stage: "pilot", version: 1, text: "Pilot sample: Set 2", update: false, qids: [], programs: [], mode: "watch" });
+    await sleep(150);
+    await type(h, "1");
+    await until(() => s.planResponses.length === 2);
+    expect(s.planResponses[1]).toEqual({ action: "confirm" });
   });
 });

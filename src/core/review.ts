@@ -1,6 +1,6 @@
 import type { AdapterCheckContext, LoadedAdapter } from "../adapters/manifest.ts";
 import type { DecisionRecord } from "./decisions.ts";
-import { approvedPlan, currentPlan, planFindings, planText } from "./plan.ts";
+import { approvedPlan, currentPlan, definitionFindings, planFindings, planText } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Claim, Entry, Finding, FindingIn, Node, Provider } from "./types.ts";
 
@@ -308,6 +308,7 @@ export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
     ...staleUsed(ctx),
     ...openQuestions(ctx),
     ...planFindings(ctx.record),
+    ...definitionFindings(ctx.record, ctx.answer),
     ...ruleChecks(ctx),
     ...(await moduleChecks(ctx)),
   ];
@@ -399,7 +400,7 @@ export function refereePrompt(ctx: ReviewContext): { system: string; text: strin
   let text = `LOG\n${logText(ctx.record)}\n\nFINAL ANSWER\n${ctx.answer}\n\nCLAIMS\n${claims || "(none)"}`;
   if (plan) {
     const now = currentPlan(ctx.record);
-    system += "\n\nThe scientist approved an analysis plan before the analysis. Check the final answer against it: does the answer give the outputs of the plan and report its checks? Is each step that is not in the plan, or that was skipped, explained?";
+    system += "\n\nThe scientist confirmed a proposed analysis before the analysis. Check that each reported measure says what it counts, as in the definitions of the plan. Check the final answer against it: does the answer give the outputs of the plan and report its checks? Is each step that is not in the plan, or that was skipped, explained?";
     text += `\n\nAPPROVED PLAN (version ${plan.version})\n${plan.text}`;
     if (plan.updates.length && now) text += `\n\nPLAN NOW, AFTER CHANGES\n${planText(now)}\nReasons: ${plan.updates.map((u) => u.reason).join("; ")}`;
   }

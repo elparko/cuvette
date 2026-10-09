@@ -1,3 +1,5 @@
+import { pilotRows, validationRows } from "./pilot.ts";
+import { approvedPlan, definitionsOf } from "./plan.ts";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, isAbsolute, join, relative } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
@@ -375,7 +377,7 @@ function stepTitle(n: Node): string {
 
 export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const { record, adapters, dir } = w;
-  const used = new Set(["summary", "steps", "files", "metrics"]);
+  const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation"]);
   const steps = stepNumbers(record.nodes());
   const stale = record.stale();
   const nodes = mainNodes(record);
@@ -391,6 +393,10 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     if (!f.set || f.key === "question") continue;
     summary.push(["Decision", f.label || f.key, show(f.value), chosenBy(record, f.key, f.owner)]);
   }
+  const defs = [...definitionsOf(record)].sort((a, b) => b.measure.length - a.measure.length);
+  const confirmed = approvedPlan(record);
+  if (confirmed) summary.push(["Analysis", "Confirmed analysis", `version ${confirmed.version}`, confirmed.pilot ? `pilot on ${confirmed.pilot.sample}` : "no pilot"]);
+  for (const d of definitionsOf(record)) summary.push(["Definition", d.measure, d.definition, "confirmed analysis", d.definition]);
   const answer = record.entries(["assistant"]).filter((e) => e.data.final).at(-1);
   if (answer) {
     const text = answerText(answer.data);
@@ -401,7 +407,8 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
       const label = Number.isInteger(c.value) && [...c.text.matchAll(new RegExp(`(?<![\\d.])${c.value}(?!\\d|\\.\\d)`, "g"))].some((m) => LABEL_BEFORE.test(c.text.slice(0, m.index)));
       if (label) continue;
       const step = c.node ? steps.get(c.node) : undefined;
-      summary.push(["Answer number", c.text.trim(), c.value, `${step ? `step ${step}` : c.node ? `node ${c.node}` : "no step"} (${c.label})`]);
+      const def = defs.find((d) => new RegExp(`\\b${d.measure.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(c.text));
+      summary.push(["Answer number", c.text.trim(), c.value, `${step ? `step ${step}` : c.node ? `node ${c.node}` : "no step"} (${c.label})`, ...(def ? [def.definition] : [])]);
     }
   }
 
@@ -470,8 +477,12 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     }
   }
 
+  const pilot = pilotRows(record);
+  const validation = validationRows(record);
   return [
-    { name: "Summary", columns: ["Section", "Item", "Value", "Source"], rows: summary },
+    { name: "Summary", columns: ["Section", "Item", "Value", "Source", "Definition"], rows: summary },
+    ...(pilot.rows.length ? [{ name: "Pilot", columns: pilot.columns, rows: pilot.rows }] : []),
+    ...(validation ? [{ name: "Validation", columns: validation.columns, rows: [...validation.rows, [], ...validation.summary.map((x) => [x]), ...(validation.plot ? [[`Bland-Altman plot: ${rel(dir, validation.plot)}`]] : [])] }] : []),
     ...tableSheets,
     { name: "Steps", columns: ["Step", "Tool", "Adapter", "Description", "Result", "Inputs", "Input SHA-256", "Outputs", "Table sheets", "Manual route", "Fidelity", "Status", "Node"], rows: stepRows },
     ...(metricRows.length ? [{ name: "Metrics", columns: ["Step", "Metric", "Value"], rows: metricRows }] : []),

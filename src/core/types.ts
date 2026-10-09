@@ -12,6 +12,7 @@ export type EntryKind =
   | "question" | "answer" | "sensitivity"
   | "finding" | "finding_resolution" | "claim_check"
   | "mode" | "follow_step" | "lab_memory" | "plan" | "plan_approved"
+  | "pilot_run" | "pilot_approved" | "pilot_rejected" | "reference" | "validation"
   | "eln_push" | "eln_link" | "setting" | "note" | "notice" | "error" | "usage" | "compaction" | "correction" | "adapter";
 
 export interface Entry {
@@ -320,6 +321,36 @@ export type BusEvent =
   | { type: "permission"; rid: string; tool: string; args: Args; code?: string; touches: string; search?: { root: string; purpose: string } }
   | { type: "question"; question: Question }
   | { type: "instruction"; step: number; tool: string; text: string }
-  | { type: "plan"; version: number; text: string; update: boolean; qids: string[]; programs: { part: string; adapter: string; alternatives: string[] }[]; mode: Mode };
+  | PlanEvent;
 
-export type PlanResponse = { action: "approve"; mode?: Mode } | { action: "change"; text: string } | { action: "cancel" };
+export interface PlanEvent {
+  type: "plan";
+  stage: "plan" | "pilot";
+  version: number;
+  text: string;
+  update: boolean;
+  qids: string[];
+  programs: { part: string; adapter: string; alternatives: string[] }[];
+  mode: Mode;
+  restatement?: string;
+  definitions?: { measure: string; definition: string }[];
+  pilot?: string;
+  reference?: { question: string; candidates: { path: string; sheet?: string; columns: string[]; label: string }[] };
+  images?: string[];
+}
+
+export interface ReferenceChoice {
+  mode: "compare" | "blind" | "none";
+  path?: string;
+  sheet?: string;
+  sample_column?: string;
+  columns?: string[];
+}
+
+export type PlanResponse =
+  | { action: "approve"; mode?: Mode; reference?: ReferenceChoice }
+  | { action: "pilot"; mode?: Mode; reference?: ReferenceChoice }
+  | { action: "confirm" }
+  | { action: "another"; text?: string }
+  | { action: "change"; text: string; definition?: { measure: string; old: string; new: string } }
+  | { action: "cancel" };

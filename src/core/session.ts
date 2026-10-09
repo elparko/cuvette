@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { allowAdapter, BLIND_REASON, blindCheck } from "../adapters/blind.ts";
+import { spawn } from "node:child_process";
+import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
 import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
@@ -20,6 +21,9 @@ import { ADAPTER_DECISION, decisionHook, DecisionRecord } from "./decisions.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
 import { compareNote, instruction, teachReview, type TeachSummary } from "./modes.ts";
+import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
+import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
+import { definitionsOf } from "./plan.ts";
 import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
@@ -40,6 +44,7 @@ import {
   type Owner,
   type Part,
   type PlanResponse,
+  type ReferenceChoice,
   type Provider,
   type Question,
   type Tool,
@@ -83,8 +88,9 @@ const MODE_NOTE: Record<Mode, string> = {
   plan: "Mode is now plan: write a plan with the plan tool. Run only read-only tools.",
 };
 
-const PLAN_NOTE = "Plan first. Before any analysis step, write the analysis plan for this request with the plan tool. First look at the data with read-only tools, at most three calls. Then call plan once with these sections: question (one sentence), data (files, what one row is, the unit of replication, the sample sizes), programs (the adapter for each part and why, with other choices), steps (in order; each with the method, the tool and the decisions it needs), outputs, checks (each assumption to test and what you do if it fails), and out_of_scope. For each decision, give the value if the setup or the request sets it. Leave the value out if the scientist must decide; the harness asks the scientist. Write for a scientist: short sentences, plain words. If the request is short and simple, write a short plan of two or three lines. No analysis step runs before the scientist approves the plan.";
+const PLAN_NOTE = "Plan first. Before any analysis step, write the proposed analysis for this request with the plan tool. First look at the data with read-only tools, at most three calls. Then call plan once with these sections: restatement (what the scientist wants, in the scientist's terms, starting with 'You want:'), question (one sentence), definitions (what you will count: an operational definition of each measure, in plain words with the numbers), exclusions (what you will leave out and its expected effect, in numbers when you can estimate it), pilot (if the method runs on more than one sample: the sample that runs first and what the scientist will see), reference (an earlier analysis or hand count, if one exists, with a question that checks that its measure is the same as yours), data (files, what one row is, the unit of replication, the sample sizes), programs (the adapter for each part and why, with other choices), steps (in order; each with the method, the tool and the decisions it needs), outputs, checks (each assumption to test and what you do if it fails), and out_of_scope. For each decision, give the value if the setup or the request sets it. Leave the value out if the scientist must decide; the harness asks the scientist. Write for a scientist: short sentences, plain words. If the request is short and simple, write a short plan of two or three lines. No analysis step runs before the scientist approves the plan.";
 const PLAN_UPDATE_NOTE = "This is a new request in a session with an approved plan. If the request needs analysis steps that are not in the plan, call plan with only what changes: the new steps and the changed sections. The scientist approves the update before a new step runs. If the request needs no new step, answer directly.";
+const PILOT_NOTE = "Pilot: before the first step that changes or counts things, say in one sentence how you will check the method on one sample first. A step that processes many files does not run until the scientist approves a pilot: run the method on one sample, save QC images with outlines of what was counted and what was left out, and call pilot_result.";
 const CONTINUE = /^(continue|go on|go ahead|proceed|yes|ok|okay|next|carry on)\b[\s\S]{0,40}$/i;
 
 function lastSentence(text: string): string {
@@ -208,6 +214,7 @@ export class Session {
   private waitedQids = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   planFirst = false;
+  interactive = false;
   planning = false;
   plan?: AnalysisPlan;
   private planUpdate = false;
@@ -219,6 +226,11 @@ export class Session {
   private planLooks = 0;
   private planWarned = new Set<string>();
   private stopTurn = false;
+  pilotStage = false;
+  reference?: Reference;
+  private hidden: string[] = [];
+  private refCandidates: Candidate[] = [];
+  private pilotPlan?: { plan: AnalysisPlan; version: number; target: Mode; answers: string[] };
   private lastSaid = "";
 
   private constructor(id: string, cwd: string, settings: Settings, place: Place) {
@@ -292,6 +304,7 @@ export class Session {
     for (const a of this.adapters) await this.startOne(a);
 
     this.decisions = new DecisionRecord(this.adapters, this.record, this.pick ? [ADAPTER_DECISION] : []);
+    this.interactive = !!opts.interactive;
     const pf = this.settings.planFirst;
     this.planFirst = pf === undefined ? !!opts.interactive : pf === true || pf === "on";
     const approved = approvedPlan(this.record);
@@ -335,6 +348,7 @@ export class Session {
     if (this.adapters.some((a) => a.manifest.connection.history_tool)) extra.push(this.reviewTool());
     if (this.pick) extra.push(...this.adapterTools());
     if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.pipeline(t, a, id, sig) }));
+    if (this.pilotOn()) extra.push(...this.pilotTools());
     for (const t of extra) if (!this.tools.has(t.name)) this.tools.set(t.name, t);
     this.chooseActiveTools();
 
@@ -640,7 +654,7 @@ export class Session {
       await this.nameFolder(text);
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
-      if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode]);
+      if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode], ...(this.pilotOn() ? [PILOT_NOTE] : []));
       if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning();
       this.chooseActiveTools(text);
       if (this.pick) {
@@ -671,6 +685,13 @@ export class Session {
         if (!calls.length && this.steered.length) {
           if (said) this.record.append("assistant", { text: said, final: false });
           this.push({ role: "user", parts: [{ type: "text", text: this.takeSteer() }] });
+          continue;
+        }
+        if (!calls.length && nudges < 2 && !forceAnswer && (this.pilotStage || this.needsValidation())) {
+          nudges++;
+          if (said) this.record.append("assistant", { text: said, final: false });
+          const why = this.pilotStage ? "The pilot is not finished. Run the method on the pilot sample, then call pilot_result. The scientist confirms the pilot before the other samples run." : "Call batch_results with the value of each sample, so that the harness can compare your results with the reference.";
+          this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- ${why}` }] });
           continue;
         }
         if (!calls.length && this.planning && !this.planUpdate && nudges < 2 && !forceAnswer) {
@@ -887,7 +908,9 @@ export class Session {
     const fids = finalFound.map(({ f, source }) => this.findings.add(f, source).fid);
     const missing = this.resultsNotIn(finalAnswer);
     const settings = this.settingsUsed();
-    const tail = [missing, settings].filter(Boolean).join("\n\n");
+    const defs = this.approvedEntry ? definitionsOf(this.record) : [];
+    const definitions = defs.length ? `Definitions, from the confirmed analysis:\n${defs.map((d) => `- ${d.measure}: ${d.definition}`).join("\n")}` : "";
+    const tail = [missing, settings, definitions].filter(Boolean).join("\n\n");
     const shown = tail ? `${finalAnswer}\n\n${tail}` : finalAnswer;
     const annotated = annotate(finalAnswer, finalClaims) + (tail ? `\n\n${tail}` : "");
     this.record.append("assistant", { text: shown, annotated, final: true, findings: fids, settings, results: missing || undefined });
@@ -991,7 +1014,17 @@ export class Session {
       this.record.append("blocked", { callId, tool: tool.name, path: blind.path, reason: BLIND_REASON });
       return error(blind.message);
     }
+    const held = this.heldBack(args);
+    if (held) {
+      this.record.append("blocked", { callId, tool: tool.name, path: held, reason: "reference held back for the blind test" });
+      return error(`${basename(held)} is held back for the blind test. The harness compares it with your results after the batch. Do not read it.`);
+    }
     if (tool.source === "generic" && !this.pathAllowed(args)) return error("This path is outside the folders of this analysis. Ask the scientist where the data is, or use a path from the request.");
+    const gate = this.pilotGate(tool, args);
+    if (gate) {
+      this.record.append("blocked", { callId, tool: tool.name, reason: gate, pilot: true });
+      return error(gate);
+    }
     if (this.planning && depth === 0 && tool.readOnly && tool.name !== "plan" && ++this.planLooks === 4) this.notes.push("You have looked at the data enough. Call plan now.");
     if ((this.mode === "plan" || this.mode === "teach") && !tool.readOnly)
       return error(this.planning ? "Plan first: no analysis step runs before the scientist approves the plan. Call plan now." : this.mode === "plan" ? "Plan mode: the agent plans and runs only read-only tools. Switch to watch mode to run steps." : "Teach mode: the scientist runs the steps and the agent runs only read-only tools.");
@@ -1548,6 +1581,7 @@ export class Session {
   async applySetting(name: string, value: unknown): Promise<void> {
     if (name === "mode") return this.setMode(value as Mode);
     if (name === "planFirst") this.planFirst = value === true || value === "on";
+    if (name === "pilot" && (value === true || value === "on")) this.addPilotTools();
     const next = { ...this.settings, [name]: value } as Settings;
     const provider = name === "model" || name === "effort" ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think }) : this.provider;
     const referee = ["model", "referee", "effort"].includes(name)
@@ -1578,11 +1612,282 @@ export class Session {
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
     this.modeBefore = this.mode === "plan" ? "watch" : this.mode;
+    this.refCandidates = this.findReferenceFiles();
     if (this.mode !== "plan") {
       this.record.append("mode", { old: this.mode, new: "plan", reason: "plan first" });
       this.mode = "plan";
     }
     this.notes.push(this.planUpdate ? PLAN_UPDATE_NOTE : PLAN_NOTE);
+    if (!this.planUpdate && this.refCandidates.length)
+      this.notes.push(`Files in the project folder that may be earlier results on the same data: ${this.refCandidates.map(describeCandidate).join("; ")}. If one fits, name it in the reference section, state each measure in the reference's own terms, and ask in reference.question whether your measure is the same as the reference's measure.`);
+  }
+
+  private findReferenceFiles(): Candidate[] {
+    const text = String(this.record.entries(["user"]).at(-1)?.data.text ?? "");
+    const paths = pathsIn(text).filter((p) => existsSync(p));
+    const names: string[] = [];
+    const skip: string[] = [];
+    for (const p of paths) {
+      names.push(basename(p, extname(p)), basename(dirname(p)));
+      skip.push(p);
+      try {
+        if (statSync(p).isDirectory()) names.push(...readdirSync(p).slice(0, 60).map((n) => basename(n, extname(n))));
+      } catch {}
+    }
+    names.push(basename(this.cwd));
+    return findReferences([this.cwd, dirname(this.cwd)], names, skip);
+  }
+
+  pilotOn(): boolean {
+    const p = this.settings.pilot;
+    return this.settings.guidance && (p === undefined ? this.interactive || this.planFirst : p === true || p === "on");
+  }
+
+  private pilotTools(): Tool[] {
+    const base = { source: "harness" as const, readOnly: true, permission: "allow" as const };
+    return [
+      {
+        ...base,
+        name: "pilot_result",
+        description: "Show the scientist the pilot: the method run on one sample. Give the sample, the numbers (one for each measure), the paths of the QC images (outlines of what was counted and what was left out, with a legend) and your own plain check of what looks wrong or uncertain. The scientist confirms the pilot, asks for a change, or asks for another sample.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            sample: { type: "string", description: "The pilot sample, for example the file name." },
+            values: { type: "object", description: "One number for each measure, named as in the plan, for example {\"positive cells\": 296, \"all cells\": 530}." },
+            images: { type: "array", items: { type: "string" }, description: "Paths of the QC images." },
+            check: { type: "string", description: "Your own plain check: what looks wrong or uncertain." },
+          },
+          required: ["sample", "values", "check"],
+        },
+        execute: async (a) => this.pilotResult(a),
+      },
+      {
+        ...base,
+        name: "batch_results",
+        description: "After all samples ran, give the value of each sample for one measure. The harness compares the values with the reference that the scientist named, writes the validation table and plot, and shows you the result.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            measure: { type: "string", description: "The measure, named as in the plan." },
+            values: { type: "array", items: { type: "object", properties: { sample: { type: "string" }, value: { type: "number" } }, required: ["sample", "value"] } },
+          },
+          required: ["measure", "values"],
+        },
+        execute: async (a) => this.batchResults(a),
+      },
+    ];
+  }
+
+  private addPilotTools() {
+    for (const t of this.pilotTools()) if (!this.tools.has(t.name)) (this.tools.set(t.name, t), this.active.add(t.name));
+  }
+
+  setPilot(on: boolean): void {
+    if (on) this.addPilotTools();
+    this.settings = { ...this.settings, pilot: on ? "on" : "off" };
+    this.record.append("notice", { text: on ? "Pilot is on. A batch step waits until you approve a pilot on one sample." : "Pilot is off. Batch steps run without a pilot." });
+  }
+
+  private pilotGate(tool: Tool, args: Args): string | undefined {
+    if (!this.pilotOn() || tool.readOnly) return undefined;
+    const remote = tool.remoteName ?? tool.name;
+    const declared = !!this.adapterOf(tool)?.manifest.tools.find((t) => t.name === remote)?.batch;
+    const why = batchReason(remote, args, declared);
+    if (!why) return undefined;
+    const st = pilotState(this.record);
+    if (st.approved && !st.stale) return undefined;
+    if (st.stale) return `Pilot first: ${why} The pilot is out of date: ${st.stale}. Run the method again on one sample, save the QC images, and call pilot_result. The scientist confirms it before the batch runs.`;
+    return `Pilot first: ${why} This step processes many files, so it waits for a pilot. Run the method on one sample only, save QC images with outlines of what was counted and what was left out, and call pilot_result. The scientist approves the pilot before the batch runs.`;
+  }
+
+  private heldBack(args: Args): string | undefined {
+    if (!this.hidden.length) return undefined;
+    const paths = pathsIn(args);
+    const strings = JSON.stringify(args);
+    return this.hidden.find((h) => paths.some((p) => p === h || p.startsWith(`${h}/`)) || strings.includes(basename(h)));
+  }
+
+  private setReference(choice: ReferenceChoice | undefined) {
+    if (!choice || choice.mode === "none" || !choice.path) {
+      if (choice) this.record.append("reference", { mode: "none" });
+      return;
+    }
+    const path = resolve(this.cwd, choice.path);
+    this.reference = { path, sheet: choice.sheet, sample_column: choice.sample_column, columns: choice.columns, mode: choice.mode };
+    this.record.append("reference", { ...this.reference });
+    if (choice.mode !== "blind") return;
+    this.hidden.push(path);
+    const bp = blindPolicy();
+    if (bp) setBlindPolicy({ allow: bp.allow, deny: [...bp.deny, path], hide: bp.hide });
+  }
+
+  private needsValidation(): boolean {
+    return !!this.reference && !!this.record.entries(["pilot_approved"]).length && !this.record.entries(["validation"]).length && this.record.nodes().some((n) => n.entry > (this.record.entries(["pilot_approved"]).at(-1)?.id ?? 0));
+  }
+
+  private figuresDir(): string {
+    const d = join(this.outputDir, "figures");
+    mkdirSync(d, { recursive: true });
+    return d;
+  }
+
+  private showImages(paths: string[]) {
+    if (this.settings.headless || !this.interactive || process.platform !== "darwin" || process.env.VITEST) return;
+    for (const p of paths) {
+      const child = spawn("open", [p], { stdio: "ignore", detached: true });
+      child.on("error", () => {});
+      child.unref();
+    }
+  }
+
+  private async askPlanCard(event: Omit<import("./types.ts").PlanEvent, "type">): Promise<PlanResponse | undefined> {
+    const wait = new Promise<PlanResponse>((resolve) => (this.planWait = { resolve }));
+    this.bus.emit({ type: "plan", ...event });
+    this.bus.emit({ type: "status", state: "waiting", tool: event.stage === "pilot" ? "pilot_result" : "plan" });
+    try {
+      return await abortable(wait, this.abort?.signal);
+    } catch {
+      return undefined;
+    } finally {
+      this.planWait = undefined;
+    }
+  }
+
+  private changeDefinition(d: { measure: string; old: string; new: string }) {
+    this.record.append("decision", { key: `definition:${d.measure}`, old: d.old, new: d.new, by: "human", reason: "the scientist changed the definition" });
+  }
+
+  private referenceQuestion(): { question: string; candidates: { path: string; sheet?: string; columns: string[]; label: string }[] } {
+    const c = this.refCandidates;
+    return {
+      question: c.length ? `I found ${describeCandidate(c[0]!)}. Is this an earlier analysis of these images? Should the pilot compare with it?` : "Do you have hand counts or an earlier analysis to check against?",
+      candidates: c.map((x) => ({ path: x.path, sheet: x.sheet, columns: x.columns, label: describeCandidate(x) })),
+    };
+  }
+
+  private approvePlan(plan: AnalysisPlan, version: number, target: Mode, answers: string[], pilot?: PilotRun): number {
+    const text = planText(plan);
+    this.plan = structuredClone(plan);
+    this.approvedEntry = this.record.append("plan_approved", { version, text, plan: structuredClone(plan), mode: target, update: this.planUpdate, answers, ...(pilot ? { pilot } : {}) }).id;
+    this.planWarned.clear();
+    return this.approvedEntry;
+  }
+
+  private async pilotResult(a: Args): Promise<ToolOutput> {
+    const sample = String(a.sample ?? "").trim();
+    if (!sample) return { ok: false, error: "Give the pilot sample." };
+    const values: Record<string, number> = {};
+    for (const [k, v] of Object.entries((a.values ?? {}) as Record<string, unknown>)) if (Number.isFinite(Number(v))) values[k] = Number(v);
+    if (!Object.keys(values).length) return { ok: false, error: "Give the numbers for the pilot sample in values, one for each measure, for example {\"positive cells\": 296}." };
+    const plan = this.pilotPlan?.plan ?? this.plan;
+    const definitions = plan?.definitions ?? [];
+    const figs = this.figuresDir();
+    const images = (Array.isArray(a.images) ? a.images.map(String) : []).filter((p) => existsSync(p)).map((p) => {
+      const to = join(figs, `pilot-${norm(sample) || "sample"}-${basename(p)}`);
+      if (resolve(p) !== to) copyFileSync(p, to);
+      return to;
+    });
+    const comparison: string[] = [];
+    let refValues: Record<string, number> | undefined;
+    if (this.reference?.mode === "compare") {
+      try {
+        refValues = referenceValues(this.reference, sample);
+      } catch (e) {
+        comparison.push(`The reference could not be read: ${(e as Error).message}`);
+      }
+      if (refValues) {
+        const cols = Object.keys(refValues);
+        Object.entries(values).forEach(([k, v], i) => {
+          const col = cols.find((c) => norm(c).includes(norm(k)) || norm(k).includes(norm(c))) ?? cols[i];
+          if (col !== undefined) comparison.push(compareLine(k, v, refValues![col]!, col));
+        });
+      } else if (!comparison.length) comparison.push(`The reference has no row for ${sample}.`);
+    }
+    const run = { sample, values, images, check: String(a.check ?? ""), comparison, reference: this.reference ? { path: this.reference.path, mode: this.reference.mode, values: refValues } : undefined, definitions };
+    const entry = this.record.append("pilot_run", run as unknown as Record<string, unknown>).id;
+    this.showImages(images);
+    const pending = this.pilotPlan;
+    const r = await this.askPlanCard({ stage: "pilot", version: pending?.version ?? this.planVersion, text: pilotText(run), update: false, qids: [], programs: [], mode: pending?.target ?? this.mode, definitions, images });
+    if (!r) return { ok: false, error: "the scientist stopped the turn before answering the pilot" };
+    if (r.action === "confirm") {
+      const pilot = { entry, ...run } as PilotRun;
+      this.record.append("pilot_approved", { run: entry, sample });
+      this.pilotStage = false;
+      if (pending) {
+        this.approvePlan(pending.plan, pending.version, pending.target, pending.answers, pilot);
+        this.pilotPlan = undefined;
+      }
+      const next = this.reference ? " After all samples ran, call batch_results with the value of each sample, so that the harness compares them with the reference." : "";
+      return { ok: true, summary: `The scientist confirmed the ${pending ? "plan and the " : ""}pilot on ${sample}. Run all samples now with the same method and settings.${next}` };
+    }
+    if (r.action === "cancel") {
+      this.record.append("pilot_rejected", { run: entry, sample, reason: "cancelled" });
+      if (pending) this.record.append("plan", { action: "cancelled", version: pending.version });
+      this.pilotStage = false;
+      this.pilotPlan = undefined;
+      this.stopTurn = true;
+      return { ok: true, summary: "The scientist cancelled. Stop now." };
+    }
+    if (r.action === "another") {
+      this.record.append("pilot_rejected", { run: entry, sample, reason: "try another sample", another: true });
+      return { ok: true, summary: `The scientist wants the pilot on another sample${r.text ? `: ${r.text}` : ""}. Run the same method on one other sample, then call pilot_result.` };
+    }
+    if (r.action === "change") {
+      if (r.definition) this.changeDefinition(r.definition);
+      this.record.append("pilot_rejected", { run: entry, sample, reason: r.text });
+      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the method, run the pilot on ${sample} again, then call pilot_result. If a definition changes, call plan with the new definition and the reason.` };
+    }
+    return { ok: false, error: "unknown answer" };
+  }
+
+  private async batchResults(a: Args): Promise<ToolOutput> {
+    const ref = this.reference;
+    const measure = String(a.measure ?? "").trim();
+    const raw = a.values;
+    const rows: { sample: string; value: number }[] = Array.isArray(raw)
+      ? raw.map((x: any) => ({ sample: String(x?.sample ?? ""), value: Number(x?.value) }))
+      : Object.entries((raw ?? {}) as Record<string, unknown>).map(([sample, value]) => ({ sample, value: Number(value) }));
+    const good = rows.filter((r) => r.sample && Number.isFinite(r.value));
+    if (!good.length) return { ok: false, error: "Give values as a list of {sample, value}." };
+    if (!ref) return { ok: true, summary: `Saved ${good.length} values. No reference was set, so there is nothing to compare.` };
+    const pilots = new Set(this.record.entries(["pilot_approved"]).map((e) => norm(e.data.sample)));
+    const pairs: Pair[] = [];
+    const missing: string[] = [];
+    let refColumn = "";
+    for (const r of good) {
+      let vals: Record<string, number> | undefined;
+      try {
+        vals = referenceValues(ref, r.sample);
+      } catch (e) {
+        return { ok: false, error: `The reference could not be read: ${(e as Error).message}` };
+      }
+      const cols = Object.keys(vals ?? {});
+      const col = cols.find((c) => norm(c).includes(norm(measure)) || norm(measure).includes(norm(c))) ?? cols[0];
+      if (!vals || col === undefined) {
+        missing.push(r.sample);
+        continue;
+      }
+      refColumn ||= col;
+      pairs.push({ sample: r.sample, ours: r.value, ref: vals[col]!, pilot: pilots.has(norm(r.sample)) });
+    }
+    if (!pairs.length) return { ok: false, error: `The reference has no rows for these samples: ${missing.join(", ")}.` };
+    const all = agreement(pairs);
+    const rest = pairs.filter((p) => !p.pilot);
+    const summary = [
+      `Measure: ${measure || "value"}; reference column "${refColumn}" in ${basename(ref.path)} (${ref.mode === "blind" ? "held back from the agent until now" : "seen in the pilot"}).`,
+      agreementText("All samples", all),
+      ...(rest.length && rest.length < pairs.length ? [agreementText("Without the pilot sample", agreement(rest))] : []),
+      ...(missing.length ? [`No reference row for: ${missing.join(", ")}.`] : []),
+    ];
+    const plot = pairs.length >= 2 ? blandAltmanPng(pairs, join(this.figuresDir(), `bland-altman-${norm(measure) || "value"}.png`)) : undefined;
+    this.record.append("validation", { measure, refColumn, reference: ref.path, mode: ref.mode, pairs, summary, plot });
+    if (ref.mode === "blind") {
+      this.hidden = this.hidden.filter((h) => h !== ref.path);
+      this.record.append("reference", { ...ref, revealed: true });
+    }
+    const table = pairs.map((p) => `${p.sample}: agent ${p.ours}, reference ${p.ref}${p.pilot ? " (pilot)" : ""}`).join("\n");
+    return { ok: true, summary: summary.join(" "), text: `${summary.join("\n")}\n${table}\nNow you can read the reference. Explain the gaps between your values and the reference in the answer.` };
   }
 
   private endPlanning(target?: Mode) {
@@ -1654,11 +1959,15 @@ export class Session {
       const next = mergePlan(prev, given);
       const added = addedSteps(prev, next);
       const skipped = next.steps.filter((x) => x.status === "skipped" && prev.steps.find((p) => p.step.toLowerCase() === x.step.toLowerCase())?.status !== "skipped");
-      const sections = (["question", "data", "programs", "outputs", "checks", "out_of_scope"] as const).some((k) => given[k] !== undefined);
+      const sections = (["restatement", "question", "definitions", "exclusions", "pilot", "reference", "data", "programs", "outputs", "checks", "out_of_scope"] as const).some((k) => given[k] !== undefined);
       const changed = added.length > 0 || skipped.length > 0 || sections;
       if (changed && !reason && ![...added, ...skipped].every((x) => x.reason)) return { ok: false, error: "Give the reason for this change of the approved plan in reason. The scientist sees it." };
       const ran = this.record.nodes().filter((n) => n.entry > this.approvedEntry && !n.sensitivityOf).map((n) => n.tool);
       for (const x of added) if (x.status === "todo" && ran.some((t) => matchStep({ steps: [x] }, t) === 0)) x.status = "done";
+      for (const d of given.definitions ?? []) {
+        const old = prev.definitions?.find((x) => x.measure.toLowerCase() === d.measure.toLowerCase());
+        if (old?.definition !== d.definition) this.record.append("decision", { key: `definition:${d.measure}`, old: old?.definition ?? null, new: d.definition, by: "agent", reason: reason || "the agent changed the definition" });
+      }
       this.plan = next;
       if (changed) this.planVersion++;
       this.record.append("plan", { action: changed ? "updated" : "status", version: this.planVersion, reason: reason || [...added, ...skipped].map((x) => x.reason).join(" "), text: planText(next), plan: structuredClone(next) });
@@ -1672,19 +1981,23 @@ export class Session {
     const shown = planText(this.planUpdate ? { ...given, steps: addedSteps(this.plan!, plan) } : plan);
     this.record.append("plan", { action: this.planUpdate ? "update_proposed" : "proposed", version, text: shown, full: planText(plan), plan: structuredClone(plan) });
     const qids = await this.askPlanDecisions(plan);
-    const wait = new Promise<PlanResponse>((resolve) => (this.planWait = { resolve }));
     const programs = (plan.programs ?? []).map((g) => ({ part: g.part, adapter: g.adapter, alternatives: g.alternatives ?? [] }));
-    this.bus.emit({ type: "plan", version, text: shown, update: this.planUpdate, qids, programs, mode: this.modeBefore });
-    this.bus.emit({ type: "status", state: "waiting", tool: "plan" });
-    let r: PlanResponse;
-    try {
-      r = await abortable(wait, this.abort?.signal);
-    } catch {
-      return { ok: false, error: "the scientist stopped the turn before answering the plan" };
-    } finally {
-      this.planWait = undefined;
-    }
+    const r = await this.askPlanCard({
+      stage: "plan",
+      version,
+      text: shown,
+      update: this.planUpdate,
+      qids,
+      programs,
+      mode: this.modeBefore,
+      restatement: plan.restatement,
+      definitions: plan.definitions,
+      pilot: plan.pilot?.sample,
+      reference: this.planUpdate || this.reference ? undefined : this.referenceQuestion(),
+    });
+    if (!r) return { ok: false, error: "the scientist stopped the turn before answering the plan" };
     if (r.action === "change") {
+      if (r.definition) this.changeDefinition(r.definition);
       this.record.append("plan", { action: "change_requested", version, text: r.text });
       return { ok: true, summary: `The scientist asks for a change: "${r.text}". Revise the plan and call plan again${this.planUpdate ? " with only what changes" : " with the full plan"}. Do not run steps yet.` };
     }
@@ -1694,13 +2007,29 @@ export class Session {
       this.stopTurn = true;
       return { ok: true, summary: "The scientist cancelled the plan. No step runs. Stop now." };
     }
+    if (r.action !== "approve" && r.action !== "pilot") return { ok: false, error: "unknown answer" };
     this.fillDecisions(plan);
     const target: Mode = r.mode && r.mode !== "plan" ? r.mode : this.modeBefore;
     const answers = [...this.planQids.values()].filter((d) => d.by === "you").map((d) => `${d.label} = ${String(d.value)}`);
-    const text = planText(plan);
-    this.plan = structuredClone(plan);
-    this.approvedEntry = this.record.append("plan_approved", { version, text, plan: structuredClone(plan), mode: target, update: this.planUpdate, answers }).id;
-    this.planWarned.clear();
+    this.setReference(r.reference);
+    const refNote = this.reference ? (this.reference.mode === "blind" ? ` The reference ${basename(this.reference.path)} is held back for a blind test. Do not try to read it.` : ` The pilot compares with the reference ${basename(this.reference.path)}.`) : "";
+    if (r.action === "pilot" && plan.pilot) {
+      this.pilotPlan = { plan: structuredClone(plan), version, target, answers };
+      this.pilotStage = true;
+      this.record.append("plan", { action: "pilot_requested", version, sample: plan.pilot.sample });
+      this.endPlanning(target);
+      return {
+        ok: true,
+        summary: [
+          `The scientist wants the pilot first. Mode is now ${target}.`,
+          answers.length ? `The scientist answered: ${answers.join("; ")}.` : "",
+          `Run the method on ${plan.pilot.sample} only. Save QC images: outlines of what was counted and what was left out, with a legend in plain words (for example yellow = counted as positive, cyan = counted as negative, magenta = red that is not counted, orange = left out).`,
+          "Then call pilot_result with the sample, the numbers (one for each measure in What I will count), the QC image paths and your own plain check: what looks wrong or uncertain. Do not run the other samples yet.",
+          refNote,
+        ].filter(Boolean).join(" "),
+      };
+    }
+    this.approvePlan(plan, version, target, answers);
     this.endPlanning(target);
     const first = plan.steps.findIndex((x) => x.status !== "done" && x.status !== "skipped") + 1;
     const open = openDecisions(plan).map((x) => x.decision.label);
@@ -1710,7 +2039,7 @@ export class Session {
         `The scientist approved plan version ${version}. Mode is now ${target}.`,
         answers.length ? `The scientist answered: ${answers.join("; ")}.` : "",
         open.length ? `Still open: ${open.join("; ")}. The harness asks the scientist when a step needs one.` : "",
-        `Start with step ${first || 1} now. If you run a step that is not in the plan, or skip one, call plan with the reason.`,
+        `Start with step ${first || 1} now. If you run a step that is not in the plan, or skip one, call plan with the reason.${refNote}`,
       ].filter(Boolean).join(" "),
     };
   }

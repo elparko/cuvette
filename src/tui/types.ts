@@ -50,6 +50,7 @@ export interface SessionLike {
   planFirst?: boolean;
   respondPlan?(r: PlanResponse): void;
   setPlanFirst?(on: boolean): void;
+  setPilot?(on: boolean): void;
   interrupt(): void;
   respondPermission(rid: string, ok: boolean, note?: string, always?: boolean): void;
   answer(qid: string, value: unknown, note?: string): Promise<void>;
