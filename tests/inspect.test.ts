@@ -49,10 +49,11 @@ test("the rule check drops a question or an option that names a stain or a chann
       { question: "What counts as a positive cell?", options: ["Any red inside the cell", "Green and red overlap", "Red covers most of the cell"] },
       { question: "Do you want the nuclei counted too?", options: ["Yes", "No"] },
       { question: "CH1 looks like brightfield. Is that right?", options: ["Yes", "No"] },
+      { question: "There is no nuclear stain. Should I count each round dark object in CH1 as one cell?", options: ["Yes", "No"] },
     ],
     insp,
   );
-  expect(g.kept.map((q) => q.question)).toEqual(["What counts as a positive cell?", "CH1 looks like brightfield. Is that right?"]);
+  expect(g.kept.map((q) => q.question)).toEqual(["What counts as a positive cell?", "CH1 looks like brightfield. Is that right?", "There is no nuclear stain. Should I count each round dark object in CH1 as one cell?"]);
   expect(g.kept[0]!.options).toEqual(["Any red inside the cell", "Red covers most of the cell"]);
   expect(g.dropped.map((d) => d.question)).toEqual(["Which channel is DAPI?", "What counts as a positive cell? (options: Green and red overlap)", "Do you want the nuclei counted too?"]);
   expect(g.dropped[0]!.reason).toMatch(/^The data has no blue channel or stain\./);

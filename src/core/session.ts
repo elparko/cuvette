@@ -2722,7 +2722,7 @@ export class Session {
     if (!this.planning || this.planUpdate) return { ok: false, error: "clarify is for the start of a new request, before the proposed metrics." };
     if (!this.inspection) return { ok: false, error: "Look at the data first: call inspect_data on the data folder or file of the request (or . for the project folder). Then call clarify, with questions that fit what you found." };
     let found = String(a.found ?? "").trim();
-    const wrong = absentStains(found, this.inspection, true);
+    const wrong = absentStains(found, this.inspection);
     if (!found || wrong.length) {
       if (found) this.record.append("clarify", { action: "found_replaced", phase: "Questions", found, reason: `The data has no ${wrong.join(" or ")} channel or stain.` });
       found = this.inspection.summary;
