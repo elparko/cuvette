@@ -278,6 +278,7 @@ export class Collapser {
   private held: Logged[] = [];
   private args = new Map<string, Record<string, unknown>>();
   private planShown = false;
+  private answered = new Set<string>();
 
   add(l: Logged): Item[] {
     const e = l.e;
@@ -292,9 +293,15 @@ export class Collapser {
       this.planShown = true;
     }
     if (e.kind === "tool_call") this.args.set(String(e.data.callId), (e.data.args ?? {}) as Record<string, unknown>);
+    if (e.kind === "decision" && /^answer to /.test(String(e.data.reason ?? ""))) return [];
     if (e.kind === "answer") {
-      const qid = String(e.data.qid);
-      this.held = this.held.filter((h) => !(h.e && HELD.has(h.e.kind) && String(h.e.data.qid ?? "").split(",").includes(qid)));
+      this.answered.add(String(e.data.qid));
+      const open = (h: Logged) => String(h.e!.data.qid ?? "").split(",").some((q) => !this.answered.has(q));
+      const waiting = this.held.filter((h) => h.e && HELD.has(h.e.kind) && open(h));
+      this.held = this.held.filter((h) => !(h.e && HELD.has(h.e.kind)));
+      const out = [...this.flush(e), ...l.items];
+      this.held = waiting;
+      return out;
     }
     const r = role(e);
     if (r === "housekeeping" && !l.items.length && e.kind !== "tool_result") return [];

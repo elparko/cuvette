@@ -493,6 +493,21 @@ describe("quiet view", () => {
     expect(texts(mainView(log, true).settled)).toEqual(["· Read 1 file (sleep.csv)", "✓ Which test? Welch", "✓ Alpha: 0.05"]);
   });
 
+  test("several questions at once stay one line for each answer, and the decision lines go to the details view", () => {
+    const { log } = feed((s) => {
+      s.record.append("question", { qid: "q1", title: "Paired test" });
+      s.record.append("question", { qid: "q2", title: "Sidedness" });
+      s.record.append("blocked", { tool: "compare_two_groups", reason: "waiting for the scientist: paired, alternative", qid: "q1,q2" });
+      s.record.append("answer", { qid: "q1", value: true, by: "human" });
+      s.record.append("decision", { key: "paired", old: null, new: true, by: "human", reason: "answer to q1" });
+      s.record.append("answer", { qid: "q2", value: "two-sided", by: "human" });
+      s.record.append("decision", { key: "alternative", old: null, new: "two-sided", by: "human", reason: "answer to q2" });
+      s.record.append("tool_result", { callId: "a", tool: "compare_two_groups", adapter: "biostats", ok: true, summary: "Paired t test" }, { node: "n1" });
+    });
+    expect(texts(mainView(log, true).settled)).toEqual(["✓ Paired test: true", "✓ Sidedness: two-sided", "Step 1 Paired t test"]);
+    expect(log.flatMap((l) => l.items).some((i) => i.t === "line" && i.text.startsWith("Decision: paired"))).toBe(true);
+  });
+
   test("a step with no agent text before it shows its purpose; code never shows in the settings", () => {
     const { log } = feed((s) => {
       const args = { code: "import x\nprint(1)", purpose: "count nuclei in 24 images", does: "Opens 24 images, finds the nuclei and saves counts.csv." };
