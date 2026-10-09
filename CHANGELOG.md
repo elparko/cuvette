@@ -15,9 +15,15 @@ These items are being built and are not on main yet:
 - ASD-STE100 Simplified Technical English for all text that the agent writes, with a checker.
 - A package lock for each session, more reasons for "out of date", `/status`, and a before-and-after table.
 - A warning before likely patient identifiers go to a cloud model, and the session cost in the status line.
-- A data check on load, and a sample sheet with checks for pseudoreplication and confounding.
 - Rewind, branches and method templates.
 - Image decks: compile figures and QC images into a PowerPoint file or a PDF.
+
+## 9 October 2026
+
+### Data handling
+- A data check runs when the agent first reads a table or a folder: missing values, duplicates, mixed types, missing channels, names spelled two ways, and files that differ. Problems that need a choice become question cards.
+- A sample sheet (`samples.csv`) lists each sample with its group, unit of replication and batch. You edit it in the app or with `/samples`. The proposed metrics take n from it.
+- Design checks on the sample sheet: pseudoreplication, groups confounded with a batch, unbalanced groups, and too few n for the planned test.
 
 ## 8 October 2026
 
