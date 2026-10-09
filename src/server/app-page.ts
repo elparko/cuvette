@@ -200,9 +200,9 @@ ul.scards li { margin: 0 0 8px; }
 @media (max-width: 480px) { .scard img, .scard .nothumb { width: 52px; height: 52px; } }
 ul.dirs li button { background: none; border: 0; padding: 5px 6px; cursor: pointer; width: 100%; text-align: left; border-radius: 5px; overflow-wrap: anywhere; }
 ul.dirs li button:hover { background: var(--panel2); }
-.choice { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; padding: 10px 12px; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); cursor: pointer; }
-.choice:hover, .choice[aria-pressed="true"] { border-color: var(--accent); }
-.choice[aria-pressed="true"] { background: var(--accent-bg); }
+button.modelchoice { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; padding: 10px 12px; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); cursor: pointer; }
+button.modelchoice:hover, button.modelchoice[aria-pressed="true"] { border-color: var(--accent); }
+button.modelchoice[aria-pressed="true"] { background: var(--accent-bg); }
 ul.checks { list-style: none; padding: 0; margin: 4px 0; }
 ul.checks li { padding: 4px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 ul.checks code { font: 12.5px ui-monospace, Menlo, monospace; background: var(--code-bg); padding: 0 4px; border-radius: 3px; overflow-wrap: anywhere; }
@@ -775,7 +775,7 @@ async function setupPage() {
   box.replaceChildren();
   for (const c of fstate.choices) {
     const b = document.createElement("button");
-    b.type = "button"; b.className = "choice"; b.dataset.choice = c.id;
+    b.type = "button"; b.className = "modelchoice"; b.dataset.choice = c.id;
     const t = document.createElement("strong"); t.textContent = c.label;
     const h = document.createElement("span"); h.className = "dim small"; h.textContent = c.help;
     b.append(t, h);
