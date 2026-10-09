@@ -56,8 +56,8 @@ For each item that is missing or old, `cuvette doctor` shows the install command
 ### Programs
 
 `cuvette programs`, `/programs` in the terminal and the Programs page of the browser app show the
-same list: each adapter, its program, the status, the version, the size of its environment, the
-last use and the access settings, grouped by field.
+same list. Each adapter has one row with its program, the status, the version, the size of its
+environment, the last use and the access settings. The list groups the rows by field.
 
 ```bash
 cuvette programs                         # the list
@@ -196,7 +196,7 @@ change applies at once. `/help` shows the keys of the current style.
 
 `classic` is a one-line box with the plain keys. A paste with line breaks stays one message in each style.
 Shift+Tab, Ctrl+O, Ctrl+T, Ctrl+C twice, Tab and the `!` prefix work in each style.
-Ctrl+T cycles the setting `footer_hints` (group Display): `full`, `short` (mode and model only) or `off`.
+Ctrl+T cycles the setting `footer_hints` (group `Display`): `full`, `short` (mode and model only) or `off`.
 The text fields on the cards and in `/config` use the same keys as the input box, in one line.
 
 To record the raw key bytes for a bug report, start with `CUVETTE_KEYLOG=/tmp/keys.log cuvette`.
@@ -243,10 +243,10 @@ A project folder can have Cuvette files in `.ga/` or `.cuvette/`:
 - `adapters/`. An adapter here replaces a catalog adapter with the same name.
 
 Cuvette reads these files only in the project folder. It does not read them in a parent folder.
-Cuvette ignores these files until you trust the folder. Only display settings apply without trust:
+Cuvette ignores these files until you trust the folder. Without trust, only these settings apply:
 `animations`, `input_keys`, `openImages`, `databook_paper` and `databook_author`.
 
-When a session starts in a folder that is not trusted, a card shows:
+When a session starts in a folder that you do not trust, a card shows:
 
 - The folder path.
 - Each settings key that would change, with its value.
@@ -258,7 +258,7 @@ The card has three choices:
 
 1. Trust this folder. Cuvette saves the folder in `trusted_folders` in
    `~/.cuvette/settings.json`, with a SHA-256 hash of each file.
-2. Trust once (this session). Nothing is saved.
+2. Trust once (this session). Cuvette saves nothing.
 3. Do not trust. The session runs with your user settings only.
 
 If a trusted file changes, the card shows again with a list of the changes. A setting that you
@@ -282,10 +282,10 @@ The benchmark (`cuvette bench papers`) trusts its own checkout. It passes the mo
 
 ### Old names
 
-The old name of Cuvette is guided-analysis. Cuvette still reads the old names:
+Cuvette had the old name guided-analysis. Cuvette still reads the old names:
 
 - At start, Cuvette moves `~/.guided-analysis` to `~/.cuvette` if only the old folder exists. It prints one line. The old path becomes a link to the new folder, so old sessions still open.
-- If a `CUVETTE_*` environment variable is not set, Cuvette reads the old `GA_*` variable. For example, `GA_HOME` works if `CUVETTE_HOME` is not set.
+- If you do not set a `CUVETTE_*` environment variable, Cuvette reads the old `GA_*` variable. For example, `GA_HOME` works if you do not set `CUVETTE_HOME`.
 - Cuvette gives each adapter process both names, for example `CUVETTE_WORK_DIR` and `GA_WORK_DIR`.
 - In a project folder, Cuvette also reads the old `.ga/` folder. If `.cuvette/` has the same adapter or setting, the `.cuvette/` one wins. Folder trust covers both folders.
 
@@ -311,18 +311,21 @@ The old name of Cuvette is guided-analysis. Cuvette still reads the old names:
 
 **Warning: the patient identifier check is a help, not a guarantee. Do not send patient data to a cloud model unless your institution allows it.**
 
-- Before content goes to a cloud model (Claude), the harness looks for likely patient identifiers:
-  names next to clinical words, dates of birth, medical record numbers, Social Security numbers,
-  phone numbers, email addresses, street addresses, and ZIP codes with dates. It also looks for
+- Before content goes to a cloud model (Claude), the harness looks for likely patient identifiers.
+  These identifiers include names next to clinical words, dates of birth and medical record numbers.
+  They include Social Security numbers, phone numbers, email addresses, street addresses, and ZIP
+  codes with dates. It also looks for
   table columns such as name, MRN, DOB, patient, SSN and address.
 - If it finds one, a card shows what it found and where (file, column, line), with the values
-  masked, for example `J*** D**`. You choose: send anyway (the record logs it), mask the values
-  and send (the model sees `[NAME 1]`; your files do not change), use a local model for this
-  session, or stop.
+  masked, for example `J*** D**`. You choose one of these options.
+  Send anyway. The record logs it.
+  Mask the values and send. The model sees `[NAME 1]`. Your files do not change.
+  Use a local model for this session.
+  Stop.
 - A local model (Ollama) gets no card. The record still logs a notice.
-- Settings: `phi_check` (on by default; off needs a second confirmation), `local_model` (the
-  model that the card offers, for example `ollama:qwen3:8b`), and `no_patient_data` ("No
-  patient data here") for the project folder. All three are in `/config`, under Patient data.
+- Settings: `phi_check` (on by default; off needs a second confirmation) and `local_model` (the
+  model that the card offers, for example `ollama:qwen3:8b`).
+  The setting `no_patient_data` ("No patient data here") applies to the project folder. All three are in `/config`, under Patient data.
 - The reference is the HIPAA Safe Harbor list of 18 identifiers, 45 CFR 164.514(b)(2). The check
   covers only some of them. [docs/patient-data.md](docs/patient-data.md) lists what it checks
   and what it does not check.
