@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { platform, release, tmpdir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,7 @@ import { labelMap, loadAdapters, sha256File, sizeText } from "../bench/papers-ca
 import { extractNumbers } from "./claims.ts";
 import { mainNodes, methodsSentence, stepLines } from "./exports.ts";
 import { stepNumbers } from "./housekeeping.ts";
+import { inProject, outputRoot, placeAt, readIndex } from "./places.ts";
 import { AnalysisRecord } from "./record.ts";
 import { find, resolve as resolveSetting, type Paper } from "./settings.ts";
 export { localePaper, type Paper } from "./settings.ts";
@@ -468,7 +469,7 @@ function figureCaption(p: Part, n: Node, name: string): string {
 function nodeImages(p: Part, n: Node): { src?: string; name: string; tiff: boolean }[] {
   const seen = new Set<string>();
   const out: { src?: string; name: string; tiff: boolean }[] = [];
-  const shown = n.outputs.filter((o) => o.kind === "image");
+  const shown = n.outputs.filter((o) => o.kind === "image" || /\.(png|jpe?g|gif|webp|svg|tiff?)$/i.test(o.path));
   const stems = new Set(shown.filter((o) => !/\.svg$/i.test(o.path)).map((o) => o.path.replace(/\.[^.]+$/, "")));
   for (const o of shown) {
     if (/\.svg$/i.test(o.path) && stems.has(o.path.replace(/\.[^.]+$/, ""))) continue;
@@ -521,6 +522,7 @@ function linkedAnswer(p: Part, text: string, claims: Claim[]): string {
 function sectionResults(w: Writer, p: Part, level: number): void {
   w.head(level, "Results");
   const used = new Set<string>();
+  const drawn = new Set<number>();
   let any = false;
   for (const n of p.nodes) {
     const step = p.steps.get(n.id)!;
@@ -534,6 +536,7 @@ function sectionResults(w: Writer, p: Part, level: number): void {
     }
     for (const img of nodeImages(p, n)) {
       used.add(img.name);
+      drawn.add(step);
       any = true;
       if (img.src) w.figure(img.src, figureCaption(p, n, img.name));
       else w.p(`Step ${step} made the image ${img.name}. ${img.tiff ? "The data book does not show TIFF images." : "The image file is not on this computer."}`);
@@ -541,13 +544,15 @@ function sectionResults(w: Writer, p: Part, level: number): void {
   }
   const figDir = p.outDir ? join(p.outDir, "figures") : "";
   if (figDir && existsSync(figDir)) {
-    const files = readdirSync(figDir).filter((f) => /\.(png|jpe?g|svg)$/i.test(f) && !used.has(f)).sort();
+    const stepOf = (f: string) => Number(/^step(\d+)-/.exec(f)?.[1] ?? 0);
+    const files = readdirSync(figDir).filter((f) => /\.(png|jpe?g|svg)$/i.test(f) && !used.has(f) && !drawn.has(stepOf(f))).sort();
     const pngStems = new Set(files.filter((f) => !/\.svg$/i.test(f)).map((f) => f.replace(/\.[^.]+$/, "")));
     for (const f of files.filter((x) => !/\.svg$/i.test(x) || !pngStems.has(x.replace(/\.[^.]+$/, "")))) {
       const src = fileUri(join(figDir, f));
       if (!src) continue;
       any = true;
-      w.figure(src, `${f.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ")}. File figures/${f}. The record does not link this figure to one step, so n and the error bar type are not given here.`);
+      const node = p.nodes.find((n) => p.steps.get(n.id) === stepOf(f));
+      w.figure(src, node ? `${figureCaption(p, node, f.replace(/^step\d+-/, ""))} File figures/${f}.` : `${f.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ")}. File figures/${f}. The record does not link this figure to one step, so n and the error bar type are not given here.`);
     }
   }
   const xlsx = p.outDir ? join(p.outDir, "results.xlsx") : "";
@@ -823,10 +828,18 @@ function sessionIdOf(dir: string): string {
   }
 }
 
+interface Found {
+  recordDir: string;
+  outDir: string;
+  project: string;
+  inProject: boolean;
+}
+
 function sessionCwd(dir: string): string | undefined {
   try {
     const first = JSON.parse(readFileSync(join(dir, "log.jsonl"), "utf8").split("\n", 1)[0]!);
-    return first.kind === "session" && typeof first.data?.cwd === "string" ? first.data.cwd : undefined;
+    const cwd = first.kind === "session" ? first.data?.cwd : undefined;
+    return typeof cwd === "string" && isAbsolute(cwd) ? cwd : undefined;
   } catch {
     return undefined;
   }
@@ -842,60 +855,70 @@ const real = (p: string) => {
 
 function hasContent(dir: string): boolean {
   try {
-    const text = readFileSync(join(dir, "log.jsonl"), "utf8");
-    return /"kind":\s*"(user|node)"/.test(text);
+    return /"kind":\s*"(user|node)"/.test(readFileSync(join(dir, "log.jsonl"), "utf8"));
   } catch {
     return false;
   }
 }
 
-export function sessionOutDir(dir: string): string {
-  return basename(dir) === ".record" ? dirname(dir) : join(dir, "exports");
+export function foundAt(recordDir: string): Found | undefined {
+  if (!existsSync(join(recordDir, "log.jsonl"))) return undefined;
+  const place = placeAt(recordDir);
+  if (place) return { recordDir, outDir: place.outDir, project: place.project, inProject: inProject(place) };
+  if (basename(recordDir) === ".record") {
+    const outDir = dirname(recordDir);
+    const cwd = sessionCwd(recordDir);
+    return { recordDir, outDir, project: cwd && existsSync(cwd) ? cwd : dirname(dirname(outDir)), inProject: true };
+  }
+  return { recordDir, outDir: join(recordDir, "exports"), project: sessionCwd(recordDir) ?? dirname(recordDir), inProject: false };
 }
 
-export function projectSessions(project: string, ids?: string[]): string[] {
-  const out = new Map<string, string>();
-  const cuv = join(project, "cuvette");
-  if (existsSync(cuv))
-    for (const d of readdirSync(cuv)) {
-      const r = join(cuv, d, ".record");
-      if (existsSync(join(r, "log.jsonl"))) out.set(sessionIdOf(r), r);
-    }
-  const home = join(gaHome(), "sessions");
+export function openRecord(f: Found): AnalysisRecord {
+  const places = basename(f.recordDir) === ".record" ? { workDir: f.outDir, exportDir: f.outDir, project: f.inProject ? f.project : undefined } : {};
+  return new AnalysisRecord(f.recordDir, sessionIdOf(f.recordDir), places);
+}
+
+function outputFolder(project: string): string {
+  return outputRoot(project, str(resolveSetting(find("output_folder")!, { cwd: project }).value) || "cuvette");
+}
+
+export function projectSessions(project: string, ids?: string[]): Found[] {
+  const out = new Map<string, Found>();
   const me = real(project);
-  if (existsSync(home))
-    for (const d of readdirSync(home)) {
-      const dir = join(home, d);
-      const cwd = sessionCwd(dir);
-      if (cwd && real(cwd) === me && !out.has(sessionIdOf(dir))) out.set(sessionIdOf(dir), dir);
-    }
+  const add = (recordDir: string) => {
+    const f = foundAt(recordDir);
+    if (f && real(f.project) === me && !out.has(sessionIdOf(recordDir))) out.set(sessionIdOf(recordDir), f);
+  };
+  const root = outputFolder(project);
+  if (existsSync(root))
+    for (const d of readdirSync(root)) if (!d.startsWith(".new-") && !lstatSync(join(root, d)).isSymbolicLink()) add(join(root, d, ".record"));
+  for (const r of readIndex()) if (real(r.project) === me) add(join(r.folder, ".record"));
+  const home = join(gaHome(), "sessions");
+  if (existsSync(home)) for (const d of readdirSync(home)) add(join(home, d));
   const pickIds = ids?.filter((x) => x && x !== "all");
   return [...out.entries()]
-    .filter(([id, dir]) => (pickIds?.length ? pickIds.some((x) => id === x || basename(dirname(dir)) === x || id.startsWith(x)) : hasContent(dir)))
+    .filter(([id, f]) => (pickIds?.length ? pickIds.some((x) => id === x || basename(f.outDir) === x || id.startsWith(x)) : hasContent(f.recordDir)))
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, dir]) => dir);
+    .map(([, f]) => f);
 }
 
 export interface BookTarget {
   project: string;
-  dirs: string[];
+  found: Found[];
   outDir: string;
   base: string;
   projectLevel: boolean;
 }
 
 export function resolveTarget(target: string | undefined, cwd: string, ids?: string[]): BookTarget {
-  const p = resolve(cwd, target ?? ".");
-  const id = target && existsSync(join(gaHome(), "sessions", target, "log.jsonl")) ? join(gaHome(), "sessions", target) : undefined;
-  const sessionDir = existsSync(join(p, "log.jsonl")) ? p : existsSync(join(p, ".record", "log.jsonl")) ? join(p, ".record") : id;
-  if (sessionDir) {
-    const proj = sessionCwd(sessionDir) ?? (basename(sessionDir) === ".record" ? dirname(dirname(dirname(sessionDir))) : dirname(sessionDir));
-    return { project: proj, dirs: [sessionDir], outDir: sessionOutDir(sessionDir), base: "databook", projectLevel: false };
-  }
+  const p = resolve(cwd, (target ?? ".").replace(/^~(?=\/|$)/, process.env.HOME ?? "~"));
+  const byId = target && !target.includes("/") ? (readIndex().find((r) => r.id === target)?.folder ?? (existsSync(join(gaHome(), "sessions", target)) ? join(gaHome(), "sessions", target) : undefined)) : undefined;
+  const one = foundAt(p) ?? foundAt(join(p, ".record")) ?? (byId ? (foundAt(byId) ?? foundAt(join(byId, ".record"))) : undefined);
+  if (one) return { project: one.project, found: [one], outDir: one.outDir, base: "databook", projectLevel: false };
   if (!existsSync(p) || !statSync(p).isDirectory()) throw new Error(`${p} is not a session folder or a project folder.`);
-  const dirs = projectSessions(p, ids);
-  if (!dirs.length) throw new Error(`No sessions found for the project folder ${p}. Give a session folder, or start a session in this folder.`);
-  return { project: p, dirs, outDir: join(p, "cuvette"), base: `databook-${new Date().toISOString().slice(0, 10)}`, projectLevel: true };
+  const found = projectSessions(p, ids);
+  if (!found.length) throw new Error(`No sessions found for the project folder ${p}. Give a session folder, or start a session in this folder.`);
+  return { project: p, found, outDir: outputFolder(p), base: `databook-${new Date().toISOString().slice(0, 10)}`, projectLevel: true };
 }
 
 // ---------------------------------------------------------------- author and paper
@@ -976,9 +999,15 @@ export async function printPdf(html: string, pdf: string): Promise<string | unde
   const tmp = mkdtempSync(join(tmpdir(), "ga-databook-"));
   try {
     rmSync(pdf, { force: true });
-    const args = ["--headless", "--disable-gpu", "--no-first-run", `--user-data-dir=${join(tmp, "profile")}`, "--no-pdf-header-footer", `--print-to-pdf=${pdf}`, html];
-    await run(chrome, args, dirname(html), 120000, /bytes written to file/);
-    return existsSync(pdf) && statSync(pdf).size > 0 ? undefined : "No PDF: Chrome did not write the file.";
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const args = [
+        "--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-background-networking",
+        "--use-mock-keychain", "--password-store=basic", `--user-data-dir=${join(tmp, `profile-${attempt}`)}`, "--no-pdf-header-footer", `--print-to-pdf=${pdf}`, html,
+      ];
+      await run(chrome, args, dirname(html), 45000, /bytes written to file/);
+      if (existsSync(pdf) && statSync(pdf).size > 0) return undefined;
+    }
+    return "No PDF: Chrome did not write the file.";
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -986,14 +1015,14 @@ export async function printPdf(html: string, pdf: string): Promise<string | unde
 
 export async function writeDatabook(o: WriteOptions): Promise<Written> {
   const t = resolveTarget(o.target, o.cwd, o.sessions);
-  const records = t.dirs.map((d) => new AnalysisRecord(d, sessionIdOf(d)));
+  const records = t.found.map(openRecord);
   const s = bookSettings(t.project);
   const book = buildDatabook({
     records,
     project: t.project,
     author: o.author ?? s.author,
     paper: o.paper ?? s.paper,
-    outDirs: t.dirs.map((d) => (basename(d) === ".record" ? dirname(d) : undefined)),
+    outDirs: t.found.map((f) => (basename(f.recordDir) === ".record" ? f.outDir : undefined)),
   });
   mkdirSync(t.outDir, { recursive: true });
   const html = join(t.outDir, `${t.base}.html`);

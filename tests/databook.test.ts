@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildDatabook, localePaper, pdfPages, resolveTarget, writeDatabook } from "../src/core/databook.ts";
+import { buildDatabook, localePaper, openRecord, pdfPages, resolveTarget, writeDatabook } from "../src/core/databook.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { find } from "../src/core/settings.ts";
 import { findChrome } from "../src/core/trail.ts";
@@ -136,16 +136,18 @@ describe("databook", () => {
     const lines = readFileSync(FIXTURE, "utf8").replace(/20261008-192132-8dd2/g, "20261009-100000-aaaa");
     mkdirSync(join(project, "cuvette", "2026-10-09-sleep", ".record"), { recursive: true });
     writeFileSync(join(project, "cuvette", "2026-10-09-sleep", ".record", "log.jsonl"), lines);
+    writeFileSync(join(project, "cuvette", "2026-10-09-sleep", ".record", "meta.json"), JSON.stringify({ id: "20261009-100000-aaaa", title: "sleep", created: "2026-10-09T10:00:00Z", fromProject: "cuvette/2026-10-09-sleep" }));
     const t = resolveTarget(project, "/", undefined);
     expect(t.projectLevel).toBe(true);
-    expect(t.dirs).toHaveLength(2);
+    expect(t.found).toHaveLength(2);
+    expect(t.found.map((f) => f.project)).toEqual([project, project]);
     expect(t.outDir).toBe(join(project, "cuvette"));
     expect(t.base).toMatch(/^databook-\d{4}-\d{2}-\d{2}$/);
-    expect(resolveTarget(project, "/", ["20261009-100000-aaaa"]).dirs).toHaveLength(1);
+    expect(resolveTarget(project, "/", ["20261009-100000-aaaa"]).found).toHaveLength(1);
     const one = resolveTarget(join(project, "cuvette", "2026-10-08-sleep"), "/");
     expect(one.projectLevel).toBe(false);
     expect(one.outDir).toBe(join(project, "cuvette", "2026-10-08-sleep"));
-    const b = book(t.dirs.map((d) => new AnalysisRecord(d, "x")));
+    const b = book(t.found.map(openRecord));
     expect(b.toc.filter((x) => x.level === 1).map((x) => x.num)).toEqual(["1", "2", "3", "Appendix A", "Appendix B", "Appendix C"]);
     expect(b.toc[1]).toMatchObject({ num: "1.1", title: "Question and confirmed analysis" });
   });
@@ -165,5 +167,5 @@ describe("databook", () => {
     expect(w.pdf && existsSync(w.pdf)).toBe(true);
     expect(w.pages).toBeGreaterThan(1);
     expect(pdfPages(w.pdf!)).toBe(w.pages);
-  });
+  }, 120000);
 });
