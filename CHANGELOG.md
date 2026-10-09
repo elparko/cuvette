@@ -7,10 +7,20 @@ The project is in early development. Version numbers start at the first public r
 
 These items are being built and are not on main yet:
 - A desktop app for macOS (Tauri), about one third the size of an Electron app.
-- New analyses: ELISA standard curves, dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
+- New analyses: dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
 - A map of proprietary lab software and the open-source alternatives that Cuvette supports.
 
 ## 9 October 2026
+
+### Session flow
+- Before it asks anything, the agent looks at the data with a new read-only tool, `inspect_data`: the channels and their kind (brightfield or fluorescence), names, bit depth and groups. It then says what it found, and it never asks about a stain or channel that the data does not have.
+- Questions come one at a time ("Question 1 of 3"), with the recommendation selected. Enter accepts it, the next question opens by itself, and Back returns to the previous one.
+- `/change` reopens any answered question or decision. Results that used the old value become out of date, and a demonstration that used it can run again.
+- The agent chooses the program and gives the reason. `/program` shows or changes it.
+- Settings that you confirm in the proposed metrics count as answered when the steps run, so no card asks again.
+
+### New analyses
+- ELISA and other immunoassays (R drc): standard curves with 4PL and 5PL fits, in the Prism and SoftMax Pro forms, back-calculated concentrations with the dilution factor, replicate CV, LOD, LLOQ and ULOQ, and samples outside the curve flagged. A published Lassa ELISA paper is the benchmark case.
 
 ### Patient data and cost
 - Before content goes to a cloud model, Cuvette looks for likely patient identifiers (names, record numbers, dates of birth, contact data and similar, after the HIPAA Safe Harbor list). A card shows what it found, masked, and you choose: send, mask the values, use a local model, or stop. Local models skip the card. The check is a help, not a guarantee; see `docs/patient-data.md`.
