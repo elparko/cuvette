@@ -219,23 +219,12 @@ function send(res: ServerResponse, status: number, body: string, type = "applica
   res.end(body);
 }
 
-export async function startWindow(
-  session: WindowSession,
-  opts: { port?: number } = {},
-): Promise<{ url: string; close(): void }> {
-  const token = randomBytes(18).toString("base64url");
+export function windowRoutes(session: WindowSession, token: string): { handle(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void>; close(): void } {
   const clients = new Set<ServerResponse>();
   const permissions = new Map<string, Extract<BusEvent, { type: "permission" }>>();
   const instructions = new Map<number, Extract<BusEvent, { type: "instruction" }>>();
 
-  const server = createServer(async (req, res) => {
-    const { port } = server.address() as AddressInfo;
-    const host = req.headers.host ?? "";
-    if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) return send(res, 403, '{"error":"bad host"}');
-    const url = new URL(req.url ?? "/", `http://${host}`);
-    if (url.pathname === "/favicon.ico") return send(res, 204, "");
-    const given = url.searchParams.get("t") ?? req.headers["x-token"];
-    if (given !== token) return send(res, 401, '{"error":"missing or wrong token"}');
+  const handle = async (req: IncomingMessage, res: ServerResponse, url: URL) => {
     try {
       if (req.method === "GET" && url.pathname === "/") return send(res, 200, pageHtml(token), "text/html; charset=utf-8");
       if (req.method === "GET" && url.pathname === "/panel") return send(res, 200, panelHtml(token), "text/html; charset=utf-8");
@@ -313,7 +302,7 @@ export async function startWindow(
     } catch (e) {
       send(res, 400, JSON.stringify({ error: (e as Error).message }));
     }
-  });
+  };
 
   const off = session.bus.on((e) => {
     if (e.type === "permission") permissions.set(e.rid, e);
@@ -327,6 +316,36 @@ export async function startWindow(
     for (const c of clients) c.write(": keep-alive\n\n");
   }, 20000);
   beat.unref();
+  return {
+    handle,
+    close() {
+      off();
+      clearInterval(beat);
+      for (const c of clients) c.end();
+    },
+  };
+}
+
+export function hostAllowed(host: string, port: number): boolean {
+  return host === `127.0.0.1:${port}` || host === `localhost:${port}`;
+}
+
+export async function startWindow(
+  session: WindowSession,
+  opts: { port?: number } = {},
+): Promise<{ url: string; close(): void }> {
+  const token = randomBytes(18).toString("base64url");
+  const routes = windowRoutes(session, token);
+  const server = createServer(async (req, res) => {
+    const { port } = server.address() as AddressInfo;
+    const host = req.headers.host ?? "";
+    if (!hostAllowed(host, port)) return send(res, 403, '{"error":"bad host"}');
+    const url = new URL(req.url ?? "/", `http://${host}`);
+    if (url.pathname === "/favicon.ico") return send(res, 204, "");
+    const given = url.searchParams.get("t") ?? req.headers["x-token"];
+    if (given !== token) return send(res, 401, '{"error":"missing or wrong token"}');
+    await routes.handle(req, res, url);
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -339,10 +358,8 @@ export async function startWindow(
   return {
     url,
     close() {
-      off();
-      clearInterval(beat);
+      routes.close();
       setWindowUrl(undefined);
-      for (const c of clients) c.end();
       server.close();
       server.closeAllConnections();
     },

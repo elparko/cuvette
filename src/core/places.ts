@@ -32,6 +32,8 @@ export interface IndexRow {
   folder: string;
   title: string;
   date: string;
+  name?: string;
+  description?: string;
 }
 
 const README = "This folder holds one Cuvette analysis session: results, figures, scripts, exports, and the record in .record.\nTo continue the session, run \"ga open .\" in this folder.\nTo read it without Cuvette, open index.html in a browser.\n";
@@ -48,9 +50,10 @@ export function readIndex(): IndexRow[] {
   }
 }
 
-export function saveIndexRow(p: Place): void {
+export function saveIndexRow(p: Place, named?: { title: string; description: string }): void {
   if (p.legacy) return;
-  const row: IndexRow = { id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created };
+  const old = readIndex().find((r) => r.id === p.id);
+  const row: IndexRow = { id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, description: named?.description ?? old?.description };
   const rows = readIndex().filter((r) => r.id !== p.id);
   mkdirSync(gaHome(), { recursive: true });
   writeFileSync(indexPath(), JSON.stringify([...rows, row], null, 1));

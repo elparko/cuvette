@@ -12,6 +12,10 @@ Usage
   ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume [<id>|<folder>]] [--output <folder>]
   ga resume [<id>]                     pick one of the last 10 sessions and continue it [--bypass-permissions]
   ga open [<folder>]                   continue a session from its folder or from the project folder (default: this folder)
+  ga app [<folder>] [--resume [<id>|<folder>]] [--model <model>] [--no-open (no browser or other window; for tests)]
+                                       the browser app: a full session in a browser window on this computer only.
+                                       With a folder it starts a session there; with no folder it shows a folder chooser.
+                                       ga --resume in the terminal continues a session that the app started, and back.
   ga -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json]
 
   With no --adapter, the agent calls list_adapters and asks to load the adapter that fits
@@ -132,6 +136,7 @@ const { values: o, positionals: pos } = parseArgs({
     plan: { type: "boolean" },
     "no-plan": { type: "boolean" },
     fix: { type: "boolean" },
+    "no-open": { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -238,12 +243,68 @@ async function interactive(resumeId?: string) {
   if (o.resume !== undefined && !resumeId) resumeId = str(o.resume) || (await chooseSession(false));
   let sample: { cwd: string; message: string } | undefined;
   if (!resumeId && !str(o.model) && process.stdin.isTTY && (await import("./core/firststart.ts")).needsFirstStart()) sample = await firstStart();
+  if (resumeId) {
+    const lock = await liveLock(resumeId);
+    if (lock) fail(lock.app ? `This session is open in the app: ${lock.app}\nUse it there, or close the session there (Sessions, or /quit) and run this again.` : "This session is open in another terminal. Close it there first.");
+  }
   if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
   const s = resumeId
     ? await Session.resume(resumeId, { model: str(o.model), interactive: true, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See ga sessions.`))
     : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, cwd: sample?.cwd, settings: { ...bypass(), ...planSetting() } });
   await runTui(s as never, { firstMessage: sample?.message });
   await s.close();
+}
+
+async function liveLock(ref: string) {
+  const { findPlace } = await import("./core/places.ts");
+  const { openLock } = await import("./core/sessions.ts");
+  const place = findPlace(ref, { cwd: process.cwd() });
+  const lock = place ? openLock(place.recordDir) : undefined;
+  return lock && lock.pid !== process.pid ? lock : undefined;
+}
+
+async function sharedApp(ref: string): Promise<string | undefined> {
+  const lock = await liveLock(ref);
+  if (!lock) return undefined;
+  if (lock.app) return lock.app;
+  if (process.platform === "win32") fail("This session is open in another window. Close it there first.");
+  process.kill(lock.pid, "SIGUSR2");
+  for (let i = 0; i < 50; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    const now = await liveLock(ref);
+    if (now?.app) return now.app;
+  }
+  fail("This session is open in another window, and that window did not start the app. Type /app there, or close the session there first.");
+}
+
+async function app(folder?: string) {
+  if (o["no-open"]) process.env.GA_NO_OPEN = "1";
+  const { startApp } = await import("./server/app.ts");
+  const { openWithOs } = await import("./ui/commands.ts");
+  let resume: string | undefined;
+  if (o.resume !== undefined) {
+    const { listSessions, defaultSession } = await import("./core/sessions.ts");
+    resume = str(o.resume) || defaultSession(listSessions(), folder ?? process.cwd())?.info.id;
+    if (!resume) fail("There is no session to resume.");
+  }
+  if (folder && !existsSync(folder)) fail(`No folder ${folder}.`);
+  if (resume) {
+    const url = await sharedApp(resume);
+    if (url) {
+      console.log(`This session is open in a terminal. The app shows the same session: ${url}`);
+      if (!o["no-open"]) openWithOs(url);
+      return;
+    }
+  }
+  const a = await startApp({ folder, start: process.cwd(), resume, model: str(o.model), adapters: (o.adapter as string[]) ?? [] }).catch((e: Error) => fail(`The app did not start: ${e.message}`));
+  console.log(`Cuvette app: ${a.url}\nThe app runs on this computer only. Press Ctrl+C to stop it.`);
+  if (!o["no-open"]) openWithOs(a.url);
+  await new Promise<void>((done) => {
+    process.once("SIGINT", done);
+    process.once("SIGTERM", done);
+  });
+  await a.close();
+  process.exit(0);
 }
 
 async function main() {
@@ -257,6 +318,8 @@ async function main() {
       return interactive(a1 || (await chooseSession(true)));
     case "help":
       return console.log(HELP);
+    case "app":
+      return app(a1);
     case "adapters": {
       for (const [name, dir] of Object.entries(adapterDirs())) {
         try {

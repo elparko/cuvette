@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
@@ -10,7 +10,8 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
-import { findPlace, inProject, legacyPlace, local, newPlace, outputRoot, outside, provisional, titlePlace, type Place } from "./places.ts";
+import { findPlace, inProject, legacyPlace, local, newPlace, outputRoot, outside, provisional, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { changedAnalysis, describeSession, lastTitle } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
 import { compact, needsCompaction, summaryMessage } from "./compaction.ts";
@@ -238,7 +239,7 @@ export class Session {
   private pilotPlan?: { plan: AnalysisPlan; version: number; target: Mode; answers: string[] };
   private lastSaid = "";
   private waiting = new Map<string, BusEvent>();
-  status: Extract<BusEvent, { type: "status" }> = { type: "status", state: "idle" };
+  lastStatus: Extract<BusEvent, { type: "status" }> = { type: "status", state: "idle" };
 
   private constructor(id: string, cwd: string, settings: Settings, place: Place) {
     this.id = id;
@@ -253,7 +254,7 @@ export class Session {
     this.workDir = this.record.workDir;
     this.record.onAppend = (entry: Entry) => this.bus.emit({ type: "entry", entry });
     this.bus.on((e) => {
-      if (e.type === "status") this.status = e;
+      if (e.type === "status") this.lastStatus = e;
     });
   }
 
@@ -408,6 +409,7 @@ export class Session {
     }
     if (this.permissionMode === "bypass") this.record.append("permission_mode", { old: "ask", new: "bypass", how: opts.settings?.permissionMode === "bypass" ? "the --bypass-permissions flag" : "a settings file" });
     await this.hooks.event("SessionStart", { session: this.id });
+    this.markOpen({ app: undefined });
     this.timer = setInterval(() => this.expireQuestions(), 30_000);
     this.timer.unref?.();
   }
@@ -853,7 +855,38 @@ export class Session {
       await this.writeReport();
       this.bus.emit({ type: "status", state: "idle" });
       await this.hooks.event("Stop", { session: this.id }).catch(() => {});
+      this.titling = this.retitle(turnStart);
     }
+  }
+
+  titling?: Promise<void>;
+
+  private async retitle(turnStart: number): Promise<void> {
+    if (!this.interactive || this.settings.headless || this.provider.info.provider === "fake") return;
+    const all = this.record.entries();
+    const had = lastTitle(all);
+    if (!changedAnalysis(all.slice(turnStart)) && (had || !all.some((e) => e.kind === "assistant" && e.data.final))) return;
+    try {
+      const p = this.provider.info.provider === "claude" ? await makeProvider("claude:claude-haiku-5-5", { effort: "low" }) : this.provider;
+      const t = await describeSession(p, this.record, AbortSignal.timeout(60_000));
+      if (!t || (had && had.title === t.title && had.description === t.description)) return;
+      this.record.append("title", { ...t });
+      if (!this.place.legacy) saveIndexRow(this.place, t);
+    } catch {}
+  }
+
+  private lockPath(): string {
+    return join(this.dir, "open.json");
+  }
+
+  markOpen(extra: Record<string, unknown> = {}): void {
+    try {
+      let old: Record<string, unknown> = {};
+      try {
+        old = JSON.parse(readFileSync(this.lockPath(), "utf8"));
+      } catch {}
+      writeFileSync(this.lockPath(), JSON.stringify({ ...(old.pid === process.pid ? old : {}), pid: process.pid, started: old.started ?? new Date().toISOString(), ...extra }), { mode: 0o600 });
+    } catch {}
   }
 
   saveResults(since = 0, force = false): Saved | undefined {
@@ -2401,6 +2434,10 @@ export class Session {
   async close(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     this.interrupt();
+    await this.titling?.catch(() => {});
+    try {
+      if (JSON.parse(readFileSync(this.lockPath(), "utf8")).pid === process.pid) rmSync(this.lockPath());
+    } catch {}
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
   }
 }

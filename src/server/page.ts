@@ -385,7 +385,7 @@ function card(it, pos) {
   el.append(top);
   el.append(h("span", { class: "mid" }, num ? h("span", { class: "num" + (num.text.length > 5 ? " long" : "") }, num.text) : null, h("span", { class: "txt" }, num ? num.rest : text)));
   const img = it.node && it.node.images && it.node.images.length ? it.node.images[it.node.images.length - 1] : null;
-  if (img) el.append(h("img", { class: "thumb", src: api("/api/blob/" + img), alt: "", loading: "lazy" }));
+  if (img) el.append(h("img", { class: "thumb", src: api("api/blob/" + img), alt: "", loading: "lazy" }));
   el.addEventListener("click", () => {
     if (it.question) { tab = "questions"; selected = null; }
     else selected = it.id;
@@ -484,7 +484,7 @@ function drawDetail() {
   (n.outputs || []).filter((o) => o.kind === "image" && IMG_EXT.test(o.path)).forEach((o) => addImg(o.sha, o.name || baseName(o.path)));
   if (imgs.length) {
     box.append(h("h3", {}, "Images"));
-    box.append(h("div", { class: "images" }, imgs.map(([sha, name]) => h("a", { href: api("/api/blob/" + sha), target: "_blank", rel: "noopener" }, h("img", { src: api("/api/blob/" + sha), alt: name, loading: "lazy" })))));
+    box.append(h("div", { class: "images" }, imgs.map(([sha, name]) => h("a", { href: api("api/blob/" + sha), target: "_blank", rel: "noopener" }, h("img", { src: api("api/blob/" + sha), alt: name, loading: "lazy" })))));
   }
 
   const dec = Object.entries(n.decisions || {});
@@ -532,7 +532,7 @@ function drawDetail() {
   }
   if (files.length) {
     box.append(h("h3", {}, "Output files (" + files.length + ")"));
-    box.append(h("ul", { class: "plain" }, files.slice(0, 40).map((o) => h("li", {}, o.sha ? h("a", { href: api("/api/blob/" + o.sha), target: "_blank", rel: "noopener" }, baseName(o.path)) : baseName(o.path), h("span", { class: "dim" }, "  " + o.kind + (dirName(o.path) ? " in " + dirName(o.path) : ""))))));
+    box.append(h("ul", { class: "plain" }, files.slice(0, 40).map((o) => h("li", {}, o.sha ? h("a", { href: api("api/blob/" + o.sha), target: "_blank", rel: "noopener" }, baseName(o.path)) : baseName(o.path), h("span", { class: "dim" }, "  " + o.kind + (dirName(o.path) ? " in " + dirName(o.path) : ""))))));
   }
   const metrics = n.result && n.result.metrics ? Object.entries(n.result.metrics) : [];
   if (metrics.length) {
@@ -598,7 +598,7 @@ function drawDecisions(box) {
 }
 
 async function answer(qid, value) {
-  const r = await fetch(api("/api/answer"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ qid, value }) });
+  const r = await fetch(api("api/answer"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ qid, value }) });
   if (!r.ok) alert("The answer was not saved: " + (await r.json()).error);
   await load();
 }
@@ -708,7 +708,7 @@ function render() {
 }
 
 async function load() {
-  const r = await fetch(api("/api/state"));
+  const r = await fetch(api("api/state"));
   state = await r.json();
   const live = document.getElementById("live");
   if (live.classList.contains("on") || live.classList.contains("busy")) live.classList.toggle("busy", !!state.busy);
@@ -726,7 +726,7 @@ document.getElementById("theme").addEventListener("click", () => {
 
 let timer = null;
 function connect() {
-  const es = new EventSource(api("/events"));
+  const es = new EventSource(api("events"));
   const live = document.getElementById("live");
   const label = live.querySelector("span");
   es.onopen = () => { live.className = "live on"; label.textContent = "live"; };

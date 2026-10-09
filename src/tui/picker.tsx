@@ -28,8 +28,10 @@ export function SessionPicker(props: { list: SessionInfo[]; initial: number; not
             <Text color={i === sel ? "cyan" : undefined} bold={i === sel}>
               {i === sel ? "▸ " : "  "}
               {age} · {clipStart(folderText(s.cwd), width - age.length - 3)}
+              {s.status ? <Text dimColor> · {s.status}</Text> : null}
             </Text>
-            <Text dimColor>    {s.ask ? clip(s.ask, width - 2) : "(no request)"}</Text>
+            {s.name ? <Text>    {clip(s.name, width - 2)}</Text> : null}
+            <Text dimColor>    {s.description ? clip(s.description, width - 2) : s.ask ? clip(s.ask, width - 2) : "(no request)"}</Text>
           </Box>
         );
       })}

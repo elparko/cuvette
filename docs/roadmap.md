@@ -16,7 +16,7 @@ This file lists planned work that is not built yet. Each item says what it is fo
 - Model and API key settings in a settings page, with the spend shown.
 - The terminal UI and the browser app use the same session and the same event bus, so a session can move between them.
 
-**First step.** Extend the graph window (`src/server/window.ts`) with a chat box and the setup form, then add `ga app`.
+**Status (2026-10-08).** `ga app` is built: the conversation, the cards, the Analysis, Results, Decisions and Record tabs, Settings, Sessions with titles, the first-start setup page and the sample analysis. See "Browser app" in `docs/architecture.md`. Next: the desktop wrapper, a facelift for the Settings page, and a live view of one session from two processes (now the second view runs in the same process).
 
 ## Other planned items
 

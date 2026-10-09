@@ -74,7 +74,11 @@ src/tools/
 src/ui/                      view-independent commands, cards, messages, settings;    [F]
                              the terminal UI and the browser app both call them
 src/tui/                     Ink app                                                  [F]
-src/server/                  later: graph window (HTTP + SSE) and ntfy push           [F]
+src/server/                  graph window (HTTP + SSE), ntfy push, and the browser    [F]
+                             app: app.ts (startApp: server, token, sessions),
+                             app-view.ts (one session's view and card state),
+                             app-html.ts (server-side HTML of items, cards, tabs),
+                             app-page.ts (the page shell, plain HTML, CSS and JS)
 src/mcp-server.ts            the harness as an MCP server                             [lead]
 src/onboarding/              checker, known-answer runner, onboarding agent           [I]
 src/bench/                   trap datasets, scenarios, six scores                     [J]
@@ -396,3 +400,35 @@ ga mcp
   with `overwritten: true`, and tells the model to ask the scientist if it needs a change. An
   agent-owned decision changes when the agent gives a new value (logged as a `decision` by the
   agent). In headless mode `ask_scientist` always waits, because the answer comes at once.
+
+## Browser app (`src/server/app.ts`, 2026-10-08)
+
+`ga app [folder] [--resume <id|folder>] [--no-open]` starts `startApp(opts)`: an HTTP server on
+127.0.0.1 with a random port and a random token. Every request needs the token (`?t=` or the
+`x-token` header), the Host header must be 127.0.0.1 or localhost with the port, a POST with an
+Origin header must come from the same origin, and the server sends no CORS headers. The page
+uses relative URLs only. `startApp` returns `{ url, port, token, close() }`, so a desktop wrapper
+can start and stop it without the command line.
+
+- **Same layer as the terminal.** `src/ui/` holds the commands, the card logic (the proposed
+  analysis is a reducer, `planReduce`), the message routing during a turn and the settings
+  editor. `WebView` (`app-view.ts`) maps the bus events with the same `Mapper` and `Collapser`
+  as the terminal and runs every slash command through the same `commands` list.
+  `tests/parity.test.ts` checks that both views have every command and every card type.
+- **Cards are rendered on the server** (`app-html.ts`, `WEB_CARDS`, one renderer for each card
+  type). The page posts `{id, act, value, fields}` to `/api/act`.
+- **Desktop bridge.** The page calls `window.cuvetteDesktop` when a wrapper provides it:
+  `chooseFolder(start)`, `reveal(path)`, `notify(title, body)`, `saveFile(url, name)`. In a
+  browser the fallbacks are the in-page folder field, `/api/reveal`, the Notification API and a
+  download link.
+- **One session, two views.** In the terminal, `/app` starts the app on the running session.
+  `ga app --resume <id>` on a session that a terminal holds sends SIGUSR2 to that process,
+  which starts the app on its session and writes the URL to `.record/open.json`. A session that
+  the app holds refuses `ga --resume` and prints the app URL. `open.json` (pid, app URL, mode
+  0600) is removed when the session closes.
+- **Session titles.** After a turn that changes the analysis, the session makes one short
+  model call (Claude Haiku for Claude models, the session model otherwise) for a title and a
+  one-sentence description. The record gets a `title` entry and the home index gets `name` and
+  `description`. `ga sessions`, the terminal picker and the app's Sessions page show them.
+- **Tests and windows.** `openWithOs`, the reveal action and the pilot image viewer do nothing
+  under vitest or with `GA_NO_OPEN=1` (`--no-open` sets it).

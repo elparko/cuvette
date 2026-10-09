@@ -115,11 +115,7 @@ function StepView({ item }: { item: Extract<Item, { t: "step" }> }) {
   );
 }
 
-export function activityText(state: string, purpose?: string, tool?: string): string {
-  if (state === "running") return purpose || (tool ? `Running ${tool.replace(/_/g, " ")}` : "Working");
-  if (state === "waiting") return "Waiting for your answer";
-  return "Thinking about the next step";
-}
+export { activityText } from "../ui/messages.ts";
 
 export function elapsedText(s: number): string {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;

@@ -32,3 +32,9 @@ export function inputPlaceholder(session: SessionLike, busy: boolean): string {
   if (!busy) return "Ask for an analysis step, or type / for commands";
   return session.settings?.messages === "queue" ? "The agent is working. Your message waits until the turn ends." : "The agent is working. Your message goes in after the current step.";
 }
+
+export function activityText(state: string, purpose?: string, tool?: string): string {
+  if (state === "running") return purpose || (tool ? `Running ${tool.replace(/_/g, " ")}` : "Working");
+  if (state === "waiting") return "Waiting for your answer";
+  return "Thinking about the next step";
+}

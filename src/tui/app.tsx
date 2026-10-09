@@ -5,7 +5,7 @@ import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
-import { commands, openSetup, openWithOs, suggestions, table, type CommandCtx } from "../ui/commands.ts";
+import { commands, openPanels, openSetup, openWithOs, suggestions, table, type CommandCtx } from "../ui/commands.ts";
 import { imageProtocol, inlineImage } from "./image.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
@@ -32,6 +32,7 @@ export function App({ session, opts, reprint }: { session: SessionLike; opts: Tu
   const mapper = useRef(new Mapper(session));
   const counter = useRef(0);
   const windowHandle = useRef<{ url: string; close(): void } | undefined>(undefined);
+  const appHandle = useRef<{ url: string; close(): Promise<void> | void } | undefined>(undefined);
   const lastCtrlC = useRef(0);
   const log = useRef<Logged[]>([]);
   const collapser = useRef(new Collapser());
@@ -110,8 +111,28 @@ export function App({ session, opts, reprint }: { session: SessionLike; opts: Tu
     setOpenQ(session.questions.open().length);
   }, [session]);
 
+  const serveApp = useCallback(async () => {
+    if (!appHandle.current) {
+      const { startApp } = await import("../server/app.ts");
+      appHandle.current = await startApp({ session: session as never, env });
+    }
+    return appHandle.current.url;
+  }, [session, env]);
+
+  useEffect(() => {
+    if (process.platform === "win32") return;
+    const onSignal = () => {
+      serveApp()
+        .then(() => line("▸", "The browser app opened this session. Both views show the same session.", undefined, true))
+        .catch((e: Error) => line("✗", `The app did not start: ${e.message}`, "red"));
+    };
+    process.on("SIGUSR2", onSignal);
+    return () => void process.off("SIGUSR2", onSignal);
+  }, [serveApp]);
+
   const quit = useCallback(async () => {
     windowHandle.current?.close();
+    await appHandle.current?.close();
     try {
       await session.close();
     } finally {
@@ -220,6 +241,12 @@ export function App({ session, opts, reprint }: { session: SessionLike; opts: Tu
         }
         return windowHandle.current.url;
       },
+      startApp: async () => {
+        const fresh = !appHandle.current;
+        const url = await serveApp();
+        if (fresh) openWithOs(url);
+        return url;
+      },
       startPanel: async () => {
         if (!windowHandle.current) {
           const { startWindow } = await import("../server/window.ts");
@@ -228,19 +255,7 @@ export function App({ session, opts, reprint }: { session: SessionLike; opts: Tu
         const u = new URL(windowHandle.current.url);
         u.pathname = "/panel";
         const url = u.toString();
-        const opened: string[] = [];
-        const failed: string[] = [];
-        for (const a of (session as unknown as { adapters?: { name: string; module(): Promise<{ openPanel?: (url: string, o: { sessionDir: string }) => Promise<unknown> }> }[] }).adapters ?? []) {
-          try {
-            const mod = await a.module();
-            if (!mod.openPanel) continue;
-            await mod.openPanel(url, { sessionDir: session.dir });
-            opened.push(a.name);
-          } catch (e) {
-            failed.push(`${a.name}: ${(e as Error).message}`);
-          }
-        }
-        return { url, opened, failed };
+        return { url, ...(await openPanels(session, url)) };
       },
     }),
     [session, cards, addCard, refresh, quit, opts, toggleDetails, keyStyle],

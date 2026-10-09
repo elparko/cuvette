@@ -65,6 +65,7 @@ export interface SessionLike {
   elnPush?(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }>;
   elnLink?(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }>;
   openEvents?(): BusEvent[];
+  markOpen?(extra?: Record<string, unknown>): void;
   close(): Promise<void>;
 }
 

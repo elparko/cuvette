@@ -6,7 +6,7 @@ import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, re
 import { stepNumbers } from "../core/housekeeping.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { listSessions, sessionLine } from "../core/sessions.ts";
-import { show, type Card } from "./cards.ts";
+import { choiceLabel, choiceValue, show, type Card } from "./cards.ts";
 import type { OutputRef } from "./items.ts";
 import type { SessionLike } from "./types.ts";
 
@@ -25,6 +25,7 @@ export interface CommandCtx {
   toggleDetails(): boolean;
   startWindow(): Promise<string>;
   startPanel(): Promise<{ url: string; opened: string[]; failed: string[] }>;
+  startApp(): Promise<string>;
 }
 
 export interface Command {
@@ -57,6 +58,31 @@ export function table(headers: string[], rows: string[][]): string {
 function clip(s: string, n = 48): string {
   const one = s.replace(/\s+/g, " ");
   return one.length > n ? one.slice(0, n - 1) + "…" : one;
+}
+
+export function parseDecision(f: { kind: string; choices?: any[] }, raw: string): unknown {
+  if (f.choices?.length) {
+    const n = Number(raw);
+    const hit = f.choices.find((c) => String(choiceValue(c)) === raw || choiceLabel(c).toLowerCase() === raw.toLowerCase());
+    if (hit !== undefined) return choiceValue(hit);
+    if (Number.isInteger(n) && n >= 1 && n <= f.choices.length) return choiceValue(f.choices[n - 1]);
+    throw new Error(`Use one of: ${f.choices.map(choiceLabel).join(", ")}`);
+  }
+  if (/bool/.test(f.kind)) return /^(true|yes|on|1)$/i.test(raw);
+  if (/int|float|num|real/.test(f.kind)) {
+    const n = Number(raw);
+    if (raw.trim() === "" || Number.isNaN(n)) throw new Error("Type a number.");
+    return n;
+  }
+  return raw;
+}
+
+export function rerunText(session: SessionLike): string | undefined {
+  const stale = [...session.record.stale()];
+  if (!stale.length) return undefined;
+  const steps = stepNumbers(session.record.nodes());
+  const names = stale.map((id) => (steps.has(id) ? `step ${steps.get(id)}` : id));
+  return `I changed a decision. Run the steps that are out of date again with the recorded values: ${names.join(", ")}. Then update the answer.`;
 }
 
 export function decisionRows(session: SessionLike): string[][] {
@@ -138,7 +164,10 @@ export function renderGraph(session: SessionLike): string {
   return out.join("\n");
 }
 
+export const noOpen = () => !!(process.env.VITEST || process.env.GA_NO_OPEN);
+
 export function openWithOs(path: string): void {
+  if (noOpen()) return;
   const [cmd, args] =
     process.platform === "darwin"
       ? ["open", [path]]
@@ -148,6 +177,22 @@ export function openWithOs(path: string): void {
   const child = spawn(cmd!, args as string[], { stdio: "ignore", detached: true });
   child.on("error", () => {});
   child.unref();
+}
+
+export async function openPanels(session: SessionLike, url: string): Promise<{ opened: string[]; failed: string[] }> {
+  const opened: string[] = [];
+  const failed: string[] = [];
+  for (const a of (session as unknown as { adapters?: { name: string; module(): Promise<{ openPanel?: (url: string, o: { sessionDir: string }) => Promise<unknown> }> }[] }).adapters ?? []) {
+    try {
+      const mod = await a.module();
+      if (!mod.openPanel) continue;
+      await mod.openPanel(url, { sessionDir: session.dir });
+      opened.push(a.name);
+    } catch (e) {
+      failed.push(`${a.name}: ${(e as Error).message}`);
+    }
+  }
+  return { opened, failed };
 }
 
 async function loadProfiles(): Promise<{ name: string; version: number }[]> {
@@ -195,6 +240,37 @@ export const commands: Command[] = [
         ctx.notice(keys.length ? `${who === "agent" ? "The agent now owns" : "You now own"} ${keys.length} ${keys.length === 1 ? "decision" : "decisions"}: ${keys.join(", ")}. Fixed decisions do not change.` : "No decision changed owner.");
       } else if (who) return ctx.error("Use: /decisions, /decisions agent or /decisions me");
       ctx.print(table(["Key", "Value", "Owner", "Set by"], decisionRows(ctx.session)), "Decisions");
+    },
+  },
+  {
+    name: "change",
+    args: "<key> <value>",
+    help: "Change the value of a decision. Steps that used the old value become out of date.",
+    run([key, ...rest], ctx) {
+      const raw = rest.join(" ").trim();
+      const f = ctx.session.decisions.fields().find((x) => x.key === key);
+      if (!key || !raw) return ctx.error("Use: /change <key> <value>");
+      if (!f) return ctx.error(`No decision named ${key}. See /decisions.`);
+      if (f.owner === "fixed") return ctx.error(`${f.label} is fixed by the lab profile.`);
+      let value: unknown;
+      try {
+        value = parseDecision(f, raw);
+      } catch (e) {
+        return ctx.error((e as Error).message);
+      }
+      const stale = ctx.session.setDecision(key, value, "changed by the scientist");
+      ctx.notice(`${f.label} is now ${show(value)}.${stale.length ? ` ${stale.length} ${stale.length === 1 ? "step is" : "steps are"} out of date. Type /rerun to run them again.` : ""}`);
+      ctx.refresh();
+    },
+  },
+  {
+    name: "rerun",
+    help: "Ask the agent to run the out-of-date steps again.",
+    run(_, ctx) {
+      const text = rerunText(ctx.session);
+      if (!text) return ctx.notice("No step is out of date.");
+      if (ctx.session.busy) return ctx.error("The agent is busy. Wait, then type /rerun again.");
+      void ctx.session.send(text).catch((e: Error) => ctx.error(`The agent stopped: ${e.message}`));
     },
   },
   {
@@ -555,6 +631,17 @@ export const commands: Command[] = [
         ctx.notice(`Window: ${await ctx.startWindow()}`);
       } catch (e) {
         ctx.error(`The window did not start: ${(e as Error).message}`);
+      }
+    },
+  },
+  {
+    name: "app",
+    help: "Open this session in the browser app. Both views show the same session.",
+    async run(_, ctx) {
+      try {
+        ctx.notice(`App: ${await ctx.startApp()}`);
+      } catch (e) {
+        ctx.error(`The app did not start: ${(e as Error).message}`);
       }
     },
   },

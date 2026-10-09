@@ -74,7 +74,7 @@ function drawCards(f) {
     if (q.evidence) c.append(el("pre", "", q.evidence));
     for (const o of q.options) {
       const rec = q.recommendation && JSON.stringify(q.recommendation.value) === JSON.stringify(o.value);
-      c.append(btn(o.label + (rec ? " (recommended)" : ""), () => api("/api/answer", { qid: q.qid, value: o.value }), rec));
+      c.append(btn(o.label + (rec ? " (recommended)" : ""), () => api("api/answer", { qid: q.qid, value: o.value }), rec));
     }
     if (q.recommendation) c.append(el("div", "rec", "Recommended: " + q.recommendation.reason));
     box.append(c);
@@ -82,19 +82,19 @@ function drawCards(f) {
   for (const p of f.pendingPermissions) {
     const c = el("div", "card"); c.append(el("h3", "", "Allow " + p.tool + "?"), el("div", "", p.touches || ""));
     if (p.code) c.append(el("pre", "", p.code));
-    c.append(btn("Allow", () => api("/api/permission", { rid: p.rid, ok: true }), true), btn("Deny", () => api("/api/permission", { rid: p.rid, ok: false })));
+    c.append(btn("Allow", () => api("api/permission", { rid: p.rid, ok: true }), true), btn("Deny", () => api("api/permission", { rid: p.rid, ok: false })));
     box.append(c);
   }
   for (const s2 of f.pendingFollow) {
     const c = el("div", "card"); c.append(el("h3", "", "Step " + s2.step + ": do this by hand"), el("div", "", s2.text));
     const note = el("input"); note.type = "text"; note.placeholder = "Numbers you got (optional)";
-    c.append(note, btn("Done", () => api("/api/follow", { step: s2.step, note: note.value }), true), btn("Let the agent do it", () => api("/api/follow", { step: s2.step, agentDoes: true })));
+    c.append(note, btn("Done", () => api("api/follow", { step: s2.step, note: note.value }), true), btn("Let the agent do it", () => api("api/follow", { step: s2.step, agentDoes: true })));
     box.append(c);
   }
 }
 async function poll() {
   try {
-    const r = await api("/api/feed?since=" + since);
+    const r = await api("api/feed?since=" + since);
     const f = await r.json();
     const log = $("log"), stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
     for (const e of f.entries) addEntry(e);
@@ -109,11 +109,11 @@ async function poll() {
 $("f").onsubmit = async (ev) => {
   ev.preventDefault();
   const text = $("in").value.trim(); if (!text) return;
-  const r = await api("/api/send", { text });
+  const r = await api("api/send", { text });
   if (r.status === 409) line("error", "The agent is busy. Wait or press Stop."); else $("in").value = "";
 };
-$("stop").onclick = () => api("/api/stop", {});
-$("mode").onchange = () => api("/api/mode", { mode: $("mode").value });
+$("stop").onclick = () => api("api/stop", {});
+$("mode").onchange = () => api("api/mode", { mode: $("mode").value });
 poll();
 </script>
 </body>

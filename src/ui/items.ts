@@ -29,7 +29,7 @@ export type Item =
       code?: string;
       why?: string;
     }
-  | { key: string; t: "line"; sym: string; color?: string; text: string; dim?: boolean }
+  | { key: string; t: "line"; sym: string; color?: string; text: string; dim?: boolean; group?: number[] }
   | { key: string; t: "block"; title?: string; text: string };
 
 const MAX_SETTINGS = 5;
@@ -345,7 +345,7 @@ export class Collapser {
     let group: Entry[] = [];
     const close = () => {
       const text = group.length ? housekeepingText(group, (e) => (e.data.effectiveArgs as Record<string, unknown>) ?? this.args.get(String(e.data.callId)) ?? {}) : "";
-      if (text) out.push({ key: `h${group[0]!.id}`, t: "line", sym: "·", text, dim: true });
+      if (text) out.push({ key: `h${group[0]!.id}`, t: "line", sym: "·", text, dim: true, group: group.map((e) => e.id) });
       group = [];
     };
     this.held.forEach((h, i) => {
