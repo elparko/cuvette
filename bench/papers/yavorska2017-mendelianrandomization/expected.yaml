@@ -1,0 +1,34 @@
+tool: MendelianRandomization (R), mr_ivw, mr_egger, mr_median
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/yavorska2017-mendelianrandomization/ldl_chd.csv
+decisions:
+  allele_harmonization: true
+  mr_methods: "ivw, egger, weighted_median"
+  ivw_model: default
+  distribution: normal
+  alpha: 0.05
+  exclude_variants: none
+expected:
+  - {description: "Number of variants", value: 28, tolerance: 0, source: "package vignette 0.9.0"}
+  - {description: "Inverse-variance weighted estimate", value: 2.834, tolerance: 0.01, source: "package vignette 0.9.0, mr_ivw output; check.py"}
+  - {description: "Standard error of the inverse-variance weighted estimate", value: 0.530, tolerance: 0.01, source: "package vignette 0.9.0; check.py"}
+  - {description: "Lower limit of the 95% confidence interval of the inverse-variance weighted estimate", value: 1.796, tolerance: 0.02, source: "package vignette 0.9.0"}
+  - {description: "Upper limit of the 95% confidence interval of the inverse-variance weighted estimate", value: 3.873, tolerance: 0.02, source: "package vignette 0.9.0"}
+  - {description: "Cochran's Q", value: 99.5304, tolerance: 0.5, source: "package vignette 0.9.0; check.py"}
+  - {description: "I-squared, percent", value: 72.9, tolerance: 0.5, source: "package vignette 0.9.0; check.py"}
+  - {description: "F statistic", value: 28.0, tolerance: 0.5, source: "package vignette 0.9.0; check.py"}
+  - {description: "Standard error of the MR-Egger estimate", value: 0.770, tolerance: 0.01, source: "package vignette 0.9.0; check.py"}
+  - {description: "MR-Egger estimate", value: 3.253, tolerance: 0.01, source: "package vignette 0.9.0, mr_egger output; check.py"}
+  - {description: "MR-Egger intercept", value: -0.011, tolerance: 0.002, source: "package vignette 0.9.0; check.py"}
+  - {description: "p value of the MR-Egger intercept", value: 0.451, tolerance: 0.01, source: "package vignette 0.9.0"}
+  - {description: "Weighted median estimate", value: 2.683, tolerance: 0.01, source: "package vignette 0.9.0, mr_median output; check.py"}
+notes: |
+  The expected values are the numbers that the MendelianRandomization vignette (version 0.9.0) prints for the 28-variant
+  data set. Package version 0.10.0 on R 4.6.1 gives the same values to the printed digits (run on 2026-10-09). check.py
+  (NumPy and SciPy, output in check.out) reproduces the inverse-variance estimate and its standard error, Cochran's Q, the
+  F statistic, the MR-Egger fit and the weighted median without the package.
+  The paper (Yavorska and Burgess 2017) uses the same 28 variants for a figure, with no numbers in the text. The numbers come
+  from the vignette, not from the paper text.
+  Trap: a fixed-effect model gives a smaller standard error (the random-effects value divided by the residual standard error of 1.92).
+  The default model for more than three variants is random effects.

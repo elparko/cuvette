@@ -1,0 +1,475 @@
+adapter:
+  name: mendelianrandomization
+  field: human genetics
+  file_types: [".csv", ".tsv"]
+  title: MendelianRandomization (causal effect from GWAS summary statistics)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Estimates the causal effect of an exposure on an outcome from summary statistics of genetic variants, with the R
+    package MendelianRandomization. It gives the inverse-variance weighted, MR-Egger, median, mode and maximum
+    likelihood estimates, the heterogeneity tests and the instrument strength. The scientist decides which variants
+    and which methods to use.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: MendelianRandomization
+  version: "0.10.0"
+  tested_versions: []
+  homepage: https://cran.r-project.org/package=MendelianRandomization
+  docs:
+    - https://cran.r-project.org/web/packages/MendelianRandomization/vignettes/Vignette_MR.pdf
+    - https://cran.r-project.org/web/packages/MendelianRandomization/MendelianRandomization.pdf
+    - https://doi.org/10.1093/ije/dyx034
+  install: >
+    Install R (brew install r on macOS). Then install the R packages MendelianRandomization and jsonlite into a library
+    folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("MendelianRandomization", "jsonlite"), repos = "https://cloud.r-project.org")'
+  citation:
+    - text: "Yavorska, O. O., & Burgess, S. (2017). MendelianRandomization: an R package for performing Mendelian randomization analyses using summarized data. International Journal of Epidemiology, 46(6), 1734-1739. https://doi.org/10.1093/ije/dyx034"
+      doi: 10.1093/ije/dyx034
+      bibtex: |
+        @article{yavorska2017mendelianrandomization,
+          author  = {Yavorska, Olena O. and Burgess, Stephen},
+          title   = {{MendelianRandomization}: an {R} package for performing {Mendelian} randomization analyses using summarized data},
+          journal = {International Journal of Epidemiology},
+          year    = {2017},
+          volume  = {46},
+          number  = {6},
+          pages   = {1734--1739},
+          doi     = {10.1093/ije/dyx034}
+        }
+    - text: "Broadbent, J. R., Foley, C. N., Grant, A. J., Mason, A. M., Staley, J. R., & Burgess, S. (2020). MendelianRandomization v0.5.0: updates to an R package for performing Mendelian randomization analyses using summarized data. Wellcome Open Research, 5, 252. https://doi.org/10.12688/wellcomeopenres.16374.2"
+      doi: 10.12688/wellcomeopenres.16374.2
+      bibtex: |
+        @article{broadbent2020mendelianrandomization,
+          author  = {Broadbent, James R. and Foley, Christopher N. and Grant, Andrew J. and Mason, Amy M. and Staley, James R. and Burgess, Stephen},
+          title   = {{MendelianRandomization} v0.5.0: updates to an {R} package for performing {Mendelian} randomization analyses using summarized data},
+          journal = {Wellcome Open Research},
+          year    = {2020},
+          volume  = {5},
+          pages   = {252},
+          doi     = {10.12688/wellcomeopenres.16374.2}
+        }
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 600
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first
+  folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  ~/.guided-analysis/R-library. The program version in this adapter is the version of the R package
+  MendelianRandomization, not of R. The package does not align alleles. The tools refuse to run until the
+  scientist confirms that the exposure and the outcome effects use the same effect allele for every variant.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools read summary statistics of variants (effect sizes and standard errors). They read no data of persons.
+
+decisions:
+  - key: allele_harmonization
+    label: Allele harmonization
+    kind: bool
+    group: Data
+    help: >
+      The package does not align alleles. For each variant, the exposure effect and the outcome effect must refer to the same
+      effect allele. Confirm that you aligned them, and that you removed palindromic variants with an allele frequency near
+      one half. A wrong alignment flips the sign of a variant and changes the estimate.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: estimate_causal_effect, arg: alleles_harmonized }
+      - { tool: check_variants, arg: alleles_harmonized }
+
+  - key: mr_methods
+    label: Estimation methods
+    kind: text
+    default: "ivw,egger,weighted_median"
+    group: Method
+    help: >
+      A comma list from ivw, egger, weighted_median, simple_median, mode and maxlik. The ivw estimate is the main estimate if
+      all variants are valid. egger, the medians and mode stay consistent under some forms of invalid instruments.
+      Report the methods that you chose before you saw the result, and say if they disagree.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: estimate_causal_effect, arg: methods }
+
+  - key: ivw_model
+    label: Model of the inverse-variance weighted method
+    kind: choice
+    choices: [default, random, fixed]
+    default: default
+    group: Method
+    help: >
+      The choice default uses a fixed-effect model for three variants or fewer and a random-effects model for more. A random-effects
+      model widens the standard error when the variant estimates differ more than chance allows. A fixed-effect model does not.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: estimate_causal_effect, arg: ivw_model }
+
+  - key: distribution
+    label: Distribution for the confidence interval
+    kind: choice
+    choices: [normal, t-dist]
+    default: normal
+    group: Method
+    help: >
+      The choice normal uses the normal distribution. The choice t-dist uses a t distribution with the residual degrees of freedom.
+      The t distribution gives wider intervals for few variants.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: estimate_causal_effect, arg: distribution }
+
+  - key: alpha
+    label: Significance level of the confidence interval
+    kind: float
+    default: 0.05
+    lo: 0.001
+    hi: 0.5
+    group: Method
+    help: The interval has the confidence level one minus this value. The unit is a fraction. The tests of heterogeneity and pleiotropy use the same level.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: estimate_causal_effect, arg: alpha }
+      - { tool: check_variants, arg: alpha }
+
+  - key: exclude_variants
+    label: Variants that you exclude
+    kind: text
+    default: none
+    group: Instruments
+    help: >
+      Name each variant that you remove and the reason. An example is a variant in the gene region of another trait. Write none to keep all variants. Decide before you see the estimates. Removing a variant because it is an outlier in
+      the result is a data-driven choice. Report it as such.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: estimate_causal_effect, arg: exclude }
+      - { tool: check_variants, arg: exclude }
+
+  - key: min_f
+    label: Weakest accepted instrument (F statistic)
+    kind: float
+    default: 10
+    lo: 1
+    hi: 1000
+    group: Instruments
+    help: >
+      The F statistic of a variant is the squared ratio of its exposure effect to its standard error. A value below this limit marks
+      a weak instrument. The usual limit is 10. Weak instruments bias the estimate toward the observational association in an overlapping sample.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: check_variants, arg: min_f }
+
+checks:
+  - id: single_method_only
+    description: The answer reports one estimation method with no check for invalid instruments.
+    severity: warning
+    text: >
+      Report the answer if it gives a causal estimate from only the inverse-variance weighted method and does not give the
+      MR-Egger intercept, a median or mode estimate, or the Cochran Q test.
+  - id: heterogeneity_ignored
+    description: The answer does not mention a significant heterogeneity test.
+    severity: warning
+    text: >
+      Report the answer if the result lists a Cochran Q p value below the significance level or an MR-Egger intercept p value below
+      it, and the answer does not mention it.
+  - id: weak_instruments
+    description: The answer reports an estimate while the instruments are weak.
+    severity: warning
+    text: >
+      Report the answer if the result shows an F statistic below 10 and the answer does not say that the instruments can be weak.
+  - id: causal_language
+    description: The answer says that the exposure proves or shows a cause.
+    severity: warning
+    text: >
+      Report the answer if it states that the result proves a cause. Mendelian randomization estimates a causal effect only under
+      three assumptions: relevance, independence of confounders, and no effect on the outcome except through the exposure.
+  - id: effect_scale
+    description: The answer does not name the scale of the estimate.
+    severity: warning
+    text: >
+      Report the answer if it gives the estimate without the scale. A binary outcome gives a log odds ratio for one unit of the exposure.
+      Give the odds ratio only after you take the exponential of the estimate and of the interval limits.
+
+map:
+  - tool: estimate_causal_effect
+    route: "library(MendelianRandomization); x <- mr_input(bx = bx, bxse = bxse, by = by, byse = byse); mr_ivw(x); mr_egger(x); mr_median(x); mr_mbe(x); mr_maxlik(x)"
+    steps:
+      - "R: build the input with mr_input(bx, bxse, by, byse). Add corr = matrix for correlated variants."
+      - "R: run mr_ivw(x), mr_egger(x), mr_median(x), mr_mbe(x) and mr_maxlik(x). Each prints the estimate, the standard error, the interval and the p value."
+      - "MR-Base web app: upload the summary statistics, harmonize, then choose the methods in the Analysis tab."
+      - "Stata: use mrrobust (mregger, mrmedian) on the same four variables."
+    params:
+      - { arg: methods, label: "the functions mr_ivw, mr_egger, mr_median, mr_mbe and mr_maxlik" }
+      - { arg: ivw_model, label: "model of mr_ivw()", ui_default: "default" }
+      - { arg: distribution, label: "distribution of each function", ui_default: "normal" }
+      - { arg: alpha, label: "alpha of each function", ui_default: 0.05 }
+      - { arg: exclude, label: "rows removed from the vectors bx, bxse, by and byse" }
+    fidelity: exact
+    evidence:
+      source: docs
+      test: ldl-chd-package-vignette
+      note: The tool calls the same functions. The package vignette prints the same estimates for the same data.
+
+  - tool: check_variants
+    route: "ratio <- by/bx; w <- bx^2/byse^2; Q_i <- w*(ratio - weighted.mean(ratio, w))^2; F_i <- (bx/bxse)^2; for each i, mr_ivw() without variant i"
+    steps:
+      - "R: compute the Wald ratio by/bx and its standard error byse/abs(bx) for each variant."
+      - "R: compute the contribution to Cochran Q with the inverse-variance weights, and the F statistic (bx/bxse)^2 for each variant."
+      - "R: drop one variant at a time and rerun mr_ivw() for the leave-one-out estimate."
+      - "MR-Base web app: Single SNP and Leave-one-out analyses in the Analysis tab."
+    params:
+      - { arg: min_f, label: "F statistic limit for a weak instrument", ui_default: 10 }
+      - { arg: alpha, label: "alpha for the chi-square limit of the Q contribution", ui_default: 0.05 }
+    fidelity: exact
+    evidence:
+      source: docs
+      test: variants-ldl-chd
+      note: The total of the Q contributions equals the Cochran Q that the package prints. NumPy gives the same values (checks/check_mr_numpy.py).
+
+tests:
+  - id: ldl-chd-package-vignette
+    description: >
+      The 28 LDL cholesterol variants against coronary heart disease (Waterworth et al. 2010, data in the package). The values
+      are the output that the package vignette prints for this data (MendelianRandomization vignette, version 0.9.0, rounded to
+      three decimals). The mode standard error comes from a bootstrap and differs by 0.001 between platforms.
+    data: [data/ldl_chd.csv]
+    calls:
+      - tool: estimate_causal_effect
+        args: { data: "{adapter_dir}/data/ldl_chd.csv", alleles_harmonized: true, methods: "ivw,egger,weighted_median,simple_median,mode,maxlik", exposure: LDL cholesterol, outcome: coronary heart disease }
+    expect:
+      - { path: metrics.n_variants, equals: 28 }
+      - { path: metrics.ivw_estimate, approx: 2.834, abs: 0.0005 }
+      - { path: metrics.ivw_se, approx: 0.530, abs: 0.0005 }
+      - { path: metrics.ivw_ci_low, approx: 1.796, abs: 0.0005 }
+      - { path: metrics.ivw_ci_high, approx: 3.873, abs: 0.0005 }
+      - { path: metrics.ivw_q, approx: 99.5304, abs: 0.00005 }
+      - { path: metrics.ivw_q_df, equals: 27 }
+      - { path: metrics.ivw_i2, approx: 72.9, abs: 0.05 }
+      - { path: metrics.ivw_rse, approx: 1.920, abs: 0.0005 }
+      - { path: metrics.f_statistic, approx: 28.0, abs: 0.05 }
+      - { path: metrics.egger_estimate, approx: 3.253, abs: 0.0005 }
+      - { path: metrics.egger_se, approx: 0.770, abs: 0.0005 }
+      - { path: metrics.egger_intercept, approx: -0.011, abs: 0.0005 }
+      - { path: metrics.egger_intercept_se, approx: 0.015, abs: 0.0005 }
+      - { path: metrics.egger_intercept_p, approx: 0.451, abs: 0.0005 }
+      - { path: metrics.egger_q, approx: 97.3975, abs: 0.00005 }
+      - { path: metrics.weighted_median_estimate, approx: 2.683, abs: 0.0005 }
+      - { path: metrics.weighted_median_se, approx: 0.419, abs: 0.0005 }
+      - { path: metrics.simple_median_estimate, approx: 1.755, abs: 0.0005 }
+      - { path: metrics.simple_median_se, approx: 0.740, abs: 0.0005 }
+      - { path: metrics.mode_estimate, approx: 2.946, abs: 0.0005 }
+      - { path: metrics.mode_se, approx: 1.005, abs: 0.0015 }
+      - { path: metrics.maxlik_estimate, approx: 3.225, abs: 0.0005 }
+      - { path: metrics.maxlik_se, approx: 0.569, abs: 0.0005 }
+      - { path: metrics.maxlik_q, approx: 86.8145, abs: 0.00005 }
+
+  - id: calcium-glucose-correlated
+    description: >
+      Six correlated variants in the CASR gene region, calcium against fasting glucose (Burgess et al. 2015, data in the package,
+      with the correlation matrix). The values are the output that the package vignette prints, rounded to three decimals.
+    data: [data/calcium_glucose.csv, data/calcium_correlation.csv]
+    calls:
+      - tool: estimate_causal_effect
+        args: { data: "{adapter_dir}/data/calcium_glucose.csv", correlation: "{adapter_dir}/data/calcium_correlation.csv", alleles_harmonized: true, methods: "ivw,egger,maxlik" }
+    expect:
+      - { path: metrics.n_variants, equals: 6 }
+      - { path: metrics.ivw_estimate, approx: 2.245, abs: 0.0005 }
+      - { path: metrics.ivw_se, approx: 0.643, abs: 0.0005 }
+      - { path: metrics.ivw_ci_low, approx: 0.984, abs: 0.0005 }
+      - { path: metrics.ivw_ci_high, approx: 3.505, abs: 0.0005 }
+      - { path: metrics.ivw_q, approx: 2.0530, abs: 0.00005 }
+      - { path: metrics.f_statistic, approx: 11.5, abs: 0.05 }
+      - { path: metrics.egger_estimate, approx: 1.302, abs: 0.0005 }
+      - { path: metrics.egger_se, approx: 1.518, abs: 0.0005 }
+      - { path: metrics.egger_intercept, approx: 0.009, abs: 0.0005 }
+      - { path: metrics.egger_intercept_p, approx: 0.493, abs: 0.0005 }
+      - { path: metrics.maxlik_estimate, approx: 2.303, abs: 0.0005 }
+      - { path: metrics.maxlik_se, approx: 0.709, abs: 0.0005 }
+
+  - id: ldl-chd-numpy
+    description: >
+      An independent calculation of the same 28 variants with NumPy and SciPy (checks/check_mr_numpy.py and .out): the
+      inverse-variance estimate, Cochran Q, the MR-Egger fit with the standard error scaled by the residual standard error,
+      and the weighted and simple medians from the formulas of Bowden et al. 2016.
+    data: [data/ldl_chd.csv]
+    calls:
+      - tool: estimate_causal_effect
+        args: { data: "{adapter_dir}/data/ldl_chd.csv", alleles_harmonized: true, methods: "ivw,egger,weighted_median,simple_median" }
+    expect:
+      - { path: metrics.ivw_estimate, approx: 2.8342, abs: 0.00005 }
+      - { path: metrics.ivw_se, approx: 0.5298, abs: 0.00005 }
+      - { path: metrics.ivw_q, approx: 99.5304, abs: 0.00005 }
+      - { path: metrics.egger_estimate, approx: 3.2529, abs: 0.00005 }
+      - { path: metrics.egger_se, approx: 0.7701, abs: 0.00005 }
+      - { path: metrics.egger_intercept, approx: -0.0115, abs: 0.00005 }
+      - { path: metrics.egger_intercept_se, approx: 0.0152, abs: 0.00005 }
+      - { path: metrics.weighted_median_estimate, approx: 2.6829, abs: 0.00005 }
+      - { path: metrics.simple_median_estimate, approx: 1.7551, abs: 0.00005 }
+
+  - id: exclude-one-variant
+    description: >
+      Excluding the variant with the largest Q contribution gives the inverse-variance estimate of the leave-one-out calculation
+      in checks/check_mr_numpy.out.
+    data: [data/ldl_chd.csv]
+    calls:
+      - tool: estimate_causal_effect
+        args: { data: "{adapter_dir}/data/ldl_chd.csv", alleles_harmonized: true, methods: ivw, exclude: snp_12 }
+    expect:
+      - { path: metrics.n_variants, equals: 27 }
+      - { path: metrics.n_excluded, equals: 1 }
+      - { path: metrics.ivw_estimate, approx: 2.8803, abs: 0.00005 }
+
+  - id: variants-ldl-chd
+    description: >
+      The variant table for the 28 LDL variants. The Q contributions add up to the Cochran Q of the package. The largest
+      contribution and the estimate without that variant are in checks/check_mr_numpy.out.
+    data: [data/ldl_chd.csv]
+    calls:
+      - tool: check_variants
+        args: { data: "{adapter_dir}/data/ldl_chd.csv", alleles_harmonized: true }
+    expect:
+      - { path: metrics.n_variants, equals: 28 }
+      - { path: metrics.q_total, approx: 99.5304, abs: 0.00005 }
+      - { path: metrics.max_q_contribution, approx: 23.7677, abs: 0.00005 }
+      - { path: data.top_variant, equals: snp_12 }
+      - { path: "table.rows[0][7]", approx: 2.8803, abs: 0.00005 }
+
+  - id: methods-as-json-text
+    description: A model can send the method list as JSON text. The list gives the two estimates of the inverse-variance and the MR-Egger fits in checks/check_mr_numpy.out.
+    data: [data/ldl_chd.csv]
+    calls:
+      - tool: estimate_causal_effect
+        args: { data: "{adapter_dir}/data/ldl_chd.csv", alleles_harmonized: true, methods: "[\"ivw\", \"egger\"]" }
+    expect:
+      - { path: metrics.ivw_estimate, approx: 2.8342, abs: 0.00005 }
+      - { path: metrics.egger_estimate, approx: 3.2529, abs: 0.00005 }
+
+  - id: harmonization-not-confirmed
+    description: A call with alleles_harmonized false fails, and the error says that the package does not align alleles.
+    data: [data/ldl_chd.csv]
+    calls:
+      - tool: estimate_causal_effect
+        args: { data: "{adapter_dir}/data/ldl_chd.csv", alleles_harmonized: false }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "The package does not align alleles" }
+
+  - id: wrong-column
+    description: An effect column that is not in the file fails, and the error names the argument and the valid columns.
+    data: [data/ldl_chd.csv]
+    calls:
+      - tool: estimate_causal_effect
+        args: { data: "{adapter_dir}/data/ldl_chd.csv", alleles_harmonized: true, bx_col: beta_x }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "bx_col 'beta_x' is not a column" }
+      - { path: error, contains: "Columns: snp, beta_exposure" }
+
+  - id: median-with-correlation
+    description: The median method with a correlation file fails, and the error names the cause.
+    data: [data/calcium_glucose.csv, data/calcium_correlation.csv]
+    calls:
+      - tool: estimate_causal_effect
+        args: { data: "{adapter_dir}/data/calcium_glucose.csv", correlation: "{adapter_dir}/data/calcium_correlation.csv", alleles_harmonized: true, methods: weighted_median }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "need uncorrelated variants" }
+
+tools:
+  - name: estimate_causal_effect
+    title: Estimate the causal effect from variant summary statistics
+    description: >
+      Estimate the causal effect of an exposure on an outcome from the summary statistics of genetic variants. The input is a
+      CSV file with one row for each variant, with the effect and standard error for the exposure and for the outcome. It gives
+      the estimate, standard error, confidence interval and p value of each chosen method, Cochran Q, I-squared, the F statistic
+      and the MR-Egger intercept. The estimate is on the scale of the outcome effects.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each variant and a header row." }
+      snp_col: { type: string, description: "Column with the variant name. Default snp." }
+      bx_col: { type: string, description: "Column with the effect of the variant on the exposure (beta). Default beta_exposure." }
+      bxse_col: { type: string, description: "Column with the standard error of the exposure effect. Default se_exposure." }
+      by_col: { type: string, description: "Column with the effect of the variant on the outcome. A log odds ratio for a binary outcome. Default beta_outcome." }
+      byse_col: { type: string, description: "Column with the standard error of the outcome effect. Default se_outcome." }
+      correlation: { type: string, description: "Path of a CSV file with the square matrix of correlations between the variants, in the order of the variant table. Leave out for independent variants. The median and mode methods cannot use it." }
+      alleles_harmonized: { type: boolean, description: "Leave out. The harness sets it from the decision record. true if the exposure and outcome effects refer to the same effect allele." }
+      methods: { type: [array, string], items: { type: string, enum: [ivw, egger, weighted_median, simple_median, mode, maxlik] }, description: "Leave out. The harness sets it from the decision record. Methods as a list or comma text." }
+      ivw_model: { type: string, enum: [default, random, fixed], description: "Leave out. The harness sets it from the decision record." }
+      distribution: { type: string, enum: [normal, t-dist], description: "Leave out. The harness sets it from the decision record." }
+      alpha: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. Significance level as a fraction." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Variant names to drop, as a list or as comma text. none keeps all variants." }
+      iterations: { type: integer, minimum: 100, description: "Number of bootstrap draws (count) for the standard error of the median and mode methods. Default 10000." }
+      seed: { type: integer, description: "Random seed (index) of the bootstrap. Default 314159265, the package default." }
+      exposure: { type: string, description: "Name of the exposure, for labels only." }
+      outcome: { type: string, description: "Name of the outcome, for labels only." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      estimates: { kind: table, ext: .csv, description: "One row for each method with the estimate, the standard error, the interval and the p value." }
+    script: scripts/estimate_effect.R
+    parse: json
+    citations:
+      - text: "Burgess, S., Butterworth, A., & Thompson, S. G. (2013). Mendelian randomization analysis with multiple genetic variants using summarized data. Genetic Epidemiology, 37(7), 658-665. https://doi.org/10.1002/gepi.21758"
+        doi: 10.1002/gepi.21758
+        when: { methods: [ivw, maxlik] }
+      - text: "Bowden, J., Davey Smith, G., & Burgess, S. (2015). Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression. International Journal of Epidemiology, 44(2), 512-525. https://doi.org/10.1093/ije/dyv080"
+        doi: 10.1093/ije/dyv080
+        when: { methods: egger }
+      - text: "Bowden, J., Davey Smith, G., Haycock, P. C., & Burgess, S. (2016). Consistent estimation in Mendelian randomization with some invalid instruments using a weighted median estimator. Genetic Epidemiology, 40(4), 304-314. https://doi.org/10.1002/gepi.21965"
+        doi: 10.1002/gepi.21965
+        when: { methods: [weighted_median, simple_median] }
+      - text: "Hartwig, F. P., Davey Smith, G., & Bowden, J. (2017). Robust inference in summary data Mendelian randomization via the zero modal pleiotropy assumption. International Journal of Epidemiology, 46(6), 1985-1998. https://doi.org/10.1093/ije/dyx102"
+        doi: 10.1093/ije/dyx102
+        when: { methods: mode }
+
+  - name: check_variants
+    title: Check the variants for weak instruments and outliers
+    description: >
+      Check each genetic variant of a Mendelian randomization analysis. For each variant it gives the Wald ratio, the F statistic, the
+      contribution to Cochran Q and the inverse-variance estimate without that variant. It flags weak instruments and variants with a
+      large Q contribution. Run it before you exclude a variant. It needs uncorrelated variants.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each variant and a header row." }
+      snp_col: { type: string, description: "Column with the variant name. Default snp." }
+      bx_col: { type: string, description: "Column with the effect of the variant on the exposure (beta). Default beta_exposure." }
+      bxse_col: { type: string, description: "Column with the standard error of the exposure effect. Default se_exposure." }
+      by_col: { type: string, description: "Column with the effect of the variant on the outcome. Default beta_outcome." }
+      byse_col: { type: string, description: "Column with the standard error of the outcome effect. Default se_outcome." }
+      alleles_harmonized: { type: boolean, description: "Leave out. The harness sets it from the decision record. true if the exposure and outcome effects refer to the same effect allele." }
+      alpha: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. Significance level as a fraction, for the chi-square limit of the Q contribution." }
+      min_f: { type: number, description: "Leave out. The harness sets it from the decision record. F statistic (unitless) below which a variant is a weak instrument." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Variant names to drop, as a list or as comma text. none keeps all variants." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      variants: { kind: table, ext: .csv, description: "One row for each variant, sorted by the Q contribution." }
+    script: scripts/check_variants.R
+    parse: json

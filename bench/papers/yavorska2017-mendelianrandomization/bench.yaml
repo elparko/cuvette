@@ -1,0 +1,32 @@
+adapters: [mendelianrandomization]
+prompt: |
+  Does a higher LDL cholesterol level raise the risk of coronary heart disease? The file {data}/yavorska2017-mendelianrandomization/ldl_chd.csv has 28 genetic variants (one row each). The columns are snp (variant name), beta_exposure and se_exposure (effect of the variant on LDL cholesterol and its standard error), and beta_outcome and se_outcome (effect on coronary heart disease as a log odds ratio, and its standard error). The effects of the exposure and the outcome refer to the same effect allele of each variant, and the variants are independent. Estimate the causal effect with the inverse-variance weighted method, MR-Egger and the weighted median. Give each estimate with its standard error and 95% confidence interval. Give Cochran's Q with its degrees of freedom, I-squared, the F statistic, and the MR-Egger intercept with its p value. Write every number in your final answer text.
+answers:
+  allele_harmonization: true
+  mr_methods: "ivw,egger,weighted_median"
+  ivw_model: default
+  distribution: normal
+  alpha: 0.05
+  exclude_variants: none
+  min_f: 10
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data: [yavorska2017-mendelianrandomization/ldl_chd.csv]
+items:
+  # Source of the values: the MendelianRandomization package vignette (version 0.9.0), section "The data" to "MR-Egger method",
+  # on the 28 variants of the package data set (ldlc, chdlodds). Package version 0.10.0 gives the same values to the
+  # printed digits. check.py (NumPy, check.out) gives the estimates, Q and the Egger fit without the package.
+  - {key: n_variants, description: "Number of variants", value: 28, exact: true, tool: estimate_causal_effect}
+  - {key: ivw_estimate, description: "Inverse-variance weighted estimate (log odds ratio per unit of LDL cholesterol)", value: 2.834, tolerance: 0.01, tool: estimate_causal_effect}
+  - {key: ivw_se, description: "Standard error of the inverse-variance weighted estimate (random effects)", value: 0.530, tolerance: 0.01, tool: estimate_causal_effect}
+  - {key: ivw_ci_low, description: "Lower limit of the 95% confidence interval of the inverse-variance weighted estimate", value: 1.796, tolerance: 0.02, tool: estimate_causal_effect}
+  - {key: ivw_ci_high, description: "Upper limit of the 95% confidence interval of the inverse-variance weighted estimate", value: 3.873, tolerance: 0.02, tool: estimate_causal_effect}
+  - {key: cochran_q, description: "Cochran's Q (27 degrees of freedom)", value: 99.5304, tolerance: 0.5, tool: estimate_causal_effect}
+  - {key: i_squared, description: "I-squared of the variant estimates, percent", value: 72.9, tolerance: 0.5, tool: estimate_causal_effect}
+  - {key: f_statistic, description: "F statistic of the instruments (equals the number of variants to the printed digit; the scorer can match the variant count)", value: 28.0, tolerance: 0.5, in_answer: true, reference: true}
+  - {key: egger_se, description: "Standard error of the MR-Egger estimate", value: 0.770, tolerance: 0.01, tool: estimate_causal_effect}
+  - {key: egger_estimate, description: "MR-Egger estimate", value: 3.253, tolerance: 0.01, tool: estimate_causal_effect}
+  - {key: egger_intercept, description: "MR-Egger intercept", value: -0.011, tolerance: 0.002, tool: estimate_causal_effect}
+  - {key: egger_intercept_p, description: "p value of the MR-Egger intercept", value: 0.451, tolerance: 0.01, tool: estimate_causal_effect}
+  - {key: weighted_median_estimate, description: "Weighted median estimate", value: 2.683, tolerance: 0.01, tool: estimate_causal_effect}

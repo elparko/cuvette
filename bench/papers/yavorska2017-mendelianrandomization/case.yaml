@@ -1,0 +1,122 @@
+kind: tool tutorial or test suite
+short: Yavorska 2017
+field: Human genetics
+program: MendelianRandomization (R), through the mendelianrandomization adapter
+citation:
+  authors: Yavorska OO, Burgess S
+  title: "MendelianRandomization: an R package for performing Mendelian randomization analyses using summarized data"
+  venue: International Journal of Epidemiology 46(6):1734-1739
+  year: 2017
+  doi: 10.1093/ije/dyx034
+related:
+  - text: >-
+      Patel A, Ye T, Xue H, Lin Z, Xu S, Woolf B, Mason AM, Burgess S. MendelianRandomization v0.9.0: updates to an R
+      package for performing Mendelian randomization analyses using summarized data. Wellcome Open Res 8:449 (2023). Describes
+      the package version of the vignette that prints the values.
+    doi: 10.12688/wellcomeopenres.19995.1
+  - text: >-
+      Waterworth DM et al. Genetic variants influencing circulating lipid levels and risk of coronary artery disease.
+      Arterioscler Thromb Vasc Biol 30(11):2264-2276 (2010). Source of the 28 variants.
+    doi: 10.1161/atvbaha.109.201020
+measured: >-
+  The package paper describes methods that estimate the causal effect of an exposure on an outcome from the summary statistics of
+  genetic variants. The package vignette applies them to 28 variants with effects on LDL cholesterol and on coronary heart disease.
+  It prints the inverse-variance weighted, MR-Egger, median, mode and maximum likelihood estimates with the heterogeneity tests.
+instruction: >-
+  I have the effects of 28 genetic variants on LDL cholesterol and on coronary heart disease. Does a higher LDL cholesterol raise
+  the risk? Give the inverse-variance weighted, MR-Egger and weighted median estimates with their standard errors and intervals,
+  Cochran's Q, I-squared, the F statistic and the MR-Egger intercept.
+instruction_basis: >-
+  The package vignette (version 0.9.0), sections on the data, the inverse-variance weighted method, the median-based method and
+  the MR-Egger method. The vignette prints the values with three or four digits.
+answers:
+  allele_harmonization:
+    decision: Allele harmonization
+    value: true, the effects of the exposure and the outcome refer to the same effect allele
+    source: The package data set holds the effects of the same allele for the exposure and the outcome of each variant.
+  mr_methods:
+    decision: Estimation methods
+    value: ivw, egger, weighted_median
+    source: The request names these three methods. The vignette prints them in this order.
+  ivw_model:
+    decision: Model of the inverse-variance weighted method
+    value: default (random effects for more than three variants)
+    source: The vignette prints "random-effect model" for the 28 variants with the default setting.
+  distribution:
+    decision: Distribution for the confidence interval
+    value: normal
+    source: The vignette uses the default, the normal distribution.
+  alpha:
+    decision: Significance level of the confidence interval
+    value: 0.05
+    source: The vignette prints 95% intervals.
+  exclude_variants:
+    decision: Variants that you exclude
+    value: none
+    source: The vignette uses all 28 variants.
+  min_f:
+    decision: Weakest accepted instrument (F statistic)
+    value: 10
+    source: Not in the vignette. The usual limit of 10.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the vignette. The benchmark answers a free question with this text.
+items:
+  n_variants:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: 'Section "The data" and the printed "Number of Variants : 28".'
+  ivw_estimate:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: Inverse-variance weighted method, printed estimate 2.834.
+  ivw_se:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: Inverse-variance weighted method, printed standard error 0.530.
+  ivw_ci_low:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: Inverse-variance weighted method, printed 95% confidence interval.
+  ivw_ci_high:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: Inverse-variance weighted method, printed 95% confidence interval.
+  cochran_q:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: Inverse-variance weighted method, "Heterogeneity test statistic (Cochran's Q) = 99.5304 on 27 degrees of freedom".
+  i_squared:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: Inverse-variance weighted method, "I^2 = 72.9%".
+  f_statistic:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: Inverse-variance weighted method, "F statistic = 28.0".
+  egger_se:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: MR-Egger method, printed standard error 0.770.
+  egger_estimate:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: MR-Egger method, printed estimate 3.253.
+  egger_intercept:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: MR-Egger method, printed intercept -0.011.
+  egger_intercept_p:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: MR-Egger method, printed intercept p value 0.451.
+  weighted_median_estimate:
+    source: tutorial
+    tool: the MendelianRandomization vignette, version 0.9.0
+    where: Median-based method, printed weighted median estimate 2.683.
+data:
+  source: R package MendelianRandomization 0.10.0, data ldlc, ldlcse, chdlodds, chdloddsse, written to CSV by catalog/mendelianrandomization/data/make_fixtures.R
+  url: https://cran.r-project.org/package=MendelianRandomization
+  license: GPL-2 or GPL-3, the license of the package. The data are published summary statistics of variants. They hold no data of persons.
+  size: 28 rows, 2 kB

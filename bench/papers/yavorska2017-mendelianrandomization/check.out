@@ -1,0 +1,8 @@
+variants 28
+ivw estimate 2.8342 se 0.5298 p 8.82e-08
+cochran q 99.5304 df 27 p 3.07e-10 i2 72.9 rse 1.9200
+f statistic 28.0
+egger estimate 3.2529 se 0.7701 intercept -0.0115 se 0.0152 q 97.3975 rse 1.9355
+weighted median point estimate 2.6829
+simple median point estimate 1.7551
+largest q contribution variant index 12, q 23.7677; ivw without it 2.8803
