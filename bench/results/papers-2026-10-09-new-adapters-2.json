@@ -1,0 +1,923 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "chure2024-hplc-py",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 153.18,
+   "session": "20261009-000317-1ee8",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/chure2024-hplc-py/run1/home/sessions/20261009-000317-1ee8",
+   "answer": "## Corrections from the review\n\n- **0.67 (6 mM residual):** This number is from the chosen calibration setting, not from a comparison. This session ran no comparison. The calibration fit used an intercept and no weighting. The first run gave 0.6651401 %, and the repeat run gave the same value. The table below shows the source for each residual.\n- **3.59 (3 mM residual):** The logged value is −3.5895777 %, from the same calibration fit. The first run and the repeat run both logged this value.\n\n## Results\n\n**Trace and settings (run of sample.txt)**\n\n- File: /Volumes/T7/guided-analysis/data/chure2024-hplc-py/sample.txt. Detector channel: Intensity. Time unit: min.\n- Window: 10 to 20 min. Baseline: SNIP (Statistics-sensitive Nonlinear Iterative Peak-clipping). Peak width: 5 min. Prominence: 0.01. The harness used this value, not the 0.05 I passed.\n- Area: the summed fitted signal over the peak. It is not signal times time.\n\n**1. Peaks in the 10 to 20 min window: 6 peaks**\n\n| Peak | Retention time (min) | Area | Area percent |\n|---|---|---|---|\n| 1 | 10.90 | 2805655.43 | 16.73 |\n| 2 | 13.17 | 5179894.75 | 30.88 |\n| 3 | 14.45 | 4163696.59 | 24.82 |\n| 4 | 15.53 | 1807420.30 | 10.78 |\n| 5 | 16.52 | 1312688.15 | 7.83 |\n| 6 | 17.29 | 1503118.99 | 8.96 |\n\nTotal area of the six peaks: 16772474.23.\n\n**2. Fitted values for peak 1 (10.90 min)**\n\n- Amplitude: 23380.46\n- Scale: 0.158762\n- Skew: 0.691800\n\n**3. Lactose calibration**\n\nEach standard has one peak at 13.56 min. I used the same settings as the run, over the whole trace.\n\n- Number of standards: 4. Range: 0.5 to 6 mM.\n- Weighting: none. Intercept: fitted. The line is not forced through zero.\n- Slope: 156586.74 area per mM.\n- Intercept: 14624.94.\n- R squared (coefficient of determination): 0.998868.\n- Estimated limit of detection (LOD): 0.3396 mM. Estimated limit of quantification (LOQ): 1.029 mM. These come from the calibration residuals and are estimates only.\n\nResiduals of each standard, from the calibration result:\n\n| Standard (mM) | Area | Residual (area) | Residual (%), logged value |\n|---|---|---|---|\n| 0.5 | 89667.79 | −3250.51 | −3.6250639 (shown −3.63) |\n| 1 | 184858.17 | +13646.49 | +7.382141 (shown +7.38) |\n| 3 | 467600.29 | −16784.88 | −3.5895777 (shown −3.59) |\n| 6 | 960534.29 | +6388.90 | +0.6651401 (shown +0.67) |\n\n**4. Unknown sample (lactose_mM_2)**\n\n- Area: 312048.11. Retention time: 13.56 min.\n- Concentration: 1.8994 mM, which is 1.90 mM to two decimal places.\n- The value is inside the range of the standards (0.5 to 6 mM).\n\n## What I measured and what I infer\n\n- Measured by the tools: peak areas, retention times, the fitted parameters, the calibration values, the residuals and the unknown area.\n- Inferred from the calibration line: the concentration of 1.90 mM.\n- The residuals show a pattern. The 1 mM standard sits 7.38 % above the line. The 3 mM standard sits 3.59 % below it. The unknown lies between these two standards. Its uncertainty is probably several percent. I did not measure replicates, so I cannot give a validated uncertainty.\n\n## What is uncertain\n\n1. **Prominence:** the run used 0.01, not the 0.05 I passed.\n2. **Peak width:** you said a peak is about 5 min wide at the base. In the plot, the peaks look about 0.5 to 1 min wide. A 5 min setting can change how the peaks at 13.17 and 14.45 min are split.\n3. **Calibration shape:** the four standards each have one replicate. The residuals reach 7.38 %, so linearity is not clear.\n\n## What waits for you\n\n- Confirm whether the peak width is 5 min or closer to the observed 0.5 to 1 min.\n- Confirm that prominence 0.01 is the value you want for this run.\n\nStep results that the answer does not mention, from the record:\n- n1 read_trace: sample.txt: 4801 points from 0 to 40 (step 0.00833, even spacing). Signal -544 to 75508; it starts at 0 and ends at 19.\n\nSettings used, from the decision record: Baseline correction: snip · Approximate peak width, in time units: 5 · Smallest peak height that counts, as a fraction of the largest peak: 0.01 · Force the calibration line through zero: false · Weighting of the calibration fit: none.",
+   "items": [
+    {
+     "key": "n_peaks",
+     "description": "Number of peaks between 10 and 20 minutes",
+     "expected": 6,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_peaks",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 6,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n16",
+      "claimEntry": 127,
+      "text": "- **0.67 (6 mM residual):** This number is from the chosen calibration setting, not from a comparison."
+     }
+    },
+    {
+     "key": "peak1_retention_time",
+     "description": "Retention time of the first peak, in minutes",
+     "expected": 10.9,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10.9,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.retention_time_1",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 10.9,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 127,
+      "text": "| 1 | 10.90 | 2805655.43 | 16.73 |"
+     }
+    },
+    {
+     "key": "peak1_area",
+     "description": "Area of the first peak",
+     "expected": 2800000,
+     "tolerance": 50000,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2805655.4319818616,
+      "diff": 5655.431981861591,
+      "node": "n6",
+      "path": "metrics.area_1",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 2805655.43,
+      "diff": 5655.430000000168,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 127,
+      "text": "| 1 | 10.90 | 2805655.43 | 16.73 |"
+     }
+    },
+    {
+     "key": "peak1_amplitude",
+     "description": "Fitted amplitude of the first peak",
+     "expected": 23000,
+     "tolerance": 500,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 23380.461933188817,
+      "diff": 380.46193318881706,
+      "node": "n6",
+      "path": "table.rows[0][3]",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 23380.46,
+      "diff": 380.4599999999991,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 127,
+      "text": "- Amplitude: 23380.46"
+     }
+    },
+    {
+     "key": "peak1_scale",
+     "description": "Fitted scale of the first peak",
+     "expected": 0.16,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.1587618915028268,
+      "diff": 0.001238108497173207,
+      "node": "n6",
+      "path": "table.rows[0][4]",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.158762,
+      "diff": 0.0012380000000000169,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 127,
+      "text": "- Scale: 0.158762"
+     }
+    },
+    {
+     "key": "peak1_skew",
+     "description": "Fitted skew of the first peak",
+     "expected": 0.7,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.6917995605487433,
+      "diff": 0.008200439451256702,
+      "node": "n6",
+      "path": "table.rows[0][5]",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.6918,
+      "diff": 0.008199999999999985,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 127,
+      "text": "- Skew: 0.691800"
+     }
+    },
+    {
+     "key": "peak3_retention_time",
+     "description": "Retention time of the third peak, in minutes",
+     "expected": 14.45,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 14.45,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.retention_time_3",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 14.45,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 127,
+      "text": "| 3 | 14.45 | 4163696.59 | 24.82 |"
+     }
+    },
+    {
+     "key": "peak1_area_exact",
+     "description": "Area of the first peak, full precision",
+     "expected": 2805655.43,
+     "tolerance": 300,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2805655.4319818616,
+      "diff": 0.001981861423701048,
+      "node": "n6",
+      "path": "metrics.area_1",
+      "entry": 43
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 127,
+      "text": null
+     }
+    },
+    {
+     "key": "calibration_slope",
+     "description": "Calibration slope, area per mM",
+     "expected": 156586.74,
+     "tolerance": 160,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 156586.74150544376,
+      "diff": 0.0015054437681101263,
+      "node": "n14",
+      "path": "metrics.slope",
+      "entry": 87
+     },
+     "reported": {
+      "pass": true,
+      "value": 156586.74,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n16",
+      "claimEntry": 127,
+      "text": "- Slope: 156586.74 area per mM."
+     }
+    },
+    {
+     "key": "calibration_intercept",
+     "description": "Calibration intercept, in area units",
+     "expected": 14624.94,
+     "tolerance": 150,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 14624.93792157904,
+      "diff": 0.0020784209609701065,
+      "node": "n14",
+      "path": "metrics.intercept",
+      "entry": 87
+     },
+     "reported": {
+      "pass": true,
+      "value": 14624.94,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n16",
+      "claimEntry": 127,
+      "text": "- Intercept: 14624.94."
+     }
+    },
+    {
+     "key": "calibration_r_squared",
+     "description": "R squared of the calibration",
+     "expected": 0.99887,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.9988678581183046,
+      "diff": 0.000002141881695449932,
+      "node": "n14",
+      "path": "metrics.r_squared",
+      "entry": 87
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.998868,
+      "diff": 0.0000020000000000575113,
+      "via": "tolerance",
+      "node": "n16",
+      "claimEntry": 127,
+      "text": "- R squared (coefficient of determination): 0.998868."
+     }
+    },
+    {
+     "key": "unknown_concentration",
+     "description": "Concentration of the unknown lactose sample, in mM",
+     "expected": 1.8994,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.8994147701897757,
+      "diff": 0.000014770189775692444,
+      "node": "n15",
+      "path": "metrics.mean_concentration",
+      "entry": 95
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.8994,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n15",
+      "claimEntry": 127,
+      "text": "- Concentration: 1.8994 mM, which is 1.90 mM to two decimal places."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 8,
+    "inputTokens": 24,
+    "outputTokens": 10148,
+    "cacheRead": 216639,
+    "cacheWrite": 52094,
+    "toolCalls": 11,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 6,
+     "warning": 3,
+     "error": 2
+    },
+    "unsourced": 2,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 10
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/chure2024-hplc-py/run1/home/sessions/20261009-000317-1ee8/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/chure2024-hplc-py/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/chromatography",
+     "/Users/parker/.guided-analysis/envs/chromatography",
+     "/Volumes/ga-envs/chromatography",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/chromatography"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_0.5.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_1.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_2.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_3.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_6.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/sample.txt"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 2,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "klindworth2013-16s-primers",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 94.006,
+   "session": "20261009-000550-f823",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/klindworth2013-16s-primers/run1/home/sessions/20261009-000550-f823",
+   "answer": "## Results\n\n**Template:** GenBank J01695.2, E. coli rrnB operon, 7258 bp, linear (your answer to the topology question). The 16S gene starts at position 1268, as you gave.\n\n**Simulation setting:** Both simulations used a minimum 3' match of 13 bp. The simulation output logs this value. I had requested 15 bp, but the harness kept 13 bp. A 13 bp match is less strict, so a 15 bp setting could give fewer binding sites. I did not run the 15 bp case.\n\n### 1. Products on J01695.2\n\n1. **Pair 1** (CCTACGGGNGGCWGCAG / GACTACHVGGGTATCTAATCC): 1 product.\n   - Product length: 465 bp.\n   - Positions: 1608 to 2072, top strand.\n   - The forward primer binds the top strand. The reverse primer binds the bottom strand.\n2. **Pair 2** (AGAGTTTGATCMTGGC / CCGTCAATTCMTTTGAGTTT): 1 product.\n   - Product length: 919 bp.\n   - Positions: 1275 to 2193, top strand.\n   - The forward primer binds the top strand. The reverse primer binds the bottom strand.\n\n### 2. Forward primer start in the 16S gene\n\nThe position is the template start minus 1268, plus 1. The calculation tool gave these values.\n\n- **Pair 1 forward** (CCTACGGGNGGCWGCAG): starts at position 341 in the 16S gene (template position 1608).\n- **Pair 2 forward** (AGAGTTTGATCMTGGC): starts at position 8 in the 16S gene (template position 1275).\n\nPair 2 forward is a common primer name in the literature. Check that your naming convention matches the start position found here. I did not run a tool to check the literature name.\n\n### 3. Melting temperature of CCTACGGGAGGCAGCAG\n\n- **Melting temperature (Tm): 61.39 °C.**\n- Method: Primer3 (SantaLucia 1998), salt correction SantaLucia.\n- Conditions: Na+ 50 mM, Mg2+ 1.5 mM, dNTP 0.6 mM, primer 200 nM.\n- Length: 17 nt. GC content: 70.59%.\n- I chose this method because you did not name one. The harness settings set the conditions.\n- The Tm is not the annealing temperature. Use the polymerase vendor rule for the annealing temperature.\n\nOther values from the same call (not asked): hairpin Tm 38.96 °C, hairpin ΔG −0.11 kcal/mol, self-dimer ΔG −3.48 kcal/mol.\n\n## What is uncertain\n\n- The product counts come from an in-silico check with a 13 bp 3' match. A real PCR can give products that this check does not show. The check does not search other genomes.\n- The simulation treated the degenerate positions as matches. I did not test each possible sequence of the degenerate primers.\n- I calculated the Tm for the unambiguous primer only. I did not calculate the Tm of the degenerate primers.\n- My first Tm call failed because I sent the primer in the wrong format. The second call, in the correct format, succeeded.\n\n## What waits for you\n\n1. Confirm the minimum 3' match: 13 bp (the value in use) or 15 bp (your request). I can run the check at 15 bp if you want.\n2. Confirm the Tm method and salt correction you want to report.\n3. Confirm your naming convention for the pair 2 forward primer. Its start position here is 8.\n\nSettings used, from the decision record: Monovalent cations (Na+ and K+) in the PCR buffer, mM: 50 · Mg2+ in the PCR buffer, mM: 1.5 · Total dNTP in the PCR, mM: 0.6 · Primer concentration, nM: 200 · Melting temperature method: primer3 · Salt correction of the Tm: santalucia · Shortest 3' match for a primer binding site, bp: 13 · Linear or circular template: linear.",
+   "items": [
+    {
+     "key": "pair1_products",
+     "description": "Number of products from pair 1",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 11
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 97,
+      "text": "### 1."
+     }
+    },
+    {
+     "key": "pair1_start",
+     "description": "Start of the pair 1 product on J01695.2",
+     "expected": 1608,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1608,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.start_1based",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 1608,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 97,
+      "text": "- Positions: 1608 to 2072, top strand."
+     }
+    },
+    {
+     "key": "pair1_end",
+     "description": "End of the pair 1 product on J01695.2",
+     "expected": 2072,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2072,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.end_1based",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 2072,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 97,
+      "text": "- Positions: 1608 to 2072, top strand."
+     }
+    },
+    {
+     "key": "pair1_length",
+     "description": "Length of the pair 1 product, first to last base",
+     "expected": 465,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 465,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.product_bp",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 465,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 97,
+      "text": "- Product length: 465 bp."
+     }
+    },
+    {
+     "key": "pair1_ecoli_position",
+     "description": "Start of the pair 1 forward primer in the E. coli 16S numbering",
+     "expected": 341,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 341,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.pair1_fwd_16S_pos",
+      "entry": 68
+     },
+     "reported": {
+      "pass": true,
+      "value": 341,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 97,
+      "text": "- **Pair 1 forward** (CCTACGGGNGGCWGCAG): starts at position 341 in the 16S gene (template position 1608)."
+     }
+    },
+    {
+     "key": "pair2_products",
+     "description": "Number of products from pair 2",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 11
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 97,
+      "text": "### 1."
+     }
+    },
+    {
+     "key": "pair2_start",
+     "description": "Start of the pair 2 product on J01695.2",
+     "expected": 1275,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1275,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.start_1based",
+      "entry": 39
+     },
+     "reported": {
+      "pass": true,
+      "value": 1275,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 97,
+      "text": "- Positions: 1275 to 2193, top strand."
+     }
+    },
+    {
+     "key": "pair2_end",
+     "description": "End of the pair 2 product on J01695.2",
+     "expected": 2193,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2193,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.end_1based",
+      "entry": 39
+     },
+     "reported": {
+      "pass": true,
+      "value": 2193,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 97,
+      "text": "- Positions: 1275 to 2193, top strand."
+     }
+    },
+    {
+     "key": "pair2_length",
+     "description": "Length of the pair 2 product, first to last base",
+     "expected": 919,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 919,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.product_bp",
+      "entry": 39
+     },
+     "reported": {
+      "pass": true,
+      "value": 919,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 97,
+      "text": "- Product length: 919 bp."
+     }
+    },
+    {
+     "key": "pair2_ecoli_position",
+     "description": "Start of the pair 2 forward primer in the E. coli 16S numbering",
+     "expected": 8,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.pair2_fwd_16S_pos",
+      "entry": 68
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 97,
+      "text": "- **Pair 2 forward** (AGAGTTTGATCMTGGC): starts at position 8 in the 16S gene (template position 1275)."
+     }
+    },
+    {
+     "key": "tm_primer3",
+     "description": "Melting temperature of CCTACGGGAGGCAGCAG, in degrees C",
+     "expected": 61.39,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 61.386,
+      "diff": 0.003999999999997783,
+      "node": "n7",
+      "path": "metrics.tm_c_1",
+      "entry": 76
+     },
+     "reported": {
+      "pass": true,
+      "value": 61.39,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 97,
+      "text": "- **Melting temperature (Tm): 61.39 °C.**"
+     }
+    },
+    {
+     "key": "pair1_coordinate_difference",
+     "description": "Difference of the two primer start positions in the E. coli numbering (the published amplicon size)",
+     "expected": 464,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 465,
+      "diff": 1,
+      "node": "n4",
+      "path": "metrics.product_bp",
+      "entry": 35
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 97,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 18,
+    "outputTokens": 7527,
+    "cacheRead": 78516,
+    "cacheWrite": 23519,
+    "toolCalls": 7,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 4,
+     "error": 1
+    },
+    "unsourced": 4,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/klindworth2013-16s-primers/run1/home/sessions/20261009-000550-f823/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/klindworth2013-16s-primers/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/cloning",
+     "/Users/parker/.guided-analysis/envs/cloning",
+     "/Volumes/ga-envs/cloning",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/cloning"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers/ecoli_rrnb.fasta"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 4,
+    "literature": 1
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-new-adapters-2.md",
+  "json": "bench/results/papers-2026-10-09-new-adapters-2.json"
+ },
+ "summary": {
+  "cells": {
+   "chure2024-hplc-py": {
+    "claude:claude-haiku-5-5": {
+     "computed": 12,
+     "computedOf": 12,
+     "reported": 11,
+     "reportedOf": 11,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "klindworth2013-16s-primers": {
+    "claude:claude-haiku-5-5": {
+     "computed": 11,
+     "computedOf": 11,
+     "reported": 11,
+     "reportedOf": 11,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 23,
+    "computedOf": 23,
+    "reported": 22,
+    "reportedOf": 22,
+    "runs": 2,
+    "statuses": {
+     "answer": 2
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 2,
+    "durationS": 247.186,
+    "requests": 14,
+    "inputTokens": 42,
+    "outputTokens": 17675,
+    "cacheRead": 295155,
+    "cacheWrite": 75613,
+    "toolCalls": 18,
+    "failedToolCalls": 3,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 2,
+    "findings_info": 9,
+    "findings_warning": 7,
+    "findings_error": 3,
+    "unsourced": 6,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 15
+   }
+  },
+  "skipped": []
+ }
+}

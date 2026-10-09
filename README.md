@@ -333,6 +333,9 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `samtools` | samtools | command line | sequencing alignments |
 | `fastqc` | FastQC | command line | sequencing quality |
 | `rdkit` | RDKit | Python library | chemistry |
+| `cloning` | Biopython, primer3-py | Python library | sequences, primers, cloning |
+| `enrichment` | gseapy | Python library | gene set enrichment |
+| `chromatography` | hplc-py | Python library | chromatogram peaks |
 | `openbabel` | Open Babel | command line | chemistry |
 | `onboarding` | the onboarding tools | MCP; used by `ga onboard` | any |
 
@@ -375,4 +378,6 @@ agent's prompt.
 - [docs/architecture.md](docs/architecture.md): the modules and their contracts.
 - [docs/harness-survey.md](docs/harness-survey.md): how Claude Code and OpenCode work, and what
   this harness takes from them.
+- [docs/proprietary-alternatives.md](docs/proprietary-alternatives.md): the programs that labs buy, the
+  open-source alternative for each one, and the adapter that runs it.
 - [docs/adapter-spec.md](docs/adapter-spec.md) and [docs/onboarding-guide.md](docs/onboarding-guide.md).
