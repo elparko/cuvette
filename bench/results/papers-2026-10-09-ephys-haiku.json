@@ -1,0 +1,1059 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "gouwens2019-allen-ephys",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 250.26,
+   "session": "20261009-045801-e265",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/gouwens2019-allen-ephys/run1/home/sessions/20261009-045801-e265",
+   "answer": "I checked the cell 1 ratio again. The number does not come from a comparison run. I did not run compare_options or change the junction potential in this session. The first measurement and the confirmation run both used the chosen setting of 0 mV, and both gave the same values.\n\n**Scientist decisions used**\n- Spike threshold: `dvdt_fraction_of_upstroke`, with dV/dt cutoff 20 mV/ms. The threshold is the first point at 20 mV/ms, then back to 5% of the mean upstroke.\n- Lowest spike peak: -30 mV.\n- Liquid junction potential: 0 mV. The voltages are not corrected.\n- Input resistance: peak deflection.\n- Baseline: 0.92 to 1.02 s.\n- Sweeps: all Long Square sweeps in each file.\n\n**Procedure**\n1. I inspected the three Neurodata Without Borders (NWB) files. The default step window reads the ramp, so I set the step window to 1.02 to 2.02 s.\n2. I kept only sweeps labeled \"Long Square\". Cell 1 used 33 sweeps, cell 2 used 24 and cell 3 used 26.\n3. I measured spikes. This gave the rheobase, the frequency-current (F-I) slope, the threshold and the upstroke/downstroke ratio of the first spike at rheobase.\n4. I measured passive properties on the hyperpolarizing sweeps between -100 and 0 pA. This gave the input resistance and the membrane time constant (tau).\n5. I reran the cell 1 spike measurement with 0 mV to confirm the ratio.\n\n**Results**\n\n| Cell | Rheobase | F-I slope | Input resistance (peak) | Tau | Upstroke/downstroke ratio |\n|---|---|---|---|---|---|\n| 1 (567987585) | 230 pA | 1.072 Hz/pA | 129.8 MOhm | 8.223 ms | 1.146 |\n| 2 (595511209) | 70 pA | 0.115 Hz/pA | 187.2 MOhm | 32.26 ms | 3.875 |\n| 3 (563220277) | 90 pA | 0.208 Hz/pA | 128.5 MOhm | 15.79 ms | 3.226 |\n\nDetails by cell:\n- **Cell 1 (567987585):** Rheobase step size is 10 pA. The 220 pA sweep had no spike. F-I slope uses 16 sweeps with spikes. Input resistance uses 5 sweeps, coefficient of determination (R squared) 0.9977. Tau is the mean of 5 fits. First spike at rheobase: threshold -30.56 mV, peak 21.56 mV, upstroke 368.6 mV/ms, downstroke -321.7 mV/ms.\n- **Cell 2 (595511209):** Rheobase step size is 20 pA. F-I slope uses 15 sweeps. Input resistance uses 5 sweeps, R squared 0.9903. Tau is the mean of 5 fits, which range from 22.3 to 42.2 ms. First spike at rheobase: threshold -29.22 mV, peak 43.53 mV, upstroke 306.5 mV/ms, downstroke -79.1 mV/ms.\n- **Cell 3 (563220277):** Rheobase step size is 10 pA. F-I slope uses 15 sweeps. Input resistance uses 3 sweeps (-90, -50, -10 pA), R squared 0.9998. Tau is the mean of 2 fits; the -10 pA fit failed. First spike at rheobase: threshold -36.78 mV, peak 42.31 mV, upstroke 408.7 mV/ms, downstroke -126.7 mV/ms.\n\n**Uncertain**\n- Cells 2 and 3 have repeated sweeps at the rheobase current with different spike results. Their rheobase depends on the step size.\n- Cell 1 has a ratio of 1.146. This is far below the ratios of cells 2 and 3. Its first spike at rheobase is small. Check the plot before you use this value.\n- Cell 2 tau fits vary widely. The mean is less reliable.\n- Cell 3 has only three hyperpolarizing sweeps, so its input resistance uses few points.\n- The tau fit window is the tool default. I did not set it.\n- The threshold sensitivity check with other definitions was not run.\n\n**Waits for you**\n- Nothing waits. Tell me if you want the cell 1 spike checked against the plot or another threshold definition compared.\n\nSettings used, from the decision record: Definition of the spike threshold: dvdt_fraction_of_upstroke · Spike threshold cutoff for dV/dt (mV per ms): 20 · Lowest spike peak (mV): -30 · Baseline window before the step (s): 0.92,1.02 · Sweeps to include: all · Liquid junction potential correction (mV): 0 · Deflection that gives the input resistance: peak.",
+   "items": [
+    {
+     "key": "c1_rheobase",
+     "description": "Cell 567987585: rheobase, pA",
+     "expected": 230,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 230,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.rheobase_pa",
+      "entry": 71
+     },
+     "reported": {
+      "pass": true,
+      "value": 230,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 144,
+      "text": "| 1 (567987585) | 230 pA | 1.072 Hz/pA | 129.8 MOhm | 8.223 ms | 1.146 |"
+     }
+    },
+    {
+     "key": "c1_fi_slope",
+     "description": "Cell 567987585: F-I slope, Hz per pA",
+     "expected": 1.0717,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0716636564318691,
+      "diff": 0.00003634356813098094,
+      "node": "n6",
+      "path": "metrics.fi_slope_hz_per_pa",
+      "entry": 71
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.072,
+      "diff": 0.00029999999999996696,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 144,
+      "text": "| 1 (567987585) | 230 pA | 1.072 Hz/pA | 129.8 MOhm | 8.223 ms | 1.146 |"
+     }
+    },
+    {
+     "key": "c1_ri",
+     "description": "Cell 567987585: input resistance, MOhm",
+     "expected": 129.84,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 129.84376347966537,
+      "diff": 0.003763479665366276,
+      "node": "n11",
+      "path": "metrics.input_resistance_mohm",
+      "entry": 95
+     },
+     "reported": {
+      "pass": true,
+      "value": 129.8,
+      "diff": 0.03999999999999204,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 144,
+      "text": "| 1 (567987585) | 230 pA | 1.072 Hz/pA | 129.8 MOhm | 8.223 ms | 1.146 |"
+     }
+    },
+    {
+     "key": "c1_tau",
+     "description": "Cell 567987585: membrane time constant, ms",
+     "expected": 8.26,
+     "tolerance": 0.3,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8.223051219817508,
+      "diff": 0.0369487801824917,
+      "node": "n11",
+      "path": "metrics.tau_ms",
+      "entry": 95
+     },
+     "reported": {
+      "pass": true,
+      "value": 8.223,
+      "diff": 0.036999999999999034,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 144,
+      "text": "| 1 (567987585) | 230 pA | 1.072 Hz/pA | 129.8 MOhm | 8.223 ms | 1.146 |"
+     }
+    },
+    {
+     "key": "c1_ratio",
+     "description": "Cell 567987585: upstroke to downstroke ratio",
+     "expected": 1.1458,
+     "tolerance": 0.003,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.1458152672157924,
+      "diff": 0.00001526721579248047,
+      "node": "n6",
+      "path": "metrics.upstroke_downstroke_ratio",
+      "entry": 71
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.146,
+      "diff": 0.00019999999999997797,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 144,
+      "text": "| 1 (567987585) | 230 pA | 1.072 Hz/pA | 129.8 MOhm | 8.223 ms | 1.146 |"
+     }
+    },
+    {
+     "key": "c2_rheobase",
+     "description": "Cell 595511209: rheobase, pA",
+     "expected": 70,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 70,
+      "diff": 0,
+      "node": "n6",
+      "path": "table.rows[9][2]",
+      "entry": 71
+     },
+     "reported": {
+      "pass": true,
+      "value": 70,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 144,
+      "text": "| 2 (595511209) | 70 pA | 0.115 Hz/pA | 187.2 MOhm | 32.26 ms | 3.875 |"
+     }
+    },
+    {
+     "key": "c2_fi_slope",
+     "description": "Cell 595511209: F-I slope, Hz per pA",
+     "expected": 0.1152,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.1151536312849162,
+      "diff": 0.00004636871508380269,
+      "node": "n7",
+      "path": "metrics.fi_slope_hz_per_pa",
+      "entry": 75
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.115,
+      "diff": 0.00019999999999999185,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 144,
+      "text": "| 2 (595511209) | 70 pA | 0.115 Hz/pA | 187.2 MOhm | 32.26 ms | 3.875 |"
+     }
+    },
+    {
+     "key": "c2_ri",
+     "description": "Cell 595511209: input resistance, MOhm",
+     "expected": 187.19,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 187.18756641256684,
+      "diff": 0.0024335874331598006,
+      "node": "n12",
+      "path": "metrics.input_resistance_mohm",
+      "entry": 99
+     },
+     "reported": {
+      "pass": true,
+      "value": 187.2,
+      "diff": 0.009999999999990905,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 144,
+      "text": "| 2 (595511209) | 70 pA | 0.115 Hz/pA | 187.2 MOhm | 32.26 ms | 3.875 |"
+     }
+    },
+    {
+     "key": "c2_tau",
+     "description": "Cell 595511209: membrane time constant, ms",
+     "expected": 32.56,
+     "tolerance": 0.6,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 32.25924356596762,
+      "diff": 0.3007564340323796,
+      "node": "n12",
+      "path": "metrics.tau_ms",
+      "entry": 99
+     },
+     "reported": {
+      "pass": true,
+      "value": 32.26,
+      "diff": 0.30000000000000426,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 144,
+      "text": "| 2 (595511209) | 70 pA | 0.115 Hz/pA | 187.2 MOhm | 32.26 ms | 3.875 |"
+     }
+    },
+    {
+     "key": "c2_ratio",
+     "description": "Cell 595511209: upstroke to downstroke ratio",
+     "expected": 3.8746,
+     "tolerance": 0.004,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.8745687478633046,
+      "diff": 0.00003125213669541438,
+      "node": "n7",
+      "path": "metrics.upstroke_downstroke_ratio",
+      "entry": 75
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.875,
+      "diff": 0.00039999999999995595,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 144,
+      "text": "| 2 (595511209) | 70 pA | 0.115 Hz/pA | 187.2 MOhm | 32.26 ms | 3.875 |"
+     }
+    },
+    {
+     "key": "c3_rheobase",
+     "description": "Cell 563220277: rheobase, pA",
+     "expected": 90,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 90,
+      "diff": 0,
+      "node": "n6",
+      "path": "table.rows[10][2]",
+      "entry": 71
+     },
+     "reported": {
+      "pass": true,
+      "value": 90,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 144,
+      "text": "| 3 (563220277) | 90 pA | 0.208 Hz/pA | 128.5 MOhm | 15.79 ms | 3.226 |"
+     }
+    },
+    {
+     "key": "c3_fi_slope",
+     "description": "Cell 563220277: F-I slope, Hz per pA",
+     "expected": 0.2075,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.20753239740820742,
+      "diff": 0.000032397408207429645,
+      "node": "n8",
+      "path": "metrics.fi_slope_hz_per_pa",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.208,
+      "diff": 0.0005000000000000004,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 144,
+      "text": "| 3 (563220277) | 90 pA | 0.208 Hz/pA | 128.5 MOhm | 15.79 ms | 3.226 |"
+     }
+    },
+    {
+     "key": "c3_ri",
+     "description": "Cell 563220277: input resistance, MOhm",
+     "expected": 128.52,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 128.51562264274224,
+      "diff": 0.0043773572577663344,
+      "node": "n13",
+      "path": "metrics.input_resistance_mohm",
+      "entry": 103
+     },
+     "reported": {
+      "pass": true,
+      "value": 128.5,
+      "diff": 0.020000000000010232,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 144,
+      "text": "| 3 (563220277) | 90 pA | 0.208 Hz/pA | 128.5 MOhm | 15.79 ms | 3.226 |"
+     }
+    },
+    {
+     "key": "c3_ratio",
+     "description": "Cell 563220277: upstroke to downstroke ratio",
+     "expected": 3.2259,
+     "tolerance": 0.004,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.225886087700435,
+      "diff": 0.000013912299565266295,
+      "node": "n8",
+      "path": "metrics.upstroke_downstroke_ratio",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.226,
+      "diff": 0.00009999999999976694,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 144,
+      "text": "| 3 (563220277) | 90 pA | 0.208 Hz/pA | 128.5 MOhm | 15.79 ms | 3.226 |"
+     }
+    },
+    {
+     "key": "c3_tau",
+     "description": "Cell 563220277: membrane time constant, ms (the tool gives no fit for one of the three sweeps)",
+     "expected": 14.87,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 15,
+      "diff": 0.13000000000000078,
+      "node": "n12",
+      "path": "table.rows[0][0]",
+      "entry": 99
+     },
+     "reported": {
+      "pass": true,
+      "value": 15,
+      "diff": 0.13000000000000078,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 144,
+      "text": "F-I slope uses 15 sweeps."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 9,
+    "inputTokens": 26,
+    "outputTokens": 18439,
+    "cacheRead": 560923,
+    "cacheWrite": 119354,
+    "toolCalls": 16,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 4,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 4,
+    "overwritten": 4,
+    "nodes": 10
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/gouwens2019-allen-ephys/run1/home/sessions/20261009-045801-e265/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/gouwens2019-allen-ephys",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/gouwens2019-allen-ephys/run1",
+     "/Users/parker/Code/guided-analysis/catalog/patch-clamp",
+     "/Users/parker/.guided-analysis/envs/patch-clamp",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/patch-clamp"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/gouwens2019-allen-ephys/563220277.nwb",
+     "/Volumes/T7/guided-analysis/data/gouwens2019-allen-ephys/567987585.nwb",
+     "/Volumes/T7/guided-analysis/data/gouwens2019-allen-ephys/595511209.nwb",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/gouwens2019-allen-ephys/run1/home/sessions/20261009-045801-e265/work/inspect_recording-1/sweeps.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/gouwens2019-allen-ephys/run1/home/sessions/20261009-045801-e265/work/inspect_recording-2/sweeps.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/gouwens2019-allen-ephys/run1/home/sessions/20261009-045801-e265/work/inspect_recording-3/sweeps.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "jahncke2025-dag1-mipsc",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 272.51,
+   "session": "20261009-050212-27d1",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1",
+   "answer": "## mIPSC results: Ctrl versus cKO (Dag1 conditional knockout)\n\n**Caution:** the reader found 1 sweep in all 32 files. You described 10 sweeps. This conflict is not resolved. The results below use one sweep per cell.\n\n### Settings used (decision record)\n- Event detection method: template (Clements and Bekkers).\n- Event direction: inward.\n- Template rise: 0.7 ms. Template decay: 8 ms.\n- Event threshold: 4 times the noise SD. The decision record sets this value. You own it. I did not find your answer to this value in my log.\n- Filter: none.\n- Analysis window: 1 to 29.5 s.\n- Sweeps: all.\n- Liquid junction potential: not corrected.\n- Unit of replication for the main test: cells.\n- Test: Welch t-test. Alpha: 0.05.\n\n### What I did\n1. Read the cell list and the metadata file. The metadata file is malformed. Each cell name sits on one line. Its animal and group sit on the next line. I wrote a corrected copy, cells_metadata_clean.csv. The original file is unchanged. You did not confirm the corrected copy.\n2. Checked the sweep count in all 32 cell files with the inspection tool. Each file has 1 sweep of 29.9999 s at 10000 Hz.\n3. Detected mIPSCs in all 32 cells with the settings above. Each cell analyzed 28.5 s.\n4. Joined the cell results to the corrected metadata. Ran a Welch t-test with each cell as one observation (cKO minus Ctrl).\n\n### Groups (step 1)\n- Ctrl: 16 cells from 6 animals.\n- cKO: 16 cells from 6 animals.\n\n### Frequency and amplitude (step 2, chosen settings)\n- Mean frequency: Ctrl 2.62 Hz; cKO 1.64 Hz.\n- Mean amplitude: Ctrl 55.6 pA; cKO 40.2 pA.\n\n### Group comparison (step 3, cells as observations, Welch t-test)\n- Frequency: cKO minus Ctrl −0.98 Hz (95% CI −1.83 to −0.14). p = 0.024. Adjusted p (Benjamini-Hochberg, four features) = 0.048. Cohen d = −0.84. Significant at alpha 0.05 after adjustment.\n- Amplitude: cKO minus Ctrl −15.4 pA (95% CI −27.2 to −3.6). p = 0.012. Adjusted p = 0.048. Cohen d = −0.94. Significant at alpha 0.05 after adjustment.\n\n### Kinetics (step 4, cells as observations, Welch t-test)\n- Mean decay time constant, Ctrl: 8.14 ms.\n- 10–90% rise time: Ctrl 0.92 ms; cKO 1.00 ms. p = 0.269 (adjusted p 0.269). Not significant.\n- Decay time constant: Ctrl 8.14 ms; cKO 7.32 ms. p = 0.178 (adjusted p 0.237). Not significant.\n\n### Checks (comparison runs, not the chosen settings)\n- **Animal as the unit (comparison run):** no feature passes the adjusted p value at alpha 0.05. The smallest raw p is 0.027. The smallest adjusted p is 0.062.\n- **Threshold (comparison run):** mean amplitude over all 32 cells is 37.8 pA at 3 times the noise SD and 57.2 pA at 5 times. The chosen threshold of 4 times gives 47.9 pA. I did not obtain a frequency at thresholds 3 or 5. My two direct runs at those values returned the recorded threshold of 4, so they do not count as results.\n- **Non-independence:** cells in one animal share variance. The intraclass correlation for the animal is up to 0.30. So the cell-level p values above are likely too small. A mixed model with the animal as a random effect is the correct test here: lme4 lmer(feature ~ group + (1 | animal)). I did not run this model.\n\n### What is uncertain\n- **Sweep count.** The reader finds 1 sweep in all 32 files. You described 10 sweeps. I did not check the files in Igor Pro. If 10 sweeps exist, the counts, frequencies and means change.\n- **Threshold.** Frequency and amplitude depend on the threshold. The frequency at other thresholds is not known from this session.\n- **Metadata.** The corrected copy is my reading of the file. You did not confirm it.\n- **Group evidence.** The cell-level p values may overstate the evidence. The animal-level check does not show a significant group difference.\n\n### What waits for you\n1. Confirm the event threshold (the record value is 4 times the noise SD).\n2. Check the sweep count in Igor Pro. If 10 sweeps exist, I run all analyses again.\n3. Confirm the corrected metadata copy, cells_metadata_clean.csv.\n4. Decide whether the main result uses the cell-level test or the mixed model with the animal as a random effect.\n\nFiles: cell_features_mipsc.csv (one row per cell), group_comparison.csv, events.png and group_comparison.png in the session folder.\n\nStep results that the answer does not mention, from the record:\n- n2 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1/work and wrote 0 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1/work.\n- n11 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1/work and wrote 2 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1/work.\n- n48 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1/work and wrote 96 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1/work.\n\nSettings used, from the decision record: Sweeps to include: all · Event detection method: template · Event detection threshold (times the noise SD): 4 · Direction of the events: inward · Expected event rise time constant (ms): 0.7 · Expected event decay time constant (ms): 8 · Unit of replication for the group comparison: cells · Test for the difference between two groups: t · Significance level (alpha): 0.05.",
+   "items": [
+    {
+     "key": "n_cells_ctrl",
+     "description": "Control cells",
+     "expected": 16,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n12",
+      "path": "table.rows[0][4]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 308,
+      "text": "- Ctrl: 16 cells from 6 animals."
+     }
+    },
+    {
+     "key": "n_cells_cko",
+     "description": "cKO cells",
+     "expected": 16,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n12",
+      "path": "table.rows[0][4]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 308,
+      "text": "- Ctrl: 16 cells from 6 animals."
+     }
+    },
+    {
+     "key": "n_animals_per_group",
+     "description": "Animals in each group",
+     "expected": 6,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6,
+      "diff": 0,
+      "node": "n12",
+      "path": "table.rows[0][6]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 6,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 308,
+      "text": "- Ctrl: 16 cells from 6 animals."
+     }
+    },
+    {
+     "key": "p_frequency",
+     "description": "p value of the mIPSC frequency, cKO against Ctrl, cells as observations (the paper prints 0.018; the tolerance covers a different detection method)",
+     "expected": 0.018,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.012460025754105555,
+      "diff": 0.005539974245894443,
+      "node": "n12",
+      "path": "metrics.min_p",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.012,
+      "diff": 0.005999999999999998,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 308,
+      "text": "p = 0.012."
+     }
+    },
+    {
+     "key": "p_amplitude",
+     "description": "p value of the mIPSC amplitude, cKO against Ctrl, cells as observations (the paper prints 0.017)",
+     "expected": 0.017,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.012460025754105555,
+      "diff": 0.004539974245894446,
+      "node": "n12",
+      "path": "metrics.min_p",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.012,
+      "diff": 0.005000000000000001,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 308,
+      "text": "p = 0.012."
+     }
+    },
+    {
+     "key": "p_rise",
+     "description": "p value of the 10-90% rise time difference (the paper prints 0.38)",
+     "expected": 0.38,
+     "tolerance": 0.2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.3971269173630798,
+      "diff": 0.017126917363079808,
+      "node": "n12",
+      "path": "table.rows[3][14]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.3,
+      "diff": 0.08000000000000002,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 308,
+      "text": "The intraclass correlation for the animal is up to 0.30."
+     }
+    },
+    {
+     "key": "p_decay",
+     "description": "p value of the decay time constant difference (the paper prints 0.36)",
+     "expected": 0.36,
+     "tolerance": 0.25,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.3971269173630798,
+      "diff": 0.037126917363079825,
+      "node": "n12",
+      "path": "table.rows[3][14]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.3,
+      "diff": 0.06,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 308,
+      "text": "The intraclass correlation for the animal is up to 0.30."
+     }
+    },
+    {
+     "key": "decay_ctrl",
+     "description": "Mean decay time constant of the Ctrl cells, ms (the paper prints 7.87)",
+     "expected": 7.87,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8.14249359254797,
+      "diff": 0.2724935925479697,
+      "node": "n12",
+      "path": "table.rows[3][8]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 8.14,
+      "diff": 0.27000000000000046,
+      "via": "tolerance",
+      "node": "n50",
+      "claimEntry": 308,
+      "text": "- Mean decay time constant, Ctrl: 8.14 ms."
+     }
+    },
+    {
+     "key": "freq_ctrl",
+     "description": "Mean frequency of the Ctrl cells, Hz (not printed in the paper)",
+     "expected": 2.97,
+     "tolerance": 0.6,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.6228070175438596,
+      "diff": 0.3471929824561406,
+      "node": "n12",
+      "path": "table.rows[0][8]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.62,
+      "diff": 0.3500000000000001,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 308,
+      "text": "- Mean frequency: Ctrl 2.62 Hz; cKO 1.64 Hz."
+     }
+    },
+    {
+     "key": "freq_cko",
+     "description": "Mean frequency of the cKO cells, Hz (not printed in the paper)",
+     "expected": 1.76,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.8518452178193594,
+      "diff": 0.09184521781935939,
+      "node": "n12",
+      "path": "table.rows[3][9]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.64,
+      "diff": 0.1200000000000001,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 308,
+      "text": "- Mean frequency: Ctrl 2.62 Hz; cKO 1.64 Hz."
+     }
+    },
+    {
+     "key": "amp_ctrl",
+     "description": "Mean amplitude of the Ctrl cells, pA (not printed in the paper)",
+     "expected": 51.9,
+     "tolerance": 7,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 55.61392924869553,
+      "diff": 3.7139292486955284,
+      "node": "n12",
+      "path": "table.rows[1][8]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 55.6,
+      "diff": 3.700000000000003,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 308,
+      "text": "- Mean amplitude: Ctrl 55.6 pA; cKO 40.2 pA."
+     }
+    },
+    {
+     "key": "amp_cko",
+     "description": "Mean amplitude of the cKO cells, pA (not printed in the paper)",
+     "expected": 38.3,
+     "tolerance": 6,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 40.22686193057011,
+      "diff": 1.9268619305701122,
+      "node": "n12",
+      "path": "table.rows[1][10]",
+      "entry": 117
+     },
+     "reported": {
+      "pass": true,
+      "value": 37.8,
+      "diff": 0.5,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 308,
+      "text": "- **Threshold (comparison run):** mean amplitude over all 32 cells is 37.8 pA at 3 times the noise SD and 57.2 pA at 5 times."
+     }
+    },
+    {
+     "key": "p_amplitude_animal_unit",
+     "description": "p value of the amplitude with the animal as the unit (6 against 6 animals): not significant at 0.05",
+     "expected": 0.067,
+     "tolerance": 0.03,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.04764355438132954,
+      "diff": 0.019356445618670462,
+      "node": "n12",
+      "path": "metrics.min_p_bh",
+      "entry": 117
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 308,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 12,
+    "inputTokens": 30,
+    "outputTokens": 22409,
+    "cacheRead": 439959,
+    "cacheWrite": 91463,
+    "toolCalls": 48,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 3,
+     "error": 5
+    },
+    "unsourced": 0,
+    "deviations": 2,
+    "overwritten": 2,
+    "nodes": 42
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1",
+     "/Users/parker/Code/guided-analysis/catalog/patch-clamp",
+     "/Users/parker/.guided-analysis/envs/patch-clamp",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/patch-clamp"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_01_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_01_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_01_cell3.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_02_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_02_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_03_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_04_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_04_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_04_cell3.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_04_cell4.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_04_cell5.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_05_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_05_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_05_cell3.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_05_cell4.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_05_cell5.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_06_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_06_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_07_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_07_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_07_cell3.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_08_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_08_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_09_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_09_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_09_cell3.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_10_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_11_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_11_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_11_cell3.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_12_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_12_cell2.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells_metadata.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1/work/cell_features_mipsc.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-050212-27d1/work/detect_events_for_cells-1/cells.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-ephys-haiku.md",
+  "json": "bench/results/papers-2026-10-09-ephys-haiku.json"
+ },
+ "summary": {
+  "cells": {
+   "gouwens2019-allen-ephys": {
+    "claude:claude-haiku-5-5": {
+     "computed": 14,
+     "computedOf": 14,
+     "reported": 14,
+     "reportedOf": 14,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "jahncke2025-dag1-mipsc": {
+    "claude:claude-haiku-5-5": {
+     "computed": 12,
+     "computedOf": 12,
+     "reported": 12,
+     "reportedOf": 12,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 26,
+    "computedOf": 26,
+    "reported": 26,
+    "reportedOf": 26,
+    "runs": 2,
+    "statuses": {
+     "answer": 2
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 2,
+    "durationS": 522.77,
+    "requests": 21,
+    "inputTokens": 56,
+    "outputTokens": 40848,
+    "cacheRead": 1000882,
+    "cacheWrite": 210817,
+    "toolCalls": 64,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 2,
+    "findings_info": 8,
+    "findings_warning": 7,
+    "findings_error": 6,
+    "unsourced": 0,
+    "deviations": 6,
+    "overwritten": 6,
+    "nodes": 52
+   }
+  },
+  "skipped": []
+ }
+}
