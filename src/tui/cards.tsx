@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
+import { CardRows, Fit } from "./fit.tsx";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { Question } from "../core/types.ts";
@@ -12,13 +13,23 @@ import type { PlanResponse } from "../core/types.ts";
 
 export type { Card } from "../ui/cards.ts";
 
-function Frame({ title, color, children }: { title: string; color: string; children: React.ReactNode }) {
-  return (
-    <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
+function Frame({ title, color, children, arrows }: { title: string; color: string; children: React.ReactNode; arrows?: boolean }) {
+  const max = useContext(CardRows);
+  const parts = React.Children.toArray(children);
+  const tail = parts.length > 1 ? parts.pop() : undefined;
+  const head = (
+    <>
       <Text bold color={color}>
         {title}
       </Text>
-      {children}
+      {parts}
+    </>
+  );
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
+      <CardRows.Provider value={Infinity}>
+        <Fit max={max - 2} head={head} tail={tail} arrows={arrows} />
+      </CardRows.Provider>
     </Box>
   );
 }
@@ -123,27 +134,29 @@ export function QuestionCard(props: {
           <Text>{q.evidence}</Text>
         </Box>
       ) : null}
-      <Box flexDirection="column" marginTop={1}>
-        {q.options.map((o, i) => (
-          <Text key={i}>
-            <Text color="magenta">{i + 1}</Text> {o.label}
-            {i === recIndex ? <Text color="green"> (recommended)</Text> : null}
+      <Box flexDirection="column">
+        <Box flexDirection="column" marginTop={1}>
+          {q.options.map((o, i) => (
+            <Text key={i}>
+              <Text color="magenta">{i + 1}</Text> {o.label}
+              {i === recIndex ? <Text color="green"> (recommended)</Text> : null}
+            </Text>
+          ))}
+          <Text>
+            <Text color="magenta">o</Text> other: type your own answer
           </Text>
-        ))}
-        <Text>
-          <Text color="magenta">o</Text> other: type your own answer
-        </Text>
-      </Box>
-      {q.recommendation ? (
-        <Box marginTop={1}>
-          <Text dimColor>Recommended: {q.recommendation.reason} Press Enter to take it.</Text>
         </Box>
-      ) : null}
-      {other ? (
-        <Prompt label="Your answer:" onSubmit={(v) => v.trim() && props.onAnswer(v.trim())} onCancel={() => setOther(false)} />
-      ) : (
-        <Text dimColor>Press a number to answer. Esc to answer later with /questions.</Text>
-      )}
+        {q.recommendation ? (
+          <Box marginTop={1}>
+            <Text dimColor>Recommended: {q.recommendation.reason} Press Enter to take it.</Text>
+          </Box>
+        ) : null}
+        {other ? (
+          <Prompt label="Your answer:" onSubmit={(v) => v.trim() && props.onAnswer(v.trim())} onCancel={() => setOther(false)} />
+        ) : (
+          <Text dimColor>Press a number to answer. Esc to answer later with /questions.</Text>
+        )}
+      </Box>
     </Frame>
   );
 }
@@ -312,7 +325,7 @@ export function SetupCard(props: {
   );
 
   return (
-    <Frame title="Setup: your choices for this analysis" color="green">
+    <Frame title="Setup: your choices for this analysis" color="green" arrows={false}>
       {rows.map((r, i) => {
         const on = i === cursor;
         const mark = on ? "▸" : " ";

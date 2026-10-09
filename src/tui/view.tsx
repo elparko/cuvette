@@ -9,13 +9,25 @@ export type StaticItem = Item | { key: string; t: "header" };
 
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-export function Spinner() {
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setI((x) => (x + 1) % FRAMES.length), 120);
-    return () => clearInterval(t);
-  }, []);
-  return <Text color="cyan">{FRAMES[i]}</Text>;
+export const SPINNER_MS = 80;
+
+export function animationsOn(stdout: { isTTY?: boolean } | undefined, env: Record<string, string | undefined>, setting?: unknown): boolean {
+  return Boolean(stdout?.isTTY) && env.TERM !== "dumb" && setting !== "off" && setting !== false;
+}
+
+export function liveLayout(o: { rows: number; columns: number; card: boolean; running: boolean; input: number; queue: number; suggestions: number; text: boolean; pending: boolean }) {
+  const budget = o.rows - 2;
+  const footer = 2 + (o.running ? 1 : 0) + o.queue + o.suggestions;
+  const box = 2 + Math.max(1, Math.ceil((o.input + 4) / Math.max(1, o.columns - 4)));
+  const inputBox = !o.card || budget - footer - box >= 16;
+  const avail = Math.max(0, budget - footer - (inputBox ? box : 0));
+  if (o.card) {
+    const live = o.text ? Math.min(3, Math.max(0, avail - 12)) : 0;
+    const pending = o.pending ? Math.min(2, Math.max(0, avail - live - 12)) : 0;
+    return { inputBox, live, pending, card: Math.max(4, avail - live - pending) };
+  }
+  const pending = o.pending ? Math.floor(avail / (o.text ? 3 : 1)) : 0;
+  return { inputBox, live: avail - pending, pending, card: avail };
 }
 
 export function Header({ session }: { session: SessionLike }) {
@@ -118,14 +130,31 @@ export function runningText(tool: string, purpose: string | undefined, seconds: 
   return seconds >= 5 ? `${what} · ${elapsedText(seconds)} · Esc stops it` : what;
 }
 
-export function RunningLine(props: { tool: string; purpose?: string; since?: number }) {
+export function RunningLine(props: { tool: string; purpose?: string; since?: number; waiting?: boolean; animate?: boolean; color?: boolean }) {
   const [now, setNow] = useState(Date.now());
+  const [frame, setFrame] = useState(0);
+  const { waiting, animate } = props;
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
+    if (waiting) return;
+    const t = setInterval(
+      () => {
+        setNow(Date.now());
+        if (animate) setFrame((f) => (f + 1) % FRAMES.length);
+      },
+      animate ? SPINNER_MS : 1000,
+    );
     return () => clearInterval(t);
-  }, []);
+  }, [waiting, animate]);
+  if (waiting) return <Text dimColor wrap="truncate-end">● Waiting for your answer</Text>;
   const seconds = props.since ? Math.max(0, Math.floor((now - props.since) / 1000)) : 0;
-  return <Text dimColor>● {runningText(props.tool, props.purpose, seconds)}</Text>;
+  return (
+    <Text wrap="truncate-end">
+      <Text color={animate && props.color ? "cyan" : undefined} dimColor={!animate}>
+        {animate ? FRAMES[frame] : "●"}
+      </Text>
+      <Text dimColor> {runningText(props.tool, props.purpose, seconds)}</Text>
+    </Text>
+  );
 }
 
 const MODE_TEXT: Record<Mode, string> = {
@@ -166,9 +195,7 @@ export function StatusLine(props: {
   ];
   if (props.busy) {
     parts.push(
-      <Text key="b">
-        <Spinner /> {props.state === "waiting" ? "waiting for you" : props.state === "running" ? "working" : "thinking"}
-      </Text>,
+      <Text key="b">{props.state === "waiting" ? "waiting for you" : props.state === "running" ? "working" : "thinking"}</Text>,
     );
   }
   if (props.openQuestions > 0) {
@@ -186,7 +213,7 @@ export function StatusLine(props: {
     );
   }
   const line = (
-    <Text dimColor>
+    <Text dimColor wrap="truncate-end">
       {parts.map((p, i) => (
         <React.Fragment key={i}>
           {i > 0 ? " · " : ""}
@@ -198,7 +225,7 @@ export function StatusLine(props: {
   return (
     <Box flexDirection="column">
       {props.bypass ? (
-        <Text>
+        <Text wrap="truncate-end">
           <Text color="yellow" bold>
             bypass permissions
           </Text>
@@ -208,7 +235,7 @@ export function StatusLine(props: {
       ) : (
         line
       )}
-      <Text dimColor>{props.hint || (props.busy ? busyHint(props.state, props.queue) : props.details ? "Ctrl+O: short view" : "Ctrl+O: all steps")}</Text>
+      <Text dimColor wrap="truncate-end">{props.hint || (props.busy ? busyHint(props.state, props.queue) : props.details ? "Ctrl+O: short view" : "Ctrl+O: all steps")}</Text>
     </Box>
   );
 }

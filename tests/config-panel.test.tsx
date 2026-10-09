@@ -33,8 +33,8 @@ async function key(h: Harness, k: string) {
   await sleep(60);
 }
 
-async function open() {
-  const h = makeHarness(120);
+async function open(rows = 80) {
+  const h = makeHarness(120, rows);
   const s = new FakeSession({ delayMs: 0 });
   live = { h, done: runTui(s, { stdin: h.stdin, stdout: h.stdout, autoSetup: false, env: {} }) };
   await sleep(100);
@@ -54,6 +54,17 @@ test("the panel shows groups, values, sources and the help line", async () => {
   expect(screen).toContain("The model that does the analysis.");
   expect(h.all()).not.toContain("panelsecret");
   expect(h.all()).not.toContain("QRST");
+});
+
+test("in a short terminal the panel keeps the selected row and the help line in view", async () => {
+  const { h } = await open(24);
+  expect(h.term.view()).toContain("Enter or Space change");
+  expect(h.term.view()).not.toContain("Lab notebook");
+  await key(h, "\x1b[A");
+  const view = h.term.view();
+  expect(view).toContain("Lab notebook");
+  expect(view).toContain("Enter or Space change");
+  expect(view.split("\n").length).toBeLessThanOrEqual(24);
 });
 
 test("a change asks where to save it and goes into the record", async () => {

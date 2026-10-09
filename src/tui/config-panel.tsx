@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
+import { CardRows, Fit } from "./fit.tsx";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { Scope, SettingCtx, SettingDef } from "../core/settings.ts";
@@ -20,6 +21,7 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
   const [text, setText] = useState("");
   const [msg, setMsg] = useState<{ text: string; color?: string }>();
   const row = rows[Math.min(sel, rows.length - 1)]!;
+  const max = useContext(CardRows);
 
   const save = async (def: SettingDef, value: string, scope: Scope) => {
     setStep({ t: "list" });
@@ -67,10 +69,13 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
 
   const labelW = Math.max(...rows.map((r) => r.def.label.length)) + 2;
   let group = "";
+  let at = 1;
+  let follow = 0;
   const lines: React.ReactNode[] = [];
   rows.forEach((r, i) => {
     if (r.def.group !== group) {
       group = r.def.group;
+      at += i ? 2 : 1;
       lines.push(
         <Box key={`g${i}`} marginTop={i ? 1 : 0}>
           <Text bold>{group}</Text>
@@ -78,6 +83,8 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
       );
     }
     const on = i === sel;
+    if (on) follow = at;
+    at++;
     const tag = rowTag(r);
     lines.push(
       <Box key={r.def.name}>
@@ -123,22 +130,30 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
   const keys =
     step.t === "list" ? "↑↓ move · Enter or Space change · Esc close" : step.t === "text" ? "Enter saves · Esc goes back" : "↑↓ move · Enter choose · Esc goes back";
 
-  return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+  const extra = step.t === "value" ? step.sel + 1 : step.t === "scope" ? step.sel + 2 : step.t === "text" ? 1 : 0;
+  const head = (
+    <>
       <Text bold color="cyan">
         Settings
       </Text>
       {lines}
-      <Box marginTop={1} flexDirection="column">
-        <Text>{rowHelp(row)}</Text>
-        {(row.def.details?.(ctx) ?? []).map((d, i) => (
-          <Text key={i} dimColor>
-            {"  " + d}
-          </Text>
-        ))}
-        {msg ? <Text color={msg.color}>{msg.text}</Text> : null}
-        <Text dimColor>{keys}</Text>
-      </Box>
+    </>
+  );
+  const tail = (
+    <Box marginTop={1} flexDirection="column">
+      <Text>{rowHelp(row)}</Text>
+      {(row.def.details?.(ctx) ?? []).map((d, i) => (
+        <Text key={i} dimColor>
+          {"  " + d}
+        </Text>
+      ))}
+      {msg ? <Text color={msg.color}>{msg.text}</Text> : null}
+      <Text dimColor>{keys}</Text>
+    </Box>
+  );
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+      <Fit max={max - 2} head={head} tail={tail} arrows={false} follow={follow + extra} />
     </Box>
   );
 }

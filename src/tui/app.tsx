@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, Static, Text, render, useApp, useInput, useStdout } from "ink";
+import { Box, Static, Text, render, useApp, useInput, useStdout, useWindowSize } from "ink";
 import TextInput from "ink-text-input";
 import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
@@ -9,9 +9,10 @@ import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from ".
 import { imageProtocol, inlineImage } from "./image.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
-import { Header, ItemView, RunningLine, StatusLine, activityText, type StaticItem } from "./view.tsx";
+import { Header, ItemView, RunningLine, StatusLine, activityText, animationsOn, liveLayout, type StaticItem } from "./view.tsx";
 import { Markdown } from "./markdown.tsx";
 import { ConfigPanel } from "./config-panel.tsx";
+import { CardRows, Last } from "./fit.tsx";
 import type { SettingSession } from "../core/settings.ts";
 import { applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
 import { inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
@@ -322,6 +323,10 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
 
   const card = cards[0];
   const program = session.adapterInfo[0]?.title ?? "the program";
+  const { columns, rows } = useWindowSize();
+  const running = status.state !== "idle";
+  const fit = liveLayout({ rows, columns, card: !!card, running, input: input.length, queue: queue.length, suggestions: sugg.length, text: !!live, pending: pending.length > 0 });
+  const animate = animationsOn(opts.stdout ?? process.stdout, env, session.settings?.animations);
 
   return (
     <Box flexDirection="column">
@@ -332,17 +337,37 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           </Box>
         )}
       </Static>
-      {pending.map((it) => (
-        <ItemView key={it.key} item={it} />
-      ))}
-      {live ? (
-        <Box marginTop={1}>
-          <Markdown text={live} width={((stdout as unknown as { columns?: number })?.columns ?? 80) - 1} />
-        </Box>
+      {pending.length && fit.pending > 0 ? (
+        <Last max={fit.pending}>
+          {pending.map((it) => (
+            <ItemView key={it.key} item={it} />
+          ))}
+        </Last>
       ) : null}
-      {status.state !== "idle" ? <RunningLine key={`${status.state}${status.tool ?? ""}${status.since ?? ""}`} tool={status.tool ?? ""} purpose={activityText(status.state, status.purpose, status.tool)} since={status.since} /> : null}
-      {card ? (cardViews({ session, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: status.state !== "idle", program })[card.t] as (c: Card) => React.ReactNode)(card) : null}
-      <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
+      {live && fit.live > 0 ? (
+        <Last max={fit.live}>
+          <Box marginTop={1}>
+            <Markdown text={live} width={columns - 1} />
+          </Box>
+        </Last>
+      ) : null}
+      {running ? (
+        <RunningLine
+          key={`${status.state}${status.tool ?? ""}${status.since ?? ""}`}
+          tool={status.tool ?? ""}
+          purpose={activityText(card ? "waiting" : status.state, status.purpose, status.tool)}
+          since={status.since}
+          waiting={!!card || status.state === "waiting"}
+          animate={animate}
+          color={!env.NO_COLOR}
+        />
+      ) : null}
+      {card ? (
+        <CardRows.Provider value={fit.card}>
+          {(cardViews({ session, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: running, program })[card.t] as (c: Card) => React.ReactNode)(card)}
+        </CardRows.Provider>
+      ) : null}
+      {fit.inputBox ? <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
         <Text color="cyan">{"> "}</Text>
         {card ? (
           <Text dimColor>Answer the card above.</Text>
@@ -358,14 +383,14 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
             placeholder={inputPlaceholder(session, status.state !== "idle")}
           />
         )}
-      </Box>
+      </Box> : null}
       {queue.map((q, i) => (
-        <Text key={i} dimColor>
+        <Text key={i} dimColor wrap="truncate-end">
           Queued: {q}
         </Text>
       ))}
       {sugg.map((c, i) => (
-        <Text key={c.name} color={c === selected ? "cyan" : undefined} dimColor={c !== selected}>
+        <Text key={c.name} color={c === selected ? "cyan" : undefined} dimColor={c !== selected} wrap="truncate-end">
           {c === selected ? "▸" : " "} /{c.name}
           {c.args ? ` ${c.args}` : ""}  {c.help}
         </Text>
