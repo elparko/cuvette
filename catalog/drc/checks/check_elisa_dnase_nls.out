@@ -1,0 +1,15 @@
+         Estimate Std. Error    t value     Pr(>|t|)
+A    -0.007897239 0.01719971 -0.4591495 6.543328e-01
+B     2.377239353 0.10951641 21.7066951 5.350773e-11
+xmid  1.507403357 0.10207991 14.7668958 4.648133e-09
+scal  1.062578904 0.05699608 18.6430185 3.162722e-10
+as drc LL.4: b -0.941107 c -0.007897 d 2.377239 e 4.514992
+residual SE 0.019806 on 12 df
+Analysis of Variance Table
+
+Model 1: density ~ SSlogis(log(conc), Asym, xmid, scal)
+Model 2: density ~ SSfpl(log(conc), A, B, xmid, scal)
+  Res.Df Res.Sum Sq Df     Sum Sq F value Pr(>F)
+1     13  0.0047896                             
+2     12  0.0047073  1 8.2314e-05  0.2098 0.6551
+3PL against 4PL: RSS 0.00478957 and 0.00470725, F 0.209840, p 0.655078

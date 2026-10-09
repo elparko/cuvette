@@ -1,0 +1,197 @@
+kind: research paper
+short: Yun 2026
+field: Immunoassay (ELISA)
+program: drc (R), through the drc adapter. The paper used BioTek Gen5 3.16.
+citation:
+  authors: Yun H, Sigei F, Appiah NYA, Quaye CNO, Yankey CAB, Kyei-Baafour E, Hayes P, Marini A, Bailer RT, Zaric M, Kusi KA
+  title: Development and qualification of an enzyme-linked immunosorbent assay to detect human serum immunoglobulin G reactive to multiple lineages of Lassa virus nucleoprotein
+  venue: PLOS ONE 21(7):e0340568
+  year: 2026
+  doi: 10.1371/journal.pone.0340568
+related:
+  - text: "Data: S1 Data (Excel workbook) of the article, CC BY 4.0. fetch.sh downloads it from the PLOS supplement link."
+    url: https://journals.plos.org/plosone/article/file?type=supplementary&id=10.1371/journal.pone.0340568.s010
+measured: >-
+  The study qualified an indirect ELISA for human serum IgG against Lassa virus nucleoprotein, calibrated to the
+  First WHO International Standard in IU/mL. For the dynamic range, nine runs each had a ten-point standard curve in
+  duplicate, four blank wells, high and low positive controls (HPC, LPC) and a negative control in triplicate, and a
+  ten-point two-fold dilution series of a reference serum pool in duplicate. Gen5 fitted a 4PL curve for each run and
+  back-calculated each dilution and control. Table 1 gives the mean OD, the mean interpolated concentration, their CV over
+  the nine runs and the recovery against the nominal value.
+instruction: >-
+  Fit a 4PL standard curve for each run and back-calculate the dilutions and the controls. Give the mean OD and the mean
+  concentration over the runs with their CV, and the recovery for each dilution and each positive control. Give the LLOQ
+  and the ULOQ from the dilutions with a recovery of 75 to 125 percent and a CV below 25 percent.
+instruction_basis: >-
+  Methods (ELISA procedure: 4PL standard curves in Gen5 3.16), Results (Anti-LASV-NP IgG ELISA dynamic range and positive
+  controls: the LLOQ and ULOQ rule and values), and Table 1.
+answers:
+  curve_model:
+    decision: Standard curve model
+    value: 4PL
+    source: Methods. "extrapolated by four-parameter logistic (4PL) standard curves using Biotek GEN5 version 3.16".
+  weighting:
+    decision: Weighting of the standard curve fit
+    value: none
+    source: Not in the paper. Gen5 fits without weighting by default. With no weighting, SciPy gives the Gen5 values in the workbook to five digits (check.out).
+  blank:
+    decision: Blank correction
+    value: none
+    source: Not in the paper. With no blank subtraction, SciPy gives the Gen5 values to five digits (check.out). With blank subtraction they differ.
+  average_replicates:
+    decision: Average the replicate wells before the fit
+    value: signal
+    source: The workbook gives a mean OD for each standard and sample and one Gen5 concentration for each mean OD. A fit to the mean OD gives the Gen5 values (check.out).
+  lod_sd:
+    decision: LOD as the blank mean plus k standard deviations
+    value: 3
+    source: Not used for the items. The paper gives a cutoff OD from healthy volunteers, not an LOD.
+  recovery_limit_pct:
+    decision: Accepted bias of a back-calculated standard (percent)
+    value: 25
+    source: Results. "within the 75–125% recovery range".
+  cv_limit_pct:
+    decision: Highest accepted CV of replicate wells (percent)
+    value: 25
+    source: Results. "remained precise with coefficients of variation (CV) <25%".
+  exclude_wells:
+    decision: Wells that you exclude as outliers
+    value: R7-LPC-2, R9-LPC-1
+    source: S1 Data. The two OD values have a trailing asterisk (masked in Gen5), and the printed mean OD of the LPC leaves them out.
+items:
+  runs:
+    source: published
+    where: Table 1 and S1 Data. Nine runs.
+    check: check.py reads nine runs.
+  conc_d1:
+    source: published
+    where: Table 1, Dilution 1. 7.587 IU/mL.
+    check: SciPy gives 7.5869 (check.py).
+  conc_d2:
+    source: published
+    where: Table 1, Dilution 2. 3.707.
+    check: SciPy gives 3.7072 (check.py).
+  conc_d3:
+    source: published
+    where: Table 1, Dilution 3. 1.872.
+    check: SciPy gives 1.8719 (check.py).
+  conc_d4:
+    source: published
+    where: Table 1, Dilution 4. 0.917.
+    check: SciPy gives 0.9171 (check.py).
+  conc_d5:
+    source: published
+    where: Table 1, Dilution 5. 0.464.
+    check: SciPy gives 0.4637 (check.py).
+  conc_d6:
+    source: published
+    where: Table 1, Dilution 6. 0.233.
+    check: SciPy gives 0.2334 (check.py).
+  conc_d7:
+    source: published
+    where: Table 1, Dilution 7. 0.120.
+    check: SciPy gives 0.1205 (check.py).
+  conc_d8:
+    source: published
+    where: Table 1, Dilution 8. 0.056.
+    check: SciPy gives 0.0558 (check.py).
+  conc_d9:
+    source: published
+    where: Table 1, Dilution 9. 0.027.
+    check: SciPy gives 0.0266 (check.py).
+  conc_d10:
+    source: published
+    where: Table 1, Dilution 10. 0.014. Run 1 gives no value (the mean OD is below the lower asymptote), so the mean has 8 runs.
+    check: SciPy gives 0.0139 from 8 runs (check.py).
+  cv_conc_d1:
+    source: published
+    where: Table 1. 11.07.
+    check: SciPy gives 11.0700 (check.py).
+  cv_conc_d4:
+    source: published
+    where: Table 1. 10.93.
+    check: SciPy gives 10.9268 (check.py).
+  cv_conc_d7:
+    source: published
+    where: Table 1. 15.71.
+    check: SciPy gives 15.7136 (check.py).
+  cv_conc_d8:
+    source: published
+    where: Table 1. 15.55.
+    check: SciPy gives 15.5534 (check.py).
+  cv_conc_d9:
+    source: published
+    where: Table 1. 25.90. The computed value rounds to 25.89.
+    check: SciPy gives 25.8945 (check.py).
+  cv_od_d7:
+    source: published
+    where: Table 1. 21.92.
+    check: SciPy gives 21.9188 (check.py).
+  cv_od_d8:
+    source: published
+    where: Table 1. 26.62. This CV is above 25 percent, so dilution 8 is outside the range.
+    check: SciPy gives 26.6206 (check.py).
+  mean_od_d1:
+    source: published
+    where: Table 1. 2.887.
+    check: SciPy gives 2.8867 (check.py).
+  recovery_d1:
+    source: published
+    where: Table 1. 98.0.
+    check: SciPy gives 97.97 (check.py).
+  recovery_d4:
+    source: published
+    where: Table 1. 94.7.
+    check: SciPy gives 94.74 (check.py).
+  recovery_d7:
+    source: published
+    where: Table 1. 99.6.
+    check: SciPy gives 99.55 (check.py).
+  recovery_d9:
+    source: published
+    where: Table 1. 88.7, with the nominal value 0.030 of Table 1.
+    check: SciPy gives 88.71 (check.py).
+  recovery_d8_printed:
+    source: published
+    where: Table 1. 92.0. It does not reproduce. The computed value is 92.99 with the nominal 0.060 and 92.22 with 0.0605.
+    check: SciPy gives 92.99 (check.py).
+  hpc_conc:
+    source: published
+    where: Table 1, HPC. 1.993.
+    check: SciPy gives 1.9932 (check.py).
+  hpc_cv:
+    source: published
+    where: Table 1, HPC. 22.45.
+    check: SciPy gives 22.4473 (check.py).
+  hpc_recovery:
+    source: published
+    where: Table 1, HPC. 107.3.
+    check: SciPy gives 107.276 (check.py).
+  lpc_conc:
+    source: published
+    where: Table 1, LPC. 0.457.
+    check: SciPy gives 0.4569 with the two masked wells left out (check.py).
+  lpc_recovery:
+    source: published
+    where: Table 1, LPC. 98.3.
+    check: SciPy gives 98.254 (check.py).
+  lpc_cv_printed:
+    source: published
+    where: Table 1, LPC. 20.09. It does not reproduce. The computed value is 20.03.
+    check: SciPy gives 20.028 (check.py).
+  lloq:
+    source: published
+    where: Results and Table 1. LLOQ 0.12 IU/mL, the nominal value 0.121 of dilution 7.
+    check: SciPy gives dilutions 1 to 7 in range (check.py).
+  uloq:
+    source: published
+    where: Results and Table 1. ULOQ 7.74 IU/mL, the nominal value 7.744 of dilution 1.
+    check: SciPy gives dilutions 1 to 7 in range (check.py).
+data:
+  source: >-
+    S1 Data of the article, sheet "Table 1 dynamic range". fetch.sh writes one row for each well: the run, a well name
+    (R<run>-<sample>-<replicate>), the type, the sample, the standard concentration, the nominal value of the dilutions
+    and controls from Table 1, the OD and the masked flag. The Gen5 concentrations stay in the workbook in the reference folder.
+  url: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0340568
+  license: CC BY 4.0, the license of the article and its supplement. The data have no personal information.
+  size: 184 KB Excel workbook with 16 sheets. The CSV has 477 rows and 8 columns.

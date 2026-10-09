@@ -1,0 +1,1027 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "yun2026-lasv-elisa",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 199.216,
+   "session": "20261008-230845-6caa",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1/home/sessions/20261008-230845-6caa",
+   "answer": "## Final answer: nine-run qualification of the LASV IgG ELISA\n\n**LLOQ = 0.121 IU/mL (STD\\*-7). ULOQ = 7.744 IU/mL (STD\\*-1).** This follows your request text, which requires a CV below 25% for both OD and concentration. The LLOQ depends on that reading, so see the question below.\n\n### Corrections from the review\n- **R² and recovery values:** I did not run compare_options, so no number comes from a comparison run. The R² values 0.9997 (plates 1 and 5) are from the chosen 4PL fit. The 75% is the lower bound of your recovery window, not a result.\n- **Blank value 0.146:** confirmed by the script output. Run 1 blank R1-Blank-2 reads 0.146. The other run 1 blanks read 0.023, 0.015 and 0.014.\n- **LLOQ reading:** your request says CV below 25% \"for both the OD and the concentration\". Under that reading STD\\*-8 fails on OD CV (26.62%), so the LLOQ is 0.121 IU/mL. If only the concentration CV counts, STD\\*-8 (0.060 IU/mL) passes with a concentration CV of 15.55% and recovery of 92.99%, and the LLOQ becomes 0.060 IU/mL. I kept the rule as you wrote it. Please confirm which reading you want.\n\n### Settings and steps\n- **Model:** 4PL (the tool's fit). I did not see a recorded answer for the curve model, so please confirm.\n- **Weighting:** none. **Blank correction:** none. **Replicates:** signals averaged per run before the fit.\n- **LOD:** blank mean plus 3 SD. **Accepted bias:** 25%. **CV limit:** 25%.\n- **Excluded wells:** R7-LPC-2 and R9-LPC-1, both masked in the reader software. The refit matched the first run, so the record already held these exclusions.\n- **Dilution factor:** 1 for all wells, because the file has no dilution column. The nominal values are taken as the concentrations of the dilutions.\n- **drc version:** the adapter lists drc 4.6.1. The tool output I read does not print the version string.\n- **Steps:** I fitted each run (9 runs, 10 standards with 2 replicate wells each), checked the fits, summarised each dilution and control across the runs with a script (saved as qualification_summary.csv), and applied the LLOQ/ULOQ rule.\n\n### Fit quality per run (tool output)\n- R-squared: 0.9997, 0.9999, 0.9999, 0.9999, 0.9997, 0.9999, 0.9993, 1, 0.9999 (runs 1 to 9).\n\n### Dilutions and controls, mean over the 9 runs\nMean OD and mean concentration are the means of the per-run values. CV is the sample SD over runs divided by the mean. Recovery is the mean concentration over nominal.\n\n| Sample | Nominal (IU/mL) | Mean OD (CV %) | Mean conc (IU/mL) (CV %) | Recovery % | Passes rule (both OD and conc CV) |\n|---|---|---|---|---|---|\n| STD\\*-1 | 7.744 | 2.8867 (11.93) | 7.5869 (11.07) | 97.97 | yes |\n| STD\\*-2 | 3.872 | 2.2355 (14.60) | 3.7072 (8.73) | 95.74 | yes |\n| STD\\*-3 | 1.936 | 1.5657 (15.40) | 1.8719 (11.39) | 96.69 | yes |\n| STD\\*-4 | 0.968 | 0.9767 (18.77) | 0.9171 (10.93) | 94.74 | yes |\n| STD\\*-5 | 0.484 | 0.5754 (17.96) | 0.4637 (9.21) | 95.81 | yes |\n| STD\\*-6 | 0.242 | 0.3264 (19.94) | 0.2334 (8.79) | 96.45 | yes |\n| STD\\*-7 | 0.121 | 0.1871 (21.92) | 0.1205 (15.71) | 99.55 | yes |\n| STD\\*-8 | 0.060 | 0.1030 (26.62) | 0.0558 (15.55) | 92.99 | no (OD CV) |\n| STD\\*-9 | 0.030 | 0.0626 (35.00) | 0.0266 (25.89) | 88.71 | no (OD and conc CV) |\n| STD\\*-10 | 0.015 | 0.0412 (48.35) | 0.0139 (42.04), n = 8 | 92.56 | no (OD and conc CV) |\n| HPC (control) | 1.858 | 1.6177 (21.49) | 1.9932 (22.45) | 107.28 | not a dilution |\n| LPC (control) | 0.465 | 0.5723 (25.33) | 0.4569 (20.03) | 98.25 | not a dilution |\n\n- STD\\*-10 has 8 runs with a concentration. In run 1 its OD (0.0355) lies below the lower asymptote, so the curve gives no concentration there.\n- LPC's OD CV (25.33%) is just above 25%. It is a control, so it does not enter the LLOQ or ULOQ rule.\n\n### Points to check\n- **Blank in run 1:** R1-Blank-2 (0.146) is well above the other run 1 blanks (0.014 to 0.023). It inflates the run 1 blank SD and so the run 1 LOD. I did not exclude it, because you named only two wells.\n- **LOD by run (IU/mL, tool output):** run 1 0.1619; runs 2, 3 and 4 undefined (the 3-SD blank signal lies below the fitted lower asymptote); run 5 0.00092; run 6 0.00066; run 7 0.0186; run 8 0.0054; run 9 0.0165. The spread is wide, so I would not quote one LOD until the blank question is settled.\n- **Per-run standard LLOQ (tool, 25% bias rule):** 0.29 IU/mL in run 1, 0.036 in runs 7 and 9, and 0.018 in the other runs. This is a separate rule from the dilution rule. The standard ULOQ is 9.292 IU/mL in every run.\n- **Dilution factor:** if the dilutions were made on top of the nominal values, the concentrations change by that factor.\n\n### What is uncertain\n- The LLOQ depends on how the CV rule is read (both OD and concentration, or concentration alone). It gives 0.121 IU/mL or 0.060 IU/mL.\n- The LOD depends on the blank question above.\n\n### What waits for the scientist\n- Confirm the LLOQ rule: both OD and concentration CV (LLOQ 0.121 IU/mL), or concentration CV only (LLOQ 0.060 IU/mL).\n- Confirm 4PL as the curve model.\n- Decide whether R1-Blank-2 is an outlier.\n- Say whether the ULOQ should be reported as 7.744 IU/mL or as \"at least\" that value.\n\nStep results that the answer does not mention, from the record:\n- n5 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1/home/sessions/20261008-230845-6caa/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1/home/sessions/20261008-230845-6caa/work.\n- n6 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1/home/sessions/20261008-230845-6caa/work and wrote 0 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1/home/sessions/20261008-230845-6caa/work.\n\nSettings used, from the decision record: Standard curve model: 4PL · Weighting of the standard curve fit: none · Blank correction: none · Average the replicate wells before the fit: signal · LOD as the blank mean plus k standard deviations: 3 · Accepted bias of a back-calculated standard (percent): 25 · Highest accepted CV of replicate wells (percent): 25 · Wells that you exclude as outliers: R7-LPC-2, R9-LPC-1.",
+   "items": [
+    {
+     "key": "runs",
+     "description": "Number of runs with a standard curve",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.n_plates",
+      "entry": 54
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 133,
+      "text": null
+     }
+    },
+    {
+     "key": "conc_d1",
+     "description": "Mean interpolated concentration, dilution 1 (IU/mL)",
+     "expected": 7.5869,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 7.5869,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 7.5869,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-1 | 7.744 | 2.8867 (11.93) | 7.5869 (11.07) | 97.97 | yes |"
+     }
+    },
+    {
+     "key": "conc_d2",
+     "description": "Mean interpolated concentration, dilution 2 (IU/mL)",
+     "expected": 3.7072,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.7072,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.7072,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-2 | 3.872 | 2.2355 (14.60) | 3.7072 (8.73) | 95.74 | yes |"
+     }
+    },
+    {
+     "key": "conc_d3",
+     "description": "Mean interpolated concentration, dilution 3 (IU/mL)",
+     "expected": 1.8719,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.8719,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.8719,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-3 | 1.936 | 1.5657 (15.40) | 1.8719 (11.39) | 96.69 | yes |"
+     }
+    },
+    {
+     "key": "conc_d4",
+     "description": "Mean interpolated concentration, dilution 4 (IU/mL)",
+     "expected": 0.91706,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.917061029424136,
+      "diff": 0.0000010294241360453427,
+      "node": "n3",
+      "path": "metrics.mean_conc_STD_4",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.9171,
+      "diff": 0.000040000000000040004,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-4 | 0.968 | 0.9767 (18.77) | 0.9171 (10.93) | 94.74 | yes |"
+     }
+    },
+    {
+     "key": "conc_d5",
+     "description": "Mean interpolated concentration, dilution 5 (IU/mL)",
+     "expected": 0.46371,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.463713432334906,
+      "diff": 0.0000034323349059617314,
+      "node": "n3",
+      "path": "metrics.mean_conc_STD_5",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.4637,
+      "diff": 0.000010000000000010001,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-5 | 0.484 | 0.5754 (17.96) | 0.4637 (9.21) | 95.81 | yes |"
+     }
+    },
+    {
+     "key": "conc_d6",
+     "description": "Mean interpolated concentration, dilution 6 (IU/mL)",
+     "expected": 0.2334,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.2334,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.2334,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-6 | 0.242 | 0.3264 (19.94) | 0.2334 (8.79) | 96.45 | yes |"
+     }
+    },
+    {
+     "key": "conc_d7",
+     "description": "Mean interpolated concentration, dilution 7 (IU/mL)",
+     "expected": 0.12046,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.120455580383999,
+      "diff": 0.000004419616000991833,
+      "node": "n3",
+      "path": "metrics.mean_conc_STD_7",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.1205,
+      "diff": 0.00003999999999999837,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-7 | 0.121 | 0.1871 (21.92) | 0.1205 (15.71) | 99.55 | yes |"
+     }
+    },
+    {
+     "key": "conc_d8",
+     "description": "Mean interpolated concentration, dilution 8 (IU/mL)",
+     "expected": 0.055794,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0557941341624244,
+      "diff": 1.341624243991757e-7,
+      "node": "n3",
+      "path": "metrics.mean_conc_STD_8",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0558,
+      "diff": 0.000005999999999999062,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-8 | 0.060 | 0.1030 (26.62) | 0.0558 (15.55) | 92.99 | no (OD CV) |"
+     }
+    },
+    {
+     "key": "conc_d9",
+     "description": "Mean interpolated concentration, dilution 9 (IU/mL)",
+     "expected": 0.026613,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0266131828917336,
+      "diff": 1.82891733598034e-7,
+      "node": "n3",
+      "path": "metrics.mean_conc_STD_9",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0266,
+      "diff": 0.000013000000000002593,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-9 | 0.030 | 0.0626 (35.00) | 0.0266 (25.89) | 88.71 | no (OD and conc CV) |"
+     }
+    },
+    {
+     "key": "conc_d10",
+     "description": "Mean interpolated concentration, dilution 10 (IU/mL)",
+     "expected": 0.013885,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0138845636491182,
+      "diff": 4.363508818005374e-7,
+      "node": "n3",
+      "path": "metrics.mean_conc_STD_10",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0139,
+      "diff": 0.000014999999999999389,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-10 | 0.015 | 0.0412 (48.35) | 0.0139 (42.04), n = 8 | 92.56 | no (OD and conc CV) |"
+     }
+    },
+    {
+     "key": "cv_conc_d1",
+     "description": "CV of the interpolated concentration, dilution 1 (%)",
+     "expected": 11.07,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 11.07,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 11.07,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-1 | 7.744 | 2.8867 (11.93) | 7.5869 (11.07) | 97.97 | yes |"
+     }
+    },
+    {
+     "key": "cv_conc_d4",
+     "description": "CV of the interpolated concentration, dilution 4 (%)",
+     "expected": 10.927,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10.9267598132039,
+      "diff": 0.00024018679610016136,
+      "node": "n3",
+      "path": "metrics.cv_conc_pct_STD_4",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 10.93,
+      "diff": 0.0030000000000001137,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-4 | 0.968 | 0.9767 (18.77) | 0.9171 (10.93) | 94.74 | yes |"
+     }
+    },
+    {
+     "key": "cv_conc_d7",
+     "description": "CV of the interpolated concentration, dilution 7 (%)",
+     "expected": 15.714,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 15.7136081215853,
+      "diff": 0.00039187841469967566,
+      "node": "n3",
+      "path": "metrics.cv_conc_pct_STD_7",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 15.71,
+      "diff": 0.0039999999999995595,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-7 | 0.121 | 0.1871 (21.92) | 0.1205 (15.71) | 99.55 | yes |"
+     }
+    },
+    {
+     "key": "cv_conc_d8",
+     "description": "CV of the interpolated concentration, dilution 8 (%)",
+     "expected": 15.553,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 15.5533937563338,
+      "diff": 0.0003937563337998995,
+      "node": "n3",
+      "path": "metrics.cv_conc_pct_STD_8",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 15.55,
+      "diff": 0.0030000000000001137,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "If only the concentration CV counts, STD\\*-8 (0.060 IU/mL) passes with a concentration CV of 15.55% and recovery of 92.99%, and the LLOQ becomes 0.060 IU/mL."
+     }
+    },
+    {
+     "key": "cv_conc_d9",
+     "description": "CV of the interpolated concentration, dilution 9 (%)",
+     "expected": 25.895,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 25.8945469481039,
+      "diff": 0.0004530518960983443,
+      "node": "n3",
+      "path": "metrics.cv_conc_pct_STD_9",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 25.89,
+      "diff": 0.004999999999999005,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-9 | 0.030 | 0.0626 (35.00) | 0.0266 (25.89) | 88.71 | no (OD and conc CV) |"
+     }
+    },
+    {
+     "key": "cv_od_d7",
+     "description": "CV of the OD, dilution 7 (%)",
+     "expected": 21.919,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 21.9188030156159,
+      "diff": 0.00019698438410031827,
+      "node": "n3",
+      "path": "table.rows[9][6]",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 21.92,
+      "diff": 0.0010000000000012221,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-7 | 0.121 | 0.1871 (21.92) | 0.1205 (15.71) | 99.55 | yes |"
+     }
+    },
+    {
+     "key": "cv_od_d8",
+     "description": "CV of the OD, dilution 8 (%)",
+     "expected": 26.621,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 26.6205820172216,
+      "diff": 0.0004179827783978851,
+      "node": "n3",
+      "path": "table.rows[10][6]",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 26.62,
+      "diff": 0.0009999999999976694,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "Under that reading STD\\*-8 fails on OD CV (26.62%), so the LLOQ is 0.121 IU/mL."
+     }
+    },
+    {
+     "key": "mean_od_d1",
+     "description": "Mean OD, dilution 1",
+     "expected": 2.8867,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.8867,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 133,
+      "text": null
+     }
+    },
+    {
+     "key": "recovery_d1",
+     "description": "Recovery, dilution 1 (%)",
+     "expected": 97.97,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 97.97,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 97.97,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-1 | 7.744 | 2.8867 (11.93) | 7.5869 (11.07) | 97.97 | yes |"
+     }
+    },
+    {
+     "key": "recovery_d4",
+     "description": "Recovery, dilution 4 (%)",
+     "expected": 94.74,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 94.74,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 94.74,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-4 | 0.968 | 0.9767 (18.77) | 0.9171 (10.93) | 94.74 | yes |"
+     }
+    },
+    {
+     "key": "recovery_d7",
+     "description": "Recovery, dilution 7 (%)",
+     "expected": 99.55,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 99.55,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 99.55,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-7 | 0.121 | 0.1871 (21.92) | 0.1205 (15.71) | 99.55 | yes |"
+     }
+    },
+    {
+     "key": "recovery_d9",
+     "description": "Recovery, dilution 9 (%)",
+     "expected": 88.71,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 88.71,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 88.71,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-9 | 0.030 | 0.0626 (35.00) | 0.0266 (25.89) | 88.71 | no (OD and conc CV) |"
+     }
+    },
+    {
+     "key": "recovery_d8_printed",
+     "description": "Recovery, dilution 8, as printed in Table 1 (does not reproduce; computed 92.99)",
+     "expected": 92,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 91.9946501619888,
+      "diff": 0.005349838011198926,
+      "node": "n4",
+      "path": "file:/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1/home/sessions/20261008-230845-6caa/work/fit_standard_curve-4/samples.csv",
+      "entry": 63
+     },
+     "reported": {
+      "pass": false,
+      "value": 92.56,
+      "diff": 0.5600000000000023,
+      "via": null,
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| STD\\*-10 | 0.015 | 0.0412 (48.35) | 0.0139 (42.04), n = 8 | 92.56 | no (OD and conc CV) |"
+     }
+    },
+    {
+     "key": "hpc_conc",
+     "description": "HPC mean interpolated concentration (IU/mL)",
+     "expected": 1.9932,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.9932,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.9932,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| HPC (control) | 1.858 | 1.6177 (21.49) | 1.9932 (22.45) | 107.28 | not a dilution |"
+     }
+    },
+    {
+     "key": "hpc_cv",
+     "description": "HPC CV of the interpolated concentration (%)",
+     "expected": 22.447,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22.4472910092887,
+      "diff": 0.000291009288702071,
+      "node": "n3",
+      "path": "metrics.cv_conc_pct_HPC",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 22.45,
+      "diff": 0.0030000000000001137,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| HPC (control) | 1.858 | 1.6177 (21.49) | 1.9932 (22.45) | 107.28 | not a dilution |"
+     }
+    },
+    {
+     "key": "hpc_recovery",
+     "description": "HPC recovery (%)",
+     "expected": 107.28,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 107.28,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 107.28,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| HPC (control) | 1.858 | 1.6177 (21.49) | 1.9932 (22.45) | 107.28 | not a dilution |"
+     }
+    },
+    {
+     "key": "lpc_conc",
+     "description": "LPC mean interpolated concentration (IU/mL)",
+     "expected": 0.45688,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.456879471634887,
+      "diff": 5.283651129950329e-7,
+      "node": "n3",
+      "path": "metrics.mean_conc_LPC",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.4569,
+      "diff": 0.00001999999999996449,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| LPC (control) | 0.465 | 0.5723 (25.33) | 0.4569 (20.03) | 98.25 | not a dilution |"
+     }
+    },
+    {
+     "key": "lpc_recovery",
+     "description": "LPC recovery (%)",
+     "expected": 98.25,
+     "tolerance": 0.06,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 98.25,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": true,
+      "value": 98.25,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| LPC (control) | 0.465 | 0.5723 (25.33) | 0.4569 (20.03) | 98.25 | not a dilution |"
+     }
+    },
+    {
+     "key": "lpc_cv_printed",
+     "description": "LPC CV of the interpolated concentration, as printed (does not reproduce; computed 20.03)",
+     "expected": 20.09,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 20.03,
+      "diff": 0.05999999999999872,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 90
+     },
+     "reported": {
+      "pass": false,
+      "value": 20.03,
+      "diff": 0.05999999999999872,
+      "via": null,
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "| LPC (control) | 0.465 | 0.5723 (25.33) | 0.4569 (20.03) | 98.25 | not a dilution |"
+     }
+    },
+    {
+     "key": "lloq",
+     "description": "LLOQ (IU/mL)",
+     "expected": 0.121,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.121,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.series_lloq_sample",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.121,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "**LLOQ = 0.121 IU/mL (STD\\*-7)."
+     }
+    },
+    {
+     "key": "uloq",
+     "description": "ULOQ (IU/mL)",
+     "expected": 7.744,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 7.744,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.series_uloq_sample",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 7.744,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 133,
+      "text": "ULOQ = 7.744 IU/mL (STD\\*-1).** This follows your request text, which requires a CV below 25% for both OD and concentration."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 12,
+    "inputTokens": 32,
+    "outputTokens": 21414,
+    "cacheRead": 663157,
+    "cacheWrite": 87306,
+    "toolCalls": 11,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 1,
+     "warning": 6,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 4
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1/home/sessions/20261008-230845-6caa/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/yun2026-lasv-elisa",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/catalog/drc",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aff8d08d4808ad9f7/catalog/drc"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/yun2026-lasv-elisa/lasv_elisa_runs.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1/home/sessions/20261008-230845-6caa/work/fit_standard_curve-4",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/yun2026-lasv-elisa/run1/home/sessions/20261008-230845-6caa/work/fit_standard_curve-4/samples.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-drc-elisa-haiku.md",
+  "json": "bench/results/papers-2026-10-09-drc-elisa-haiku.json"
+ },
+ "summary": {
+  "cells": {
+   "yun2026-lasv-elisa": {
+    "claude:claude-haiku-5-5": {
+     "computed": 30,
+     "computedOf": 30,
+     "reported": 28,
+     "reportedOf": 28,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 30,
+    "computedOf": 30,
+    "reported": 28,
+    "reportedOf": 28,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 199.216,
+    "requests": 12,
+    "inputTokens": 32,
+    "outputTokens": 21414,
+    "cacheRead": 663157,
+    "cacheWrite": 87306,
+    "toolCalls": 11,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings_info": 1,
+    "findings_warning": 6,
+    "findings_error": 1,
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 4
+   }
+  },
+  "skipped": []
+ }
+}

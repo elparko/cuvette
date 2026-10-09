@@ -1,0 +1,450 @@
+adapter:
+  name: drc
+  field: plate assays
+  file_types: [".csv", ".tsv"]
+  title: drc (ELISA standard curves, dose-response, enzyme kinetics)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Fits ELISA and other immunoassay standard curves (4PL and 5PL) with the R package drc, back-calculates
+    sample concentrations with the dilution factor, and gives the LOD, LLOQ and ULOQ. The scientist chooses
+    the model, the weighting, the blank and the outlier wells.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: drc
+  version: "4.0.0"
+  tested_versions: []
+  homepage: https://cran.r-project.org/package=drc
+  docs:
+    - https://cran.r-project.org/web/packages/drc/drc.pdf
+    - https://doi.org/10.1371/journal.pone.0146021
+    - https://doi.org/10.1201/b21966
+  install: >
+    Install R (brew install r on macOS). Then install the R packages drc, svglite and jsonlite into a library folder
+    that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("drc", "svglite", "jsonlite"), repos = "https://cloud.r-project.org")'
+  citation:
+    - text: "Ritz C, Jensen SM, Gerhard D, Streibig JC (2019). Dose-Response Analysis Using R. Chapman and Hall/CRC, New York. ISBN 9781315270098."
+      doi: 10.1201/b21966
+    - text: "Ritz C, Baty F, Streibig JC, Gerhard D (2015). Dose-Response Analysis Using R. PLOS ONE 10(12): e0146021."
+      doi: 10.1371/journal.pone.0146021
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 600
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first
+  folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  ~/.guided-analysis/R-library. The program version in this adapter is the version of the R package
+  drc, not of R. The tools fit with drm() and a strict tolerance (drmc(relTol = 1e-12)), then polish
+  the estimates with optim. The drc default tolerance can stop early in the fourth digit.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return the plate values that the scientist gave, the fitted parameters and the back-calculated concentrations.
+
+decisions:
+  - key: curve_model
+    label: Standard curve model
+    kind: choice
+    choices: [4PL, 5PL, 5PL-softmax]
+    default: 4PL
+    group: Standard curve
+    help: >
+      4PL is the four-parameter logistic, the default in SoftMax Pro, Gen5 and Prism. 5PL adds an asymmetry
+      parameter in the Prism form. 5PL-softmax is the five-parameter form of SoftMax Pro and Gen5; for a rising
+      curve it is a different model from the Prism form.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_standard_curve, arg: model }
+    sensitivity:
+      options: [4PL, 5PL]
+      tool: fit_standard_curve
+      compare: [metrics.ec50, metrics.lloq, metrics.uloq, metrics.n_flagged]
+      max_runs: 2
+
+  - key: weighting
+    label: Weighting of the standard curve fit
+    kind: choice
+    choices: [none, 1/y, 1/y^2]
+    default: none
+    group: Standard curve
+    help: >
+      none gives each standard the same weight. 1/y^2 gives low signals more weight. It suits an assay with a
+      constant CV, which is common in ELISA. The weight uses the measured signal, as in SoftMax Pro.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_standard_curve, arg: weighting }
+      - { tool: compare_models, arg: weighting }
+
+  - key: blank
+    label: Blank correction
+    kind: choice
+    choices: [subtract, none]
+    default: subtract
+    group: Plate
+    help: >
+      subtract removes the mean of the blank wells from every well. If there are no blank wells, it uses the
+      zero standard. none fits the raw signal. The fitted bottom of the curve then holds the background.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_standard_curve, arg: blank }
+
+  - key: average_replicates
+    label: Average the replicate wells before the fit
+    kind: choice
+    choices: [signal, none]
+    default: none
+    group: Standard curve
+    help: >
+      signal fits the curve to the mean signal of each standard and back-calculates the mean signal of each
+      sample, as Gen5 does. none fits each well and averages the concentrations of the wells.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_standard_curve, arg: average_replicates }
+
+  - key: lod_sd
+    label: LOD as the blank mean plus k standard deviations
+    kind: float
+    default: 3
+    lo: 1
+    hi: 10
+    group: Limits
+    help: >
+      The LOD signal is the mean of the blank wells plus k times their standard deviation. The tool converts it
+      to a concentration with the curve. Many kit inserts use k = 2 or k = 3. Name the value in the report.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_standard_curve, arg: lod_sd }
+
+  - key: recovery_limit_pct
+    label: Accepted bias of a back-calculated standard (percent)
+    kind: float
+    default: 20
+    lo: 1
+    hi: 50
+    group: Limits
+    help: >
+      A standard is in the quantifiable range if its back-calculated mean is within this percent of the
+      nominal value. LLOQ and ULOQ are the lowest and the highest standard of the longest run of accepted
+      standards. Ligand binding guidance uses 20 percent, and 25 percent at the ends of the range.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_standard_curve, arg: recovery_limit_pct }
+
+  - key: cv_limit_pct
+    label: Highest accepted CV of replicate wells (percent)
+    kind: float
+    default: 20
+    lo: 1
+    hi: 100
+    group: Limits
+    help: >
+      A standard with a CV of the back-calculated concentration above this limit is not in the quantifiable
+      range. A sample with a CV above this limit gets a flag.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_standard_curve, arg: cv_limit_pct }
+
+  - key: exclude_wells
+    label: Wells that you exclude as outliers
+    kind: text
+    default: none
+    group: Plate
+    help: >
+      Name each well that you exclude and the reason, such as a bubble or a pipetting error. Write none to keep
+      all wells. Decide before you see the concentrations.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_standard_curve, arg: exclude }
+
+checks:
+  - id: lod_without_blanks
+    description: The answer gives a limit of detection, but the plate has fewer than two blank wells.
+    severity: warning
+    text: >
+      Report the answer if it gives a limit of detection and the result of fit_standard_curve has a blank_sd of
+      null or n_blanks below 2.
+  - id: extrapolated_sample
+    description: The answer reports a sample concentration that the tool flagged as outside the quantifiable range.
+    severity: error
+    text: >
+      Report the answer if it gives a sample concentration as a number and the samples table flags the sample
+      as below LLOQ, above ULOQ or beyond an asymptote, and the answer does not say so.
+  - id: dilution_not_applied
+    description: The answer gives the concentration in the well and calls it the sample concentration.
+    severity: warning
+    text: >
+      Report the answer if the samples have a dilution factor above 1 and the answer gives the column
+      conc_in_well as the sample concentration.
+  - id: model_named
+    description: The answer does not name the curve model and the weighting.
+    severity: warning
+    text: Report the answer if it gives concentrations from a standard curve and does not name the model (4PL or 5PL) and the weighting.
+
+map:
+  - tool: fit_standard_curve
+    route: "library(drc); fit <- drm(signal ~ conc, data = standards, fct = LL.4(), control = drmc(relTol = 1e-12)); ED(fit, sample_signal, type = \"absolute\")"
+    steps:
+      - "R: subtract the mean blank, then run drm(signal ~ conc, fct = LL.4()) on the standards. Use LL.5() for 5PL and weights = signal for 1/y^2."
+      - "R: run ED(fit, y, type = \"absolute\") for each sample signal, then multiply by the dilution factor."
+      - "SoftMax Pro: Template Editor, mark Standards with concentrations, Unknowns with dilution factors and the Plate Blank. Graph, Curve Fit Settings, 4-Parameter or 5-Parameter, Weighting 1/Y^2. Read Result and Adj.Result in the Unknowns table."
+      - "Gen5: Plate Layout, mark STD, BLK and SPL wells with dilutions. Data Reduction, Blank subtraction, then Curve Analysis with the 4-parameter or 5-parameter fit. Read Conc and Conc*Dil."
+      - "Prism: XY table with concentration as X and replicate signals as Y; add the sample signals with no X. Analyze, Nonlinear regression, Interpolate a standard curve, Sigmoidal 4PL X is concentration (or Asymmetric Sigmoidal 5PL). Multiply the interpolated X by the dilution factor."
+      - "Excel: the four parameters from one of the programs, then =e*((d-c)/(y-c)-1)^(1/b) for each sample signal, times the dilution factor."
+    params:
+      - { arg: model, label: "fct of drm(); Curve Fit Settings in SoftMax Pro; equation in Prism", ui_default: "4PL" }
+      - { arg: weighting, label: "weights of drm(); Weighting in SoftMax Pro and Prism", ui_default: "none" }
+      - { arg: blank, label: "Plate Blank in SoftMax Pro; Blank step in Gen5" }
+      - { arg: dilution, label: "dilution factor of the Unknowns group (SoftMax Pro) or of the SPL wells (Gen5)", ui_default: 1 }
+      - { arg: average_replicates, label: "Gen5 fits the mean of the replicates; SoftMax Pro fits each replicate by default" }
+    fidelity: close
+    difference: >
+      The R route uses the same model as the tool. The tool sets a strict tolerance and polishes the fit, so a drm()
+      call with the default tolerance can differ in the fourth digit. SoftMax Pro and Gen5 write the 5PL as
+      D + (A - D) / (1 + (x/C)^B)^E; that is 5PL-softmax, not 5PL. Prism 5PL is the tool 5PL. LOD, LLOQ and ULOQ
+      rules differ between programs; the tool uses the rules in the decision help. The SoftMax Pro, Gen5 and Prism
+      routes were not run.
+    evidence:
+      source: docs
+      test: elisa-dnase-4pl
+      note: R help ?DNase gives the 4PL fit with nls and SSfpl. A SciPy script in checks/ gives the same values.
+
+  - tool: compare_models
+    route: "library(drc); m4 <- drm(y ~ x, data = d, fct = LL.4()); m5 <- drm(y ~ x, data = d, fct = LL.5()); anova(m4, m5); AIC(m4, m5); modelFit(m5)"
+    steps:
+      - "R: fit each model with drm() on the same rows. Run anova(simpler, larger) for the F test and modelFit() for the lack-of-fit test."
+      - "Prism: Nonlinear regression, Compare tab, For each data set which of two equations fits best, with the extra sum-of-squares F test or AICc."
+      - "SoftMax Pro: fit each curve type in Curve Fit Settings and compare the residual and the R^2 by eye. SoftMax Pro has no F test."
+    params:
+      - { arg: models, label: "the models to compare (fct of drm(); two equations in the Prism Compare tab)" }
+      - { arg: weighting, label: "weights of drm(); Weighting in Prism", ui_default: "none" }
+    fidelity: close
+    difference: >
+      The F test and AICc are the formulas that Prism uses. AICc uses the weighted residual sum of squares when a
+      weighting is set. The lack-of-fit p comes from drc modelFit() and needs replicate wells. The Prism route was not run.
+    evidence:
+      source: docs
+      test: compare-dnase-3pl-4pl
+      note: R help ?DNase compares the 3-parameter and the 4-parameter logistic with anova(); the tool gives the same F and p.
+
+tests:
+  - id: elisa-dnase-4pl
+    description: >
+      DNase ELISA, run 1 (R datasets, Davidian and Giltinan 1995), 4PL. The parameters are from the R help example
+      ?DNase (nls with SSfpl), converted to the drc form (checks/check_elisa_dnase_nls.R and .out). The samples are the
+      run 2 wells read as unknowns with a dilution of 10. The back-calculated concentrations, the recovery of the
+      standards, LLOQ and ULOQ are from SciPy (checks/check_elisa_dnase.py and .out).
+    data: [data/dnase_elisa.csv]
+    calls:
+      - tool: fit_standard_curve
+        args: { data: "{adapter_dir}/data/dnase_elisa.csv", model: 4PL, weighting: none, blank: none, conc_unit: ng/mL }
+    expect:
+      - { path: metrics.b, approx: -0.941107, abs: 0.000005 }
+      - { path: metrics.c, approx: -0.007897, abs: 0.000005 }
+      - { path: metrics.d, approx: 2.377239, abs: 0.000005 }
+      - { path: metrics.e, approx: 4.51499, abs: 0.00001 }
+      - { path: metrics.rse, approx: 0.019806, abs: 0.000001 }
+      - { path: metrics.r_squared, approx: 0.999130, abs: 0.000001 }
+      - { path: metrics.lloq, approx: 0.1953125, rel: 0.000001 }
+      - { path: metrics.uloq, approx: 12.5, rel: 0.000001 }
+      - { path: metrics.n_samples, equals: 8 }
+      - { path: "table.rows[0][2]", equals: serum_01 }
+      - { path: "table.rows[0][8]", approx: 0.849717, abs: 0.000005 }
+      - { path: "table.rows[7][8]", approx: 210.229271, abs: 0.0001 }
+      - { path: "table.rows[7][13]", contains: "above ULOQ" }
+      - { path: "table.rows[3][10]", approx: 4.06268, abs: 0.00001 }
+      - { path: "outputs[0].path", contains: ".png" }
+      - { path: "outputs[1].path", contains: ".svg" }
+
+  - id: elisa-lasv-nine-runs
+    description: >
+      Lassa virus nucleoprotein IgG ELISA, nine runs (Yun et al. 2026, PLOS ONE, S1 Data, CC BY 4.0). A 4PL for each run on
+      the mean OD of the standards, as Gen5 does, with the two masked wells left out. The means over the runs, the CV and the
+      recovery are in Table 1 of the paper (7.587, 11.07, 98.0 for dilution 1; 1.993, 22.45, 107.3 for HPC; LLOQ 0.121 and
+      ULOQ 7.744). The values with more digits and the LOD of run 1 are from SciPy (checks/check_elisa_lasv.py and .out).
+      SciPy gives the Gen5 concentration of each run to five digits (bench/papers/yun2026-lasv-elisa/check.out).
+    data: [data/lasv_elisa_runs.csv]
+    calls:
+      - tool: fit_standard_curve
+        args: { data: "{adapter_dir}/data/lasv_elisa_runs.csv", model: 4PL, weighting: none, blank: none, average_replicates: signal, plate_col: run, signal_col: od, nominal_col: nominal, exclude: "R7-LPC-2, R9-LPC-1", recovery_limit_pct: 25, cv_limit_pct: 25, lod_sd: 3 }
+    expect:
+      - { path: metrics.n_plates, equals: 9 }
+      - { path: metrics.n_excluded, equals: 2 }
+      - { path: metrics.p1_e, approx: 2.293200, abs: 0.000005 }
+      - { path: metrics.p7_e, approx: 10.387206, abs: 0.00002 }
+      - { path: metrics.p1_lod, approx: 0.161944, abs: 0.000005 }
+      - { path: metrics.mean_conc_STD_1, approx: 7.586938, abs: 0.000005 }
+      - { path: metrics.cv_conc_pct_STD_1, approx: 11.070015, abs: 0.00005 }
+      - { path: metrics.recovery_pct_STD_7, approx: 99.550066, abs: 0.0001 }
+      - { path: metrics.mean_conc_HPC, approx: 1.993188, abs: 0.000005 }
+      - { path: metrics.cv_conc_pct_HPC, approx: 22.447291, abs: 0.00005 }
+      - { path: metrics.recovery_pct_HPC, approx: 107.275991, abs: 0.0001 }
+      - { path: metrics.series_lloq, approx: 0.121, rel: 0.000001 }
+      - { path: metrics.series_uloq, approx: 7.744, rel: 0.000001 }
+      - { path: data.warnings, contains: "plate 2: the LOD signal" }
+
+  - id: elisa-dnase-5pl
+    description: >
+      The same standards with the 5PL in the drc and Prism form. The values are from SciPy least squares
+      (checks/check_elisa_dnase.py and .out).
+    data: [data/dnase_elisa.csv]
+    calls:
+      - tool: fit_standard_curve
+        args: { data: "{adapter_dir}/data/dnase_elisa.csv", model: 5PL, weighting: none, blank: none }
+    expect:
+      - { path: metrics.f, approx: 0.887470, abs: 0.00001 }
+      - { path: metrics.e, approx: 5.035282, abs: 0.00005 }
+      - { path: metrics.ec50, approx: 4.258098, abs: 0.00005 }
+
+  - id: elisa-dnase-5pl-softmax
+    description: >
+      The same standards with the 5PL in the SoftMax Pro and Gen5 form. The values are from SciPy least squares
+      (checks/check_elisa_dnase.py and .out). The midpoint differs from the Prism form.
+    data: [data/dnase_elisa.csv]
+    calls:
+      - tool: fit_standard_curve
+        args: { data: "{adapter_dir}/data/dnase_elisa.csv", model: 5PL-softmax, weighting: none, blank: none }
+    expect:
+      - { path: metrics.b, approx: 0.954531, abs: 0.00001 }
+      - { path: metrics.f, approx: 0.870330, abs: 0.00001 }
+      - { path: metrics.ec50, approx: 4.805059, abs: 0.00005 }
+
+  - id: elisa-dnase-weighted
+    description: >
+      The 4PL with 1/y^2 weighting. The value of e is from SciPy (checks/check_elisa_dnase.py and .out). R nls with
+      weights 1/density^2 gives the same value to five digits.
+    data: [data/dnase_elisa.csv]
+    calls:
+      - tool: fit_standard_curve
+        args: { data: "{adapter_dir}/data/dnase_elisa.csv", model: 4PL, weighting: 1/y^2, blank: none }
+    expect:
+      - { path: metrics.e, approx: 7.255535, abs: 0.00005 }
+      - { path: metrics.d, approx: 2.898692, abs: 0.00001 }
+
+  - id: compare-dnase-3pl-4pl
+    description: >
+      The 3-parameter logistic (bottom 0) against the 4PL on the DNase run 1 standards. F 0.209840 and p 0.655078
+      are the anova() values of the R help example ?DNase (checks/check_elisa_dnase_nls.R and .out).
+    data: [data/dnase_elisa.csv]
+    calls:
+      - tool: compare_models
+        args: { data: "{adapter_dir}/data/dnase_elisa.csv", type_col: type, x_col: conc, y_col: signal, models: [3PL, 4PL] }
+    expect:
+      - { path: metrics.F_3PL_vs_4PL, approx: 0.209840, abs: 0.000001 }
+      - { path: metrics.p_3PL_vs_4PL, approx: 0.655078, abs: 0.000001 }
+      - { path: metrics.rss_4PL, approx: 0.00470725, abs: 0.00000001 }
+
+  - id: elisa-wrong-column
+    description: A signal column that is not in the file fails, and the error names the column and the valid columns.
+    data: [data/dnase_elisa.csv]
+    calls:
+      - tool: fit_standard_curve
+        args: { data: "{adapter_dir}/data/dnase_elisa.csv", model: 4PL, signal_col: OD450 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "signal_col 'OD450' is not a column" }
+      - { path: error, contains: "Columns: plate, well, type" }
+
+  - id: elisa-missing-file
+    description: A data file that does not exist fails, and the error names the file.
+    calls:
+      - tool: fit_standard_curve
+        args: { data: "{adapter_dir}/data/no_such_plate.csv", model: 4PL }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_plate.csv" }
+
+tools:
+  - name: fit_standard_curve
+    title: Fit an ELISA standard curve and back-calculate samples
+    description: >
+      Fit a 4PL or 5PL standard curve to the standards of an immunoassay plate and back-calculate the samples.
+      Returns the curve parameters, R-squared, the LOD from the blank wells, LLOQ and ULOQ from the recovery of the
+      standards, and for each sample the concentration times the dilution factor, the CV of the replicates and a
+      flag for values outside the range. Saves the curve plot as PNG and SVG. The input is one row for each well.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each well and a header row." }
+      model: { type: string, enum: [4PL, 5PL, 5PL-softmax], description: "Leave out. The harness sets it from the decision record. The curve model." }
+      weighting: { type: string, enum: [none, 1/y, 1/y^2], description: "Leave out. The harness sets it from the decision record." }
+      blank: { type: string, enum: [subtract, none], description: "Leave out. The harness sets it from the decision record." }
+      lod_sd: { type: number, description: "Leave out. The harness sets it from the decision record. Count of blank standard deviations (unitless)." }
+      recovery_limit_pct: { type: number, description: "Leave out. The harness sets it from the decision record. Percent." }
+      cv_limit_pct: { type: number, description: "Leave out. The harness sets it from the decision record. Percent." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Well names (from well_col) or file row numbers to drop, as a list or as comma text. none keeps all wells." }
+      type_col: { type: string, description: "Column that marks each well as standard, blank or sample. Default type. Other values, such as qc, count as samples." }
+      conc_col: { type: string, description: "Column with the known concentration of each standard (in conc_unit). Empty for samples. Default conc." }
+      signal_col: { type: string, description: "Column with the measured signal, such as the optical density (OD) at 450 nm. Default signal." }
+      sample_col: { type: string, description: "Column with the sample name. Replicate wells share a name. Default sample." }
+      dilution_col: { type: string, description: "Column with the dilution factor of each well (unitless, 1 for neat). Default dilution, if the column exists." }
+      dilution: { type: number, description: "Dilution factor for all samples when there is no dilution column (unitless). Default 1." }
+      plate_col: { type: string, description: "Column with the plate or run name. The tool fits one curve for each plate, and with two or more plates it adds a summary across plates (mean, inter-assay CV, recovery)." }
+      nominal_col: { type: string, description: "Column with the expected concentration of a sample, such as a control or a dilution of a reference serum (in conc_unit). The tool gives the recovery." }
+      average_replicates: { type: string, enum: [signal, none], description: "Leave out. The harness sets it from the decision record." }
+      well_col: { type: string, description: "Column with the well name, such as A1. Default well, if the column exists." }
+      conc_unit: { type: string, description: "Unit of the standard concentrations, such as pg/mL. Used for labels only." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      plot: { kind: image, ext: .png, description: The standard curve with the standards and the back-calculated samples. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+      samples: { kind: table, ext: .csv, description: One row for each sample and dilution. }
+      standards: { kind: table, ext: .csv, description: One row for each standard level with the recovery and the CV. }
+      across: { kind: table, ext: .csv, description: "With two or more plates: one row for each sample with the mean over the plates, the CV and the recovery." }
+    script: scripts/fit_standard_curve.R
+    parse: json
+
+  - name: compare_models
+    title: Compare curve models
+    description: >
+      Fit two or more curve models to the same points and compare them. Returns the residual sum of squares, AICc,
+      the lack-of-fit p for each model, and the extra sum-of-squares F test for each nested pair, such as 4PL
+      against 5PL. Use it on the standards of a plate or on one dose-response group. Saves a plot as PNG and SVG.
+    params:
+      data: { type: string, description: "Path of a CSV file with a header row." }
+      models: { type: array, minItems: 2, items: { type: string, enum: [4PL, 5PL, 5PL-softmax, 3PL, 4PL-normalized, Weibull1, Weibull2] }, description: "Two or more model names. 3PL has the bottom fixed at 0. 4PL-normalized has the bottom at 0 and the top at 100." }
+      x_col: { type: string, description: "Column with the concentration or the dose. Default conc." }
+      y_col: { type: string, description: "Column with the signal or the response. Default signal." }
+      type_col: { type: string, description: "For a plate: the column that marks standard, blank and sample wells. The tool then uses the standards only." }
+      blank: { type: string, enum: [subtract, none], description: "For a plate with type_col: subtract the mean blank first. Default none." }
+      group_col: { type: string, description: "Column with the compound or the curve name. Give group too." }
+      group: { type: string, description: "The value of group_col to fit." }
+      weighting: { type: string, enum: [none, 1/y, 1/y^2], description: "Leave out. The harness sets it from the decision record." }
+    required: [data, models]
+    read_only: true
+    batch: false
+    outputs:
+      table: { kind: table, ext: .csv, description: One row for each model. }
+      plot: { kind: image, ext: .png, description: The points with each fitted curve. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    script: scripts/compare_models.R
+    parse: json

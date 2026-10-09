@@ -1,0 +1,50 @@
+adapters: [drc]
+prompt: |
+  I qualified an ELISA for IgG against Lassa virus nucleoprotein over nine runs. The file {data}/yun2026-lasv-elisa/lasv_elisa_runs.csv has one row for each well. The columns are run (1 to 9), well, type (standard, blank, sample or control), sample, conc (IU/mL of each standard), nominal (the expected IU/mL of the ten dilutions STD*-1 to STD*-10 of a reference serum pool and of the high and low positive controls HPC and LPC), od (optical density) and masked (1 for a well that we masked in the plate reader software). Fit a standard curve for each run and back-calculate the dilutions and the controls. For each dilution and each positive control, give the mean OD over the runs with its CV, the mean back-calculated concentration over the runs with its CV, and the recovery against the nominal value. Then give the LLOQ and the ULOQ: the lowest and the highest nominal concentration of the dilutions that have a recovery from 75 to 125 percent and a CV below 25 percent for both the OD and the concentration. Write every number in your final answer text.
+answers:
+  curve_model: 4PL
+  weighting: none
+  blank: none
+  average_replicates: signal
+  lod_sd: 3
+  recovery_limit_pct: 25
+  cv_limit_pct: 25
+  exclude_wells: "R7-LPC-2, R9-LPC-1"
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data:
+  - yun2026-lasv-elisa/lasv_elisa_runs.csv
+items:
+  - {key: runs, description: "Number of runs with a standard curve", value: 9, exact: true, in_answer: false, tool: fit_standard_curve}
+  - {key: conc_d1, description: "Mean interpolated concentration, dilution 1 (IU/mL)", value: 7.5869, tolerance: 0.001}
+  - {key: conc_d2, description: "Mean interpolated concentration, dilution 2 (IU/mL)", value: 3.7072, tolerance: 0.001}
+  - {key: conc_d3, description: "Mean interpolated concentration, dilution 3 (IU/mL)", value: 1.8719, tolerance: 0.001}
+  - {key: conc_d4, description: "Mean interpolated concentration, dilution 4 (IU/mL)", value: 0.91706, tolerance: 0.001}
+  - {key: conc_d5, description: "Mean interpolated concentration, dilution 5 (IU/mL)", value: 0.46371, tolerance: 0.001}
+  - {key: conc_d6, description: "Mean interpolated concentration, dilution 6 (IU/mL)", value: 0.23340, tolerance: 0.001}
+  - {key: conc_d7, description: "Mean interpolated concentration, dilution 7 (IU/mL)", value: 0.12046, tolerance: 0.0006}
+  - {key: conc_d8, description: "Mean interpolated concentration, dilution 8 (IU/mL)", value: 0.055794, tolerance: 0.0006}
+  - {key: conc_d9, description: "Mean interpolated concentration, dilution 9 (IU/mL)", value: 0.026613, tolerance: 0.0006}
+  - {key: conc_d10, description: "Mean interpolated concentration, dilution 10 (IU/mL)", value: 0.013885, tolerance: 0.0006}
+  - {key: cv_conc_d1, description: "CV of the interpolated concentration, dilution 1 (%)", value: 11.070, tolerance: 0.015}
+  - {key: cv_conc_d4, description: "CV of the interpolated concentration, dilution 4 (%)", value: 10.927, tolerance: 0.015}
+  - {key: cv_conc_d7, description: "CV of the interpolated concentration, dilution 7 (%)", value: 15.714, tolerance: 0.015}
+  - {key: cv_conc_d8, description: "CV of the interpolated concentration, dilution 8 (%)", value: 15.553, tolerance: 0.015}
+  - {key: cv_conc_d9, description: "CV of the interpolated concentration, dilution 9 (%)", value: 25.895, tolerance: 0.015}
+  - {key: cv_od_d7, description: "CV of the OD, dilution 7 (%)", value: 21.919, tolerance: 0.015}
+  - {key: cv_od_d8, description: "CV of the OD, dilution 8 (%)", value: 26.621, tolerance: 0.015}
+  - {key: mean_od_d1, description: "Mean OD, dilution 1", value: 2.8867, tolerance: 0.001, in_answer: false}
+  - {key: recovery_d1, description: "Recovery, dilution 1 (%)", value: 97.97, tolerance: 0.06}
+  - {key: recovery_d4, description: "Recovery, dilution 4 (%)", value: 94.74, tolerance: 0.06}
+  - {key: recovery_d7, description: "Recovery, dilution 7 (%)", value: 99.55, tolerance: 0.06}
+  - {key: recovery_d9, description: "Recovery, dilution 9 (%)", value: 88.71, tolerance: 0.06}
+  - {key: recovery_d8_printed, description: "Recovery, dilution 8, as printed in Table 1 (does not reproduce; computed 92.99)", value: 92.0, tolerance: 0.06, reference: true}
+  - {key: hpc_conc, description: "HPC mean interpolated concentration (IU/mL)", value: 1.9932, tolerance: 0.001}
+  - {key: hpc_cv, description: "HPC CV of the interpolated concentration (%)", value: 22.447, tolerance: 0.015}
+  - {key: hpc_recovery, description: "HPC recovery (%)", value: 107.28, tolerance: 0.06}
+  - {key: lpc_conc, description: "LPC mean interpolated concentration (IU/mL)", value: 0.45688, tolerance: 0.001}
+  - {key: lpc_recovery, description: "LPC recovery (%)", value: 98.25, tolerance: 0.06}
+  - {key: lpc_cv_printed, description: "LPC CV of the interpolated concentration, as printed (does not reproduce; computed 20.03)", value: 20.09, tolerance: 0.015, reference: true}
+  - {key: lloq, description: "LLOQ (IU/mL)", value: 0.121, tolerance: 0.0005}
+  - {key: uloq, description: "ULOQ (IU/mL)", value: 7.744, tolerance: 0.0005}

@@ -1,0 +1,50 @@
+tool: drc (R), fit_standard_curve of the drc adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/yun2026-lasv-elisa/lasv_elisa_runs.csv
+decisions:
+  curve_model: 4PL
+  weighting: none
+  blank: "none (Gen5 fitted the raw OD)"
+  average_replicates: "signal (Gen5 fits the mean OD of the duplicate standards and back-calculates the mean OD of each sample)"
+  exclude_wells: "R7-LPC-2, R9-LPC-1 (masked in Gen5 by the authors)"
+  range_rule: "recovery 75 to 125 percent and CV below 25 percent for the OD and the concentration"
+expected:
+  - {description: "runs", value: 9, tolerance: 0, source: "paper, Table 1 and S1 Data"}
+  - {description: "mean interpolated concentration, dilution 1", value: 7.5869, tolerance: 0.001, source: "paper Table 1: 7.587"}
+  - {description: "mean interpolated concentration, dilution 2", value: 3.7072, tolerance: 0.001, source: "paper Table 1: 3.707"}
+  - {description: "mean interpolated concentration, dilution 3", value: 1.8719, tolerance: 0.001, source: "paper Table 1: 1.872"}
+  - {description: "mean interpolated concentration, dilution 4", value: 0.91706, tolerance: 0.001, source: "paper Table 1: 0.917"}
+  - {description: "mean interpolated concentration, dilution 5", value: 0.46371, tolerance: 0.001, source: "paper Table 1: 0.464"}
+  - {description: "mean interpolated concentration, dilution 6", value: 0.23340, tolerance: 0.001, source: "paper Table 1: 0.233"}
+  - {description: "mean interpolated concentration, dilution 7", value: 0.12046, tolerance: 0.0006, source: "paper Table 1: 0.120"}
+  - {description: "mean interpolated concentration, dilution 8", value: 0.055794, tolerance: 0.0006, source: "paper Table 1: 0.056"}
+  - {description: "mean interpolated concentration, dilution 9", value: 0.026613, tolerance: 0.0006, source: "paper Table 1: 0.027"}
+  - {description: "mean interpolated concentration, dilution 10", value: 0.013885, tolerance: 0.0006, source: "paper Table 1: 0.014"}
+  - {description: "CV of the concentration, dilution 1", value: 11.070, tolerance: 0.015, source: "paper Table 1: 11.07"}
+  - {description: "CV of the concentration, dilution 4", value: 10.927, tolerance: 0.015, source: "paper Table 1: 10.93"}
+  - {description: "CV of the concentration, dilution 7", value: 15.714, tolerance: 0.015, source: "paper Table 1: 15.71"}
+  - {description: "CV of the concentration, dilution 8", value: 15.553, tolerance: 0.015, source: "paper Table 1: 15.55"}
+  - {description: "CV of the concentration, dilution 9", value: 25.895, tolerance: 0.015, source: "paper Table 1: 25.90"}
+  - {description: "CV of the OD, dilution 7", value: 21.919, tolerance: 0.015, source: "paper Table 1: 21.92"}
+  - {description: "CV of the OD, dilution 8", value: 26.621, tolerance: 0.015, source: "paper Table 1: 26.62"}
+  - {description: "mean OD, dilution 1", value: 2.8867, tolerance: 0.001, source: "paper Table 1: 2.887"}
+  - {description: "recovery, dilution 1", value: 97.97, tolerance: 0.06, source: "paper Table 1: 98.0"}
+  - {description: "recovery, dilution 4", value: 94.74, tolerance: 0.06, source: "paper Table 1: 94.7"}
+  - {description: "recovery, dilution 7", value: 99.55, tolerance: 0.06, source: "paper Table 1: 99.6"}
+  - {description: "recovery, dilution 9", value: 88.71, tolerance: 0.06, source: "paper Table 1: 88.7"}
+  - {description: "recovery, dilution 8, as printed", value: 92.0, tolerance: 0.06, source: "paper Table 1: 92.0; computed 92.99; reference only"}
+  - {description: "HPC mean interpolated concentration", value: 1.9932, tolerance: 0.001, source: "paper Table 1: 1.993"}
+  - {description: "HPC CV of the concentration", value: 22.447, tolerance: 0.015, source: "paper Table 1: 22.45"}
+  - {description: "HPC recovery", value: 107.28, tolerance: 0.06, source: "paper Table 1: 107.3"}
+  - {description: "LPC mean interpolated concentration", value: 0.45688, tolerance: 0.001, source: "paper Table 1: 0.457"}
+  - {description: "LPC recovery", value: 98.25, tolerance: 0.06, source: "paper Table 1: 98.3"}
+  - {description: "LPC CV of the concentration, as printed", value: 20.09, tolerance: 0.015, source: "paper Table 1: 20.09; computed 20.03; reference only"}
+  - {description: "LLOQ", value: 0.121, tolerance: 0.0005, source: "paper, Results: LLOQ 0.12 IU/mL (nominal 0.121 in Table 1)"}
+  - {description: "ULOQ", value: 7.744, tolerance: 0.0005, source: "paper, Results: ULOQ 7.74 IU/mL (nominal 7.744 in Table 1)"}
+notes: |
+  The paper used BioTek Gen5 3.16 with a 4PL fit for each run. Gen5 fits the mean OD of the duplicate standards and back-calculates the mean OD of each sample, with no blank subtraction. With these settings, SciPy gives the Gen5 concentration of each of the 89 dilution values in the workbook to five digits (check.py, check.out).
+  The nominal values in the CSV are the printed Table 1 values (0.060, 0.030 and 0.015 for dilutions 8 to 10, not 0.0605, 0.03025 and 0.015125). The printed recoveries of dilutions 9 and 10 match only with these rounded values.
+  Two printed values do not reproduce: the recovery of dilution 8 (92.0; computed 92.99 with nominal 0.060 and 92.22 with 0.0605) and the CV of the LPC concentration (20.09; computed 20.03). They are reference items.
+  The workbook goes to the reference folder, because it holds the Gen5 concentrations. The data folder holds only the CSV of the optical densities.
+  Trap: blank subtraction or a fit to each replicate well changes the concentrations in the second or third digit.
