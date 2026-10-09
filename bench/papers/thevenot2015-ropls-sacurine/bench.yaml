@@ -1,0 +1,51 @@
+adapters: [metabolomics-stats]
+prompt: |
+  Do the urine metabolomes of men and women differ? The file {data}/thevenot2015-ropls-sacurine/sacurine.csv has 183 adults (one row each). The columns are sample, gender (M or F), age (years), bmi (kg/m2) and 109 metabolite columns measured by liquid chromatography with mass spectrometry. The values are already normalized to osmolality and log10 transformed. The table has no missing values. First fit a PCA of the metabolites and give the cumulative R2X and the number of components. Then fit a PLS-DA of gender and an OPLS-DA of gender with 1 predictive component, and give R2X, R2Y, Q2, RMSEE, the number of components and the permutation p values of each. Then train the OPLS-DA on the odd-numbered rows only (holdout odd) and give R2Y, Q2, RMSEP and the number of correct calls in the test set. Then fit an OPLS regression of age with 1 predictive component and give R2Y, Q2 and RMSEE. Last, test every metabolite between men and women with the Welch test and the Benjamini-Hochberg adjustment, and give the number of significant metabolites (up and down). Write every number in your final answer text.
+answers:
+  zero_as_missing: false
+  min_detect_fraction: 0
+  exclude_samples: none
+  imputation: none
+  normalization: none
+  pqn_reference: all
+  transform: none
+  scale: standard
+  n_predictive: auto
+  n_orthogonal: auto
+  cv_segments: 7
+  permutations: 20
+  vip_cutoff: 1
+  model_seed: 1
+  test: welch
+  adjust: BH
+  fdr: 0.05
+  min_abs_log2fc: 0
+  values_are: log10
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data: [thevenot2015-ropls-sacurine/sacurine.csv]
+items:
+  # Source of the values: the ropls vignette (package version 1.44.0), sections "Principal Component Analysis", "PLS-DA", "OPLS-DA",
+  # the test-set example and the VIP section (OPLS of age). The gender t test counts come from check_metab.py (SciPy).
+  - {key: n_samples, description: "Number of samples", value: 183, exact: true, tool: fit_multivariate_model}
+  - {key: pca_r2x, description: "Cumulative R2X of the PCA (standard scaling)", value: 0.501, tolerance: 0.002, tool: fit_multivariate_model}
+  - {key: pca_components, description: "Number of PCA components that ropls keeps", value: 8, exact: true, tool: fit_multivariate_model}
+  - {key: plsda_r2x, description: "Cumulative R2X of the PLS-DA of gender", value: 0.275, tolerance: 0.002, tool: fit_multivariate_model}
+  - {key: plsda_r2y, description: "Cumulative R2Y of the PLS-DA of gender", value: 0.73, tolerance: 0.005, tool: fit_multivariate_model}
+  - {key: plsda_q2, description: "Cumulative Q2 of the PLS-DA of gender", value: 0.584, tolerance: 0.005, tool: fit_multivariate_model}
+  - {key: plsda_rmsee, description: "RMSEE of the PLS-DA of gender", value: 0.262, tolerance: 0.003, tool: fit_multivariate_model}
+  - {key: plsda_components, description: "Number of PLS-DA components", value: 3, exact: true, tool: fit_multivariate_model}
+  - {key: oplsda_q2, description: "Cumulative Q2 of the OPLS-DA of gender", value: 0.602, tolerance: 0.005, tool: fit_multivariate_model}
+  - {key: oplsda_orthogonal, description: "Number of orthogonal components of the OPLS-DA", value: 2, exact: true, tool: fit_multivariate_model}
+  - {key: permutation_p, description: "Permutation p value of Q2 with 20 permutations (the smallest possible value)", value: 0.05, tolerance: 0.005, tool: fit_multivariate_model}
+  - {key: oplsda_test_r2y, description: "R2Y of the OPLS-DA trained on the odd rows", value: 0.825, tolerance: 0.005, tool: fit_multivariate_model}
+  - {key: oplsda_test_q2, description: "Q2 of the OPLS-DA trained on the odd rows", value: 0.608, tolerance: 0.005, tool: fit_multivariate_model}
+  - {key: oplsda_test_rmsep, description: "RMSEP of the OPLS-DA on the test rows", value: 0.341, tolerance: 0.003, tool: fit_multivariate_model}
+  - {key: oplsda_test_correct, description: "Correct calls in the test set of 91 samples", value: 77, exact: true, tool: fit_multivariate_model}
+  - {key: age_r2y, description: "R2Y of the OPLS regression of age", value: 0.476, tolerance: 0.005, tool: fit_multivariate_model}
+  - {key: age_q2, description: "Q2 of the OPLS regression of age", value: 0.31, tolerance: 0.005, tool: fit_multivariate_model}
+  - {key: age_rmsee, description: "RMSEE of the OPLS regression of age (years)", value: 7.53, tolerance: 0.02, tool: fit_multivariate_model}
+  - {key: n_significant, description: "Metabolites with an adjusted p below 0.05 (Welch test)", value: 42, exact: true, tool: test_features}
+  - {key: n_up, description: "Significant metabolites that are higher in men", value: 11, exact: true, tool: test_features}
+  - {key: n_down, description: "Significant metabolites that are lower in men", value: 31, exact: true, tool: test_features}

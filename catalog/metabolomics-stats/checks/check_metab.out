@@ -1,0 +1,24 @@
+tiny half_min m5 fill 3.0 3.0
+tiny total_area factors [0.645503 0.804233 0.585538 1.354497 1.195767 1.488536]
+tiny total_area s1 [154.918033  77.459016  30.983607  15.491803   4.647541]
+tiny median factors [0.625  0.8125 0.5    1.25   1.1875 1.375 ]
+tiny pqn factors [0.632611 0.858896 0.56935  1.334483 1.201035 1.518265]
+tiny pqn s1 [158.07513   79.037565  31.615026  15.807513   4.742254]
+tiny pqn s5 [149.87075   83.261528  31.639381  14.987075   2.497846]
+sacurine pqn factor min max 0.401055 2.324616
+welch n raw p<0.05 49 n BH<0.05 39 min p 3.48865e-14 top Testosterone glucuronide
+student n raw p<0.05 49 n BH<0.05 39 min p 4.51639e-17 top Testosterone glucuronide
+wilcoxon n raw p<0.05 49 n BH<0.05 39 min p 3.01964e-18 top Testosterone glucuronide
+welch top feature t 8.731694
+log2fc of top welch feature 2.164695
+log10 welch n raw p<0.05 46 n BH<0.05 42 min p 7.66984e-12 top Testosterone glucuronide
+log10 wilcoxon n raw p<0.05 52 n BH<0.05 45 min p 2.94586e-14 top Testosterone glucuronide
+log10 spearman age n raw p<0.05 48 n BH<0.05 37 min p 6.27171e-11 top Quinic acid
+log10 anova n raw p<0.05 47 n BH<0.05 42 min p 8.16142e-14 top Testosterone glucuronide
+log10 welch top t 7.636865 adj p 5.53368e-10 mean diff 0.6013
+n up (diff>0) and BH<0.05 welch 11 n down 31
+plsda 3 components R2X 0.2752 R2Y 0.7298
+vip mean square 1.0 n VIP>=1 40
+top vip [('Testosterone glucuronide', 2.3696), ('Malic acid', 2.0763), ('p-Anisic acid', 2.0753)]
+plsda RMSEE (scaled y) 0.5184
+pca R2X cumulative 8 components 0.5009 pc1 0.1485 pc2 0.1035 pc3 0.0668

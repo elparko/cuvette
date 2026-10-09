@@ -1,0 +1,18 @@
+ropls 1.44.0 
+      R2X(cum) pre ort
+Total    0.501   8   0
+      R2X(cum) R2Y(cum) Q2(cum) RMSEE pre ort pR2Y  pQ2
+Total    0.275     0.73   0.584 0.262   3   0 0.05 0.05
+      R2X(cum) R2Y(cum) Q2(cum) RMSEE pre ort pR2Y  pQ2
+Total    0.275     0.73   0.602 0.262   1   2 0.05 0.05
+Warning message:
+'permI' set to 0 because train/test partition is selected 
+      R2X(cum) R2Y(cum) Q2(cum) RMSEE RMSEP pre ort
+Total     0.26    0.825   0.608 0.213 0.341   1   2
+   
+     M  F
+  M 43  7
+  F  7 34
+      R2X(cum) R2Y(cum) Q2(cum) RMSEE pre ort pR2Y  pQ2
+Total    0.212    0.476    0.31  7.53   1   1 0.05 0.05
+significant 42 up 11 down 31 

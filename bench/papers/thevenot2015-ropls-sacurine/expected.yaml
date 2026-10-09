@@ -1,0 +1,44 @@
+tool: ropls (R), opls, getVipVn; t.test and p.adjust
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/thevenot2015-ropls-sacurine/sacurine.csv
+decisions:
+  scale: standard
+  n_predictive: auto
+  n_orthogonal: auto
+  cv_segments: 7
+  permutations: 20
+  test: welch
+  adjust: BH
+  fdr: 0.05
+expected:
+  - {description: "Number of samples", value: 183, tolerance: 0, source: "ropls vignette 1.44.0"}
+  - {description: "Cumulative R2X of the PCA", value: 0.501, tolerance: 0.002, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Number of PCA components", value: 8, tolerance: 0, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Cumulative R2X of the PLS-DA", value: 0.275, tolerance: 0.002, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Cumulative R2Y of the PLS-DA", value: 0.73, tolerance: 0.005, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Cumulative Q2 of the PLS-DA", value: 0.584, tolerance: 0.005, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "RMSEE of the PLS-DA", value: 0.262, tolerance: 0.003, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Number of PLS-DA components", value: 3, tolerance: 0, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Cumulative Q2 of the OPLS-DA", value: 0.602, tolerance: 0.005, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Orthogonal components of the OPLS-DA", value: 2, tolerance: 0, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Permutation p value (20 permutations)", value: 0.05, tolerance: 0.005, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "R2Y of the OPLS-DA on the odd rows", value: 0.825, tolerance: 0.005, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Q2 of the OPLS-DA on the odd rows", value: 0.608, tolerance: 0.005, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "RMSEP of the OPLS-DA on the test rows", value: 0.341, tolerance: 0.003, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Correct calls in the test set", value: 77, tolerance: 0, source: "ropls vignette 1.44.0 confusion table (43 + 34); check.R"}
+  - {description: "R2Y of the OPLS regression of age", value: 0.476, tolerance: 0.005, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Q2 of the OPLS regression of age", value: 0.31, tolerance: 0.005, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "RMSEE of the OPLS regression of age", value: 7.53, tolerance: 0.02, source: "ropls vignette 1.44.0; check.R"}
+  - {description: "Significant metabolites, Welch test with BH at 0.05", value: 42, tolerance: 0, source: "check.R; checks/check_metab.py (SciPy)"}
+  - {description: "Significant metabolites higher in men", value: 11, tolerance: 0, source: "check.R; checks/check_metab.py"}
+  - {description: "Significant metabolites lower in men", value: 31, tolerance: 0, source: "check.R; checks/check_metab.py"}
+notes: |
+  The expected values are the numbers that the ropls vignette (version 1.44.0) prints for the sacurine data. Package version 1.44.0 on R 4.6.1
+  gives the same values (check.R, run on 2026-10-09). The vignette also states the test-set result as 85% correct: 43 men and 34 women of
+  91 samples. The paper (Thevenot et al. 2015) describes the workflow. The numbers come from the vignette, not from the paper text.
+  The adapter test checks/check_metab.py (NumPy, SciPy) reproduces R2X, R2Y and the VIP scores of the PLS-DA, the PCA variance, and the
+  Welch test counts without the package.
+  The data were normalized to osmolality and log10 transformed before they entered the package. A second normalization or log transform
+  changes every number.
+  Trap: the OPLS-DA has Q2 of 0.602 and the PLS-DA has 0.584 on the same data. R2X and R2Y are the same in both models.

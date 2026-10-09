@@ -1,0 +1,883 @@
+adapter:
+  name: metabolomics-stats
+  field: metabolomics statistics
+  file_types: [".csv", ".tsv"]
+  title: ropls (metabolomics statistics from a feature table)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Analyzes a processed metabolite feature table with the R package ropls. It filters, imputes, normalizes and transforms the
+    table. It fits PCA, PLS-DA and OPLS-DA models with cross-validated Q2, permutation tests and VIP scores. It tests each feature
+    with false discovery rate control. The scientist decides the normalization, the scaling and the model.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: ropls
+  version: "1.44.0"
+  tested_versions: []
+  homepage: https://bioconductor.org/packages/ropls
+  docs:
+    - https://bioconductor.org/packages/release/bioc/vignettes/ropls/inst/doc/ropls-vignette.html
+    - https://doi.org/10.1021/acs.jproteome.5b00354
+  install: >
+    Install R (brew install r on macOS). Then install the Bioconductor package ropls and the CRAN packages svglite and jsonlite
+    into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("BiocManager", "svglite", "jsonlite"), repos = "https://cloud.r-project.org"); BiocManager::install("ropls")'
+  citation:
+    - text: "Thevenot, E. A., Roux, A., Xu, Y., Ezan, E., & Junot, C. (2015). Analysis of the human adult urinary metabolome variations with age, body mass index, and gender by implementing a comprehensive workflow for univariate and OPLS statistical analyses. Journal of Proteome Research, 14(8), 3322-3335. https://doi.org/10.1021/acs.jproteome.5b00354"
+      doi: 10.1021/acs.jproteome.5b00354
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that exists
+  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library. The
+  program version in this adapter is the version of the R package ropls, not of R. The input is a table with one row for
+  each sample and one column for each feature.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return counts, model statistics, the top features and plots. The feature table stays on the computer.
+
+decisions:
+  - key: zero_as_missing
+    label: Zero counts as a missing value
+    kind: bool
+    default: false
+    group: Table
+    help: >
+      true turns each zero into a missing value before the filter and the imputation. Use it if a zero means that the software
+      found no peak. false keeps zeros as measured values.
+    owner: human
+    stage: setup
+    links:
+      - { tool: prepare_metabolite_table, arg: zero_as_missing }
+
+  - key: min_detect_fraction
+    label: Fraction of samples that must have a value
+    kind: float
+    default: 0.5
+    lo: 0
+    hi: 1
+    group: Table
+    help: >
+      A feature stays in the table only if this fraction of all samples has a value. 0.5 removes a feature that is missing in more
+      than half of the samples. 0 keeps every feature that has at least one value. The unit is a fraction.
+    owner: human
+    stage: setup
+    essential: true
+    links:
+      - { tool: prepare_metabolite_table, arg: min_detect_fraction }
+    sensitivity:
+      options: [0.5, 0.8]
+      tool: prepare_metabolite_table
+      compare: [metrics.n_features_kept]
+      max_runs: 2
+
+  - key: exclude_samples
+    label: Samples that you exclude
+    kind: text
+    default: none
+    group: Table
+    help: >
+      Name each sample that you remove and the reason, such as a failed injection or a quality control sample. Write none to keep all
+      samples. Decide before you see the model. A sample that is an outlier in a score plot is a data-driven choice. Report it as such.
+    owner: human
+    stage: setup
+    links:
+      - { tool: prepare_metabolite_table, arg: exclude_samples }
+
+  - key: imputation
+    label: Imputation of missing values
+    kind: choice
+    choices: [none, half_min, min, median, zero]
+    default: half_min
+    group: Table
+    help: >
+      The choice half_min fills a gap with half of the smallest positive value of the feature. The choice min uses the smallest value.
+      The choice median uses the median of the feature. The choice zero uses 0. The choice none stops if a missing value remains.
+      An imputed value is not a measurement.
+    owner: human
+    stage: setup
+    essential: true
+    links:
+      - { tool: prepare_metabolite_table, arg: imputation }
+
+  - key: normalization
+    label: Normalization of each sample
+    kind: choice
+    choices: [none, total_area, median, pqn]
+    default: none
+    group: Normalization
+    help: >
+      pqn (probabilistic quotient normalization) divides each sample by the median ratio to a reference sample. It corrects a
+      dilution effect, such as urine concentration. total_area divides by the sample total. median divides by the sample median.
+      none keeps the values. Total area is wrong if a few large features change between the groups.
+    owner: human
+    stage: setup
+    essential: true
+    links:
+      - { tool: prepare_metabolite_table, arg: normalization }
+    sensitivity:
+      options: [none, total_area, pqn]
+      tool: test_features
+      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
+      max_runs: 3
+
+  - key: pqn_reference
+    label: Reference sample of the PQN
+    kind: text
+    default: all
+    group: Normalization
+    help: >
+      all builds the reference from the median of every sample. A group name builds it from that group only, such as the control
+      group or the quality control samples. It counts only for pqn.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: prepare_metabolite_table, arg: pqn_reference }
+
+  - key: transform
+    label: Transformation of the values
+    kind: choice
+    choices: [none, log2, log10, sqrt]
+    default: none
+    group: Normalization
+    help: >
+      A log transform makes the spread of intensities more equal. It brings the distribution closer to normal.
+      The choice sqrt reduces large values less. The choice none keeps the values. The choices log2 and log10 need positive values,
+      so fill the gaps first. Skip the transform if the values are already logarithms.
+    owner: human
+    stage: setup
+    essential: true
+    links:
+      - { tool: prepare_metabolite_table, arg: transform }
+
+  - key: scale
+    label: Scaling of the features in the model
+    kind: choice
+    choices: [none, center, pareto, standard]
+    default: pareto
+    group: Model
+    help: >
+      The choice center subtracts the mean of each feature. The choice pareto also divides by the square root of the standard deviation.
+      The choice standard (unit variance, UV in SIMCA) divides by the standard deviation. Then every feature has equal weight, and noise
+      features gain weight. The choice none leaves the values as they are. The choice changes R2X, Q2 and the VIP scores.
+    owner: human
+    stage: when_needed
+    essential: true
+    links:
+      - { tool: fit_multivariate_model, arg: scale }
+
+  - key: n_predictive
+    label: Predictive components
+    kind: text
+    default: auto
+    group: Model
+    help: >
+      auto lets ropls add components while the cross-validated Q2 of each component stays above its limit. A number sets the count.
+      A model with more components than the data support fits noise. Read Q2 and the permutation test before you add components.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_multivariate_model, arg: n_predictive }
+
+  - key: n_orthogonal
+    label: Orthogonal components
+    kind: text
+    default: auto
+    group: Model
+    help: >
+      Only for OPLS. auto lets ropls add orthogonal components while Q2 improves. A number sets the count. 0 gives a model that is
+      the same as PLS.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_multivariate_model, arg: n_orthogonal }
+
+  - key: cv_segments
+    label: Cross-validation segments
+    kind: int
+    default: 7
+    lo: 2
+    hi: 50
+    group: Model
+    help: >
+      The number of equal parts for the cross-validation that gives Q2. 7 is the ropls and SIMCA default. A leave-one-out check
+      uses the number of samples. The unit is a count.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_multivariate_model, arg: cv_segments }
+
+  - key: permutations
+    label: Permutations of the response
+    kind: int
+    default: 100
+    lo: 0
+    hi: 5000
+    group: Model
+    help: >
+      ropls refits the model with a shuffled response this many times. The p value of Q2 is the fraction of shuffled models that
+      score the same as the real model or better. 100 gives the smallest p value of 0.01. 0 gives no p value. The unit is a count.
+    owner: human
+    stage: when_needed
+    essential: true
+    links:
+      - { tool: fit_multivariate_model, arg: permutations }
+
+  - key: vip_cutoff
+    label: VIP limit for important features
+    kind: float
+    default: 1
+    lo: 0.5
+    hi: 3
+    group: Model
+    help: >
+      A feature with a VIP score at or above this limit counts as important in the model. 1 is the usual limit. The mean of the
+      squared VIP scores is 1. VIP ranks features in the model. It is not a significance test.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_multivariate_model, arg: vip_cutoff }
+
+  - key: model_seed
+    label: Random seed of the permutations
+    kind: int
+    default: 1
+    lo: 0
+    hi: 100000
+    group: Model
+    help: The permutations are random. The same seed gives the same p values.
+    owner: agent
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: fit_multivariate_model, arg: seed }
+
+  - key: test
+    label: Univariate test
+    kind: choice
+    choices: [welch, student, wilcoxon, anova, kruskal, pearson, spearman]
+    default: welch
+    group: Univariate test
+    help: >
+      The choices welch and student compare two groups with a t test. The choice wilcoxon compares two groups and needs no normal distribution.
+      The choices anova and kruskal compare three groups or more. The choices pearson and spearman test the link to a number such as age.
+      Pick the test before you see the p values.
+    owner: human
+    stage: when_needed
+    essential: true
+    links:
+      - { tool: test_features, arg: test }
+    sensitivity:
+      options: [welch, wilcoxon]
+      tool: test_features
+      compare: [metrics.n_significant]
+      max_runs: 2
+
+  - key: adjust
+    label: Adjustment of the p values
+    kind: choice
+    choices: [BH, BY, holm, bonferroni, none]
+    default: BH
+    group: Univariate test
+    help: >
+      The choice BH (Benjamini-Hochberg) controls the false discovery rate for independent or positively linked features.
+      The choice BY (Benjamini-Yekutieli) holds for any link and is stricter.
+      The choices holm and bonferroni control the chance of any false positive.
+      The choice none gives raw p values, which are wrong for many features.
+    owner: human
+    stage: when_needed
+    essential: true
+    links:
+      - { tool: test_features, arg: adjust }
+
+  - key: fdr
+    label: Significance level of the adjusted p value
+    kind: float
+    default: 0.05
+    lo: 0.001
+    hi: 0.25
+    group: Univariate test
+    help: >
+      A feature is significant if its adjusted p value is below this fraction. With BH, 0.05 means that about 1 in 20 significant
+      features can be a false positive. Choose the level before you see the result.
+    owner: human
+    stage: when_needed
+    essential: true
+    links:
+      - { tool: test_features, arg: fdr }
+
+  - key: min_abs_log2fc
+    label: Smallest log2 fold change
+    kind: float
+    default: 0
+    lo: 0
+    hi: 5
+    group: Univariate test
+    help: >
+      A significant feature must also have an absolute log2 fold change of at least this value. 0 uses the adjusted p value
+      only. 1 means a twofold change. The fold change needs a table of linear or log values.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_features, arg: min_abs_log2fc }
+
+  - key: values_are
+    label: Scale of the table values
+    kind: choice
+    choices: [linear, log2, log10, other]
+    default: linear
+    group: Univariate test
+    help: >
+      The scale of the prepared table. The fold change needs it. The choice linear gives log2 of the ratio of means.
+      The choices log2 and log10 give the difference of means as log2 fold change. The choice other gives no fold change.
+      Set it from the transform of the preparation step.
+    owner: agent
+    stage: when_needed
+    links:
+      - { tool: test_features, arg: values_are }
+
+checks:
+  - id: no_permutation_test
+    description: A supervised model has no permutation test.
+    severity: warning
+    rule: { tool: fit_multivariate_model, arg: permutations, op: "==", value: 0, message: "The model has no permutation test. R2Y and Q2 of a PLS model can look good for random labels." }
+  - id: r2y_without_q2
+    description: The answer reports the fit of a PLS model without the cross-validated Q2.
+    severity: warning
+    text: >
+      Report the answer if it gives R2Y of a PLS-DA or OPLS-DA model as evidence of a group difference and does not give Q2 and the
+      permutation test.
+  - id: vip_as_significance
+    description: The answer calls features with a high VIP significant.
+    severity: warning
+    text: >
+      Report the answer if it calls a feature significant, regulated or a biomarker because its VIP is above the limit. VIP ranks
+      features in a model. A univariate test with an adjusted p value or a validation set supports a claim.
+  - id: selection_on_same_data
+    description: The answer picks features by VIP or p value and then reports the accuracy on the same samples.
+    severity: warning
+    text: >
+      Report the answer if it selects features from the data and then reports the accuracy or the fit of a model on the same samples,
+      with no test set and no cross-validation that repeats the selection.
+  - id: raw_p_values
+    description: The answer calls features significant with raw p values from many tests.
+    severity: warning
+    text: >
+      Report the answer if it counts or names significant features from raw p values of more than 20 features and does not use the adjusted p value.
+  - id: preprocessing_not_reported
+    description: The answer does not name the normalization, the transform and the scaling.
+    severity: warning
+    text: >
+      Report the answer if it gives model or test results and does not name the normalization, the transform, the scaling and the number
+      of samples in each group.
+  - id: more_features_than_samples
+    description: The answer trusts a PLS model with more features than samples and no validation.
+    severity: warning
+    text: >
+      Report the answer if the table has more features than samples and the answer trusts the group separation in a score plot without
+      Q2 and a permutation test.
+
+map:
+  - tool: prepare_metabolite_table
+    route: "MetaboAnalyst: Data Processing, Missing value estimation, Data Filtering, Normalization (Row-wise: Normalization by sum or Probabilistic Quotient Normalization; Data transformation: Log or Square root)"
+    steps:
+      - "MetaboAnalyst: Statistical Analysis module, upload the CSV file with samples in rows and the group in the second column."
+      - "MetaboAnalyst: Missing value step: remove features with more than 50% missing values, and replace the other gaps by 1/5 of the smallest positive value or a mean or median. The tool uses half the minimum."
+      - "MetaboAnalyst: Normalization step: Row-wise procedure PQN with a reference sample (all samples or a group), or normalization by sum. Then Data transformation (log, square root) and Data scaling."
+      - "R: pqn <- function(x) { x <- x / rowSums(x); ref <- apply(x, 2, median); x / apply(sweep(x, 2, ref, '/'), 1, median) }"
+      - "SIMCA: the Workset dialog sets the transformation (Log, Square root) and the scaling of each variable. SIMCA has no row-wise normalization. Normalize in the table first."
+    params:
+      - { arg: min_detect_fraction, label: "Remove features with more than ... % missing values", ui_default: 0.5 }
+      - { arg: imputation, label: "Missing value estimation in MetaboAnalyst", ui_default: "1/5 of the smallest positive value" }
+      - { arg: normalization, label: "Row-wise procedure in MetaboAnalyst", ui_default: none }
+      - { arg: transform, label: "Data transformation in MetaboAnalyst", ui_default: none }
+    fidelity: close
+    difference: >
+      MetaboAnalyst fills a gap with one fifth of the smallest positive value by default and removes features by a percent of missing values.
+      The tool fills with half of the smallest value. PQN divides first by the total area, as in the original method, and scales the
+      result to the median total. MetaboAnalyst scales differently, so only ratios between samples agree. The MetaboAnalyst and SIMCA routes were not run.
+    evidence:
+      source: docs
+      test: prep-tiny-pqn
+      note: A NumPy calculation of the filter, the half-minimum imputation and PQN gives the same numbers as the tool.
+
+  - tool: fit_multivariate_model
+    route: "library(ropls); m <- opls(x, y, predI = NA, orthoI = NA, crossvalI = 7, permI = 100, scaleC = \"pareto\"); getVipVn(m)"
+    steps:
+      - "R: m <- opls(x, y, predI = 1, orthoI = NA, crossvalI = 7, permI = 100, scaleC = 'standard'). The summary prints R2X(cum), R2Y(cum), Q2(cum), RMSEE, the components and the permutation p values."
+      - "R: getVipVn(m) gives the VIP scores. getScoreMN(m) gives the scores. plot(m) draws the overview."
+      - "MetaboAnalyst: Statistical Analysis module, Chemometrics Analysis, PCA or PLS-DA or Orthogonal PLS-DA. Cross-validation (5-fold or LOOCV) gives R2 and Q2. The Permutation test uses 100 or 1000 permutations."
+      - "SIMCA: Analysis, Autofit or Workset then OPLS/O2PLS-DA. The summary shows R2X(cum), R2Y(cum) and Q2(cum) with 7-fold cross-validation. Validate Model, Permutations, with 100 permutations."
+      - "SAS: PROC PLS with CV=SPLIT(7) and the option VARSCALE (SAS has no OPLS in this procedure)."
+    params:
+      - { arg: scale, label: "Scaling of the variables (UV is standard, Par is pareto) in SIMCA", ui_default: "UV" }
+      - { arg: cv_segments, label: "Cross-validation in SIMCA", ui_default: 7 }
+      - { arg: permutations, label: "Permutations in SIMCA Validate Model", ui_default: 100 }
+      - { arg: n_predictive, label: "Number of predictive components", ui_default: auto }
+      - { arg: n_orthogonal, label: "Number of orthogonal components", ui_default: auto }
+    fidelity: close
+    difference: >
+      SIMCA and ropls share the NIPALS algorithm, the 7-fold cross-validation and the Q2 rule, but SIMCA picks the components with its own
+      significance rule and writes Q2 as Q2(cum) in the same way. MetaboAnalyst uses the R package pls with 5-fold cross-validation, so its Q2 differs.
+      SIMCA and MetaboAnalyst were not run.
+    evidence:
+      source: docs
+      test: plsda-sacurine-vignette
+      note: The ropls vignette prints the same R2X, R2Y, Q2 and RMSEE for the same data. A NumPy NIPALS calculation gives R2X, R2Y and the VIP scores.
+
+  - tool: test_features
+    route: "p <- apply(x, 2, function(v) t.test(v[g == 'a'], v[g == 'b'])$p.value); p.adjust(p, method = 'BH')"
+    steps:
+      - "R: apply a test to each column and adjust with p.adjust(p, method = 'BH')."
+      - "MetaboAnalyst: Statistical Analysis module, Univariate Analysis, T-tests (non-parametric: Wilcoxon rank-sum). Set the p value threshold and FDR. Volcano Plot adds the fold change."
+      - "Stata: loop over the features with ttest, by(group) unequal, then multproc or qqvalue for the adjustment."
+      - "SIMCA: not a route for this test. SIMCA gives no p value for each feature."
+    params:
+      - { arg: test, label: "Non-parametric test and Equal variance in MetaboAnalyst", ui_default: "t-test with equal variance" }
+      - { arg: adjust, label: "FDR in MetaboAnalyst", ui_default: BH }
+      - { arg: fdr, label: "p value threshold in MetaboAnalyst", ui_default: 0.05 }
+      - { arg: min_abs_log2fc, label: "Fold change threshold in the volcano plot", ui_default: 2 }
+    fidelity: close
+    difference: >
+      MetaboAnalyst runs the t test with equal variance by default and the Welch test only if you clear the equal variance box. The tool defaults to the Welch test.
+      MetaboAnalyst adjusts with Benjamini-Hochberg. The MetaboAnalyst and Stata routes were not run.
+    evidence:
+      source: docs
+      test: test-welch-sacurine
+      note: A SciPy calculation of the Welch test and the Benjamini-Hochberg adjustment gives the same counts as the tool.
+
+tests:
+  - id: pca-sacurine-vignette
+    description: >
+      PCA of the 183 urine samples with 109 metabolites (MetaboLights MTBLS404, the sacurine data of the ropls package), standard
+      scaling. The ropls vignette prints R2X(cum) 0.501 with 8 components. A NumPy SVD (checks/check_metab.py and
+      checks/check_metab.out) gives 0.5009 and the first three components 0.1485, 0.1035 and 0.0668.
+    data: [data/sacurine.csv]
+    calls:
+      - tool: fit_multivariate_model
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: gender, meta_columns: "age,bmi", model: pca, scale: standard, permutations: 0 }
+    expect:
+      - { path: metrics.n_samples, equals: 183 }
+      - { path: metrics.n_features, equals: 109 }
+      - { path: metrics.r2x, approx: 0.501, abs: 0.0005 }
+      - { path: metrics.n_predictive, equals: 8 }
+      - { path: metrics.r2x_pc1, approx: 0.149, abs: 0.0006 }
+      - { path: metrics.r2x_pc2, approx: 0.103, abs: 0.0006 }
+      - { path: metrics.r2x_pc3, approx: 0.067, abs: 0.0006 }
+      - { path: "outputs[1].path", contains: ".png" }
+
+  - id: plsda-sacurine-vignette
+    description: >
+      PLS-DA of gender on the same data with standard scaling and 20 permutations. The ropls vignette prints R2X(cum) 0.275, R2Y(cum) 0.73,
+      Q2(cum) 0.584, RMSEE 0.262, 3 components, pR2Y 0.05 and pQ2 0.05. The NumPy NIPALS fit gives R2X 0.2752 and R2Y 0.7298 (checks/check_metab.out).
+    data: [data/sacurine.csv]
+    calls:
+      - tool: fit_multivariate_model
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: gender, meta_columns: "age,bmi", model: pls, scale: standard, permutations: 20 }
+    expect:
+      - { path: metrics.r2x, approx: 0.275, abs: 0.0005 }
+      - { path: metrics.r2y, approx: 0.73, abs: 0.0005 }
+      - { path: metrics.q2, approx: 0.584, abs: 0.0005 }
+      - { path: metrics.rmsee, approx: 0.262, abs: 0.0005 }
+      - { path: metrics.n_predictive, equals: 3 }
+      - { path: metrics.n_orthogonal, equals: 0 }
+      - { path: metrics.p_r2y, approx: 0.05, abs: 0.0005 }
+      - { path: metrics.p_q2, approx: 0.05, abs: 0.0005 }
+
+  - id: oplsda-sacurine-vignette
+    description: >
+      OPLS-DA of gender with 1 predictive component, the orthogonal components chosen by ropls, standard scaling and 20 permutations.
+      The ropls vignette prints R2X(cum) 0.275, R2Y(cum) 0.73, Q2(cum) 0.602, RMSEE 0.262, 1 predictive and 2 orthogonal components, pR2Y 0.05 and pQ2 0.05.
+    data: [data/sacurine.csv]
+    calls:
+      - tool: fit_multivariate_model
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: gender, meta_columns: "age,bmi", model: opls, scale: standard, permutations: 20 }
+    expect:
+      - { path: metrics.r2x, approx: 0.275, abs: 0.0005 }
+      - { path: metrics.r2y, approx: 0.73, abs: 0.0005 }
+      - { path: metrics.q2, approx: 0.602, abs: 0.0005 }
+      - { path: metrics.rmsee, approx: 0.262, abs: 0.0005 }
+      - { path: metrics.n_predictive, equals: 1 }
+      - { path: metrics.n_orthogonal, equals: 2 }
+      - { path: metrics.p_r2y, approx: 0.05, abs: 0.0005 }
+      - { path: metrics.p_q2, approx: 0.05, abs: 0.0005 }
+
+  - id: oplsda-sacurine-test-set
+    description: >
+      OPLS-DA trained on the odd-numbered rows. The ropls vignette prints for the 92 training samples R2X(cum) 0.26, R2Y(cum) 0.825, Q2(cum) 0.608,
+      RMSEE 0.213 and RMSEP 0.341. The test set of 91 samples has 43 and 34 correct calls (7 wrong in each group), which is 85% correct. The
+      training set has no errors.
+    data: [data/sacurine.csv]
+    calls:
+      - tool: fit_multivariate_model
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: gender, meta_columns: "age,bmi", model: opls, scale: standard, holdout: odd }
+    expect:
+      - { path: metrics.r2x, approx: 0.26, abs: 0.0005 }
+      - { path: metrics.r2y, approx: 0.825, abs: 0.0005 }
+      - { path: metrics.q2, approx: 0.608, abs: 0.0005 }
+      - { path: metrics.rmsee, approx: 0.213, abs: 0.0005 }
+      - { path: metrics.rmsep, approx: 0.341, abs: 0.0005 }
+      - { path: metrics.holdout_n, equals: 91 }
+      - { path: metrics.holdout_correct, equals: 77 }
+      - { path: metrics.train_accuracy, approx: 1, abs: 0.0001 }
+
+  - id: opls-age-regression
+    description: >
+      OPLS regression of age (a number) with 1 predictive component and the orthogonal components chosen by ropls. The ropls vignette
+      prints R2X(cum) 0.212, R2Y(cum) 0.476, Q2(cum) 0.31, RMSEE 7.53, 1 predictive and 1 orthogonal component.
+    data: [data/sacurine.csv]
+    calls:
+      - tool: fit_multivariate_model
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: age, meta_columns: "gender,bmi", model: opls, scale: standard, permutations: 0 }
+    expect:
+      - { path: metrics.r2x, approx: 0.212, abs: 0.0005 }
+      - { path: metrics.r2y, approx: 0.476, abs: 0.0005 }
+      - { path: metrics.q2, approx: 0.31, abs: 0.0005 }
+      - { path: metrics.rmsee, approx: 7.53, abs: 0.005 }
+      - { path: metrics.n_predictive, equals: 1 }
+      - { path: metrics.n_orthogonal, equals: 1 }
+
+  - id: plsda-vip-numpy
+    description: >
+      PLS-DA with 3 components and standard scaling. The NumPy NIPALS fit (checks/check_metab.py and checks/check_metab.out) gives R2X 0.2752, R2Y 0.7298
+      and 40 features with a VIP of 1 or more.
+    data: [data/sacurine.csv]
+    calls:
+      - tool: fit_multivariate_model
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: gender, meta_columns: "age,bmi", model: pls, scale: standard, n_predictive: 3, permutations: 0, vip_cutoff: 1 }
+    expect:
+      - { path: metrics.r2x, approx: 0.2752, abs: 0.0006 }
+      - { path: metrics.r2y, approx: 0.7298, abs: 0.0006 }
+      - { path: metrics.n_vip_above_cutoff, equals: 40 }
+      - { path: "table.rows[0][0]", equals: Testosterone glucuronide }
+      - { path: "table.rows[0][2]", approx: 2.3696, abs: 0.0005 }
+
+  - id: prep-tiny-pqn
+    description: >
+      Six samples and five features (data/tiny_table.csv, synthetic, written by data/make_fixtures.R). One zero and one empty cell in feature m5 are
+      missing values. A NumPy calculation (checks/check_metab.py and checks/check_metab.out) gives the half-minimum fill of 3.0 and the PQN scale
+      factors 0.632611 to 1.518265.
+    data: [data/tiny_table.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/tiny_table.csv", group_column: group, zero_as_missing: true, min_detect_fraction: 0.6, imputation: half_min, normalization: pqn, transform: none }
+    expect:
+      - { path: metrics.n_missing_before_imputation, equals: 2 }
+      - { path: metrics.n_imputed, equals: 2 }
+      - { path: metrics.n_features_kept, equals: 5 }
+      - { path: metrics.factor_min, approx: 0.56935, abs: 0.000001 }
+      - { path: metrics.factor_max, approx: 1.518265, abs: 0.000001 }
+      - { path: "table.rows[0][2]", approx: 158.07513, abs: 0.00001 }
+      - { path: "table.rows[4][6]", approx: 2.497846, abs: 0.000001 }
+
+  - id: prep-tiny-total-area
+    description: Total area normalization of the same table. The NumPy factors run from 0.585538 to 1.488536 (checks/check_metab.out).
+    data: [data/tiny_table.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/tiny_table.csv", group_column: group, zero_as_missing: true, imputation: half_min, normalization: total_area }
+    expect:
+      - { path: metrics.factor_min, approx: 0.585538, abs: 0.000001 }
+      - { path: metrics.factor_max, approx: 1.488536, abs: 0.000001 }
+      - { path: "table.rows[0][2]", approx: 154.918033, abs: 0.00001 }
+
+  - id: prep-tiny-median
+    description: Median normalization of the same table. The NumPy factors run from 0.5 to 1.375 (checks/check_metab.out).
+    data: [data/tiny_table.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/tiny_table.csv", group_column: group, zero_as_missing: true, imputation: half_min, normalization: median }
+    expect:
+      - { path: metrics.factor_min, approx: 0.5, abs: 0.000001 }
+      - { path: metrics.factor_max, approx: 1.375, abs: 0.000001 }
+
+  - id: prep-detect-filter
+    description: A required fraction of 0.7 removes feature m5, which has values in 4 of 6 samples (0.667 after zero_as_missing).
+    data: [data/tiny_table.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/tiny_table.csv", group_column: group, zero_as_missing: true, min_detect_fraction: 0.7, imputation: none }
+    expect:
+      - { path: metrics.n_features_removed, equals: 1 }
+      - { path: metrics.n_features_kept, equals: 4 }
+      - { path: metrics.n_imputed, equals: 0 }
+
+  - id: prep-sacurine-pqn-log2
+    description: >
+      PQN with all samples as reference and a log2 transform on the back-transformed sacurine values (10 to the power of the published values,
+      data/sacurine_linear.csv). The NumPy scale factors run from 0.401055 to 2.324616 (checks/check_metab.out). A Welch test on the result gives 39 significant
+      features at the Benjamini-Hochberg level of 0.05 (NumPy and SciPy).
+    data: [data/sacurine_linear.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/sacurine_linear.csv", group_column: gender, meta_columns: "age,bmi", normalization: pqn, transform: log2, imputation: none }
+        save_as: prep
+      - tool: test_features
+        args: { data: "{saved.prep.data.prepared_file}", response_column: gender, meta_columns: "age,bmi", test: welch, values_are: log2, group_a: M, group_b: F, adjust: BH, fdr: 0.05 }
+    expect:
+      - { path: saved.prep.metrics.n_features_kept, equals: 109 }
+      - { path: saved.prep.metrics.factor_min, approx: 0.401055, abs: 0.000001 }
+      - { path: saved.prep.metrics.factor_max, approx: 2.324616, abs: 0.000001 }
+      - { path: metrics.n_significant, equals: 39 }
+      - { path: metrics.n_raw_p_below_alpha, equals: 49 }
+
+  - id: test-welch-sacurine
+    description: >
+      Welch test of gender on the published (log10) values with the Benjamini-Hochberg adjustment. SciPy gives 46 features with a raw p below 0.05, 42 with
+      an adjusted p below 0.05 (11 higher in males, 31 lower), the top feature Testosterone glucuronide with t 7.636865 and a mean difference of 0.6013
+      (checks/check_metab.out).
+    data: [data/sacurine.csv]
+    calls:
+      - tool: test_features
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: gender, meta_columns: "age,bmi", test: welch, values_are: log10, group_a: M, group_b: F, adjust: BH, fdr: 0.05 }
+    expect:
+      - { path: metrics.n_tested, equals: 109 }
+      - { path: metrics.n_raw_p_below_alpha, equals: 46 }
+      - { path: metrics.n_significant, equals: 42 }
+      - { path: metrics.n_up, equals: 11 }
+      - { path: metrics.n_down, equals: 31 }
+      - { path: "table.rows[0][0]", equals: Testosterone glucuronide }
+      - { path: "table.rows[0][1]", approx: 7.636865, abs: 0.00001 }
+      - { path: "table.rows[0][3]", approx: 5.53368e-10, rel: 0.0001 }
+
+  - id: test-wilcoxon-sacurine
+    description: Wilcoxon rank-sum test (normal approximation with continuity correction) of gender. SciPy gives 52 raw p below 0.05 and 45 adjusted p below 0.05 (checks/check_metab.out).
+    data: [data/sacurine.csv]
+    calls:
+      - tool: test_features
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: gender, meta_columns: "age,bmi", test: wilcoxon, values_are: log10, group_a: M, group_b: F, adjust: BH, fdr: 0.05 }
+    expect:
+      - { path: metrics.n_raw_p_below_alpha, equals: 52 }
+      - { path: metrics.n_significant, equals: 45 }
+
+  - id: test-spearman-age
+    description: Spearman correlation of each metabolite with age. SciPy gives 48 raw p below 0.05, 37 adjusted p below 0.05 and the top feature Quinic acid (checks/check_metab.out).
+    data: [data/sacurine.csv]
+    calls:
+      - tool: test_features
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: age, meta_columns: "gender,bmi", test: spearman, values_are: log10, adjust: BH, fdr: 0.05 }
+    expect:
+      - { path: metrics.n_raw_p_below_alpha, equals: 48 }
+      - { path: metrics.n_significant, equals: 37 }
+      - { path: "table.rows[0][0]", equals: Quinic acid }
+
+  - id: test-anova-sacurine
+    description: One-way analysis of variance of gender for each metabolite. SciPy gives 47 raw p below 0.05 and 42 adjusted p below 0.05 (checks/check_metab.out).
+    data: [data/sacurine.csv]
+    calls:
+      - tool: test_features
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: gender, meta_columns: "age,bmi", test: anova, values_are: log10, adjust: BH, fdr: 0.05 }
+    expect:
+      - { path: metrics.n_raw_p_below_alpha, equals: 47 }
+      - { path: metrics.n_significant, equals: 42 }
+
+  - id: prep-log-table-passes-through
+    description: The published log10 table (negative values) passes through the preparation with every option none. All 109 metabolites and 183 samples stay.
+    data: [data/sacurine.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/sacurine.csv", group_column: gender, meta_columns: "age,bmi", imputation: none, normalization: none, transform: none }
+    expect:
+      - { path: metrics.n_samples, equals: 183 }
+      - { path: metrics.n_features_kept, equals: 109 }
+      - { path: metrics.n_imputed, equals: 0 }
+
+  - id: prep-normalize-log-table
+    description: PQN on a table with negative values fails, and the error names the count and the fix.
+    data: [data/sacurine.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/sacurine.csv", group_column: gender, meta_columns: "age,bmi", imputation: none, normalization: pqn }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "so it is probably on a log scale" }
+
+  - id: prep-missing-group-column
+    description: A group column that is not in the table fails, and the error names the argument and the columns.
+    data: [data/tiny_table.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/tiny_table.csv", group_column: class }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "group_column 'class' is not a column of the data" }
+      - { path: error, contains: "Columns: sample, group, m1" }
+
+  - id: prep-imputation-none-with-gaps
+    description: A table with gaps and imputation none fails, and the error names the count and the choice.
+    data: [data/tiny_table.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/tiny_table.csv", group_column: group, zero_as_missing: true, imputation: none }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "2 missing value(s) after the filter and imputation is none" }
+
+  - id: prep-log-of-zero
+    description: A log transform of a table with a zero fails, and the error names the count and the fix.
+    data: [data/tiny_table.csv]
+    calls:
+      - tool: prepare_metabolite_table
+        args: { data: "{adapter_dir}/data/tiny_table.csv", group_column: group, imputation: zero, transform: log2 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "transform log2 needs positive values, and 2 value(s) are zero" }
+
+  - id: fit-opls-three-groups
+    description: OPLS on a response with three groups fails, and the error names the groups.
+    data: [data/tiny_three_groups.csv]
+    calls:
+      - tool: fit_multivariate_model
+        args: { data: "{adapter_dir}/data/tiny_three_groups.csv", response_column: group, model: opls, scale: standard, permutations: 0 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "opls needs 2 groups and column 'group' has 3 (A, B, C)" }
+
+  - id: test-numeric-response-with-t-test
+    description: A t test on a numeric response fails, and the error names the column and the tests to use.
+    data: [data/sacurine.csv]
+    calls:
+      - tool: test_features
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: age, meta_columns: "gender,bmi", test: welch, values_are: log10 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "test welch needs a group column and 'age' is numeric" }
+
+  - id: test-unknown-group
+    description: A group that is not in the response column fails, and the error names the groups.
+    data: [data/sacurine.csv]
+    calls:
+      - tool: test_features
+        args: { data: "{adapter_dir}/data/sacurine.csv", response_column: gender, meta_columns: "age,bmi", test: welch, values_are: log10, group_a: X, group_b: F }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "group 'X' is not in column 'gender'. Groups: M, F" }
+
+tools:
+  - name: prepare_metabolite_table
+    title: Prepare a metabolite feature table
+    description: >
+      Prepare a metabolite feature table for models and tests. It removes features with too many gaps, fills the gaps, normalizes each
+      sample, and transforms the values. It saves the prepared table. The input has one row for each sample and one column for each feature.
+    params:
+      data: { type: string, description: "Path of a CSV or tab-separated file with a header row. One row for each sample, one column for each feature, and a group column." }
+      id_column: { type: string, description: "Column with the sample name. Default: the first column." }
+      group_column: { type: string, description: "Column with the group of each sample, such as control or case." }
+      meta_columns: { type: [array, string], items: { type: string }, description: "Columns that are not features and must stay in the table, such as age or batch, as a list or as comma text." }
+      exclude_samples: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Sample names to drop, as a list or as comma text. none keeps all." }
+      zero_as_missing: { type: boolean, description: "Leave out. The harness sets it from the decision record. true turns each zero into a missing value." }
+      min_detect_fraction: { type: number, minimum: 0, maximum: 1, description: "Leave out. The harness sets it from the decision record. Fraction of samples that must have a value for a feature to stay." }
+      imputation: { type: string, enum: [none, half_min, min, median, zero], description: "Leave out. The harness sets it from the decision record." }
+      normalization: { type: string, enum: [none, total_area, median, pqn], description: "Leave out. The harness sets it from the decision record." }
+      pqn_reference: { type: string, description: "Leave out. The harness sets it from the decision record. all, or the name of the group that gives the reference sample of the PQN." }
+      transform: { type: string, enum: [none, log2, log10, sqrt], description: "Leave out. The harness sets it from the decision record." }
+    required: [data, group_column]
+    read_only: true
+    batch: false
+    outputs:
+      prepared: { kind: table, ext: .csv, description: "One row for each sample with the group, the kept meta columns and the prepared feature values." }
+    script: scripts/prepare_metabolite_table.R
+    parse: json
+    citations:
+      - text: "Dieterle, F., Ross, A., Schlotterbeck, G., & Senn, H. (2006). Probabilistic quotient normalization as robust method to account for dilution of complex biological mixtures. Analytical Chemistry, 78(13), 4281-4290. https://doi.org/10.1021/ac051632c"
+        doi: 10.1021/ac051632c
+        when: { normalization: pqn }
+      - text: "van den Berg, R. A., Hoefsloot, H. C. J., Westerhuis, J. A., Smilde, A. K., & van der Werf, M. J. (2006). Centering, scaling, and transformations: improving the biological information content of metabolomics data. BMC Genomics, 7, 142. https://doi.org/10.1186/1471-2164-7-142"
+        doi: 10.1186/1471-2164-7-142
+        when: { transform: [log2, log10, sqrt] }
+
+  - name: fit_multivariate_model
+    title: Fit a PCA, PLS-DA or OPLS-DA model
+    description: >
+      Fit a PCA, PLS or OPLS model to a prepared feature table with ropls. A group column gives PLS-DA or OPLS-DA, and a number column gives
+      a regression. It gives R2X, R2Y, the cross-validated Q2, a permutation test, VIP scores and a score plot. Run it after the preparation step.
+    params:
+      data: { type: string, description: "Path of the prepared CSV file from prepare_metabolite_table, or a table with the same layout." }
+      id_column: { type: string, description: "Column with the sample name. Default: the first column." }
+      response_column: { type: string, description: "Column with the group (text) or a number (such as age). PCA uses it only to color the plot." }
+      meta_columns: { type: [array, string], items: { type: string }, description: "Columns that are not features, such as age or batch, as a list or as comma text." }
+      model: { type: string, enum: [pca, pls, opls], description: "pca has no response. pls on a group column is PLS-DA. opls on a group column is OPLS-DA and needs 2 groups." }
+      scale: { type: string, enum: [none, center, pareto, standard], description: "Leave out. The harness sets it from the decision record." }
+      n_predictive: { type: [integer, string], description: "Leave out. The harness sets it from the decision record. Number of predictive components (count) or auto." }
+      n_orthogonal: { type: [integer, string], description: "Leave out. The harness sets it from the decision record. Number of orthogonal components (count) or auto. Only for opls." }
+      cv_segments: { type: integer, minimum: 2, description: "Leave out. The harness sets it from the decision record. Number of cross-validation segments (count)." }
+      permutations: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Number of permutations of the response (count). 0 gives no test." }
+      holdout: { type: string, enum: [none, odd], description: "none uses all samples. odd trains on the odd-numbered rows and tests on the other rows. odd gives no permutation test. Default none." }
+      vip_cutoff: { type: number, minimum: 0.5, description: "Leave out. The harness sets it from the decision record. VIP score (unitless) at or above which a feature counts as important." }
+      seed: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Random seed (index) of the permutations." }
+    required: [data, response_column, model]
+    read_only: true
+    batch: false
+    outputs:
+      plot: { kind: image, ext: .png, description: Score plot. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+      features: { kind: table, ext: .csv, description: "One row for each feature with the loading on the first component and the VIP score, sorted by VIP." }
+      scores: { kind: table, ext: .csv, description: "One row for each sample with the component scores." }
+    script: scripts/fit_multivariate_model.R
+    parse: json
+    citations:
+      - text: "Trygg, J., & Wold, S. (2002). Orthogonal projections to latent structures (O-PLS). Journal of Chemometrics, 16(3), 119-128. https://doi.org/10.1002/cem.695"
+        doi: 10.1002/cem.695
+        when: { model: opls }
+      - text: "Wold, S., Sjostrom, M., & Eriksson, L. (2001). PLS-regression: a basic tool of chemometrics. Chemometrics and Intelligent Laboratory Systems, 58(2), 109-130. https://doi.org/10.1016/S0169-7439(01)00155-1"
+        doi: 10.1016/S0169-7439(01)00155-1
+        when: { model: [pls, opls] }
+      - text: "Szymanska, E., Saccenti, E., Smilde, A. K., & Westerhuis, J. A. (2012). Double-check: validation of diagnostic statistics for PLS-DA models in metabolomics studies. Metabolomics, 8(Suppl 1), 3-16. https://doi.org/10.1007/s11306-011-0330-3"
+        doi: 10.1007/s11306-011-0330-3
+        when: { permutations: set }
+
+  - name: test_features
+    title: Test each feature between groups
+    description: >
+      Test every feature of a prepared table between two groups, among three groups or more, or against a number. It adjusts the p values for
+      many tests and gives the fold change, the counts of significant features and a volcano plot. Use it to name which features differ.
+    params:
+      data: { type: string, description: "Path of the prepared CSV file from prepare_metabolite_table, or a table with the same layout." }
+      id_column: { type: string, description: "Column with the sample name. Default: the first column." }
+      response_column: { type: string, description: "Column with the group (text) or a number (such as age)." }
+      meta_columns: { type: [array, string], items: { type: string }, description: "Columns that are not features, such as age or batch, as a list or as comma text." }
+      group_a: { type: string, description: "Group of interest (numerator of the fold change). Needed for welch, student and wilcoxon." }
+      group_b: { type: string, description: "Reference group (denominator of the fold change). Needed for welch, student and wilcoxon." }
+      test: { type: string, enum: [welch, student, wilcoxon, anova, kruskal, pearson, spearman], description: "Leave out. The harness sets it from the decision record." }
+      adjust: { type: string, enum: [holm, hochberg, hommel, bonferroni, BH, BY, fdr, none], description: "Leave out. The harness sets it from the decision record." }
+      fdr: { type: number, minimum: 0.001, maximum: 0.25, description: "Leave out. The harness sets it from the decision record. Significance level of the adjusted p value (fraction)." }
+      min_abs_log2fc: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest absolute log2 fold change." }
+      values_are: { type: string, enum: [linear, log2, log10, other], description: "Leave out. The harness sets it from the decision record. Scale of the table values." }
+    required: [data, response_column]
+    read_only: true
+    batch: false
+    outputs:
+      results: { kind: table, ext: .csv, description: "One row for each feature with the statistic, the p value, the adjusted p value and the fold change, sorted by p value." }
+      plot: { kind: image, ext: .png, description: Volcano plot. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    script: scripts/test_features.R
+    parse: json
+    citations:
+      - text: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society B, 57(1), 289-300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x"
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+        when: { adjust: [BH, fdr] }
+      - text: "Welch, B. L. (1947). The generalization of 'Student's' problem when several different population variances are involved. Biometrika, 34(1-2), 28-35. https://doi.org/10.1093/biomet/34.1-2.28"
+        doi: 10.1093/biomet/34.1-2.28
+        when: { test: welch }

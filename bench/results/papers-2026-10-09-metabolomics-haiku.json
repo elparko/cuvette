@@ -1,0 +1,731 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "thevenot2015-ropls-sacurine",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 197.985,
+   "session": "20261009-041011-a533",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/thevenot2015-ropls-sacurine/run1/home/sessions/20261009-041011-a533",
+   "answer": "## Correction\n\nThe outlier statement needs a source. The data check flags come from the harness data check note. That note came with the inspect_data result for sacurine.csv. The inspect_data table itself lists only columns, group counts and value ranges. The harness check uses a modified z-score above 3.5, computed within each gender group. It flagged extreme values in many columns. Examples: Quinic acid 18 values, N4-Acetylcytidine 16 values, (2-methoxyethoxy)propanoic acid isomer 16 values, 3-Indole carboxylic acid glucuronide 16 values, Mevalonic acid isomer 1 14 values. The check removed nothing. All 183 samples stayed in every model and test.\n\n## Answer\n\nMen and women differ in urine metabolome. The PLS-DA and OPLS-DA models predict gender in cross-validation (Q2 0.584 and 0.602). The Welch test finds 42 significant metabolites after Benjamini-Hochberg (BH) adjustment: 11 up in men and 31 down in men. The principal component analysis (PCA) does not show a clear split.\n\nEvery planned step ran. The plan is marked done.\n\n## Settings\n\n- Samples: 183 (M 100, F 83). Metabolites: 109 before and after the filter.\n- Missing values: none. Filter, imputation, normalization and transform: none. Your file is already normalized and log10 transformed.\n- Scaling: standard, from the harness record. Cross-validation: 7 segments. Permutations: 20. Seed: 1.\n- Software: ropls 1.44.0.\n\n## Results\n\n1. **PCA.** Cumulative R2X is 0.501 over 8 components (auto). PC1 R2X is 0.149, PC2 is 0.103 and PC3 is 0.067.\n2. **PLS-DA of gender.** The model has 3 predictive components (auto) and 0 orthogonal components. R2X 0.275, R2Y 0.73, Q2 0.584, RMSEE 0.262. Permutation p values: R2Y 0.05, Q2 0.05.\n3. **OPLS-DA of gender, 1 predictive component.** The model has 2 orthogonal components. R2X 0.275, R2Y 0.73, Q2 0.602, RMSEE 0.262. Permutation p values: R2Y 0.05, Q2 0.05. The auto setting gave the same result as the value 1.\n4. **OPLS-DA trained on odd rows.** R2Y 0.825, Q2 0.608, RMSEP 0.341. The test set has 91 samples, with 77 correct calls (accuracy 0.846). This run has no permutation test.\n5. **OPLS regression of age, 1 predictive component.** The model has 1 orthogonal component. R2Y 0.476, Q2 0.31, RMSEE 7.53 years. Permutation p values: R2Y 0.05, Q2 0.05.\n6. **Welch test, men against women, BH, level 0.05.** 42 significant: 11 up, 31 down. The top metabolites:\n   - Testosterone glucuronide: up, log2 fold change 1.997, adjusted p 5.53e-10.\n   - p-Anisic acid: down, log2 fold change -3.346, adjusted p 5.53e-10.\n   - Malic acid: down, log2 fold change -0.763, adjusted p 7.74e-09.\n   - Pantothenic acid: down, log2 fold change -0.709, adjusted p 1.53e-07.\n   - Acetylphenylalanine: down, log2 fold change -0.854, adjusted p 7.01e-06.\n\n## Uncertain\n\n- The permutation p values use 20 permutations. This gives a coarse result. More permutations give finer p values.\n- The odd and even split is one split. Its 77 of 91 result has no spread estimate.\n- The gender effect is not tested after adjustment for age and BMI. Age alone gives a model with Q2 0.31.\n- The VIP lists and the significant metabolites do not identify biomarkers. The data do not show a cause.\n- The harness data check flagged extreme values in many columns. The models keep these samples. Removing them is your decision.\n\n## Waits for you\n\n1. Confirm the scaling (standard) and the cross-validation and permutation counts.\n2. Set the number of predictive components. The record says auto. For the holdout and age runs, auto gave 1 predictive component, which matches your request. I did not run those two with the value 1 set directly.\n3. Choose more permutations for the final p values.\n4. Decide whether to test gender after adjustment for age and BMI.\n\nSettings used, from the decision record: Zero counts as a missing value: false · Fraction of samples that must have a value: 0 · Samples that you exclude: none · Imputation of missing values: none · Normalization of each sample: none · Reference sample of the PQN: all · Transformation of the values: none · Scaling of the features in the model: standard · Predictive components: auto · Orthogonal components: auto · Cross-validation segments: 7 · Permutations of the response: 20 · VIP limit for important features: 1 · Univariate test: welch · Adjustment of the p values: BH · Significance level of the adjusted p value: 0.05 · Smallest log2 fold change: 0 · Scale of the table values: log10 (agent's choice).",
+   "items": [
+    {
+     "key": "n_samples",
+     "description": "Number of samples",
+     "expected": 183,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 183,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_samples",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 183,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 150,
+      "text": "All 183 samples stayed in every model and test."
+     }
+    },
+    {
+     "key": "pca_r2x",
+     "description": "Cumulative R2X of the PCA (standard scaling)",
+     "expected": 0.501,
+     "tolerance": 0.002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.501,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.r2x",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.501,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 150,
+      "text": "**PCA.** Cumulative R2X is 0.501 over 8 components (auto)."
+     }
+    },
+    {
+     "key": "pca_components",
+     "description": "Number of PCA components that ropls keeps",
+     "expected": 8,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_predictive",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 150,
+      "text": "**PCA.** Cumulative R2X is 0.501 over 8 components (auto)."
+     }
+    },
+    {
+     "key": "plsda_r2x",
+     "description": "Cumulative R2X of the PLS-DA of gender",
+     "expected": 0.275,
+     "tolerance": 0.002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.275,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.r2x",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.275,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 150,
+      "text": "R2X 0.275, R2Y 0.73, Q2 0.584, RMSEE 0.262."
+     }
+    },
+    {
+     "key": "plsda_r2y",
+     "description": "Cumulative R2Y of the PLS-DA of gender",
+     "expected": 0.73,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.73,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.r2y",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.73,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 150,
+      "text": "R2X 0.275, R2Y 0.73, Q2 0.584, RMSEE 0.262."
+     }
+    },
+    {
+     "key": "plsda_q2",
+     "description": "Cumulative Q2 of the PLS-DA of gender",
+     "expected": 0.584,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.584,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.q2",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.584,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 150,
+      "text": "The PLS-DA and OPLS-DA models predict gender in cross-validation (Q2 0.584 and 0.602)."
+     }
+    },
+    {
+     "key": "plsda_rmsee",
+     "description": "RMSEE of the PLS-DA of gender",
+     "expected": 0.262,
+     "tolerance": 0.003,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.262,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.rmsee",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.262,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 150,
+      "text": "R2X 0.275, R2Y 0.73, Q2 0.584, RMSEE 0.262."
+     }
+    },
+    {
+     "key": "plsda_components",
+     "description": "Number of PLS-DA components",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.n_predictive",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 3,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 150,
+      "text": "Examples: Quinic acid 18 values, N4-Acetylcytidine 16 values, (2-methoxyethoxy)propanoic acid isomer 16 values, 3-Indole carboxylic acid glucuronide 16 values, Mevalonic acid isomer 1 14 values."
+     }
+    },
+    {
+     "key": "oplsda_q2",
+     "description": "Cumulative Q2 of the OPLS-DA of gender",
+     "expected": 0.602,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.602,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.q2",
+      "entry": 68
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.602,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 150,
+      "text": "The PLS-DA and OPLS-DA models predict gender in cross-validation (Q2 0.584 and 0.602)."
+     }
+    },
+    {
+     "key": "oplsda_orthogonal",
+     "description": "Number of orthogonal components of the OPLS-DA",
+     "expected": 2,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.n_orthogonal",
+      "entry": 68
+     },
+     "reported": {
+      "pass": true,
+      "value": 2,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 150,
+      "text": "Examples: Quinic acid 18 values, N4-Acetylcytidine 16 values, (2-methoxyethoxy)propanoic acid isomer 16 values, 3-Indole carboxylic acid glucuronide 16 values, Mevalonic acid isomer 1 14 values."
+     }
+    },
+    {
+     "key": "permutation_p",
+     "description": "Permutation p value of Q2 with 20 permutations (the smallest possible value)",
+     "expected": 0.05,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.05,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.p_r2y",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.05,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 150,
+      "text": "Permutation p values: R2Y 0.05, Q2 0.05."
+     }
+    },
+    {
+     "key": "oplsda_test_r2y",
+     "description": "R2Y of the OPLS-DA trained on the odd rows",
+     "expected": 0.825,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.825,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.r2y",
+      "entry": 87
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.825,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 150,
+      "text": "**OPLS-DA trained on odd rows.** R2Y 0.825, Q2 0.608, RMSEP 0.341."
+     }
+    },
+    {
+     "key": "oplsda_test_q2",
+     "description": "Q2 of the OPLS-DA trained on the odd rows",
+     "expected": 0.608,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.608,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.q2",
+      "entry": 87
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.608,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 150,
+      "text": "**OPLS-DA trained on odd rows.** R2Y 0.825, Q2 0.608, RMSEP 0.341."
+     }
+    },
+    {
+     "key": "oplsda_test_rmsep",
+     "description": "RMSEP of the OPLS-DA on the test rows",
+     "expected": 0.341,
+     "tolerance": 0.003,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.341,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.rmsep",
+      "entry": 87
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.341,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 150,
+      "text": "**OPLS-DA trained on odd rows.** R2Y 0.825, Q2 0.608, RMSEP 0.341."
+     }
+    },
+    {
+     "key": "oplsda_test_correct",
+     "description": "Correct calls in the test set of 91 samples",
+     "expected": 77,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 77,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.holdout_correct",
+      "entry": 87
+     },
+     "reported": {
+      "pass": true,
+      "value": 77,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 150,
+      "text": "The test set has 91 samples, with 77 correct calls (accuracy 0.846)."
+     }
+    },
+    {
+     "key": "age_r2y",
+     "description": "R2Y of the OPLS regression of age",
+     "expected": 0.476,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.476,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.r2y",
+      "entry": 91
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.476,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 150,
+      "text": "R2Y 0.476, Q2 0.31, RMSEE 7.53 years."
+     }
+    },
+    {
+     "key": "age_q2",
+     "description": "Q2 of the OPLS regression of age",
+     "expected": 0.31,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.31,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.q2",
+      "entry": 91
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.31,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 150,
+      "text": "R2Y 0.476, Q2 0.31, RMSEE 7.53 years."
+     }
+    },
+    {
+     "key": "age_rmsee",
+     "description": "RMSEE of the OPLS regression of age (years)",
+     "expected": 7.53,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 7.53,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.rmsee",
+      "entry": 91
+     },
+     "reported": {
+      "pass": true,
+      "value": 7.53,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 150,
+      "text": "R2Y 0.476, Q2 0.31, RMSEE 7.53 years."
+     }
+    },
+    {
+     "key": "n_significant",
+     "description": "Metabolites with an adjusted p below 0.05 (Welch test)",
+     "expected": 42,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42,
+      "diff": 0,
+      "node": "n10",
+      "path": "metrics.n_significant",
+      "entry": 114
+     },
+     "reported": {
+      "pass": true,
+      "value": 42,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 150,
+      "text": "The Welch test finds 42 significant metabolites after Benjamini-Hochberg (BH) adjustment: 11 up in men and 31 down in men."
+     }
+    },
+    {
+     "key": "n_up",
+     "description": "Significant metabolites that are higher in men",
+     "expected": 11,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 11,
+      "diff": 0,
+      "node": "n10",
+      "path": "metrics.n_up",
+      "entry": 114
+     },
+     "reported": {
+      "pass": true,
+      "value": 11,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 150,
+      "text": "The Welch test finds 42 significant metabolites after Benjamini-Hochberg (BH) adjustment: 11 up in men and 31 down in men."
+     }
+    },
+    {
+     "key": "n_down",
+     "description": "Significant metabolites that are lower in men",
+     "expected": 31,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 31,
+      "diff": 0,
+      "node": "n10",
+      "path": "metrics.n_down",
+      "entry": 114
+     },
+     "reported": {
+      "pass": true,
+      "value": 31,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 150,
+      "text": "The Welch test finds 42 significant metabolites after Benjamini-Hochberg (BH) adjustment: 11 up in men and 31 down in men."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 10,
+    "inputTokens": 28,
+    "outputTokens": 18471,
+    "cacheRead": 419210,
+    "cacheWrite": 78943,
+    "toolCalls": 12,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 4,
+     "error": 2
+    },
+    "unsourced": 5,
+    "deviations": 3,
+    "overwritten": 3,
+    "nodes": 7
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/thevenot2015-ropls-sacurine/run1/home/sessions/20261009-041011-a533/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/thevenot2015-ropls-sacurine",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/thevenot2015-ropls-sacurine/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb/catalog/metabolomics-stats",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-aaca4298f723197cb/catalog/metabolomics-stats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/thevenot2015-ropls-sacurine/sacurine.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/thevenot2015-ropls-sacurine/run1/home/sessions/20261009-041011-a533/work/prepare_metabolite_table-1/prepared.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 5,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-metabolomics-haiku.md",
+  "json": "bench/results/papers-2026-10-09-metabolomics-haiku.json"
+ },
+ "summary": {
+  "cells": {
+   "thevenot2015-ropls-sacurine": {
+    "claude:claude-haiku-5-5": {
+     "computed": 21,
+     "computedOf": 21,
+     "reported": 21,
+     "reportedOf": 21,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 21,
+    "computedOf": 21,
+    "reported": 21,
+    "reportedOf": 21,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 197.985,
+    "requests": 10,
+    "inputTokens": 28,
+    "outputTokens": 18471,
+    "cacheRead": 419210,
+    "cacheWrite": 78943,
+    "toolCalls": 12,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings_info": 4,
+    "findings_warning": 4,
+    "findings_error": 2,
+    "unsourced": 5,
+    "deviations": 3,
+    "overwritten": 3,
+    "nodes": 7
+   }
+  },
+  "skipped": []
+ }
+}

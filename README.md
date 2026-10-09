@@ -352,6 +352,7 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `enrichment` | gseapy | Python library | gene set enrichment |
 | `limma-proteomics` | R limma | R scripts | differential proteins from a protein table |
 | `mofa` | MOFA+ (mofapy2) | Python library | multi-omics factor analysis |
+| `metabolomics-stats` | R ropls | R scripts | metabolite feature tables: normalization, PCA, PLS-DA, OPLS-DA, univariate tests |
 | `chromatography` | hplc-py | Python library | chromatogram peaks |
 | `openbabel` | Open Babel | command line | chemistry |
 | `onboarding` | the onboarding tools | MCP; used by `cuvette onboard` | any |

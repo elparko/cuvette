@@ -1,0 +1,20 @@
+.libPaths(c("/Volumes/T7/guided-analysis/tools/R-library", .libPaths()))
+suppressMessages(library(ropls))
+data(sacurine)
+x <- sacurine$dataMatrix
+g <- sacurine$sampleMetadata$gender
+age <- sacurine$sampleMetadata$age
+cat("ropls", as.character(packageVersion("ropls")), "\n")
+show <- function(m) print(getSummaryDF(m))
+show(opls(x, fig.pdfC = "none", info.txtC = "none"))
+show(opls(x, g, fig.pdfC = "none", info.txtC = "none"))
+show(opls(x, g, predI = 1, orthoI = NA, fig.pdfC = "none", info.txtC = "none"))
+m <- opls(x, g, predI = 1, orthoI = NA, subset = "odd", fig.pdfC = "none", info.txtC = "none")
+show(m)
+tr <- getSubsetVi(m)
+print(table(g[-tr], predict(m, x[-tr, ])))
+show(opls(x, age, predI = 1, orthoI = NA, fig.pdfC = "none", info.txtC = "none"))
+p <- apply(x, 2, function(v) t.test(v[g == "M"], v[g == "F"])$p.value)
+q <- p.adjust(p, "BH")
+d <- colMeans(x[g == "M", ]) - colMeans(x[g == "F", ])
+cat("significant", sum(q < 0.05), "up", sum(q < 0.05 & d > 0), "down", sum(q < 0.05 & d < 0), "\n")

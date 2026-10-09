@@ -1,0 +1,198 @@
+kind: tool tutorial or test suite
+short: Thevenot 2015
+field: Metabolomics
+program: ropls (R), through the metabolomics-stats adapter
+citation:
+  authors: Thevenot EA, Roux A, Xu Y, Ezan E, Junot C
+  title: "Analysis of the human adult urinary metabolome variations with age, body mass index, and gender by implementing a comprehensive workflow for univariate and OPLS statistical analyses"
+  venue: Journal of Proteome Research 14(8):3322-3335
+  year: 2015
+  doi: 10.1021/acs.jproteome.5b00354
+related:
+  - text: >-
+      The ropls vignette (Bioconductor, version 1.44.0) applies the PCA, PLS-DA and OPLS-DA of the paper to the same data and prints the
+      model statistics. The numbers in this case come from the vignette.
+    doi: 10.18129/B9.bioc.ropls
+  - text: >-
+      MetaboLights study MTBLS404 holds the data of the paper (sacurine).
+    doi: 10.1093/nar/gkad1045
+measured: >-
+  The paper describes a workflow with univariate tests and OPLS models for urine metabolomics data. The vignette of the R package
+  applies PCA, PLS-DA and OPLS-DA to 183 urine profiles of 109 metabolites and prints R2X, R2Y, Q2, RMSEE and the permutation p values.
+instruction: >-
+  I have the urine metabolome of 183 adults. Do men and women differ? Fit a PCA, a PLS-DA and an OPLS-DA of gender, check the OPLS-DA on a
+  test set, fit an OPLS regression of age, and test each metabolite between men and women.
+instruction_basis: >-
+  The ropls vignette, sections 4.2 (PCA), 4.3 (PLS-DA), 4.4 (OPLS-DA and the test set) and 5.2 (OPLS of age). The vignette prints the values
+  with three digits.
+answers:
+  zero_as_missing:
+    decision: Zero counts as a missing value
+    value: false
+    source: The table has no zero values from missing peaks.
+  min_detect_fraction:
+    decision: Fraction of samples that must have a value
+    value: 0
+    source: The vignette uses all 109 metabolites.
+  exclude_samples:
+    decision: Samples that you exclude
+    value: none
+    source: The vignette uses all 183 samples.
+  imputation:
+    decision: Imputation of missing values
+    value: none
+    source: The table has no missing values.
+  normalization:
+    decision: Normalization of each sample
+    value: none
+    source: The data are already normalized to osmolality.
+  pqn_reference:
+    decision: Reference sample of the PQN
+    value: all
+    source: Not used. The normalization is none.
+  transform:
+    decision: Transformation of the values
+    value: none
+    source: The data are already log10 transformed.
+  scale:
+    decision: Scaling of the features in the model
+    value: standard
+    source: The vignette prints "standard scaling of predictors and response(s)".
+  n_predictive:
+    decision: Predictive components
+    value: auto
+    source: The vignette lets ropls choose the PLS-DA components. The OPLS-DA has 1 predictive component.
+  n_orthogonal:
+    decision: Orthogonal components
+    value: auto
+    source: The vignette lets ropls choose the orthogonal components.
+  cv_segments:
+    decision: Cross-validation segments
+    value: 7
+    source: The ropls default.
+  permutations:
+    decision: Permutations of the response
+    value: 20
+    source: The ropls default. The vignette prints pR2Y and pQ2 of 0.05, the smallest value with 20 permutations.
+  vip_cutoff:
+    decision: VIP limit for important features
+    value: 1
+    source: The usual limit. Not in the vignette output.
+  model_seed:
+    decision: Random seed of the permutations
+    value: 1
+    source: Not in the vignette. The p values of 0.05 do not depend on the seed.
+  test:
+    decision: Univariate test
+    value: welch
+    source: The request names the Welch test.
+  adjust:
+    decision: Adjustment of the p values
+    value: BH
+    source: The request names the Benjamini-Hochberg adjustment.
+  fdr:
+    decision: Significance level of the adjusted p value
+    value: 0.05
+    source: The usual level.
+  min_abs_log2fc:
+    decision: Smallest log2 fold change
+    value: 0
+    source: The request sets no fold change limit.
+  values_are:
+    decision: Scale of the table values
+    value: log10
+    source: The data description says the values are log10 transformed.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the vignette. The benchmark answers a free question with this text.
+items:
+  n_samples:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: 'Section 4.2, "183 samples x 109 variables".'
+  pca_r2x:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.2, PCA summary, R2X(cum) 0.501.
+  pca_components:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: 'Section 4.2, "8 components were selected".'
+  plsda_r2x:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.3, PLS-DA summary, R2X(cum) 0.275.
+  plsda_r2y:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.3, PLS-DA summary, R2Y(cum) 0.73.
+  plsda_q2:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.3, PLS-DA summary, Q2(cum) 0.584.
+  plsda_rmsee:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.3, PLS-DA summary, RMSEE 0.262.
+  plsda_components:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.3, PLS-DA summary, pre 3.
+  oplsda_q2:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.4, OPLS-DA summary, Q2(cum) 0.602.
+  oplsda_orthogonal:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.4, OPLS-DA summary, ort 2.
+  permutation_p:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Sections 4.3 and 4.4, pR2Y 0.05 and pQ2 0.05.
+  oplsda_test_r2y:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.4, model on the odd subset, R2Y(cum) 0.825.
+  oplsda_test_q2:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.4, model on the odd subset, Q2(cum) 0.608.
+  oplsda_test_rmsep:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.4, model on the odd subset, RMSEP 0.341.
+  oplsda_test_correct:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 4.4, confusion table of the test subset, 43 and 34 correct of 91, which the vignette calls 85% correct.
+  age_r2y:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 5.2, OPLS of age, R2Y(cum) 0.476.
+  age_q2:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 5.2, OPLS of age, Q2(cum) 0.31.
+  age_rmsee:
+    source: tutorial
+    tool: the ropls vignette, version 1.44.0
+    where: Section 5.2, OPLS of age, RMSEE 7.53.
+  n_significant:
+    source: computed
+    tool: SciPy (checks/check_metab.py in the adapter) and R t.test (check.R)
+    where: Welch test of gender with the Benjamini-Hochberg adjustment, 42 metabolites below 0.05.
+  n_up:
+    source: computed
+    tool: SciPy and R
+    where: 11 of the 42 are higher in men.
+  n_down:
+    source: computed
+    tool: SciPy and R
+    where: 31 of the 42 are lower in men.
+data:
+  source: R package ropls 1.44.0, data sacurine (dataMatrix and sampleMetadata), written to CSV by catalog/metabolomics-stats/data/make_fixtures.R. Public data of MetaboLights MTBLS404.
+  url: https://bioconductor.org/packages/ropls
+  license: CeCILL, the license of the package. The study is public in MetaboLights. The data hold the age, body mass index and gender of each volunteer and a study code. No other data of persons.
+  size: 183 rows and 113 columns, 244 kB
