@@ -552,6 +552,7 @@ test("a session with defaults loads the default adapters, keeps the adapter choi
   session = await Session.create({ adapters: [], provider, cwd, defaults: true, settings: { defaultAdapters: ["lab2", "no-such-adapter"] } });
   expect(session.pick).toBe(true);
   expect(session.adapters.map((a) => a.name)).toEqual(["lab2"]);
+  expect(session.adapterInfo.map((a) => a.name)).toEqual(["lab2"]);
   expect(session.allTools().map((t) => t.name)).toEqual(expect.arrayContaining(["count", "list_adapters", "use_adapter"]));
   expect(session.record.entries(["session"])[0].data).toMatchObject({ pick: true, defaults: ["lab2"] });
   session.decisions.applySetup({});
@@ -569,6 +570,7 @@ test("without defaults, as in the benchmark, only the named adapters load; a nam
   session = await Session.create({ adapters: ["lab"], provider: new FakeProvider([]), cwd, defaults: true, settings: { defaultAdapters: ["lab", "lab2"] } });
   expect(session.pick).toBe(false);
   expect(session.adapters.map((a) => a.name)).toEqual(["lab", "lab2"]);
+  expect(session.adapterInfo.map((a) => a.name)).toEqual(["lab", "lab2"]);
   expect(session.allTools().filter((t) => t.name === "count")).toHaveLength(1);
 });
 

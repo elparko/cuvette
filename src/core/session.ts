@@ -369,8 +369,9 @@ export class Session {
     else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
 
     this.pick = opts.pick ?? opts.adapters.length === 0;
+    const named = [...this.adapters];
     const defaults = opts.defaults ? this.defaultAdapters() : [];
-    for (const a of this.adapters) await this.startOne(a);
+    for (const a of named) await this.startOne(a);
     for (const a of [...defaults])
       try {
         await this.startOne(a);
