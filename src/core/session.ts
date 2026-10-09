@@ -1195,7 +1195,7 @@ export class Session {
     const rid = `r${++this.permCount}`;
     const code = typeof args.code === "string" ? args.code : undefined;
     if (this.permissionMode === "bypass" && !outward) {
-      this.record.append("permission", { rid, tool: tool.name, decision: "allowed", by: "harness", reason: "bypass permissions", always: false, sha256: code ? createHash("sha256").update(code).digest("hex") : undefined });
+      this.record.append("permission", { rid, tool: tool.name, decision: "allowed", by: "harness", reason: "bypass permissions", always: false, sha256: code ? createHash("sha256").update(code).digest("hex") : undefined, ...(search ? { search: search.root } : {}) });
       return { ok: true, note: "bypass permissions", always: false };
     }
     let touches = outward ?? ( tool.adapter ? `Runs ${tool.remoteName ?? tool.name} in ${this.adapterInfo.find((a) => a.name === tool.adapter)?.title}. It writes only to the session folder.` : "Runs on this computer with your user permissions.");

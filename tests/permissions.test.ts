@@ -80,6 +80,18 @@ test("bypass allows an ask rule without a card and logs the reason", async () =>
   expect(session.record.entries(["permission_mode"])[0].data).toMatchObject({ old: "ask", new: "bypass" });
 });
 
+test("bypass allows the disk search card and logs the folder", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "ga-perm-cwd-"));
+  const provider = new FakeProvider([{ calls: [{ name: "run_command", args: { argv: ["find", "/Volumes", "-maxdepth", "0"], purpose: "find the data", does: "lists /Volumes" } }] }, { text: "ok" }]);
+  session = await Session.create({ adapters: [], provider, cwd, generic: true, settings: { permissionMode: "bypass", guidance: false } });
+  const cards: string[] = [];
+  session.bus.on((e) => e.type === "permission" && cards.push(e.rid));
+  await session.send("find");
+  expect(cards).toEqual([]);
+  expect(results(provider)[0].isError).toBeFalsy();
+  expect(session.record.entries(["permission"]).at(-1)!.data).toMatchObject({ tool: "run_command", reason: "bypass permissions", search: "/Volumes" });
+});
+
 test("bypass keeps deny rules", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "x", method: "Default" } }] }, { text: "ok" }]);
   session = await bypassSession(provider, { permissions: { count: "deny" } });
