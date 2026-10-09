@@ -33,6 +33,8 @@ These items are being built and are not on main yet:
 - `docs/proprietary-alternatives.md` maps common proprietary lab and clinical programs to open-source alternatives and shows which ones Cuvette supports.
 - Clinical statistics: logistic regression with odds ratios, chi-square, Fisher's exact and McNemar tests, and Cox models with categorical covariates and row subsets (biostats). Meta-analysis with forest and funnel plots and Egger's test (metafor). ROC curves, AUC with DeLong intervals and best thresholds (pROC). Power and sample size (pwr). Manual routes give the menu paths in SPSS, Stata, SAS, Prism, RevMan, MedCalc and G*Power. Four new benchmark papers: TB treatment default, HCC biomarkers, passive smoking and lung cancer, and a trial sample size.
 - ELISA and other immunoassays (R drc): standard curves with 4PL and 5PL fits, in the Prism and SoftMax Pro forms, back-calculated concentrations with the dilution factor, replicate CV, LOD, LLOQ and ULOQ, and samples outside the curve flagged. A published Lassa ELISA paper is the benchmark case.
+- CRISPR screens (mageck), ChIP-seq and ATAC-seq differential peaks (diffbind) and Mendelian randomization from summary statistics (mendelianrandomization). Each has known-answer tests, manual routes, and one benchmark paper.
+- The mageck tools refuse a count table where Excel changed gene symbols to dates. The supplement of the MAGeCK paper has this fault in 120 rows.
 - Dose-response, enzyme kinetics and plate quality (R drc): IC50 and EC50 with a confidence interval and Hill slope, Michaelis-Menten and inhibition fits, plate normalization to controls and the Z' factor. Three published papers are the benchmark cases.
 
 ### Patient data and cost

@@ -54,16 +54,25 @@ Status: searched on 2026-10-09. The section "Outcome" at the end lists what was 
 
 ## Outcome
 
-Built on 2026-10-09:
+Built on 2026-10-09. Each benchmark paper passed all items in a blind run with claude:claude-haiku-5-5 (report: `bench/results/papers-2026-10-09-epigenomics-crispr-genetics-haiku.md`).
 
-- mendelianrandomization (candidate 7): the vignette values reproduce to the printed digits with package 0.10.0, and a NumPy script reproduces the inverse-variance estimate, Q, the Egger fit and the medians. Blind benchmark paper yavorska2017-mendelianrandomization.
-- mageck (candidates 1 and 2): see the sections added with the benchmark papers.
+- mendelianrandomization (candidate 7): the vignette values reproduce to the printed digits with package 0.10.0. A NumPy script reproduces the inverse-variance estimate, Q, the Egger fit and the medians. Paper `yavorska2017-mendelianrandomization`, 13 items.
+- mageck (candidate 1, melanoma screen of the same supplement): the ranks of the paper reproduce with MAGeCK 0.5.9.5. Paper `li2014-mageck-melanoma`, 8 items. A script reproduces the gene scores and the gene log2 fold changes of the demo without MAGeCK.
+- diffbind (candidate 4): DESeq2 with the library sizes reproduces the 246, 783 and 1470 sites of the vignette. DiffBind counts the 2845 sites and the library sizes and FRiP values of the vignette table from the BAM files. Paper `ross-innes2012-diffbind-tamoxifen`, 5 items.
 
 Rejected, with the reason:
 
-- Candidate 1, the rank statements of the paper: the current MAGeCK 0.5.9.5 does not reproduce them. MAP4K3 is at rank 17 and EPM2A at rank 18 with an FDR of 0.095, not 9 and 10 with 0.14. The paper used MAGeCK 0.2 and a comparison between the two cell lines that the test command does not run. The count table is a usable input for candidate 2. The supplement also has a data fault: Excel changed 120 gene symbols (SEPT and MARCH families) to dates. The mageck tools refuse such a table.
+- Candidate 1, the leukemia rank statements of the paper: MAGeCK 0.5.9.5 does not reproduce them. MAP4K3 is at rank 17 and EPM2A at rank 18 with an FDR of 0.095, not 9 and 10 with 0.14. The tests of each cell line alone and the total count normalization also fail to give them. The paper used MAGeCK 0.2. The count table works for the melanoma sheet and for the demo.
+- Candidate 1, the false discovery rates of the melanoma screen: CDH13 0.028 (paper 0.017), PPT1 0.097 (0.085), RREB1 0.025 (0.05). The ranks reproduce and are the items.
+- Candidate 2, the beta scores of the demo page: on the same count table (SHA-256 2ea5e902...), mageck mle gives RNF11 0.129 and 0.685 for HL60, not 3.6354 and 10.513. The page values come from another input.
 - Candidate 3: the package data are result files. A run cannot start from counts.
 - Candidate 5: the GEO series holds only a 6.3 GB raw tar and no count matrix. A run takes hours.
 - Candidate 6: the tutorial prints no count of differential peaks.
 - Candidate 8: no source prints numbers that we did not make ourselves.
 - Candidate 9: needs a token.
+- The edgeR numbers of the DiffBind vignette (819 and 1518): the quasi-likelihood test gives 820 and 1517, and the single-factor design gives 31 against 29 of DiffBind. They are not items. The adapter tests use the direct edgeR call (`checks/check_direct.out`).
+
+Data faults found:
+
+- The supplement of the MAGeCK paper has 120, 118 and 113 gene symbols (leukemia, melanoma and ESC sheets) that Excel changed to dates, such as 2014-09-10 for SEPT10. The command line program reads a date with a space as two fields and stops. Without the space it ranks the date entries first. The mageck tools refuse such a table. `fetch.sh` restores the symbols from the sgRNA names.
+- The package object `tamoxifen_counts` of DiffBind holds scores with decimals. The raw reads are in the slot `peaks`. The differential tool refuses counts with decimals.

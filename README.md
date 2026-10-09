@@ -328,6 +328,9 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `cellpose` | Cellpose | Python library | cell segmentation |
 | `cellprofiler` | CellProfiler | pipeline file, headless | image cytometry |
 | `image-assays` | scikit-image and SciPy | Python library | bench image assays: colony counts, colocalization, cell uptake |
+| `mageck` | MAGeCK | Python script that runs the command line program | CRISPR screen hits from sgRNA counts |
+| `diffbind` | DiffBind, DESeq2, edgeR | R scripts | ChIP-seq and ATAC-seq differential peaks |
+| `mendelianrandomization` | MendelianRandomization | R scripts | causal effects from variant summary statistics |
 | `qupath` | QuPath | Groovy scripts, one batch run for each step | histology |
 | `bftools` | Bio-Formats tools | command line | image formats |
 | `scanpy` | scanpy | Python library | single-cell RNA |
