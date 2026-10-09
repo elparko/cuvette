@@ -261,49 +261,88 @@ def design_primers(template, product_size_range=None, opt_tm_c=None, min_tm_c=No
             "table": _table(frame, "primer_pairs"), "outputs": _save(fig, "primer_pairs")}
 
 
-def simulate_pcr(template, forward, reverse, min_anneal_bp=None, topology="file"):
-    from pydna.amplify import Anneal
-    from pydna.dseqrecord import Dseqrecord
-    from pydna.primer import Primer
+IUPAC = {"A": "A", "C": "C", "G": "G", "T": "T", "U": "T", "R": "AG", "Y": "CT", "S": "CG", "W": "AT", "K": "GT",
+         "M": "AC", "B": "CGT", "D": "AGT", "H": "ACT", "V": "ACG", "N": "ACGT", "I": "ACGT"}
 
+
+def _revcomp(s):
+    pairs = {"A": "T", "C": "G", "G": "C", "T": "A", "U": "A", "R": "Y", "Y": "R", "S": "S", "W": "W", "K": "M",
+             "M": "K", "B": "V", "V": "B", "D": "H", "H": "D", "N": "N", "I": "N"}
+    return "".join(pairs[c] for c in reversed(s))
+
+
+def _pattern(primer):
+    return re.compile("".join("[%s]" % IUPAC[c] for c in primer))
+
+
+def _bind(primer, target, k):
+    """Positions on target where the 3' end of primer matches for at least k bases."""
+    seed = _pattern(primer[-k:])
+    hits = []
+    for m in re.finditer("(?=(%s))" % seed.pattern, target):
+        end = m.start() + k
+        foot = k
+        while foot < len(primer) and m.start() - 1 >= 0 and _pattern(primer[-foot - 1]).match(target[m.start() - (foot - k) - 1]):
+            foot += 1
+        hits.append({"end": end, "footprint": foot})
+    return hits
+
+
+def simulate_pcr(template, forward, reverse, min_anneal_bp=None, topology="file"):
     if min_anneal_bp is None:
         return _fail("min_anneal_bp is missing. It is a decision: the shortest 3' match that counts as a binding site.")
     seq, name, rec = _template(template)
     if seq is None:
         return _fail(rec if isinstance(rec, str) else "Could not read the template %s." % template)
     top = _topology(rec if not isinstance(rec, str) else None, None, topology) or "linear"
+    primers = {}
     for label, p in (("forward", forward), ("reverse", reverse)):
-        if not re.fullmatch(r"[ACGTacgt]+", str(p or "")):
-            return _fail("The %s primer %r has a letter that is not A, C, G or T." % (label, p))
-    t = Dseqrecord(seq, circular=(top == "circular"))
-    try:
-        ann = Anneal([Primer(forward.upper(), id="forward"), Primer(reverse.upper(), id="reverse")], t, limit=int(min_anneal_bp))
-    except Exception as e:
-        return _fail("pydna Anneal stopped on %s (%d bp) with min_anneal_bp %s: %s" % (name, len(seq), min_anneal_bp, e))
-    sites = {"forward primer on the top strand": 0, "forward primer on the bottom strand": 0, "reverse primer on the top strand": 0, "reverse primer on the bottom strand": 0}
-    for p in ann.forward_primers:
-        sites["%s primer on the top strand" % p.id] += 1
-    for p in ann.reverse_primers:
-        sites["%s primer on the bottom strand" % p.id] += 1
+        s = re.sub(r"\s", "", str(p or "")).upper()
+        bad = sorted(set(s) - set(IUPAC))
+        if not s or bad:
+            return _fail("The %s primer %r has a letter that is not a DNA or IUPAC ambiguity code: %s." % (label, p, ", ".join(bad) or "it is empty"))
+        if len(s) < int(min_anneal_bp):
+            return _fail("The %s primer is %d bases long, shorter than min_anneal_bp (%s)." % (label, len(s), min_anneal_bp))
+        primers[label] = s
+    k = int(min_anneal_bp)
+    target = seq + seq[: max(len(p) for p in primers.values()) + 2] if top == "circular" else seq
+    fwd = _bind(primers["forward"], target, k)
+    rev = [{"start": len(target) - h["end"], "footprint": h["footprint"]} for h in _bind(primers["reverse"], _revcomp(target), k)]
+    other_f = [{"start": len(target) - h["end"]} for h in _bind(primers["forward"], _revcomp(target), k)]
+    other_r = _bind(primers["reverse"], target, k)
+    sites = {"forward primer on the top strand": len([h for h in fwd if h["end"] - h["footprint"] < len(seq)]),
+             "reverse primer on the bottom strand": len([h for h in rev if h["start"] < len(seq)]),
+             "forward primer on the bottom strand": len([h for h in other_f if h["start"] < len(seq)]),
+             "reverse primer on the top strand": len([h for h in other_r if h["end"] - h["footprint"] < len(seq)])}
     rows = []
-    for prod in ann.products:
-        fp, rp = prod.forward_primer, prod.reverse_primer
-        ps = str(prod.seq).upper()
-        core = ps[len(fp) - len(fp.footprint): len(ps) - (len(rp) - len(rp.footprint))]
-        idx = (seq + seq).find(core) if top == "circular" else seq.find(core)
-        start = idx + 1
-        end = (idx + len(core) - 1) % len(seq) + 1
-        rows.append({"forward": fp.id, "reverse": rp.id, "product_bp": len(prod), "start_1based": start, "end_1based": end,
-                     "forward_footprint_bp": len(fp.footprint), "reverse_footprint_bp": len(rp.footprint)})
+    seen = set()
+    for f in fwd:
+        f_start = f["end"] - f["footprint"]
+        if f_start >= len(seq):
+            continue
+        for r in rev:
+            r_end = r["start"] + r["footprint"]
+            span = r_end - f_start
+            if span <= 0 or span > len(seq):
+                continue
+            product = len(primers["forward"]) - f["footprint"] + span + len(primers["reverse"]) - r["footprint"]
+            key = (f_start % len(seq), r_end % len(seq) or len(seq))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({"forward": "forward", "reverse": "reverse", "product_bp": product, "start_1based": f_start % len(seq) + 1,
+                         "end_1based": (r_end - 1) % len(seq) + 1, "forward_footprint_bp": f["footprint"], "reverse_footprint_bp": r["footprint"],
+                         "_seq": primers["forward"] + seq_slice(seq, f_start + f["footprint"], r_end - r["footprint"]) + _revcomp(primers["reverse"])})
     n_sites = sum(sites.values())
     if not rows:
         return _fail("No PCR product on %s (%d bp, %s). Binding sites with a 3' match of %s bp or more: %s. Check the primer orientation (both 5' to 3') and the template." % (
-            name, len(seq), top, min_anneal_bp, ", ".join("%s: %d" % (k, v) for k, v in sites.items() if v) or "none"))
-    frame = pd.DataFrame(rows).sort_values("product_bp")
+            name, len(seq), top, min_anneal_bp, ", ".join("%s: %d" % (key, v) for key, v in sites.items() if v) or "none"))
+    frame = pd.DataFrame(rows).sort_values("product_bp").reset_index(drop=True)
     fasta = os.path.join(os.getcwd(), "pcr_products.fasta")
     with open(fasta, "w") as fh:
-        for i, prod in enumerate(sorted(ann.products, key=len)):
-            fh.write(">product_%d_%dbp\n%s\n" % (i + 1, len(prod), str(prod.seq)))
+        for i, r in frame.iterrows():
+            fh.write(">product_%d_%dbp\n%s\n" % (i + 1, r["product_bp"], r["_seq"]))
+    frame = frame.drop(columns=["_seq"])
     main = frame.iloc[0]
     metrics = {"n_products": len(rows), "product_bp": int(main["product_bp"]), "start_1based": int(main["start_1based"]),
                "end_1based": int(main["end_1based"]), "n_binding_sites": n_sites, "template_bp": len(seq)}
@@ -326,6 +365,12 @@ def simulate_pcr(template, forward, reverse, min_anneal_bp=None, topology="file"
     outputs = _save(fig, "pcr_products") + [{"path": fasta, "kind": "file", "name": "pcr_products.fasta"}]
     return {"ok": True, "summary": summary, "metrics": metrics, "data": {"topology": top, "sites": sites},
             "table": _table(frame, "pcr_products"), "outputs": outputs}
+
+
+def seq_slice(seq, a, b):
+    if b <= len(seq):
+        return seq[a:b]
+    return seq[a:] + seq[: b - len(seq)]
 
 
 def _ladder_y(bp):

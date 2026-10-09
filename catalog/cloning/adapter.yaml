@@ -2,7 +2,7 @@ adapter:
   name: cloning
   field: molecular cloning
   file_types: [".dna", ".gb", ".gbk", ".fasta", ".fa", ".ab1", ".fastq"]
-  title: Sequences, primers and cloning (Biopython, primer3-py, pydna)
+  title: Sequences, primers and cloning (Biopython, primer3-py)
   version: 0.1.0
   spec: "1"
   description: >
@@ -12,19 +12,18 @@ adapter:
   status: draft
 
 program:
-  name: Biopython, primer3-py, pydna
-  version: "biopython 1.88, primer3-py 2.3.1, pydna 5.5.16"
+  name: Biopython, primer3-py
+  version: "biopython 1.88, primer3-py 2.3.1"
   tested_versions: []
   homepage: https://biopython.org
   docs:
     - https://biopython.org/docs/latest/Tutorial/index.html
     - https://libnano.github.io/primer3-py/
     - https://primer3.org/manual.html
-    - https://pydna-group.github.io/pydna/
   install: >
     The adapter uses a Python environment in ~/.guided-analysis/envs/cloning. Make it and install the packages:
     uv venv ~/.guided-analysis/envs/cloning && uv pip install --python ~/.guided-analysis/envs/cloning/bin/python
-    biopython primer3-py pydna matplotlib pandas numpy
+    biopython primer3-py matplotlib pandas numpy
   citation:
     - text: "Cock, P. J. A., Antao, T., Chang, J. T., Chapman, B. A., Cox, C. J., Dalke, A., Friedberg, I., Hamelryck, T., Kauff, F., Wilczynski, B., & de Hoon, M. J. L. (2009). Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics, 25(11), 1422-1423."
       doi: 10.1093/bioinformatics/btp163
@@ -32,8 +31,6 @@ program:
       doi: 10.1093/nar/gks596
     - text: "Koressaar, T., & Remm, M. (2007). Enhancements and modifications of primer design program Primer3. Bioinformatics, 23(10), 1289-1291."
       doi: 10.1093/bioinformatics/btm091
-    - text: "Pereira, F., Azevedo, F., Carvalho, A., Ribeiro, G. F., Budde, M. W., & Johansson, B. (2015). Pydna: a simulation and documentation tool for DNA assembly strategies using python. BMC Bioinformatics, 16, 142."
-      doi: 10.1186/s12859-015-0544-x
 
 connection:
   kind: python
@@ -47,7 +44,7 @@ locate:
     - ~/.guided-analysis/envs/cloning/bin/python
     - ~/.guided-analysis/envs/cloning/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import Bio, primer3, pydna; print('biopython', Bio.__version__, 'primer3', primer3.__version__)"]
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import Bio, primer3; print('biopython', Bio.__version__, 'primer3', primer3.__version__)"]
   version_pattern: 'biopython (\S+)'
   identity: 'biopython \d.*primer3 \d'
 
@@ -306,13 +303,13 @@ tools:
     title: Simulate a PCR (in-silico PCR)
     description: >
       Find where two primers bind a template and give each PCR product with its size and positions. Reports every product, so it
-      also shows off-target products. Use design_primers to make new primers.
+      also shows off-target products. The primers can hold IUPAC ambiguity codes. Use design_primers to make new primers.
     read_only: true
     function: "ga_cloning:simulate_pcr"
     params:
       template: { type: string, minLength: 1, description: "Absolute path of the template file, or the sequence itself." }
-      forward: { type: string, minLength: 6, description: "Forward primer, 5' to 3'." }
-      reverse: { type: string, minLength: 6, description: "Reverse primer, 5' to 3', as ordered (not the reverse complement)." }
+      forward: { type: string, minLength: 6, description: "Forward primer, 5' to 3'. A, C, G, T and the IUPAC ambiguity codes." }
+      reverse: { type: string, minLength: 6, description: "Reverse primer, 5' to 3', as ordered (not the reverse complement). IUPAC codes are allowed." }
       min_anneal_bp: { type: integer, minimum: 6, description: "Shortest 3' match that counts as a binding site, in bp." }
       topology: { type: string, enum: [file, linear, circular], description: "file uses the topology in the file. A FASTA template is linear unless you say circular." }
     required: [template, forward, reverse]
@@ -395,16 +392,19 @@ map:
     evidence: { source: docs, test: primer3-suite-design, note: "Matches the primer3 test suite file primer3web_v4_0_0_default_settings_output." }
 
   - tool: simulate_pcr
-    route: 'pydna.amplify.Anneal([Primer(fwd), Primer(rev)], Dseqrecord(template, circular=False), limit=13).products'
+    route: |
+      pattern = "".join("[%s]" % IUPAC[c] for c in primer[-13:])   # the 3' end of the primer
+      re.finditer(pattern, template)                                # and the same on the reverse complement
     steps:
+      - "Each hit grows 5' while the bases keep matching. That length is the footprint."
+      - "A forward hit and a reverse hit on the same strand pair make a product."
       - "In SnapGene: Actions > PCR, choose the two primers, then read the product size."
-      - "Or Tools > Simulate Agarose Gel with a lane 'amplified by PCR'."
     params:
-      - { arg: min_anneal_bp, label: limit, ui_default: 13 }
+      - { arg: min_anneal_bp, label: "minimum 3' match", ui_default: 13 }
       - { arg: topology, label: circular, ui_default: linear }
     fidelity: close
-    difference: "SnapGene menu names are from the SnapGene support pages, not tested in SnapGene. SnapGene finds binding sites with its own rule, so off-target products can differ."
-    evidence: { source: docs, test: pcr-cdc-n2 }
+    difference: "The rule is an exact 3' match of the set length, with no mismatch. A real PCR can amplify from a mismatched 3' end. SnapGene menu names are from the SnapGene support pages, not tested in SnapGene, and SnapGene uses its own rule, so off-target products can differ."
+    evidence: { source: code, test: pcr-cdc-n2 }
 
   - tool: digest_sequence
     route: 'Bio.Restriction.RestrictionBatch(["EcoRI"]).search(seq, linear=True); then the fragment sizes between the cuts'
@@ -604,3 +604,20 @@ tests:
     expect:
       - { path: ok, equals: false }
       - { path: error, contains: "Set topology to linear or circular" }
+
+  - id: pcr-16s-v3v4-degenerate
+    description: >
+      Klindworth et al. 2013 (Nucleic Acids Research 41(1):e1) print 464 bp for the primer pair S-D-Bact-0341-b-S-17
+      and S-D-Bact-0785-a-A-21 on the Escherichia coli rrnB operon (GenBank J01695.2). The forward primer starts at
+      E. coli position 341. The tool gives the positions 1608 to 2072 on J01695.2, which is E. coli position 341,
+      and 465 bases counted from the first to the last base. The paper's 464 is the difference of the two coordinates
+      (805 minus 341), not the inclusive count. checks/pcr_string_search.py shows the same positions.
+    data: [data/ecoli_rrnb_J01695.2.fasta]
+    calls:
+      - tool: simulate_pcr
+        args: { template: "{adapter_dir}/data/ecoli_rrnb_J01695.2.fasta", forward: CCTACGGGNGGCWGCAG, reverse: GACTACHVGGGTATCTAATCC, min_anneal_bp: 13, topology: linear }
+    expect:
+      - { path: metrics.n_products, equals: 1 }
+      - { path: metrics.start_1based, equals: 1608 }
+      - { path: metrics.end_1based, equals: 2072 }
+      - { path: metrics.product_bp, equals: 465 }

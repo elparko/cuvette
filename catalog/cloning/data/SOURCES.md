@@ -9,3 +9,4 @@
 | `primer3web_v4_0_0_default_settings.txt` | primer3, `settings_files/primer3web_v4_0_0_default_settings.txt` | GPL-2.0 (primer3) |
 | `primer3_test_template.fasta` | primer3 test suite, the SEQUENCE_TEMPLATE of `test/primer3web_v4_0_0_default_settings_input` | GPL-2.0 (primer3) |
 | `sanger_reference.fasta` | synthetic, made by `checks/make_sanger_reference.py` from `3730.ab1` and `lambda.gb` | synthetic |
+| `ecoli_rrnb_J01695.2.fasta` | NCBI GenBank J01695.2, Escherichia coli rRNA operon rrnB. Brosius J et al. PNAS 75:4801-4805 (1978), DOI 10.1073/pnas.75.10.4801 | NCBI sequence data, no use restrictions |
