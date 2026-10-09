@@ -17,6 +17,9 @@ program:
     or the python that SMILE_MSI_PYTHON names. Put the source in that folder (the public source URL is not confirmed;
     the README links releases at https://github.com/elparko/SMILE-MSI). Then add the engine and the MCP extra:
     cd ~/Code/SMILE-MSI && uv venv && uv pip install -e '.[mcp]'
+  citation:
+    - text: SMILE MSI (Version 2.0.0) [Computer software]. https://github.com/elparko/SMILE-MSI
+      url: https://github.com/elparko/SMILE-MSI
 connection:
   kind: mcp
   transport: stdio

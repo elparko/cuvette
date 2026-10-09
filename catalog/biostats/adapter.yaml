@@ -27,6 +27,44 @@ program:
     that ga_biostats.py imports:
     uv venv ~/.guided-analysis/envs/biostats && uv pip install --python ~/.guided-analysis/envs/biostats/bin/python
     statsmodels pingouin lifelines scipy pandas matplotlib
+  citation:
+    - text: "Seabold, S., & Perktold, J. (2010). Statsmodels: Econometric and Statistical Modeling with Python. In Proceedings of the 9th Python in Science Conference (pp. 92–96). https://doi.org/10.25080/Majora-92bf1922-011"
+      doi: 10.25080/Majora-92bf1922-011
+      bibtex: |
+        @inproceedings{seabold2010statsmodels,
+          author    = {Seabold, Skipper and Perktold, Josef},
+          title     = {Statsmodels: Econometric and Statistical Modeling with {Python}},
+          booktitle = {Proceedings of the 9th Python in Science Conference},
+          year      = {2010},
+          pages     = {92--96},
+          doi       = {10.25080/Majora-92bf1922-011}
+        }
+    - text: "Vallat, R. (2018). Pingouin: statistics in Python. Journal of Open Source Software, 3(31), 1026. https://doi.org/10.21105/joss.01026"
+      doi: 10.21105/joss.01026
+      bibtex: |
+        @article{vallat2018pingouin,
+          author  = {Vallat, Raphael},
+          title   = {Pingouin: statistics in {Python}},
+          journal = {Journal of Open Source Software},
+          year    = {2018},
+          volume  = {3},
+          number  = {31},
+          pages   = {1026},
+          doi     = {10.21105/joss.01026}
+        }
+    - text: "Davidson-Pilon, C. (2019). lifelines: survival analysis in Python. Journal of Open Source Software, 4(40), 1317. https://doi.org/10.21105/joss.01317"
+      doi: 10.21105/joss.01317
+      bibtex: |
+        @article{davidsonpilon2019lifelines,
+          author  = {Davidson-Pilon, Cameron},
+          title   = {lifelines: survival analysis in {Python}},
+          journal = {Journal of Open Source Software},
+          year    = {2019},
+          volume  = {4},
+          number  = {40},
+          pages   = {1317},
+          doi     = {10.21105/joss.01317}
+        }
 
 connection:
   kind: python
@@ -306,6 +344,56 @@ tools:
     required: [path, outcome, group]
     outputs:
       result: { kind: table, ext: csv, description: The test result. }
+    citations:
+      - text: Welch, B. L. (1947). The Generalization of "Student's" Problem when Several Different Population Variances are Involved. Biometrika, 34(1-2), 28–35. https://doi.org/10.1093/biomet/34.1-2.28
+        doi: 10.1093/biomet/34.1-2.28
+        when:
+          test: t
+          paired: false
+          equal_variance: false
+        bibtex: |
+          @article{welch1947generalization,
+            author  = {Welch, B. L.},
+            title   = {The Generalization of "{Student's}" Problem when Several Different Population Variances are Involved},
+            journal = {Biometrika},
+            year    = {1947},
+            volume  = {34},
+            number  = {1-2},
+            pages   = {28--35},
+            doi     = {10.1093/biomet/34.1-2.28}
+          }
+      - text: Wilcoxon, F. (1945). Individual Comparisons by Ranking Methods. Biometrics Bulletin, 1(6), 80–83. https://doi.org/10.2307/3001968
+        doi: 10.2307/3001968
+        when:
+          test: wilcoxon
+          paired: true
+        bibtex: |
+          @article{wilcoxon1945individual,
+            author  = {Wilcoxon, Frank},
+            title   = {Individual Comparisons by Ranking Methods},
+            journal = {Biometrics Bulletin},
+            year    = {1945},
+            volume  = {1},
+            number  = {6},
+            pages   = {80--83},
+            doi     = {10.2307/3001968}
+          }
+      - text: Mann, H. B., & Whitney, D. R. (1947). On a Test of Whether one of Two Random Variables is Stochastically Larger than the Other. The Annals of Mathematical Statistics, 18(1), 50–60. https://doi.org/10.1214/aoms/1177730491
+        doi: 10.1214/aoms/1177730491
+        when:
+          test: wilcoxon
+          paired: false
+        bibtex: |
+          @article{mann1947test,
+            author  = {Mann, H. B. and Whitney, D. R.},
+            title   = {On a Test of Whether one of Two Random Variables is Stochastically Larger than the Other},
+            journal = {The Annals of Mathematical Statistics},
+            year    = {1947},
+            volume  = {18},
+            number  = {1},
+            pages   = {50--60},
+            doi     = {10.1214/aoms/1177730491}
+          }
 
   - name: anova_oneway
     title: One-way ANOVA
@@ -324,6 +412,82 @@ tools:
     outputs:
       anova: { kind: table, ext: csv, description: The ANOVA table. }
       posthoc: { kind: table, ext: csv, description: The pairwise comparisons. }
+    citations:
+      - text: "Welch, B. L. (1951). On the Comparison of Several Mean Values: An Alternative Approach. Biometrika, 38(3-4), 330–336. https://doi.org/10.1093/biomet/38.3-4.330"
+        doi: 10.1093/biomet/38.3-4.330
+        when:
+          variance: unequal
+        bibtex: |
+          @article{welch1951comparison,
+            author  = {Welch, B. L.},
+            title   = {On the Comparison of Several Mean Values: An Alternative Approach},
+            journal = {Biometrika},
+            year    = {1951},
+            volume  = {38},
+            number  = {3-4},
+            pages   = {330--336},
+            doi     = {10.1093/biomet/38.3-4.330}
+          }
+      - text: Tukey, J. W. (1949). Comparing Individual Means in the Analysis of Variance. Biometrics, 5(2), 99–114. https://doi.org/10.2307/3001913
+        doi: 10.2307/3001913
+        when:
+          posthoc: tukey
+        bibtex: |
+          @article{tukey1949comparing,
+            author  = {Tukey, John W.},
+            title   = {Comparing Individual Means in the Analysis of Variance},
+            journal = {Biometrics},
+            year    = {1949},
+            volume  = {5},
+            number  = {2},
+            pages   = {99--114},
+            doi     = {10.2307/3001913}
+          }
+      - text: "Games, P. A., & Howell, J. F. (1976). Pairwise Multiple Comparison Procedures with Unequal N's and/or Variances: A Monte Carlo Study. Journal of Educational Statistics, 1(2), 113–125. https://doi.org/10.3102/10769986001002113"
+        doi: 10.3102/10769986001002113
+        when:
+          posthoc: games-howell
+        bibtex: |
+          @article{games1976pairwise,
+            author  = {Games, Paul A. and Howell, John F.},
+            title   = {Pairwise Multiple Comparison Procedures with Unequal N's and/or Variances: A Monte Carlo Study},
+            journal = {Journal of Educational Statistics},
+            year    = {1976},
+            volume  = {1},
+            number  = {2},
+            pages   = {113--125},
+            doi     = {10.3102/10769986001002113}
+          }
+      - text: Holm, S. (1979). A Simple Sequentially Rejective Multiple Test Procedure. Scandinavian Journal of Statistics, 6(2), 65–70. https://www.jstor.org/stable/4615733
+        url: https://www.jstor.org/stable/4615733
+        when:
+          posthoc: holm
+        bibtex: |
+          @article{holm1979simple,
+            author  = {Holm, Sture},
+            title   = {A Simple Sequentially Rejective Multiple Test Procedure},
+            journal = {Scandinavian Journal of Statistics},
+            year    = {1979},
+            volume  = {6},
+            number  = {2},
+            pages   = {65--70},
+            url     = {https://www.jstor.org/stable/4615733}
+          }
+      - text: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing. Journal of the Royal Statistical Society: Series B (Methodological), 57(1), 289–300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x"
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+        when:
+          posthoc: fdr_bh
+        bibtex: |
+          @article{benjamini1995controlling,
+            author  = {Benjamini, Yoav and Hochberg, Yosef},
+            title   = {Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing},
+            journal = {Journal of the Royal Statistical Society: Series B (Methodological)},
+            year    = {1995},
+            volume  = {57},
+            number  = {1},
+            pages   = {289--300},
+            doi     = {10.1111/j.2517-6161.1995.tb02031.x}
+          }
 
   - name: adjust_pvalues
     title: Correct p-values for many tests
@@ -335,6 +499,52 @@ tools:
       alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
     required: [pvalues]
     read_only: true
+    citations:
+      - text: Holm, S. (1979). A Simple Sequentially Rejective Multiple Test Procedure. Scandinavian Journal of Statistics, 6(2), 65–70. https://www.jstor.org/stable/4615733
+        url: https://www.jstor.org/stable/4615733
+        when:
+          method: holm
+        bibtex: |
+          @article{holm1979simple,
+            author  = {Holm, Sture},
+            title   = {A Simple Sequentially Rejective Multiple Test Procedure},
+            journal = {Scandinavian Journal of Statistics},
+            year    = {1979},
+            volume  = {6},
+            number  = {2},
+            pages   = {65--70},
+            url     = {https://www.jstor.org/stable/4615733}
+          }
+      - text: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing. Journal of the Royal Statistical Society: Series B (Methodological), 57(1), 289–300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x"
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+        when:
+          method: fdr_bh
+        bibtex: |
+          @article{benjamini1995controlling,
+            author  = {Benjamini, Yoav and Hochberg, Yosef},
+            title   = {Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing},
+            journal = {Journal of the Royal Statistical Society: Series B (Methodological)},
+            year    = {1995},
+            volume  = {57},
+            number  = {1},
+            pages   = {289--300},
+            doi     = {10.1111/j.2517-6161.1995.tb02031.x}
+          }
+      - text: Benjamini, Y., & Yekutieli, D. (2001). The control of the false discovery rate in multiple testing under dependency. The Annals of Statistics, 29(4), 1165–1188. https://doi.org/10.1214/aos/1013699998
+        doi: 10.1214/aos/1013699998
+        when:
+          method: fdr_by
+        bibtex: |
+          @article{benjamini2001control,
+            author  = {Benjamini, Yoav and Yekutieli, Daniel},
+            title   = {The control of the false discovery rate in multiple testing under dependency},
+            journal = {The Annals of Statistics},
+            year    = {2001},
+            volume  = {29},
+            number  = {4},
+            pages   = {1165--1188},
+            doi     = {10.1214/aos/1013699998}
+          }
 
   - name: fit_ols
     title: Fit a linear model
@@ -351,6 +561,22 @@ tools:
     required: [path, formula]
     outputs:
       coefficients: { kind: table, ext: csv, description: Coefficients with standard errors and confidence intervals. }
+    citations:
+      - text: MacKinnon, J. G., & White, H. (1985). Some heteroskedasticity-consistent covariance matrix estimators with improved finite sample properties. Journal of Econometrics, 29(3), 305–325. https://doi.org/10.1016/0304-4076(85)90158-7
+        doi: 10.1016/0304-4076(85)90158-7
+        when:
+          cov_type: HC3
+        bibtex: |
+          @article{mackinnon1985some,
+            author  = {MacKinnon, James G. and White, Halbert},
+            title   = {Some heteroskedasticity-consistent covariance matrix estimators with improved finite sample properties},
+            journal = {Journal of Econometrics},
+            year    = {1985},
+            volume  = {29},
+            number  = {3},
+            pages   = {305--325},
+            doi     = {10.1016/0304-4076(85)90158-7}
+          }
 
   - name: fit_mixed_model
     title: Fit a linear mixed model
@@ -387,6 +613,20 @@ tools:
     outputs:
       curves: { kind: image, ext: png, description: The Kaplan-Meier curves. }
       summary: { kind: table, ext: csv, description: "Events, medians and survival at the chosen times." }
+    citations:
+      - text: Kaplan, E. L., & Meier, P. (1958). Nonparametric Estimation from Incomplete Observations. Journal of the American Statistical Association, 53(282), 457–481. https://doi.org/10.1080/01621459.1958.10501452
+        doi: 10.1080/01621459.1958.10501452
+        bibtex: |
+          @article{kaplan1958nonparametric,
+            author  = {Kaplan, E. L. and Meier, Paul},
+            title   = {Nonparametric Estimation from Incomplete Observations},
+            journal = {Journal of the American Statistical Association},
+            year    = {1958},
+            volume  = {53},
+            number  = {282},
+            pages   = {457--481},
+            doi     = {10.1080/01621459.1958.10501452}
+          }
 
   - name: fit_cox
     title: Fit a Cox proportional hazards model
@@ -405,6 +645,65 @@ tools:
     required: [path, duration, event, covariates]
     outputs:
       coefficients: { kind: table, ext: csv, description: Coefficients and hazard ratios. }
+    citations:
+      - text: "Cox, D. R. (1972). Regression Models and Life-Tables. Journal of the Royal Statistical Society: Series B (Methodological), 34(2), 187–202. https://doi.org/10.1111/j.2517-6161.1972.tb00899.x"
+        doi: 10.1111/j.2517-6161.1972.tb00899.x
+        bibtex: |
+          @article{cox1972regression,
+            author  = {Cox, D. R.},
+            title   = {Regression Models and Life-Tables},
+            journal = {Journal of the Royal Statistical Society: Series B (Methodological)},
+            year    = {1972},
+            volume  = {34},
+            number  = {2},
+            pages   = {187--202},
+            doi     = {10.1111/j.2517-6161.1972.tb00899.x}
+          }
+      - text: Efron, B. (1977). The Efficiency of Cox's Likelihood Function for Censored Data. Journal of the American Statistical Association, 72(359), 557–565. https://doi.org/10.1080/01621459.1977.10480613
+        doi: 10.1080/01621459.1977.10480613
+        when:
+          ties: efron
+        bibtex: |
+          @article{efron1977efficiency,
+            author  = {Efron, Bradley},
+            title   = {The Efficiency of {Cox's} Likelihood Function for Censored Data},
+            journal = {Journal of the American Statistical Association},
+            year    = {1977},
+            volume  = {72},
+            number  = {359},
+            pages   = {557--565},
+            doi     = {10.1080/01621459.1977.10480613}
+          }
+      - text: Breslow, N. (1974). Covariance Analysis of Censored Survival Data. Biometrics, 30(1), 89–99. https://doi.org/10.2307/2529620
+        doi: 10.2307/2529620
+        when:
+          ties: breslow
+        bibtex: |
+          @article{breslow1974covariance,
+            author  = {Breslow, N.},
+            title   = {Covariance Analysis of Censored Survival Data},
+            journal = {Biometrics},
+            year    = {1974},
+            volume  = {30},
+            number  = {1},
+            pages   = {89--99},
+            doi     = {10.2307/2529620}
+          }
+      - text: Grambsch, P. M., & Therneau, T. M. (1994). Proportional hazards tests and diagnostics based on weighted residuals. Biometrika, 81(3), 515–526. https://doi.org/10.1093/biomet/81.3.515
+        doi: 10.1093/biomet/81.3.515
+        when:
+          ties: efron
+        bibtex: |
+          @article{grambsch1994proportional,
+            author  = {Grambsch, Patricia M. and Therneau, Terry M.},
+            title   = {Proportional hazards tests and diagnostics based on weighted residuals},
+            journal = {Biometrika},
+            year    = {1994},
+            volume  = {81},
+            number  = {3},
+            pages   = {515--526},
+            doi     = {10.1093/biomet/81.3.515}
+          }
 
 map:
   - tool: inspect_table

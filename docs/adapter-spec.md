@@ -116,7 +116,7 @@ A citation has these fields:
 | `url` | text | `""` | A web address. Use it when the reference has no DOI. |
 | `bibtex` | text | `""` | A BibTeX entry. If it is empty, the harness makes one from `text` and `doi`. |
 | `kind` | `program`, `method`, `model`, `dataset` | `program` in `program.citation`, `method` in a tool | What the reference describes. |
-| `when` | argument name to value | `{}` | Only in a tool citation. The citation applies only to a call whose arguments have these values, such as `{ adjust: BH }`. |
+| `when` | argument name to value | `{}` | Only in a tool citation. The citation applies only to a call whose arguments have these values, such as `{ adjust: BH }`. A list of values matches any one of them. The value `set` matches an argument that is present and is not 0, false, empty or `none`. If the call does not give the argument, the harness uses the linked decision, then the `default` of the parameter. |
 
 Use the citation that the program asks for. Look on the program website, in `citation("Package")`
 for an R package, and in `CITATION.cff` or the package metadata for a Python package. Do not

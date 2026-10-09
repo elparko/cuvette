@@ -27,6 +27,31 @@ program:
     packages that ga_mne.py imports, and scikit-learn for the fastica method of ICA:
     uv venv ~/.guided-analysis/envs/mne && uv pip install --python ~/.guided-analysis/envs/mne/bin/python
     mne matplotlib pandas scikit-learn
+  citation:
+    - text: Gramfort, A., Luessi, M., Larson, E., Engemann, D. A., Strohmeier, D., Brodbeck, C., Goj, R., Jas, M., Brooks, T., Parkkonen, L., & Hämäläinen, M. S. (2013). MEG and EEG data analysis with MNE-Python. Frontiers in Neuroscience, 7, 267. https://doi.org/10.3389/fnins.2013.00267
+      doi: 10.3389/fnins.2013.00267
+      bibtex: |
+        @article{gramfort2013meg,
+          author  = {Gramfort, Alexandre and Luessi, Martin and Larson, Eric and Engemann, Denis A. and Strohmeier, Daniel and Brodbeck, Christian and Goj, Roman and Jas, Mainak and Brooks, Teon and Parkkonen, Lauri and H{\"a}m{\"a}l{\"a}inen, Matti S.},
+          title   = {{MEG} and {EEG} data analysis with {MNE-Python}},
+          journal = {Frontiers in Neuroscience},
+          year    = {2013},
+          volume  = {7},
+          pages   = {267},
+          doi     = {10.3389/fnins.2013.00267}
+        }
+    - text: Gramfort, A., Luessi, M., Larson, E., Engemann, D. A., Strohmeier, D., Brodbeck, C., Parkkonen, L., & Hämäläinen, M. S. (2014). MNE software for processing MEG and EEG data. NeuroImage, 86, 446–460. https://doi.org/10.1016/j.neuroimage.2013.10.027
+      doi: 10.1016/j.neuroimage.2013.10.027
+      bibtex: |
+        @article{gramfort2014mne,
+          author  = {Gramfort, Alexandre and Luessi, Martin and Larson, Eric and Engemann, Denis A. and Strohmeier, Daniel and Brodbeck, Christian and Parkkonen, Lauri and H{\"a}m{\"a}l{\"a}inen, Matti S.},
+          title   = {{MNE} software for processing {MEG} and {EEG} data},
+          journal = {NeuroImage},
+          year    = {2014},
+          volume  = {86},
+          pages   = {446--460},
+          doi     = {10.1016/j.neuroimage.2013.10.027}
+        }
 
 connection:
   kind: python
@@ -465,6 +490,52 @@ tools:
     required: [raw]
     outputs:
       components: { kind: image, ext: png, description: Component maps. }
+    citations:
+      - text: Hyvärinen, A. (1999). Fast and robust fixed-point algorithms for independent component analysis. IEEE Transactions on Neural Networks, 10(3), 626–634. https://doi.org/10.1109/72.761722
+        doi: 10.1109/72.761722
+        when:
+          method: fastica
+        bibtex: |
+          @article{hyvarinen1999fast,
+            author  = {Hyv{\"a}rinen, Aapo},
+            title   = {Fast and robust fixed-point algorithms for independent component analysis},
+            journal = {IEEE Transactions on Neural Networks},
+            year    = {1999},
+            volume  = {10},
+            number  = {3},
+            pages   = {626--634},
+            doi     = {10.1109/72.761722}
+          }
+      - text: Bell, A. J., & Sejnowski, T. J. (1995). An Information-Maximization Approach to Blind Separation and Blind Deconvolution. Neural Computation, 7(6), 1129–1159. https://doi.org/10.1162/neco.1995.7.6.1129
+        doi: 10.1162/neco.1995.7.6.1129
+        when:
+          method: infomax
+        bibtex: |
+          @article{bell1995information,
+            author  = {Bell, Anthony J. and Sejnowski, Terrence J.},
+            title   = {An Information-Maximization Approach to Blind Separation and Blind Deconvolution},
+            journal = {Neural Computation},
+            year    = {1995},
+            volume  = {7},
+            number  = {6},
+            pages   = {1129--1159},
+            doi     = {10.1162/neco.1995.7.6.1129}
+          }
+      - text: Ablin, P., Cardoso, J.-F., & Gramfort, A. (2018). Faster Independent Component Analysis by Preconditioning With Hessian Approximations. IEEE Transactions on Signal Processing, 66(15), 4040–4049. https://doi.org/10.1109/TSP.2018.2844203
+        doi: 10.1109/TSP.2018.2844203
+        when:
+          method: picard
+        bibtex: |
+          @article{ablin2018faster,
+            author  = {Ablin, Pierre and Cardoso, Jean-Fran{\c{c}}ois and Gramfort, Alexandre},
+            title   = {Faster Independent Component Analysis by Preconditioning With {Hessian} Approximations},
+            journal = {IEEE Transactions on Signal Processing},
+            year    = {2018},
+            volume  = {66},
+            number  = {15},
+            pages   = {4040--4049},
+            doi     = {10.1109/TSP.2018.2844203}
+          }
 
   - name: apply_ica
     title: Remove ICA components

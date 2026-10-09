@@ -25,6 +25,20 @@ program:
     Install bedtools with Homebrew. The adapter reads the BEDTOOLS variable, then /opt/homebrew/bin,
     /usr/local/bin, /usr/bin, ~/.local/bin and the PATH.
     brew install bedtools
+  citation:
+    - text: "Quinlan, A. R., & Hall, I. M. (2010). BEDTools: a flexible suite of utilities for comparing genomic features. Bioinformatics, 26(6), 841–842. https://doi.org/10.1093/bioinformatics/btq033"
+      doi: 10.1093/bioinformatics/btq033
+      bibtex: |
+        @article{quinlan2010bedtools,
+          author  = {Quinlan, Aaron R. and Hall, Ira M.},
+          title   = {{BEDTools}: a flexible suite of utilities for comparing genomic features},
+          journal = {Bioinformatics},
+          year    = {2010},
+          volume  = {26},
+          number  = {6},
+          pages   = {841--842},
+          doi     = {10.1093/bioinformatics/btq033}
+        }
 
 connection:
   kind: cli

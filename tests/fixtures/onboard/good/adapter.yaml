@@ -12,6 +12,9 @@ program:
   version: "1.0"
   tested_versions: []
   install: "Install meanstat from its homepage. The adapter runs meanstat from PATH."
+  citation:
+    - text: "Meanstat authors. meanstat [Computer software]. https://example.org/meanstat"
+      url: https://example.org/meanstat
 
 connection:
   kind: cli

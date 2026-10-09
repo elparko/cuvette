@@ -6,6 +6,9 @@ program:
   name: wc
   version: ""
   homepage: https://www.gnu.org/software/coreutils/manual/html_node/wc-invocation.html
+  citation:
+    - text: "GNU coreutils: wc [Computer software]. Free Software Foundation. https://www.gnu.org/software/coreutils/"
+      url: https://www.gnu.org/software/coreutils/
 connection:
   kind: cli
   env:

@@ -23,6 +23,20 @@ program:
     Install IQ-TREE and MAFFT with Homebrew. The adapter reads the IQTREE variable, then iqtree3 or iqtree2 in
     /opt/homebrew/bin, /usr/local/bin, ~/.local/bin and the PATH. It finds MAFFT through the MAFFT variable or the PATH.
     brew install iqtree3 mafft
+  citation:
+    - text: "Wong, T. K. F., Ly-Trong, N., Ren, H., Demotte, P., Baños, H., Roger, A. J., Susko, E., Bielow, C., De Maio, N., Goldman, N., Hahn, M. W., dos Reis, M., Vinh, L. S., Huttley, G., Lanfear, R., & Minh, B. Q. (2026). IQ-TREE 3: phylogenomic inference software using complex evolutionary models. Molecular Biology and Evolution, 43(5), msag117. https://doi.org/10.1093/molbev/msag117"
+      doi: 10.1093/molbev/msag117
+      bibtex: |
+        @article{wong2026iqtree,
+          author  = {Wong, Thomas K. F. and Ly-Trong, Nhan and Ren, Huaiyan and Demotte, Piyumal and Ba{\~n}os, Hector and Roger, Andrew J. and Susko, Edward and Bielow, Chris and De Maio, Nicola and Goldman, Nick and Hahn, Matthew W. and dos Reis, Mario and Vinh, Le Sy and Huttley, Gavin and Lanfear, Robert and Minh, Bui Quang},
+          title   = {{IQ-TREE} 3: phylogenomic inference software using complex evolutionary models},
+          journal = {Molecular Biology and Evolution},
+          year    = {2026},
+          volume  = {43},
+          number  = {5},
+          pages   = {msag117},
+          doi     = {10.1093/molbev/msag117}
+        }
 
 connection:
   kind: cli
@@ -180,6 +194,21 @@ tools:
       aln: { kind: file, ext: .fasta, description: The aligned sequences in FASTA format. }
     command: ["/bin/sh", "{adapter_dir}/scripts/align.sh", "{algorithm}", "{path}", "{output.aln}"]
     parse: keyvalue
+    citations:
+      - text: "Katoh, K., & Standley, D. M. (2013). MAFFT Multiple Sequence Alignment Software Version 7: Improvements in Performance and Usability. Molecular Biology and Evolution, 30(4), 772–780. https://doi.org/10.1093/molbev/mst010"
+        doi: 10.1093/molbev/mst010
+        kind: program
+        bibtex: |
+          @article{katoh2013mafft,
+            author  = {Katoh, Kazutaka and Standley, Daron M.},
+            title   = {{MAFFT} Multiple Sequence Alignment Software Version 7: Improvements in Performance and Usability},
+            journal = {Molecular Biology and Evolution},
+            year    = {2013},
+            volume  = {30},
+            number  = {4},
+            pages   = {772--780},
+            doi     = {10.1093/molbev/mst010}
+          }
 
   - name: alignment_stats
     title: Describe an alignment
@@ -221,6 +250,20 @@ tools:
     required: [path]
     command: ["/bin/sh", "{adapter_dir}/scripts/iqtree.sh", "{program_path}", "select", "--alignment", "{path}", "--seed", "{seed}"]
     parse: keyvalue
+    citations:
+      - text: "Kalyaanamoorthy, S., Minh, B. Q., Wong, T. K. F., von Haeseler, A., & Jermiin, L. S. (2017). ModelFinder: fast model selection for accurate phylogenetic estimates. Nature Methods, 14(6), 587–589. https://doi.org/10.1038/nmeth.4285"
+        doi: 10.1038/nmeth.4285
+        bibtex: |
+          @article{kalyaanamoorthy2017modelfinder,
+            author  = {Kalyaanamoorthy, Subha and Minh, Bui Quang and Wong, Thomas K. F. and von Haeseler, Arndt and Jermiin, Lars S.},
+            title   = {{ModelFinder}: fast model selection for accurate phylogenetic estimates},
+            journal = {Nature Methods},
+            year    = {2017},
+            volume  = {14},
+            number  = {6},
+            pages   = {587--589},
+            doi     = {10.1038/nmeth.4285}
+          }
 
   - name: infer_tree
     title: Build a maximum-likelihood tree with IQ-TREE
@@ -239,6 +282,56 @@ tools:
     required: [path]
     command: ["/bin/sh", "{adapter_dir}/scripts/iqtree.sh", "{program_path}", "infer", "--alignment", "{path}", "--model", "{model}", "--bootstrap-type", "{bootstrap_type}", "--replicates", "{replicates}", "--outgroup", "{outgroup}", "--seed", "{seed}"]
     parse: keyvalue
+    citations:
+      - text: "Kalyaanamoorthy, S., Minh, B. Q., Wong, T. K. F., von Haeseler, A., & Jermiin, L. S. (2017). ModelFinder: fast model selection for accurate phylogenetic estimates. Nature Methods, 14(6), 587–589. https://doi.org/10.1038/nmeth.4285"
+        doi: 10.1038/nmeth.4285
+        when:
+          model:
+            - MFP
+            - MF
+            - TESTNEW
+            - TEST
+        bibtex: |
+          @article{kalyaanamoorthy2017modelfinder,
+            author  = {Kalyaanamoorthy, Subha and Minh, Bui Quang and Wong, Thomas K. F. and von Haeseler, Arndt and Jermiin, Lars S.},
+            title   = {{ModelFinder}: fast model selection for accurate phylogenetic estimates},
+            journal = {Nature Methods},
+            year    = {2017},
+            volume  = {14},
+            number  = {6},
+            pages   = {587--589},
+            doi     = {10.1038/nmeth.4285}
+          }
+      - text: "Hoang, D. T., Chernomor, O., von Haeseler, A., Minh, B. Q., & Vinh, L. S. (2018). UFBoot2: Improving the Ultrafast Bootstrap Approximation. Molecular Biology and Evolution, 35(2), 518–522. https://doi.org/10.1093/molbev/msx281"
+        doi: 10.1093/molbev/msx281
+        when:
+          bootstrap_type: ufboot
+        bibtex: |
+          @article{hoang2018ufboot2,
+            author  = {Hoang, Diep Thi and Chernomor, Olga and von Haeseler, Arndt and Minh, Bui Quang and Vinh, Le Sy},
+            title   = {{UFBoot2}: Improving the Ultrafast Bootstrap Approximation},
+            journal = {Molecular Biology and Evolution},
+            year    = {2018},
+            volume  = {35},
+            number  = {2},
+            pages   = {518--522},
+            doi     = {10.1093/molbev/msx281}
+          }
+      - text: "Felsenstein, J. (1985). Confidence limits on phylogenies: an approach using the bootstrap. Evolution, 39(4), 783–791. https://doi.org/10.1111/j.1558-5646.1985.tb00420.x"
+        doi: 10.1111/j.1558-5646.1985.tb00420.x
+        when:
+          bootstrap_type: standard
+        bibtex: |
+          @article{felsenstein1985confidence,
+            author  = {Felsenstein, Joseph},
+            title   = {Confidence limits on phylogenies: an approach using the bootstrap},
+            journal = {Evolution},
+            year    = {1985},
+            volume  = {39},
+            number  = {4},
+            pages   = {783--791},
+            doi     = {10.1111/j.1558-5646.1985.tb00420.x}
+          }
 
 map:
   - tool: align_sequences

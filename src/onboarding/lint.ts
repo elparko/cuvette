@@ -45,6 +45,8 @@ export const RULES: Record<string, { severity: Severity; rule: string }> = {
   "file-types": { severity: "error", rule: "adapter.file_types lists the input file types, or [] if the adapter reads no local files." },
   "locate-identity": { severity: "error", rule: "A locate block that searches for a program has a version_command and an identity pattern that its output must match, so that a different program at the same path is not taken." },
   "install-hint": { severity: "error", rule: "program.install says how to install the program, if the adapter needs one." },
+  "program-citation": { severity: "error", rule: "program.citation has at least one reference with a doi or a url, so that each output can cite the program." },
+  "method-citation": { severity: "warning", rule: "A tool whose description names a published method, such as Benjamini-Hochberg or Otsu, cites the method in its citations." },
   "tool-description": { severity: "error", rule: "Each tool has a description." },
   "tool-description-length": { severity: "warning", rule: `A tool description has ${DESCRIPTION_LIMIT} characters or fewer.` },
   "tool-description-plain": { severity: "warning", rule: "The first sentence of a tool description has no code: no backticks, calls, dotted names or snake_case words." },
@@ -117,6 +119,38 @@ function needsProgram(a: LoadedAdapter): boolean {
   if (m.connection.kind === "http") return false;
   return true;
 }
+
+export const PUBLISHED_METHODS: [RegExp, string][] = [
+  [/\bBenjamini\b|\bHochberg\b|\bfdr_b[hy]\b/i, "Benjamini-Hochberg"],
+  [/\bHolm\b/, "Holm"],
+  [/\bKaplan[- ]Meier\b|\bsurvival curve\b/i, "Kaplan-Meier"],
+  [/\bCox (model|regression|proportional)/i, "Cox regression"],
+  [/\bOtsu\b/i, "Otsu"],
+  [/\brolling[- ]ball\b/i, "rolling ball"],
+  [/\bLeiden\b/, "Leiden"],
+  [/\bUMAP (embedding|projection)\b/i, "UMAP"],
+  [/\bt-SNE\b/i, "t-SNE"],
+  [/\bLipinski\b|\brule of five\b/i, "Lipinski rule of five"],
+  [/\bESOL\b|\blog solubility\b/i, "ESOL"],
+  [/\bModelFinder\b/, "ModelFinder"],
+  [/\bUFBoot|\bultrafast bootstrap\b/i, "UFBoot"],
+  [/\bPERMANOVA\b|\badonis2?\b/i, "PERMANOVA"],
+  [/\bbetadisper\b/, "betadisper"],
+  [/\bNMDS\b/, "NMDS"],
+  [/\blogicle\b|\bhyperlog\b/i, "logicle"],
+  [/\bSatterthwaite\b|\bKenward\b/i, "Satterthwaite"],
+  [/\bindependent component analysis\b/i, "independent component analysis"],
+  [/\btarget-decoy\b/i, "target-decoy"],
+  [/\bWelch\b/, "Welch"],
+  [/\bTukey\b|\bGames-Howell\b/i, "Tukey"],
+  [/\bMann-Whitney\b|\bWilcoxon\b/i, "Wilcoxon"],
+  [/\bMAFFT\b/, "MAFFT"],
+  [/\bshrunken centroids\b/i, "spatial shrunken centroids"],
+  [/\bShannon\b|\bSimpson\b/, "Shannon or Simpson diversity"],
+  [/\bCostes\b|\bManders\b/, "Costes or Manders colocalization"],
+  [/\bQCP\b|\bquaternion\b/i, "QCP superposition"],
+  [/\bSExtractor\b/i, "SExtractor"],
+];
 
 const CODE_LIKE: [RegExp, string][] = [
   [/`/, "backticks"],
@@ -452,6 +486,8 @@ export function lint(input: LintInput): Finding[] {
       if (/^[\\d\s.()+*?\[\]S-]*$/.test(loc.identity)) add(out, "locate-identity", "locate.identity", "the identity has no program name. Put a word from the program's own version output in it.");
     }
   }
+  if (needsProgram(a) && !m.program.citation.some((c) => c.doi.trim() || c.url.trim()))
+    add(out, "program-citation", "program.citation", m.program.citation.length ? "no citation has a doi or a url. Add the DOI of the paper that the program asks users to cite, or the web address of the program if it has no paper." : `there is no citation. Add the reference that the authors of ${m.program.name} ask for, with text and doi. Look on the program website, in citation("Package") for an R package, or in CITATION.cff.`);
   if (needsProgram(a) && !m.program.install.trim()) add(out, "install-hint", "program.install", "the adapter needs a program, but program.install is empty. Write the install command in one or two sentences, with the environment the adapter looks in.");
 
   const usedInTests = new Set(m.tests.flatMap((t) => t.calls.map((c) => c.tool)));
@@ -488,6 +524,9 @@ export function lint(input: LintInput): Finding[] {
         add(out, "advice-limits", `${where}, ${what}`, `"${absolute[0]}" reads as a rule for all cases. A small model applies it everywhere. Say when it is wrong, such as "only for X; keep Y for Z".`);
     }
     const def = m.tools.find((d) => d.name === t.name);
+    const method = PUBLISHED_METHODS.find(([re]) => re.test(t.description));
+    if (method && !def?.citations.length && !m.citations.some((c) => c.tool === t.name))
+      add(out, "method-citation", where, `the description names ${method[1]}, a published method, but the tool cites nothing. Add citations with the text and doi of the method paper${t.source === "manifest" ? "" : " to the top-level citations list, with tool set to this tool name"}.`);
     if (t.source === "manifest" && def && !def.approval && /^(run_(script|code|python|r|macro|user_tool)|exec\w*|eval\w*|(create|edit|delete)_tool)$/.test(t.name))
       add(out, "approval-code", where, "the tool runs code from the model but approval is false. Set approval: true.");
     const batchWhy = looksBatch(t);

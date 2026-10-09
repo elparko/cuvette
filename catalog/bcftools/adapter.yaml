@@ -23,6 +23,20 @@ program:
     Install bcftools with Homebrew. The adapter reads the BCFTOOLS variable, then /opt/homebrew/bin,
     /usr/local/bin, /usr/bin, ~/.local/bin and the PATH.
     brew install bcftools
+  citation:
+    - text: Danecek, P., Bonfield, J. K., Liddle, J., Marshall, J., Ohan, V., Pollard, M. O., Whitwham, A., Keane, T., McCarthy, S. A., Davies, R. M., & Li, H. (2021). Twelve years of SAMtools and BCFtools. GigaScience, 10(2), giab008. https://doi.org/10.1093/gigascience/giab008
+      doi: 10.1093/gigascience/giab008
+      bibtex: |
+        @article{danecek2021twelve,
+          author  = {Danecek, Petr and Bonfield, James K. and Liddle, Jennifer and Marshall, John and Ohan, Valeriu and Pollard, Martin O. and Whitwham, Andrew and Keane, Thomas and McCarthy, Shane A. and Davies, Robert M. and Li, Heng},
+          title   = {Twelve years of {SAMtools} and {BCFtools}},
+          journal = {GigaScience},
+          year    = {2021},
+          volume  = {10},
+          number  = {2},
+          pages   = {giab008},
+          doi     = {10.1093/gigascience/giab008}
+        }
 
 connection:
   kind: cli

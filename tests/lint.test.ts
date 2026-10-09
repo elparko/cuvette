@@ -18,6 +18,9 @@ const BASE = `adapter:
 program:
   name: meanstat
   install: "Install meanstat with uv tool install meanstat."
+  citation:
+    - text: "Doe, J. (2020). meanstat: trimmed means. Journal of Examples, 1, 1."
+      doi: 10.1234/meanstat
 connection:
   kind: cli
 locate:
@@ -90,6 +93,31 @@ const tool = (y: string, from: string, to: string) => y.replace(from, to);
 describe("lint: the base adapter passes", () => {
   test("no finding at all", async () => {
     expect(await findings(make())).toEqual([]);
+  });
+});
+
+describe("lint: citations", () => {
+  test("program-citation: no citation, or one without a doi or url, is an error; a url is enough", async () => {
+    const none = await findings(make((y) => y.replace(/  citation:\n(    .*\n)+/, "")), "program-citation");
+    expect(none).toHaveLength(1);
+    expect(none[0].severity).toBe("error");
+    expect(none[0].message).toMatch(/citation\("Package"\)/);
+    expect(await findings(make((y) => y.replace("      doi: 10.1234/meanstat\n", "")), "program-citation")).toHaveLength(1);
+    expect(await findings(make((y) => y.replace("      doi: 10.1234/meanstat\n", "      url: https://example.org/meanstat\n")), "program-citation")).toHaveLength(0);
+  });
+  test("program-citation: a self-contained adapter needs none", async () => {
+    const self = make((y) => y.replace(/  citation:\n(    .*\n)+/, "").replace("  kind: cli", "  kind: files").replace(/locate:\n(  .*\n)+/, ""));
+    expect(await findings(self, "program-citation")).toHaveLength(0);
+  });
+  test("method-citation: a tool that names a published method and cites nothing is a warning", async () => {
+    const named = (y: string) => y.replace("description: Compute the mean of one column of a CSV file.", "description: Adjust the p-values of one column with Benjamini-Hochberg.");
+    const f = await findings(make(named), "method-citation");
+    expect(f).toHaveLength(1);
+    expect(f[0].severity).toBe("warning");
+    expect(f[0].message).toMatch(/Benjamini-Hochberg/);
+    const cited = (y: string) => named(y).replace("    parse: keyvalue\n", "    parse: keyvalue\n    citations:\n      - { text: \"Benjamini, Y., & Hochberg, Y. (1995).\", doi: 10.1111/j.2517-6161.1995.tb02031.x }\n");
+    expect(await findings(make(cited), "method-citation")).toHaveLength(0);
+    expect(await findings(make(), "method-citation")).toHaveLength(0);
   });
 });
 

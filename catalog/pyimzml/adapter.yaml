@@ -15,6 +15,23 @@ program:
   install: >
     The adapter uses the pyimzml Python environment. Make the environment and add pyimzML to it:
     uv venv ~/.guided-analysis/envs/pyimzml && uv pip install --python ~/.guided-analysis/envs/pyimzml/bin/python pyimzml
+  citation:
+    - text: pyimzML [Computer software]. Alexandrov Team, EMBL. https://github.com/alexandrovteam/pyimzML
+      url: https://github.com/alexandrovteam/pyimzML
+    - text: Schramm, T., Hester, Z., Klinkert, I., Both, J.-P., Heeren, R. M. A., Brunelle, A., Laprévote, O., Desbenoit, N., Robbe, M.-F., Stoeckli, M., Spengler, B., & Römpp, A. (2012). imzML – A common data format for the flexible exchange and processing of mass spectrometry imaging data. Journal of Proteomics, 75(16), 5106–5110. https://doi.org/10.1016/j.jprot.2012.07.026
+      doi: 10.1016/j.jprot.2012.07.026
+      kind: method
+      bibtex: |
+        @article{schramm2012imzml,
+          author  = {Schramm, Thorsten and Hester, Zo{\"e} and Klinkert, Ivo and Both, Jean-Pierre and Heeren, Ron M. A. and Brunelle, Alain and Lapr{\'e}vote, Olivier and Desbenoit, Nicolas and Robbe, Marie-France and Stoeckli, Markus and Spengler, Bernhard and R{\"o}mpp, Andreas},
+          title   = {{imzML} -- A common data format for the flexible exchange and processing of mass spectrometry imaging data},
+          journal = {Journal of Proteomics},
+          year    = {2012},
+          volume  = {75},
+          number  = {16},
+          pages   = {5106--5110},
+          doi     = {10.1016/j.jprot.2012.07.026}
+        }
 connection:
   kind: python
   interpreter: ["{program_path}"]

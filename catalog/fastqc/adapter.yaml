@@ -23,6 +23,18 @@ program:
     Install FastQC with Homebrew. Homebrew also installs the Java runtime that FastQC needs. The adapter
     reads the FASTQC variable, then /opt/homebrew/bin, /usr/local/bin, ~/.local/bin and the PATH.
     brew install fastqc
+  citation:
+    - text: "Andrews, S. (2010). FastQC: A Quality Control Tool for High Throughput Sequence Data [Computer software]. Babraham Bioinformatics. https://www.bioinformatics.babraham.ac.uk/projects/fastqc/"
+      url: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/
+      bibtex: |
+        @misc{andrews2010fastqc,
+          author       = {Andrews, Simon},
+          title        = {{FastQC}: A Quality Control Tool for High Throughput Sequence Data},
+          year         = {2010},
+          howpublished = {Babraham Bioinformatics},
+          url          = {https://www.bioinformatics.babraham.ac.uk/projects/fastqc/},
+          note         = {Version 0.13.0. No DOI.}
+        }
 
 connection:
   kind: cli

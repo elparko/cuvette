@@ -17,6 +17,20 @@ program:
   install: >
     The adapter uses the Python environment at ~/.guided-analysis/envs/rdkit, or the python that GA_RDKIT_PYTHON names. Make it and add RDKit and numpy:
     uv venv ~/.guided-analysis/envs/rdkit && uv pip install --python ~/.guided-analysis/envs/rdkit/bin/python rdkit numpy
+  citation:
+    - text: "Landrum, G., et al. (2026). RDKit: Open-source cheminformatics (Version 2026.03.6) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.591637"
+      doi: 10.5281/zenodo.591637
+      bibtex: |
+        @software{landrum2026rdkit,
+          author    = {Landrum, Greg and others},
+          title     = {{RDKit}: Open-source cheminformatics},
+          version   = {2026.03.6},
+          year      = {2026},
+          publisher = {Zenodo},
+          doi       = {10.5281/zenodo.591637},
+          url       = {https://www.rdkit.org},
+          note      = {Zenodo concept DOI. The project has no official paper.}
+        }
 connection:
   kind: python
   interpreter: ["{program_path}"]
@@ -155,6 +169,35 @@ tools:
       logp_method: { type: string, enum: [crippen] }
       hbd_hba: { type: string, enum: [lipinski, rdmoldescriptors] }
     required: [molecules]
+    citations:
+      - text: Wildman, S. A., & Crippen, G. M. (1999). Prediction of Physicochemical Parameters by Atomic Contributions. Journal of Chemical Information and Computer Sciences, 39(5), 868–873. https://doi.org/10.1021/ci990307l
+        doi: 10.1021/ci990307l
+        when:
+          logp_method: crippen
+        bibtex: |
+          @article{wildman1999prediction,
+            author  = {Wildman, Scott A. and Crippen, Gordon M.},
+            title   = {Prediction of Physicochemical Parameters by Atomic Contributions},
+            journal = {Journal of Chemical Information and Computer Sciences},
+            year    = {1999},
+            volume  = {39},
+            number  = {5},
+            pages   = {868--873},
+            doi     = {10.1021/ci990307l}
+          }
+      - text: Ertl, P., Rohde, B., & Selzer, P. (2000). Fast Calculation of Molecular Polar Surface Area as a Sum of Fragment-Based Contributions and Its Application to the Prediction of Drug Transport Properties. Journal of Medicinal Chemistry, 43(20), 3714–3717. https://doi.org/10.1021/jm000942e
+        doi: 10.1021/jm000942e
+        bibtex: |
+          @article{ertl2000fast,
+            author  = {Ertl, Peter and Rohde, Bernhard and Selzer, Paul},
+            title   = {Fast Calculation of Molecular Polar Surface Area as a Sum of Fragment-Based Contributions and Its Application to the Prediction of Drug Transport Properties},
+            journal = {Journal of Medicinal Chemistry},
+            year    = {2000},
+            volume  = {43},
+            number  = {20},
+            pages   = {3714--3717},
+            doi     = {10.1021/jm000942e}
+          }
   - name: rule_of_five
     title: Count rule of five violations
     description: Count the molecules that break the Lipinski rule of five. Counts molecules with zero, one and two or more violations.
@@ -165,6 +208,20 @@ tools:
       cutoffs: { type: string, enum: [lipinski_1997] }
       allowed_violations: { type: integer, minimum: 0, maximum: 4, description: "Count of rule of five violations that a molecule can have and still pass. The decision allowed_violations sets it." }
     required: [descriptors]
+    citations:
+      - text: Lipinski, C. A., Lombardo, F., Dominy, B. W., & Feeney, P. J. (1997). Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings. Advanced Drug Delivery Reviews, 23(1-3), 3–25. https://doi.org/10.1016/S0169-409X(96)00423-1
+        doi: 10.1016/S0169-409X(96)00423-1
+        bibtex: |
+          @article{lipinski1997experimental,
+            author  = {Lipinski, Christopher A. and Lombardo, Franco and Dominy, Beryl W. and Feeney, Paul J.},
+            title   = {Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings},
+            journal = {Advanced Drug Delivery Reviews},
+            year    = {1997},
+            volume  = {23},
+            number  = {1-3},
+            pages   = {3--25},
+            doi     = {10.1016/S0169-409X(96)00423-1}
+          }
   - name: fit_solubility_model
     title: Fit or score the solubility equation
     description: "Predict log solubility from logP, molecular weight, rotatable bonds and aromatic proportion. Reports coefficients, R squared, root mean square error and the largest outliers. Needs target_column in load_molecules."
@@ -177,6 +234,20 @@ tools:
       seed: { type: integer, minimum: 0, description: "Random seed for the train and test split. Only the refit equation uses it. The decision split_seed sets it." }
       n_outliers: { type: integer, minimum: 1, maximum: 50, default: 10, description: Count of molecules with the largest residuals that the result lists. }
     required: [descriptors]
+    citations:
+      - text: "Delaney, J. S. (2004). ESOL: Estimating Aqueous Solubility Directly from Molecular Structure. Journal of Chemical Information and Computer Sciences, 44(3), 1000–1005. https://doi.org/10.1021/ci034243x"
+        doi: 10.1021/ci034243x
+        bibtex: |
+          @article{delaney2004esol,
+            author  = {Delaney, John S.},
+            title   = {{ESOL}: Estimating Aqueous Solubility Directly from Molecular Structure},
+            journal = {Journal of Chemical Information and Computer Sciences},
+            year    = {2004},
+            volume  = {44},
+            number  = {3},
+            pages   = {1000--1005},
+            doi     = {10.1021/ci034243x}
+          }
 map:
   - tool: load_molecules
     route: "In Python: ga_rdkit.load_molecules(path, smiles_column, id_column, target_column, salts, invalid). Each row calls Chem.MolFromSmiles(smiles.strip())."

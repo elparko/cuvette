@@ -84,6 +84,8 @@ Program and install:
 
 - Set `field` and `file_types`. The model picks an adapter by them. [field, file-types]
 - Write `program.install` with the install command and the place where the adapter looks. [install-hint]
+- Write `program.citation`: the reference that the authors ask for, with `text` and `doi` (or `url` if the program has no paper). Take it from the program website, from `citation("Package")` for an R package, or from `CITATION.cff`. Check that the DOI resolves. Do not write a reference from memory. [program-citation]
+- If a tool uses a published method, such as Benjamini-Hochberg or Otsu, list the method paper in the tool's `citations`. Use `when` if the method applies only to some argument values. [method-citation]
 - Check the program's identity in `locate`: a `version_command` and an `identity` pattern that its output must match. On macOS, `FileInfo` also found leptonica's `fileinfo`. [locate-identity]
 - Run scripts in the environment that has the libraries. The run_script environment had no pandas, lifelines or openpyxl.
 

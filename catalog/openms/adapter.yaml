@@ -27,6 +27,33 @@ program:
     /Volumes/T7/guided-analysis/tools/openms/env or ~/.guided-analysis/openms/env. The adapter finds FileInfo in env/bin
     and runs the other TOPP tools from the same folder. Set OPENMS_FILEINFO to the FileInfo path for another location.
     micromamba create -y -p ~/.guided-analysis/openms/env -c conda-forge -c bioconda openms
+  citation:
+    - text: Pfeuffer, J., Bielow, C., Wein, S., Jeong, K., Netz, E., Walter, A., Alka, O., Nilse, L., Colaianni, P. D., McCloskey, D., et al. (2024). OpenMS 3 enables reproducible analysis of large-scale mass spectrometry data. Nature Methods, 21(3), 365–367. https://doi.org/10.1038/s41592-024-02197-7
+      doi: 10.1038/s41592-024-02197-7
+      bibtex: |
+        @article{pfeuffer2024openms,
+          author  = {Pfeuffer, Julianus and Bielow, Chris and Wein, Samuel and Jeong, Kyowon and Netz, Eugen and Walter, Axel and Alka, Oliver and Nilse, Lars and Colaianni, Pasquale Domenico and McCloskey, Douglas and others},
+          title   = {{OpenMS} 3 enables reproducible analysis of large-scale mass spectrometry data},
+          journal = {Nature Methods},
+          year    = {2024},
+          volume  = {21},
+          number  = {3},
+          pages   = {365--367},
+          doi     = {10.1038/s41592-024-02197-7}
+        }
+    - text: "Röst, H. L., Sachsenberg, T., Aiche, S., Bielow, C., Weisser, H., Aicheler, F., Andreotti, S., Ehrlich, H.-C., Gutenbrunner, P., Kenar, E., et al. (2016). OpenMS: a flexible open-source software platform for mass spectrometry data analysis. Nature Methods, 13(9), 741–748. https://doi.org/10.1038/nmeth.3959"
+      doi: 10.1038/nmeth.3959
+      bibtex: |
+        @article{rost2016openms,
+          author  = {R{\"o}st, Hannes L. and Sachsenberg, Timo and Aiche, Stephan and Bielow, Chris and Weisser, Hendrik and Aicheler, Fabian and Andreotti, Sandro and Ehrlich, Hans-Christian and Gutenbrunner, Petra and Kenar, Erhan and others},
+          title   = {{OpenMS}: a flexible open-source software platform for mass spectrometry data analysis},
+          journal = {Nature Methods},
+          year    = {2016},
+          volume  = {13},
+          number  = {9},
+          pages   = {741--748},
+          doi     = {10.1038/nmeth.3959}
+        }
 
 connection:
   kind: cli
@@ -314,6 +341,20 @@ tools:
       idxml: { kind: file, ext: .idXML, description: The PSMs that pass. }
     command: ["/bin/sh", "{adapter_dir}/scripts/fdr.sh", "{program_path}", "{path}", "{output.idxml}", "{fdr_threshold}"]
     parse: keyvalue
+    citations:
+      - text: Elias, J. E., & Gygi, S. P. (2007). Target-decoy search strategy for increased confidence in large-scale protein identifications by mass spectrometry. Nature Methods, 4(3), 207–214. https://doi.org/10.1038/nmeth1019
+        doi: 10.1038/nmeth1019
+        bibtex: |
+          @article{elias2007target,
+            author  = {Elias, Joshua E. and Gygi, Steven P.},
+            title   = {Target-decoy search strategy for increased confidence in large-scale protein identifications by mass spectrometry},
+            journal = {Nature Methods},
+            year    = {2007},
+            volume  = {4},
+            number  = {3},
+            pages   = {207--214},
+            doi     = {10.1038/nmeth1019}
+          }
 
 map:
   - tool: file_info

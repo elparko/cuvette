@@ -26,6 +26,20 @@ program:
     ~/.guided-analysis/sage/. The adapter finds sage-*/sage in these folders, or reads the SAGE variable,
     ~/.cargo/bin, /opt/homebrew/bin, /usr/local/bin and the PATH.
     mkdir -p ~/.guided-analysis/sage && tar -xzf <downloaded archive> -C ~/.guided-analysis/sage
+  citation:
+    - text: "Lazear, M. R. (2023). Sage: An Open-Source Tool for Fast Proteomics Searching and Quantification at Scale. Journal of Proteome Research, 22(11), 3652–3659. https://doi.org/10.1021/acs.jproteome.3c00486"
+      doi: 10.1021/acs.jproteome.3c00486
+      bibtex: |
+        @article{lazear2023sage,
+          author  = {Lazear, Michael R.},
+          title   = {Sage: An Open-Source Tool for Fast Proteomics Searching and Quantification at Scale},
+          journal = {Journal of Proteome Research},
+          year    = {2023},
+          volume  = {22},
+          number  = {11},
+          pages   = {3652--3659},
+          doi     = {10.1021/acs.jproteome.3c00486}
+        }
 
 connection:
   kind: cli
@@ -426,6 +440,20 @@ tools:
     required: [path]
     command: ["{node}", "{adapter_dir}/scripts/sage.mjs", count, "--path", "{path}", "--level", "{level}", "--threshold", "{threshold}"]
     parse: keyvalue
+    citations:
+      - text: Elias, J. E., & Gygi, S. P. (2007). Target-decoy search strategy for increased confidence in large-scale protein identifications by mass spectrometry. Nature Methods, 4(3), 207–214. https://doi.org/10.1038/nmeth1019
+        doi: 10.1038/nmeth1019
+        bibtex: |
+          @article{elias2007target,
+            author  = {Elias, Joshua E. and Gygi, Steven P.},
+            title   = {Target-decoy search strategy for increased confidence in large-scale protein identifications by mass spectrometry},
+            journal = {Nature Methods},
+            year    = {2007},
+            volume  = {4},
+            number  = {3},
+            pages   = {207--214},
+            doi     = {10.1038/nmeth1019}
+          }
 
 map:
   - tool: search_sage

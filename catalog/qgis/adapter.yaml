@@ -25,6 +25,32 @@ program:
     headless program qgis_process in QGIS*.app/Contents/MacOS. For an app in another folder, set
     GA_QGIS_PROCESS to the path of qgis_process. The tools start scripts/ga_qgis.py with python3, and the
     script uses only the Python standard library.
+  citation:
+    - text: QGIS.org. (2026). QGIS Geographic Information System (Version 4.2.3) [Computer software]. QGIS Association. https://doi.org/10.5281/zenodo.6139224
+      doi: 10.5281/zenodo.6139224
+      bibtex: |
+        @software{qgis2026qgis,
+          author    = {{QGIS.org}},
+          title     = {{QGIS} Geographic Information System},
+          version   = {4.2.3},
+          year      = {2026},
+          publisher = {QGIS Association},
+          doi       = {10.5281/zenodo.6139224},
+          url       = {https://qgis.org}
+        }
+    - text: "Graser, A., Sutton, T., & Bernasocchi, M. (2025). The QGIS project: Spatial without compromise. Patterns, 6(7), 101265. https://doi.org/10.1016/j.patter.2025.101265"
+      doi: 10.1016/j.patter.2025.101265
+      bibtex: |
+        @article{graser2025qgis,
+          author  = {Graser, Anita and Sutton, Tim and Bernasocchi, Marco},
+          title   = {The {QGIS} project: Spatial without compromise},
+          journal = {Patterns},
+          year    = {2025},
+          volume  = {6},
+          number  = {7},
+          pages   = {101265},
+          doi     = {10.1016/j.patter.2025.101265}
+        }
 
 connection:
   kind: cli

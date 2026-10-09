@@ -24,6 +24,33 @@ program:
     Install samtools with Homebrew. The adapter reads the SAMTOOLS variable, then /opt/homebrew/bin,
     /usr/local/bin, /usr/bin, ~/.local/bin and the PATH.
     brew install samtools
+  citation:
+    - text: Danecek, P., Bonfield, J. K., Liddle, J., Marshall, J., Ohan, V., Pollard, M. O., Whitwham, A., Keane, T., McCarthy, S. A., Davies, R. M., & Li, H. (2021). Twelve years of SAMtools and BCFtools. GigaScience, 10(2), giab008. https://doi.org/10.1093/gigascience/giab008
+      doi: 10.1093/gigascience/giab008
+      bibtex: |
+        @article{danecek2021twelve,
+          author  = {Danecek, Petr and Bonfield, James K. and Liddle, Jennifer and Marshall, John and Ohan, Valeriu and Pollard, Martin O. and Whitwham, Andrew and Keane, Thomas and McCarthy, Shane A. and Davies, Robert M. and Li, Heng},
+          title   = {Twelve years of {SAMtools} and {BCFtools}},
+          journal = {GigaScience},
+          year    = {2021},
+          volume  = {10},
+          number  = {2},
+          pages   = {giab008},
+          doi     = {10.1093/gigascience/giab008}
+        }
+    - text: Li, H., Handsaker, B., Wysoker, A., Fennell, T., Ruan, J., Homer, N., Marth, G., Abecasis, G., Durbin, R., & 1000 Genome Project Data Processing Subgroup. (2009). The Sequence Alignment/Map format and SAMtools. Bioinformatics, 25(16), 2078–2079. https://doi.org/10.1093/bioinformatics/btp352
+      doi: 10.1093/bioinformatics/btp352
+      bibtex: |
+        @article{li2009sequence,
+          author  = {Li, Heng and Handsaker, Bob and Wysoker, Alec and Fennell, Tim and Ruan, Jue and Homer, Nils and Marth, Gabor and Abecasis, Goncalo and Durbin, Richard and {1000 Genome Project Data Processing Subgroup}},
+          title   = {The Sequence Alignment/Map format and {SAMtools}},
+          journal = {Bioinformatics},
+          year    = {2009},
+          volume  = {25},
+          number  = {16},
+          pages   = {2078--2079},
+          doi     = {10.1093/bioinformatics/btp352}
+        }
 
 connection:
   kind: cli

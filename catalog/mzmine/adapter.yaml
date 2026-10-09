@@ -25,6 +25,20 @@ program:
     Download the MZmine portable zip for your system from the MZmine GitHub releases page (linked from https://mzmine.github.io) and unzip it.
     The adapter looks for /Volumes/T7/guided-analysis/tools/mzmine/mzmine.app, then /Applications and ~/Applications,
     or the program that MZMINE_PATH names. The steps after the chromatogram builder need an MZmine user file; set MZMINE_USER_FILE to it.
+  citation:
+    - text: Schmid, R., Heuckeroth, S., Korf, A., Smirnov, A., Myers, O., Dyrlund, T. S., Bushuiev, R., Murray, K. J., Hoffmann, N., Lu, M., . . . Pluskal, T. (2023). Integrative analysis of multimodal mass spectrometry data in MZmine 3. Nature Biotechnology, 41(4), 447–449. https://doi.org/10.1038/s41587-023-01690-2
+      doi: 10.1038/s41587-023-01690-2
+      bibtex: |
+        @article{schmid2023integrative,
+          author  = {Schmid, Robin and Heuckeroth, Steffen and Korf, Ansgar and Smirnov, Aleksandr and Myers, Owen and Dyrlund, Thomas S. and Bushuiev, Roman and Murray, Kevin J. and Hoffmann, Nils and Lu, Miaoshan and others and Pluskal, Tom{\'a}{\v{s}}},
+          title   = {Integrative analysis of multimodal mass spectrometry data in {MZmine} 3},
+          journal = {Nature Biotechnology},
+          year    = {2023},
+          volume  = {41},
+          number  = {4},
+          pages   = {447--449},
+          doi     = {10.1038/s41587-023-01690-2}
+        }
 
 connection:
   kind: script
@@ -345,6 +359,20 @@ tools:
       batch: { kind: file, ext: .mzbatch, description: The batch file. }
     script: scripts/write_batch.mjs
     parse: json
+    citations:
+      - text: Myers, O. D., Sumner, S. J., Li, S., Barnes, S., & Du, X. (2017). Detailed Investigation and Comparison of the XCMS and MZmine 2 Chromatogram Construction and Chromatographic Peak Detection Methods for Preprocessing Mass Spectrometry Metabolomics Data. Analytical Chemistry, 89(17), 8689–8695. https://doi.org/10.1021/acs.analchem.7b01069
+        doi: 10.1021/acs.analchem.7b01069
+        bibtex: |
+          @article{myers2017detailed,
+            author  = {Myers, Owen D. and Sumner, Susan J. and Li, Shuzhao and Barnes, Stephen and Du, Xiuxia},
+            title   = {Detailed Investigation and Comparison of the {XCMS} and {MZmine} 2 Chromatogram Construction and Chromatographic Peak Detection Methods for Preprocessing Mass Spectrometry Metabolomics Data},
+            journal = {Analytical Chemistry},
+            year    = {2017},
+            volume  = {89},
+            number  = {17},
+            pages   = {8689--8695},
+            doi     = {10.1021/acs.analchem.7b01069}
+          }
 
   - name: run_batch
     title: Run a batch file
@@ -383,6 +411,20 @@ tools:
       features: { kind: table, ext: .csv, description: The feature table that the export step wrote. }
     script: scripts/detect_features.mjs
     parse: json
+    citations:
+      - text: Myers, O. D., Sumner, S. J., Li, S., Barnes, S., & Du, X. (2017). Detailed Investigation and Comparison of the XCMS and MZmine 2 Chromatogram Construction and Chromatographic Peak Detection Methods for Preprocessing Mass Spectrometry Metabolomics Data. Analytical Chemistry, 89(17), 8689–8695. https://doi.org/10.1021/acs.analchem.7b01069
+        doi: 10.1021/acs.analchem.7b01069
+        bibtex: |
+          @article{myers2017detailed,
+            author  = {Myers, Owen D. and Sumner, Susan J. and Li, Shuzhao and Barnes, Stephen and Du, Xiuxia},
+            title   = {Detailed Investigation and Comparison of the {XCMS} and {MZmine} 2 Chromatogram Construction and Chromatographic Peak Detection Methods for Preprocessing Mass Spectrometry Metabolomics Data},
+            journal = {Analytical Chemistry},
+            year    = {2017},
+            volume  = {89},
+            number  = {17},
+            pages   = {8689--8695},
+            doi     = {10.1021/acs.analchem.7b01069}
+          }
 
   - name: read_feature_table
     title: Read a feature table

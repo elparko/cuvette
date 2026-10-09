@@ -26,6 +26,19 @@ program:
     and the packages that ga_flowkit.py imports:
     uv venv ~/.guided-analysis/envs/flowkit && uv pip install --python ~/.guided-analysis/envs/flowkit/bin/python
     flowkit numpy pandas matplotlib
+  citation:
+    - text: "White, S., Quinn, J., Enzor, J., Staats, J., Mosier, S. M., Almarode, J., Denny, T. N., Weinhold, K. J., Ferrari, G., & Chan, C. (2021). FlowKit: A Python Toolkit for Integrated Manual and Automated Cytometry Analysis Workflows. Frontiers in Immunology, 12, 768541. https://doi.org/10.3389/fimmu.2021.768541"
+      doi: 10.3389/fimmu.2021.768541
+      bibtex: |
+        @article{white2021flowkit,
+          author  = {White, Scott and Quinn, John and Enzor, Jennifer and Staats, Janet and Mosier, Sarah M. and Almarode, James and Denny, Thomas N. and Weinhold, Kent J. and Ferrari, Guido and Chan, Cliburn},
+          title   = {{FlowKit}: A Python Toolkit for Integrated Manual and Automated Cytometry Analysis Workflows},
+          journal = {Frontiers in Immunology},
+          year    = {2021},
+          volume  = {12},
+          pages   = {768541},
+          doi     = {10.3389/fimmu.2021.768541}
+        }
 
 connection:
   kind: python
@@ -334,6 +347,37 @@ tools:
     outputs:
       effect: { kind: table, ext: csv, description: Range of each channel before and after. }
       histograms: { kind: image, ext: png, description: One histogram for each channel. }
+    citations:
+      - text: Parks, D. R., Roederer, M., & Moore, W. A. (2006). A new ``Logicle'' display method avoids deceptive effects of logarithmic scaling for low signals and compensated data. Cytometry Part A, 69A(6), 541–551. https://doi.org/10.1002/cyto.a.20258
+        doi: 10.1002/cyto.a.20258
+        when:
+          transform: logicle
+        bibtex: |
+          @article{parks2006new,
+            author  = {Parks, David R. and Roederer, Mario and Moore, Wayne A.},
+            title   = {A new ``{Logicle}'' display method avoids deceptive effects of logarithmic scaling for low signals and compensated data},
+            journal = {Cytometry Part A},
+            year    = {2006},
+            volume  = {69A},
+            number  = {6},
+            pages   = {541--551},
+            doi     = {10.1002/cyto.a.20258}
+          }
+      - text: "Bagwell, C. B. (2005). Hyperlog: A flexible log-like transform for negative, zero, and positive valued data. Cytometry Part A, 64A(1), 34–42. https://doi.org/10.1002/cyto.a.20114"
+        doi: 10.1002/cyto.a.20114
+        when:
+          transform: hyperlog
+        bibtex: |
+          @article{bagwell2005hyperlog,
+            author  = {Bagwell, C. Bruce},
+            title   = {Hyperlog: A flexible log-like transform for negative, zero, and positive valued data},
+            journal = {Cytometry Part A},
+            year    = {2005},
+            volume  = {64A},
+            number  = {1},
+            pages   = {34--42},
+            doi     = {10.1002/cyto.a.20114}
+          }
 
   - name: list_gates
     title: List the gates
@@ -437,6 +481,37 @@ tools:
     required: [path, x_channel]
     outputs:
       plot: { kind: image, ext: png, description: Dot plot with the gate. }
+    citations:
+      - text: Parks, D. R., Roederer, M., & Moore, W. A. (2006). A new ``Logicle'' display method avoids deceptive effects of logarithmic scaling for low signals and compensated data. Cytometry Part A, 69A(6), 541–551. https://doi.org/10.1002/cyto.a.20258
+        doi: 10.1002/cyto.a.20258
+        when:
+          transform: logicle
+        bibtex: |
+          @article{parks2006new,
+            author  = {Parks, David R. and Roederer, Mario and Moore, Wayne A.},
+            title   = {A new ``{Logicle}'' display method avoids deceptive effects of logarithmic scaling for low signals and compensated data},
+            journal = {Cytometry Part A},
+            year    = {2006},
+            volume  = {69A},
+            number  = {6},
+            pages   = {541--551},
+            doi     = {10.1002/cyto.a.20258}
+          }
+      - text: "Bagwell, C. B. (2005). Hyperlog: A flexible log-like transform for negative, zero, and positive valued data. Cytometry Part A, 64A(1), 34–42. https://doi.org/10.1002/cyto.a.20114"
+        doi: 10.1002/cyto.a.20114
+        when:
+          transform: hyperlog
+        bibtex: |
+          @article{bagwell2005hyperlog,
+            author  = {Bagwell, C. Bruce},
+            title   = {Hyperlog: A flexible log-like transform for negative, zero, and positive valued data},
+            journal = {Cytometry Part A},
+            year    = {2005},
+            volume  = {64A},
+            number  = {1},
+            pages   = {34--42},
+            doi     = {10.1002/cyto.a.20114}
+          }
 
 map:
   - tool: inspect_fcs

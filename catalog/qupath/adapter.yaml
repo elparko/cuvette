@@ -25,6 +25,20 @@ program:
     Download QuPath from https://qupath.github.io and install it. On macOS without admin rights, unpack the .pkg file with pkgutil --expand-full.
     The adapter reads the QuPath executable from QUPATH, from /Applications/QuPath-*.app, from /Volumes/T7/guided-analysis/tools/qupath/expanded on the T7 drive, or from the PATH:
     export QUPATH=/Applications/QuPath-0.7.0-arm64.app/Contents/MacOS/QuPath-0.7.0-arm64
+  citation:
+    - text: "Bankhead, P., Loughrey, M. B., Fernández, J. A., Dombrowski, Y., McArt, D. G., Dunne, P. D., McQuaid, S., Gray, R. T., Murray, L. J., Coleman, H. G., James, J. A., Salto-Tellez, M., & Hamilton, P. W. (2017). QuPath: Open source software for digital pathology image analysis. Scientific Reports, 7(1), 16878. https://doi.org/10.1038/s41598-017-17204-5"
+      doi: 10.1038/s41598-017-17204-5
+      bibtex: |
+        @article{bankhead2017qupath,
+          author  = {Bankhead, Peter and Loughrey, Maurice B. and Fern{\'a}ndez, Jos{\'e} A. and Dombrowski, Yvonne and McArt, Darragh G. and Dunne, Philip D. and McQuaid, Stephen and Gray, Ronan T. and Murray, Liam J. and Coleman, Helen G. and James, Jacqueline A. and Salto-Tellez, Manuel and Hamilton, Peter W.},
+          title   = {{QuPath}: Open source software for digital pathology image analysis},
+          journal = {Scientific Reports},
+          year    = {2017},
+          volume  = {7},
+          number  = {1},
+          pages   = {16878},
+          doi     = {10.1038/s41598-017-17204-5}
+        }
 
 connection:
   kind: macro
@@ -583,6 +597,25 @@ tools:
         gaImageLines(d)
         gaSave(d, "{output.state}")
       }
+    citations:
+      - text: Ruifrok, A. C., & Johnston, D. A. (2001). Quantification of histochemical staining by color deconvolution. Analytical and Quantitative Cytology and Histology, 23(4), 291–299. https://pubmed.ncbi.nlm.nih.gov/11531144/
+        url: https://pubmed.ncbi.nlm.nih.gov/11531144/
+        when:
+          image_type:
+            - Brightfield (H&E)
+            - Brightfield (H-DAB)
+            - Brightfield (other)
+        bibtex: |
+          @article{ruifrok2001quantification,
+            author  = {Ruifrok, A. C. and Johnston, D. A.},
+            title   = {Quantification of histochemical staining by color deconvolution},
+            journal = {Analytical and Quantitative Cytology and Histology},
+            year    = {2001},
+            volume  = {23},
+            number  = {4},
+            pages   = {291--299},
+            url     = {https://pubmed.ncbi.nlm.nih.gov/11531144/}
+          }
 
   - name: set_pixel_size
     title: Set the pixel size
@@ -829,6 +862,20 @@ tools:
           single_threshold: "{single_threshold}",
         ], "qupath.imagej.detect.cells.PositiveCellDetection", true, "{output.state}")
       }
+    citations:
+      - text: Ruifrok, A. C., & Johnston, D. A. (2001). Quantification of histochemical staining by color deconvolution. Analytical and Quantitative Cytology and Histology, 23(4), 291–299. https://pubmed.ncbi.nlm.nih.gov/11531144/
+        url: https://pubmed.ncbi.nlm.nih.gov/11531144/
+        bibtex: |
+          @article{ruifrok2001quantification,
+            author  = {Ruifrok, A. C. and Johnston, D. A.},
+            title   = {Quantification of histochemical staining by color deconvolution},
+            journal = {Analytical and Quantitative Cytology and Histology},
+            year    = {2001},
+            volume  = {23},
+            number  = {4},
+            pages   = {291--299},
+            url     = {https://pubmed.ncbi.nlm.nih.gov/11531144/}
+          }
 
   - name: export_measurements
     title: Export measurements to a CSV file

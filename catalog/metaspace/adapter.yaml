@@ -21,6 +21,30 @@ program:
     The adapter uses the Python environment at ~/.guided-analysis/envs/metaspace, or the python that GA_METASPACE_PYTHON names.
     Make it and add the METASPACE client. The tools need network access and no API key:
     uv venv ~/.guided-analysis/envs/metaspace && uv pip install --python ~/.guided-analysis/envs/metaspace/bin/python metaspace2020
+  citation:
+    - text: Palmer, A., Phapale, P., Chernyavsky, I., Lavigne, R., Fay, D., Tarasov, A., Kovalev, V., Fuchser, J., Nikolenko, S., Pineau, C., Becker, M., & Alexandrov, T. (2017). FDR-controlled metabolite annotation for high-resolution imaging mass spectrometry. Nature Methods, 14(1), 57–60. https://doi.org/10.1038/nmeth.4072
+      doi: 10.1038/nmeth.4072
+      bibtex: |
+        @article{palmer2017fdr,
+          author  = {Palmer, Andrew and Phapale, Prasad and Chernyavsky, Ilya and Lavigne, Regis and Fay, Dominik and Tarasov, Artem and Kovalev, Vitaly and Fuchser, Jens and Nikolenko, Sergey and Pineau, Charles and Becker, Michael and Alexandrov, Theodore},
+          title   = {{FDR}-controlled metabolite annotation for high-resolution imaging mass spectrometry},
+          journal = {Nature Methods},
+          year    = {2017},
+          volume  = {14},
+          number  = {1},
+          pages   = {57--60},
+          doi     = {10.1038/nmeth.4072}
+        }
+    - text: "Alexandrov, T., Ovchinnikova, K., Palmer, A., Kovalev, V., Tarasov, A., Stuart, L., Nigmetzianov, R., Fay, D., et al. (2019). METASPACE: A community-populated knowledge base of spatial metabolomes in health and disease [Computer software]. bioRxiv preprint 539478. https://doi.org/10.1101/539478"
+      doi: 10.1101/539478
+      bibtex: |
+        @misc{alexandrov2019metaspace,
+          author       = {Alexandrov, Theodore and Ovchinnikova, Katja and Palmer, Andrew and Kovalev, Vitaly and Tarasov, Artem and Stuart, Lachlan and Nigmetzianov, Renat and Fay, Dominik and others},
+          title        = {{METASPACE}: A community-populated knowledge base of spatial metabolomes in health and disease},
+          year         = {2019},
+          howpublished = {bioRxiv preprint 539478},
+          doi          = {10.1101/539478}
+        }
 
 connection:
   kind: python

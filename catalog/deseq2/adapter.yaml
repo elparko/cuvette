@@ -27,6 +27,20 @@ program:
     into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library
     or ~/.guided-analysis/R-library.
     mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages("BiocManager", repos = "https://cloud.r-project.org"); BiocManager::install(c("DESeq2", "tximport", "jsonlite", "rhdf5"))'
+  citation:
+    - text: Love, M. I., Huber, W., & Anders, S. (2014). Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology, 15(12), 550. https://doi.org/10.1186/s13059-014-0550-8
+      doi: 10.1186/s13059-014-0550-8
+      bibtex: |
+        @article{love2014moderated,
+          author  = {Love, Michael I. and Huber, Wolfgang and Anders, Simon},
+          title   = {Moderated estimation of fold change and dispersion for {RNA-seq} data with {DESeq2}},
+          journal = {Genome Biology},
+          year    = {2014},
+          volume  = {15},
+          number  = {12},
+          pages   = {550},
+          doi     = {10.1186/s13059-014-0550-8}
+        }
 
 connection:
   kind: script
@@ -657,6 +671,36 @@ tools:
       results: { kind: table, ext: .csv, description: "One row for each tested gene, sorted by padj." }
     script: scripts/run_deseq.R
     parse: json
+    citations:
+      - text: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing. Journal of the Royal Statistical Society: Series B (Methodological), 57(1), 289–300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x"
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+        bibtex: |
+          @article{benjamini1995controlling,
+            author  = {Benjamini, Yoav and Hochberg, Yosef},
+            title   = {Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing},
+            journal = {Journal of the Royal Statistical Society: Series B (Methodological)},
+            year    = {1995},
+            volume  = {57},
+            number  = {1},
+            pages   = {289--300},
+            doi     = {10.1111/j.2517-6161.1995.tb02031.x}
+          }
+      - text: "Soneson, C., Love, M. I., & Robinson, M. D. (2015). Differential analyses for RNA-seq: transcript-level estimates improve gene-level inferences. F1000Research, 4, 1521. https://doi.org/10.12688/f1000research.7563.1"
+        doi: 10.12688/f1000research.7563.1
+        when:
+          input_type:
+            - transcript quantification
+            - counts and lengths
+        bibtex: |
+          @article{soneson2015differential,
+            author  = {Soneson, Charlotte and Love, Michael I. and Robinson, Mark D.},
+            title   = {Differential analyses for {RNA-seq}: transcript-level estimates improve gene-level inferences},
+            journal = {F1000Research},
+            year    = {2015},
+            volume  = {4},
+            pages   = {1521},
+            doi     = {10.12688/f1000research.7563.1}
+          }
 
   - name: top_genes
     title: List the top genes

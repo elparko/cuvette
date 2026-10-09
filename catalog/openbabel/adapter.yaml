@@ -18,6 +18,19 @@ program:
     Install Open Babel with Homebrew. The adapter reads the GA_OBABEL variable, then obabel on the PATH,
     /opt/homebrew/bin, /usr/local/bin and /usr/bin.
     brew install open-babel
+  citation:
+    - text: "O'Boyle, N. M., Banck, M., James, C. A., Morley, C., Vandermeersch, T., & Hutchison, G. R. (2011). Open Babel: An open chemical toolbox. Journal of Cheminformatics, 3, 33. https://doi.org/10.1186/1758-2946-3-33"
+      doi: 10.1186/1758-2946-3-33
+      bibtex: |
+        @article{oboyle2011open,
+          author  = {O'Boyle, Noel M. and Banck, Michael and James, Craig A. and Morley, Chris and Vandermeersch, Tim and Hutchison, Geoffrey R.},
+          title   = {Open {Babel}: An open chemical toolbox},
+          journal = {Journal of Cheminformatics},
+          year    = {2011},
+          volume  = {3},
+          pages   = {33},
+          doi     = {10.1186/1758-2946-3-33}
+        }
 connection:
   kind: cli
 locate:

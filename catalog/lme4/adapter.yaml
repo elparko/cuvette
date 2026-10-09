@@ -26,6 +26,33 @@ program:
     reformulas, lattice and jsonlite) into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER,
     /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
     mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("lme4", "lmerTest", "reformulas", "lattice", "jsonlite"), repos = "https://cloud.r-project.org")'
+  citation:
+    - text: Bates, D., Mächler, M., Bolker, B., & Walker, S. (2015). Fitting Linear Mixed-Effects Models Using lme4. Journal of Statistical Software, 67(1), 1–48. https://doi.org/10.18637/jss.v067.i01
+      doi: 10.18637/jss.v067.i01
+      bibtex: |
+        @article{bates2015fitting,
+          author  = {Bates, Douglas and M{\"a}chler, Martin and Bolker, Ben and Walker, Steve},
+          title   = {Fitting Linear Mixed-Effects Models Using {lme4}},
+          journal = {Journal of Statistical Software},
+          year    = {2015},
+          volume  = {67},
+          number  = {1},
+          pages   = {1--48},
+          doi     = {10.18637/jss.v067.i01}
+        }
+    - text: "Kuznetsova, A., Brockhoff, P. B., & Christensen, R. H. B. (2017). lmerTest Package: Tests in Linear Mixed Effects Models. Journal of Statistical Software, 82(13), 1–26. https://doi.org/10.18637/jss.v082.i13"
+      doi: 10.18637/jss.v082.i13
+      bibtex: |
+        @article{kuznetsova2017lmertest,
+          author  = {Kuznetsova, Alexandra and Brockhoff, Per B. and Christensen, Rune H. B.},
+          title   = {{lmerTest} Package: Tests in Linear Mixed Effects Models},
+          journal = {Journal of Statistical Software},
+          year    = {2017},
+          volume  = {82},
+          number  = {13},
+          pages   = {1--26},
+          doi     = {10.18637/jss.v082.i13}
+        }
 
 connection:
   kind: script
@@ -418,6 +445,37 @@ tools:
       fixed: { kind: table, ext: .csv, description: The fixed effects. }
     script: scripts/fit_mixed_model.R
     parse: json
+    citations:
+      - text: Satterthwaite, F. E. (1946). An Approximate Distribution of Estimates of Variance Components. Biometrics Bulletin, 2(6), 110–114. https://doi.org/10.2307/3002019
+        doi: 10.2307/3002019
+        when:
+          p_value_method: satterthwaite
+        bibtex: |
+          @article{satterthwaite1946approximate,
+            author  = {Satterthwaite, F. E.},
+            title   = {An Approximate Distribution of Estimates of Variance Components},
+            journal = {Biometrics Bulletin},
+            year    = {1946},
+            volume  = {2},
+            number  = {6},
+            pages   = {110--114},
+            doi     = {10.2307/3002019}
+          }
+      - text: Kenward, M. G., & Roger, J. H. (1997). Small Sample Inference for Fixed Effects from Restricted Maximum Likelihood. Biometrics, 53(3), 983–997. https://doi.org/10.2307/2533558
+        doi: 10.2307/2533558
+        when:
+          p_value_method: kenward-roger
+        bibtex: |
+          @article{kenward1997small,
+            author  = {Kenward, Michael G. and Roger, James H.},
+            title   = {Small Sample Inference for Fixed Effects from Restricted Maximum Likelihood},
+            journal = {Biometrics},
+            year    = {1997},
+            volume  = {53},
+            number  = {3},
+            pages   = {983--997},
+            doi     = {10.2307/2533558}
+          }
 
   - name: compare_models
     title: Compare two nested models

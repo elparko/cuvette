@@ -27,6 +27,57 @@ program:
     The adapter uses its own Python environment at ~/.guided-analysis/envs/astropy, or the Python in GA_ASTROPY_PYTHON.
     Make the environment and install astropy, photutils and the libraries that the adapter imports:
     uv venv ~/.guided-analysis/envs/astropy && uv pip install --python ~/.guided-analysis/envs/astropy/bin/python astropy photutils scipy pandas matplotlib
+  citation:
+    - text: "Astropy Collaboration, Price-Whelan, A. M., Lim, P. L., Earl, N., Starkman, N., Bradley, L., Shupe, D. L., Patil, A. A., et al. (2022). The Astropy Project: Sustaining and Growing a Community-oriented Open-source Project and the Latest Major Release (v5.0) of the Core Package. The Astrophysical Journal, 935(2), 167. https://doi.org/10.3847/1538-4357/ac7c74"
+      doi: 10.3847/1538-4357/ac7c74
+      bibtex: |
+        @article{astropy2022astropy,
+          author  = {{Astropy Collaboration} and Price-Whelan, Adrian M. and Lim, Pey Lian and Earl, Nicholas and Starkman, Nathaniel and Bradley, Larry and Shupe, David L. and Patil, Aarya A. and others},
+          title   = {The {Astropy} Project: Sustaining and Growing a Community-oriented Open-source Project and the Latest Major Release (v5.0) of the Core Package},
+          journal = {The Astrophysical Journal},
+          year    = {2022},
+          volume  = {935},
+          number  = {2},
+          pages   = {167},
+          doi     = {10.3847/1538-4357/ac7c74}
+        }
+    - text: "Astropy Collaboration, Price-Whelan, A. M., Sipőcz, B. M., Günther, H. M., Lim, P. L., Crawford, S. M., Conseil, S., Shupe, D. L., et al. (2018). The Astropy Project: Building an Open-science Project and Status of the v2.0 Core Package. The Astronomical Journal, 156(3), 123. https://doi.org/10.3847/1538-3881/aabc4f"
+      doi: 10.3847/1538-3881/aabc4f
+      bibtex: |
+        @article{astropy2018astropy,
+          author  = {{Astropy Collaboration} and Price-Whelan, Adrian M. and Sip{\H{o}}cz, Brigitta M. and G{\"u}nther, Hans M. and Lim, P. L. and Crawford, Steven M. and Conseil, Simon and Shupe, David L. and others},
+          title   = {The {Astropy} Project: Building an Open-science Project and Status of the v2.0 Core Package},
+          journal = {The Astronomical Journal},
+          year    = {2018},
+          volume  = {156},
+          number  = {3},
+          pages   = {123},
+          doi     = {10.3847/1538-3881/aabc4f}
+        }
+    - text: "Astropy Collaboration, Robitaille, T. P., Tollerud, E. J., Greenfield, P., Droettboom, M., Bray, E., Aldcroft, T., Davis, M., et al. (2013). Astropy: A community Python package for astronomy. Astronomy & Astrophysics, 558, A33. https://doi.org/10.1051/0004-6361/201322068"
+      doi: 10.1051/0004-6361/201322068
+      bibtex: |
+        @article{astropy2013astropy,
+          author  = {{Astropy Collaboration} and Robitaille, Thomas P. and Tollerud, Erik J. and Greenfield, Perry and Droettboom, Michael and Bray, Erik and Aldcroft, Tom and Davis, Matt and others},
+          title   = {Astropy: A community {Python} package for astronomy},
+          journal = {Astronomy \& Astrophysics},
+          year    = {2013},
+          volume  = {558},
+          pages   = {A33},
+          doi     = {10.1051/0004-6361/201322068}
+        }
+    - text: Bradley, L., Sipőcz, B. M., Robitaille, T. P., Tollerud, E. J., Vinícius, Z., Deil, C., et al. (2026). Photutils (Version 3.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.596036
+      doi: 10.5281/zenodo.596036
+      bibtex: |
+        @software{bradley2026photutils,
+          author    = {Bradley, Larry and Sip{\H{o}}cz, Brigitta M. and Robitaille, Thomas P. and Tollerud, Erik J. and Vin{\'i}cius, Z{\'e} and Deil, Christoph and others},
+          title     = {Photutils},
+          version   = {3.0.0},
+          year      = {2026},
+          publisher = {Zenodo},
+          doi       = {10.5281/zenodo.596036},
+          note      = {Zenodo concept DOI}
+        }
 
 connection:
   kind: python
@@ -338,6 +389,23 @@ tools:
     outputs:
       subtracted: { kind: file, ext: fits, description: "Image minus background. Extensions BKG and RMS." }
       plot: { kind: image, ext: png, description: "Image, background map and noise map." }
+    citations:
+      - text: "Bertin, E., & Arnouts, S. (1996). SExtractor: Software for source extraction. Astronomy and Astrophysics Supplement Series, 117(2), 393–404. https://doi.org/10.1051/aas:1996164"
+        doi: 10.1051/aas:1996164
+        when:
+          method: background2d
+          estimator: sextractor
+        bibtex: |
+          @article{bertin1996sextractor,
+            author  = {Bertin, E. and Arnouts, S.},
+            title   = {{SExtractor}: Software for source extraction},
+            journal = {Astronomy and Astrophysics Supplement Series},
+            year    = {1996},
+            volume  = {117},
+            number  = {2},
+            pages   = {393--404},
+            doi     = {10.1051/aas:1996164}
+          }
 
   - name: detect_sources
     title: Detect sources

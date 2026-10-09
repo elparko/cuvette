@@ -10,6 +10,19 @@ adapter:
 program:
   name: Onboarding tools
   homepage: ""
+  citation:
+    - text: Smith, P. (2026). Cuvette (Version 0.1.0) [Computer software]. https://cuvette.ai
+      url: https://cuvette.ai
+      bibtex: |
+        @software{smith2026cuvette,
+          author  = {Smith, Parker},
+          title   = {Cuvette},
+          version = {0.1.0},
+          year    = {2026},
+          license = {AGPL-3.0-only},
+          url     = {https://cuvette.ai},
+          note    = {Source code: https://github.com/elparko/cuvette}
+        }
 
 connection:
   kind: mcp

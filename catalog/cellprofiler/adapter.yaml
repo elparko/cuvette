@@ -26,6 +26,20 @@ program:
     Set CELLPROFILER_JAVA_HOME or JAVA_HOME to that Java, or put it in /Volumes/T7/guided-analysis/tools/cellprofiler/jre17x64 on the T7 drive.
     The adapter reads the cp executable from CELLPROFILER_PATH, from CellProfiler.app on the T7 drive or in /Applications, or from the PATH:
     export CELLPROFILER_PATH=/Applications/CellProfiler.app/Contents/MacOS/cp
+  citation:
+    - text: "Stirling, D. R., Swain-Bowden, M. J., Lucas, A. M., Carpenter, A. E., Cimini, B. A., & Goodman, A. (2021). CellProfiler 4: improvements in speed, utility and usability. BMC Bioinformatics, 22(1), 433. https://doi.org/10.1186/s12859-021-04344-9"
+      doi: 10.1186/s12859-021-04344-9
+      bibtex: |
+        @article{stirling2021cellprofiler,
+          author  = {Stirling, David R. and Swain-Bowden, Madison J. and Lucas, Alice M. and Carpenter, Anne E. and Cimini, Beth A. and Goodman, Allen},
+          title   = {{CellProfiler} 4: improvements in speed, utility and usability},
+          journal = {BMC Bioinformatics},
+          year    = {2021},
+          volume  = {22},
+          number  = {1},
+          pages   = {433},
+          doi     = {10.1186/s12859-021-04344-9}
+        }
 
 connection:
   kind: script
@@ -494,6 +508,52 @@ tools:
       pipeline: { kind: file, ext: .cppipe, description: The pipeline file. }
     script: scripts/write_pipeline.mjs
     parse: json
+    citations:
+      - text: Otsu, N. (1979). A Threshold Selection Method from Gray-Level Histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62–66. https://doi.org/10.1109/TSMC.1979.4310076
+        doi: 10.1109/TSMC.1979.4310076
+        when:
+          threshold_method: Otsu
+        bibtex: |
+          @article{otsu1979threshold,
+            author  = {Otsu, Nobuyuki},
+            title   = {A Threshold Selection Method from Gray-Level Histograms},
+            journal = {IEEE Transactions on Systems, Man, and Cybernetics},
+            year    = {1979},
+            volume  = {9},
+            number  = {1},
+            pages   = {62--66},
+            doi     = {10.1109/TSMC.1979.4310076}
+          }
+      - text: Li, C. H., & Lee, C. K. (1993). Minimum cross entropy thresholding. Pattern Recognition, 26(4), 617–625. https://doi.org/10.1016/0031-3203(93)90115-D
+        doi: 10.1016/0031-3203(93)90115-D
+        when:
+          threshold_method: Minimum Cross-Entropy
+        bibtex: |
+          @article{li1993minimum,
+            author  = {Li, C. H. and Lee, C. K.},
+            title   = {Minimum cross entropy thresholding},
+            journal = {Pattern Recognition},
+            year    = {1993},
+            volume  = {26},
+            number  = {4},
+            pages   = {617--625},
+            doi     = {10.1016/0031-3203(93)90115-D}
+          }
+      - text: Li, C. H., & Tam, P. K. S. (1998). An iterative algorithm for minimum cross entropy thresholding. Pattern Recognition Letters, 19(8), 771–776. https://doi.org/10.1016/S0167-8655(98)00057-9
+        doi: 10.1016/S0167-8655(98)00057-9
+        when:
+          threshold_method: Minimum Cross-Entropy
+        bibtex: |
+          @article{li1998iterative,
+            author  = {Li, C. H. and Tam, P. K. S.},
+            title   = {An iterative algorithm for minimum cross entropy thresholding},
+            journal = {Pattern Recognition Letters},
+            year    = {1998},
+            volume  = {19},
+            number  = {8},
+            pages   = {771--776},
+            doi     = {10.1016/S0167-8655(98)00057-9}
+          }
 
   - name: run_pipeline
     title: Run a pipeline on a folder
@@ -551,3 +611,49 @@ tools:
       per_image: { kind: table, ext: .csv, description: One row for each image. }
     script: scripts/count_nuclei.mjs
     parse: json
+    citations:
+      - text: Otsu, N. (1979). A Threshold Selection Method from Gray-Level Histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62–66. https://doi.org/10.1109/TSMC.1979.4310076
+        doi: 10.1109/TSMC.1979.4310076
+        when:
+          threshold_method: Otsu
+        bibtex: |
+          @article{otsu1979threshold,
+            author  = {Otsu, Nobuyuki},
+            title   = {A Threshold Selection Method from Gray-Level Histograms},
+            journal = {IEEE Transactions on Systems, Man, and Cybernetics},
+            year    = {1979},
+            volume  = {9},
+            number  = {1},
+            pages   = {62--66},
+            doi     = {10.1109/TSMC.1979.4310076}
+          }
+      - text: Li, C. H., & Lee, C. K. (1993). Minimum cross entropy thresholding. Pattern Recognition, 26(4), 617–625. https://doi.org/10.1016/0031-3203(93)90115-D
+        doi: 10.1016/0031-3203(93)90115-D
+        when:
+          threshold_method: Minimum Cross-Entropy
+        bibtex: |
+          @article{li1993minimum,
+            author  = {Li, C. H. and Lee, C. K.},
+            title   = {Minimum cross entropy thresholding},
+            journal = {Pattern Recognition},
+            year    = {1993},
+            volume  = {26},
+            number  = {4},
+            pages   = {617--625},
+            doi     = {10.1016/0031-3203(93)90115-D}
+          }
+      - text: Li, C. H., & Tam, P. K. S. (1998). An iterative algorithm for minimum cross entropy thresholding. Pattern Recognition Letters, 19(8), 771–776. https://doi.org/10.1016/S0167-8655(98)00057-9
+        doi: 10.1016/S0167-8655(98)00057-9
+        when:
+          threshold_method: Minimum Cross-Entropy
+        bibtex: |
+          @article{li1998iterative,
+            author  = {Li, C. H. and Tam, P. K. S.},
+            title   = {An iterative algorithm for minimum cross entropy thresholding},
+            journal = {Pattern Recognition Letters},
+            year    = {1998},
+            volume  = {19},
+            number  = {8},
+            pages   = {771--776},
+            doi     = {10.1016/S0167-8655(98)00057-9}
+          }

@@ -26,6 +26,31 @@ program:
     The adapter uses its own Python environment at ~/.guided-analysis/envs/mdanalysis, or the Python in GA_MDANALYSIS_PYTHON.
     Make the environment and install MDAnalysis, Biopython and the libraries that the adapter imports:
     uv venv ~/.guided-analysis/envs/mdanalysis && uv pip install --python ~/.guided-analysis/envs/mdanalysis/bin/python MDAnalysis biopython pandas matplotlib
+  citation:
+    - text: "Michaud-Agrawal, N., Denning, E. J., Woolf, T. B., & Beckstein, O. (2011). MDAnalysis: A toolkit for the analysis of molecular dynamics simulations. Journal of Computational Chemistry, 32(10), 2319–2327. https://doi.org/10.1002/jcc.21787"
+      doi: 10.1002/jcc.21787
+      bibtex: |
+        @article{michaudagrawal2011mdanalysis,
+          author  = {Michaud-Agrawal, Naveen and Denning, Elizabeth J. and Woolf, Thomas B. and Beckstein, Oliver},
+          title   = {{MDAnalysis}: A toolkit for the analysis of molecular dynamics simulations},
+          journal = {Journal of Computational Chemistry},
+          year    = {2011},
+          volume  = {32},
+          number  = {10},
+          pages   = {2319--2327},
+          doi     = {10.1002/jcc.21787}
+        }
+    - text: "Gowers, R. J., Linke, M., Barnoud, J., Reddy, T. J. E., Melo, M. N., Seyler, S. L., Domański, J., Dotson, D. L., Buchoux, S., Kenney, I. M., & Beckstein, O. (2016). MDAnalysis: A Python Package for the Rapid Analysis of Molecular Dynamics Simulations. In Proceedings of the 15th Python in Science Conference (pp. 98–105). https://doi.org/10.25080/Majora-629e541a-00e"
+      doi: 10.25080/Majora-629e541a-00e
+      bibtex: |
+        @inproceedings{gowers2016mdanalysis,
+          author    = {Gowers, Richard J. and Linke, Max and Barnoud, Jonathan and Reddy, Tyler J. E. and Melo, Manuel N. and Seyler, Sean L. and Doma{\'n}ski, Jan and Dotson, David L. and Buchoux, S{\'e}bastien and Kenney, Ian M. and Beckstein, Oliver},
+          title     = {{MDAnalysis}: A Python Package for the Rapid Analysis of Molecular Dynamics Simulations},
+          booktitle = {Proceedings of the 15th Python in Science Conference},
+          year      = {2016},
+          pages     = {98--105},
+          doi       = {10.25080/Majora-629e541a-00e}
+        }
 
 connection:
   kind: python
@@ -325,6 +350,37 @@ tools:
     outputs:
       table: { kind: table, ext: csv, description: "Frame, time and RMSD." }
       plot: { kind: image, ext: png, description: RMSD against time. }
+    citations:
+      - text: "Theobald, D. L. (2005). Rapid calculation of RMSDs using a quaternion-based characteristic polynomial. Acta Crystallographica Section A: Foundations of Crystallography, 61(4), 478–480. https://doi.org/10.1107/S0108767305015266"
+        doi: 10.1107/S0108767305015266
+        when:
+          fit: true
+        bibtex: |
+          @article{theobald2005rapid,
+            author  = {Theobald, Douglas L.},
+            title   = {Rapid calculation of {RMSDs} using a quaternion-based characteristic polynomial},
+            journal = {Acta Crystallographica Section A: Foundations of Crystallography},
+            year    = {2005},
+            volume  = {61},
+            number  = {4},
+            pages   = {478--480},
+            doi     = {10.1107/S0108767305015266}
+          }
+      - text: Liu, P., Agrafiotis, D. K., & Theobald, D. L. (2010). Fast determination of the optimal rotational matrix for macromolecular superpositions. Journal of Computational Chemistry, 31(7), 1561–1563. https://doi.org/10.1002/jcc.21439
+        doi: 10.1002/jcc.21439
+        when:
+          fit: true
+        bibtex: |
+          @article{liu2010fast,
+            author  = {Liu, Pu and Agrafiotis, Dimitris K. and Theobald, Douglas L.},
+            title   = {Fast determination of the optimal rotational matrix for macromolecular superpositions},
+            journal = {Journal of Computational Chemistry},
+            year    = {2010},
+            volume  = {31},
+            number  = {7},
+            pages   = {1561--1563},
+            doi     = {10.1002/jcc.21439}
+          }
 
   - name: rmsf_per_residue
     title: RMSF of the selected atoms
@@ -346,6 +402,37 @@ tools:
     outputs:
       table: { kind: table, ext: csv, description: Residue and RMSF. }
       plot: { kind: image, ext: png, description: RMSF along the selection. }
+    citations:
+      - text: "Theobald, D. L. (2005). Rapid calculation of RMSDs using a quaternion-based characteristic polynomial. Acta Crystallographica Section A: Foundations of Crystallography, 61(4), 478–480. https://doi.org/10.1107/S0108767305015266"
+        doi: 10.1107/S0108767305015266
+        when:
+          fit: true
+        bibtex: |
+          @article{theobald2005rapid,
+            author  = {Theobald, Douglas L.},
+            title   = {Rapid calculation of {RMSDs} using a quaternion-based characteristic polynomial},
+            journal = {Acta Crystallographica Section A: Foundations of Crystallography},
+            year    = {2005},
+            volume  = {61},
+            number  = {4},
+            pages   = {478--480},
+            doi     = {10.1107/S0108767305015266}
+          }
+      - text: Liu, P., Agrafiotis, D. K., & Theobald, D. L. (2010). Fast determination of the optimal rotational matrix for macromolecular superpositions. Journal of Computational Chemistry, 31(7), 1561–1563. https://doi.org/10.1002/jcc.21439
+        doi: 10.1002/jcc.21439
+        when:
+          fit: true
+        bibtex: |
+          @article{liu2010fast,
+            author  = {Liu, Pu and Agrafiotis, Dimitris K. and Theobald, Douglas L.},
+            title   = {Fast determination of the optimal rotational matrix for macromolecular superpositions},
+            journal = {Journal of Computational Chemistry},
+            year    = {2010},
+            volume  = {31},
+            number  = {7},
+            pages   = {1561--1563},
+            doi     = {10.1002/jcc.21439}
+          }
 
   - name: radius_of_gyration
     title: Radius of gyration
@@ -406,6 +493,20 @@ tools:
       per_frame: { kind: table, ext: csv, description: Hydrogen bonds in each frame. }
       events: { kind: table, ext: csv, description: "Each hydrogen bond with residues, distance and angle." }
       plot: { kind: image, ext: png, description: Hydrogen bonds against frame. }
+    citations:
+      - text: Smith, P., Ziolek, R. M., Gazzarrini, E., Owen, D. M., & Lorenz, C. D. (2019). On the interaction of hyaluronic acid with synovial fluid lipid membranes. Physical Chemistry Chemical Physics, 21(19), 9845–9857. https://doi.org/10.1039/C9CP01532A
+        doi: 10.1039/C9CP01532A
+        bibtex: |
+          @article{smith2019interaction,
+            author  = {Smith, Paul and Ziolek, Robert M. and Gazzarrini, Elena and Owen, Dylan M. and Lorenz, Christian D.},
+            title   = {On the interaction of hyaluronic acid with synovial fluid lipid membranes},
+            journal = {Physical Chemistry Chemical Physics},
+            year    = {2019},
+            volume  = {21},
+            number  = {19},
+            pages   = {9845--9857},
+            doi     = {10.1039/C9CP01532A}
+          }
 
   - name: inspect_structure
     title: Inspect a structure file
@@ -415,6 +516,35 @@ tools:
     params:
       path: { type: string, minLength: 1, description: Absolute path of the PDB or mmCIF file. }
     required: [path]
+    citations:
+      - text: "Cock, P. J. A., Antao, T., Chang, J. T., Chapman, B. A., Cox, C. J., Dalke, A., Friedberg, I., Hamelryck, T., Kauff, F., Wilczynski, B., & de Hoon, M. J. L. (2009). Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics, 25(11), 1422–1423. https://doi.org/10.1093/bioinformatics/btp163"
+        doi: 10.1093/bioinformatics/btp163
+        kind: program
+        bibtex: |
+          @article{cock2009biopython,
+            author  = {Cock, Peter J. A. and Antao, Tiago and Chang, Jeffrey T. and Chapman, Brad A. and Cox, Cymon J. and Dalke, Andrew and Friedberg, Iddo and Hamelryck, Thomas and Kauff, Frank and Wilczynski, Bartek and de Hoon, Michiel J. L.},
+            title   = {Biopython: freely available Python tools for computational molecular biology and bioinformatics},
+            journal = {Bioinformatics},
+            year    = {2009},
+            volume  = {25},
+            number  = {11},
+            pages   = {1422--1423},
+            doi     = {10.1093/bioinformatics/btp163}
+          }
+      - text: Hamelryck, T., & Manderick, B. (2003). PDB file parser and structure class implemented in Python. Bioinformatics, 19(17), 2308–2310. https://doi.org/10.1093/bioinformatics/btg299
+        doi: 10.1093/bioinformatics/btg299
+        kind: program
+        bibtex: |
+          @article{hamelryck2003pdb,
+            author  = {Hamelryck, Thomas and Manderick, Bernard},
+            title   = {{PDB} file parser and structure class implemented in Python},
+            journal = {Bioinformatics},
+            year    = {2003},
+            volume  = {19},
+            number  = {17},
+            pages   = {2308--2310},
+            doi     = {10.1093/bioinformatics/btg299}
+          }
 
   - name: measure_distance
     title: Distance between two atoms
@@ -431,6 +561,35 @@ tools:
       atom_b: { type: string, description: Atom name of the second atom. }
       model: { type: integer, minimum: 0, default: 0, description: Model index. The index is 0-based. Model 0 is the first model in the file. }
     required: [path, chain_a, resid_a, atom_a, chain_b, resid_b, atom_b]
+    citations:
+      - text: "Cock, P. J. A., Antao, T., Chang, J. T., Chapman, B. A., Cox, C. J., Dalke, A., Friedberg, I., Hamelryck, T., Kauff, F., Wilczynski, B., & de Hoon, M. J. L. (2009). Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics, 25(11), 1422–1423. https://doi.org/10.1093/bioinformatics/btp163"
+        doi: 10.1093/bioinformatics/btp163
+        kind: program
+        bibtex: |
+          @article{cock2009biopython,
+            author  = {Cock, Peter J. A. and Antao, Tiago and Chang, Jeffrey T. and Chapman, Brad A. and Cox, Cymon J. and Dalke, Andrew and Friedberg, Iddo and Hamelryck, Thomas and Kauff, Frank and Wilczynski, Bartek and de Hoon, Michiel J. L.},
+            title   = {Biopython: freely available Python tools for computational molecular biology and bioinformatics},
+            journal = {Bioinformatics},
+            year    = {2009},
+            volume  = {25},
+            number  = {11},
+            pages   = {1422--1423},
+            doi     = {10.1093/bioinformatics/btp163}
+          }
+      - text: Hamelryck, T., & Manderick, B. (2003). PDB file parser and structure class implemented in Python. Bioinformatics, 19(17), 2308–2310. https://doi.org/10.1093/bioinformatics/btg299
+        doi: 10.1093/bioinformatics/btg299
+        kind: program
+        bibtex: |
+          @article{hamelryck2003pdb,
+            author  = {Hamelryck, Thomas and Manderick, Bernard},
+            title   = {{PDB} file parser and structure class implemented in Python},
+            journal = {Bioinformatics},
+            year    = {2003},
+            volume  = {19},
+            number  = {17},
+            pages   = {2308--2310},
+            doi     = {10.1093/bioinformatics/btg299}
+          }
 
   - name: superpose_structures
     title: Superpose two chains
@@ -450,6 +609,35 @@ tools:
     required: [mobile_path, reference_path, mobile_chain, reference_chain]
     outputs:
       fitted: { kind: file, ext: pdb, description: The fitted chain. }
+    citations:
+      - text: "Cock, P. J. A., Antao, T., Chang, J. T., Chapman, B. A., Cox, C. J., Dalke, A., Friedberg, I., Hamelryck, T., Kauff, F., Wilczynski, B., & de Hoon, M. J. L. (2009). Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics, 25(11), 1422–1423. https://doi.org/10.1093/bioinformatics/btp163"
+        doi: 10.1093/bioinformatics/btp163
+        kind: program
+        bibtex: |
+          @article{cock2009biopython,
+            author  = {Cock, Peter J. A. and Antao, Tiago and Chang, Jeffrey T. and Chapman, Brad A. and Cox, Cymon J. and Dalke, Andrew and Friedberg, Iddo and Hamelryck, Thomas and Kauff, Frank and Wilczynski, Bartek and de Hoon, Michiel J. L.},
+            title   = {Biopython: freely available Python tools for computational molecular biology and bioinformatics},
+            journal = {Bioinformatics},
+            year    = {2009},
+            volume  = {25},
+            number  = {11},
+            pages   = {1422--1423},
+            doi     = {10.1093/bioinformatics/btp163}
+          }
+      - text: Hamelryck, T., & Manderick, B. (2003). PDB file parser and structure class implemented in Python. Bioinformatics, 19(17), 2308–2310. https://doi.org/10.1093/bioinformatics/btg299
+        doi: 10.1093/bioinformatics/btg299
+        kind: program
+        bibtex: |
+          @article{hamelryck2003pdb,
+            author  = {Hamelryck, Thomas and Manderick, Bernard},
+            title   = {{PDB} file parser and structure class implemented in Python},
+            journal = {Bioinformatics},
+            year    = {2003},
+            volume  = {19},
+            number  = {17},
+            pages   = {2308--2310},
+            doi     = {10.1093/bioinformatics/btg299}
+          }
 
 map:
   - tool: inspect_trajectory

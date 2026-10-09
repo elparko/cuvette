@@ -29,6 +29,20 @@ program:
     packages that the script imports:
     uv venv ~/.guided-analysis/envs/gdal && uv pip install --python ~/.guided-analysis/envs/gdal/bin/python
     rasterstats geopandas rasterio matplotlib numpy
+  citation:
+    - text: GDAL/OGR contributors. (2026). GDAL/OGR Geospatial Data Abstraction software Library (Version 3.13.3) [Computer software]. Open Source Geospatial Foundation. https://doi.org/10.5281/zenodo.5884351
+      doi: 10.5281/zenodo.5884351
+      bibtex: |
+        @software{gdal2026gdal,
+          author    = {{GDAL/OGR contributors}},
+          title     = {{GDAL/OGR} Geospatial Data Abstraction software Library},
+          version   = {3.13.3},
+          year      = {2026},
+          publisher = {Open Source Geospatial Foundation},
+          doi       = {10.5281/zenodo.5884351},
+          url       = {https://gdal.org},
+          note      = {Zenodo concept DOI. Creators on Zenodo: Rouault, Even and Warmerdam, Frank and Schwehr, Kurt and others.}
+        }
 
 connection:
   kind: cli

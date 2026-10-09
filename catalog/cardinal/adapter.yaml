@@ -25,6 +25,33 @@ program:
     Install R (brew install r on macOS). Then install the Bioconductor package Cardinal and jsonlite into a library folder
     that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
     mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages("BiocManager", repos = "https://cloud.r-project.org"); BiocManager::install(c("Cardinal", "jsonlite"))'
+  citation:
+    - text: "Bemis, K. A., Föll, M. C., Guo, D., Lakkimsetty, S. S., & Vitek, O. (2023). Cardinal v.3: a versatile open-source software for mass spectrometry imaging analysis. Nature Methods, 20(12), 1883–1886. https://doi.org/10.1038/s41592-023-02070-z"
+      doi: 10.1038/s41592-023-02070-z
+      bibtex: |
+        @article{bemis2023cardinal,
+          author  = {Bemis, Kylie Ariel and F{\"o}ll, Melanie Christine and Guo, Dan and Lakkimsetty, Sai Srikanth and Vitek, Olga},
+          title   = {{Cardinal} v.3: a versatile open-source software for mass spectrometry imaging analysis},
+          journal = {Nature Methods},
+          year    = {2023},
+          volume  = {20},
+          number  = {12},
+          pages   = {1883--1886},
+          doi     = {10.1038/s41592-023-02070-z}
+        }
+    - text: "Bemis, K. D., Harry, A., Eberlin, L. S., Ferreira, C., van de Ven, S. M., Mallick, P., Stolowitz, M., & Vitek, O. (2015). Cardinal: an R package for statistical analysis of mass spectrometry-based imaging experiments. Bioinformatics, 31(14), 2418–2420. https://doi.org/10.1093/bioinformatics/btv146"
+      doi: 10.1093/bioinformatics/btv146
+      bibtex: |
+        @article{bemis2015cardinal,
+          author  = {Bemis, Kylie D. and Harry, April and Eberlin, Livia S. and Ferreira, Christina and van de Ven, Stephanie M. and Mallick, Parag and Stolowitz, Mark and Vitek, Olga},
+          title   = {{Cardinal}: an {R} package for statistical analysis of mass spectrometry-based imaging experiments},
+          journal = {Bioinformatics},
+          year    = {2015},
+          volume  = {31},
+          number  = {14},
+          pages   = {2418--2420},
+          doi     = {10.1093/bioinformatics/btv146}
+        }
 
 connection:
   kind: script
@@ -463,6 +490,20 @@ tools:
       models: { kind: table, ext: .csv, description: One row for each model. }
     script: scripts/segment_image.R
     parse: json
+    citations:
+      - text: Bemis, K. D., Harry, A., Eberlin, L. S., Ferreira, C. R., van de Ven, S. M., Mallick, P., Stolowitz, M., & Vitek, O. (2016). Probabilistic Segmentation of Mass Spectrometry (MS) Images Helps Select Important Ions and Characterize Confidence in the Resulting Segments. Molecular & Cellular Proteomics, 15(5), 1761–1772. https://doi.org/10.1074/mcp.O115.053918
+        doi: 10.1074/mcp.O115.053918
+        bibtex: |
+          @article{bemis2016probabilistic,
+            author  = {Bemis, Kyle D. and Harry, April and Eberlin, Livia S. and Ferreira, Christina R. and van de Ven, Stephanie M. and Mallick, Parag and Stolowitz, Mark and Vitek, Olga},
+            title   = {Probabilistic Segmentation of Mass Spectrometry ({MS}) Images Helps Select Important Ions and Characterize Confidence in the Resulting Segments},
+            journal = {Molecular \& Cellular Proteomics},
+            year    = {2016},
+            volume  = {15},
+            number  = {5},
+            pages   = {1761--1772},
+            doi     = {10.1074/mcp.O115.053918}
+          }
 
   - name: top_features
     title: List the ions of each segment

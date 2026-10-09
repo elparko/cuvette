@@ -25,6 +25,31 @@ program:
     The adapter uses its own Python environment at ~/.guided-analysis/envs/cellpose, or the Python in CELLPOSE_PYTHON.
     Make the environment and install Cellpose with packaging, which Cellpose needs but does not list:
     uv venv ~/.guided-analysis/envs/cellpose && uv pip install --python ~/.guided-analysis/envs/cellpose/bin/python cellpose packaging
+  citation:
+    - text: "Pachitariu, M., Rariden, M., & Stringer, C. (2025). Cellpose-SAM: superhuman generalization for cellular segmentation. bioRxiv. https://doi.org/10.1101/2025.04.28.651001"
+      doi: 10.1101/2025.04.28.651001
+      bibtex: |
+        @article{pachitariu2025cellpose,
+          author  = {Pachitariu, Marius and Rariden, Michael and Stringer, Carsen},
+          title   = {Cellpose-{SAM}: superhuman generalization for cellular segmentation},
+          journal = {bioRxiv},
+          year    = {2025},
+          doi     = {10.1101/2025.04.28.651001},
+          note    = {Preprint}
+        }
+    - text: "Stringer, C., Wang, T., Michaelos, M., & Pachitariu, M. (2021). Cellpose: a generalist algorithm for cellular segmentation. Nature Methods, 18(1), 100–106. https://doi.org/10.1038/s41592-020-01018-x"
+      doi: 10.1038/s41592-020-01018-x
+      bibtex: |
+        @article{stringer2021cellpose,
+          author  = {Stringer, Carsen and Wang, Tim and Michaelos, Michalis and Pachitariu, Marius},
+          title   = {Cellpose: a generalist algorithm for cellular segmentation},
+          journal = {Nature Methods},
+          year    = {2021},
+          volume  = {18},
+          number  = {1},
+          pages   = {100--106},
+          doi     = {10.1038/s41592-020-01018-x}
+        }
 
 connection:
   kind: python

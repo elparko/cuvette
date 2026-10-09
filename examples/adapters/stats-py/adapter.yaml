@@ -5,6 +5,9 @@ adapter:
 program:
   name: stats.py
   version: "1.0"
+  citation:
+    - text: "Smith, P. (2026). Cuvette (Version 0.1.0) [Computer software]. https://cuvette.ai"
+      url: https://cuvette.ai
 connection:
   kind: python
 decisions:

@@ -7,6 +7,9 @@ program:
   version: ""
   homepage: https://pandoc.org
   docs: [https://pandoc.org/MANUAL.html]
+  citation:
+    - text: "MacFarlane, J. Pandoc: a universal document converter [Computer software]. https://pandoc.org"
+      url: https://pandoc.org
 connection:
   kind: cli
 locate:

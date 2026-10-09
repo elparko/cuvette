@@ -26,6 +26,20 @@ program:
     Download ImageJ 1.x or Fiji from https://imagej.net and install Java, because the adapter starts ij.jar with java.
     The adapter reads the jar from IMAGEJ_JAR, or from /Applications/ImageJ.app/Contents/Java/ij.jar or Fiji.app/jars/ij-*.jar:
     export IMAGEJ_JAR=/Applications/ImageJ.app/Contents/Java/ij.jar
+  citation:
+    - text: "Schneider, C. A., Rasband, W. S., & Eliceiri, K. W. (2012). NIH Image to ImageJ: 25 years of image analysis. Nature Methods, 9(7), 671–675. https://doi.org/10.1038/nmeth.2089"
+      doi: 10.1038/nmeth.2089
+      bibtex: |
+        @article{schneider2012nih,
+          author  = {Schneider, Caroline A. and Rasband, Wayne S. and Eliceiri, Kevin W.},
+          title   = {{NIH} Image to {ImageJ}: 25 years of image analysis},
+          journal = {Nature Methods},
+          year    = {2012},
+          volume  = {9},
+          number  = {7},
+          pages   = {671--675},
+          doi     = {10.1038/nmeth.2089}
+        }
 
 connection:
   kind: macro
@@ -786,6 +800,20 @@ tools:
         print("note=The radius is 0, so no background was subtracted. The image is unchanged.");
       }
       savePair("{output.image}", "{output.preview}");
+    citations:
+      - text: Sternberg, S. R. (1983). Biomedical Image Processing. Computer, 16(1), 22–34. https://doi.org/10.1109/MC.1983.1654163
+        doi: 10.1109/MC.1983.1654163
+        bibtex: |
+          @article{sternberg1983biomedical,
+            author  = {Sternberg, Stanley R.},
+            title   = {Biomedical Image Processing},
+            journal = {Computer},
+            year    = {1983},
+            volume  = {16},
+            number  = {1},
+            pages   = {22--34},
+            doi     = {10.1109/MC.1983.1654163}
+          }
 
   - name: gaussian_blur
     title: Blur the image
@@ -829,6 +857,129 @@ tools:
       openImage("{input}");
       runThreshold("{method}", {dark_background});
       savePair("{output.mask}", "{output.preview}");
+    citations:
+      - text: Ridler, T. W., & Calvard, S. (1978). Picture Thresholding Using an Iterative Selection Method. IEEE Transactions on Systems, Man, and Cybernetics, 8(8), 630–632. https://doi.org/10.1109/TSMC.1978.4310039
+        doi: 10.1109/TSMC.1978.4310039
+        when:
+          method:
+            - Default
+            - IsoData
+        bibtex: |
+          @article{ridler1978picture,
+            author  = {Ridler, T. W. and Calvard, S.},
+            title   = {Picture Thresholding Using an Iterative Selection Method},
+            journal = {IEEE Transactions on Systems, Man, and Cybernetics},
+            year    = {1978},
+            volume  = {8},
+            number  = {8},
+            pages   = {630--632},
+            doi     = {10.1109/TSMC.1978.4310039}
+          }
+      - text: Otsu, N. (1979). A Threshold Selection Method from Gray-Level Histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62–66. https://doi.org/10.1109/TSMC.1979.4310076
+        doi: 10.1109/TSMC.1979.4310076
+        when:
+          method: Otsu
+        bibtex: |
+          @article{otsu1979threshold,
+            author  = {Otsu, Nobuyuki},
+            title   = {A Threshold Selection Method from Gray-Level Histograms},
+            journal = {IEEE Transactions on Systems, Man, and Cybernetics},
+            year    = {1979},
+            volume  = {9},
+            number  = {1},
+            pages   = {62--66},
+            doi     = {10.1109/TSMC.1979.4310076}
+          }
+      - text: Zack, G. W., Rogers, W. E., & Latt, S. A. (1977). Automatic measurement of sister chromatid exchange frequency. Journal of Histochemistry & Cytochemistry, 25(7), 741–753. https://doi.org/10.1177/25.7.70454
+        doi: 10.1177/25.7.70454
+        when:
+          method: Triangle
+        bibtex: |
+          @article{zack1977automatic,
+            author  = {Zack, G. W. and Rogers, W. E. and Latt, S. A.},
+            title   = {Automatic measurement of sister chromatid exchange frequency},
+            journal = {Journal of Histochemistry \& Cytochemistry},
+            year    = {1977},
+            volume  = {25},
+            number  = {7},
+            pages   = {741--753},
+            doi     = {10.1177/25.7.70454}
+          }
+      - text: Huang, L.-K., & Wang, M.-J. J. (1995). Image thresholding by minimizing the measures of fuzziness. Pattern Recognition, 28(1), 41–51. https://doi.org/10.1016/0031-3203(94)E0043-K
+        doi: 10.1016/0031-3203(94)E0043-K
+        when:
+          method: Huang
+        bibtex: |
+          @article{huang1995image,
+            author  = {Huang, Liang-Kai and Wang, Mao-Jiun J.},
+            title   = {Image thresholding by minimizing the measures of fuzziness},
+            journal = {Pattern Recognition},
+            year    = {1995},
+            volume  = {28},
+            number  = {1},
+            pages   = {41--51},
+            doi     = {10.1016/0031-3203(94)E0043-K}
+          }
+      - text: Li, C. H., & Lee, C. K. (1993). Minimum cross entropy thresholding. Pattern Recognition, 26(4), 617–625. https://doi.org/10.1016/0031-3203(93)90115-D
+        doi: 10.1016/0031-3203(93)90115-D
+        when:
+          method: Li
+        bibtex: |
+          @article{li1993minimum,
+            author  = {Li, C. H. and Lee, C. K.},
+            title   = {Minimum cross entropy thresholding},
+            journal = {Pattern Recognition},
+            year    = {1993},
+            volume  = {26},
+            number  = {4},
+            pages   = {617--625},
+            doi     = {10.1016/0031-3203(93)90115-D}
+          }
+      - text: Li, C. H., & Tam, P. K. S. (1998). An iterative algorithm for minimum cross entropy thresholding. Pattern Recognition Letters, 19(8), 771–776. https://doi.org/10.1016/S0167-8655(98)00057-9
+        doi: 10.1016/S0167-8655(98)00057-9
+        when:
+          method: Li
+        bibtex: |
+          @article{li1998iterative,
+            author  = {Li, C. H. and Tam, P. K. S.},
+            title   = {An iterative algorithm for minimum cross entropy thresholding},
+            journal = {Pattern Recognition Letters},
+            year    = {1998},
+            volume  = {19},
+            number  = {8},
+            pages   = {771--776},
+            doi     = {10.1016/S0167-8655(98)00057-9}
+          }
+      - text: "Glasbey, C. A. (1993). An Analysis of Histogram-Based Thresholding Algorithms. CVGIP: Graphical Models and Image Processing, 55(6), 532–537. https://doi.org/10.1006/cgip.1993.1040"
+        doi: 10.1006/cgip.1993.1040
+        when:
+          method: Mean
+        bibtex: |
+          @article{glasbey1993analysis,
+            author  = {Glasbey, C. A.},
+            title   = {An Analysis of Histogram-Based Thresholding Algorithms},
+            journal = {CVGIP: Graphical Models and Image Processing},
+            year    = {1993},
+            volume  = {55},
+            number  = {6},
+            pages   = {532--537},
+            doi     = {10.1006/cgip.1993.1040}
+          }
+      - text: Kapur, J. N., Sahoo, P. K., & Wong, A. K. C. (1985). A new method for gray-level picture thresholding using the entropy of the histogram. Computer Vision, Graphics, and Image Processing, 29(3), 273–285. https://doi.org/10.1016/0734-189X(85)90125-2
+        doi: 10.1016/0734-189X(85)90125-2
+        when:
+          method: MaxEntropy
+        bibtex: |
+          @article{kapur1985new,
+            author  = {Kapur, J. N. and Sahoo, P. K. and Wong, A. K. C.},
+            title   = {A new method for gray-level picture thresholding using the entropy of the histogram},
+            journal = {Computer Vision, Graphics, and Image Processing},
+            year    = {1985},
+            volume  = {29},
+            number  = {3},
+            pages   = {273--285},
+            doi     = {10.1016/0734-189X(85)90125-2}
+          }
 
   - name: watershed
     title: Split touching objects
@@ -947,6 +1098,144 @@ tools:
       saveAs("Tiff", "{output.mask}");
       analyze({min_size}, {max_size}, {min_circularity}, {exclude_edges}, "None", "{output.outlines}", "{output.particles}");
       printCounts();
+    citations:
+      - text: Ridler, T. W., & Calvard, S. (1978). Picture Thresholding Using an Iterative Selection Method. IEEE Transactions on Systems, Man, and Cybernetics, 8(8), 630–632. https://doi.org/10.1109/TSMC.1978.4310039
+        doi: 10.1109/TSMC.1978.4310039
+        when:
+          method:
+            - Default
+            - IsoData
+        bibtex: |
+          @article{ridler1978picture,
+            author  = {Ridler, T. W. and Calvard, S.},
+            title   = {Picture Thresholding Using an Iterative Selection Method},
+            journal = {IEEE Transactions on Systems, Man, and Cybernetics},
+            year    = {1978},
+            volume  = {8},
+            number  = {8},
+            pages   = {630--632},
+            doi     = {10.1109/TSMC.1978.4310039}
+          }
+      - text: Otsu, N. (1979). A Threshold Selection Method from Gray-Level Histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62–66. https://doi.org/10.1109/TSMC.1979.4310076
+        doi: 10.1109/TSMC.1979.4310076
+        when:
+          method: Otsu
+        bibtex: |
+          @article{otsu1979threshold,
+            author  = {Otsu, Nobuyuki},
+            title   = {A Threshold Selection Method from Gray-Level Histograms},
+            journal = {IEEE Transactions on Systems, Man, and Cybernetics},
+            year    = {1979},
+            volume  = {9},
+            number  = {1},
+            pages   = {62--66},
+            doi     = {10.1109/TSMC.1979.4310076}
+          }
+      - text: Zack, G. W., Rogers, W. E., & Latt, S. A. (1977). Automatic measurement of sister chromatid exchange frequency. Journal of Histochemistry & Cytochemistry, 25(7), 741–753. https://doi.org/10.1177/25.7.70454
+        doi: 10.1177/25.7.70454
+        when:
+          method: Triangle
+        bibtex: |
+          @article{zack1977automatic,
+            author  = {Zack, G. W. and Rogers, W. E. and Latt, S. A.},
+            title   = {Automatic measurement of sister chromatid exchange frequency},
+            journal = {Journal of Histochemistry \& Cytochemistry},
+            year    = {1977},
+            volume  = {25},
+            number  = {7},
+            pages   = {741--753},
+            doi     = {10.1177/25.7.70454}
+          }
+      - text: Huang, L.-K., & Wang, M.-J. J. (1995). Image thresholding by minimizing the measures of fuzziness. Pattern Recognition, 28(1), 41–51. https://doi.org/10.1016/0031-3203(94)E0043-K
+        doi: 10.1016/0031-3203(94)E0043-K
+        when:
+          method: Huang
+        bibtex: |
+          @article{huang1995image,
+            author  = {Huang, Liang-Kai and Wang, Mao-Jiun J.},
+            title   = {Image thresholding by minimizing the measures of fuzziness},
+            journal = {Pattern Recognition},
+            year    = {1995},
+            volume  = {28},
+            number  = {1},
+            pages   = {41--51},
+            doi     = {10.1016/0031-3203(94)E0043-K}
+          }
+      - text: Li, C. H., & Lee, C. K. (1993). Minimum cross entropy thresholding. Pattern Recognition, 26(4), 617–625. https://doi.org/10.1016/0031-3203(93)90115-D
+        doi: 10.1016/0031-3203(93)90115-D
+        when:
+          method: Li
+        bibtex: |
+          @article{li1993minimum,
+            author  = {Li, C. H. and Lee, C. K.},
+            title   = {Minimum cross entropy thresholding},
+            journal = {Pattern Recognition},
+            year    = {1993},
+            volume  = {26},
+            number  = {4},
+            pages   = {617--625},
+            doi     = {10.1016/0031-3203(93)90115-D}
+          }
+      - text: Li, C. H., & Tam, P. K. S. (1998). An iterative algorithm for minimum cross entropy thresholding. Pattern Recognition Letters, 19(8), 771–776. https://doi.org/10.1016/S0167-8655(98)00057-9
+        doi: 10.1016/S0167-8655(98)00057-9
+        when:
+          method: Li
+        bibtex: |
+          @article{li1998iterative,
+            author  = {Li, C. H. and Tam, P. K. S.},
+            title   = {An iterative algorithm for minimum cross entropy thresholding},
+            journal = {Pattern Recognition Letters},
+            year    = {1998},
+            volume  = {19},
+            number  = {8},
+            pages   = {771--776},
+            doi     = {10.1016/S0167-8655(98)00057-9}
+          }
+      - text: "Glasbey, C. A. (1993). An Analysis of Histogram-Based Thresholding Algorithms. CVGIP: Graphical Models and Image Processing, 55(6), 532–537. https://doi.org/10.1006/cgip.1993.1040"
+        doi: 10.1006/cgip.1993.1040
+        when:
+          method: Mean
+        bibtex: |
+          @article{glasbey1993analysis,
+            author  = {Glasbey, C. A.},
+            title   = {An Analysis of Histogram-Based Thresholding Algorithms},
+            journal = {CVGIP: Graphical Models and Image Processing},
+            year    = {1993},
+            volume  = {55},
+            number  = {6},
+            pages   = {532--537},
+            doi     = {10.1006/cgip.1993.1040}
+          }
+      - text: Kapur, J. N., Sahoo, P. K., & Wong, A. K. C. (1985). A new method for gray-level picture thresholding using the entropy of the histogram. Computer Vision, Graphics, and Image Processing, 29(3), 273–285. https://doi.org/10.1016/0734-189X(85)90125-2
+        doi: 10.1016/0734-189X(85)90125-2
+        when:
+          method: MaxEntropy
+        bibtex: |
+          @article{kapur1985new,
+            author  = {Kapur, J. N. and Sahoo, P. K. and Wong, A. K. C.},
+            title   = {A new method for gray-level picture thresholding using the entropy of the histogram},
+            journal = {Computer Vision, Graphics, and Image Processing},
+            year    = {1985},
+            volume  = {29},
+            number  = {3},
+            pages   = {273--285},
+            doi     = {10.1016/0734-189X(85)90125-2}
+          }
+      - text: Sternberg, S. R. (1983). Biomedical Image Processing. Computer, 16(1), 22–34. https://doi.org/10.1109/MC.1983.1654163
+        doi: 10.1109/MC.1983.1654163
+        when:
+          rolling_radius: set
+        bibtex: |
+          @article{sternberg1983biomedical,
+            author  = {Sternberg, Stanley R.},
+            title   = {Biomedical Image Processing},
+            journal = {Computer},
+            year    = {1983},
+            volume  = {16},
+            number  = {1},
+            pages   = {22--34},
+            doi     = {10.1109/MC.1983.1654163}
+          }
 
   - name: count_folder
     title: Count in all images of a folder
@@ -1023,6 +1312,144 @@ tools:
       print("area_unit=" + cUnit);
       print("n_saturated_images=" + nSat);
       if (nSat > 0) print("warning=" + nSat + " image(s) have more than 1 percent of pixels at the maximum value:" + satNames + ". Intensity values from these images are not reliable.");
+    citations:
+      - text: Ridler, T. W., & Calvard, S. (1978). Picture Thresholding Using an Iterative Selection Method. IEEE Transactions on Systems, Man, and Cybernetics, 8(8), 630–632. https://doi.org/10.1109/TSMC.1978.4310039
+        doi: 10.1109/TSMC.1978.4310039
+        when:
+          method:
+            - Default
+            - IsoData
+        bibtex: |
+          @article{ridler1978picture,
+            author  = {Ridler, T. W. and Calvard, S.},
+            title   = {Picture Thresholding Using an Iterative Selection Method},
+            journal = {IEEE Transactions on Systems, Man, and Cybernetics},
+            year    = {1978},
+            volume  = {8},
+            number  = {8},
+            pages   = {630--632},
+            doi     = {10.1109/TSMC.1978.4310039}
+          }
+      - text: Otsu, N. (1979). A Threshold Selection Method from Gray-Level Histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62–66. https://doi.org/10.1109/TSMC.1979.4310076
+        doi: 10.1109/TSMC.1979.4310076
+        when:
+          method: Otsu
+        bibtex: |
+          @article{otsu1979threshold,
+            author  = {Otsu, Nobuyuki},
+            title   = {A Threshold Selection Method from Gray-Level Histograms},
+            journal = {IEEE Transactions on Systems, Man, and Cybernetics},
+            year    = {1979},
+            volume  = {9},
+            number  = {1},
+            pages   = {62--66},
+            doi     = {10.1109/TSMC.1979.4310076}
+          }
+      - text: Zack, G. W., Rogers, W. E., & Latt, S. A. (1977). Automatic measurement of sister chromatid exchange frequency. Journal of Histochemistry & Cytochemistry, 25(7), 741–753. https://doi.org/10.1177/25.7.70454
+        doi: 10.1177/25.7.70454
+        when:
+          method: Triangle
+        bibtex: |
+          @article{zack1977automatic,
+            author  = {Zack, G. W. and Rogers, W. E. and Latt, S. A.},
+            title   = {Automatic measurement of sister chromatid exchange frequency},
+            journal = {Journal of Histochemistry \& Cytochemistry},
+            year    = {1977},
+            volume  = {25},
+            number  = {7},
+            pages   = {741--753},
+            doi     = {10.1177/25.7.70454}
+          }
+      - text: Huang, L.-K., & Wang, M.-J. J. (1995). Image thresholding by minimizing the measures of fuzziness. Pattern Recognition, 28(1), 41–51. https://doi.org/10.1016/0031-3203(94)E0043-K
+        doi: 10.1016/0031-3203(94)E0043-K
+        when:
+          method: Huang
+        bibtex: |
+          @article{huang1995image,
+            author  = {Huang, Liang-Kai and Wang, Mao-Jiun J.},
+            title   = {Image thresholding by minimizing the measures of fuzziness},
+            journal = {Pattern Recognition},
+            year    = {1995},
+            volume  = {28},
+            number  = {1},
+            pages   = {41--51},
+            doi     = {10.1016/0031-3203(94)E0043-K}
+          }
+      - text: Li, C. H., & Lee, C. K. (1993). Minimum cross entropy thresholding. Pattern Recognition, 26(4), 617–625. https://doi.org/10.1016/0031-3203(93)90115-D
+        doi: 10.1016/0031-3203(93)90115-D
+        when:
+          method: Li
+        bibtex: |
+          @article{li1993minimum,
+            author  = {Li, C. H. and Lee, C. K.},
+            title   = {Minimum cross entropy thresholding},
+            journal = {Pattern Recognition},
+            year    = {1993},
+            volume  = {26},
+            number  = {4},
+            pages   = {617--625},
+            doi     = {10.1016/0031-3203(93)90115-D}
+          }
+      - text: Li, C. H., & Tam, P. K. S. (1998). An iterative algorithm for minimum cross entropy thresholding. Pattern Recognition Letters, 19(8), 771–776. https://doi.org/10.1016/S0167-8655(98)00057-9
+        doi: 10.1016/S0167-8655(98)00057-9
+        when:
+          method: Li
+        bibtex: |
+          @article{li1998iterative,
+            author  = {Li, C. H. and Tam, P. K. S.},
+            title   = {An iterative algorithm for minimum cross entropy thresholding},
+            journal = {Pattern Recognition Letters},
+            year    = {1998},
+            volume  = {19},
+            number  = {8},
+            pages   = {771--776},
+            doi     = {10.1016/S0167-8655(98)00057-9}
+          }
+      - text: "Glasbey, C. A. (1993). An Analysis of Histogram-Based Thresholding Algorithms. CVGIP: Graphical Models and Image Processing, 55(6), 532–537. https://doi.org/10.1006/cgip.1993.1040"
+        doi: 10.1006/cgip.1993.1040
+        when:
+          method: Mean
+        bibtex: |
+          @article{glasbey1993analysis,
+            author  = {Glasbey, C. A.},
+            title   = {An Analysis of Histogram-Based Thresholding Algorithms},
+            journal = {CVGIP: Graphical Models and Image Processing},
+            year    = {1993},
+            volume  = {55},
+            number  = {6},
+            pages   = {532--537},
+            doi     = {10.1006/cgip.1993.1040}
+          }
+      - text: Kapur, J. N., Sahoo, P. K., & Wong, A. K. C. (1985). A new method for gray-level picture thresholding using the entropy of the histogram. Computer Vision, Graphics, and Image Processing, 29(3), 273–285. https://doi.org/10.1016/0734-189X(85)90125-2
+        doi: 10.1016/0734-189X(85)90125-2
+        when:
+          method: MaxEntropy
+        bibtex: |
+          @article{kapur1985new,
+            author  = {Kapur, J. N. and Sahoo, P. K. and Wong, A. K. C.},
+            title   = {A new method for gray-level picture thresholding using the entropy of the histogram},
+            journal = {Computer Vision, Graphics, and Image Processing},
+            year    = {1985},
+            volume  = {29},
+            number  = {3},
+            pages   = {273--285},
+            doi     = {10.1016/0734-189X(85)90125-2}
+          }
+      - text: Sternberg, S. R. (1983). Biomedical Image Processing. Computer, 16(1), 22–34. https://doi.org/10.1109/MC.1983.1654163
+        doi: 10.1109/MC.1983.1654163
+        when:
+          rolling_radius: set
+        bibtex: |
+          @article{sternberg1983biomedical,
+            author  = {Sternberg, Stanley R.},
+            title   = {Biomedical Image Processing},
+            journal = {Computer},
+            year    = {1983},
+            volume  = {16},
+            number  = {1},
+            pages   = {22--34},
+            doi     = {10.1109/MC.1983.1654163}
+          }
 
   - name: run_command
     title: Run any menu command
