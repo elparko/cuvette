@@ -1,0 +1,849 @@
+adapter:
+  name: image-assays
+  title: Bench image assays
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Measures bench image assays with scikit-image and SciPy. It counts colonies on plates and
+    gives clonogenic survival. It measures colocalization of two fluorescence channels (Pearson,
+    Manders, Costes). It counts cells with cargo for phagocytosis, efferocytosis and particle
+    uptake. Each tool writes a QC overlay of what it counted and what it left out, plots as PNG
+    and SVG, and CSV tables.
+  field: microscopy
+  file_types: [".tif", ".tiff", ".lsm", ".png", ".jpg", ".jpeg"]
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: scikit-image
+  version: "0.26.0"
+  tested_versions: []
+  homepage: https://scikit-image.org
+  docs:
+    - https://scikit-image.org/docs/stable/api/skimage.filters.html
+    - https://scikit-image.org/docs/stable/api/skimage.segmentation.html
+    - https://imagej.net/plugins/coloc-2
+  install: >
+    The adapter uses its own Python environment at ~/.guided-analysis/envs/image-assays, or the Python in IMAGE_ASSAYS_PYTHON.
+    Make it with: uv venv ~/.guided-analysis/envs/image-assays && uv pip install --python ~/.guided-analysis/envs/image-assays/bin/python scikit-image scipy matplotlib tifffile imagecodecs pillow
+  citation:
+    - text: "van der Walt, S., Schönberger, J. L., Nunez-Iglesias, J., Boulogne, F., Warner, J. D., Yager, N., Gouillart, E., & Yu, T. (2014). scikit-image: image processing in Python. PeerJ, 2, e453."
+      doi: 10.7717/peerj.453
+    - text: "Virtanen, P., Gommers, R., Oliphant, T. E., et al. (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods, 17(3), 261-272."
+      doi: 10.1038/s41592-019-0686-2
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  call_timeout_s: 1800
+
+locate:
+  env: IMAGE_ASSAYS_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/image-assays/bin/python
+    - ~/.guided-analysis/envs/image-assays/Scripts/python.exe
+  version_command: ["{program_path}", "-c", "import skimage, scipy, matplotlib, tifffile; print('skimage', skimage.__version__)"]
+  version_pattern: 'skimage (\S+)'
+  identity: 'skimage \d'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and small PNG previews. It never sees the original image files.
+
+standards: ""
+
+decisions:
+  - key: question
+    label: What question do you ask with these images?
+    kind: text
+    group: Question
+    help: Example - Does the treatment change the fraction of macrophages that ate apoptotic cells? How many colonies grow at each dose?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replication_unit
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - cells or objects in one image (exploratory)
+      - images or fields
+      - wells, plates or dishes
+      - biological replicates (animals, donors, independent cultures)
+    default: biological replicates (animals, donors, independent cultures)
+    group: Design
+    help: >
+      Cells in one field are not independent samples, and fields from one well are not
+      independent either. Compare biological replicates for a test.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: pixel_size
+    label: Pixel size in micrometers (0 = uncalibrated)
+    kind: float
+    default: 0
+    lo: 0
+    group: Design
+    help: Micrometers for each pixel. Write 0 if you do not know it. Then all sizes stay in pixels.
+    owner: human
+    stage: setup
+    links:
+      - { tool: count_colonies, arg: pixel_size }
+      - { tool: count_cell_uptake, arg: pixel_size }
+
+  - key: colony_channel
+    label: Plate image channel that shows the colonies
+    kind: choice
+    choices: [gray, red, green, blue, saturation]
+    default: gray
+    group: Colonies
+    help: The plane that the threshold reads. On red blood agar, pale colonies show best in the green channel. On a plain plate, gray is usual.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_colonies, arg: channel }
+
+  - key: colony_polarity
+    label: Are the colonies brighter or darker than the agar?
+    kind: choice
+    choices: [bright, dark]
+    default: bright
+    group: Colonies
+    help: Bright keeps the pixels above the threshold. Dark keeps the pixels below it, as for crystal violet colonies on a white dish.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_colonies, arg: colony_polarity }
+
+  - key: colony_threshold
+    label: Colony threshold (method name or a number)
+    kind: text
+    default: otsu
+    group: Colonies
+    help: >
+      A method (otsu, li, triangle, yen, isodata, mean) or a fixed number on the 0 to 1 scale of the
+      channel after the background step. When colonies cover a small part of the plate, otsu can
+      cut into the agar noise; triangle often works better then. Check the overlay.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_colonies, arg: threshold }
+    sensitivity:
+      options: [otsu, triangle, li]
+      tool: count_colonies
+      compare: [metrics.n_colonies]
+      max_runs: 3
+
+  - key: colony_min_diameter
+    label: Smallest colony to count (pixels across)
+    kind: float
+    default: 0
+    lo: 0
+    group: Colonies
+    help: Objects narrower than this are left out as dust, specks or bubbles. 0 keeps all objects.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_colonies, arg: min_diameter }
+
+  - key: colony_max_diameter
+    label: Largest colony to count (pixels across, 0 = no limit)
+    kind: float
+    default: 0
+    lo: 0
+    group: Colonies
+    help: Objects wider than this are left out, for example merged lawns or glare. 0 sets no limit.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_colonies, arg: max_diameter }
+
+  - key: colony_min_roundness
+    label: Smallest roundness of a colony (0 to 1)
+    kind: float
+    default: 0
+    lo: 0
+    hi: 1
+    group: Colonies
+    help: Roundness is 4 pi area / perimeter squared; a circle is 1. Scratches and streaks have a low value. 0 keeps all shapes.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_colonies, arg: min_circularity }
+
+  - key: rim_margin
+    label: Dish rim to leave out (fraction of the dish radius)
+    kind: float
+    default: 0.05
+    lo: 0
+    hi: 0.5
+    group: Colonies
+    help: The band at the dish wall has reflections and bubbles. The tool does not count objects in this band.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_colonies, arg: rim_margin }
+
+  - key: colony_background_radius
+    label: Background smoothing for plates (pixels, 0 = none)
+    kind: float
+    default: 0
+    lo: 0
+    group: Colonies
+    help: The tool subtracts a wide blur of the plate before the threshold, to remove uneven light. Use a value larger than a colony. 0 turns it off.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_colonies, arg: background_radius }
+
+  - key: split_touching_colonies
+    label: Split touching colonies
+    kind: bool
+    default: false
+    group: Colonies
+    help: A watershed on the distance map cuts touching colonies apart. It can also cut one irregular colony in two.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_colonies, arg: split_touching }
+
+  - key: control_condition
+    label: Control condition for the plating efficiency
+    kind: text
+    group: Clonogenic survival
+    help: The condition name in the table whose plating efficiency divides all others, usually the untreated or 0 Gy plates.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: clonogenic_survival, arg: control }
+
+  - key: coloc_threshold_method
+    label: Colocalization threshold method
+    kind: choice
+    choices: [costes, bisection, manual, none]
+    default: costes
+    group: Colocalization
+    help: >
+      Costes finds the thresholds where the pixels below them no longer correlate. Bisection is a
+      faster search for the same point. Manual uses your two numbers. None reports Manders values
+      above zero only, which background makes too high.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_colocalization, arg: threshold_method }
+
+  - key: costes_randomizations
+    label: Costes randomizations for the p value (0 = no test)
+    kind: int
+    default: 10
+    lo: 0
+    hi: 1000
+    group: Colocalization
+    help: The number of block-scrambled images for the Costes significance test. More give a steadier p value but take longer.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_colocalization, arg: costes_randomizations }
+
+  - key: psf_size
+    label: Blur spot size for the Costes test (pixels)
+    kind: int
+    default: 3
+    lo: 1
+    hi: 50
+    group: Colocalization
+    help: The block size for scrambling, about the width of the point spread function in pixels.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_colocalization, arg: psf_size }
+
+  - key: cell_mode
+    label: How the tool finds each cell
+    kind: choice
+    choices: [expand, membrane, threshold, texture, labels]
+    default: expand
+    group: Uptake
+    help: >
+      The expand mode grows each nucleus by a fixed distance. The membrane mode grows nuclei into
+      a membrane stain. The threshold mode reads a fluorescent cell stain. The texture mode reads a
+      brightfield image. The labels mode reads a label image, for example from Cellpose.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: cell_mode }
+
+  - key: nucleus_threshold
+    label: Nucleus threshold (method name or a number)
+    kind: text
+    default: otsu
+    group: Uptake
+    help: A method (otsu, li, triangle, yen, isodata, mean) or a fixed number in raw intensity units of the nucleus channel.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: nucleus_threshold }
+
+  - key: nucleus_min_diameter
+    label: Smallest nucleus (pixels across)
+    kind: float
+    default: 0
+    lo: 0
+    group: Uptake
+    help: Nuclei narrower than this are left out as debris. It also sets how far apart two touching nuclei must be to split. 0 keeps all.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: nucleus_min_diameter }
+
+  - key: nucleus_max_diameter
+    label: Largest nucleus (pixels across, 0 = no limit)
+    kind: float
+    default: 0
+    lo: 0
+    group: Uptake
+    help: Objects wider than this are left out, for example clumps that did not split.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: nucleus_max_diameter }
+
+  - key: cell_threshold
+    label: Cell threshold (method name or a number)
+    kind: text
+    default: otsu
+    group: Uptake
+    help: For membrane, threshold and texture modes. A method name or a number in raw intensity units of the cell channel (local standard deviation units for texture).
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: cell_threshold }
+
+  - key: cell_expand
+    label: Cell growth from the nucleus (pixels)
+    kind: float
+    default: 0
+    lo: 0
+    group: Uptake
+    help: In expand mode, the distance each nucleus grows to make the cell. In membrane mode, the largest growth allowed. 0 in membrane mode sets no limit.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: cell_expand }
+
+  - key: cargo_threshold
+    label: Cargo threshold (method name or a number)
+    kind: text
+    default: otsu
+    group: Uptake
+    help: >
+      The cutoff that separates cargo (beads, bacteria, apoptotic cells, particles) from the
+      background in the cargo channel. A method name or a number in raw intensity units. When
+      cargo covers a very small part of the image, otsu can cut into the background noise; use
+      a number from a no-cargo control then.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: cargo_threshold }
+    sensitivity:
+      options: [otsu, triangle, li]
+      tool: count_cell_uptake
+      compare: [metrics.fraction_positive, metrics.mean_cargo_per_cell]
+      max_runs: 3
+
+  - key: cargo_min_area
+    label: Smallest cargo object (pixels)
+    kind: float
+    default: 0
+    lo: 0
+    group: Uptake
+    help: Cargo objects with fewer pixels are left out as noise. 0 keeps all.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: cargo_min_area }
+
+  - key: positivity_rule
+    label: Rule that calls a cell positive
+    kind: choice
+    choices: [spots, area, area_fraction, intensity]
+    default: spots
+    group: Uptake
+    help: >
+      spots counts cargo objects in the cell. area counts cargo pixels. area_fraction divides
+      cargo pixels by cell pixels. intensity is the mean cargo channel value in the cell.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: positivity_rule }
+
+  - key: positivity_min
+    label: Smallest value of the rule for a positive cell
+    kind: float
+    default: 1
+    lo: 0
+    group: Uptake
+    help: A cell is positive when its value for the rule is at least this number. For spots, 1 means one cargo object.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: positivity_min }
+
+  - key: exclude_border_cells
+    label: Leave out cells that touch the image edge
+    kind: bool
+    default: true
+    group: Uptake
+    help: A cell cut by the image edge can lose its cargo outside the field, so it can count as negative.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: exclude_border_cells }
+
+tools:
+  - name: inspect_image
+    title: Inspect an image
+    description: Read the size, the channels, the bit depth, the pixel size and the value range of an image file. Warn about JPEG files, saturated pixels and 8-bit copies for viewing. If the path is a folder, list the image file patterns in it. Use it before the other tools to find the channel numbers.
+    read_only: true
+    batch: false
+    function: "assay_tools:inspect_image"
+    params:
+      path: { type: string, minLength: 1, description: "Path of an image file, or of a folder of images." }
+    required: [path]
+
+  - name: count_colonies
+    title: Count colonies on a plate
+    description: >-
+      Count bacterial, yeast or clonogenic colonies in a plate or well photo, or in each photo of a folder. It finds the dish, leaves out the rim, thresholds the colonies, and leaves out objects that are too small, too large or not round. A folder with a hand count file gives the difference for each image. For plating efficiency and surviving fraction, use clonogenic_survival next.
+    function: "assay_tools:count_colonies"
+    batch: false
+    params:
+      path: { type: string, minLength: 1, description: "Path of one plate image, or of a folder of plate images." }
+      pattern: { type: string, default: "*", description: 'For a folder. File pattern, such as "*.jpg".' }
+      hand_counts: { type: string, description: "For a folder. CSV file with an image column and a count column. The tool compares its count with each hand count." }
+      channel: { type: string, default: gray, description: "Channel name (gray, red, green, blue, saturation) or channel number (0 is the first)." }
+      colony_polarity: { type: string, enum: [bright, dark], default: bright, description: Bright or dark colonies against the agar. }
+      find_dish: { type: boolean, default: true, description: True to find the round dish and count only inside it. False for a cropped image. }
+      rim_margin: { type: number, minimum: 0, maximum: 0.9, default: 0.05, description: "Band at the dish wall to leave out, as a fraction of the dish radius (unitless)." }
+      background_radius: { type: number, minimum: 0, default: 0, description: "Width of the blur that the tool subtracts as background, in pixels. 0 means none." }
+      threshold: { type: string, default: otsu, description: "Method name (otsu, li, triangle, yen, isodata, mean) or a number on the 0 to 1 scale of the channel after the background step." }
+      min_diameter: { type: number, minimum: 0, default: 0, description: "Smallest colony, in pixels across." }
+      max_diameter: { type: number, minimum: 0, default: 0, description: "Largest colony, in pixels across. 0 means no limit." }
+      min_circularity: { type: number, minimum: 0, maximum: 1, default: 0, description: "Smallest roundness (unitless, 1 is a circle)." }
+      split_touching: { type: boolean, default: false, description: True to split touching colonies with a watershed. }
+      pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
+    required: [path]
+    citations:
+      - text: "Otsu, N. (1979). A threshold selection method from gray-level histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62-66."
+        doi: 10.1109/TSMC.1979.4310076
+        when: { threshold: otsu }
+      - text: "Zack, G. W., Rogers, W. E., & Latt, S. A. (1977). Automatic measurement of sister chromatid exchange frequency. Journal of Histochemistry & Cytochemistry, 25(7), 741-753."
+        doi: 10.1177/25.7.70454
+        when: { threshold: triangle }
+      - text: "Li, C. H., & Lee, C. K. (1993). Minimum cross entropy thresholding. Pattern Recognition, 26(4), 617-625."
+        doi: 10.1016/0031-3203(93)90115-D
+        when: { threshold: li }
+      - text: "Yen, J. C., Chang, F. J., & Chang, S. (1995). A new criterion for automatic multilevel thresholding. IEEE Transactions on Image Processing, 4(3), 370-378."
+        doi: 10.1109/83.366472
+        when: { threshold: yen }
+      - text: "Ridler, T. W., & Calvard, S. (1978). Picture thresholding using an iterative selection method. IEEE Transactions on Systems, Man, and Cybernetics, 8(8), 630-632."
+        doi: 10.1109/TSMC.1978.4310039
+        when: { threshold: isodata }
+
+  - name: clonogenic_survival
+    title: Plating efficiency and surviving fraction
+    description: >-
+      Compute the plating efficiency and the surviving fraction of a clonogenic assay from a CSV table of colony counts and cells seeded. The plating efficiency is colonies divided by cells seeded. The surviving fraction divides each plating efficiency by the mean plating efficiency of the control. Give the dose column to plot survival against dose. The counts come from count_colonies or from hand counts.
+    read_only: true
+    batch: false
+    function: "assay_tools:clonogenic_survival"
+    params:
+      table: { type: string, minLength: 1, description: "Path of a CSV file with one row for each plate or well." }
+      control: { type: string, minLength: 1, description: "The condition name of the control rows, such as untreated." }
+      condition_column: { type: string, default: condition, description: Column with the condition name. }
+      colonies_column: { type: string, default: colonies, description: Column with the colony count. }
+      seeded_column: { type: string, default: cells_seeded, description: Column with the number of cells seeded. }
+      dose_column: { type: string, default: "", description: "Optional column with the dose, for the plot." }
+    required: [table, control]
+    citations:
+      - text: "Franken, N. A. P., Rodermond, H. M., Stap, J., Haveman, J., & van Bree, C. (2006). Clonogenic assay of cells in vitro. Nature Protocols, 1(5), 2315-2319."
+        doi: 10.1038/nprot.2006.339
+
+  - name: measure_colocalization
+    title: Measure colocalization of two channels
+    description: >-
+      Measure how two fluorescence channels overlap. It gives the Pearson correlation, the Manders M1 and M2 values, tM1 and tM2 above automatic Costes thresholds, and the Costes p value. Works on a single plane or a z-stack, in the whole image or inside a mask. Give the two channels of one file, or two files. It writes a scatter plot and an overlay of the pixels above both thresholds.
+    read_only: true
+    batch: false
+    function: "assay_tools:measure_colocalization"
+    params:
+      path: { type: string, minLength: 1, description: "Path of a two-channel image. With path2, the path of the channel 1 image." }
+      path2: { type: string, description: "Path of the channel 2 image, if the channels are in separate files." }
+      channel1: { type: [integer, string], default: 0, description: "Channel number of channel 1 (0 is the first)." }
+      channel2: { type: [integer, string], default: 1, description: "Channel number of channel 2." }
+      mask: { type: string, description: "Optional mask image. The tool measures only the pixels above zero in it. It can outline one cell, or leave out the background." }
+      threshold_method: { type: string, enum: [costes, bisection, manual, none], default: costes, description: How the tool finds the thresholds for tM1 and tM2. }
+      threshold1: { type: number, description: "Channel 1 threshold in raw intensity units, for method manual." }
+      threshold2: { type: number, description: "Channel 2 threshold in raw intensity units, for method manual." }
+      costes_randomizations: { type: integer, minimum: 0, default: 10, description: "Number of scrambled images for the Costes p value (count). 0 skips the test." }
+      psf_size: { type: integer, minimum: 1, default: 3, description: "Block size for scrambling, in pixels." }
+      seed: { type: integer, default: 1, description: "Random seed for the scrambling (unitless)." }
+    required: [path]
+    citations:
+      - text: "Manders, E. M. M., Verbeek, F. J., & Aten, J. A. (1993). Measurement of co-localization of objects in dual-colour confocal images. Journal of Microscopy, 169(3), 375-382."
+        doi: 10.1111/j.1365-2818.1993.tb03313.x
+      - text: "Costes, S. V., Daelemans, D., Cho, E. H., Dobbin, Z., Pavlakis, G., & Lockett, S. (2004). Automatic and quantitative measurement of protein-protein colocalization in live cells. Biophysical Journal, 86(6), 3993-4003."
+        doi: 10.1529/biophysj.103.038422
+
+  - name: count_cell_uptake
+    title: Count cells with cargo (uptake, phagocytosis, efferocytosis)
+    description: >-
+      Count all cells and the cells with cargo inside, such as beads, bacteria, apoptotic cells or particles. It reads one image or each image of a folder. It finds the cells and the cargo objects, puts each object in a cell, and calls a cell positive by your rule. It gives the fraction of positive cells, the cargo per cell and the phagocytic index. For brightfield without a nuclear stain, use cell_mode texture, or labels with a Cellpose label image.
+    read_only: true
+    batch: false
+    function: "assay_tools:count_cell_uptake"
+    params:
+      path: { type: string, minLength: 1, description: "Path of one multichannel image, or of a folder of images." }
+      cargo_channel: { type: [integer, string], description: "Channel number of the cargo (0 is the first), for example the red channel of labeled apoptotic cells." }
+      nucleus_channel: { type: [integer, string], description: "Channel number of the nuclear stain. Leave it out if there is none." }
+      cell_channel: { type: [integer, string], description: "Channel number of the cell stain or of the brightfield image." }
+      cell_mode: { type: string, enum: [expand, membrane, threshold, texture, labels], default: expand, description: How the tool finds each cell. }
+      cell_labels: { type: string, description: "For cell_mode labels. Path of a label image with one number for each cell." }
+      pattern: { type: string, default: "*", description: 'For a folder. File pattern, such as "*.tif".' }
+      hand_counts: { type: string, description: "For a folder. CSV file with an image column and total and positive columns. The tool compares its counts with them." }
+      nucleus_threshold: { type: [string, number], default: otsu, description: "Method name or a number in raw intensity units of the nucleus channel." }
+      nucleus_min_diameter: { type: number, minimum: 0, default: 0, description: "Smallest nucleus, in pixels across." }
+      nucleus_max_diameter: { type: number, minimum: 0, default: 0, description: "Largest nucleus, in pixels across. 0 means no limit." }
+      split_nuclei: { type: boolean, default: true, description: True to split touching nuclei at intensity peaks. }
+      nucleus_smoothing: { type: number, minimum: 0, default: 0, description: "Blur before the tool splits touching nuclei, in pixels. 0 means a quarter of the smallest nucleus." }
+      nucleus_min_distance: { type: number, minimum: 0, default: 0, description: "Smallest distance between two nucleus centers, in pixels. 0 means half the smallest nucleus." }
+      cell_expand: { type: number, minimum: 0, default: 0, description: "Growth of each nucleus, in pixels. In membrane mode it is the largest growth; 0 sets no limit." }
+      cell_threshold: { type: [string, number], default: otsu, description: "Method name or a number in raw intensity units of the cell channel." }
+      cell_polarity: { type: string, enum: [bright, dark], default: bright, description: "For threshold and texture modes. Bright keeps pixels above the threshold." }
+      cell_min_diameter: { type: number, minimum: 0, default: 0, description: "Smallest cell, in pixels across." }
+      split_cells: { type: boolean, default: true, description: "For threshold and texture modes without nuclei. True to split touching cells." }
+      cargo_threshold: { type: [string, number], default: otsu, description: "Method name or a number in raw intensity units of the cargo channel." }
+      cargo_smoothing: { type: number, minimum: 0, default: 0, description: "Blur of the cargo channel before the threshold, in pixels." }
+      cargo_min_area: { type: number, minimum: 0, default: 0, description: "Smallest cargo object, in pixels." }
+      positivity_rule: { type: string, enum: [spots, area, area_fraction, intensity], default: spots, description: The measure that calls a cell positive. }
+      positivity_min: { type: number, minimum: 0, default: 1, description: "Smallest value of the rule for a positive cell: a count, pixels, a fraction or raw intensity units." }
+      exclude_border_cells: { type: boolean, default: true, description: True to leave out cells and nuclei that touch the image edge. }
+      pixel_size: { type: number, minimum: 0, default: 0, description: Micrometers for each pixel. 0 means uncalibrated. }
+    required: [path, cargo_channel]
+    citations:
+      - text: "Otsu, N. (1979). A threshold selection method from gray-level histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62-66."
+        doi: 10.1109/TSMC.1979.4310076
+        when: { cargo_threshold: otsu }
+      - text: "Otsu, N. (1979). A threshold selection method from gray-level histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62-66."
+        doi: 10.1109/TSMC.1979.4310076
+        when: { nucleus_threshold: otsu }
+      - text: "Zack, G. W., Rogers, W. E., & Latt, S. A. (1977). Automatic measurement of sister chromatid exchange frequency. Journal of Histochemistry & Cytochemistry, 25(7), 741-753."
+        doi: 10.1177/25.7.70454
+        when: { cargo_threshold: triangle }
+
+map:
+  - tool: inspect_image
+    route: "Fiji: File > Open..., then Image > Show Info... and Analyze > Histogram for each channel"
+    steps:
+      - "Image Lab, Imaris, NIS-Elements, ZEN, Harmony: the image properties panel shows the size, bit depth and pixel size"
+    params:
+      - { arg: path, label: File to open }
+    fidelity: exact
+    evidence: { source: code, test: synthetic_uptake_info }
+
+  - tool: count_colonies
+    route: "Fiji: Image > Color > Split Channels (keep the colony channel); Process > Subtract Background... (rolling ball radius = background radius); draw an oval on the dish and Edit > Clear Outside; Image > Adjust > Threshold... (method); Process > Binary > Watershed (if split); Analyze > Analyze Particles... with Size and Circularity"
+    steps:
+      - "Fiji: Image > Color > Split Channels, keep the channel {channel}"
+      - "Fiji: draw an oval inside the dish wall, then Edit > Clear Outside (the rim margin)"
+      - "Fiji: Image > Adjust > Threshold..., method {threshold}, Apply"
+      - "Fiji: Process > Binary > Watershed, only if split_touching is true"
+      - "Fiji: Analyze > Analyze Particles..., Size = area from the smallest and largest diameter, Circularity = {min_circularity}-1.00, Show = Outlines, Summarize"
+      - "OpenCFU: load the image, set the threshold and the radius range, read the count"
+      - "Bio-Rad Image Lab colony count or Synbiosis ProtoCOL: select the plate area, set the colony size limits, Count"
+    params:
+      - { arg: channel, label: Channel to keep, ui_default: gray }
+      - { arg: threshold, label: Threshold method, ui_default: Default }
+      - { arg: min_diameter, label: "Size (minimum), as a diameter", ui_default: 0 }
+      - { arg: max_diameter, label: "Size (maximum), as a diameter", ui_default: Infinity }
+      - { arg: min_circularity, label: Circularity (minimum), ui_default: 0 }
+      - { arg: split_touching, label: Watershed, ui_default: false }
+      - { arg: rim_margin, label: Oval inside the dish wall }
+      - { arg: background_radius, label: Subtract Background rolling ball radius, ui_default: 50 }
+    fidelity: close
+    difference: "The background step is a Gaussian blur, not the Fiji rolling ball. Fiji Analyze Particles takes the size as an area in pixels, not a diameter. The route was not run in Fiji."
+    evidence: { source: docs, test: synthetic_plate_count }
+
+  - tool: clonogenic_survival
+    route: "In a sheet: plating efficiency = colonies / cells seeded; surviving fraction = plating efficiency of the plate / mean plating efficiency of the control plates"
+    steps:
+      - "GraphPad Prism: enter colonies and cells seeded, then a column formula for the plating efficiency and the surviving fraction"
+    params:
+      - { arg: control, label: Control condition }
+    fidelity: exact
+    evidence: { source: code, test: synthetic_survival, note: "The values are arithmetic from the designed table." }
+
+  - tool: measure_colocalization
+    route: "Fiji: Analyze > Colocalization > Coloc 2, Channel_1 and Channel_2, ROI_or_mask, Threshold_regression = Costes or Bisection, Manders' Correlation, Costes' Significance Test, PSF = psf_size, Costes_randomisations"
+    steps:
+      - "Fiji: Analyze > Colocalization > Coloc 2"
+      - "Channel_1 = the first image, Channel_2 = the second image, ROI_or_mask = {mask}"
+      - "Threshold_regression = {threshold_method}"
+      - "Tick Manders' Correlation and Costes' Significance Test; PSF = {psf_size}; Costes_randomisations = {costes_randomizations}"
+      - "Read Pearson's R value (no threshold), Manders' tM1 and tM2 (above autothreshold), and Costes P-Value"
+      - "Volocity: Measurements > Colocalization, Costes automatic threshold; Imaris: Coloc, Automatic Threshold (Costes); NIS-Elements: Measure > Colocalization; ZEN: Colocalization view"
+    params:
+      - { arg: threshold_method, label: Threshold_regression, ui_default: costes }
+      - { arg: mask, label: ROI_or_mask }
+      - { arg: psf_size, label: PSF, ui_default: 3 }
+      - { arg: costes_randomizations, label: Costes_randomisations, ui_default: 10 }
+    fidelity: exact
+    evidence: { source: code, test: coloc2_noisy_bisection, note: "The tool repeats the Coloc 2 code for Pearson, Manders, the Costes and Bisection regressions and the Costes test. The test values are the Coloc 2 unit test values on the same images." }
+
+  - tool: count_cell_uptake
+    route: "Fiji: split channels; threshold the nuclei (Image > Adjust > Threshold...), Process > Binary > Watershed, Analyze Particles to ROI Manager; enlarge the ROIs (Edit > Selection > Enlarge) or draw cells; threshold the cargo channel; for each cell ROI, Analyze > Analyze Particles inside it to count cargo objects; a cell is positive by your rule"
+    steps:
+      - "CellProfiler: IdentifyPrimaryObjects (nuclei), IdentifySecondaryObjects (cells: Distance-N for expand, Propagation for membrane), IdentifyPrimaryObjects (cargo), RelateObjects (cargo to cells), then FilterObjects or a spreadsheet for the positivity rule"
+      - "Harmony or Columbus: Find Nuclei, Find Cytoplasm, Find Spots in the cargo channel, Calculate Properties (spots per cell), Select Population (positive cells by spot count)"
+      - "Imaris: Cells with Spots in the cargo channel, then filter cells by the spot count"
+      - "Hand count: count all macrophages and the macrophages with red cargo inside in each field"
+    params:
+      - { arg: nucleus_threshold, label: Nucleus threshold method or value, ui_default: Default }
+      - { arg: cell_mode, label: How cells are drawn }
+      - { arg: cell_expand, label: Enlarge (pixels) }
+      - { arg: cargo_threshold, label: Cargo threshold method or value, ui_default: Default }
+      - { arg: positivity_rule, label: Positive cell rule }
+      - { arg: positivity_min, label: Smallest value for a positive cell }
+    fidelity: close
+    difference: "The membrane mode grows cells with a watershed on the membrane image, not the CellProfiler Propagation method, so cell outlines differ. The Fiji route is not tested."
+    evidence: { source: code, test: synthetic_uptake_membrane }
+
+checks:
+  - id: jpeg_intensity
+    description: Intensity values from JPEG files are reported.
+    severity: warning
+    text: The report must not give intensity values (Pearson, Manders, mean cargo intensity) measured on JPEG files, or it must say that JPEG compression changes pixel values.
+  - id: thresholds_reported
+    description: The report does not give the thresholds and the size limits.
+    severity: warning
+    text: The report must give each threshold method or value, the size limits, the rim margin for plates, the positivity rule for uptake, and the region or mask for colocalization.
+  - id: no_costes_test
+    description: Colocalization is called significant without the Costes test.
+    severity: warning
+    rule:
+      tool: measure_colocalization
+      arg: costes_randomizations
+      op: "=="
+      value: 0
+      message: The Costes significance test was not run. Do not call the colocalization significant.
+  - id: coloc_without_threshold
+    description: Manders values without a threshold are reported as colocalization.
+    severity: warning
+    text: If threshold_method is none, the report must say that Manders M1 and M2 above zero include background pixels and are too high.
+  - id: pseudoreplication
+    description: A p value uses cells or fields as independent samples.
+    severity: error
+    text: The report must not give a p value or a confidence interval that treats cells in one image, or fields of one well, as independent samples. A test must use biological replicates or the unit of replication that the scientist chose.
+
+tests:
+  - id: synthetic_uptake_info
+    description: The synthetic uptake image is 420 by 420 pixels with 3 channels of 16 bits. Values from the design in data/make_synthetic.py.
+    data: [data/synthetic_uptake.tif]
+    calls:
+      - { tool: inspect_image, args: { path: "{adapter_dir}/data/synthetic_uptake.tif" } }
+    expect:
+      - { path: metrics.width, equals: 420 }
+      - { path: metrics.channels, equals: 3 }
+      - { path: metrics.bit_depth, equals: 16 }
+
+  - id: synthetic_plate_count
+    description: >
+      Synthetic plate with 12 colonies (one touching pair), 3 specks, 1 streak and 1 colony in the
+      rim band. Known answer from the design in data/make_synthetic.py; check script
+      checks/check_synthetic.py, output checks/check_synthetic.out.
+    data: [data/synthetic_plate.png]
+    calls:
+      - tool: count_colonies
+        args: { path: "{adapter_dir}/data/synthetic_plate.png", channel: green, colony_polarity: bright, find_dish: true, rim_margin: 0.12, background_radius: 30, threshold: triangle, min_diameter: 8, max_diameter: 40, min_circularity: 0.6, split_touching: true }
+    expect:
+      - { path: metrics.n_colonies, equals: 12 }
+      - { path: metrics.n_too_small, equals: 3 }
+      - { path: metrics.n_not_round, equals: 1 }
+
+  - id: synthetic_plate_no_split
+    description: Without the watershed the touching pair is one object and fails the roundness limit, so the count is 10. Known answer from the design.
+    data: [data/synthetic_plate.png]
+    calls:
+      - tool: count_colonies
+        args: { path: "{adapter_dir}/data/synthetic_plate.png", channel: green, find_dish: true, rim_margin: 0.12, background_radius: 30, threshold: triangle, min_diameter: 8, max_diameter: 40, min_circularity: 0.6, split_touching: false }
+    expect:
+      - { path: metrics.n_colonies, equals: 10 }
+      - { path: metrics.n_not_round, equals: 2 }
+
+  - id: synthetic_survival
+    description: >
+      Designed clonogenic table. Control plating efficiency 150/300 = 0.5. Surviving fraction at
+      2 Gy: mean of 0.6, 0.5 and 0.7 = 0.6; at 4 Gy: mean of 0.2, 0.24 and 0.16 = 0.2. Arithmetic
+      check in checks/check_synthetic.py.
+    data: [data/synthetic_clonogenic.csv]
+    calls:
+      - { tool: clonogenic_survival, args: { table: "{adapter_dir}/data/synthetic_clonogenic.csv", control: control, dose_column: dose_gy } }
+    expect:
+      - { path: metrics.plating_efficiency_control, approx: 0.5, rel: 0.000001 }
+      - { path: metrics.surviving_fraction_2_gy, approx: 0.6, rel: 0.000001 }
+      - { path: metrics.surviving_fraction_4_gy, approx: 0.2, rel: 0.000001 }
+
+  - id: synthetic_uptake_membrane
+    description: >
+      Synthetic 3-channel image: 9 whole cells with 0, 1, 2, 0, 3, 1, 0, 0, 1 cargo spots, one
+      cell cut by the edge (left out) and one spot outside the cells. Known answer from the design:
+      5 of 9 cells positive, 8 spots in cells, 10 spots in all.
+    data: [data/synthetic_uptake.tif]
+    calls:
+      - tool: count_cell_uptake
+        args: { path: "{adapter_dir}/data/synthetic_uptake.tif", cargo_channel: 2, nucleus_channel: 0, cell_channel: 1, cell_mode: membrane, nucleus_min_diameter: 15, cargo_threshold: 15000, positivity_rule: spots, positivity_min: 1 }
+    expect:
+      - { path: metrics.n_nuclei, equals: 10 }
+      - { path: metrics.n_cells, equals: 9 }
+      - { path: metrics.n_positive, equals: 5 }
+      - { path: metrics.n_cargo_objects, equals: 10 }
+      - { path: metrics.n_cargo_in_cells, equals: 8 }
+      - { path: metrics.n_excluded_border, equals: 1 }
+
+  - id: synthetic_uptake_expand
+    description: Same image with cells grown from the nuclei by a fixed distance. Same known answer from the design.
+    data: [data/synthetic_uptake.tif]
+    calls:
+      - tool: count_cell_uptake
+        args: { path: "{adapter_dir}/data/synthetic_uptake.tif", cargo_channel: 2, nucleus_channel: 0, cell_mode: expand, cell_expand: 31, nucleus_min_diameter: 15, cargo_threshold: otsu, positivity_rule: spots, positivity_min: 1 }
+    expect:
+      - { path: metrics.n_cells, equals: 9 }
+      - { path: metrics.n_positive, equals: 5 }
+      - { path: metrics.mean_cargo_per_cell, approx: 0.888889, abs: 0.00001 }
+
+  - id: synthetic_brightfield_red
+    description: >
+      Synthetic brightfield plus red image like an efferocytosis field: 8 macrophages, 3 with red
+      cargo inside (4 red objects in cells) and 1 red object outside the cells. Known answer from
+      the design: 3 of 8 cells positive.
+    data: [data/synthetic_brightfield_red.tif]
+    calls:
+      - tool: count_cell_uptake
+        args: { path: "{adapter_dir}/data/synthetic_brightfield_red.tif", cargo_channel: 1, cell_channel: 0, cell_mode: texture, cell_threshold: otsu, cell_min_diameter: 20, cargo_threshold: 100, positivity_rule: area, positivity_min: 20 }
+    expect:
+      - { path: metrics.n_cells, equals: 8 }
+      - { path: metrics.n_positive, equals: 3 }
+      - { path: metrics.n_cargo_objects, equals: 5 }
+      - { path: metrics.n_cargo_in_cells, equals: 4 }
+
+  - id: coloc2_manders_pairs
+    description: >
+      Coloc 2 test images mandersA and mandersB (copies of the object pairs of Manders et al.
+      1993). Coloc 2 unit tests assert Pearson r 0.72 (tolerance 0.01) and M1 = M2 = 0.75 for this
+      pair. Values in checks/check_coloc2.out.
+    data: [data/coloc2/mandersA.tiff, data/coloc2/mandersB.tiff]
+    fetch: data/fetch.sh
+    calls:
+      - { tool: measure_colocalization, args: { path: "{adapter_dir}/data/coloc2/mandersA.tiff", path2: "{adapter_dir}/data/coloc2/mandersB.tiff", threshold_method: none, costes_randomizations: 0 } }
+    expect:
+      - { path: metrics.pearson_r, approx: 0.72, abs: 0.01 }
+      - { path: metrics.manders_m1, approx: 0.75, abs: 0.0001 }
+      - { path: metrics.manders_m2, approx: 0.75, abs: 0.0001 }
+
+  - id: coloc2_manders_unequal
+    description: Coloc 2 test pair mandersA and mandersI. Coloc 2 asserts M1 0.083 (tolerance 0.001) and M2 0.75.
+    data: [data/coloc2/mandersA.tiff, data/coloc2/mandersI.tiff]
+    fetch: data/fetch.sh
+    calls:
+      - { tool: measure_colocalization, args: { path: "{adapter_dir}/data/coloc2/mandersA.tiff", path2: "{adapter_dir}/data/coloc2/mandersI.tiff", threshold_method: none, costes_randomizations: 0 } }
+    expect:
+      - { path: metrics.manders_m1, approx: 0.083, abs: 0.001 }
+      - { path: metrics.manders_m2, approx: 0.75, abs: 0.0001 }
+
+  - id: coloc2_noisy_manual
+    description: >
+      Coloc 2 test stack colocsample1b (green, red, mask) with thresholds 70 and 53 above. Coloc 2
+      asserts tM1 0.705665 and tM2 0.724752 (tolerance 0.000001) in mandersRealNoisyImagesTest.
+    data: [data/coloc2/colocsample1b-green.tif, data/coloc2/colocsample1b-red.tif, data/coloc2/colocsample1b-mask.tif]
+    fetch: data/fetch.sh
+    calls:
+      - tool: measure_colocalization
+        args: { path: "{adapter_dir}/data/coloc2/colocsample1b-green.tif", path2: "{adapter_dir}/data/coloc2/colocsample1b-red.tif", mask: "{adapter_dir}/data/coloc2/colocsample1b-mask.tif", threshold_method: manual, threshold1: 70, threshold2: 53, costes_randomizations: 0 }
+    expect:
+      - { path: metrics.manders_tm1, approx: 0.705665, abs: 0.000001 }
+      - { path: metrics.manders_tm2, approx: 0.724752, abs: 0.000001 }
+
+  - id: coloc2_noisy_bisection
+    description: >
+      The same stack with the Bisection regression. The Coloc 2 test notes that the thresholds 70
+      and 53 came from a Bisection Costes run on these images; the tool finds the same pair.
+    data: [data/coloc2/colocsample1b-green.tif, data/coloc2/colocsample1b-red.tif, data/coloc2/colocsample1b-mask.tif]
+    fetch: data/fetch.sh
+    calls:
+      - tool: measure_colocalization
+        args: { path: "{adapter_dir}/data/coloc2/colocsample1b-green.tif", path2: "{adapter_dir}/data/coloc2/colocsample1b-red.tif", mask: "{adapter_dir}/data/coloc2/colocsample1b-mask.tif", threshold_method: bisection, costes_randomizations: 10, seed: 1 }
+    expect:
+      - { path: metrics.threshold1, equals: 70 }
+      - { path: metrics.threshold2, equals: 53 }
+      - { path: metrics.manders_tm1, approx: 0.705665, abs: 0.000001 }
+      - { path: metrics.costes_p, min: 0.95 }
+
+  - id: coloc2_noisy_pearson
+    description: Pearson r of colocsample1b in the whole stack. Coloc 2 asserts 0.75 with a tolerance of 0.01.
+    data: [data/coloc2/colocsample1b-green.tif, data/coloc2/colocsample1b-red.tif]
+    fetch: data/fetch.sh
+    calls:
+      - { tool: measure_colocalization, args: { path: "{adapter_dir}/data/coloc2/colocsample1b-green.tif", path2: "{adapter_dir}/data/coloc2/colocsample1b-red.tif", threshold_method: none, costes_randomizations: 0 } }
+    expect:
+      - { path: metrics.pearson_r, approx: 0.75, abs: 0.01 }
+
+  - id: missing_image
+    description: An image file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: count_colonies, args: { path: "{adapter_dir}/data/no_such_plate.png" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "file not found" }
+      - { path: error, contains: "no_such_plate.png" }
+
+  - id: uptake_bad_channel
+    description: A channel number outside the image fails, and the error names the argument and the channel count.
+    data: [data/synthetic_brightfield_red.tif]
+    calls:
+      - { tool: count_cell_uptake, args: { path: "{adapter_dir}/data/synthetic_brightfield_red.tif", cargo_channel: 5, cell_channel: 0, cell_mode: texture } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "cargo_channel" }
+      - { path: error, contains: "2 channel(s)" }
+
+  - id: uptake_expand_without_nuclei
+    description: cell_mode expand without a nucleus channel fails and names the fix.
+    data: [data/synthetic_brightfield_red.tif]
+    calls:
+      - { tool: count_cell_uptake, args: { path: "{adapter_dir}/data/synthetic_brightfield_red.tif", cargo_channel: 1, cell_mode: expand, cell_expand: 10 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "needs nucleus_channel" }
+
+  - id: survival_missing_control
+    description: A control name that is not in the table fails and lists the conditions.
+    data: [data/synthetic_clonogenic.csv]
+    calls:
+      - { tool: clonogenic_survival, args: { table: "{adapter_dir}/data/synthetic_clonogenic.csv", control: untreated } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "not in the column condition" }
+
+  - id: coloc_manual_without_values
+    description: The manual method without the two thresholds fails and names the arguments.
+    data: [data/synthetic_uptake.tif]
+    calls:
+      - { tool: measure_colocalization, args: { path: "{adapter_dir}/data/synthetic_uptake.tif", channel1: 1, channel2: 2, threshold_method: manual, costes_randomizations: 0 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "threshold1 and threshold2" }

@@ -1,0 +1,10 @@
+plate: pale objects inside 88 percent of the agar radius: 15
+plate: specks (area < 30 px): 3
+plate: streaks (long and thin): 1
+plate: round objects (area 150 px or more): 11 ; touching pairs (area above 300 px): 1 ; colonies = 12
+uptake: nuclei 10 cells 10 cells touching the edge 1 whole cells 9
+uptake: cargo objects 10 in whole cells 8 positive whole cells 5 spots per whole cell [0, 1, 2, 0, 3, 1, 0, 0, 1]
+brightfield: red objects 5 inside cells 4 positive cells 3 of 8
+clonogenic: control plating efficiency 0.5
+clonogenic: 2 Gy surviving fractions [0.6, 0.5, 0.7] mean 0.6
+clonogenic: 4 Gy surviving fractions [0.2, 0.24, 0.16] mean 0.2

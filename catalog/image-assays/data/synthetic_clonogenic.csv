@@ -1,0 +1,10 @@
+condition,dose_gy,cells_seeded,colonies
+control,0,100,52
+control,0,100,48
+control,0,100,50
+2 Gy,2,200,60
+2 Gy,2,200,50
+2 Gy,2,200,70
+4 Gy,4,1000,100
+4 Gy,4,1000,120
+4 Gy,4,1000,80

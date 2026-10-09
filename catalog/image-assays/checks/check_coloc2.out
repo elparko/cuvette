@@ -1,0 +1,6 @@
+A-B Pearson 0.7213 M1 0.7500 M2 0.7500
+A-C Pearson 0.4426 M1 0.5000 M2 0.5000
+A-D Pearson 0.1639 M1 0.2500 M2 0.2500
+A-I Pearson 0.2290 M1 0.0833 M2 0.7500
+colocsample1b Pearson, whole stack 0.7485
+colocsample1b in mask, thresholds 70 and 53: tM1 0.705665 tM2 0.724752
