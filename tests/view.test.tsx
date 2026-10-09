@@ -129,19 +129,21 @@ test("/config changes the footer hints at once; /help shows Ctrl+T", async () =>
     h.type("\x1b[B");
     await until(() => h.term.view() !== before);
   }
+  let before = h.term.view();
   h.type("\r");
-  await until(() => /▸ short/.test(h.term.view()) || /▸ full/.test(h.term.view()));
-  for (let i = 0; i < 4 && !/▸ off/.test(h.term.view()); i++) {
-    const before = h.term.view();
+  await until(() => h.term.view() !== before);
+  for (let i = 0; i < 2; i++) {
+    before = h.term.view();
     h.type("\x1b[B");
     await until(() => h.term.view() !== before);
   }
   h.type("\r");
-  await until(() => h.term.view().includes("Save off where?"));
+  await until(() => h.term.view().includes("Save off for:"));
   h.type("\r");
   await until(() => s.settings.footer_hints === "off");
+  await until(() => h.term.view().includes("▸ Footer hints") && !h.term.view().includes("watch: the agent runs the steps"));
   h.type("\x1b");
-  await until(() => !h.term.view().includes("Settings") && !h.term.view().includes("watch: the agent runs the steps"));
+  await until(() => !h.term.view().includes("Footer hints") && !h.term.view().includes("watch: the agent runs the steps"));
   expect(bottom(h)).toMatch(/╰─+╯\s*$/);
 });
 

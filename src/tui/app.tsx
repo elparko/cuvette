@@ -114,7 +114,9 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   const addCard = useCallback((c: Card) => setCards((x) => pushCard(x, c)), []);
   const dropCard = useCallback((pred: (c: Card) => boolean) => setCards((x) => x.filter((c) => !pred(c))), []);
   const popCard = useCallback(() => setCards((x) => x.slice(1)), []);
+  const [, setTick] = useState(0);
   const refresh = useCallback(() => {
+    setTick((n) => n + 1);
     setMode(session.mode);
     setBypass(session.permissionMode === "bypass");
     setOpenQ(session.questions.open().length);
@@ -553,6 +555,7 @@ function cardViews(d: CardDeps): CardViews {
         ctx={{ cwd: session.cwd ?? process.cwd(), env: d.env, session: session as unknown as SettingSession, ui: { details: () => d.details.current, toggleDetails: d.toggleDetails } }}
         busy={d.busy}
         onClose={() => (popCard(), d.refresh())}
+        onSaved={d.refresh}
         onEdit={(t) => d.setCards((x) => [t === "key" ? { t: "key" } : t === "eln" ? { t: "eln" } : { t: "programs" }, ...x.slice(1)])}
       />
     ),

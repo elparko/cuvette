@@ -70,7 +70,7 @@ test("Up goes through lines of a message, then through past messages", async () 
   expect(s.steered.map((x) => x.text)).toEqual(["earlier", "first\nsecond!"]);
 });
 
-test("/config switches to vim at once; Esc leaves insert mode, a second Esc stops the agent", async () => {
+test("/config switches to vim at once and its search box is then in vim style; Esc leaves insert mode, a second Esc stops the agent", async () => {
   const { h, s } = start();
   await sleep(250);
   await keys(h, "/config", "\r");
@@ -81,7 +81,9 @@ test("/config switches to vim at once; Esc leaves insert mode, a second Esc stop
   await keys(h, "\r");
   await until(() => screen(h).includes("Save vim for:"));
   await keys(h, "\r");
-  await until(() => s.settings.input_keys === "vim");
+  await until(() => s.settings.input_keys === "vim" && screen(h).includes("Input keys is now vim"));
+  await keys(h, "\x1b");
+  await until(() => screen(h).includes("Settings"));
   await keys(h, "\x1b");
   await until(() => screen(h).includes("-- INSERT --"));
 
@@ -192,6 +194,18 @@ describe("every text field uses the shared editor: Option+Backspace deletes a wo
     await until(() => screen(h).includes("New value: imagej biostats"));
     await keys(h, "\x1b");
     await until(() => !screen(h).includes("New value:"));
+  });
+
+  test.each(OPT_BS)("/config search box (%j)", async (bs) => {
+    const { h } = start();
+    await sleep(250);
+    await keys(h, "/config", "\r");
+    await until(() => screen(h).includes("Type to search"));
+    await keys(h, "budget spinner", bs);
+    await until(() => /Search: budget\s+\d+ of \d+/.test(screen(h)));
+    expect(screen(h)).toContain("Budget per month");
+    await keys(h, "\x1b");
+    await until(() => screen(h).includes("Type to search"));
   });
 
   test.each(OPT_BS)("masked API key field (%j)", async (bs) => {

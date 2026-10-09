@@ -1,7 +1,7 @@
 import React, { useContext, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
 import { Box, Text, useInput } from "ink";
-import { Field } from "./input-box.tsx";
+import { Field, InputBox } from "./input-box.tsx";
 import { canReset, type Scope, type SettingCtx, type SettingDef, type SettingRow } from "../core/settings.ts";
 import { choiceNote, matches, resetRow, rowHelp, rowTag, saveSetting, scopeText, secretState, settingEditor, settingRows, spendBar, spendState, RESET } from "../ui/config.ts";
 
@@ -30,7 +30,7 @@ function textHint(r: SettingRow): string {
   return parts.filter(Boolean).join(" ");
 }
 
-export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (card: "key" | "eln" | "programs") => void; onClose: () => void }) {
+export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (card: "key" | "eln" | "programs") => void; onClose: () => void; onSaved?: () => void }) {
   const { ctx } = props;
   const [query, setQuery] = useState("");
   const all = settingRows(ctx, props.busy);
@@ -45,12 +45,16 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
   const save = async (def: SettingDef, value: string, scope: Scope) => {
     setStep({ t: "list" });
     lastScope.set(def.name, scope);
-    setMsg(await saveSetting(ctx, def, value, scope));
+    const m = await saveSetting(ctx, def, value, scope);
+    props.onSaved?.();
+    setMsg(m);
   };
 
   const reset = async (def: SettingDef) => {
     setStep({ t: "list" });
-    setMsg(await resetRow(ctx, def));
+    const m = await resetRow(ctx, def);
+    props.onSaved?.();
+    setMsg(m);
   };
 
   const pickScope = (def: SettingDef, value: string) => {
@@ -76,22 +80,17 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
     setMsg(undefined);
   };
 
+  const move = (dir: "up" | "down") => {
+    const n = Math.max(1, rows.length);
+    setSel((s) => (s + (dir === "up" ? n - 1 : 1)) % n);
+  };
+
   useInput((ch, key) => {
-    if (step.t === "text") return;
-    if (key.escape) {
-      if (step.t !== "list") return setStep({ t: "list" });
-      return query ? search("") : props.onClose();
-    }
+    if (step.t === "text" || step.t === "list") return;
+    if (key.escape) return setStep({ t: "list" });
     const up = key.upArrow, down = key.downArrow;
     const choose = key.return || ch === " ";
-    if (step.t === "list") {
-      const n = Math.max(1, rows.length);
-      if (up) setSel((s) => (s + n - 1) % n);
-      else if (down) setSel((s) => (s + 1) % n);
-      else if (choose) open();
-      else if (key.backspace || key.delete) search(query.slice(0, -1));
-      else if (ch && /^[^\x00-\x20\x7f]+$/.test(ch) && !key.ctrl && !key.meta) search(query + ch);
-    } else if (step.t === "value") {
+    if (step.t === "value") {
       const n = step.options.length;
       if (up) setStep({ ...step, sel: (step.sel + n - 1) % n });
       else if (down) setStep({ ...step, sel: (step.sel + 1) % n });
@@ -102,7 +101,7 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
       else if (down) setStep({ ...step, sel: (step.sel + 1) % n });
       else if (choose) void save(step.def, step.value, step.def.scopes[step.sel]!);
     }
-  });
+  }, { isActive: step.t !== "text" && step.t !== "list" });
 
   const labelW = Math.max(...all.map((r) => r.def.label.length)) + 2;
   let group = "";
@@ -183,7 +182,21 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
       <Text bold color="cyan">
         Settings
       </Text>
-      {query ? <Text>{`Search: ${query}`}<Text dimColor>{`  ${rows.length} of ${all.length}`}</Text></Text> : <Text dimColor>Type to search the labels and help.</Text>}
+      <Box>
+        {query ? <Text>Search: </Text> : null}
+        <InputBox
+          single
+          arrowsOut
+          active={step.t === "list"}
+          value={query}
+          placeholder="Type to search the labels and help."
+          onChange={(v) => (!query && v === " " ? open() : search(v))}
+          onSubmit={open}
+          onEscape={() => (query ? search("") : props.onClose())}
+          onEdge={move}
+        />
+        {query ? <Text dimColor>{`  ${rows.length} of ${all.length}`}</Text> : null}
+      </Box>
       {lines}
     </>
   );
