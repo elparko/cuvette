@@ -4,6 +4,7 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { Question } from "../core/types.ts";
 import {
+  CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
   choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, pilotGate, pilotQuestion, planHint, planInit,
   planQuestions, planReduce, planResolve, planTitle, programSwitches, recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, setupValues, show,
   type Card, type PlanAction, type PlanState,
@@ -428,6 +429,28 @@ export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string
 }
 
 
+export function ClarifyCard(props: { card: Extract<Card, { t: "clarify" }>; session: SessionLike }) {
+  const { card } = props;
+  const [, setTick] = useState(0);
+  const open = clarifyOpen(card, props.session.questions.open());
+  const q = open[0];
+  const answer = (value: unknown, note?: string) => void props.session.answer(q!.qid, value, note).then(() => setTick((x) => x + 1));
+  return (
+    <Frame title={CLARIFY_TITLE} color="magenta">
+      {card.found ? <Text>{card.found}</Text> : null}
+      {card.skipped.length ? <Text dimColor>Not asked, because your request answers it: {card.skipped.map((x) => x.split(" The request says:")[0]).join(" ")}</Text> : null}
+      {q ? (
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>{clarifyProgress(card, props.session.questions.open())}. Esc skips it.</Text>
+          <QuestionCard key={q.qid} card={{ t: "question", q }} onAnswer={answer} onDismiss={() => answer(CLARIFY_SKIP_ANSWER)} />
+        </Box>
+      ) : (
+        <Text dimColor>The agent now proposes the metrics.</Text>
+      )}
+    </Frame>
+  );
+}
+
 export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: SessionLike; onRespond: (r: PlanResponse) => void }) {
   const { card } = props;
   const [raw, setSt] = useState<PlanState>(() => planInit(card));
@@ -443,110 +466,114 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
     else setSt(r.state);
   };
   const switches = programSwitches(card);
-  const defs = card.definitions ?? [];
+  const items = itemCount(card);
   const pilot = pilotGate(card);
   const mode = st.mode;
   useInput(
     (input, key) => {
-      if (step === "restate") {
-        if (input === "y" || key.return) act({ a: "restate", ok: true });
-        else if (input === "n") act({ a: "restate", ok: false });
-        return;
-      }
       if (step === "program") {
         const n = Number(input);
         if (Number.isInteger(n) && n >= 1 && n <= switches.length) act({ a: "program", index: n - 1 });
         else if (key.escape) act({ a: "back" });
         return;
       }
+      if (card.stage === "pilot") {
+        if (input === "e") act({ a: "pick" });
+        else if (input === "d") act({ a: "details" });
+        return;
+      }
       const n = Number(input);
-      if (Number.isInteger(n) && n >= 1 && n <= defs.length) act({ a: "definition", index: n - 1 });
+      if (Number.isInteger(n) && n >= 1 && n <= Math.min(9, items)) act({ a: "item", n });
+      else if (input === "e") act({ a: "pick" });
+      else if (input === "d") act({ a: "details" });
       else if (input === (pilot ? "r" : "a") || key.return) act({ a: "run" });
       else if (input === "c") act({ a: "change" });
       else if (input === "x" || key.escape) act({ a: "cancel" });
       else if (input === "m") act({ a: "mode" });
       else if (input === "p" && switches.length) act({ a: "programs" });
     },
-    { isActive: card.stage === "plan" && (step === "restate" || step === "actions" || step === "program") },
+    { isActive: (card.stage === "plan" && (step === "actions" || step === "program")) || (card.stage === "pilot" && step === "decisions") },
   );
   const ask = (key: string, question: Question, onAnswer: (v: unknown) => void) => (
     <QuestionCard key={key} card={{ t: "question", q: question }} onAnswer={onAnswer} onDismiss={() => act({ a: "back" })} />
   );
+  const editor =
+    step === "pick" ? (
+      <Prompt label={PICK_LABEL} onSubmit={(v) => act({ a: "item", n: Number(v) })} onCancel={() => act({ a: "back" })} />
+    ) : step === "setting" ? (
+      settingQuestion(card, st) ? (
+        ask("setting", settingQuestion(card, st)!, (v) => act({ a: "setValue", value: v }))
+      ) : (
+        <Prompt label={settingLabel(card, st) ?? ""} onSubmit={(v) => act({ a: "setValue", value: v })} onCancel={() => act({ a: "back" })} />
+      )
+    ) : step === "definition" && definitionLabel(card, st) ? (
+      <Prompt label={definitionLabel(card, st)!} onSubmit={(v) => act({ a: "define", text: v })} onCancel={() => act({ a: "back" })} />
+    ) : step === "change" ? (
+      <Prompt label="What must change? Say it in plain words." onSubmit={(v) => act({ a: "changeText", text: v })} onCancel={() => act({ a: "back" })} />
+    ) : undefined;
   return (
     <Frame title={planTitle(card)} color="cyan">
-      {step === "restate" ? (
-        <Box flexDirection="column">
-          <Text bold>You want: {card.restatement!.replace(/^you want:?\s*/i, "")}</Text>
-          <Text>
-            Is that right? <Text color="green">y</Text> yes · <Text color="cyan">n</Text> correct it
-          </Text>
-        </Box>
-      ) : (
-        <Text>{card.text}</Text>
-      )}
-      {card.stage === "pilot" ? (
-        step === "change" ? (
-          <Prompt label="What must change?" onSubmit={(v) => act({ a: "changeText", text: v })} onCancel={() => act({ a: "back" })} />
-        ) : (
-          <QuestionCard key="pilot" card={{ t: "question", q: pilotQuestion() }} onAnswer={(v) => act({ a: "pilot", value: String(v) })} onDismiss={() => {}} />
-        )
-      ) : step === "correct" ? (
-        <Prompt label="What do you want?" onSubmit={(v) => act({ a: "correct", text: v })} onCancel={() => act({ a: "back" })} />
-      ) : q ? (
-        <Box flexDirection="column" marginTop={1}>
-          <Text dimColor>
-            Open decision {card.qids.length - open.length + 1} of {card.qids.length - st.later.length}. Answer it here, or press Esc to answer later.
-          </Text>
-          <QuestionCard
-            key={q.qid}
-            card={{ t: "question", q }}
-            onAnswer={(value, note) => void props.session.answer(q.qid, value, note).then(() => setTick((x) => x + 1))}
-            onDismiss={() => act({ a: "later", qid: q.qid })}
-          />
-        </Box>
-      ) : step === "reference" ? (
-        ask("ref", referenceQuestion(card), (v) => act({ a: "reference", value: String(v) }))
-      ) : step === "refpath" ? (
-        <Prompt label={REFERENCE_PATH_LABEL} onSubmit={(v) => act({ a: "refpath", text: v })} onCancel={() => act({ a: "back" })} />
-      ) : step === "refmode" ? (
-        ask("refmode", refModeQuestion(st), (v) => act({ a: "refmode", value: String(v) }))
-      ) : step === "change" ? (
-        <Prompt label="What must change?" onSubmit={(v) => act({ a: "changeText", text: v })} onCancel={() => act({ a: "back" })} />
-      ) : step === "definition" && definitionLabel(card, st) ? (
-        <Prompt label={definitionLabel(card, st)!} onSubmit={(v) => act({ a: "define", text: v })} onCancel={() => act({ a: "back" })} />
-      ) : step === "program" ? (
-        <Box flexDirection="column" marginTop={1}>
-          {switches.map((t, i) => (
-            <Text key={i}>
-              <Text color="cyan">{i + 1}</Text> {t}
-            </Text>
-          ))}
-          <Text dimColor>Press a number to ask the agent for this change. Esc goes back.</Text>
-        </Box>
-      ) : step === "actions" ? (
-        <Box flexDirection="column" marginTop={1}>
-          {referenceLine(st.ref) ? <Text dimColor>{referenceLine(st.ref)}</Text> : null}
-          {defs.length ? <Text dimColor>Each definition is accepted unless you change it: press its number (1 to {defs.length}).</Text> : null}
-          <Text>
-            {pilot ? (
-              <Text>
-                <Text color="green">r</Text> run the pilot on {card.pilot} in {mode} mode
-              </Text>
-            ) : (
-              <Text>
-                <Text color="green">a</Text> approve and start in {mode} mode
-              </Text>
-            )}{" "}
-            · <Text color="cyan">c</Text> change · <Text color="red">x</Text> cancel · <Text color="cyan">m</Text> mode
-            {switches.length ? (
-              <Text>
-                {" "}· <Text color="cyan">p</Text> change a program
-              </Text>
-            ) : null}
-          </Text>
-          <Text dimColor>{planHint(card)}</Text>
+      <Text>{card.text}</Text>
+      {st.details && card.details ? (
+        <Box marginTop={1}>
+          <Text dimColor>{card.details}</Text>
         </Box>
       ) : null}
+      {editor ??
+        (card.stage === "pilot" ? (
+          <Box flexDirection="column">
+            <QuestionCard key="pilot" card={{ t: "question", q: pilotQuestion() }} onAnswer={(v) => act({ a: "pilot", value: String(v) })} onDismiss={() => {}} />
+            {items ? <Text dimColor>e change a setting by its number{card.details ? ` · d ${st.details ? "hide" : "show"} details` : ""}</Text> : null}
+          </Box>
+        ) : q ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>
+              Open setting {card.qids.length - open.length + 1} of {card.qids.length - st.later.length}. Answer it here, or press Esc to answer later.
+            </Text>
+            <QuestionCard
+              key={q.qid}
+              card={{ t: "question", q }}
+              onAnswer={(value, note) => void props.session.answer(q.qid, value, note).then(() => setTick((x) => x + 1))}
+              onDismiss={() => act({ a: "later", qid: q.qid })}
+            />
+          </Box>
+        ) : step === "reference" ? (
+          ask("ref", referenceQuestion(card), (v) => act({ a: "reference", value: String(v) }))
+        ) : step === "refpath" ? (
+          <Prompt label={REFERENCE_PATH_LABEL} onSubmit={(v) => act({ a: "refpath", text: v })} onCancel={() => act({ a: "back" })} />
+        ) : step === "refmode" ? (
+          ask("refmode", refModeQuestion(st), (v) => act({ a: "refmode", value: String(v) }))
+        ) : step === "program" ? (
+          <Box flexDirection="column" marginTop={1}>
+            {switches.map((t, i) => (
+              <Text key={i}>
+                <Text color="cyan">{i + 1}</Text> {t}
+              </Text>
+            ))}
+            <Text dimColor>Press a number to ask the agent for this change. Esc goes back.</Text>
+          </Box>
+        ) : step === "actions" ? (
+          <Box flexDirection="column" marginTop={1}>
+            {referenceLine(st.ref) ? <Text dimColor>{referenceLine(st.ref)}</Text> : null}
+            <Text>
+              {pilot ? (
+                <Text>
+                  <Text color="green">r</Text> run the demonstration on {card.pilot}
+                </Text>
+              ) : (
+                <Text>
+                  <Text color="green">a</Text> approve and start
+                </Text>
+              )}{" "}
+              · <Text color="cyan">c</Text> change · <Text color="red">x</Text> cancel
+              {items ? <Text> · <Text color="cyan">1-{Math.min(9, items)}</Text>{items > 9 ? <Text>/<Text color="cyan">e</Text></Text> : null} edit</Text> : null}
+              {card.details ? <Text> · <Text color="cyan">d</Text> {st.details ? "hide" : "show"} details</Text> : null}
+              {" "}· <Text color="cyan">m</Text> mode {mode}
+              {switches.length ? <Text> · <Text color="cyan">p</Text> program</Text> : null}
+            </Text>
+            <Text dimColor>{planHint(card)}</Text>
+          </Box>
+        ) : null)}
     </Frame>
   );
 }

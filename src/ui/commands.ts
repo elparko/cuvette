@@ -241,7 +241,7 @@ export const commands: Command[] = [
   {
     name: "plan",
     args: "[on|off|<request>]",
-    help: "Show the proposed analysis, or propose one for a request before any step runs. /plan off skips it for later requests. Also /proposal.",
+    help: "Show the proposed analysis: Questions, Proposed metrics, Demonstration on a sample, Confirmed. /plan <request> starts it for one request. /plan off skips it for later requests. Also /proposal.",
     run(args, ctx) {
       const s = ctx.session;
       const sub = args.join(" ").trim();
@@ -252,7 +252,7 @@ export const commands: Command[] = [
       }
       if (!sub) {
         const v = planView(s.record);
-        if (v) return ctx.print(v.text, v.approved ? `Confirmed analysis, version ${v.version}` : `Proposed analysis, version ${v.version}`);
+        if (v) return ctx.print(v.text, v.approved ? `Confirmed, version ${v.version}` : `Proposed metrics, version ${v.version}`);
         return ctx.notice(s.planFirst ? "No proposed analysis yet. Type your request. The agent proposes the analysis first." : "No proposed analysis yet. Type /plan <request>.");
       }
       if (s.busy) return ctx.error("The agent is busy. Wait, then type /plan again.");
@@ -273,7 +273,7 @@ export const commands: Command[] = [
       }
       if (!sub) {
         const v = planView(s.record);
-        if (v) return ctx.print(v.text, v.approved ? `Confirmed analysis, version ${v.version}` : `Proposed analysis, version ${v.version}`);
+        if (v) return ctx.print(v.text, v.approved ? `Confirmed, version ${v.version}` : `Proposed metrics, version ${v.version}`);
         return ctx.notice(s.planFirst ? "No proposed analysis yet. Type your request. The agent proposes the analysis first." : "No proposed analysis yet. Type /plan <request>.");
       }
       if (s.busy) return ctx.error("The agent is busy. Wait, then type /plan again.");
@@ -294,7 +294,7 @@ export const commands: Command[] = [
       const run = s.record.entries(["pilot_run"]).at(-1);
       if (!run) return ctx.notice("No pilot yet.");
       const done = s.record.entries(["pilot_approved"]).some((e) => e.data.run === run.id);
-      ctx.print(pilotText(run.data as never), `Pilot on ${String(run.data.sample)}${done ? ", confirmed" : ""}`);
+      ctx.print(pilotText(run.data as never), `Demonstration on ${String(run.data.sample)}${done ? ", confirmed" : ""}`);
     },
   },
   {

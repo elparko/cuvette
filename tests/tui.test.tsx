@@ -718,17 +718,17 @@ describe("plan card", () => {
 
   test("the hint, then the plan with its open decision in the question card style; m sets the mode and a approves", async () => {
     const { h, s } = start();
-    await until(() => h.all().includes("Type /plan to get a proposed analysis before any step runs."));
+    await until(() => h.all().includes("Type /plan to get questions, proposed metrics and a demonstration before any step runs."));
     s.proposePlan("Question: Does drug 2 help?\n\nSteps\n1. Paired t test", [question(s.id)]);
-    await until(() => h.all().includes("Proposed analysis, version 1"));
+    await until(() => h.all().includes("Proposed metrics, version 1"));
     expect(h.all()).toContain("Question: Does drug 2 help?");
     await until(() => h.all().includes("Your decision: Significance level"));
-    expect(h.all()).toContain("Open decision 1 of 1.");
+    expect(h.all()).toContain("Open setting 1 of 1.");
     await type(h, "2");
-    await until(() => h.all().includes("approve and start in watch mode"));
+    await until(() => h.all().includes("m mode watch"));
     expect(s.record.entries(["answer"])[0]!.data.value).toBe(0.01);
     await type(h, "m");
-    await until(() => h.all().includes("approve and start in follow mode"));
+    await until(() => h.all().includes("m mode follow"));
     await type(h, "a");
     await until(() => s.planResponses.length === 1);
     expect(s.planResponses[0]).toEqual({ action: "approve", mode: "follow" });
@@ -739,7 +739,7 @@ describe("plan card", () => {
     await sleep(100);
     const programs = [{ part: "Statistics", adapter: "biostats", alternatives: ["lme4"] }];
     s.proposePlan("Question: Q1", [], programs);
-    await until(() => h.all().includes("p change a program"));
+    await until(() => h.all().includes("p program"));
     await type(h, "c");
     await until(() => h.all().includes("What must change?"));
     await type(h, "Use a Wilcoxon test.");
@@ -765,19 +765,42 @@ describe("proposed analysis card", () => {
   const plan = (s: FakeSession, extra: Record<string, unknown>) =>
     s.bus.emit({ type: "plan", stage: "plan", version: 1, text: "Question: Q", update: false, qids: [], programs: [], mode: "watch", ...extra } as never);
 
-  test("the restatement comes first; n corrects it", async () => {
+  test("Questions: what the agent found, then one question card at a time", async () => {
     const { h, s } = start();
     await sleep(100);
-    plan(s, { restatement: "You want: the number of red-positive cells in each field." });
-    await until(() => h.all().includes("Proposed analysis, version 1"));
-    expect(h.all()).toContain("You want: the number of red-positive cells in each field.");
-    expect(h.all()).toContain("Is that right?");
-    await type(h, "n");
-    await until(() => h.all().includes("What do you want?"));
-    await type(h, "red spots, not cells");
+    const mk = (qid: string, text: string, options: string[]) => ({ qid, session: s.id, decisionKey: "", title: text, text, options: options.map((o) => ({ value: o, label: o })), evidence: "", status: "open" as const, created: "" });
+    s.clarify("I see 6 groups, 139 fields, 2 channels plus an overlay in each field.", [mk("q1", "What counts as one n?", ["One Set", "One field"]), mk("q2", "What counts as a positive cell?", ["Any red inside the outline", "Red covers most of the cell"])], ["Which groups to compare? The request says: all six."]);
+    await until(() => h.all().includes("I see 6 groups, 139 fields"));
+    expect(h.all()).toContain("Questions");
+    expect(h.all()).toContain("Question 1 of 2");
+    expect(h.all()).toContain("Not asked, because your request answers it: Which groups to compare?");
+    await type(h, "1");
+    await until(() => h.all().includes("Question 2 of 2"));
+    await type(h, "o");
+    await type(h, "At least 1 red pixel");
     h.type("\r");
+    await until(() => s.record.entries(["answer"]).length === 2);
+    expect(s.record.entries(["answer"]).map((e) => e.data.value)).toEqual(["One Set", "At least 1 red pixel"]);
+  });
+
+  test("the settings are pre-filled and a number changes one", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    plan(s, {
+      text: "Metrics\n[1] n: one Set\n\nSteps\n1. Outline the cells\n   [2] cell model: cyto3 (default)",
+      details: "Data\n- Files: 139 fields",
+      definitions: [{ measure: "n", definition: "one Set" }],
+      settings: [{ index: 0, step: 1, label: "cell model", value: "cyto3", by: "default", options: ["cyto3", "nuclei"] }],
+    });
+    await until(() => h.all().includes("[2] cell model: cyto3 (default)"));
+    expect(h.all()).not.toContain("139 fields");
+    await type(h, "d");
+    await until(() => h.all().includes("139 fields"));
+    await type(h, "2");
+    await until(() => h.all().includes("Choose a new value"));
+    await type(h, "2");
     await until(() => s.planResponses.length === 1);
-    expect(s.planResponses[0]).toEqual({ action: "change", text: "The scientist corrects the request. The scientist wants: red spots, not cells" });
+    expect(s.planResponses[0]).toEqual({ action: "set", index: 0, value: "nuclei" });
   });
 
   test("the reference question, a changed definition, and Run the pilot", async () => {
@@ -789,14 +812,14 @@ describe("proposed analysis card", () => {
     await until(() => h.all().includes("Should the pilot compare with it?"));
     expect(h.all()).toContain("2 Yes. Hold it back (blind test)");
     await type(h, "2");
-    await until(() => h.all().includes("r run the pilot on Set 1 in watch mode"));
+    await until(() => h.all().includes("r run the demonstration on Set 1"));
     expect(h.all()).toContain("Reference: /p/Analysis.xlsx (held back for a blind test)");
     await type(h, "r");
     await until(() => s.planResponses.length === 1);
     expect(s.planResponses[0]).toEqual({ action: "pilot", mode: "watch", reference: { mode: "blind", path: "/p/Analysis.xlsx", sheet: "Ox-LDL" } });
 
     plan(s, { definitions, pilot: "Set 1", version: 2 });
-    await until(() => h.all().includes("Proposed analysis, version 2"));
+    await until(() => h.all().includes("Proposed metrics, version 2"));
     await sleep(150);
     await type(h, "1");
     await until(() => h.all().includes("New definition of positive cell (now: At least 1 red pixel.):"));
@@ -806,12 +829,12 @@ describe("proposed analysis card", () => {
     expect(s.planResponses[1]).toEqual({ action: "change", text: "Change the definition of positive cell to: At least 5 red pixels.", definition: { measure: "positive cell", old: "At least 1 red pixel.", new: "At least 5 red pixels." } });
   });
 
-  test("the pilot result asks: Confirm the plan and run all?", async () => {
+  test("the demonstration asks: Confirm and run all?", async () => {
     const { h, s } = start();
     await sleep(100);
     s.bus.emit({ type: "plan", stage: "pilot", version: 1, text: "Pilot sample: Set 1\n\nNumbers\n- positive cell: 296", update: false, qids: [], programs: [], mode: "watch" });
-    await until(() => h.all().includes("Confirm the plan and run all?"));
-    expect(h.all()).toContain("Proposed analysis: pilot result");
+    await until(() => h.all().includes("Confirm and run all?"));
+    expect(h.all()).toContain("Demonstration on a sample");
     expect(h.all()).toContain("3 Try another sample");
     await type(h, "3");
     await until(() => s.planResponses.length === 1);

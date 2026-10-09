@@ -24,6 +24,7 @@ import { compareNote, instruction, teachReview, type TeachSummary } from "./mode
 import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
 import { definitionsOf } from "./plan.ts";
+import { goalOnly, settingsOf } from "./plan.ts";
 import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
@@ -90,9 +91,10 @@ const MODE_NOTE: Record<Mode, string> = {
   plan: "Mode is now plan: write a plan with the plan tool. Run only read-only tools.",
 };
 
-const PLAN_NOTE = "Plan first. Before any analysis step, write the proposed analysis for this request with the plan tool. First look at the data with read-only tools, at most three calls. Then call plan once with these sections: restatement (what the scientist wants, in the scientist's terms, starting with 'You want:'), question (one sentence), definitions (what you will count: an operational definition of each measure, in plain words with the numbers), exclusions (what you will leave out and its expected effect, in numbers when you can estimate it), pilot (if the method runs on more than one sample: the sample that runs first and what the scientist will see), reference (an earlier analysis or hand count, if one exists, with a question that checks that its measure is the same as yours), data (files, what one row is, the unit of replication, the sample sizes), programs (the adapter for each part and why, with other choices), steps (in order; each with the method, the tool and the decisions it needs), outputs, checks (each assumption to test and what you do if it fails), and out_of_scope. For each decision, give the value if the setup or the request sets it. Leave the value out if the scientist must decide; the harness asks the scientist. Write for a scientist: short sentences, plain words. If the request is short and simple, write a short plan of two or three lines. No analysis step runs before the scientist approves the plan.";
+const PLAN_NOTE = "Plan first, in two phases. Phase 1, clarifying questions: look at the data with read-only tools, at most three calls. Then call clarify once. In found, tell the scientist in one or two sentences what you see, with counts (for example: I see 6 groups, 139 fields, 2 channels plus an overlay in each field). In questions, ask at most 5 questions about meaning only: what to measure and what counts as one (for example a red-positive cell or a red spot), which groups to compare, what one replicate is, whether earlier results or hand counts exist, and what the output is for. Give options from the data. Leave out a question that the request already answers, and say in answered_by_request what the request says. Never ask about technical settings such as thresholds, segmentation models, size filters, error bars, test families or alpha: you choose those in phase 2. Phase 2, proposed metrics: after the answers, call plan. In definitions, turn the answers into concrete metrics and how each is measured, with the setting values, one short line each (what counts as one n, what counts as one object, what counts as positive, the metric). restatement: only the scientific goal, starting with 'You want:'. Answer setup questions (is the program ready, where the results go) briefly in your message, not in the plan. steps: one line each in plain words, the actions you will run, with every setting filled in: its value and who set it (default, from your answer, or agent). Leave a setting open only if you cannot pick a sensible value, and at most two. Also give exclusions with their effects, pilot (if the method runs on more than one sample), outputs, programs, data, checks and out_of_scope. Write for a scientist: short sentences, plain words. No analysis step runs before the scientist confirms the proposed analysis.";
 const PLAN_UPDATE_NOTE = "This is a new request in a session with an approved plan. If the request needs analysis steps that are not in the plan, call plan with only what changes: the new steps and the changed sections. The scientist approves the update before a new step runs. If the request needs no new step, answer directly.";
 const PILOT_NOTE = "Pilot: before the first step that changes or counts things, say in one sentence how you will check the method on one sample first. A step that processes many files does not run until the scientist approves a pilot: run the method on one sample, save QC images with outlines of what was counted and what was left out, and call pilot_result.";
+const TECHNICAL = /\b(threshold|otsu|triangle|segmentation model|cellpose model|stardist|cyto\d|diameter|size (filter|limit|cut-?off)|(minimum|maximum|min|max)\.? (cell |object |particle )?size|pixels? (size|area)|sigma|blur|error bars?|standard error|sem|sd bars|test family|t-?test|wilcoxon|mann-?whitney|anova|alpha|significance level|p-?value cut|one-?sided|two-?sided|sidedness|fdr|bonferroni|correction method|random seed|iterations|normali[sz]ation method)\b/i;
 const CONTINUE = /^(continue|go on|go ahead|proceed|yes|ok|okay|next|carry on)\b[\s\S]{0,40}$/i;
 
 function lastSentence(text: string): string {
@@ -229,6 +231,7 @@ export class Session {
   private planWarned = new Set<string>();
   private stopTurn = false;
   pilotStage = false;
+  private clarified = false;
   reference?: Reference;
   private hidden: string[] = [];
   private refCandidates: Candidate[] = [];
@@ -374,6 +377,7 @@ export class Session {
     if (this.pick) extra.push(...this.adapterTools());
     if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.pipeline(t, a, id, sig) }));
     if (this.pilotOn()) extra.push(...this.pilotTools());
+    if (this.planFirst || this.interactive) extra.push(this.clarifyTool());
     for (const t of extra) if (!this.tools.has(t.name)) this.tools.set(t.name, t);
     this.chooseActiveTools();
 
@@ -1072,7 +1076,7 @@ export class Session {
       this.record.append("blocked", { callId, tool: tool.name, reason: gate, pilot: true });
       return error(gate);
     }
-    if (this.planning && depth === 0 && tool.readOnly && tool.name !== "plan" && ++this.planLooks === 4) this.notes.push("You have looked at the data enough. Call plan now.");
+    if (this.planning && depth === 0 && tool.readOnly && tool.name !== "plan" && tool.name !== "clarify" && ++this.planLooks === 4) this.notes.push(this.clarified ? "You have looked at the data enough. Call plan now." : "You have looked at the data enough. Call clarify now.");
     if ((this.mode === "plan" || this.mode === "teach") && !tool.readOnly)
       return error(this.planning ? "Plan first: no analysis step runs before the scientist approves the plan. Call plan now." : this.mode === "plan" ? "Plan mode: the agent plans and runs only read-only tools. Switch to watch mode to run steps." : "Teach mode: the scientist runs the steps and the agent runs only read-only tools.");
     const pre = await this.hooks.pre({ event: "PreToolUse", session: this.id, mode: this.mode, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args, readOnly: tool.readOnly } as never);
@@ -1660,6 +1664,7 @@ export class Session {
     this.planning = true;
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
+    this.clarified = !this.tools.has("clarify");
     this.modeBefore = this.mode === "plan" ? "watch" : this.mode;
     this.refCandidates = this.findReferenceFiles();
     if (this.mode !== "plan") {
@@ -1783,7 +1788,7 @@ export class Session {
   }
 
   private showImages(paths: string[]) {
-    if (this.settings.headless || !this.interactive || process.platform !== "darwin" || process.env.VITEST) return;
+    if (this.settings.headless || !this.interactive || process.platform !== "darwin" || process.env.VITEST || process.env.GA_NO_OPEN === "1" || this.settings.openImages === "off") return;
     for (const p of paths) {
       const child = spawn("open", [p], { stdio: "ignore", detached: true });
       child.on("error", () => {});
@@ -1859,7 +1864,20 @@ export class Session {
     const entry = this.record.append("pilot_run", run as unknown as Record<string, unknown>).id;
     this.showImages(images);
     const pending = this.pilotPlan;
-    const r = await this.askPlanCard({ stage: "pilot", version: pending?.version ?? this.planVersion, text: pilotText(run), update: false, qids: [], programs: [], mode: pending?.target ?? this.mode, definitions, images });
+    const shownPlan = pending?.plan ?? this.plan;
+    const r = await this.askPlanCard({
+      stage: "pilot",
+      version: pending?.version ?? this.planVersion,
+      text: pilotText(run),
+      details: shownPlan ? planText(shownPlan, { view: "compact" }) : undefined,
+      settings: shownPlan ? settingsOf(shownPlan).map((x, i) => ({ index: i, step: x.step, label: x.setting.label, key: x.setting.key, value: x.setting.value, by: x.setting.by, options: x.setting.options })) : [],
+      update: false,
+      qids: [],
+      programs: [],
+      mode: pending?.target ?? this.mode,
+      definitions,
+      images,
+    });
     if (!r) return { ok: false, error: "the scientist stopped the turn before answering the pilot" };
     if (r.action === "confirm") {
       const pilot = { entry, ...run } as PilotRun;
@@ -1884,10 +1902,23 @@ export class Session {
       this.record.append("pilot_rejected", { run: entry, sample, reason: "try another sample", another: true });
       return { ok: true, summary: `The scientist wants the pilot on another sample${r.text ? `: ${r.text}` : ""}. Run the same method on one other sample, then call pilot_result.` };
     }
+    if (r.action === "set" && shownPlan) {
+      const t = settingsOf(shownPlan)[r.index]?.setting;
+      if (!t) return { ok: false, error: "no such setting" };
+      const old = t.value;
+      t.value = typeof old === "number" && typeof r.value === "string" && Number.isFinite(Number(r.value)) ? Number(r.value) : r.value;
+      t.by = "you";
+      this.planVersion++;
+      if (pending) pending.version = this.planVersion;
+      this.record.append("plan", { action: "setting_changed", phase: "Demonstration on a sample", version: this.planVersion, label: t.label, key: t.key, old: old ?? null, new: t.value, text: planText(shownPlan), plan: structuredClone(shownPlan) });
+      this.commitSettings(shownPlan);
+      this.record.append("pilot_rejected", { run: entry, sample, reason: `${t.label} changed to ${String(t.value)}` });
+      return { ok: true, summary: `The scientist changed ${t.label} from ${String(old)} to ${String(t.value)}. Run the demonstration again on ${sample} with this value, then call pilot_result.` };
+    }
     if (r.action === "change") {
       if (r.definition) this.changeDefinition(r.definition);
       this.record.append("pilot_rejected", { run: entry, sample, reason: r.text });
-      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the method, run the pilot on ${sample} again, then call pilot_result. If a definition changes, call plan with the new definition and the reason.` };
+      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If a definition changes, call plan with the new definition and the reason.` };
     }
     return { ok: false, error: "unknown answer" };
   }
@@ -1949,6 +1980,13 @@ export class Session {
     this.mode = to;
   }
 
+  private whoSet(key: string): string {
+    const last = this.record.entries(["setup", "decision"]).filter((e) => (e.kind === "decision" ? e.data.key === key : key in ((e.data.values as object) ?? {}))).at(-1);
+    if (!last) return "default";
+    if (last.kind === "decision") return last.data.by === "agent" ? "agent" : String(last.data.reason ?? "").startsWith("set in the confirmed analysis") ? String(last.data.reason).replace(/^.*\((.*)\)$/, "$1") : "you";
+    return ((last.data.defaultsAccepted as string[] | undefined) ?? []).includes(key) || String(last.data.how ?? "").startsWith("defaults") ? "default" : "you";
+  }
+
   private fillDecisions(plan: AnalysisPlan) {
     const fields = this.decisions.fields();
     for (const step of plan.steps)
@@ -1959,14 +1997,22 @@ export class Session {
         if (answered) {
           d.value = f && this.decisions.hasValue(f.key) ? this.decisions.value(f.key) : answered.data.value;
           d.by = "you";
-        } else if (f && f.set && this.decisions.hasValue(f.key)) {
+        } else if (d.by === "you") continue;
+        else if (f && f.set && this.decisions.hasValue(f.key) && (d.value === undefined || this.whoSet(f.key) !== "default" || f.owner === "fixed")) {
           d.value = this.decisions.value(f.key);
-          d.by = f.owner === "fixed" ? "fixed" : "decision record";
-        } else if (f && f.owner === "human" && d.value !== undefined && d.by !== "you") {
-          d.recommendation ??= String(d.value);
-          delete d.value;
-        }
+          d.by = f.owner === "fixed" ? "fixed" : this.whoSet(f.key);
+        } else if (d.value !== undefined) d.by ??= "agent";
       }
+  }
+
+  private commitSettings(plan: AnalysisPlan) {
+    const fields = this.decisions.fields();
+    for (const { setting: d } of settingsOf(plan)) {
+      const f = d.key ? fields.find((x) => x.key === d.key) : undefined;
+      if (!f || f.owner === "fixed" || d.value === undefined) continue;
+      if (f.set && JSON.stringify(this.decisions.value(f.key)) === JSON.stringify(d.value)) continue;
+      this.decisions.change(f.key, d.value, { by: f.owner === "agent" ? "agent" : "human", reason: `set in the confirmed analysis (${d.by ?? "agent"})` });
+    }
   }
 
   private async askPlanDecisions(plan: AnalysisPlan): Promise<string[]> {
@@ -2026,55 +2072,78 @@ export class Session {
       for (const x of added) this.record.append("notice", { text: `Added to the approved plan: ${x.step}. Reason: ${x.reason || reason}`, plan: "added" });
       return { ok: true, summary: changed ? `The plan is now version ${this.planVersion}. The scientist sees the change and the reason.` : "Plan status saved." };
     }
+    if (!this.planUpdate && !this.clarified) return { ok: false, error: "Phase 1 first: call clarify with what you found in the data and your clarifying questions about meaning (or none). Then call plan with the proposed analysis." };
     const plan = this.planUpdate && this.plan ? mergePlan(this.plan, given) : ({ steps: [], ...readPlan(a) } as AnalysisPlan);
+    if (plan.restatement) {
+      const g = goalOnly(plan.restatement);
+      plan.restatement = g.text;
+      if (g.dropped.length) this.notes.push(`The restatement holds only the scientific goal. The harness took out: ${g.dropped.join(" ")} Answer such setup points briefly in your message.`);
+    }
     this.fillDecisions(plan);
-    const version = ++this.planVersion;
-    const shown = planText(this.planUpdate ? { ...given, steps: addedSteps(this.plan!, plan) } : plan);
-    this.record.append("plan", { action: this.planUpdate ? "update_proposed" : "proposed", version, text: shown, full: planText(plan), plan: structuredClone(plan) });
+    const open = openDecisions(plan);
+    if (open.length > 2) return { ok: false, error: `Too many open settings: ${open.map((x) => x.decision.label).join("; ")}. Fill in a sensible value for each technical setting (a default, or from the answers, or your choice checked in the pilot), and say who set it. Leave at most two open, only when you cannot choose.` };
+    let version = ++this.planVersion;
+    const part = this.planUpdate ? { ...given, steps: addedSteps(this.plan!, plan) } : plan;
+    this.record.append("plan", { action: this.planUpdate ? "update_proposed" : "proposed", phase: "Proposed analysis", version, text: planText(part), full: planText(plan), plan: structuredClone(plan) });
     const qids = await this.askPlanDecisions(plan);
     const programs = (plan.programs ?? []).map((g) => ({ part: g.part, adapter: g.adapter, alternatives: g.alternatives ?? [] }));
-    const r = await this.askPlanCard({
-      stage: "plan",
-      version,
-      text: shown,
-      update: this.planUpdate,
-      qids,
-      programs,
-      mode: this.modeBefore,
-      restatement: plan.restatement,
-      definitions: plan.definitions,
-      pilot: plan.pilot?.sample,
-      reference: this.planUpdate || this.reference ? undefined : this.referenceQuestion(),
-    });
-    if (!r) return { ok: false, error: "the scientist stopped the turn before answering the plan" };
+    let r: PlanResponse | undefined;
+    for (;;) {
+      const shownPart = this.planUpdate ? { ...given, steps: addedSteps(this.plan!, plan) } : plan;
+      r = await this.askPlanCard({
+        stage: "plan",
+        version,
+        text: planText(shownPart, { view: "compact", numbered: true }),
+        details: planText(shownPart, { view: "details", numbered: true }),
+        settings: settingsOf(plan).map((x, i) => ({ index: i, step: x.step, label: x.setting.label, key: x.setting.key, value: x.setting.value, by: x.setting.by, options: x.setting.options })),
+        update: this.planUpdate,
+        qids,
+        programs,
+        mode: this.modeBefore,
+        restatement: plan.restatement,
+        definitions: plan.definitions,
+        pilot: plan.pilot?.sample,
+      });
+      if (!r || r.action !== "set") break;
+      const target = settingsOf(plan)[r.index]?.setting;
+      if (!target) continue;
+      const old = target.value;
+      const raw = r.value;
+      target.value = typeof old === "number" && typeof raw === "string" && raw.trim() !== "" && Number.isFinite(Number(raw)) ? Number(raw) : raw;
+      target.by = "you";
+      version = ++this.planVersion;
+      this.record.append("plan", { action: "setting_changed", phase: "Proposed analysis", version, label: target.label, key: target.key, old: old ?? null, new: target.value, text: planText(plan), plan: structuredClone(plan) });
+    }
+    if (!r) return { ok: false, error: "the scientist stopped the turn before answering the proposed analysis" };
     if (r.action === "change") {
       if (r.definition) this.changeDefinition(r.definition);
       this.record.append("plan", { action: "change_requested", version, text: r.text });
-      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Revise the plan and call plan again${this.planUpdate ? " with only what changes" : " with the full plan"}. Do not run steps yet.` };
+      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Revise the proposed analysis and call plan again${this.planUpdate ? " with only what changes" : " with the full plan"}. Keep the settings that the scientist set. Do not run steps yet.` };
     }
     if (r.action === "cancel") {
       this.record.append("plan", { action: "cancelled", version });
       this.endPlanning();
       this.stopTurn = true;
-      return { ok: true, summary: "The scientist cancelled the plan. No step runs. Stop now." };
+      return { ok: true, summary: "The scientist cancelled the proposed analysis. No step runs. Stop now." };
     }
     if (r.action !== "approve" && r.action !== "pilot") return { ok: false, error: "unknown answer" };
     this.fillDecisions(plan);
+    this.commitSettings(plan);
     const target: Mode = r.mode && r.mode !== "plan" ? r.mode : this.modeBefore;
-    const answers = [...this.planQids.values()].filter((d) => d.by === "you").map((d) => `${d.label} = ${String(d.value)}`);
+    const answers = [...this.planQids.values(), ...settingsOf(plan).map((x) => x.setting)].filter((d, i, all) => d.by === "you" && all.indexOf(d) === i).map((d) => `${d.label} = ${String(d.value)}`);
     this.setReference(r.reference);
     const refNote = this.reference ? (this.reference.mode === "blind" ? ` The reference ${basename(this.reference.path)} is held back for a blind test. Do not try to read it.` : ` The pilot compares with the reference ${basename(this.reference.path)}.`) : "";
     if (r.action === "pilot" && plan.pilot) {
       this.pilotPlan = { plan: structuredClone(plan), version, target, answers };
       this.pilotStage = true;
-      this.record.append("plan", { action: "pilot_requested", version, sample: plan.pilot.sample });
+      this.record.append("plan", { action: "pilot_requested", phase: "Pilot", version, sample: plan.pilot.sample });
       this.endPlanning(target);
       return {
         ok: true,
         summary: [
           `The scientist wants the pilot first. Mode is now ${target}.`,
-          answers.length ? `The scientist answered: ${answers.join("; ")}.` : "",
-          `Run the method on ${plan.pilot.sample} only. Save QC images: outlines of what was counted and what was left out, with a legend in plain words (for example yellow = counted as positive, cyan = counted as negative, magenta = red that is not counted, orange = left out).`,
+          answers.length ? `The scientist set: ${answers.join("; ")}.` : "",
+          `Run the method on ${plan.pilot.sample} only, with the settings of the proposed analysis. Save QC images: outlines of what was counted and what was left out, with a legend in plain words (for example yellow = counted as positive, cyan = counted as negative, magenta = red that is not counted, orange = left out).`,
           "Then call pilot_result with the sample, the numbers (one for each measure in What I will count), the QC image paths and your own plain check: what looks wrong or uncertain. Do not run the other samples yet.",
           refNote,
         ].filter(Boolean).join(" "),
@@ -2083,14 +2152,105 @@ export class Session {
     this.approvePlan(plan, version, target, answers);
     this.endPlanning(target);
     const first = plan.steps.findIndex((x) => x.status !== "done" && x.status !== "skipped") + 1;
-    const open = openDecisions(plan).map((x) => x.decision.label);
+    const stillOpen = openDecisions(plan).map((x) => x.decision.label);
     return {
       ok: true,
       summary: [
-        `The scientist approved plan version ${version}. Mode is now ${target}.`,
-        answers.length ? `The scientist answered: ${answers.join("; ")}.` : "",
-        open.length ? `Still open: ${open.join("; ")}. The harness asks the scientist when a step needs one.` : "",
-        `Start with step ${first || 1} now. If you run a step that is not in the plan, or skip one, call plan with the reason.${refNote}`,
+        `The scientist confirmed the analysis, version ${version}. Mode is now ${target}.`,
+        answers.length ? `The scientist set: ${answers.join("; ")}.` : "",
+        stillOpen.length ? `Still open: ${stillOpen.join("; ")}. The harness asks the scientist when a step needs one.` : "",
+        `Start with step ${first || 1} now, with the settings of the confirmed analysis. If you run a step that is not in it, or skip one, call plan with the reason.${refNote}`,
+      ].filter(Boolean).join(" "),
+    };
+  }
+
+  private clarifyTool(): Tool {
+    return {
+      name: "clarify",
+      description: "Phase 1 of a new request: tell the scientist what you found in the data, and ask at most 5 questions about meaning (what counts as one n, what counts as a positive or as one object, what is measured, which groups, any earlier result or hand count, what the output is for). No technical settings. The harness shows one card at a time and returns the answers.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          found: { type: "string", description: "One or two sentences on what you see in the data, with counts." },
+          questions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                question: { type: "string" },
+                options: { type: "array", items: { type: "string" }, description: "Options from the data." },
+                recommendation: { type: "string" },
+                key: { type: "string", description: "The decision key, if the decision record has one for this meaning, for example replicate." },
+                answered_by_request: { type: "string", description: "If the request already answers this question, quote it here. The harness then skips the question." },
+              },
+              required: ["question"],
+            },
+          },
+        },
+        required: ["found"],
+      },
+      source: "harness",
+      readOnly: true,
+      permission: "allow",
+      execute: async (a) => this.clarify(a),
+    };
+  }
+
+  private async clarify(a: Args): Promise<ToolOutput> {
+    if (!this.planning || this.planUpdate) return { ok: false, error: "clarify is for the start of a new request, before the proposed metrics." };
+    const found = String(a.found ?? "").trim();
+    const raw = (Array.isArray(a.questions) ? a.questions : []).filter((q: any) => q && typeof q.question === "string" && q.question.trim());
+    const skipped: string[] = [];
+    const technical: string[] = [];
+    const kept: { question: string; options: string[]; recommendation?: string; key?: string }[] = [];
+    for (const q of raw as any[]) {
+      const text = String(q.question).trim();
+      if (typeof q.answered_by_request === "string" && q.answered_by_request.trim()) skipped.push(`${text} The request says: ${q.answered_by_request.trim()}`);
+      else if (TECHNICAL.test(text)) technical.push(text);
+      else kept.push({ question: text, options: Array.isArray(q.options) ? q.options.map(String) : [], recommendation: q.recommendation ? String(q.recommendation) : undefined, key: q.key ? String(q.key) : undefined });
+    }
+    const asked = kept.slice(0, 5);
+    const c = this.refCandidates[0];
+    const refAsked = c && !asked.some((q) => /hand count|earlier (analysis|result)|reference|previous (analysis|result)/i.test(q.question));
+    this.record.append("clarify", { action: "asked", phase: "Questions", found, questions: asked.map((q) => q.question), skipped, technical, reference: refAsked ? c.path : undefined });
+    const fields = this.decisions.fields();
+    const qs: { qid: string; question: string; ref?: boolean }[] = [];
+    for (const q of asked) {
+      const f = q.key ? fields.find((x) => x.key === q.key && x.owner === "human") : undefined;
+      const options = (q.options.length ? q.options : (f?.choices ?? []).map(String)).map((o) => ({ value: o, label: o }));
+      const asked1 = await this.questions.ask({ decisionKey: f?.key ?? "", title: q.question.length > 80 ? q.question.slice(0, 77) + "..." : q.question, text: q.question, options, recommendation: q.recommendation ? { value: q.recommendation, reason: "" } : undefined, evidence: "" });
+      qs.push({ qid: asked1.qid, question: q.question });
+    }
+    if (refAsked) {
+      const rq = this.referenceQuestion();
+      const asked1 = await this.questions.ask({ decisionKey: "", title: "Earlier results", text: rq.question, options: [{ value: "compare", label: "Yes. Compare in the demonstration" }, { value: "blind", label: "Yes. Hold it back (blind test)" }, { value: "none", label: "No, it is not a reference" }], recommendation: { value: this.settings.referenceMode ?? "compare", reason: "" }, evidence: "" });
+      qs.push({ qid: asked1.qid, question: rq.question, ref: true });
+    }
+    this.bus.emit({ type: "clarify", found, qids: qs.map((q) => q.qid), skipped });
+    for (const q of qs) this.bus.emit({ type: "question", question: this.questions.open().find((x) => x.qid === q.qid)! });
+    const answers: string[] = [];
+    for (const q of qs) {
+      this.waitedQids.add(q.qid);
+      try {
+        await abortable(this.questions.wait(q.qid), this.abort?.signal);
+      } catch {
+        return { ok: false, error: "the scientist stopped the turn before answering the questions" };
+      }
+      const ans = this.record.entries(["answer"]).filter((e) => e.data.qid === q.qid).at(-1);
+      const value = String(ans?.data.value ?? "");
+      answers.push(`${q.question} -> ${value}${ans?.data.note ? ` (${String(ans.data.note)})` : ""}`);
+      if (q.ref && c && (value === "compare" || value === "blind")) this.setReference({ mode: value, path: c.path, sheet: c.sheet });
+    }
+    this.clarified = true;
+    this.record.append("clarify", { action: "answered", phase: "Questions", found, answers, skipped });
+    return {
+      ok: true,
+      summary: [
+        answers.length ? `The scientist answered: ${answers.join("; ")}.` : "No question was needed.",
+        skipped.length ? `Skipped because the request answers them: ${skipped.join("; ")}.` : "",
+        technical.length ? `These are technical settings, not questions for the scientist: ${technical.join("; ")}. Choose a sensible value for each and show it as a setting in the proposed metrics.` : "",
+        this.reference ? (this.reference.mode === "blind" ? `The reference ${basename(this.reference.path)} is held back for a blind test. Do not read it.` : `The demonstration compares with the reference ${basename(this.reference.path)}.`) : "",
+        "Now call plan with the proposed metrics: each measure defined in plain words with its setting values, and the actions.",
       ].filter(Boolean).join(" "),
     };
   }

@@ -22,6 +22,7 @@ export interface Settings {
   planFirst?: boolean | "on" | "off";
   pilot?: boolean | "on" | "off";
   referenceMode?: "compare" | "blind";
+  openImages?: "on" | "off";
   permissions: Record<string, "allow" | "ask" | "deny">;
   permissionMode: "ask" | "bypass";
   messages: "after-step" | "queue";

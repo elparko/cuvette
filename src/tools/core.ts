@@ -27,7 +27,7 @@ const PLAN_FULL = {
     question: { type: "string", description: "The question, in one sentence." },
     definitions: {
       type: "array",
-      description: "What I will count: an operational definition of each measure, in plain words, with the numbers. For example: measure 'positive cell', definition 'A cell is an object in the brightfield image between 300 and 15,000 pixels. A cell is positive when at least 1 red pixel lies inside its outline.'",
+      description: "The proposed metrics: what counts as one n, what counts as one object, what counts as positive, and each metric, with its setting values, in plain words. For example: n 'one Set (4 per group)'; cell 'an object in CH1 of 300 to 15,000 px, outlined with Cellpose'; positive 'at least 1 red pixel (CH3, Otsu threshold for each image) inside the outline'; metric 'positive cells / all cells x 100 for each n'. Keep each one short.",
       items: { type: "object", properties: { measure: { type: "string" }, definition: { type: "string" } }, required: ["measure", "definition"] },
     },
     exclusions: {
@@ -70,10 +70,10 @@ const PLAN_FULL = {
           step: { type: "string", description: "What the step does, in a few words." },
           method: { type: "string", description: "The method, for example a paired t test." },
           tool: { type: "string", description: "The tool that runs the step, for example compare_two_groups or run_script." },
-          decisions: {
+          settings: {
             type: "array",
-            description: "The decisions the step needs. Give value for a decision that the setup or the request already sets. Leave value out for a decision that the scientist must answer.",
-            items: { type: "object", properties: { key: { type: "string", description: "The decision key, if the decision record has one." }, label: { type: "string" }, value: {}, options: { type: "array", items: { type: "string" } }, recommendation: { type: "string" } }, required: ["label"] },
+            description: "The settings of the step, each with its value filled in and who set it: default, from your answer, or agent. Leave value out only if you cannot pick a sensible value (at most two in the whole plan).",
+            items: { type: "object", properties: { key: { type: "string", description: "The decision key, if the decision record has one." }, label: { type: "string" }, value: {}, by: { type: "string", enum: ["default", "from your answer", "agent"] }, options: { type: "array", items: { type: "string" } }, recommendation: { type: "string" } }, required: ["label"] },
           },
           status: { type: "string", enum: ["todo", "doing", "done", "waiting", "skipped"] },
           reason: { type: "string", description: "Why the step was skipped or added." },

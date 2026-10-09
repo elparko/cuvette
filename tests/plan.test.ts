@@ -39,8 +39,8 @@ test("the plan text has every section in plain words", () => {
   expect(text).toContain("- Statistics: biostats. It has a paired t test. Other choices: lme4.");
   expect(text).toContain("2. Compare the two drugs");
   expect(text).toContain("   Method: Paired t test");
-  expect(text).toContain("   - Set: Paired test = true");
-  expect(text).toContain("   - You decide: Significance level.");
+  expect(text).toContain("   - Paired test: true");
+  expect(text).toContain("   - Significance level: open, you decide.");
   expect(text).toContain("- The differences are near normal. If it fails: Use a Wilcoxon signed-rank test.");
 });
 
@@ -87,7 +87,7 @@ test("the approved plan, its changes and the review findings come from the recor
   expect(a.updates).toEqual([expect.objectContaining({ version: 2, reason: "The scientist asked for survival." })]);
   expect(currentPlan(r)!.steps).toHaveLength(3);
   expect(planView(r)).toMatchObject({ approved: true, version: 2 });
-  expect(planMarkdown(r).join("\n")).toMatch(/## Confirmed analysis \(version 1, confirmed .*\)\n\nQuestion: Does drug 2[\s\S]*### Changes after confirmation\n\n- Version 2: The scientist asked for survival\./);
+  expect(planMarkdown(r).join("\n")).toMatch(/## Proposed analysis \(version 1, confirmed .*\)\n\n### Proposed metrics\n\nQuestion: Does drug 2[\s\S]*### Changes after confirmation\n\n- Version 2: The scientist asked for survival\./);
   const missing = planFindings(r);
   expect(missing.map((f) => f.check)).toEqual(["plan_step_missing", "plan_step_missing"]);
   expect(missing[0]!.message).toContain("step 2 (Compare the two drugs)");
@@ -120,9 +120,9 @@ const CELLS = {
 test("the restatement opens the proposed analysis; the definitions, exclusions with effects, pilot and reference have their own sections", () => {
   const text = planText(readPlan(CELLS));
   expect(text.split("\n")[0]).toBe("You want: for each field, the number of cells that took up red particles, and the number of all cells.");
-  expect(text).toContain("What I will count\n1) cell: An object in the brightfield image between 300 and 15,000 pixels.\n2) positive cell: A cell with at least 1 red pixel inside its outline.");
+  expect(text).toContain("Metrics\n- cell: An object in the brightfield image between 300 and 15,000 pixels.\n- positive cell: A cell with at least 1 red pixel inside its outline.");
   expect(text).toContain("What I will leave out, and what it does\n- Clumps over 15,000 px are left out. Effect: On the pilot field this leaves out about 40% of the area with cells, and the red inside it.");
-  expect(text).toContain("Pilot\n- First sample: Set 1. The method runs on this sample only. You check the result before the other samples run.\n- You will see: The overlay image with a legend");
+  expect(text).toContain("Demonstration on a sample\n- First sample: Set 1. The metrics run on this sample only. You check the result before the other samples run.\n- You will see: The overlay image with a legend");
   expect(text).toContain("Reference\n- /p/Analysis.xlsx, sheet Ox-LDL, columns Red dots, Total cells\n- The reference counts 'Red dots'. Is that the number of red-positive cells, or the number of red spots?");
 });
 

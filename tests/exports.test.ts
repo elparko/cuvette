@@ -171,5 +171,5 @@ test("protocol puts the approved plan at the top", () => {
   r.append("session", { adapters: [{ name: "fake", version: "0.1.0", programVersion: "1.0" }], model: "m" });
   r.append("plan_approved", { version: 1, text: "Question: Does drug 2 help?", plan: { steps: [] } });
   const text = readFileSync(exportProtocol(r, [adapter], join(dir, "plan-protocol.md")), "utf8");
-  expect(text).toMatch(/^# Protocol\n\nSession .*\n\n## Confirmed analysis \(version 1, confirmed .*\)\n\nQuestion: Does drug 2 help\?\n/);
+  expect(text).toMatch(/^# Protocol\n\nSession .*\n\n## Proposed analysis \(version 1, confirmed .*\)\n\n### Proposed metrics\n\nQuestion: Does drug 2 help\?\n/);
 });

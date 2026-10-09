@@ -13,7 +13,8 @@ export type Card =
   | { t: "findings"; list: Finding[] }
   | { t: "key"; reason?: string }
   | { t: "config" }
-  | ({ t: "plan" } & Omit<PlanEvent, "type">);
+  | ({ t: "plan" } & Omit<PlanEvent, "type">)
+  | { t: "clarify"; found: string; qids: string[]; skipped: string[] };
 
 export type CardType = Card["t"];
 
@@ -24,8 +25,8 @@ export function show(v: unknown): string {
 }
 
 export function pushCard(list: Card[], c: Card): Card[] {
-  if (c.t === "question" && list.some((y) => (y.t === "question" && y.q.qid === c.q.qid) || (y.t === "plan" && y.qids.includes(c.q.qid)))) return list;
-  if (c.t === "plan") return [...list.filter((y) => !(y.t === "question" && c.qids.includes(y.q.qid)) && y.t !== "plan"), c];
+  if (c.t === "question" && list.some((y) => (y.t === "question" && y.q.qid === c.q.qid) || ((y.t === "plan" || y.t === "clarify") && y.qids.includes(c.q.qid)))) return list;
+  if (c.t === "plan" || c.t === "clarify") return [...list.filter((y) => !(y.t === "question" && c.qids.includes(y.q.qid)) && y.t !== c.t), c];
   if (c.t === "setup" && list.some((y) => y.t === "setup")) return list;
   if (c.t === "key") return list.some((y) => y.t === "key") ? list : [c, ...list];
   return [...list, c];
@@ -43,6 +44,8 @@ export function cardFromEvent(e: BusEvent): Card | undefined {
       const { type: _t, ...rest } = e;
       return { t: "plan", ...rest };
     }
+    case "clarify":
+      return { t: "clarify", found: e.found, qids: e.qids, skipped: e.skipped };
   }
   return undefined;
 }
@@ -53,6 +56,7 @@ export function closesCard(en: Entry, c: Card): boolean {
   if (en.kind === "answer") return c.t === "question" && c.q.qid === en.data.qid;
   if (en.kind === "permission") return c.t === "permission" && c.rid === en.data.rid;
   if (en.kind === "follow_step") return c.t === "instruction" && c.step === en.data.step;
+  if (en.kind === "clarify" && en.data.action === "answered") return c.t === "clarify";
   if (en.kind === "plan_approved" || en.kind === "pilot_approved" || en.kind === "pilot_rejected" || (en.kind === "plan" && PLAN_ENDS.includes(String(en.data.action)))) return c.t === "plan";
   return false;
 }
@@ -75,7 +79,7 @@ export const needsSetup = (session: SessionLike) => session.decisions.fields().s
 export const NO_KEY = "No Claude API key is set. Add one now, or press Esc if you use `ant auth login`.";
 
 export function planIntro(session: SessionLike): string {
-  return session.planFirst ? "The agent writes a proposed analysis first. You confirm it before any step runs." : "Type /plan to get a proposed analysis before any step runs.";
+  return session.planFirst ? "The agent asks a few questions, proposes the metrics, and shows them on one sample. You confirm before the batch runs." : "Type /plan to get questions, proposed metrics and a demonstration before any step runs.";
 }
 
 // ---------------------------------------------------------------- permission
@@ -207,11 +211,28 @@ export function findingReasonLabel(a: "reject" | "fix"): string {
   return a === "reject" ? "Why do you reject it? (Enter to skip)" : "What did you fix? (Enter to skip)";
 }
 
-// ---------------------------------------------------------------- the proposed analysis
+// ---------------------------------------------------------------- questions (phase 1)
+
+export type ClarifyCard = Extract<Card, { t: "clarify" }>;
+
+export const CLARIFY_TITLE = "Questions";
+
+export function clarifyOpen(card: ClarifyCard, open: Question[]): Question[] {
+  return open.filter((q) => card.qids.includes(q.qid));
+}
+
+export function clarifyProgress(card: ClarifyCard, open: Question[]): string {
+  const left = clarifyOpen(card, open).length;
+  return `Question ${card.qids.length - left + 1} of ${card.qids.length}`;
+}
+
+export const CLARIFY_SKIP_ANSWER = "No answer. Use your judgment and say what you chose.";
+
+// ---------------------------------------------------------------- the proposed metrics
 
 export const RUN_MODES: Mode[] = ["watch", "follow", "teach"];
 
-export type PlanStep = "restate" | "decisions" | "reference" | "refpath" | "refmode" | "actions" | "change" | "correct" | "program" | "definition";
+export type PlanStep = "restate" | "decisions" | "reference" | "refpath" | "refmode" | "actions" | "change" | "correct" | "program" | "definition" | "setting" | "pick";
 
 export interface PlanState {
   step: PlanStep;
@@ -219,6 +240,8 @@ export interface PlanState {
   mode: Mode;
   ref?: ReferenceChoice;
   defIndex: number;
+  setIndex: number;
+  details: boolean;
 }
 
 export type PlanCard = Extract<Card, { t: "plan" }>;
@@ -240,7 +263,11 @@ export type PlanAction =
   | { a: "programs" }
   | { a: "program"; index: number }
   | { a: "back" }
-  | { a: "pilot"; value: string };
+  | { a: "pilot"; value: string }
+  | { a: "details" }
+  | { a: "item"; n: number }
+  | { a: "pick" }
+  | { a: "setValue"; value: unknown };
 
 export function parseReference(raw: string): ReferenceChoice | undefined {
   const [path = "", sheet = "", cols = ""] = raw.split(";").map((x) => x.trim());
@@ -249,7 +276,7 @@ export function parseReference(raw: string): ReferenceChoice | undefined {
 }
 
 export function planInit(card: PlanCard): PlanState {
-  return { step: card.stage === "plan" && card.restatement ? "restate" : "decisions", later: [], mode: RUN_MODES.includes(card.mode) ? card.mode : "watch", defIndex: -1 };
+  return { step: "decisions", later: [], mode: RUN_MODES.includes(card.mode) ? card.mode : "watch", defIndex: -1, setIndex: -1, details: false };
 }
 
 export function planQuestions(card: PlanCard, st: PlanState, open: Question[]): Question[] {
@@ -266,7 +293,7 @@ export function programSwitches(card: PlanCard): string[] {
 }
 
 export function planTitle(card: PlanCard): string {
-  return card.stage === "pilot" ? "Proposed analysis: pilot result" : `${card.update ? "Proposed change to the analysis" : "Proposed analysis"}, version ${card.version}`;
+  return card.stage === "pilot" ? "Demonstration on a sample" : `${card.update ? "Proposed change to the metrics" : "Proposed metrics"}, version ${card.version}`;
 }
 
 export function pilotGate(card: PlanCard): string | undefined {
@@ -287,9 +314,9 @@ export function refModeQuestion(st: PlanState): Question {
 }
 
 export function pilotQuestion(): Question {
-  return localQuestion("pilot", "Confirm the plan and run all?", "Does this look right?", [
-    { value: "confirm", label: "Confirm the plan and run all" },
-    { value: "change", label: "Change the method" },
+  return localQuestion("pilot", "Confirm and run all?", "Does this look right?", [
+    { value: "confirm", label: "Confirm and run all" },
+    { value: "change", label: "Change a metric or a setting (in plain words)" },
     { value: "another", label: "Try another sample" },
   ]);
 }
@@ -305,12 +332,45 @@ export function definitionLabel(card: PlanCard, st: PlanState): string | undefin
   return d ? `New definition of ${d.measure} (now: ${d.definition}):` : undefined;
 }
 
+export function itemCount(card: PlanCard): number {
+  return (card.stage === "plan" ? (card.definitions ?? []).length : 0) + (card.settings ?? []).length;
+}
+
+export function settingQuestion(card: PlanCard, st: PlanState): Question | undefined {
+  const x = (card.settings ?? [])[st.setIndex];
+  if (!x || !x.options?.length) return undefined;
+  return localQuestion("setting", x.label, `Now: ${show(x.value)}${x.by ? ` (${x.by})` : ""}. Choose a new value, or press o to type one.`, x.options.map((o) => ({ value: o, label: o })));
+}
+
+export function settingLabel(card: PlanCard, st: PlanState): string | undefined {
+  const x = (card.settings ?? [])[st.setIndex];
+  return x ? `New value for ${x.label} (now: ${show(x.value)}${x.by ? `, ${x.by}` : ""}):` : undefined;
+}
+
+export const PICK_LABEL = "Number of the metric or setting to change:";
+
 export function planReduce(card: PlanCard, st: PlanState, act: PlanAction): { state: PlanState; respond?: PlanResponse } {
   const to = (step: PlanStep, more: Partial<PlanState> = {}) => ({ state: { ...st, ...more, step } });
   const respond = (r: PlanResponse) => ({ state: st, respond: r });
   const defs = card.definitions ?? [];
   const after = card.stage === "pilot" ? "decisions" : "actions";
+  const ndefs = card.stage === "plan" ? defs.length : 0;
   switch (act.a) {
+    case "details":
+      return { state: { ...st, details: !st.details } };
+    case "pick":
+      return itemCount(card) ? to("pick") : { state: st };
+    case "item": {
+      const i = act.n - 1;
+      if (i < 0 || i >= itemCount(card)) return to(after);
+      if (i < ndefs) return to("definition", { defIndex: i });
+      return to("setting", { setIndex: i - ndefs });
+    }
+    case "setValue": {
+      const v = typeof act.value === "string" ? act.value.trim() : act.value;
+      if (v === "" || v === undefined) return to(after);
+      return respond({ action: "set", index: st.setIndex, value: v });
+    }
     case "restate":
       return to(act.ok ? "decisions" : "correct");
     case "correct":

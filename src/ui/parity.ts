@@ -5,4 +5,4 @@ export const COMMANDS = [
   "export", "databook", "open", "model", "key", "eln", "adapters", "skills", "lab", "compact", "resume", "window", "panel", "details", "clear", "quit",
 ];
 
-export const CARDS: CardType[] = ["setup", "eln", "permission", "question", "instruction", "findings", "key", "config", "plan"];
+export const CARDS: CardType[] = ["setup", "eln", "permission", "question", "instruction", "findings", "key", "config", "plan", "clarify"];

@@ -11,7 +11,7 @@ export type EntryKind =
   | "decision" | "owner_change" | "deviation" | "blocked" | "permission" | "permission_mode"
   | "question" | "answer" | "sensitivity"
   | "finding" | "finding_resolution" | "claim_check"
-  | "mode" | "follow_step" | "lab_memory" | "plan" | "plan_approved"
+  | "mode" | "follow_step" | "lab_memory" | "plan" | "plan_approved" | "clarify"
   | "pilot_run" | "pilot_approved" | "pilot_rejected" | "reference" | "validation"
   | "eln_push" | "eln_link" | "setting" | "note" | "notice" | "error" | "usage" | "compaction" | "correction" | "adapter";
 
@@ -321,7 +321,8 @@ export type BusEvent =
   | { type: "permission"; rid: string; tool: string; args: Args; code?: string; touches: string; search?: { root: string; purpose: string } }
   | { type: "question"; question: Question }
   | { type: "instruction"; step: number; tool: string; text: string }
-  | PlanEvent;
+  | PlanEvent
+  | { type: "clarify"; found: string; qids: string[]; skipped: string[] };
 
 export interface PlanEvent {
   type: "plan";
@@ -337,6 +338,8 @@ export interface PlanEvent {
   pilot?: string;
   reference?: { question: string; candidates: { path: string; sheet?: string; columns: string[]; label: string }[] };
   images?: string[];
+  details?: string;
+  settings?: { index: number; step: number; label: string; key?: string; value?: unknown; by?: string; options?: string[] }[];
 }
 
 export interface ReferenceChoice {
@@ -353,4 +356,5 @@ export type PlanResponse =
   | { action: "confirm" }
   | { action: "another"; text?: string }
   | { action: "change"; text: string; definition?: { measure: string; old: string; new: string } }
+  | { action: "set"; index: number; value: unknown }
   | { action: "cancel" };

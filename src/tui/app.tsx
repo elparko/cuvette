@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Box, Static, Text, render, useApp, useInput, useStdout, useWindowSize } from "ink";
 import TextInput from "ink-text-input";
 import type { BusEvent, Mode } from "../core/types.ts";
-import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
+import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import { commands, openSetup, openWithOs, suggestions, table, type CommandCtx } from "../ui/commands.ts";
@@ -510,6 +510,7 @@ function cardViews(d: CardDeps): CardViews {
         onAgent={() => (popCard(), void session.followDone(card.step, "", true))}
       />
     ),
+    clarify: (card) => <ClarifyCard key={`clarify${card.qids.join(",")}`} card={card} session={session} />,
     plan: (card) => <PlanCard key={`plan${card.stage}${card.version}${card.text.length}`} card={card} session={session} onRespond={(r) => (popCard(), session.respondPlan?.(r))} />,
     findings: (card) => <FindingsCard key="findings" card={card} session={session} onClose={popCard} />,
     eln: () => <ElnCard key="eln" path={credentialsPath()} onCancel={popCard} onSubmit={(url, key) => void (saveEln(session, url, key, { ...d.say, ok: (t) => (popCard(), d.say.ok(t)) }))} />,

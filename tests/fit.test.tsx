@@ -40,7 +40,7 @@ describe("a card taller than the terminal", () => {
     const lines = h.term.lines();
     const text = lines.join("\n");
     expect(count(text, "Plan line 001 ")).toBe(1);
-    expect(count(text, "Proposed analysis, version 1")).toBe(1);
+    expect(count(text, "Proposed metrics, version 1")).toBe(1);
     expect(h.all()).not.toContain("Plan line 040 ");
     expect(h.term.view()).toContain("approve and start");
     expect(h.term.view()).toMatch(/scroll · lines 1–\d+ of 201/);

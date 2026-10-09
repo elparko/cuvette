@@ -1,5 +1,5 @@
 import { pilotText, validationRows } from "./pilot.ts";
-import { approvedPlan, planMarkdown } from "./plan.ts";
+import { approvedPlan, planMarkdown, questionsOf } from "./plan.ts";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -301,18 +301,20 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
     case "note":
       return { icon: "note", line: clip(show(d.text)), technical: tech() };
     case "plan_approved":
-      return { icon: "setup", line: `You confirmed the analysis, version ${show(d.version)}`, details: { text: d.text, mode: d.mode, answers: d.answers }, technical: tech() };
+      return { icon: "setup", line: `Confirmed: version ${show(d.version)} of the proposed analysis`, details: { text: d.text, mode: d.mode, answers: d.answers }, technical: tech() };
     case "plan":
       if (d.action === "updated") return { icon: "decision", line: `Plan changed to version ${show(d.version)}. Reason: ${clip(show(d.reason || "none given"))}`, details: { text: d.text }, technical: tech() };
       if (d.action === "change_requested") return { icon: "note", line: `You asked to change the plan: ${clip(show(d.text))}`, technical: tech() };
       if (d.action === "cancelled") return { icon: "note", line: "You cancelled the plan. No step ran.", technical: tech() };
       return undefined;
     case "pilot_run":
-      return { icon: "note", line: `Pilot on ${show(d.sample)}: ${clip(Object.entries((d.values as Record<string, unknown>) ?? {}).map(([k, v]) => `${k} ${show(v)}`).join(", "))}`, badges: ["pilot"], details: { values: d.values, comparison: d.comparison, check: d.check, images: d.images }, technical: tech() };
+      return { icon: "note", line: `Demonstration on ${show(d.sample)}: ${clip(Object.entries((d.values as Record<string, unknown>) ?? {}).map(([k, v]) => `${k} ${show(v)}`).join(", "))}`, badges: ["pilot"], details: { values: d.values, comparison: d.comparison, check: d.check, images: d.images }, technical: tech() };
     case "pilot_approved":
-      return { icon: "setup", line: `You confirmed the pilot on ${show(d.sample)}`, technical: tech() };
+      return { icon: "setup", line: `You confirmed the demonstration on ${show(d.sample)}`, technical: tech() };
     case "pilot_rejected":
-      return { icon: "note", line: `Pilot on ${show(d.sample)} not confirmed: ${clip(show(d.reason))}`, technical: tech() };
+      return { icon: "note", line: `Demonstration on ${show(d.sample)} not confirmed: ${clip(show(d.reason))}`, technical: tech() };
+    case "clarify":
+      return d.action === "answered" ? { icon: "question", line: `Questions: ${((d.answers as string[]) ?? []).length} answered${((d.skipped as string[]) ?? []).length ? `, ${((d.skipped as string[]) ?? []).length} not asked because the request answers them` : ""}`, details: { found: d.found, answers: d.answers, skipped: d.skipped }, technical: tech() } : undefined;
     case "validation":
       return { icon: "decision", line: `Validation against the reference: ${clip(((d.summary as string[]) ?? [])[1] ?? "")}`, details: { summary: d.summary, plot: d.plot }, technical: tech() };
     case "notice":
@@ -643,13 +645,15 @@ function planHtml(record: AnalysisRecord): string {
   const p = approvedPlan(record);
   if (!p) return "";
   const pre = (t: string) => `<pre style="white-space:pre-wrap;font:inherit">${esc(t)}</pre>`;
-  const pilot = p.pilot ? `<h3>Pilot: ${esc(p.pilot.sample)}</h3>${pre(pilotText(p.pilot))}${p.pilot.images.map((i) => imgTag(i, `QC image of ${p.pilot!.sample}`)).join("")}` : "";
+  const q = questionsOf(record, p.entry);
+  const questions = q.length ? `<h3>Questions</h3>${pre(q.join("\n"))}` : "";
+  const pilot = p.pilot ? `<h3>Demonstration on a sample: ${esc(p.pilot.sample)}</h3>${pre(pilotText(p.pilot))}${p.pilot.images.map((i) => imgTag(i, `QC image of ${p.pilot!.sample}`)).join("")}` : "";
   const updates = p.updates.length ? `<h3>Changes after confirmation</h3><ul>${p.updates.map((u) => `<li>Version ${u.version}: ${esc(u.reason || "no reason given")}</li>`).join("")}</ul>` : "";
   const v = validationRows(record);
   const validation = v
     ? `<h3>Validation against the reference</h3><ul>${v.summary.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="scroll"><table><thead><tr>${v.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${v.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${v.plot ? `${imgTag(v.plot, "Bland-Altman plot")}<p class="muted">Bland-Altman plot. Each dot is one sample: the mean of the two values (across) against the agent minus the reference (up). The dark line is the mean difference. The dashed lines are the mean plus and minus 1.96 SD. The gray dot is the pilot sample.</p>` : ""}`
     : "";
-  return `<section class="plan" id="plan"><h2>Confirmed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${pre(p.text)}${pilot}${updates}${validation}</section>`;
+  return `<section class="plan" id="plan"><h2>Proposed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${p.version}.</p>${updates}${validation}</section>`;
 }
 
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {

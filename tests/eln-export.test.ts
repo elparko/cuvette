@@ -92,8 +92,8 @@ test("the content covers the question, answer, decisions, steps, findings, figur
 test("the archive has the approved plan as plan.md and at the top of the body", async () => {
   s.record.append("plan_approved", { version: 1, text: "Question: How many particles?", plan: { steps: [] } });
   const { files, top } = await exported();
-  expect(files.get(`${top}analysis/plan.md`)!.toString()).toMatch(/^# Confirmed analysis \(version 1, confirmed .*\)\n\nQuestion: How many particles\?/);
-  expect(files.get(`${top}analysis/protocol.md`)!.toString()).toContain("## Confirmed analysis (version 1");
+  expect(files.get(`${top}analysis/plan.md`)!.toString()).toMatch(/^# Proposed analysis \(version 1, confirmed .*\)\n\n### Proposed metrics\n\nQuestion: How many particles\?/);
+  expect(files.get(`${top}analysis/protocol.md`)!.toString()).toContain("## Proposed analysis (version 1");
   const { collect } = await import("../src/eln/export.ts");
-  expect(collect(s).bodyHtml.startsWith("<h2>Confirmed analysis (version 1)</h2><pre>Question: How many particles?</pre>")).toBe(true);
+  expect(collect(s).bodyHtml.startsWith("<h2>Proposed analysis, confirmed (version 1)</h2><h3>Proposed metrics</h3><pre>Question: How many particles?</pre>")).toBe(true);
 });

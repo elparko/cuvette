@@ -125,6 +125,15 @@ export const SETTINGS: SettingDef[] = [
     def: "on",
   },
   {
+    name: "openImages",
+    group: "Session",
+    label: "Open QC images",
+    help: "on: the demonstration on a sample opens its QC images on screen. off: it only saves them in figures/. GA_NO_OPEN=1 also turns it off.",
+    scopes: ALL,
+    choices: () => ["on", "off"],
+    def: "on",
+  },
+  {
     name: "referenceMode",
     group: "Session",
     label: "Reference",

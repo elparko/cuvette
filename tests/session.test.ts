@@ -629,6 +629,7 @@ test("applySetting changes the model, the referee and the mode of a running sess
 });
 
 const LAB = join(__dirname, "fixtures/lab");
+const CLARIFY = { calls: [{ name: "clarify", args: { found: "I see one image." } }] };
 const PLAN = {
   question: "How does a blur change a.tif?",
   data: { files: ["/data/a.tif"], row: "One image.", replicate: "One image.", n: "1 image." },
@@ -645,7 +646,7 @@ function toolTexts(p: FakeProvider): string[] {
 }
 
 test("plan first: no step runs before approval; approve logs plan_approved and starts step 1 in watch mode", async () => {
-  const provider = new FakeProvider([{ calls: [blur] }, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
+  const provider = new FakeProvider([CLARIFY, { calls: [blur] }, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
   session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), interactive: true });
   session.decisions.applySetup({});
   const seen: string[][] = [];
@@ -668,15 +669,15 @@ test("plan first: no step runs before approval; approve logs plan_approved and s
   expect(approved).toHaveLength(1);
   expect(approved[0]!.data).toMatchObject({ version: 1, mode: "watch" });
   expect(String(approved[0]!.data.text)).toContain("Question: How does a blur change a.tif?");
-  expect(String(approved[0]!.data.text)).toContain("- Set: Threshold method = Triangle (you)");
+  expect(String(approved[0]!.data.text)).toContain("   - Threshold method: Triangle (you)");
   expect(approved[0]!.id).toBeLessThan(session.record.nodes()[0]!.entry);
   expect(session.mode).toBe("watch");
   expect(session.decisions.value("method")).toBe("Triangle");
-  expect(toolTexts(provider).some((t) => t.includes("The scientist approved plan version 1. Mode is now watch."))).toBe(true);
+  expect(toolTexts(provider).some((t) => t.includes("The scientist confirmed the analysis, version 1. Mode is now watch."))).toBe(true);
 });
 
 test("plan first: Change sends the request back and the agent revises; Cancel ends the turn with no step", async () => {
-  const provider = new FakeProvider([{ calls: [{ name: "plan", args: PLAN }] }, { calls: [{ name: "plan", args: { ...PLAN, out_of_scope: [] } }] }, { calls: [blur] }, { text: "Blurred." }, { text: "Blurred." }]);
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: PLAN }] }, { calls: [{ name: "plan", args: { ...PLAN, out_of_scope: [] } }] }, { calls: [blur] }, { text: "Blurred." }, { text: "Blurred." }]);
   session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), interactive: true, mode: "follow" });
   session.decisions.applySetup({ method: "Otsu" });
   let n = 0;
@@ -691,10 +692,10 @@ test("plan first: Change sends the request back and the agent revises; Cancel en
   expect(session.record.entries(["plan"]).map((e) => e.data.action)).toEqual(["proposed", "change_requested", "proposed"]);
   expect(session.record.entries(["plan"])[1]!.data.text).toBe("Also count the particles.");
   expect(session.record.entries(["plan_approved"])[0]!.data).toMatchObject({ version: 2, mode: "watch" });
-  expect(String(session.record.entries(["plan_approved"])[0]!.data.text)).toContain("- Set: Threshold method = Otsu (decision record)");
+  expect(String(session.record.entries(["plan_approved"])[0]!.data.text)).toContain("   - Threshold method: Otsu (you)");
   expect(session.mode).toBe("watch");
 
-  const p2 = new FakeProvider([{ calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }]);
+  const p2 = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }]);
   const s2 = await Session.create({ adapters: [LAB], provider: p2, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), interactive: true });
   s2.decisions.applySetup({});
   s2.bus.on((e) => {
@@ -705,13 +706,12 @@ test("plan first: Change sends the request back and the agent revises; Cancel en
   expect(s2.record.entries(["notice"]).some((e) => e.data.text === "You cancelled the plan. No analysis step ran.")).toBe(true);
   expect(s2.record.nodes()).toHaveLength(0);
   expect(s2.mode).toBe("watch");
-  expect(p2.requests).toHaveLength(1);
+  expect(p2.requests).toHaveLength(2);
   await s2.close();
 });
 
 test("a step that is not in the approved plan gets a visible note, and the agent adds it with a reason", async () => {
-  const provider = new FakeProvider([
-    { calls: [{ name: "plan", args: PLAN }] },
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: PLAN }] },
     { calls: [blur] },
     { text: "I also count the particles to check the blur.", calls: [{ name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 5 } }] },
     { calls: [{ name: "plan", args: { steps: [{ step: "Count the particles", tool: "count" }] } }] },
@@ -740,7 +740,7 @@ test("headless runs do not plan unless asked; with planFirst the headless runner
   await session.close();
 
   const { attachHeadless } = await import("../src/core/headless.ts");
-  const provider = new FakeProvider([{ calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: PLAN }] }, { calls: [blur] }, { text: "Blurred with sigma 2." }, { text: "Blurred with sigma 2." }]);
   session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { headless: true, planFirst: true } });
   attachHeadless(session, { answers: { method: "Default" }, allow: new Set(["all"]) });
   session.decisions.applySetup({});
@@ -852,8 +852,7 @@ const CELL_PLAN = (images: string) => ({
 test("pilot: the plan card runs the pilot, the gate blocks the batch until the scientist confirms, and the plan is confirmed with its pilot", async () => {
   const { proj, images, ref, qc } = pilotProject();
   const folder = { name: "count", args: { input: images, method: "Otsu", min_size: 5 } };
-  const provider = new FakeProvider([
-    { calls: [{ name: "plan", args: CELL_PLAN(images) }] },
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] },
     { text: "I count all fields at once.", calls: [folder] },
     { calls: [{ name: "count", args: { input: join(images, "Set 1.tif"), method: "Otsu", min_size: 5 } }] },
     { calls: [{ name: "pilot_result", args: { sample: "Set 1", values: { "positive cell": 41 }, images: [qc], check: "Clumps are left out." } }] },
@@ -865,20 +864,24 @@ test("pilot: the plan card runs the pilot, the gate blocks the batch until the s
   session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true });
   session.decisions.applySetup({ method: "Otsu" });
   const events: any[] = [];
+  const asked: string[] = [];
   session.bus.on((e) => {
+    if (e.type === "question") {
+      asked.push(e.question.text);
+      setTimeout(() => session!.answer(e.question.qid, e.question.title === "Earlier results" ? "compare" : e.question.options[0]?.value ?? "yes"), 0);
+    }
     if (e.type !== "plan") return;
     events.push(e);
-    const c = e.reference?.candidates[0];
-    setTimeout(() => session!.respondPlan(e.stage === "plan" ? { action: "pilot", reference: { mode: "compare", path: c!.path, sheet: c!.sheet } } : { action: "confirm" }), 0);
+    setTimeout(() => session!.respondPlan(e.stage === "plan" ? { action: "pilot" } : { action: "confirm" }), 0);
   });
   await session.send(`Count the red-positive cells in ${images}`);
 
   expect(events.map((e) => e.stage)).toEqual(["plan", "pilot"]);
   expect(events[0].restatement).toBe("You want: for each field, the number of cells that took up red particles.");
   expect(events[0].pilot).toBe("Set 1");
-  expect(events[0].reference.question).toBe("I found Analysis.xlsx (sheet Ox-LDL: Field, Red dots, Total cells). Is this an earlier analysis of these images? Should the pilot compare with it?");
-  expect(events[0].text).toContain("What I will count\n1) positive cell: A cell with at least 1 red pixel inside its outline.");
-  expect(events[0].text).toContain("What I will leave out, and what it does\n- Clumps over 15,000 px are left out. Effect: About 40% of the area with cells.");
+  expect(asked).toEqual(["I found Analysis.xlsx (sheet Ox-LDL: Field, Red dots, Total cells). Is this an earlier analysis of these images? Should the pilot compare with it?"]);
+  expect(events[0].text).toContain("Metrics\n[1] positive cell: A cell with at least 1 red pixel inside its outline.");
+  expect(events[0].details).toContain("What I will leave out, and what it does\n- Clumps over 15,000 px are left out. Effect: About 40% of the area with cells.");
   const counts = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "count");
   expect(counts.map((e) => e.data.ok)).toEqual([false, true, true]);
   expect(String(counts[0]!.data.error)).toBe(`Pilot first: count gets the folder ${images}. This step processes many files, so it waits for a pilot. Run the method on one sample only, save QC images with outlines of what was counted and what was left out, and call pilot_result. The scientist approves the pilot before the batch runs.`);
@@ -917,8 +920,7 @@ test("pilot: the plan card runs the pilot, the gate blocks the batch until the s
 
 test("pilot: a held-back reference is hidden from the agent, and the harness compares every sample after the batch", async () => {
   const { proj, images, ref } = pilotProject();
-  const provider = new FakeProvider([
-    { calls: [{ name: "plan", args: CELL_PLAN(images) }] },
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] },
     { calls: [{ name: "plan", args: { ...CELL_PLAN(images), definitions: [{ measure: "positive cell", definition: "A cell with at least 5 red pixels inside its outline." }] } }] },
     { calls: [{ name: "read_file", args: { path: ref } }] },
     { calls: [{ name: "run_script", args: { code: "import pandas as pd\nprint(pd.read_excel('Analysis.xlsx'))" } }] },
@@ -934,10 +936,10 @@ test("pilot: a held-back reference is hidden from the agent, and the harness com
   let n = 0;
   const texts: string[] = [];
   session.bus.on((e) => {
+    if (e.type === "question" && e.question.title === "Earlier results") setTimeout(() => session!.answer(e.question.qid, "blind"), 0);
     if (e.type !== "plan") return;
     texts.push(e.text);
-    const c = e.reference?.candidates[0];
-    const r = e.stage === "pilot" ? { action: "confirm" as const } : n++ === 0 ? { action: "change" as const, text: "Use 5 red pixels.", definition: { measure: "positive cell", old: "A cell with at least 1 red pixel inside its outline.", new: "A cell with at least 5 red pixels inside its outline." } } : { action: "pilot" as const, reference: { mode: "blind" as const, path: c?.path ?? ref, sheet: "Ox-LDL" } };
+    const r = e.stage === "pilot" ? { action: "confirm" as const } : n++ === 0 ? { action: "change" as const, text: "Use 5 red pixels.", definition: { measure: "positive cell", old: "A cell with at least 1 red pixel inside its outline.", new: "A cell with at least 5 red pixels inside its outline." } } : { action: "pilot" as const };
     setTimeout(() => session!.respondPlan(r), 0);
   });
   await session.send(`Count the red-positive cells in ${images}`);
@@ -970,8 +972,7 @@ test("a script that only lists files makes no result node; a script that saves a
 
 test("a confirmed plan covers the load of the adapter it names; an adapter that it does not name gets the program card and a note", async () => {
   const cwd = pickCwd();
-  const provider = new FakeProvider([
-    { calls: [{ name: "use_adapter", args: { name: "lab", reason: "It counts." } }] },
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "use_adapter", args: { name: "lab", reason: "It counts." } }] },
     { calls: [{ name: "list_adapters", args: {} }] },
     { calls: [{ name: "plan", args: { question: "How many particles?", programs: [{ part: "Counting", adapter: "lab", why: "It counts particles." }], steps: [{ step: "Count the particles", tool: "count" }] } }] },
     { calls: [{ name: "use_adapter", args: { name: "lab", reason: "The plan names it." } }] },
@@ -1002,4 +1003,88 @@ test("a confirmed plan covers the load of the adapter it names; an adapter that 
   expect(notes).toEqual(["Not in the approved plan: the adapter lab2. Reason: A second counter to check the first."]);
   expect(session.planApproves("lab2")).toBe(false);
   expect(session.planApproves("lab")).toBe(true);
+});
+
+test("Questions come before the proposed metrics; technical questions and questions the request answers are not asked", async () => {
+  const metrics = {
+    restatement: "You want: the number of particles in a.tif. You also want to know if ImageJ is ready.",
+    definitions: [{ measure: "particle", definition: "An object above the threshold, at least 5 px." }],
+    steps: [{ step: "Count the particles", tool: "count", settings: [{ key: "method", label: "Threshold method", value: "Otsu", by: "default" }, { key: "min_size", label: "Smallest particle", value: 5, by: "default" }] }],
+  };
+  const provider = new FakeProvider([
+    { calls: [{ name: "plan", args: metrics }] },
+    {
+      calls: [{
+        name: "clarify",
+        args: {
+          found: "I see one image with about 60 dark particles.",
+          questions: [
+            { question: "What counts as one particle: one dark spot, or one cluster?", options: ["One dark spot", "One cluster"] },
+            { question: "Which threshold method should I use?", options: ["Otsu", "Triangle"] },
+            { question: "Which image?", answered_by_request: "Count the particles in a.tif" },
+          ],
+        },
+      }],
+    },
+    { calls: [{ name: "plan", args: metrics }] },
+    { calls: [{ name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 5 } }] },
+    { text: "There are 41 particles (a particle is an object above the threshold, at least 5 px)." },
+    { text: "There are 41 particles (a particle is an object above the threshold, at least 5 px)." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true });
+  session.decisions.applySetup({});
+  const order: string[] = [];
+  const asked: string[] = [];
+  let edited = false;
+  session.bus.on((e) => {
+    if (e.type === "clarify") order.push(`questions:${e.qids.length}`);
+    if (e.type === "question") {
+      asked.push(e.question.text);
+      setTimeout(() => session!.answer(e.question.qid, "One dark spot"), 0);
+    }
+    if (e.type !== "plan") return;
+    order.push(`metrics:${e.version}`);
+    if (!edited) {
+      edited = true;
+      expect(e.settings!.map((x) => [x.label, x.value, x.by])).toEqual([["Threshold method", "Otsu", "default"], ["Smallest particle", 5, "default"]]);
+      expect(e.text).toContain("[2] Threshold method: Otsu (default) · [3] Smallest particle: 5 (default)");
+      setTimeout(() => session!.respondPlan({ action: "set", index: 1, value: "8" }), 0);
+    } else setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Count the particles in a.tif");
+
+  const plans = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "plan");
+  expect(String(plans[0]!.data.error)).toMatch(/^Phase 1 first: call clarify/);
+  expect(order).toEqual(["questions:1", "metrics:1", "metrics:2"]);
+  expect(asked).toEqual(["What counts as one particle: one dark spot, or one cluster?"]);
+  const clarify = session.record.entries(["clarify"]);
+  expect(clarify.map((e) => e.data.action)).toEqual(["asked", "answered"]);
+  expect(clarify[0]!.data).toMatchObject({ phase: "Questions", technical: ["Which threshold method should I use?"], skipped: ["Which image? The request says: Count the particles in a.tif"] });
+  expect(toolTexts(provider).find((t) => t.includes("technical settings"))).toContain("These are technical settings, not questions for the scientist: Which threshold method should I use?");
+  const approved = session.record.entries(["plan_approved"])[0]!.data;
+  expect(approved.version).toBe(2);
+  expect(String(approved.text)).toMatch(/^You want: the number of particles in a\.tif\.\n/);
+  expect(String(approved.text)).not.toContain("ImageJ");
+  expect(String(approved.text)).toContain("   - Smallest particle: 8 (you)");
+  expect(session.record.entries(["plan"]).find((e) => e.data.action === "setting_changed")!.data).toMatchObject({ label: "Smallest particle", old: 5, new: 8 });
+  expect(session.decisions.value("method")).toBe("Otsu");
+  expect(session.decisions.value("min_size")).toBe(8);
+  expect(session.record.entries(["question"]).map((e) => e.data.decisionKey)).toEqual([""]);
+  const node = session.record.nodes().find((n) => n.tool === "count")!;
+  expect(node.decisions).toMatchObject({ method: "Otsu", min_size: 8 });
+});
+
+test("the proposed metrics leave at most two settings open", async () => {
+  const open = (label: string) => ({ label });
+  const provider = new FakeProvider([
+    CLARIFY,
+    { calls: [{ name: "plan", args: { steps: [{ step: "Count", tool: "count", settings: [open("a"), open("b"), open("c")] }] } }] },
+    { text: "I will fill them in." },
+    { text: "I will fill them in." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: tmpdir(), interactive: true });
+  session.decisions.applySetup({});
+  await session.send("Count the particles in a.tif");
+  const r = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "plan").at(-1)!;
+  expect(String(r.data.error)).toMatch(/^Too many open settings: a; b; c\./);
 });

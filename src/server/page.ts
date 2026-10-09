@@ -626,7 +626,7 @@ function drawQuestions(box) {
 function drawPlan(box) {
   const p = state.plan;
   if (!p) { box.append(h("p", { class: "empty" }, "No proposed analysis yet.")); return; }
-  box.append(h("h3", {}, p.approved ? "Confirmed analysis, version " + p.version : "Proposed analysis, version " + p.version + " (waits for you)"));
+  box.append(h("h3", {}, p.approved ? "Confirmed, version " + p.version : "Proposed metrics, version " + p.version + " (waits for you)"));
   box.append(h("pre", { class: "wrap" }, p.text));
   if (p.updates && p.updates.length) {
     box.append(h("h3", {}, "Changes after confirmation"));

@@ -148,13 +148,15 @@ export class Mapper {
       case "setting":
         return line("⚙", d.change ? `Setting ${d.name} changed (${scopeLabel(d.scope as Scope)})` : `Setting ${d.name}: ${show(d.old)} → ${show(d.new)} (${scopeLabel(d.scope as Scope)})`, "cyan");
       case "plan_approved":
-        return [{ key, t: "block", title: `Confirmed analysis, version ${d.version}. Mode: ${d.mode}.`, text: String(d.text ?? "") }];
+        return [{ key, t: "block", title: `Confirmed, version ${d.version}. Mode: ${d.mode}.`, text: String(d.text ?? "") }];
+      case "clarify":
+        return d.action === "answered" ? [{ key, t: "block", title: "Questions", text: [String(d.found ?? ""), ...((d.answers as string[]) ?? []).map((x) => `- ${x}`), ...((d.skipped as string[]) ?? []).map((x) => `- Not asked: ${x}`)].filter(Boolean).join("\n") }] : [];
       case "pilot_run":
-        return [{ key, t: "block", title: `Pilot result: ${d.sample}`, text: pilotText(d as never) }];
+        return [{ key, t: "block", title: `Demonstration on a sample: ${d.sample}`, text: pilotText(d as never) }];
       case "pilot_approved":
-        return line("✓", `You confirmed the pilot on ${d.sample}.`, "green");
+        return line("✓", `You confirmed the demonstration on ${d.sample}.`, "green");
       case "pilot_rejected":
-        return line("✎", `Pilot on ${d.sample} not confirmed: ${d.reason}`, "cyan");
+        return line("✎", `Demonstration on ${d.sample} not confirmed: ${d.reason}`, "cyan");
       case "reference":
         return d.mode === "none" ? [] : line("▸", d.revealed ? `The reference ${d.path} is now visible to the agent.` : `Reference: ${d.path} (${d.mode === "blind" ? "held back for a blind test" : "compared in the pilot"})`, "cyan");
       case "validation":

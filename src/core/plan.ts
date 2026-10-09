@@ -59,7 +59,16 @@ function decisionOf(o: Record<string, unknown>): PlanDecision {
   const opts = list(o.options);
   if (opts.length) d.options = opts;
   if (o.recommendation) d.recommendation = str(o.recommendation);
+  if (o.by && has(d.value)) d.by = str(o.by);
   return d;
+}
+
+const SETUP_SENTENCE = /\b(is ready|are ready|installed|where (the )?(results?|files?|outputs?) (go|are saved|will be saved)|which folder|save the results)\b/i;
+
+export function goalOnly(restatement: string): { text: string; dropped: string[] } {
+  const parts = restatement.split(/(?<=[.!?])\s+/);
+  const dropped = parts.filter((x) => SETUP_SENTENCE.test(x));
+  return { text: parts.filter((x) => !SETUP_SENTENCE.test(x)).join(" ").trim(), dropped };
 }
 
 export function readPlan(a: Record<string, unknown>, statusDefault = true): Partial<AnalysisPlan> {
@@ -86,7 +95,7 @@ export function readPlan(a: Record<string, unknown>, statusDefault = true): Part
       step: str(o.step),
       method: str(o.method) || undefined,
       tool: str(o.tool) || undefined,
-      decisions: objs(o.decisions).map(decisionOf).filter((d) => d.label),
+      decisions: [...objs(o.settings), ...objs(o.decisions)].map(decisionOf).filter((d) => d.label),
       status: str(o.status) || (statusDefault ? "todo" : (undefined as unknown as string)),
       reason: str(o.reason) || undefined,
     }));
@@ -112,17 +121,57 @@ export function addedSteps(prev: AnalysisPlan, next: AnalysisPlan): PlanStep[] {
   return next.steps.filter((s) => !prev.steps.some((p) => sameStep(p, s)));
 }
 
-function decisionLine(d: PlanDecision): string {
-  if (has(d.value)) return `Set: ${d.label} = ${str(d.value)}${d.by ? ` (${d.by})` : ""}`;
+const valueText = (d: PlanDecision) => `${str(d.value)}${d.by ? ` (${d.by})` : ""}`;
+
+function settingLine(d: PlanDecision): string {
+  if (has(d.value)) return `${d.label}: ${valueText(d)}`;
   const opts = d.options?.length ? ` Options: ${d.options.join(", ")}.` : "";
-  const rec = d.recommendation ? ` The agent recommends ${d.recommendation}.` : "";
-  return `You decide: ${d.label}.${opts}${rec}`;
+  const rec = d.recommendation ? ` The agent suggests ${d.recommendation}.` : "";
+  return `${d.label}: open, you decide.${opts}${rec}`;
 }
 
-export function planText(p: Partial<AnalysisPlan>): string {
+export function settingsOf(p: Partial<AnalysisPlan>): { step: number; setting: PlanDecision }[] {
+  return (p.steps ?? []).flatMap((s, i) => (s.decisions ?? []).map((setting) => ({ step: i + 1, setting })));
+}
+
+export interface PlanTextOptions {
+  view?: "full" | "compact" | "details";
+  numbered?: boolean;
+}
+
+export function planText(p: Partial<AnalysisPlan>, o: PlanTextOptions = {}): string {
+  const view = o.view ?? "full";
   const out: string[] = [];
-  if (p.restatement) out.push(`You want: ${p.restatement.replace(/^you want:?\s*/i, "")}`, "");
-  if (p.question) out.push(`Question: ${p.question}`);
+  const n = (i: number) => (o.numbered ? `[${i}] ` : "");
+  const defs = p.definitions ?? [];
+  if (view !== "details") {
+    if (p.restatement) out.push(`You want: ${p.restatement.replace(/^you want:?\s*/i, "")}`, "");
+    if (view === "full" && p.question) out.push(`Question: ${p.question}`);
+    if (defs.length) {
+      out.push(...(out.length && out.at(-1) !== "" ? [""] : []), "Metrics");
+      defs.forEach((d, i) => out.push(`${o.numbered ? n(i + 1) : "- "}${d.measure}: ${d.definition}`));
+    }
+    let item = defs.length;
+    if (p.steps?.length) {
+      out.push("", "Steps");
+      p.steps.forEach((s, i) => {
+        const mark = s.status === "done" ? " [done]" : s.status === "skipped" ? " [skipped]" : "";
+        out.push(`${i + 1}. ${s.step}${mark}`);
+        if (view === "full" && s.method) out.push(`   Method: ${s.method}`);
+        if (view === "full" && s.tool) out.push(`   Tool: ${s.tool}`);
+        const set = (s.decisions ?? []).map((x) => `${n(++item)}${settingLine(x)}`);
+        if (view === "compact" && set.length) out.push(`   ${set.join(" · ")}`);
+        else for (const x of set) out.push(`   - ${x}`);
+        if (s.reason) out.push(`   Reason: ${s.reason}`);
+      });
+    }
+    if (p.pilot) out.push("", view === "compact" ? `Demonstration: the metrics run on ${p.pilot.sample} first. You check the result before the other samples run.` : `Demonstration on a sample\n- First sample: ${p.pilot.sample}. The metrics run on this sample only. You check the result before the other samples run.${(p.pilot.shows ?? []).map((x) => `\n- You will see: ${x}`).join("")}`);
+    if (view === "compact") return out.join("\n").trim();
+  } else if (p.question) out.push(`Question: ${p.question}`);
+  if (p.exclusions?.length) {
+    out.push("", "What I will leave out, and what it does");
+    for (const x of p.exclusions) out.push(`- ${x.what}${x.effect ? ` Effect: ${x.effect}` : ""}`);
+  }
   const d = p.data;
   if (d && (d.files?.length || d.row || d.replicate || d.n)) {
     out.push("", "Data");
@@ -131,30 +180,10 @@ export function planText(p: Partial<AnalysisPlan>): string {
     if (d.replicate) out.push(`- Unit of replication: ${d.replicate}`);
     if (d.n) out.push(`- Sample size: ${d.n}`);
   }
-  if (p.definitions?.length) {
-    out.push("", "What I will count");
-    p.definitions.forEach((d, i) => out.push(`${i + 1}) ${d.measure}: ${d.definition}`));
-  }
-  if (p.exclusions?.length) {
-    out.push("", "What I will leave out, and what it does");
-    for (const x of p.exclusions) out.push(`- ${x.what}${x.effect ? ` Effect: ${x.effect}` : ""}`);
-  }
   if (p.programs?.length) {
     out.push("", "Programs");
     for (const g of p.programs) out.push(`- ${g.part}: ${g.adapter}.${g.why ? ` ${g.why}` : ""}${g.alternatives?.length ? ` Other choices: ${g.alternatives.join(", ")}.` : ""}`);
   }
-  if (p.steps?.length) {
-    out.push("", "Steps");
-    p.steps.forEach((s, i) => {
-      const mark = s.status === "done" ? " [done]" : s.status === "skipped" ? " [skipped]" : "";
-      out.push(`${i + 1}. ${s.step}${mark}`);
-      if (s.method) out.push(`   Method: ${s.method}`);
-      if (s.tool) out.push(`   Tool: ${s.tool}`);
-      for (const x of s.decisions ?? []) out.push(`   - ${decisionLine(x)}`);
-      if (s.reason) out.push(`   Reason: ${s.reason}`);
-    });
-  }
-  if (p.pilot) out.push("", "Pilot", `- First sample: ${p.pilot.sample}. The method runs on this sample only. You check the result before the other samples run.`, ...(p.pilot.shows ?? []).map((x) => `- You will see: ${x}`));
   if (p.reference?.path || p.reference?.question) {
     out.push("", "Reference");
     if (p.reference.path) out.push(`- ${p.reference.path}${p.reference.sheet ? `, sheet ${p.reference.sheet}` : ""}${p.reference.columns?.length ? `, columns ${p.reference.columns.join(", ")}` : ""}`);
@@ -216,11 +245,21 @@ export function currentPlan(record: AnalysisRecord): AnalysisPlan | undefined {
   return (last?.data.plan as unknown as AnalysisPlan | undefined) ?? a.plan;
 }
 
+export function questionsOf(record: AnalysisRecord, before = Infinity): string[] {
+  const e = record.entries(["clarify"]).filter((x) => x.id < before && x.data.action === "answered").at(-1);
+  if (!e) return [];
+  return [String(e.data.found ?? ""), ...((e.data.answers as string[]) ?? []).map((x) => `- ${x}`), ...((e.data.skipped as string[]) ?? []).map((x) => `- Not asked: ${x}`)].filter(Boolean);
+}
+
 export function planMarkdown(record: AnalysisRecord): string[] {
   const a = approvedPlan(record);
   if (!a) return [];
-  const out = [`## Confirmed analysis (version ${a.version}, confirmed ${a.ts.slice(0, 16).replace("T", " ")})`, "", a.text, ""];
-  if (a.pilot) out.push("### Pilot", "", pilotText(a.pilot), "");
+  const out = [`## Proposed analysis (version ${a.version}, confirmed ${a.ts.slice(0, 16).replace("T", " ")})`, ""];
+  const q = questionsOf(record, a.entry);
+  if (q.length) out.push("### Questions", "", ...q, "");
+  out.push("### Proposed metrics", "", a.text, "");
+  if (a.pilot) out.push("### Demonstration on a sample", "", pilotText(a.pilot), "");
+  out.push("### Confirmed", "", `The scientist confirmed version ${a.version} on ${a.ts.slice(0, 16).replace("T", " ")}.`, "");
   if (a.updates.length) {
     out.push("### Changes after confirmation", "");
     for (const u of a.updates) out.push(`- Version ${u.version}: ${u.reason || "no reason given"}`);

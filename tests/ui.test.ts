@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entry, Question } from "../src/core/types.ts";
-import { cardFromEvent, closesCard, permissionView, planInit, planReduce, planResolve, pushCard, type Card, type PlanCard } from "../src/ui/cards.ts";
+import { cardFromEvent, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, type Card, type PlanCard } from "../src/ui/cards.ts";
 import { routeMessage, nextQueued } from "../src/ui/messages.ts";
 import { settingEditor } from "../src/ui/config.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
@@ -35,11 +35,42 @@ describe("card queue", () => {
 });
 
 describe("the proposed analysis card", () => {
-  test("restate, reference, then run the pilot with the chosen reference", () => {
+  test("the questions card takes in its questions and closes when they are answered", () => {
+    let list: Card[] = [{ t: "question", q: q("q1") }];
+    const c = cardFromEvent({ type: "clarify", found: "I see 6 groups.", qids: ["q1", "q2"], skipped: [] })!;
+    list = pushCard(list, c);
+    expect(list.map((x) => x.t)).toEqual(["clarify"]);
+    expect(pushCard(list, { t: "question", q: q("q2") })).toBe(list);
+    expect(clarifyProgress(c as never, [q("q2")])).toBe("Question 2 of 2");
+    expect(clarifyOpen(c as never, [q("q2"), q("q9")]).map((x) => x.qid)).toEqual(["q2"]);
+    expect(closesCard(entry("clarify", { action: "asked" }), c)).toBe(false);
+    expect(closesCard(entry("clarify", { action: "answered" }), c)).toBe(true);
+  });
+  test("the metrics card: a number picks a metric or a setting; a setting gets a new value", () => {
+    const card = plan({
+      definitions: [{ measure: "n", definition: "one Set" }],
+      settings: [
+        { index: 0, step: 1, label: "cell model", value: "cyto3", by: "default", options: ["cyto3", "nuclei"] },
+        { index: 1, step: 2, label: "min size", value: 300, by: "agent" },
+      ],
+    });
+    expect(planTitle(card)).toBe("Proposed metrics, version 1");
+    let st = planResolve(card, planInit(card), []);
+    expect(st.step).toBe("actions");
+    expect(planReduce(card, st, { a: "item", n: 1 }).state.step).toBe("definition");
+    st = planReduce(card, st, { a: "item", n: 2 }).state;
+    expect(st).toMatchObject({ step: "setting", setIndex: 0 });
+    expect(settingQuestion(card, st)!.options.map((o) => o.label)).toEqual(["cyto3", "nuclei"]);
+    expect(planReduce(card, st, { a: "setValue", value: "nuclei" }).respond).toEqual({ action: "set", index: 0, value: "nuclei" });
+    st = planReduce(card, planResolve(card, planInit(card), []), { a: "item", n: 3 }).state;
+    expect(settingQuestion(card, st)).toBeUndefined();
+    expect(settingLabel(card, st)).toBe("New value for min size (now: 300, agent):");
+    expect(planReduce(card, st, { a: "details" }).state.details).toBe(true);
+    expect(planTitle(plan({ stage: "pilot" }))).toBe("Demonstration on a sample");
+  });
+  test("reference, then run the pilot with the chosen reference", () => {
     const card = plan({ restatement: "count cells", pilot: "Set 1", reference: { question: "Use it?", candidates: [{ path: "/a.xlsx", sheet: "S", columns: ["n"], label: "a" }] } });
     let st = planInit(card);
-    expect(st.step).toBe("restate");
-    st = planReduce(card, st, { a: "restate", ok: true }).state;
     st = planResolve(card, st, []);
     expect(st.step).toBe("reference");
     st = planReduce(card, st, { a: "reference", value: "blind" }).state;

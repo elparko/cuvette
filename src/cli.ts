@@ -75,9 +75,12 @@ Usage
   ga bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]
   ga mcp [--adapter <name>]            run the harness as an MCP server on stdio (no --adapter: the client loads adapters with use_adapter)
 
-Plan first: in an interactive session the agent writes a proposed analysis, and you confirm it before any step runs.
+Proposed analysis: in an interactive session the agent goes through four stages before the batch runs:
+  Questions (what counts as one n, what counts as positive), Proposed metrics (each with its settings, which you
+  can change), Demonstration on a sample (numbers and a QC image), and Confirmed.
   --no-plan, /plan off, or "planFirst": "off" in settings.json skips it. --plan turns it on for a -p run.
-  Pilot: a step that processes many files waits until you confirm the method on one sample. /pilot off skips it.
+  A step that processes many files waits for a confirmed demonstration. /pilot off skips that.
+  GA_NO_OPEN=1 or "openImages": "off" keeps the QC images from opening on screen.
 
 Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
 
