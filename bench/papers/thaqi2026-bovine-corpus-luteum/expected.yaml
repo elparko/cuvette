@@ -1,0 +1,80 @@
+tool: limma (R), prepare_protein_table and test_differential_proteins of the limma-proteomics adapter
+adapter_kind: script
+data:
+- /Volumes/T7/guided-analysis/data/thaqi2026-bovine-corpus-luteum/RAW_P337_02B_proteinGroups.txt
+decisions:
+  exclude_flags: Only identified by site, Reverse, Potential contaminant
+  min_peptides: 2
+  exclude_samples: none
+  min_valid: 6
+  valid_rule: at least one group
+  normalization: quantile
+  imputation: downshift normal
+  impute_shift: 1.8
+  impute_width: 0.3
+  impute_scope: all samples
+  step_order: impute first
+  impute_seed: 1
+  variance_model: robust
+  fdr: 0.05
+  min_abs_log2fc: 1
+  '*': Use the values in the decision record.
+expected:
+- description: Protein groups after the removal of the flagged rows
+  value: 3783
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage I than in stage IV
+  value: 282
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage IV than in stage I
+  value: 268
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage III than in stage V
+  value: 240
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage V than in stage III
+  value: 240
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage IV than in stage VI
+  value: 98
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage VI than in stage IV
+  value: 131
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage V than in stage VI
+  value: 74
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage VI than in stage V
+  value: 109
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage VI than in stage VII
+  value: 219
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage VII than in stage VI
+  value: 240
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage VII than in stage X
+  value: 138
+  tolerance: 0
+  source: published
+- description: Proteins higher in stage X than in stage VII
+  value: 125
+  tolerance: 0
+  source: published
+- description: Proteins tested after the peptide and valid value filters
+  value: 1908
+  tolerance: 0
+  source: check.R
+notes: With the settings of the paper, the tool reproduces all 12 published counts and the 3783 protein groups exactly. The authors' R code excludes
+  samples with a mean correlation below 0.60. No sample falls below it. The groups I to X are T1 to T10 in the paper.

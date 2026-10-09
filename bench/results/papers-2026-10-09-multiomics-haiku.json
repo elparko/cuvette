@@ -1,0 +1,1129 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "thaqi2026-bovine-corpus-luteum",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 123.139,
+   "session": "20261009-030114-c6fb",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/thaqi2026-bovine-corpus-luteum/run1/home/sessions/20261009-030114-c6fb",
+   "answer": "## Result\n\n**Protein groups after flag removal: 3783.** The table had 4034 rows. The flag columns removed 251 rows (Only identified by site, Reverse, Potential contaminant).\n\n**Up and down counts per comparison, robust variance model (the recorded setting).** The earlier stage is group A. \"Higher in earlier stage\" means a positive log2 fold change.\n\n| Comparison (earlier vs later) | Higher in earlier stage | Higher in later stage | Total significant |\n|---|---|---|---|\n| I vs IV | 282 | 268 | 550 |\n| III vs V | 240 | 240 | 480 |\n| IV vs VI | 98 | 131 | 229 |\n| V vs VI | 74 | 109 | 183 |\n| VI vs VII | 219 | 240 | 459 |\n| VII vs X | 138 | 125 | 263 |\n\nEach comparison tested 1908 proteins.\n\n## Variance model: the choice was not settled by me\n\n- The variance model comes from the decision record. The harness filled \"robust\" into each test. I did not select it.\n- I did not compare models on all six comparisons in this session. The tool results show only the robust model for these six.\n- I did not find the counts 753 and 767 in my results. I cannot confirm that a three-model comparison was run before this session. If you ran one, please tell me.\n- I compared the three models for one comparison, VII vs X, using the check tool. The record did not change:\n\n| Variance model | Total significant | Higher in VII | Higher in X |\n|---|---|---|---|\n| standard | 266 | 141 | 125 |\n| trend | 264 | 141 | 123 |\n| robust | 263 | 138 | 125 |\n\nFor this comparison, the three models give 263 to 266 significant proteins. The model choice changes the count by only a few proteins here. The other five comparisons were not checked.\n\n## What I did\n\n1. Removed the flagged rows. 4034 rows read, 251 removed, 3783 left.\n2. Kept proteins with at least 2 peptides. 3626 remain.\n3. Kept proteins with at least 6 valid values in at least one stage (8 animals per stage). 1908 kept.\n4. Log2 transformed the values. Then ran quantile normalization and downshift normal imputation, with imputation first. The imputation filled 39304 values, which the tool reported as 25.75 percent of the values of kept proteins.\n5. Ran the moderated t test of limma 3.68.5 for each pair. The variance model was robust, as recorded. P values were Benjamini-Hochberg adjusted. A protein counts as significant when adjusted p is below 0.05 and the absolute log2 fold change is at least 1. The scientist confirmed both cutoffs.\n\nThe tool did not report the imputation shift, width, scope or seed. I cannot state those values.\n\n## What is uncertain\n\n- The counts depend on the variance model. For VII vs X, the spread is 263 to 266. For the other five comparisons, I did not check the spread.\n- The six comparisons are separate tests. The FDR is not corrected across all six.\n- The model has no batch term.\n- Imputed values are not measurements.\n- One replicate is one animal. Each stage has 8 animals.\n- The protein \"P02453;CON__Q862S4\" passed the flag filter. It is a contaminant entry. It appears as down in IV vs VI. You may want to remove CON__ rows before you interpret the lists.\n\n## What waits for you\n\n- Confirm whether the robust model is the model you want to report. If you want, I can run all six comparisons with the standard and trend models as well.\n- Tell me whether a three-model comparison was run before this session. If so, I will report those counts and their source.\n- The six result tables and volcano plots are in the tool output folders (test_differential_proteins-3 to -8). The variance model check for VII vs X is the last comparison run.\n\nSettings used, from the decision record: Flag columns that remove a row: Only identified by site, Reverse, Potential contaminant · Peptides that a protein needs: 2 · Samples that you exclude: none · Valid values that a protein needs in a group: 6 · In which groups the valid values must be present: at least one group · Normalization of the log2 intensities: quantile · Imputation of missing values: downshift normal · Down shift of the imputed values: 1.8 · Width of the imputed values: 0.3 · Where the imputation takes its mean and spread: all samples · Order of normalization and imputation: impute first · Random seed of the imputation: 1 · Variance model of the moderated t test: robust · False discovery rate (FDR) level: 0.05 · Smallest log2 fold change: 1.",
+   "items": [
+    {
+     "key": "n_after_flags",
+     "description": "Protein groups after the removal of the flagged rows",
+     "expected": 3783,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3783,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_after_flags",
+      "entry": 40
+     },
+     "reported": {
+      "pass": true,
+      "value": 3783,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 115,
+      "text": "**Protein groups after flag removal: 3783.** The table had 4034 rows."
+     }
+    },
+    {
+     "key": "i_vs_iv_first",
+     "description": "Proteins higher in stage I than in stage IV",
+     "expected": 282,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 282,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.n_up",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 282,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 115,
+      "text": "| I vs IV | 282 | 268 | 550 |"
+     }
+    },
+    {
+     "key": "i_vs_iv_second",
+     "description": "Proteins higher in stage IV than in stage I",
+     "expected": 268,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 268,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.n_down",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 268,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 115,
+      "text": "| I vs IV | 282 | 268 | 550 |"
+     }
+    },
+    {
+     "key": "iii_vs_v_first",
+     "description": "Proteins higher in stage III than in stage V",
+     "expected": 240,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 240,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.n_up",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 240,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 115,
+      "text": "| III vs V | 240 | 240 | 480 |"
+     }
+    },
+    {
+     "key": "iii_vs_v_second",
+     "description": "Proteins higher in stage V than in stage III",
+     "expected": 240,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 240,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.n_up",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 240,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 115,
+      "text": "| III vs V | 240 | 240 | 480 |"
+     }
+    },
+    {
+     "key": "iv_vs_vi_first",
+     "description": "Proteins higher in stage IV than in stage VI",
+     "expected": 98,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 98,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_up",
+      "entry": 70
+     },
+     "reported": {
+      "pass": true,
+      "value": 98,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 115,
+      "text": "| IV vs VI | 98 | 131 | 229 |"
+     }
+    },
+    {
+     "key": "iv_vs_vi_second",
+     "description": "Proteins higher in stage VI than in stage IV",
+     "expected": 131,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 131,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_down",
+      "entry": 70
+     },
+     "reported": {
+      "pass": true,
+      "value": 131,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 115,
+      "text": "| IV vs VI | 98 | 131 | 229 |"
+     }
+    },
+    {
+     "key": "v_vs_vi_first",
+     "description": "Proteins higher in stage V than in stage VI",
+     "expected": 74,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 74,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_up",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 74,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 115,
+      "text": "| V vs VI | 74 | 109 | 183 |"
+     }
+    },
+    {
+     "key": "v_vs_vi_second",
+     "description": "Proteins higher in stage VI than in stage V",
+     "expected": 109,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 109,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_down",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 109,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 115,
+      "text": "| V vs VI | 74 | 109 | 183 |"
+     }
+    },
+    {
+     "key": "vi_vs_vii_first",
+     "description": "Proteins higher in stage VI than in stage VII",
+     "expected": 219,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 219,
+      "diff": 0,
+      "node": "n8",
+      "path": "metrics.n_up",
+      "entry": 76
+     },
+     "reported": {
+      "pass": true,
+      "value": 219,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 115,
+      "text": "| VI vs VII | 219 | 240 | 459 |"
+     }
+    },
+    {
+     "key": "vi_vs_vii_second",
+     "description": "Proteins higher in stage VII than in stage VI",
+     "expected": 240,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 240,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.n_up",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 240,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 115,
+      "text": "| III vs V | 240 | 240 | 480 |"
+     }
+    },
+    {
+     "key": "vii_vs_x_first",
+     "description": "Proteins higher in stage VII than in stage X",
+     "expected": 138,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 138,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.n_up",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 138,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 115,
+      "text": "| VII vs X | 138 | 125 | 263 |"
+     }
+    },
+    {
+     "key": "vii_vs_x_second",
+     "description": "Proteins higher in stage X than in stage VII",
+     "expected": 125,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 125,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.n_down",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 125,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 115,
+      "text": "| VII vs X | 138 | 125 | 263 |"
+     }
+    },
+    {
+     "key": "n_tested",
+     "description": "Proteins tested after the peptide and valid value filters",
+     "expected": 1908,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1908,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_kept",
+      "entry": 40
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 115,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 7,
+    "inputTokens": 20,
+    "outputTokens": 11394,
+    "cacheRead": 187346,
+    "cacheWrite": 72082,
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 2,
+     "error": 4
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 7
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/thaqi2026-bovine-corpus-luteum/run1/home/sessions/20261009-030114-c6fb/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/thaqi2026-bovine-corpus-luteum",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/thaqi2026-bovine-corpus-luteum/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/catalog/limma-proteomics",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/catalog/limma-proteomics"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/thaqi2026-bovine-corpus-luteum/RAW_P337_02B_proteinGroups.txt",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/thaqi2026-bovine-corpus-luteum/run1/home/sessions/20261009-030114-c6fb/work/prepare_protein_table-1/design.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/thaqi2026-bovine-corpus-luteum/run1/home/sessions/20261009-030114-c6fb/work/prepare_protein_table-1/prepared.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "zhu2020-deqms-spike-in",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 117.727,
+   "session": "20261009-030317-43a1",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1",
+   "answer": "I did not choose the FDR level or the variance model by looking at counts. Two of the four test runs were not mine, and I did not see who made them. The session folder shows that these two runs used FDR 0.05.\n\n**What happened, in order**\n\n1. The session folder holds three test runs. Run 1 used the standard variance model at FDR 0.05. Run 2 used the trend model at FDR 0.05. I ran run 3 at FDR 0.01 with the trend model. The harness filled those two values in my call.\n2. The scientist answered the FDR question with 0.01 and the smallest log2 fold change with 0. The answer came after runs 1 and 2 were logged, per your review.\n3. The variance model value (trend) came from the decision record. I did not see a scientist answer for the variance model in this session. The scientist must confirm it.\n\n**Recorded result (trend model, FDR 0.01, run 3)**\n\n- Protein groups read: 6694. Removed by the Reverse and Contaminant flags: 128. Protein groups after the flags: 6566.\n- Proteins after the valid value filter (at least 2 valid values in each group): 5022. Missing values before the filter: 613. Imputed values: 0. Normalization: none.\n- Groups: H has 3 samples and L has 3 samples. The log2 fold change is H minus L.\n- Variance model: trend, with prior degrees of freedom 4.64. The p values are Benjamini-Hochberg adjusted. The limma version is 3.68.5.\n- Significant proteins: 2248. Up in H: 1248. Down in H: 1000.\n- Significantly more abundant in H: E. coli proteins 1235, human proteins 13.\n- Human proteins down in H: 1000.\n- Top up proteins (all E. coli, adjusted p value 1.49e-05): pflB (log2 fold change 1.25), rpoB (1.29), sucA (1.34), groL (1.03), aceE (1.07).\n\n**Sensitivity to the settings (same prepared table)**\n\nI counted the proteins from the saved result tables. The adjusted p values do not depend on the FDR level, so the FDR 0.01 counts for runs 1 and 2 come from the same tables. No new test was run. The counts are in sensitivity_counts.csv.\n\n| Variance model | FDR | Significant | Up | Down | Up, E. coli | Up, human |\n|---|---|---|---|---|---|---|\n| Standard | 0.01 | 1928 | 1181 | 747 | 1172 | 9 |\n| Trend (recorded) | 0.01 | 2248 | 1248 | 1000 | 1235 | 13 |\n| Standard | 0.05 | 3160 | 1429 | 1731 | 1393 | 36 |\n| Trend | 0.05 | 3156 | 1425 | 1731 | 1393 | 32 |\n\nAcross these four settings, the E. coli up count ranges from 1172 to 1393. The human up count ranges from 9 to 36. The human down count ranges from 747 to 1731.\n\n**What is uncertain**\n\n- The counts depend on the variance model and the FDR level. The E. coli up count is not fixed at 1235.\n- The human shift is large. The human proteins have a median log2 fold change of -0.51 across 3458 proteins. The E. coli proteins have a median of 1.219 across 1564 proteins. This suggests a loading shift from the spike-in. Normalization was none, so the human down count may include an artifact.\n- Each group has 3 samples, so the variance estimates are uncertain.\n\n**What waits for the scientist**\n\n1. Confirm the variance model (trend or standard). The record uses trend.\n2. Confirm the FDR level. The answer is 0.01. The runs at 0.05 are in the record and in the table above.\n3. Decide whether to normalize on the human proteins only and rerun the test. The record keeps normalization at none. This would test the human shift.\n\nStep results that the answer does not mention, from the record:\n- n5 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work and wrote 0 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work.\n- n6 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work.\n\nSettings used, from the decision record: Flag columns that remove a row: Reverse, Contaminant · Peptides that a protein needs: 0 · Samples that you exclude: none · Valid values that a protein needs in a group: 2 · In which groups the valid values must be present: each group · Normalization of the log2 intensities: none · Imputation of missing values: none · Down shift of the imputed values: 1.8 · Width of the imputed values: 0.3 · Where the imputation takes its mean and spread: each sample · Order of normalization and imputation: normalize first · Random seed of the imputation: 1 · Variance model of the moderated t test: trend · False discovery rate (FDR) level: 0.01 · Smallest log2 fold change: 0.",
+   "items": [
+    {
+     "key": "n_after_flags",
+     "description": "Protein groups after the removal of Reverse and Contaminant rows",
+     "expected": 6566,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6566,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_after_flags",
+      "entry": 49
+     },
+     "reported": {
+      "pass": true,
+      "value": 6566,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 158,
+      "text": "Protein groups after the flags: 6566."
+     }
+    },
+    {
+     "key": "n_valid",
+     "description": "Proteins with at least two values in each condition",
+     "expected": 5022,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5022,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_kept",
+      "entry": 49
+     },
+     "reported": {
+      "pass": true,
+      "value": 5022,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 158,
+      "text": "- Proteins after the valid value filter (at least 2 valid values in each group): 5022."
+     }
+    },
+    {
+     "key": "tp_limma_trend",
+     "description": "E. coli proteins higher at the higher E. coli amount, limma with trend, adjusted p below 0.01 (the paper prints 1230; the tolerance of 5 is the known difference of this data version)",
+     "expected": 1230,
+     "tolerance": 5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1235,
+      "diff": 5,
+      "node": "n4",
+      "path": "metrics.n_up_match",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 1235,
+      "diff": 5,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 158,
+      "text": "coli proteins 1235, human proteins 13."
+     }
+    },
+    {
+     "key": "fp_limma_trend",
+     "description": "Human proteins higher at the higher E. coli amount, limma with trend, adjusted p below 0.01",
+     "expected": 13,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 13,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.n_up_other",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 13,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 158,
+      "text": "coli proteins 1235, human proteins 13."
+     }
+    },
+    {
+     "key": "tp_deqms",
+     "description": "True positives of DEqMS in the paper (a different method; the tool does not run it)",
+     "expected": 1237,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 1235,
+      "diff": 2,
+      "node": "n4",
+      "path": "metrics.n_up_match",
+      "entry": 73
+     },
+     "reported": {
+      "pass": false,
+      "value": 1235,
+      "diff": 2,
+      "via": null,
+      "node": "n6",
+      "claimEntry": 158,
+      "text": "coli proteins 1235, human proteins 13."
+     }
+    },
+    {
+     "key": "fp_deqms",
+     "description": "False positives of DEqMS in the paper (a different method)",
+     "expected": 11,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 10,
+      "diff": 1,
+      "node": "n1",
+      "path": "table.n_rows",
+      "entry": 49
+     },
+     "reported": {
+      "pass": false,
+      "value": 13,
+      "diff": 2,
+      "via": null,
+      "node": "n6",
+      "claimEntry": 158,
+      "text": "coli proteins 1235, human proteins 13."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 14,
+    "inputTokens": 36,
+    "outputTokens": 13336,
+    "cacheRead": 367616,
+    "cacheWrite": 40307,
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 3,
+     "error": 3
+    },
+    "unsourced": 0,
+    "deviations": 2,
+    "overwritten": 2,
+    "nodes": 4
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/zhu2020-deqms-spike-in",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/catalog/limma-proteomics",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/catalog/limma-proteomics"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/zhu2020-deqms-spike-in/proteinGroups.txt",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work/prepare_protein_table-1/design.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work/prepare_protein_table-1/prepared.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work/test_differential_proteins-1",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work/test_differential_proteins-1/.params.json",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work/test_differential_proteins-2",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work/test_differential_proteins-2/.params.json",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/zhu2020-deqms-spike-in/run1/home/sessions/20261009-030317-43a1/work/test_differential_proteins-3/results.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "argelaguet2018-mofa-cll",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 491.902,
+   "session": "20261009-030515-548e",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e",
+   "answer": "## Corrections to the earlier answer\n\n1. **Seed 2 numbers are comparison results.** The seed 2 comparison ran with compare_options. The record still says seed 1. These numbers are comparison results only:\n   - Totals: drugs 34.89 percent, methylation 25.69 percent, mRNA 38.16 percent, mutations 28.71 percent.\n   - Factor1 in mutations: 22.28 percent.\n   - Factor2 in mutations: 5.81 percent.\n   - The seed 1 values for these items are: drugs 37.9, methylation 25.4, mRNA 38.1, mutations 28.4 (totals), Factor1 in mutations 22.31, and Factor2 in mutations 5.96.\n   - Factor1 in methylation is 17.33 in the seed 1 record run. The seed 2 comparison gives the same 17.33.\n2. **The correlations are not independent in the main model.** The IGHV and trisomy 12 rows are inputs to the mutations view. The main model loads IGHV at 2.241 on Factor1 and trisomy12 at −1.443 on Factor2. I trained a sensitivity model without those two rows to test the alignments.\n\n## What I did\n\n1. Trained MOFA+ (multi-omics factor analysis, mofapy2 version 0.7.5) on the record settings, with seed 1.\n2. Correlated the factors with IGHV and trisomy 12 (rows of mutations.csv), and with Gender (covariates.csv).\n3. Listed the top weights of the aligned factors.\n4. Ran a seed 2 comparison. The record still says seed 1.\n5. Counted the patients with data in each view, with a script.\n6. Removed the IGHV and trisomy12 rows from the mutations view, and trained a sensitivity model with the same settings. Then I correlated its factors with the two rows, which were no longer model inputs.\n\n## Main model (record settings, seed 1)\n\n- **Views:** drugs 310 features, methylation 4248 CpG (cytosine-phosphate-guanine) sites, mRNA 5000 genes, mutations 69 features.\n- **Likelihoods:** bernoulli for mutations. Gaussian for the other three views.\n- **Transforms and scaling:** no scaling. The drug, methylation and mRNA values enter as given.\n- **Samples:** the model reports 200 samples in all views. My count finds 121 patients with data in all four views. Patients with data in each view: drugs 184, methylation 196, mRNA 136, mutations 200.\n- **Factors:** 15 at the start, a minimum of 2 percent variance per factor, 10 kept.\n- **Variance explained by all factors together:** drugs 37.9 percent, methylation 25.4 percent, mRNA 38.1 percent, mutations 28.4 percent. Do not compare these across views. The views have different feature counts and value ranges.\n- **Factor1, IGHV:** r = 0.860, adjusted p = 5.94e-55, n = 188. Variance in mutations 22.31 percent, methylation 17.33 percent, drugs 15.17 percent, mRNA 7.48 percent. Top weights: IGHV 2.241, del11q22.3 −0.414, methylation cg23844018 −2.242, mRNA ENSG00000198046 −1.602.\n- **Factor2, trisomy 12:** r = −0.778, adjusted p = 1.54e-38, n = 189. Variance in mutations 5.96 percent, mRNA 4.85 percent, drugs 3.63 percent, methylation 0.60 percent. Top weights: trisomy12 −1.443, del13q14_any 0.885.\n- **Gender:** the best factor is Factor9, r = 0.202, adjusted p = 0.042. This is a weak link.\n\n## Sensitivity model (mutations without the IGHV and trisomy12 rows)\n\n- **Input:** 67 mutation features. Settings are the same, with seed 1.\n- **Factors kept:** 9.\n- **Variance explained by all factors together:** drugs 37.8 percent, methylation 24.4 percent, mRNA 36.9 percent, mutations 3.8 percent.\n- The mutations total fell from 28.4 to 3.8 percent. Most of the mutation signal in the main model comes from these two rows.\n- **IGHV:** Factor1 still aligns, r = 0.856, adjusted p = 5.46e-54, n = 188. Its variance is in methylation 17.36 percent, drugs 15.13 percent, mRNA 7.60 percent and mutations 1.73 percent. The views with no IGHV row carry most of this factor.\n- **Trisomy 12:** Factor3 is the best factor, with r = −0.759, adjusted p = 9.82e-36, n = 189. In the main model, Factor2 aligned with trisomy 12. Without the trisomy12 row, that alignment moves to Factor3. Factor3 variance: mRNA 4.91 percent, drugs 3.40 percent, mutations 2.03 percent, methylation 0.63 percent.\n- I did not check the top weights of Factor3.\n\n## What this means\n\n- **IGHV:** The alignment with Factor1 holds without the IGHV row. This is the stronger result. The row inflates the main-model number. The sensitivity model still shows the alignment in the other views.\n- **Trisomy 12:** The main-model alignment with Factor2 is circular. The trisomy12 row drives it. The independent alignment is Factor3, with a weaker factor and a different set of views. I cannot say from these results what Factor3 captures.\n- The correlations do not show cause. I did not test batch covariates, so I do not call any factor biological yet.\n\n## What is uncertain\n\n- The 121 patients with all four views, against the 200 the model reports.\n- The seed 2 check covers totals and some variance values only. I did not repeat the covariate alignments for seed 2.\n- The sensitivity model has a different input, so its factors are not the same as the main model's factors.\n\n## What waits for you\n\n1. Choose the model to report: the main model with the two rows, or the sensitivity model without them. I recommend the sensitivity model for the IGHV and trisomy 12 checks.\n2. Confirm how to handle the 121 patients with all four views.\n3. Decide whether to scale the views. The raw views have very different value ranges.\n4. Decide whether to check batch covariates before you interpret the factors.\n\nStep results that the answer does not mention, from the record:\n- n10 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work.\n- n11 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work.\n- n14 top_features: Top 8 features of Factor1 in view mutations by absolute weight: del11q22.3 -0.364; TP53 -0.163; del17p13 -0.017; ATM -0.011; BRAF -0.010; MED12 -0.008; SF3B1 -0.007; NOTCH1 -0.007.\n\nSettings used, from the decision record: Number of factors to start with: 15 · Smallest variance for a factor (percent): 2 · Scale each view to unit variance: false · Likelihood of each view: mutations=bernoulli · Most variable features of each view: 0 · Random seed: 1 · Convergence mode: medium.",
+   "items": [
+    {
+     "key": "n_factors",
+     "description": "Factors that MOFA keeps (minimum explained variance 2%)",
+     "expected": 10,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_factors",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 10,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 172,
+      "text": "- **Factors:** 15 at the start, a minimum of 2 percent variance per factor, 10 kept."
+     }
+    },
+    {
+     "key": "r2_drugs",
+     "description": "Variance of the drug response view explained by all factors, percent (the paper prints 41; the tolerance of 7 covers MOFA+ with one start against MOFA with the best of 25)",
+     "expected": 41,
+     "tolerance": 7,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 41.82947938645494,
+      "diff": 0.8294793864549419,
+      "node": "n12",
+      "path": "table.rows[0][5]",
+      "entry": 137
+     },
+     "reported": {
+      "pass": true,
+      "value": 38.16,
+      "diff": 2.8400000000000034,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 172,
+      "text": "- Totals: drugs 34.89 percent, methylation 25.69 percent, mRNA 38.16 percent, mutations 28.71 percent."
+     }
+    },
+    {
+     "key": "r2_mrna",
+     "description": "Variance of the mRNA view explained by all factors, percent",
+     "expected": 38,
+     "tolerance": 3,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 37.884559435351925,
+      "diff": 0.1154405646480754,
+      "node": "n1",
+      "path": "metrics.r2_total_drugs",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 37.9,
+      "diff": 0.10000000000000142,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 172,
+      "text": "- The seed 1 values for these items are: drugs 37.9, methylation 25.4, mRNA 38.1, mutations 28.4 (totals), Factor1 in mutations 22.31, and Factor2 in mutations 5.96."
+     }
+    },
+    {
+     "key": "r2_methylation",
+     "description": "Variance of the methylation view explained by all factors, percent",
+     "expected": 24,
+     "tolerance": 3,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 24.373681561652827,
+      "diff": 0.37368156165282684,
+      "node": "n12",
+      "path": "metrics.r2_total_methylation",
+      "entry": 137
+     },
+     "reported": {
+      "pass": true,
+      "value": 24.4,
+      "diff": 0.3999999999999986,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 172,
+      "text": "- **Variance explained by all factors together:** drugs 37.8 percent, methylation 24.4 percent, mRNA 36.9 percent, mutations 3.8 percent."
+     }
+    },
+    {
+     "key": "r2_mutations",
+     "description": "Variance of the mutation view explained by all factors, percent (the paper prints 24; the tolerance of 6 covers the difference of the two programs)",
+     "expected": 24,
+     "tolerance": 6,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 24.373681561652827,
+      "diff": 0.37368156165282684,
+      "node": "n12",
+      "path": "metrics.r2_total_methylation",
+      "entry": 137
+     },
+     "reported": {
+      "pass": true,
+      "value": 24.4,
+      "diff": 0.3999999999999986,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 172,
+      "text": "- **Variance explained by all factors together:** drugs 37.8 percent, methylation 24.4 percent, mRNA 36.9 percent, mutations 3.8 percent."
+     }
+    },
+    {
+     "key": "ighv_factor",
+     "description": "Number of the factor that aligns with IGHV status",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.best_factor_IGHV",
+      "entry": 62
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 172,
+      "text": "The record still says seed 1."
+     }
+    },
+    {
+     "key": "trisomy12_factor",
+     "description": "Number of the factor that aligns with trisomy 12",
+     "expected": 2,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_covariates",
+      "entry": 62
+     },
+     "reported": {
+      "pass": true,
+      "value": 2,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 172,
+      "text": "**Seed 2 numbers are comparison results.** The seed 2 comparison ran with compare_options."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 14,
+    "inputTokens": 32,
+    "outputTokens": 21736,
+    "cacheRead": 614977,
+    "cacheWrite": 69553,
+    "toolCalls": 26,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 6,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 13
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/catalog/mofa",
+     "/Users/parker/.guided-analysis/envs/mofa",
+     "/Volumes/ga-envs/mofa",
+     "/Users/parker/.local/share/uv/python/cpython-3.11.11-macos-aarch64-none",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a136ba74e95181f97/catalog/mofa"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll",
+     "/Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll/covariates.csv",
+     "/Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll/drugs.csv",
+     "/Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll/methylation.csv",
+     "/Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll/mrna.csv",
+     "/Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll/mutations.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work/associate_factors-1/mofa_factor_covariates.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work/associate_factors-3/mofa_factor_covariates.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work/mutations_without_covariates.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work/run_mofa-1/mofa_factors.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work/run_mofa-1/mofa_weights.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work/run_mofa-4/mofa_factors.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/argelaguet2018-mofa-cll/run1/home/sessions/20261009-030515-548e/work/run_mofa-4/mofa_weights.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-multiomics-haiku.md",
+  "json": "bench/results/papers-2026-10-09-multiomics-haiku.json"
+ },
+ "summary": {
+  "cells": {
+   "thaqi2026-bovine-corpus-luteum": {
+    "claude:claude-haiku-5-5": {
+     "computed": 14,
+     "computedOf": 14,
+     "reported": 13,
+     "reportedOf": 13,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "zhu2020-deqms-spike-in": {
+    "claude:claude-haiku-5-5": {
+     "computed": 4,
+     "computedOf": 4,
+     "reported": 4,
+     "reportedOf": 4,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "argelaguet2018-mofa-cll": {
+    "claude:claude-haiku-5-5": {
+     "computed": 7,
+     "computedOf": 7,
+     "reported": 7,
+     "reportedOf": 7,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 25,
+    "computedOf": 25,
+    "reported": 24,
+    "reportedOf": 24,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 732.768,
+    "requests": 35,
+    "inputTokens": 88,
+    "outputTokens": 46466,
+    "cacheRead": 1169939,
+    "cacheWrite": 181942,
+    "toolCalls": 51,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 3,
+    "findings_info": 8,
+    "findings_warning": 11,
+    "findings_error": 9,
+    "unsourced": 0,
+    "deviations": 3,
+    "overwritten": 3,
+    "nodes": 24
+   }
+  },
+  "skipped": []
+ }
+}

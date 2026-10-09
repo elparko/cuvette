@@ -1,0 +1,47 @@
+tool: limma (R), prepare_protein_table and test_differential_proteins of the limma-proteomics adapter
+adapter_kind: script
+data:
+- /Volumes/T7/guided-analysis/data/zhu2020-deqms-spike-in/proteinGroups.txt
+decisions:
+  exclude_flags: Reverse, Contaminant
+  min_peptides: 0
+  exclude_samples: none
+  min_valid: 2
+  valid_rule: each group
+  normalization: none
+  imputation: none
+  variance_model: trend
+  fdr: 0.01
+  min_abs_log2fc: 0
+  '*': Use the values in the decision record.
+expected:
+- description: Protein groups after the removal of Reverse and Contaminant rows
+  value: 6566
+  tolerance: 0
+  source: published, Results of the paper
+- description: Proteins with at least two values in each condition
+  value: 5022
+  tolerance: 0
+  source: published, Results of the paper
+- description: E. coli proteins higher at the higher E. coli amount, limma with trend, adjusted p below 0.01 (the paper prints 1230; the tolerance
+    of 5 is the known difference of this data version)
+  value: 1230
+  tolerance: 5
+  source: published, Results of the paper
+- description: Human proteins higher at the higher E. coli amount, limma with trend, adjusted p below 0.01
+  value: 13
+  tolerance: 0
+  source: published, Results of the paper
+- description: True positives of DEqMS in the paper (a different method; the tool does not run it)
+  value: 1237
+  tolerance: 0.5
+  source: published, Results of the paper
+- description: False positives of DEqMS in the paper (a different method)
+  value: 11
+  tolerance: 0.5
+  source: published, Results of the paper
+notes: The counts of proteins reproduce exactly (6566, 5022, and 1902 E. coli proteins). limma with trend gives 1235 true positives and 13 false
+  positives for the proteins that are more abundant in the higher E. coli sample. The paper prints 1230 and 13. The true positive item has a tolerance
+  of 5 for this difference. DEqMS (1237 and 11 in the paper) gives 1218 and 7 on this table, so the DEqMS items are reference items. Without the
+  direction filter, limma finds 1004 more human proteins (the human proteins have a lower median in the sample with more E. coli, as the E. coli
+  proteins take a part of the loading).

@@ -36,6 +36,8 @@ These items are being built and are not on main yet:
 - CRISPR screens (mageck), ChIP-seq and ATAC-seq differential peaks (diffbind) and Mendelian randomization from summary statistics (mendelianrandomization). Each has known-answer tests, manual routes, and one benchmark paper.
 - The mageck tools refuse a count table where Excel changed gene symbols to dates. The supplement of the MAGeCK paper has this fault in 120 rows.
 - Dose-response, enzyme kinetics and plate quality (R drc): IC50 and EC50 with a confidence interval and Hill slope, Michaelis-Menten and inhibition fits, plate normalization to controls and the Z' factor. Three published papers are the benchmark cases.
+- Proteomics statistics (limma-proteomics): filter, log2, normalize and impute a protein table, then run the moderated t test and draw a volcano plot, in place of the Perseus steps. Two benchmark papers reproduce their printed counts.
+- Multi-omics factor analysis (mofa): MOFA+ factors and the variance that each factor explains in each view, with factor correlation to covariates. The Argelaguet 2018 leukemia data is the benchmark paper.
 
 ### Patient data and cost
 - Before content goes to a cloud model, Cuvette looks for likely patient identifiers (names, record numbers, dates of birth, contact data and similar, after the HIPAA Safe Harbor list). A card shows what it found, masked, and you choose: send, mask the values, use a local model, or stop. Local models skip the card. The check is a help, not a guarantee; see `docs/patient-data.md`.

@@ -83,13 +83,14 @@ of each package. The sources are at the end.
 | --- | --- | --- | --- | --- | --- |
 | Ingenuity Pathway Analysis (IPA) | QIAGEN, commercial subscription | Pathway and upstream-regulator analysis of gene lists from RNA-seq and proteomics. | clusterProfiler (Artistic-2.0); fgsea (MIT); gseapy (BSD-3); GSEA desktop (BSD-style Broad license) | none | This work: over-representation analysis and preranked GSEA. IPA's upstream-regulator scores use a closed knowledge base and stay open. |
 | MetaCore | Clarivate, commercial subscription | Curated pathway enrichment. | clusterProfiler (Artistic-2.0); ReactomePA (GPL-2); gseapy (BSD-3) | none | This work (same tools as for IPA). |
-| Partek Flow and Genomics Suite | Partek (Illumina), commercial | Point-and-click bulk and single-cell RNA-seq. | DESeq2 (LGPL-3 or later); limma (GPL-2 or later); edgeR (GPL-2 or later); scanpy (BSD-3); harmonypy (GPL-3 or later); Squidpy (BSD-3) | `deseq2`, `scanpy`, `harmony`, `squidpy`, `diffbind` | Partial. No limma adapter. Clustering, sample integration with Harmony and spatial statistics: this work. ChIP-seq and ATAC-seq peak counts and differential peaks: `diffbind` (DiffBind with DESeq2 or edgeR). |
+| Partek Flow and Genomics Suite | Partek (Illumina), commercial | Point-and-click bulk and single-cell RNA-seq. | DESeq2 (LGPL-3 or later); limma (GPL-2 or later); edgeR (GPL-2 or later); scanpy (BSD-3); harmonypy (GPL-3 or later); Squidpy (BSD-3) | `deseq2`, `scanpy`, `harmony`, `squidpy`, `diffbind`, `limma-proteomics` | Partial. `limma-proteomics` runs limma on protein tables. Limma on microarray or RNA-seq tables is open. Clustering, sample integration with Harmony and spatial statistics: this work. ChIP-seq and ATAC-seq peak counts and differential peaks: `diffbind` (DiffBind with DESeq2 or edgeR). |
 | Loupe Browser | 10x Genomics, free, closed | Views Cell Ranger and Space Ranger results: clusters, gene expression, differential expression and spatial gene plots. | scanpy (BSD-3); Squidpy (BSD-3); harmonypy (GPL-3 or later) | `scanpy`, `harmony`, `squidpy` | Partial. Clustering, marker genes, sample integration with Harmony, Moran's I, neighborhood enrichment and spatial domains: this work. Selecting cells by hand on the screen is open. |
 | Golden Helix SVS and other genetics suites | Golden Helix, commercial | Association tests and Mendelian randomization from summary statistics of genetic variants. | MendelianRandomization (GPL-2 or GPL-3); TwoSampleMR (MIT); PLINK 2 (GPL-3) | `mendelianrandomization` | This work: inverse-variance, MR-Egger, median, mode and maximum likelihood estimates from summary statistics. The PLINK 2 association test on genotypes stays open. |
 | CRISPR screen analysis in vendor portals | Several vendors, commercial | Hit genes from pooled CRISPR screens. | MAGeCK (BSD-3); BAGEL2 (MIT); DrugZ (MIT) | `mageck` | This work: MAGeCK rank aggregation and beta scores from a count table. Read counting from FASTQ files stays open. |
 | GeneSpring | Agilent, commercial | Microarray expression analysis. | limma (GPL-2 or later); oligo and affy (LGPL-2 or later) | none | Open (microarrays are less common now). |
 | CLC Genomics Workbench | QIAGEN, commercial | Read mapping, variant calls, RNA-seq in a GUI. | samtools, bcftools (MIT); bedtools (MIT); Galaxy (MIT); UGENE (GPL-2) | `samtools`, `bcftools`, `bedtools`, `fastqc`, `deseq2` | Partial. No read aligner adapter. |
-| MaxQuant and Perseus | Max Planck Institute of Biochemistry, free, closed | Label-free, SILAC and TMT protein quantification; statistics in Perseus. | Sage (MIT); OpenMS (BSD-3); MSstats (Artistic-2.0) | `sage`, `openms`, `pyopenms` | Partial. Protein-level statistics (MSstats) are open. |
+| MaxQuant and Perseus | Max Planck Institute of Biochemistry, free, closed | Label-free, SILAC and TMT protein quantification; statistics in Perseus. | Sage (MIT); OpenMS (BSD-3); limma (GPL-2 or later); MSstats (Artistic-2.0) | `sage`, `openms`, `pyopenms`, `limma-proteomics` | Partial. `limma-proteomics` replaces the Perseus steps for a proteinGroups.txt table: filter rows, log2, valid values, normalization, imputation by down shift, the test and the volcano plot. The Perseus t test with permutation FDR, clustering and the other Perseus plugins are open. MSstats on feature-level input is open. |
+| SIMCA | Sartorius (Umetrics), commercial | Principal component analysis (PCA), PLS-DA and OPLS-DA of multivariate data, multi-block models. | MOFA+ (mofapy2, LGPL-3); mixOmics (GPL-2 or later); ropls (CeCILL) | `mofa` | Partial. `mofa` finds the factors and the variance of each view for several tables. PLS-DA, OPLS-DA and the SIMCA validation plots (mixOmics, ropls) are open. |
 
 ## Sequences, cloning and primers
 
@@ -107,8 +108,8 @@ of each package. The sources are at the end.
 | OpenLab CDS | Agilent, commercial | HPLC and GC data system. | hplc-py (GPL-3); OpenChrom (EPL-2.0) | none | This work (as for Chromeleon). |
 | MassHunter | Agilent, commercial | LC-MS and GC-MS qualitative and quantitative work. | MZmine (MIT); xcms (GPL-2 or later); OpenMS and pyOpenMS (BSD-3) | `mzmine`, `pyopenms`, `openms` | Covered for features. Targeted quantification is partial. |
 | Xcalibur and FreeStyle | Thermo Fisher. Xcalibur commercial. FreeStyle free, closed. | Raw file viewing, targeted quantification. | ProteoWizard msconvert (Apache-2.0; the vendor readers are closed); pyteomics (Apache-2.0) | `pyopenms`, `openms` | Partial. `.raw` files need a conversion to mzML first. |
-| Spectronaut | Biognosys, commercial | Data-independent acquisition (DIA) proteomics. | EncyclopeDIA (Apache-2.0); OpenSWATH in OpenMS (BSD-3); alphaDIA (Apache-2.0). DIA-NN is free for academia but closed. | `openms` | Open for DIA. |
-| Proteome Discoverer | Thermo Fisher, commercial | Database search for DDA and TMT. | Sage (MIT); OpenMS (BSD-3); mokapot (Apache-2.0). MSFragger is free for academia but closed. | `sage`, `openms` | Covered for search. TMT reporter quantification is partial. |
+| Spectronaut | Biognosys, commercial | Data-independent acquisition (DIA) proteomics. | EncyclopeDIA (Apache-2.0); OpenSWATH in OpenMS (BSD-3); alphaDIA (Apache-2.0). DIA-NN is free for academia but closed. | `openms`, `limma-proteomics` | Partial. `limma-proteomics` covers the post-analysis (filter, normalize, test, volcano plot) of an exported protein group table. Extraction of the DIA data is open. |
+| Proteome Discoverer | Thermo Fisher, commercial | Database search for DDA and TMT. | Sage (MIT); OpenMS (BSD-3); mokapot (Apache-2.0); limma (GPL-2 or later). MSFragger is free for academia but closed. | `sage`, `openms`, `limma-proteomics` | Covered for search. TMT reporter quantification is partial. `limma-proteomics` replaces the statistics of a Proteins table export (ratio test and volcano plot). |
 | PEAKS Studio | Bioinformatics Solutions, commercial | De novo sequencing and database search. | Sage (MIT); OpenMS (BSD-3) | `sage` | Partial. De novo sequencing is open. |
 
 ## What this work builds
@@ -127,7 +128,7 @@ The order of value follows the table. The choice leaves out what the other agent
    Kruskal-Wallis with Dunn, Friedman and exact rank tests. These are the Prism and SPSS menus
    that the other agents do not cover.
 
-The status of each one is in "Results" below.
+The status of each one is in "Results" below. A second work added `limma-proteomics` and `mofa`; see "Proteomics statistics and multi-omics".
 
 ## Results
 
@@ -201,6 +202,32 @@ What stays open:
 
 - No adapter yet for annotation with CellTypist, trajectories (PAGA, RNA velocity with scVelo) or cell-cell communication (LIANA, CellChat). The search found no open paper whose printed number a run from processed data reproduces. The reasons are in `bench/papers/CANDIDATES-singlecell-spatial.md`.
 - No adapter yet for integration with scVI, for the same reason.
+
+## Proteomics statistics and multi-omics
+
+Two adapters from the work of 9 October 2026. Each passes `ga adapter check <name> --run-tests`.
+
+| Adapter | Engine | Tools | Known-answer tests | Benchmark papers |
+| --- | --- | --- | --- | --- |
+| `limma-proteomics` | R limma | prepare_protein_table, test_differential_proteins | 10 | Thaqi 2026, DOI 10.1038/s41597-026-07515-6. Zhu 2020, DOI 10.1074/mcp.TIR119.001646 |
+| `mofa` | MOFA+ (mofapy2) | run_mofa, associate_factors, top_features | 4 | Argelaguet 2018, DOI 10.15252/msb.20178124 |
+
+Where each test value comes from:
+
+- `limma-proteomics`: the counts that the two papers print. Also the R code of Thaqi et al., written out
+  with limma (`checks/check_bovine.R`). Also a NumPy and SciPy calculation of the empirical Bayes variance,
+  the moderated t and the Benjamini-Hochberg adjustment (`checks/check_limma.py`).
+- `mofa`: the variance explained and the factors that the CLL paper prints. Also a NumPy calculation of the
+  variance explained and of the correlations from the saved factors and weights (`checks/check_mofa.py`).
+
+What stays open:
+
+- No mixOmics adapter. No paper from 2018 on has an open data table and a printed result that a seeded run
+  reproduces. The DIABLO paper prints error rates for a four-block panel, and the `breast.TCGA` data of the
+  package has three blocks. `bench/papers/CANDIDATES-multiomics-proteomics.md` lists the papers that the work checked.
+- limma runs the moderated t test only. The DEqMS variance model, MSstats on feature-level input and the
+  roll-up of peptides to proteins stay open. The DEqMS numbers of Zhu 2020 do not reproduce.
+- The work did not run the Perseus, Proteome Discoverer, Spectronaut and SIMCA manual routes.
 
 ## Sources
 

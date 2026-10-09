@@ -1,0 +1,88 @@
+kind: research paper
+short: Argelaguet 2018
+field: Multi-omics integration
+program: MOFA+ (mofapy2), through the mofa adapter
+citation:
+  authors: Argelaguet R, Velten B, Arnol D, Dietrich S, Zenz T, Marioni JC, Buettner F, Huber W, Stegle O
+  title: 'Multi-Omics Factor Analysis: a framework for unsupervised integration of multi-omics data sets'
+  venue: Molecular Systems Biology 14(6):e8124
+  year: 2018
+  doi: 10.15252/msb.20178124
+related:
+- text: 'Data: Bioconductor package MOFAdata, files CLL_data.RData and CLL_covariates.RData (LGPL-3). The CLL data come from Dietrich et al. 2018,
+    J Clin Invest 128(1): 427-445. fetch.sh downloads the files and writes the CSV tables.'
+  doi: 10.1172/JCI93801
+measured: 'The study applied MOFA to 200 patients with chronic lymphocytic leukemia (CLL) with four views: drug response (310 features), methylation
+  (4248), mRNA (5000) and somatic mutations (69). MOFA found 10 factors. Factor 1 aligned with the IGHV mutation status and Factor 2 with trisomy
+  of chromosome 12.'
+instruction: Train MOFA on the four views with a 2% variance threshold. Give the number of factors, the variance of each view that all factors
+  explain, and the factors that align with IGHV and trisomy 12.
+instruction_basis: Results (MOFA identifies the major sources of variation in CLL) and Methods of the paper.
+answers:
+  n_factors:
+    decision: Number of factors to start with
+    value: 15
+    source: Not in the paper. 15 is the MOFA2 default. The 2% threshold drops the factors that explain less.
+  drop_factor_r2:
+    decision: Smallest variance for a factor (percent)
+    value: 2
+    source: Results. A minimum explained variance of 2% in at least one data type.
+  scale_views:
+    decision: Scale each view to unit variance
+    value: false
+    source: Not in the paper. The data package holds the views as the authors used them.
+  likelihoods:
+    decision: Likelihood of each view
+    value: mutations=bernoulli
+    source: Methods. Binary data (mutations) use a Bernoulli likelihood. The other views are gaussian.
+  top_features:
+    decision: Most variable features of each view
+    value: 0
+    source: The data package holds the most variable features already (5000 mRNA genes, 4248 CpG sites).
+  seed:
+    decision: Random seed
+    value: 1
+    source: Not in the paper. The paper trained from 25 random starts and kept the best model.
+  convergence_mode:
+    decision: Convergence mode
+    value: medium
+    source: Not in the paper. medium is the MOFA2 default.
+  '*':
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text.
+items:
+  n_factors:
+    source: published
+    where: Results. MOFA identified 10 factors (minimum explained variance 2% in at least one data type).
+    check: MOFA+ with seeds 1 and 2 gives 10.
+  r2_drugs:
+    source: published
+    where: Results. The 10 factors explained 41% of the variation in the drug response data.
+    check: MOFA+ gives 37.9 (seed 1) and 34.9 (seed 2). A NumPy calculation from the saved factors and weights gives 37.88 (catalog/mofa/checks).
+  r2_mrna:
+    source: published
+    where: Results. 38% in the mRNA data.
+    check: 38.1 (seeds 1 and 2).
+  r2_methylation:
+    source: published
+    where: Results. 24% in the DNA methylation data.
+    check: 25.4 and 25.7.
+  r2_mutations:
+    source: published
+    where: Results. 24% in the mutation data.
+    check: 28.4 and 28.7. The difference of 4.4 points is larger than for the other views.
+  ighv_factor:
+    source: published
+    where: Results. Factor 1 aligned with the somatic mutation status of IGHV.
+    check: The correlation of Factor 1 with IGHV is 0.860 (NumPy).
+  trisomy12_factor:
+    source: published
+    where: Results. Factor 2 aligned with trisomy of chromosome 12.
+    check: The correlation of Factor 2 with trisomy 12 is 0.778 (NumPy).
+data:
+  source: Bioconductor package MOFAdata (github.com/bioFAM/MOFAdata), data/CLL_data.RData (9 MB) and data/CLL_covariates.RData. fetch.sh writes
+    drugs.csv, methylation.csv, mrna.csv, mutations.csv and covariates.csv.
+  url: https://github.com/bioFAM/MOFAdata/tree/master/data
+  license: LGPL-3, the license of MOFAdata. The paper is CC BY 4.0.
+  size: 'Four tables of 200 patients: 310, 4248, 5000 and 69 features (the CSV files are 58 MB).'

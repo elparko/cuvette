@@ -1,0 +1,11 @@
+n_tested 4508
+ecoli_tested 1444
+d0 2.5177
+s20 0.039481
+P09373 log2fc 1.245161 t_ordinary 29.5839 t_moderated 11.7372 p 1.266085e-05 adj_p 4.666799e-04
+sig_fdr_0.01 2000 up 1173 down 827
+up_ecoli 1166 up_other 7
+min_valid2_proteins 5022
+column_medians 25.765356 25.780417 25.899475 25.800132 25.765547 25.689339
+P09373 median_normalized 35.737390 35.615109 35.567015 34.363253 34.494364 34.516646
+missing_values_min_valid2 613

@@ -1,0 +1,62 @@
+adapters:
+- limma-proteomics
+prompt: 'The sample is a HeLa cell lysate with an E. coli lysate added in two amounts (a 1 to 3 ratio), three replicates for each amount, measured
+  by label-free mass spectrometry and quantified with MaxQuant. The file {data}/zhu2020-deqms-spike-in/proteinGroups.txt is the proteinGroups.txt
+  of MaxQuant. It has the columns LFQ intensity L1 to L3 (the lower E. coli amount) and LFQ intensity H1 to H3 (the higher E. coli amount). The
+  column Fasta headers names the species: a protein group is an E. coli protein if its Fasta headers text contains Escherichia or _ECOLI, and
+  a human protein otherwise. Find the proteins that are more abundant in the H samples than in the L samples, with the moderated t test of limma.
+  Give the number of protein groups after you remove the rows that MaxQuant flags, and the number of proteins that stay after the filter on valid
+  values. Among the proteins that are significantly more abundant in H, give the number of E. coli proteins and the number of human proteins.
+  Write every number in your final answer text.'
+answers:
+  exclude_flags: Reverse, Contaminant
+  min_peptides: 0
+  exclude_samples: none
+  min_valid: 2
+  valid_rule: each group
+  normalization: none
+  imputation: none
+  variance_model: trend
+  fdr: 0.01
+  min_abs_log2fc: 0
+  '*': Use the values in the decision record.
+allow: all
+timeout_s: 1800
+data:
+- zhu2020-deqms-spike-in/proteinGroups.txt
+items:
+- key: n_after_flags
+  description: Protein groups after the removal of Reverse and Contaminant rows
+  value: 6566
+  exact: true
+  in_answer: true
+  tool: prepare_protein_table
+- key: n_valid
+  description: Proteins with at least two values in each condition
+  value: 5022
+  exact: true
+  in_answer: true
+  tool: prepare_protein_table
+- key: tp_limma_trend
+  description: E. coli proteins higher at the higher E. coli amount, limma with trend, adjusted p below 0.01 (the paper prints 1230; the tolerance
+    of 5 is the known difference of this data version)
+  value: 1230
+  tolerance: 5
+  in_answer: true
+  tool: test_differential_proteins
+- key: fp_limma_trend
+  description: Human proteins higher at the higher E. coli amount, limma with trend, adjusted p below 0.01
+  value: 13
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: tp_deqms
+  description: True positives of DEqMS in the paper (a different method; the tool does not run it)
+  value: 1237
+  tolerance: 0.5
+  reference: true
+- key: fp_deqms
+  description: False positives of DEqMS in the paper (a different method)
+  value: 11
+  tolerance: 0.5
+  reference: true

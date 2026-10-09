@@ -1,0 +1,368 @@
+adapter:
+  name: mofa
+  field: multi-omics integration
+  file_types: [".csv", ".tsv", ".txt"]
+  title: MOFA+ (multi-omics factor analysis)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Finds the shared sources of variation in two or more omics tables of the same samples with MOFA+ (mofapy2). It gives
+    the factors of each sample, the weights of each feature, and the variance that each factor explains in each view. It
+    also correlates the factors with sample covariates.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: mofapy2
+  version: "0.7.5"
+  tested_versions: []
+  homepage: https://biofam.github.io/MOFA2/
+  docs:
+    - https://biofam.github.io/MOFA2/tutorials.html
+    - https://github.com/bioFAM/mofapy2
+    - https://doi.org/10.1186/s13059-020-02015-1
+    - https://doi.org/10.15252/msb.20178124
+  install: >
+    The adapter uses the Python environment at ~/.guided-analysis/envs/mofa. Make it and add mofapy2, h5py, pandas, scipy
+    and matplotlib:
+    uv venv ~/.guided-analysis/envs/mofa && uv pip install --python ~/.guided-analysis/envs/mofa/bin/python mofapy2 h5py pandas scipy matplotlib
+  citation:
+    - text: "Argelaguet R, Arnol D, Bredikhin D, Deloro Y, Velten B, Marioni JC, Stegle O (2020). MOFA+: a statistical framework for comprehensive integration of multi-modal single-cell data. Genome Biology 21: 111."
+      doi: 10.1186/s13059-020-02015-1
+    - text: "Argelaguet R, Velten B, Arnol D, Dietrich S, Zenz T, Marioni JC, Buettner F, Huber W, Stegle O (2018). Multi-Omics Factor Analysis: a framework for unsupervised integration of multi-omics data sets. Molecular Systems Biology 14: e8124."
+      doi: 10.15252/msb.20178124
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: GA_MOFA_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/mofa/bin/python
+    - ~/.guided-analysis/envs/mofa/Scripts/python.exe
+    - /Volumes/ga-envs/mofa/bin/python
+  which: []
+  version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('mofapy2', m.version('mofapy2'))"]
+  version_pattern: 'mofapy2 (\S+)'
+  identity: 'mofapy2 \d'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees the variance explained, the correlations and the top feature names. It never sees the omics tables.
+
+decisions:
+  - key: n_factors
+    label: Number of factors to start with
+    kind: int
+    default: 15
+    lo: 2
+    hi: 100
+    group: Model
+    help: >
+      MOFA starts with this many factors and drops the ones that explain too little. Start with more factors than you expect.
+      The MOFA2 default is 15.
+    owner: human
+    stage: setup
+    essential: true
+    links:
+      - { tool: run_mofa, arg: n_factors }
+
+  - key: drop_factor_r2
+    label: Smallest variance for a factor (percent)
+    kind: float
+    default: 2
+    lo: 0
+    hi: 20
+    group: Model
+    help: >
+      MOFA drops a factor that explains less than this percent of the variance in every view. 0 keeps all factors. The
+      original MOFA paper used 2.
+    owner: human
+    stage: setup
+    essential: true
+    links:
+      - { tool: run_mofa, arg: drop_factor_r2 }
+
+  - key: scale_views
+    label: Scale each view to unit variance
+    kind: bool
+    default: false
+    group: Model
+    help: >
+      true gives each view the same total variance. This stops a view with many features or large values from taking all the
+      factors. false keeps the values as they are. Scale the features of your tables yourself if you need that.
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_mofa, arg: scale_views }
+
+  - key: likelihoods
+    label: Likelihood of each view
+    kind: text
+    default: none
+    group: Model
+    help: >
+      Every view is gaussian by default. Name the views of other types as name=likelihood, such as mutations=bernoulli for
+      0 and 1 data, or counts=poisson. Write none to keep gaussian for all views.
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_mofa, arg: likelihoods }
+
+  - key: top_features
+    label: Most variable features of each view
+    kind: int
+    default: 0
+    lo: 0
+    hi: 100000
+    group: Model
+    help: >
+      Keep only this many features of each view, those with the highest variance. 0 keeps all features. A view with many more
+      features than the others can take the factors, so a filter of several thousand is usual.
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_mofa, arg: top_features }
+
+  - key: seed
+    label: Random seed
+    kind: int
+    default: 1
+    lo: 0
+    hi: 100000
+    group: Model
+    help: >
+      The training starts from random values. The same seed gives the same factors. Run two or three seeds and compare the
+      variance explained before you trust a factor.
+    owner: human
+    stage: setup
+    links:
+      - { tool: run_mofa, arg: seed }
+
+  - key: convergence_mode
+    label: Convergence mode
+    kind: choice
+    choices: [fast, medium, slow]
+    default: medium
+    group: Model
+    help: >
+      The training stops when the evidence lower bound changes less than a limit. slow uses a smaller limit and takes longer.
+      The MOFA2 default is medium.
+    owner: human
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: run_mofa, arg: convergence_mode }
+
+checks:
+  - id: single_seed
+    description: The answer states how many factors exist and what each one means from one training run only.
+    severity: warning
+    text: Report the answer if it interprets the factors and does not say that the training used one seed or that the seed was changed.
+  - id: variance_causal
+    description: The answer says that a factor causes a trait.
+    severity: warning
+    text: Report the answer if it says that a factor causes or drives a phenotype. A factor is a pattern of covariation, not a cause.
+  - id: scaled_features_not_said
+    description: The answer compares the variance explained of views with different scaling and does not name the scaling.
+    severity: warning
+    text: Report the answer if it compares views and does not say if the views were scaled and which transform each view had.
+  - id: samples_not_named
+    description: The answer gives no sample count and no count of samples with all views.
+    severity: warning
+    text: Report the answer if it gives factors and does not give the number of samples and the number of samples in all views.
+
+map:
+  - tool: run_mofa
+    route: "library(MOFA2); m <- create_mofa(list(drugs = d, mrna = r)); mo <- get_default_model_options(m); mo$num_factors <- 15; tr <- get_default_training_options(m); tr$drop_factor_threshold <- 0.02; tr$seed <- 1; m <- prepare_mofa(m, model_options = mo, training_options = tr); m <- run_mofa(m, 'model.hdf5'); plot_variance_explained(m)"
+    steps:
+      - "R MOFA2: create_mofa(list of matrices with features in rows and samples in columns), prepare_mofa, run_mofa, then plot_variance_explained(model, x = 'view', y = 'factor')."
+      - "R MOFA2: calculate_variance_explained(model) gives the numbers of the plot."
+      - "Python: mofapy2.run.entry_point.entry_point() with set_data_matrix, set_model_options, set_train_options and run, then save."
+      - "SIMCA: no equivalent. SIMCA Multi-block (hierarchical) PCA or PLS models give block scores and block contributions with no sparsity prior and no variance explained of each factor in each block."
+    params:
+      - { arg: n_factors, label: "num_factors of get_default_model_options()", ui_default: 15 }
+      - { arg: drop_factor_r2, label: "drop_factor_threshold of the training options, as a fraction", ui_default: -1 }
+      - { arg: scale_views, label: "scale_views of the data options", ui_default: false }
+      - { arg: likelihoods, label: "likelihoods of the model options" }
+      - { arg: seed, label: "seed of the training options", ui_default: 42 }
+      - { arg: convergence_mode, label: "convergence_mode of the training options", ui_default: medium }
+    fidelity: close
+    difference: >
+      The tool calls the same Python engine as MOFA2 (mofapy2). The R package MOFA2 sorts the factors by the variance that they
+      explain, and the tool does the same. The R route was not run. The default of MOFA2 for drop_factor_threshold is -1 (no
+      drop), and its default seed is 42.
+    evidence:
+      source: docs
+      test: cll-factors
+      note: The test compares the variance explained with a NumPy calculation from the saved factors and weights.
+
+  - tool: associate_factors
+    route: "library(MOFA2); correlate_factors_with_covariates(model, covariates = c('IGHV', 'trisomy12'), plot = 'r')"
+    steps:
+      - "R MOFA2: correlate_factors_with_covariates(model, covariates = names, plot = 'log_pval') draws the heat map."
+      - "R: cor.test(factors[, 'Factor1'], covariate) gives the Pearson r and the p value of one pair."
+    params:
+      - { arg: covariate_names, label: "covariates of correlate_factors_with_covariates()" }
+    fidelity: close
+    difference: >
+      correlate_factors_with_covariates uses Pearson r with a p value and a Benjamini-Hochberg adjustment of its own. The tool
+      adjusts over all factor and covariate pairs. The R route was not run.
+    evidence:
+      source: docs
+      test: cll-factors
+      note: A NumPy calculation of the correlation of each factor with IGHV and trisomy 12 gives the same values.
+
+  - tool: top_features
+    route: "library(MOFA2); get_weights(model, views = 'mrna', factors = 1, as.data.frame = TRUE)"
+    steps:
+      - "R MOFA2: plot_top_weights(model, view = 'mrna', factor = 1, nfeatures = 10)."
+      - "R MOFA2: get_weights(model, as.data.frame = TRUE), then sort by the absolute value of the weight."
+    params:
+      - { arg: view, label: "view of plot_top_weights()" }
+      - { arg: factor, label: "factor of plot_top_weights()" }
+      - { arg: n, label: "nfeatures of plot_top_weights()", ui_default: 10 }
+    fidelity: close
+    difference: The tool sorts by the absolute weight, as plot_top_weights does. The R route was not run.
+    evidence:
+      source: docs
+      test: cll-factors
+      note: The test reads the top features of Factor1 in the mutation view.
+
+tests:
+  - id: cll-factors
+    description: >
+      Argelaguet et al. 2018 (Molecular Systems Biology 14: e8124), the chronic lymphocytic leukemia data of the Bioconductor
+      package MOFAdata (LGPL-3). The paper reports 10 factors with a 2% limit, and that the factors explain 41% (drugs), 38%
+      (mRNA), 24% (methylation) and 24% (mutations) of the variance. It reports that Factor 1 aligns with the IGHV status
+      and Factor 2 with trisomy 12. The paper used MOFA with the best of 25 starts. This test uses MOFA+ with seed 1. Seeds 1
+      and 2 give 35 to 38 (drugs), 38 (mRNA), 25 (methylation) and 28 (mutations), so the tolerances on the published
+      percentages are 7, 3, 3 and 6 points. A NumPy calculation from the saved factors and weights gives the variance
+      explained of drugs and mRNA and the correlations with IGHV and trisomy 12 (checks/check_mofa.py and check_mofa.out).
+    data: [data/cll/drugs.csv, data/cll/methylation.csv, data/cll/mrna.csv, data/cll/mutations.csv, data/cll/covariates.csv]
+    fetch: data/fetch.sh
+    calls:
+      - tool: run_mofa
+        args:
+          views: ["drugs={adapter_dir}/data/cll/drugs.csv", "methylation={adapter_dir}/data/cll/methylation.csv", "mrna={adapter_dir}/data/cll/mrna.csv", "mutations={adapter_dir}/data/cll/mutations.csv"]
+          likelihoods: "mutations=bernoulli"
+          n_factors: 15
+          drop_factor_r2: 2
+          seed: 1
+        save_as: model
+      - tool: associate_factors
+        args: { factors_file: "{saved.model.data.data.factors_file}", covariates: "{adapter_dir}/data/cll/mutations.csv", covariate_names: "IGHV, trisomy12" }
+        save_as: assoc
+      - tool: associate_factors
+        args: { factors_file: "{saved.model.data.data.factors_file}", covariates: "{adapter_dir}/data/cll/covariates.csv", orientation: samples in rows }
+        save_as: assoc_text
+      - tool: top_features
+        args: { weights_file: "{saved.model.data.data.weights_file}", view: mutations, factor: Factor1, n: 3 }
+    expect:
+      - { path: saved.model.metrics.n_factors, equals: 10 }
+      - { path: saved.model.metrics.n_samples, equals: 200 }
+      - { path: saved.model.metrics.r2_total_drugs, approx: 41, abs: 7 }
+      - { path: saved.model.metrics.r2_total_mrna, approx: 38, abs: 3 }
+      - { path: saved.model.metrics.r2_total_methylation, approx: 24, abs: 3 }
+      - { path: saved.model.metrics.r2_total_mutations, approx: 24, abs: 6 }
+      - { path: saved.model.metrics.r2_total_drugs, approx: 37.88, abs: 1.5 }
+      - { path: saved.model.metrics.r2_total_mrna, approx: 38.13, abs: 1.5 }
+      - { path: saved.assoc.metrics.best_factor_IGHV, equals: 1 }
+      - { path: saved.assoc.metrics.abs_r_IGHV, approx: 0.860, abs: 0.02 }
+      - { path: saved.assoc.metrics.best_factor_trisomy12, equals: 2 }
+      - { path: saved.assoc.metrics.abs_r_trisomy12, approx: 0.778, abs: 0.02 }
+      - { path: saved.assoc_text.metrics.n_covariates, equals: 1 }
+      - { path: "table.rows[0][0]", equals: IGHV }
+
+  - id: one-view
+    description: A single view fails, and the error names the number of views.
+    calls:
+      - tool: run_mofa
+        args: { views: "a={adapter_dir}/data/no_such_view.csv" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "MOFA needs 2 views or more. views has 1" }
+
+  - id: bad-likelihood
+    description: A likelihood of an unknown view fails, and the error lists the views.
+    calls:
+      - tool: run_mofa
+        args: { views: "a={adapter_dir}/data/no_such_view.csv, b={adapter_dir}/data/no_such_view2.csv", likelihoods: "c=bernoulli" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "likelihoods names the view c, but the views are: a, b" }
+
+  - id: missing-view-file
+    description: A view file that does not exist fails, and the error names the view and the file.
+    calls:
+      - tool: run_mofa
+        args: { views: "a={adapter_dir}/data/no_such_view.csv, b={adapter_dir}/data/no_such_view2.csv" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "View a: File not found" }
+
+tools:
+  - name: run_mofa
+    title: Train a MOFA model
+    description: >
+      Train a MOFA+ model on two or more omics tables of the same samples. It gives the factors of each sample, the weights of
+      each feature and the variance that each factor explains in each view. It saves a heat map of the variance explained.
+    function: "ga_mofa:run_mofa"
+    params:
+      views: { type: [array, string], minItems: 2, items: { type: string }, description: "One name=path pair for each view, as a list or as comma text, such as mrna=/path/mrna.csv. The first column holds the feature or sample names." }
+      orientation: { type: string, enum: [features in rows, samples in rows], description: "Layout of each table. Default features in rows, as in the MOFA data packages." }
+      likelihoods: { type: string, description: "Leave out. The harness sets it from the decision record. name=likelihood pairs for views that are not gaussian." }
+      n_factors: { type: integer, minimum: 2, description: "Leave out. The harness sets it from the decision record. Count of factors to start with." }
+      drop_factor_r2: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest percent of variance in a view for a factor. 0 keeps all." }
+      scale_views: { type: boolean, description: "Leave out. The harness sets it from the decision record." }
+      top_features: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Count of most variable features to keep in each view. 0 keeps all." }
+      seed: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Random seed." }
+      convergence_mode: { type: string, enum: [fast, medium, slow], description: "Leave out. The harness sets it from the decision record." }
+      max_iterations: { type: integer, minimum: 10, description: "Count of iterations at most. Default 1000." }
+    required: [views]
+    read_only: true
+    batch: false
+    outputs:
+      factors: { kind: table, ext: csv, description: One row for each sample with its factor values. }
+      weights: { kind: table, ext: csv, description: "One row for each view, feature and factor with the weight." }
+      variance: { kind: table, ext: csv, description: "Variance explained by each factor in each view, in percent." }
+      plot: { kind: image, ext: png, description: Heat map of the variance explained. }
+      model: { kind: file, ext: hdf5, description: The model file that the R package MOFA2 can read. }
+
+  - name: associate_factors
+    title: Correlate factors with covariates
+    description: >
+      Correlate each factor with sample covariates, such as a clinical group or a mutation. It gives the Pearson r, the p value
+      and the Benjamini-Hochberg adjusted p value of each pair, and the best factor for each covariate. Run run_mofa first.
+    function: "ga_mofa:associate_factors"
+    params:
+      factors_file: { type: string, minLength: 1, description: "The factors_file of run_mofa." }
+      covariates: { type: string, minLength: 1, description: "Path of a table of covariates. Rows can be features, such as a mutation view, or samples. Set orientation." }
+      orientation: { type: string, enum: [features in rows, samples in rows], description: "Layout of the covariate table. Default features in rows." }
+      covariate_names: { type: [array, string], items: { type: string }, description: "Covariates to use, as a list or as comma text. Leave out to use all." }
+    required: [factors_file, covariates]
+    read_only: true
+    batch: false
+    citations:
+      - text: "Benjamini Y, Hochberg Y (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society B 57(1): 289-300."
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+    outputs:
+      correlations: { kind: table, ext: csv, description: One row for each factor and covariate pair. }
+
+  - name: top_features
+    title: Top features of a factor
+    description: List the features of one view with the largest absolute weight in one factor. Run run_mofa first.
+    function: "ga_mofa:top_features"
+    params:
+      weights_file: { type: string, minLength: 1, description: "The weights_file of run_mofa." }
+      view: { type: string, minLength: 1, description: "View name, as in the views argument of run_mofa." }
+      factor: { type: string, minLength: 1, description: "Factor name, such as Factor1." }
+      n: { type: integer, minimum: 1, description: "Count of features to list. Default 10." }
+    required: [weights_file, view, factor]
+    read_only: true
+    batch: false
+    outputs:
+      top: { kind: table, ext: csv, description: The features and their weights. }

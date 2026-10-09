@@ -1,0 +1,69 @@
+adapters:
+- mofa
+prompt: 'These data are from 200 patients with chronic lymphocytic leukemia. The folder {data}/argelaguet2018-mofa-cll has four tables of the
+  same patients, with the features in rows and the patients in columns: drugs.csv (the viability after 62 drugs at five concentrations), methylation.csv
+  (CpG sites), mrna.csv (gene expression) and mutations.csv (mutations as 0 and 1, with the rows IGHV and trisomy12 for the IGHV mutation status
+  and trisomy of chromosome 12). Integrate the four tables with multi-omics factor analysis and find the main sources of variation across the
+  patients. Give the number of factors that MOFA keeps, the percent of the variance of each of the four views that all factors explain together,
+  the factor that aligns best with IGHV status and the factor that aligns best with trisomy 12. Write every number in your final answer text.'
+answers:
+  n_factors: 15
+  drop_factor_r2: 2
+  scale_views: false
+  likelihoods: mutations=bernoulli
+  top_features: 0
+  seed: 1
+  convergence_mode: medium
+  '*': Use the values in the decision record.
+allow: all
+timeout_s: 1800
+data:
+- argelaguet2018-mofa-cll/drugs.csv
+- argelaguet2018-mofa-cll/methylation.csv
+- argelaguet2018-mofa-cll/mrna.csv
+- argelaguet2018-mofa-cll/mutations.csv
+items:
+- key: n_factors
+  description: Factors that MOFA keeps (minimum explained variance 2%)
+  value: 10
+  exact: true
+  in_answer: true
+  tool: run_mofa
+- key: r2_drugs
+  description: Variance of the drug response view explained by all factors, percent (the paper prints 41; the tolerance of 7 covers MOFA+ with
+    one start against MOFA with the best of 25)
+  value: 41
+  tolerance: 7
+  in_answer: true
+  tool: run_mofa
+- key: r2_mrna
+  description: Variance of the mRNA view explained by all factors, percent
+  value: 38
+  tolerance: 3
+  in_answer: true
+  tool: run_mofa
+- key: r2_methylation
+  description: Variance of the methylation view explained by all factors, percent
+  value: 24
+  tolerance: 3
+  in_answer: true
+  tool: run_mofa
+- key: r2_mutations
+  description: Variance of the mutation view explained by all factors, percent (the paper prints 24; the tolerance of 6 covers the difference
+    of the two programs)
+  value: 24
+  tolerance: 6
+  in_answer: true
+  tool: run_mofa
+- key: ighv_factor
+  description: Number of the factor that aligns with IGHV status
+  value: 1
+  exact: true
+  in_answer: true
+  tool: associate_factors
+- key: trisomy12_factor
+  description: Number of the factor that aligns with trisomy 12
+  value: 2
+  exact: true
+  in_answer: true
+  tool: associate_factors

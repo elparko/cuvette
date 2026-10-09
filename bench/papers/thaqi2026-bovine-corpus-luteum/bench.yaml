@@ -1,0 +1,115 @@
+adapters:
+- limma-proteomics
+prompt: I measured the proteome of bovine corpus luteum samples from 10 reproductive stages, 8 animals for each stage, by label-free mass spectrometry,
+  and I searched the raw files with MaxQuant. The file {data}/thaqi2026-bovine-corpus-luteum/RAW_P337_02B_proteinGroups.txt is the proteinGroups.txt
+  of MaxQuant. It has one column named LFQ intensity <stage>-<animal> for each of the 80 samples. The stages are named I, II, III, IV, V, VI,
+  VII, VIII, IX and X, in time order. I want the proteins that change between stages. First give the number of protein groups of the table after
+  you remove the rows that MaxQuant flags. Then, for each of six comparisons (I and IV, III and V, IV and VI, V and VI, VI and VII, VII and X),
+  give the number of proteins that are higher in the earlier stage and the number that are higher in the later stage. Write every number in your
+  final answer text.
+answers:
+  exclude_flags: Only identified by site, Reverse, Potential contaminant
+  min_peptides: 2
+  exclude_samples: none
+  min_valid: 6
+  valid_rule: at least one group
+  normalization: quantile
+  imputation: downshift normal
+  impute_shift: 1.8
+  impute_width: 0.3
+  impute_scope: all samples
+  step_order: impute first
+  impute_seed: 1
+  variance_model: robust
+  fdr: 0.05
+  min_abs_log2fc: 1
+  '*': Use the values in the decision record.
+allow: all
+timeout_s: 1800
+data:
+- thaqi2026-bovine-corpus-luteum/RAW_P337_02B_proteinGroups.txt
+items:
+- key: n_after_flags
+  description: Protein groups after the removal of the flagged rows
+  value: 3783
+  exact: true
+  in_answer: true
+  tool: prepare_protein_table
+- key: i_vs_iv_first
+  description: Proteins higher in stage I than in stage IV
+  value: 282
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: i_vs_iv_second
+  description: Proteins higher in stage IV than in stage I
+  value: 268
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: iii_vs_v_first
+  description: Proteins higher in stage III than in stage V
+  value: 240
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: iii_vs_v_second
+  description: Proteins higher in stage V than in stage III
+  value: 240
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: iv_vs_vi_first
+  description: Proteins higher in stage IV than in stage VI
+  value: 98
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: iv_vs_vi_second
+  description: Proteins higher in stage VI than in stage IV
+  value: 131
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: v_vs_vi_first
+  description: Proteins higher in stage V than in stage VI
+  value: 74
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: v_vs_vi_second
+  description: Proteins higher in stage VI than in stage V
+  value: 109
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: vi_vs_vii_first
+  description: Proteins higher in stage VI than in stage VII
+  value: 219
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: vi_vs_vii_second
+  description: Proteins higher in stage VII than in stage VI
+  value: 240
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: vii_vs_x_first
+  description: Proteins higher in stage VII than in stage X
+  value: 138
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: vii_vs_x_second
+  description: Proteins higher in stage X than in stage VII
+  value: 125
+  exact: true
+  in_answer: true
+  tool: test_differential_proteins
+- key: n_tested
+  description: Proteins tested after the peptide and valid value filters
+  value: 1908
+  exact: true
+  in_answer: false
+  tool: prepare_protein_table

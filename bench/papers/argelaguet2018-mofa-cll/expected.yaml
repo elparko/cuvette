@@ -1,0 +1,51 @@
+tool: MOFA+ (mofapy2), run_mofa and associate_factors of the mofa adapter
+adapter_kind: python
+data:
+- /Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll/drugs.csv
+- /Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll/methylation.csv
+- /Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll/mrna.csv
+- /Volumes/T7/guided-analysis/data/argelaguet2018-mofa-cll/mutations.csv
+decisions:
+  n_factors: 15
+  drop_factor_r2: 2
+  scale_views: false
+  likelihoods: mutations=bernoulli
+  top_features: 0
+  seed: 1
+  convergence_mode: medium
+  '*': Use the values in the decision record.
+expected:
+- description: Factors that MOFA keeps (minimum explained variance 2%)
+  value: 10
+  tolerance: 0
+  source: published, Results of the paper
+- description: Variance of the drug response view explained by all factors, percent (the paper prints 41; the tolerance of 7 covers MOFA+ with
+    one start against MOFA with the best of 25)
+  value: 41
+  tolerance: 7
+  source: published, Results of the paper
+- description: Variance of the mRNA view explained by all factors, percent
+  value: 38
+  tolerance: 3
+  source: published, Results of the paper
+- description: Variance of the methylation view explained by all factors, percent
+  value: 24
+  tolerance: 3
+  source: published, Results of the paper
+- description: Variance of the mutation view explained by all factors, percent (the paper prints 24; the tolerance of 6 covers the difference
+    of the two programs)
+  value: 24
+  tolerance: 6
+  source: published, Results of the paper
+- description: Number of the factor that aligns with IGHV status
+  value: 1
+  tolerance: 0
+  source: published, Results of the paper
+- description: Number of the factor that aligns with trisomy 12
+  value: 2
+  tolerance: 0
+  source: published, Results of the paper
+notes: The paper trained the original MOFA with 25 random starts and kept the best model. The benchmark runs MOFA+ (mofapy2) with one start. Seeds
+  1 and 2 give 10 factors, the same factor for IGHV (Factor 1) and for trisomy 12 (Factor 2), and variance explained of 35 to 38 (drugs), 38 (mRNA),
+  25 (methylation) and 28 (mutations). The tolerances of the four variance items (7, 3, 3 and 6 points) are these differences. They are not a
+  tool error.

@@ -1,0 +1,11 @@
+after flags 3783 
+peptides>1 3626 
+valid in 6 of 8 in one group 1908 
+samples with mean correlation below 0.6: 0 
+imputed values 39304 
+T1 vs T4: higher in T1 282, higher in T4 268
+T3 vs T5: higher in T3 240, higher in T5 240
+T4 vs T6: higher in T4 98, higher in T6 131
+T5 vs T6: higher in T5 74, higher in T6 109
+T6 vs T7: higher in T6 219, higher in T7 240
+T7 vs T10: higher in T7 138, higher in T10 125

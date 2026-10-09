@@ -1,0 +1,632 @@
+adapter:
+  name: limma-proteomics
+  field: quantitative proteomics statistics
+  file_types: [".txt", ".tsv", ".csv"]
+  title: limma for protein tables (differential proteins)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Finds differentially abundant proteins in a quantified protein table, such as MaxQuant proteinGroups.txt, a DIA-NN or
+    Spectronaut report, or a Proteome Discoverer export. It filters, log2 transforms, normalizes and imputes the table,
+    then runs the moderated t test of the R package limma. It draws a volcano plot.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: limma
+  version: "3.68.5"
+  tested_versions: []
+  homepage: https://bioconductor.org/packages/limma
+  docs:
+    - https://bioconductor.org/packages/release/bioc/vignettes/limma/inst/doc/usersguide.pdf
+    - https://doi.org/10.1093/nar/gkv007
+    - https://doi.org/10.1074/mcp.TIR119.001646
+  install: >
+    Install R (brew install r on macOS). Then install the Bioconductor package limma and the CRAN packages svglite and jsonlite
+    into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("BiocManager", "svglite", "jsonlite"), repos = "https://cloud.r-project.org"); BiocManager::install("limma")'
+  citation:
+    - text: "Ritchie ME, Phipson B, Wu D, Hu Y, Law CW, Shi W, Smyth GK (2015). limma powers differential expression analyses for RNA-sequencing and microarray studies. Nucleic Acids Research 43(7): e47."
+      doi: 10.1093/nar/gkv007
+    - text: "Smyth GK (2004). Linear models and empirical Bayes methods for assessing differential expression in microarray experiments. Statistical Applications in Genetics and Molecular Biology 3: Article 3."
+      doi: 10.2202/1544-6115.1027
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that exists
+  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library. The
+  program version in this adapter is the version of the R package limma, not of R.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return counts, the top proteins and the volcano plot. The protein table stays on the computer.
+
+decisions:
+  - key: exclude_flags
+    label: Flag columns that remove a row
+    kind: text
+    default: "Reverse, Potential contaminant, Contaminant"
+    group: Table
+    help: >
+      The tool removes each row that has a plus sign in one of these columns. It skips a column that the table does not have.
+      MaxQuant also marks proteins that it found only by a modified site, in the column Only identified by site. Add that
+      column to remove them. Write none to keep all rows.
+    owner: human
+    stage: setup
+    links:
+      - { tool: prepare_protein_table, arg: exclude_flags }
+
+  - key: min_peptides
+    label: Peptides that a protein needs
+    kind: int
+    default: 0
+    lo: 0
+    hi: 20
+    group: Table
+    help: >
+      A protein stays in the table only if the peptide column has at least this number. 2 removes proteins that one peptide
+      identifies. 0 keeps all proteins. The tool reads the column Peptides of MaxQuant.
+    owner: human
+    stage: setup
+    links:
+      - { tool: prepare_protein_table, arg: min_peptides }
+
+  - key: exclude_samples
+    label: Samples that you exclude
+    kind: text
+    default: none
+    group: Table
+    help: >
+      Name each sample column that you exclude. Give the reason, such as a failed injection or a low correlation with the
+      other samples of its group. Write none to keep all samples. Decide before you see the test result.
+    owner: human
+    stage: setup
+    links:
+      - { tool: prepare_protein_table, arg: exclude_samples }
+
+  - key: min_valid
+    label: Valid values that a protein needs in a group
+    kind: int
+    default: 2
+    lo: 1
+    hi: 50
+    group: Missing values
+    help: >
+      A protein stays in the table only if it has at least this many measured values in a group. A zero or an empty cell is a
+      missing value. A higher number gives fewer proteins and more stable tests.
+    owner: human
+    stage: setup
+    essential: true
+    links:
+      - { tool: prepare_protein_table, arg: min_valid }
+    sensitivity:
+      options: [2, 3]
+      tool: prepare_protein_table
+      compare: [metrics.n_kept]
+      max_runs: 2
+
+  - key: valid_rule
+    label: In which groups the valid values must be present
+    kind: choice
+    choices: [each group, at least one group]
+    default: each group
+    group: Missing values
+    help: >
+      each group needs the valid values in every group. at least one group also keeps a protein that one group lacks. Perseus uses at least one group. Use imputation with that rule.
+    owner: human
+    stage: setup
+    links:
+      - { tool: prepare_protein_table, arg: valid_rule }
+
+  - key: normalization
+    label: Normalization of the log2 intensities
+    kind: choice
+    choices: [none, median, quantile]
+    default: median
+    group: Normalization
+    help: >
+      median subtracts the median of each sample, so all samples have the same median. quantile gives all samples the same
+      distribution. none keeps the values. Use none for intensities that the software already normalized, such as MaxLFQ.
+      A large change in the amount of one species between groups can make median normalization wrong.
+    owner: human
+    stage: setup
+    essential: true
+    links:
+      - { tool: prepare_protein_table, arg: normalization }
+    sensitivity:
+      options: [none, median, quantile]
+      tool: test_differential_proteins
+      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
+      max_runs: 3
+
+  - key: imputation
+    label: Imputation of missing values
+    kind: choice
+    choices: [none, downshift normal, minimum]
+    default: none
+    group: Missing values
+    help: >
+      none lets limma fit each protein with the values that it has. downshift normal fills each gap with a random value. The
+      value comes from a narrow normal curve below the sample values, as in Perseus. minimum fills with the lowest value of the
+      sample. An imputed value is not a measurement, so it makes p values smaller than they are.
+    owner: human
+    stage: setup
+    essential: true
+    links:
+      - { tool: prepare_protein_table, arg: imputation }
+
+  - key: impute_shift
+    label: Down shift of the imputed values
+    kind: float
+    default: 1.8
+    lo: 0
+    hi: 5
+    group: Missing values
+    help: >
+      The imputed values have a mean that is this many standard deviations below the mean of the measured values of the
+      sample. The Perseus default is 1.8. It counts only for downshift normal.
+    owner: human
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: prepare_protein_table, arg: impute_shift }
+
+  - key: impute_width
+    label: Width of the imputed values
+    kind: float
+    default: 0.3
+    lo: 0.05
+    hi: 2
+    group: Missing values
+    help: >
+      The standard deviation of the imputed values is this fraction of the standard deviation of the measured values of the
+      sample. The Perseus default is 0.3. It counts only for downshift normal.
+    owner: human
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: prepare_protein_table, arg: impute_width }
+
+  - key: impute_scope
+    label: Where the imputation takes its mean and spread
+    kind: choice
+    choices: [each sample, all samples]
+    default: each sample
+    group: Missing values
+    help: >
+      each sample takes the mean and the spread from its own measured values. all samples takes them from all
+      measured values of the table. This is the Total matrix mode of Perseus. It counts only for downshift normal.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: prepare_protein_table, arg: impute_scope }
+
+  - key: step_order
+    label: Order of normalization and imputation
+    kind: choice
+    choices: [normalize first, impute first]
+    default: normalize first
+    group: Normalization
+    help: >
+      normalize first fits the normalization to the measured values. impute first fills the gaps, then normalizes the filled
+      table. The order changes the imputed values and the p values.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: prepare_protein_table, arg: step_order }
+
+  - key: impute_seed
+    label: Random seed of the imputation
+    kind: int
+    default: 1
+    lo: 0
+    hi: 100000
+    group: Missing values
+    help: The imputed values are random. The same seed gives the same values. It counts only for downshift normal.
+    owner: human
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: prepare_protein_table, arg: seed }
+
+  - key: variance_model
+    label: Variance model of the moderated t test
+    kind: choice
+    choices: [standard, trend, robust, trend and robust]
+    default: standard
+    group: Test
+    help: >
+      standard shrinks the variance of each protein to one common prior. trend lets the prior depend on the mean intensity.
+      It fits label-free data in which low proteins have a larger variance. The third choice limits the effect of a few proteins
+      with a very large variance. Check the mean-variance plot before you choose trend.
+    owner: human
+    stage: when_needed
+    essential: true
+    links:
+      - { tool: test_differential_proteins, arg: variance_model }
+    sensitivity:
+      options: [standard, trend]
+      tool: test_differential_proteins
+      compare: [metrics.n_significant, metrics.n_up, metrics.n_down]
+      max_runs: 2
+
+  - key: fdr
+    label: False discovery rate (FDR) level
+    kind: float
+    default: 0.05
+    lo: 0.001
+    hi: 0.25
+    group: Test
+    help: >
+      A protein is significant if its Benjamini-Hochberg adjusted p value is below this fraction. 0.05 means that about 1 in 20
+      of the significant proteins can be a false positive. Choose the level before you see the result.
+    owner: human
+    stage: when_needed
+    essential: true
+    links:
+      - { tool: test_differential_proteins, arg: fdr }
+
+  - key: min_abs_log2fc
+    label: Smallest log2 fold change
+    kind: float
+    default: 0
+    lo: 0
+    hi: 5
+    group: Test
+    help: >
+      A significant protein must also have an absolute log2 fold change of at least this value. The tool applies it after the
+      test, as Perseus does. 0 uses the adjusted p value only. 1 means a twofold change.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: test_differential_proteins, arg: min_abs_log2fc }
+
+checks:
+  - id: imputed_p_values
+    description: The answer gives p values after imputation and does not say that the values are imputed.
+    severity: warning
+    text: Report the answer if the table was imputed and the answer gives p values or a count of significant proteins without a word about the imputation.
+  - id: fdr_after_looking
+    description: The answer changes the FDR level or the fold change cutoff to get more significant proteins.
+    severity: warning
+    text: Report the answer if it tries several FDR levels or fold change cutoffs and keeps the one that gives the most proteins.
+  - id: samples_as_replicates
+    description: The answer treats technical injections of one sample as independent replicates.
+    severity: warning
+    text: Report the answer if it counts injections of one biological sample as replicates and does not say so.
+  - id: group_sizes_named
+    description: The answer gives a result and does not name the number of samples in each group.
+    severity: warning
+    text: Report the answer if it gives significant proteins and does not give the number of samples in each group.
+
+map:
+  - tool: prepare_protein_table
+    route: "Perseus: Filter rows based on categorical column (Reverse, Potential contaminant); Basic > Transform (log2(x)); Filter rows based on valid values; Normalization (Subtract, median); Imputation (Replace missing values from normal distribution)"
+    steps:
+      - "Perseus: load proteinGroups.txt with Generic matrix upload. Mark the LFQ intensity columns as Main columns."
+      - "Perseus: Processing > Filter rows > Filter rows based on categorical column. Choose Only identified by site, Reverse and Potential contaminant, mode Remove matching rows."
+      - "Perseus: Processing > Basic > Transform, log2(x). Group the columns with Annot. rows > Categorical annotation rows."
+      - "Perseus: Processing > Filter rows > Filter rows based on valid values. Set Min. number of values, Mode In at least one group or In each group."
+      - "Perseus: Processing > Normalization > Subtract, Mode Median, for the median option."
+      - "Perseus: Processing > Imputation > Replace missing values from normal distribution. Width 0.3, Down shift 1.8, mode Separately for each column."
+      - "R: x <- log2(m); x[rowSums(!is.na(x[, g == 'a'])) >= 2 & rowSums(!is.na(x[, g == 'b'])) >= 2, ]; limma::normalizeBetweenArrays(x, method = 'quantile')"
+      - "Proteome Discoverer: the Consensus Workflow normalizes the abundances (Normalization Mode, Total Peptide Amount or Specialized Peptides). Export the Proteins table and use this tool for the filter and the test."
+      - "Spectronaut: the Post Analysis perspective takes the Run Normalization of the run settings. Export the Candidates or the Protein Group table."
+    params:
+      - { arg: min_valid, label: "Min. number of values in Perseus", ui_default: 2 }
+      - { arg: valid_rule, label: "Mode of the valid values filter in Perseus", ui_default: "In at least one group" }
+      - { arg: normalization, label: "Normalization > Subtract, Mode in Perseus", ui_default: none }
+      - { arg: imputation, label: "Imputation > Replace missing values from normal distribution", ui_default: none }
+      - { arg: impute_shift, label: "Down shift of Perseus", ui_default: 1.8 }
+      - { arg: impute_width, label: "Width of Perseus", ui_default: 0.3 }
+    fidelity: close
+    difference: >
+      The filter, the log2 transform, the median subtraction and the down shift imputation follow the Perseus steps, but the
+      random imputed values differ because the generator differs. Perseus has no quantile normalization. The Perseus,
+      Proteome Discoverer and Spectronaut routes were not run.
+    evidence:
+      source: docs
+      test: median-normalization
+      note: The test pins the filter counts and the median normalization with a NumPy calculation.
+
+  - tool: test_differential_proteins
+    route: "library(limma); fit <- eBayes(lmFit(y, model.matrix(~ grp)), trend = TRUE); topTable(fit, coef = 2, number = Inf, adjust.method = \"BH\")"
+    steps:
+      - "R: design <- model.matrix(~ grp), fit <- lmFit(y, design), fit <- eBayes(fit, trend = TRUE, robust = FALSE), topTable(fit, coef = 2, number = Inf, adjust.method = 'BH')."
+      - "Perseus: Analysis > Tests > Two-samples test (or Volcano plot). Choose the groups, Test Student's t-test or Welch's t-test, Side Both, FDR by permutation or Benjamini-Hochberg. Perseus does not moderate the variance."
+      - "Proteome Discoverer: in the result, the Volcano plot of the grouped abundance ratios gives the ratio and the adjusted p value (Benjamini-Hochberg) of a t test or ANOVA."
+      - "Spectronaut: Post Analysis > Differential Abundance Analysis, the unpaired t test with a q value. The q value is not the Benjamini-Hochberg value."
+      - "SIMCA: not a route for this test. SIMCA fits PLS-DA and OPLS-DA models, and gives no p value for each protein."
+    params:
+      - { arg: group_a, label: "Group of interest (numerator of the ratio)" }
+      - { arg: group_b, label: "Reference group (denominator of the ratio)" }
+      - { arg: variance_model, label: "trend and robust of eBayes()", ui_default: standard }
+      - { arg: fdr, label: "FDR of Perseus Two-samples test", ui_default: 0.05 }
+      - { arg: min_abs_log2fc, label: "S0 or the fold change filter in Perseus", ui_default: 0 }
+    fidelity: close
+    difference: >
+      The R route is the same function. Perseus uses a classical t test, with an optional S0 correction and a permutation FDR,
+      so its p values differ from the moderated p values. Spectronaut uses a q value of Storey. The Perseus, Proteome Discoverer
+      and Spectronaut routes were not run.
+    evidence:
+      source: docs
+      test: independent-moderated-t
+      note: A NumPy calculation of the empirical Bayes variance and the moderated t gives the same numbers as the tool.
+
+tests:
+  - id: independent-moderated-t
+    description: >
+      Zhu et al. 2020 data set D2 (PRIDE PXD000279, the proteinGroups.txt of the label-free spike-in), the 4508 proteins with 3
+      valid values in each group and no normalization. A NumPy and SciPy calculation of the limma empirical Bayes variance, the
+      moderated t statistic and the Benjamini-Hochberg adjustment gives the expected values (checks/check_limma.py and
+      checks/check_limma.out). Flag columns Reverse and Contaminant. The up proteins that match the E. coli header are the
+      true positives of the paper.
+    data: [data/pxd000279_lfq.tsv]
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/pxd000279_lfq.tsv", sample_prefix: "LFQ intensity ", groups: "H,H,H,L,L,L", exclude_flags: "Reverse, Contaminant", min_valid: 3, valid_rule: each group, normalization: none, imputation: none, keep_columns: ["Fasta headers"] }
+        save_as: prep
+      - tool: test_differential_proteins
+        args: { data: "{saved.prep.data.prepared_file}", design: "{saved.prep.data.design_file}", group_a: H, group_b: L, variance_model: standard, fdr: 0.01, annotation_column: "Fasta headers", annotation_pattern: "Escherichia|_ECOLI" }
+    expect:
+      - { path: saved.prep.metrics.n_kept, equals: 4508 }
+      - { path: metrics.n_tested, equals: 4508 }
+      - { path: metrics.n_tested_match, equals: 1444 }
+      - { path: metrics.df_prior, approx: 2.5177, abs: 0.0001 }
+      - { path: metrics.s2_prior_median, approx: 0.039481, abs: 0.000001 }
+      - { path: metrics.n_significant, equals: 2000 }
+      - { path: metrics.n_up, equals: 1173 }
+      - { path: metrics.n_down, equals: 827 }
+      - { path: metrics.n_up_match, equals: 1166 }
+      - { path: metrics.n_up_other, equals: 7 }
+      - { path: "outputs[0].path", contains: ".png" }
+      - { path: "outputs[1].path", contains: ".svg" }
+
+  - id: paper-spike-in-trend
+    description: >
+      Zhu et al. 2020 (Mol Cell Proteomics 19: 1047), data set D2, label-free spike-in of E. coli in a human background.
+      The paper prints 6566 proteins after the removal of Reverse and Contaminant rows and 5022 proteins with at least two
+      values in each condition. limma with trend and an adjusted p value below 0.01 gives 1230 true positives and 13 false
+      positives in the paper. Here the proteins that are more abundant in the high E. coli samples count, and a protein
+      is a true positive if its header names E. coli. The tool gives 1235 true positives, 5 more than the paper, and 13 false
+      positives. The tolerance of 5 on the true positives is this known difference.
+    data: [data/pxd000279_lfq.tsv]
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/pxd000279_lfq.tsv", sample_prefix: "LFQ intensity ", groups: "H,H,H,L,L,L", exclude_flags: "Reverse, Contaminant", min_valid: 2, valid_rule: each group, normalization: none, imputation: none, keep_columns: ["Fasta headers"] }
+        save_as: prep
+      - tool: test_differential_proteins
+        args: { data: "{saved.prep.data.prepared_file}", design: "{saved.prep.data.design_file}", group_a: H, group_b: L, variance_model: trend, fdr: 0.01, annotation_column: "Fasta headers", annotation_pattern: "Escherichia|_ECOLI" }
+    expect:
+      - { path: saved.prep.metrics.n_after_flags, equals: 6566 }
+      - { path: saved.prep.metrics.n_kept, equals: 5022 }
+      - { path: metrics.n_tested, equals: 5022 }
+      - { path: metrics.n_up_match, approx: 1230, abs: 5 }
+      - { path: metrics.n_up_other, equals: 13 }
+
+  - id: paper-bovine-corpus-luteum
+    description: >
+      Thaqi et al. 2026 (Scientific Data, DOI 10.1038/s41597-026-07515-6), bovine corpus luteum, 10 stages with 8 samples each
+      (the groups I to X are T1 to T10 in the paper). The paper prints 3783 proteins after the removal of flagged rows. The
+      pipeline: remove Only identified by site, Reverse and Potential contaminant, keep proteins with 2 peptides or more and 6
+      valid values in at least one group, impute from the total matrix with a down shift of 1.8 and a width of 0.3 (seed 1),
+      quantile normalization after the imputation, limma with robust eBayes, adjusted p below 0.05 and a log2 fold change above
+      1. The paper prints the counts of proteins that are higher in the first and in the second group of six comparisons. The
+      table data/bovine_lfq.tsv holds the columns of the Zenodo file RAW_P337_02B_proteinGroups.txt that the pipeline reads.
+      The R code of the authors, run with the same settings, gives the same counts (checks/check_bovine.R and check_bovine.out).
+    data: [data/bovine_lfq.tsv]
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/bovine_lfq.tsv", sample_prefix: "LFQ intensity ", group_regex: "LFQ intensity (.+)-[0-9]+$", exclude_flags: "Only identified by site, Reverse, Potential contaminant", min_peptides: 2, min_valid: 6, valid_rule: at least one group, normalization: quantile, imputation: downshift normal, impute_scope: all samples, step_order: impute first, impute_shift: 1.8, impute_width: 0.3, seed: 1 }
+        save_as: prep
+      - tool: test_differential_proteins
+        args: { data: "{saved.prep.data.prepared_file}", design: "{saved.prep.data.design_file}", group_a: IV, group_b: I, variance_model: robust, fdr: 0.05, min_abs_log2fc: 1 }
+        save_as: c1
+      - tool: test_differential_proteins
+        args: { data: "{saved.prep.data.prepared_file}", design: "{saved.prep.data.design_file}", group_a: V, group_b: III, variance_model: robust, fdr: 0.05, min_abs_log2fc: 1 }
+        save_as: c2
+      - tool: test_differential_proteins
+        args: { data: "{saved.prep.data.prepared_file}", design: "{saved.prep.data.design_file}", group_a: VI, group_b: IV, variance_model: robust, fdr: 0.05, min_abs_log2fc: 1 }
+        save_as: c3
+      - tool: test_differential_proteins
+        args: { data: "{saved.prep.data.prepared_file}", design: "{saved.prep.data.design_file}", group_a: VI, group_b: V, variance_model: robust, fdr: 0.05, min_abs_log2fc: 1 }
+        save_as: c4
+      - tool: test_differential_proteins
+        args: { data: "{saved.prep.data.prepared_file}", design: "{saved.prep.data.design_file}", group_a: VII, group_b: VI, variance_model: robust, fdr: 0.05, min_abs_log2fc: 1 }
+        save_as: c5
+      - tool: test_differential_proteins
+        args: { data: "{saved.prep.data.prepared_file}", design: "{saved.prep.data.design_file}", group_a: X, group_b: VII, variance_model: robust, fdr: 0.05, min_abs_log2fc: 1 }
+        save_as: c6
+    expect:
+      - { path: saved.prep.metrics.n_after_flags, equals: 3783 }
+      - { path: saved.prep.metrics.n_kept, equals: 1908 }
+      - { path: saved.prep.metrics.n_imputed, equals: 39304 }
+      - { path: saved.c1.metrics.n_down, equals: 282 }
+      - { path: saved.c1.metrics.n_up, equals: 268 }
+      - { path: saved.c2.metrics.n_down, equals: 240 }
+      - { path: saved.c2.metrics.n_up, equals: 240 }
+      - { path: saved.c3.metrics.n_down, equals: 98 }
+      - { path: saved.c3.metrics.n_up, equals: 131 }
+      - { path: saved.c4.metrics.n_down, equals: 74 }
+      - { path: saved.c4.metrics.n_up, equals: 109 }
+      - { path: saved.c5.metrics.n_down, equals: 219 }
+      - { path: saved.c5.metrics.n_up, equals: 240 }
+      - { path: saved.c6.metrics.n_down, equals: 138 }
+      - { path: saved.c6.metrics.n_up, equals: 125 }
+
+  - id: median-normalization
+    description: >
+      The same data with at least 2 valid values in each group, before and after median normalization. The six column medians
+      of the log2 LFQ intensities have a mean of 25.783378 and a range of 0.210136 (NumPy, checks/check_limma.out). After
+      median normalization the range is 0.
+    data: [data/pxd000279_lfq.tsv]
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/pxd000279_lfq.tsv", sample_prefix: "LFQ intensity ", groups: "H,H,H,L,L,L", exclude_flags: "Reverse, Contaminant", min_valid: 2, normalization: median }
+    expect:
+      - { path: metrics.n_kept, equals: 5022 }
+      - { path: metrics.median_of_column_medians, approx: 25.783378, abs: 0.000001 }
+      - { path: metrics.column_median_range_before, approx: 0.210136, abs: 0.000001 }
+      - { path: metrics.column_median_range_after, approx: 0, abs: 0.000000001 }
+      - { path: metrics.n_missing_before_imputation, equals: 613 }
+
+  - id: imputation-fills-gaps
+    description: >
+      The 613 missing values of the 5022 proteins with at least 2 valid values in each group (NumPy, checks/check_limma.out).
+      The down shift imputation fills all of them. The values are random, so the test pins only the counts.
+    data: [data/pxd000279_lfq.tsv]
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/pxd000279_lfq.tsv", sample_prefix: "LFQ intensity ", groups: "H,H,H,L,L,L", exclude_flags: "Reverse, Contaminant", min_valid: 2, normalization: none, imputation: downshift normal, seed: 7 }
+    expect:
+      - { path: metrics.n_missing_before_imputation, equals: 613 }
+      - { path: metrics.n_imputed, equals: 613 }
+      - { path: metrics.n_kept, equals: 5022 }
+
+  - id: groups-as-json-text
+    description: The groups argument arrives as JSON text, as a model sent it. The result equals the comma text result.
+    data: [data/pxd000279_lfq.tsv]
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/pxd000279_lfq.tsv", sample_prefix: "LFQ intensity ", groups: "[\"H\", \"H\", \"H\", \"L\", \"L\", \"L\"]", exclude_flags: "Reverse, Contaminant", min_valid: 3, normalization: none }
+    expect:
+      - { path: metrics.n_kept, equals: 4508 }
+      - { path: metrics.n_groups, equals: 2 }
+
+  - id: groups-wrong-length
+    description: Five group names for six sample columns fail, and the error names both counts.
+    data: [data/pxd000279_lfq.tsv]
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/pxd000279_lfq.tsv", sample_prefix: "LFQ intensity ", groups: "H,H,H,L,L" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "groups has 5 entries but there are 6 sample columns" }
+
+  - id: group-regex-no-match
+    description: A group_regex that matches no column fails, and the error names the pattern and the columns.
+    data: [data/pxd000279_lfq.tsv]
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/pxd000279_lfq.tsv", sample_prefix: "LFQ intensity ", group_regex: "^Z(.)" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "group_regex '^Z(.)' does not match the sample column(s)" }
+
+  - id: unknown-group
+    description: A group that is not in the design fails, and the error names the groups of the design.
+    data: [data/pxd000279_lfq.tsv]
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/pxd000279_lfq.tsv", sample_prefix: "LFQ intensity ", groups: "H,H,H,L,L,L", min_valid: 3, normalization: none }
+        save_as: prep
+      - tool: test_differential_proteins
+        args: { data: "{saved.prep.data.prepared_file}", design: "{saved.prep.data.design_file}", group_a: X, group_b: L }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "group 'X' is not in the design. Groups: H, L" }
+
+  - id: missing-file
+    description: A table that does not exist fails, and the error names the file.
+    calls:
+      - tool: prepare_protein_table
+        args: { data: "{adapter_dir}/data/no_such_table.txt", sample_prefix: "LFQ intensity ", groups: "H,L" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_table.txt" }
+
+tools:
+  - name: prepare_protein_table
+    title: Prepare a protein table
+    description: >
+      Prepare a quantified protein table for a test. It removes flagged rows (reverse hits and contaminants), turns zeros into
+      missing values, and takes log2. It keeps proteins with enough valid values, then normalizes and imputes. It saves the
+      prepared table and a design file.
+    params:
+      data: { type: string, description: "Path of the protein table. A tab-separated text file such as proteinGroups.txt, or a CSV file. One row for each protein and one column for each sample." }
+      sample_columns: { type: [array, string], items: { type: string }, description: "Intensity columns, as a list or as comma text. Give this or sample_prefix." }
+      sample_prefix: { type: string, description: "Text that the intensity column names start with, such as 'LFQ intensity '. Give this or sample_columns." }
+      groups: { type: [array, string], items: { type: string }, description: "Group of each sample column, in the column order, as a list or as comma text. Or name=group pairs. Give this or group_regex." }
+      group_regex: { type: string, description: "Regular expression for a column name. Its first capture group is the group name, such as 'LFQ intensity (.+)-[0-9]+$'. Give this or groups." }
+      id_column: { type: string, description: "Column with the protein identifier. Default: Protein IDs, Protein accession or the first column." }
+      label_column: { type: string, description: "Column with the gene name for the plot and the tables. Default: Gene names if the table has it." }
+      keep_columns: { type: [array, string], items: { type: string }, description: "Extra columns to carry into the result, such as the FASTA header, as a list or as comma text." }
+      exclude_flags: { type: string, description: "Leave out. The harness sets it from the decision record. Flag columns that remove a row that has a plus sign." }
+      zero_as_missing: { type: boolean, description: "true (default) treats a zero as a missing value, as MaxQuant writes a missing LFQ value." }
+      already_log2: { type: boolean, description: "true if the values are already log2 values. Default false: the tool takes log2 of intensities." }
+      min_peptides: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Count of peptides that a protein needs. 0 keeps all." }
+      peptide_column: { type: string, description: "Column with the peptide count of a protein. Default Peptides." }
+      exclude_samples: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Sample columns to drop, as a list or as comma text. none keeps all." }
+      min_valid: { type: integer, minimum: 1, description: "Leave out. The harness sets it from the decision record. Count of valid values that a protein needs in a group." }
+      valid_rule: { type: string, enum: [each group, at least one group], description: "Leave out. The harness sets it from the decision record." }
+      normalization: { type: string, enum: [none, median, quantile], description: "Leave out. The harness sets it from the decision record." }
+      imputation: { type: string, enum: [none, downshift normal, minimum], description: "Leave out. The harness sets it from the decision record." }
+      impute_shift: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Down shift, in standard deviations." }
+      impute_width: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Width, as a fraction of the standard deviation." }
+      impute_scope: { type: string, enum: [each sample, all samples], description: "Leave out. The harness sets it from the decision record." }
+      step_order: { type: string, enum: [normalize first, impute first], description: "Leave out. The harness sets it from the decision record." }
+      seed: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Random seed of the imputation." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      prepared: { kind: table, ext: .csv, description: "One row for each protein with the log2 values of the samples." }
+      design: { kind: table, ext: .csv, description: One row for each sample with its group. }
+    script: scripts/prepare_protein_table.R
+    parse: json
+
+  - name: test_differential_proteins
+    title: Test differential proteins
+    description: >
+      Test two groups of a prepared protein table with the moderated t test of limma. It gives the log2 fold change, the
+      p value and the Benjamini-Hochberg adjusted p value of each protein. It also gives the counts of up and down
+      proteins and a volcano plot. Run prepare_protein_table first.
+    params:
+      data: { type: string, description: "The prepared_file of prepare_protein_table." }
+      design: { type: string, description: "The design_file of prepare_protein_table." }
+      group_a: { type: string, description: "The group of interest, as in the design file. The log2 fold change is this group minus group_b, so a positive value means more protein in group_a." }
+      group_b: { type: string, description: "The reference group, as in the design file, such as the control." }
+      variance_model: { type: string, enum: [standard, trend, robust, trend and robust], description: "Leave out. The harness sets it from the decision record." }
+      fdr: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Adjusted p value limit, as a fraction." }
+      min_abs_log2fc: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest absolute log2 fold change of a significant protein." }
+      batch_column: { type: string, description: "Column of the design file with a batch, to adjust for it. Leave out for no batch term." }
+      annotation_column: { type: string, description: "Column of the prepared file to search with annotation_pattern, such as the FASTA header column that keep_columns carried." }
+      annotation_pattern: { type: string, description: "Regular expression. The summary counts the up and down proteins that match it, such as the proteins of one species." }
+      n_labels: { type: integer, minimum: 0, description: "Count of top proteins that the volcano plot labels. Default 10." }
+    required: [data, design, group_a, group_b]
+    read_only: true
+    batch: false
+    outputs:
+      results: { kind: table, ext: .csv, description: "One row for each protein with the statistics, sorted by p value." }
+      plot: { kind: image, ext: .png, description: Volcano plot. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    citations:
+      - text: "Benjamini Y, Hochberg Y (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society B 57(1): 289-300."
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+      - text: "Phipson B, Lee S, Majewski IJ, Alexander WS, Smyth GK (2016). Robust hyperparameter estimation protects against hypervariable genes and improves power to detect differential expression. Annals of Applied Statistics 10(2): 946-963."
+        doi: 10.1214/16-AOAS920
+        when: { variance_model: robust }
+      - text: "Law CW, Chen Y, Shi W, Smyth GK (2014). voom: precision weights unlock linear model analysis tools for RNA-seq read counts. Genome Biology 15: R29."
+        doi: 10.1186/gb-2014-15-2-r29
+        when: { variance_model: trend }
+    script: scripts/test_differential_proteins.R
+    parse: json

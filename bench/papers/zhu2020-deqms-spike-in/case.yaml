@@ -1,0 +1,96 @@
+kind: research paper
+short: Zhu 2020
+field: Quantitative proteomics
+program: limma (R), through the limma-proteomics adapter
+citation:
+  authors: Zhu Y, Orre LM, Zhou Tran Y, Mermelekas G, Johansson HJ, Malyutina A, Anders S, Lehtiö J
+  title: 'DEqMS: a method for accurate variance estimation in differential protein expression analysis'
+  venue: Molecular and Cellular Proteomics 19(6):1047-1057
+  year: 2020
+  doi: 10.1074/mcp.TIR119.001646
+related:
+- text: 'Data: PRIDE PXD000279, the label-free benchmark of Cox et al. 2014 (MaxLFQ). fetch.sh downloads proteomebenchmark.zip and unpacks proteinGroups.txt.'
+  doi: 10.1074/mcp.M113.031591
+measured: The authors compared tools for differential protein abundance on a benchmark of human proteins with E. coli proteins added in a 1 to
+  3 ratio. A tool finds a true positive if an E. coli protein is more abundant in the sample with more E. coli. Human proteins that are significant
+  are false positives. They compare limma, limma with trend and DEqMS.
+instruction: Remove Reverse and Contaminant rows. Keep proteins with at least two LFQ values in each condition. Test H against L with limma (trend)
+  and adjusted p below 0.01. Count the E. coli and the human proteins that are more abundant in H.
+instruction_basis: Results (Benchmarking of DEqMS) and Methods of the paper. The paper gives log2 LFQ values as the input of all methods and does
+  not state a normalization.
+answers:
+  exclude_flags:
+    decision: Flag columns that remove a row
+    value: Reverse, Contaminant
+    source: Not in the paper. Reverse and Contaminant give the 6566 proteins that the paper prints (check.R).
+  min_peptides:
+    decision: Peptides that a protein needs
+    value: 0
+    source: The paper gives no peptide filter.
+  exclude_samples:
+    decision: Samples that you exclude
+    value: none
+    source: The paper excludes no sample.
+  min_valid:
+    decision: Valid values that a protein needs in a group
+    value: 2
+    source: Results. Proteins with quantification values in at least two samples per condition.
+  valid_rule:
+    decision: In which groups the valid values must be present
+    value: each group
+    source: Results. At least two samples per condition.
+  normalization:
+    decision: Normalization of the log2 intensities
+    value: none
+    source: Results. The log2 LFQ intensities are the input, with no other normalization.
+  imputation:
+    decision: Imputation of missing values
+    value: none
+    source: The paper uses no imputation.
+  variance_model:
+    decision: Variance model of the moderated t test
+    value: trend
+    source: Results. limma with trend = TRUE.
+  fdr:
+    decision: False discovery rate (FDR) level
+    value: 0.01
+    source: Results. Adjusted p below 0.01, Benjamini-Hochberg.
+  min_abs_log2fc:
+    decision: Smallest log2 fold change
+    value: 0
+    source: The paper uses no fold change cutoff.
+  '*':
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text.
+items:
+  n_after_flags:
+    source: published
+    where: Results. 6566 proteins, of which 1902 are E. coli proteins and 4664 are human.
+    check: check.R gives 6566 and 1902.
+  n_valid:
+    source: published
+    where: Results. 5022 proteins with quantification values in at least two samples in each condition.
+    check: check.R gives 5022.
+  tp_limma_trend:
+    source: published
+    where: Results. The second best method was limma (trend = TRUE) with 1230 true positives and 13 false positives. The check gives 1235 for
+      the proteins that are more abundant in H, 5 more than the paper.
+    check: check.R gives 1235.
+  fp_limma_trend:
+    source: published
+    where: Results. 13 false positives for limma (trend = TRUE).
+    check: check.R gives 13.
+  tp_deqms:
+    source: published
+    where: Results. DEqMS reported 1237 true differentially expressed E. coli proteins and 11 human proteins.
+    check: The tool does not run DEqMS. A DEqMS run on this table gives 1218 and 7, so this item does not reproduce.
+  fp_deqms:
+    source: published
+    where: Results. 11 false positives for DEqMS.
+    check: Does not reproduce (7).
+data:
+  source: PRIDE PXD000279, file proteomebenchmark.zip (38 MB), file proteinGroups.txt of the zip (28 MB). fetch.sh unpacks it.
+  url: https://ftp.pride.ebi.ac.uk/pride/data/archive/2014/09/PXD000279/proteomebenchmark.zip
+  license: PRIDE data are open under the ProteomeXchange data policy. The paper is CC BY 4.0.
+  size: 28 MB table with 6694 protein groups.

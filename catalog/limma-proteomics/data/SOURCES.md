@@ -1,0 +1,6 @@
+# Test data sources
+
+| File | Source | License |
+| --- | --- | --- |
+| pxd000279_lfq.tsv | Cox J, Hein MY, Luber CA, Paron I, Nagaraj N, Mann M (2014). Accurate proteome-wide label-free quantification by delayed normalization and maximal peptide ratio extraction, termed MaxLFQ. Molecular and Cellular Proteomics 13(9): 2513-2526, DOI 10.1074/mcp.M113.031591. PRIDE PXD000279, file proteomebenchmark.zip, proteinGroups.txt. The file keeps the first protein ID, the first gene name, the first 120 characters of the first FASTA header, the three flag columns and the six LFQ intensity columns of all 6694 rows. Written by data/make_fixture.R. | PRIDE data are open under the ProteomeXchange data policy. The paper is CC BY 4.0. Cite the paper. |
+| bovine_lfq.tsv | Thaqi G, et al. (2026). Bovine corpus luteum proteomics during different reproductive and physiological stages. Scientific Data, DOI 10.1038/s41597-026-07515-6. Zenodo 10.5281/zenodo.18680101 (file RAW_P337_02B_proteinGroups.txt inside the zip), PRIDE PXD069851. The file keeps the columns Protein IDs, Peptides, the three flag columns and the 80 LFQ intensity columns of all 4034 rows. Written by data/make_fixture.R. | CC BY 4.0, the license of the Zenodo record. Cite the paper. |

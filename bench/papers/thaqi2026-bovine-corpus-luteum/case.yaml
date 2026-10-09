@@ -1,0 +1,151 @@
+kind: research paper
+short: Thaqi 2026
+field: Quantitative proteomics
+program: limma (R), through the limma-proteomics adapter
+citation:
+  authors: Thaqi G, Chiang DM, Wudy SI, Ludwig C, Berisha B, Pfaffl MW
+  title: Bovine Corpus Luteum Proteomics during Different Reproductive and Physiological Stages
+  venue: Scientific Data 13:826
+  year: 2026
+  doi: 10.1038/s41597-026-07515-6
+related:
+- text: 'Data: PRIDE PXD069851 (raw files and MaxQuant output). The raw proteinGroups.txt and the R code are on Zenodo, CC BY 4.0. fetch.sh downloads
+    RAW_P337_02B_proteinGroups.txt.'
+  doi: 10.5281/zenodo.18680101
+measured: The study measured the proteome of bovine corpus luteum from 10 stages, from days 1 to 2 of the estrous cycle to more than 7 months
+  of pregnancy, with 8 samples for each stage. The authors compared pairs of stages with limma and give the number of proteins that are higher
+  in each stage.
+instruction: Remove the flagged rows and report the number of protein groups. For six pairs of stages, give the number of proteins that are higher
+  in each stage of the pair (adjusted p below 0.05 and a twofold change).
+instruction_basis: Methods (Statistical analysis and Data processing) and the table of significantly regulated proteins of each comparison.
+answers:
+  exclude_flags:
+    decision: Flag columns that remove a row
+    value: Only identified by site, Reverse, Potential contaminant
+    source: Methods. Protein groups that MaxQuant marks as Only identified by site, Reverse or Potential contaminant were excluded.
+  min_peptides:
+    decision: Peptides that a protein needs
+    value: 2
+    source: Methods. Proteins that more than one peptide supports.
+  exclude_samples:
+    decision: Samples that you exclude
+    value: none
+    source: The authors flag samples with a mean correlation below 0.60. No sample is below it, so none is excluded (check.R).
+  min_valid:
+    decision: Valid values that a protein needs in a group
+    value: 6
+    source: Methods. At least 70% valid values in at least one of the ten groups, which is 6 of 8.
+  valid_rule:
+    decision: In which groups the valid values must be present
+    value: at least one group
+    source: Methods. At least one of the ten groups.
+  normalization:
+    decision: Normalization of the log2 intensities
+    value: quantile
+    source: Methods. Quantile normalization.
+  imputation:
+    decision: Imputation of missing values
+    value: downshift normal
+    source: Methods. Perseus-style Gaussian imputation.
+  impute_shift:
+    decision: Down shift of the imputed values
+    value: 1.8
+    source: Methods. Down shift of 1.8 standard deviations.
+  impute_width:
+    decision: Width of the imputed values
+    value: 0.3
+    source: Methods. Width of 0.3 standard deviations.
+  impute_scope:
+    decision: Where the imputation takes its mean and spread
+    value: all samples
+    source: The R code takes the mean and the standard deviation of all valid values of the table (the Zenodo script, imputation step).
+  step_order:
+    decision: Order of normalization and imputation
+    value: impute first
+    source: The R code imputes first, then applies the quantile normalization.
+  impute_seed:
+    decision: Random seed of the imputation
+    value: 1
+    source: Methods. The seed was fixed at 1.
+  variance_model:
+    decision: Variance model of the moderated t test
+    value: robust
+    source: Methods. eBayes with robust = TRUE.
+  fdr:
+    decision: False discovery rate (FDR) level
+    value: 0.05
+    source: Methods. Benjamini-Hochberg adjusted p below 0.05.
+  min_abs_log2fc:
+    decision: Smallest log2 fold change
+    value: 1
+    source: Methods. An absolute log2 fold change above 1.
+  '*':
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text, so that the record of decisions stays the only source of
+      the settings.
+items:
+  n_after_flags:
+    source: published
+    where: Abstract and Methods. In total we identified 3,783 distinct proteins across all groups.
+    check: check.R gives 3783 rows after the removal of the three flags.
+  i_vs_iv_first:
+    source: published
+    where: Results, table of the significantly regulated proteins. 282 proteins are higher in stage I (T1) than in stage IV (T4).
+    check: check.R, the processing steps of the authors written out with limma, gives 282.
+  i_vs_iv_second:
+    source: published
+    where: Results, table of the significantly regulated proteins. 268 proteins are higher in stage IV (T4) than in stage I (T1).
+    check: check.R gives 268.
+  iii_vs_v_first:
+    source: published
+    where: Results, table of the significantly regulated proteins. 240 proteins are higher in stage III (T3) than in stage V (T5).
+    check: check.R, the processing steps of the authors written out with limma, gives 240.
+  iii_vs_v_second:
+    source: published
+    where: Results, table of the significantly regulated proteins. 240 proteins are higher in stage V (T5) than in stage III (T3).
+    check: check.R gives 240.
+  iv_vs_vi_first:
+    source: published
+    where: Results, table of the significantly regulated proteins. 98 proteins are higher in stage IV (T4) than in stage VI (T6).
+    check: check.R, the processing steps of the authors written out with limma, gives 98.
+  iv_vs_vi_second:
+    source: published
+    where: Results, table of the significantly regulated proteins. 131 proteins are higher in stage VI (T6) than in stage IV (T4).
+    check: check.R gives 131.
+  v_vs_vi_first:
+    source: published
+    where: Results, table of the significantly regulated proteins. 74 proteins are higher in stage V (T5) than in stage VI (T6).
+    check: check.R, the processing steps of the authors written out with limma, gives 74.
+  v_vs_vi_second:
+    source: published
+    where: Results, table of the significantly regulated proteins. 109 proteins are higher in stage VI (T6) than in stage V (T5).
+    check: check.R gives 109.
+  vi_vs_vii_first:
+    source: published
+    where: Results, table of the significantly regulated proteins. 219 proteins are higher in stage VI (T6) than in stage VII (T7).
+    check: check.R, the processing steps of the authors written out with limma, gives 219.
+  vi_vs_vii_second:
+    source: published
+    where: Results, table of the significantly regulated proteins. 240 proteins are higher in stage VII (T7) than in stage VI (T6).
+    check: check.R gives 240.
+  vii_vs_x_first:
+    source: published
+    where: Results, table of the significantly regulated proteins. 138 proteins are higher in stage VII (T7) than in stage X (T10).
+    check: check.R, the processing steps of the authors written out with limma, gives 138.
+  vii_vs_x_second:
+    source: published
+    where: Results, table of the significantly regulated proteins. 125 proteins are higher in stage X (T10) than in stage VII (T7).
+    check: check.R gives 125.
+  n_tested:
+    source: computed
+    tool: prepare_protein_table of the limma-proteomics adapter
+    where: Not printed. The count of proteins after the peptide and valid value filters.
+    independence: independent
+    check: check.R gives 1908.
+data:
+  source: Zenodo record 10.5281/zenodo.18680101, zip RAW proteinGroups with FASTA file_Bovine_proteomics.zip, file RAW_P337_02B_proteinGroups.txt.
+    fetch.sh unpacks it. The R code of the authors goes to the reference folder.
+  url: https://zenodo.org/records/18680101
+  license: CC BY 4.0, from the Zenodo record. The paper is CC BY 4.0.
+  size: 36 MB table with 4034 protein groups and 80 LFQ intensity columns.

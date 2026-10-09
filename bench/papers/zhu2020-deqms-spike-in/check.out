@@ -1,0 +1,5 @@
+rows 6694 
+after removal of Reverse and Contaminant 6566  E. coli 1902 
+at least 2 values in each condition 5022 
+limma trend=TRUE, adjusted p < 0.01, more abundant at the higher E. coli amount: 1235 true positives (E. coli), 13 false positives (other)
+limma trend=FALSE, adjusted p < 0.01, more abundant at the higher E. coli amount: 1172 true positives (E. coli), 9 false positives (other)
