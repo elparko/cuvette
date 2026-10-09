@@ -11,7 +11,7 @@ const CODE = /\.(ts|tsx|mjs|js|py)$/;
 const selected = (f) =>
   !SKIP.has(f) &&
   TEXT.test(f) &&
-  (f === "README.md" ||
+  (f === "README.md" || f === "CLAUDE.md" || f === "AGENTS.md" ||
     (/^docs\/[^/]+\.md$/.test(f) && !/^docs\/(handoff|status|release)-/.test(f)) ||
     f.startsWith("src/") ||
     (f.startsWith("catalog/") && !/^catalog\/[^/]+\/data\//.test(f)) ||
@@ -111,6 +111,8 @@ function renameText(text, file) {
     .map((line) => renameLine(line, file))
     .join("\n");
   t = t.replace(/\bgaHome\b/g, "cuvetteHome");
+  t = t.replace(/\bGaPaths\b/g, "CuvettePaths").replace(/\bgaPaths\b/g, "cuvettePaths");
+  t = t.replace(/(?<=\w)\.ga\b(?![\w/])/g, ".cuvette").replace(/(?<!\w)\$GA\b/g, "$CUVETTE_JS").replace(/\bGA=(?=\$\{sq|')/g, "CUVETTE_JS=");
   t = t.replace(/join\(cwd, "\.ga", /g, 'join(cwd, ".cuvette", ');
   if (CODE.test(file)) t = t.replace(/(?<![\w.-])ga-(?=[a-z"'`])/g, "cuvette-");
   return t;
