@@ -102,7 +102,7 @@ export class ClaudeProvider implements Provider {
       const rest: unknown[] = [];
       for (const p of m.parts) {
         if (p.type === "tool_result") {
-          const { images, note } = budget.pick(p.images ?? []);
+          const { images, note } = p.isError ? { images: [], note: p.images?.length ? `${p.images.length} image(s) left out of an error result` : "" } : budget.pick(p.images ?? []);
           const block: Record<string, unknown> = { type: "tool_result", tool_use_id: p.callId, content: toolResultContent(p.text, images, note) };
           if (p.isError) block.is_error = true;
           results.push(block);

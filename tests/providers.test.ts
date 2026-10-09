@@ -145,6 +145,20 @@ describe("claude", () => {
     expect(content[1]).toMatchObject({ tool_use_id: "b", is_error: true, content: "boom" });
   });
 
+  test("an error result with images sends text only", () => {
+    dirImg();
+    const p = new ClaudeProvider("claude-opus-5-5", { client: {} });
+    const native: any[] = p.toNative([
+      user("go"),
+      { role: "assistant", parts: [{ type: "tool_call", id: "a", name: "run", args: {} }] },
+      { role: "user", parts: [{ type: "tool_result", callId: "a", name: "run", text: "failed", images: [imgPath], isError: true }] },
+    ]);
+    const block = native[2].content[0];
+    expect(block.is_error).toBe(true);
+    expect(typeof block.content).toBe("string");
+    expect(block.content).toContain("left out of an error result");
+  });
+
   test("image limits: 4 per result, 50 per conversation", () => {
     dirImg();
     const p = new ClaudeProvider("claude-opus-5-5", { client: {} });
