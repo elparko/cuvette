@@ -17,8 +17,11 @@ record, a manual route for each step, and a record of every number.
 
 There are two installs with one core:
 
-- Terminal: the npm package gives the `cuvette` command (and `cuvette`). `cuvette app` opens the app in
-  the browser. From this repository: `npm install`, then `npm link`.
+- Terminal, macOS and Linux: `curl -fsSL https://cuvette.ai/install.sh | sh`. The script checks
+  Node.js and Python, installs Cuvette and runs `cuvette doctor`. `cuvette app` opens the app in the
+  browser.
+- Terminal, any system: the npm package gives the `cuvette` command. From this repository:
+  `npm install`, then `npm link`.
 - Desktop (Mac): open the .dmg and drag Cuvette to Applications. To get `cuvette` in Terminal
   too, choose Cuvette > Install Command Line Tool. It runs the core inside the app.
 
