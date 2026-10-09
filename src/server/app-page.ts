@@ -39,6 +39,7 @@ h3, h4 { margin: 10px 0 6px; }
 h4 { font-size: 14px; }
 p { margin: 6px 0; }
 .dim { color: var(--dim); }
+span.path { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
 .small { font-size: 13px; }
 .warn { color: var(--warn); }
 .empty { color: var(--dim); }
@@ -138,6 +139,9 @@ ul.files { margin: 4px 0; padding-left: 18px; font-size: 14px; }
 .card .evidence { background: var(--panel2); border-radius: 6px; padding: 6px 8px; white-space: pre-wrap; }
 .card .touches { font-weight: 600; }
 .card .args { font: 13px ui-monospace, Menlo, monospace; padding-left: 18px; overflow-wrap: anywhere; }
+.card.active { box-shadow: 0 0 0 3px var(--accent-bg); }
+.card:focus { outline: none; }
+.card .btn.sel { outline: 3px solid var(--focus); outline-offset: 1px; }
 .card .cardmsg { color: var(--bad); font-weight: 600; }
 .card .sub-q { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 6px; }
 .card .def { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 4px 0; }
@@ -349,6 +353,8 @@ async function call(path, body) {
   if (!r.ok) throw new Error((data && data.error) || data.text || ("HTTP " + r.status));
   return data;
 }
+function midText(t, n) { if (t.length <= n) return t; const k = Math.floor((n - 1) / 2); return t.slice(0, k) + "…" + t.slice(t.length - k); }
+function setWhere(t) { const w = $("where"); w.title = t; w.textContent = midText(t, window.innerWidth < 600 ? 48 : 90); }
 function toast(text) {
   const t = $("toast");
   t.textContent = text;
@@ -394,7 +400,7 @@ function show(p) {
 async function boot() {
   state = await call("api/state");
   $("modewrap").classList.toggle("hidden", !state.session);
-  $("where").textContent = state.session ? (state.session.folderLine || state.session.folder) + " · " + state.session.model : "No session open";
+  setWhere(state.session ? (state.session.folderLine || state.session.folder) + " · " + state.session.model : "No session open");
   if (state.session) show(page === "settings" || page === "sessions" ? page : "session");
   else if (state.setup || page === "setup") { show("setup"); if (!fstate) setupPage(); }
   else {
@@ -438,6 +444,7 @@ function handle(m) {
       $("live").textContent = m.live || "";
       $("cards").innerHTML = m.cards;
     });
+    focusCard();
     setStatus(m.status);
     follow = true;
     stick(() => {});
@@ -445,12 +452,56 @@ function handle(m) {
   }
   if (m.t === "append") stick(() => $("items").insertAdjacentHTML("beforeend", m.html));
   else if (m.t === "pending") stick(() => { $("pending").innerHTML = m.html; });
-  else if (m.t === "cards") { stick(() => { $("cards").innerHTML = m.html; }); drawStatus(); }
+  else if (m.t === "cards") { stick(() => { $("cards").innerHTML = m.html; }); drawStatus(); focusCard(); }
   else if (m.t === "live") stick(() => { if (m.reset) $("live").textContent = ""; else $("live").textContent += m.text; });
   else if (m.t === "status") setStatus(m);
   else if (m.t === "changed") loadTab(true);
   else if (m.t === "notify") { if (!m.quiet || document.hidden) bridge.notify(m.title, m.body); }
 }
+
+function activeCard() {
+  const cs = [...document.querySelectorAll("#cards [data-card]")];
+  return cs.find((c) => c.querySelector(".opts .btn")) || cs[0] || null;
+}
+function optionButtons(card) {
+  const sub = card.querySelector(".sub-q") || card;
+  const opts = [...sub.querySelectorAll(".opts .btn")];
+  return opts.length ? opts : [...card.querySelectorAll(".row .btn")].filter((b) => !b.classList.contains("quiet"));
+}
+function markSel(card, i) {
+  const bs = optionButtons(card);
+  bs.forEach((b, j) => b.classList.toggle("sel", j === i));
+  card.dataset.sel = String(i);
+}
+function focusCard() {
+  const card = activeCard();
+  for (const c of document.querySelectorAll("#cards [data-card]")) c.classList.toggle("active", c === card);
+  if (!card) return;
+  const bs = optionButtons(card);
+  markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
+  const a = document.activeElement;
+  const typing = a && (a.tagName === "INPUT" || a.tagName === "SELECT" || (a.tagName === "TEXTAREA" && a.value.trim()));
+  if (!typing && page === "session") { card.tabIndex = -1; card.focus({ preventScroll: true }); }
+}
+document.addEventListener("keydown", (e) => {
+  if (page !== "session" || e.metaKey || e.ctrlKey || e.altKey) return;
+  const a = document.activeElement;
+  if (a && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA")) return;
+  if (document.querySelector("dialog[open]")) return;
+  const card = activeCard();
+  if (!card) return;
+  const bs = optionButtons(card);
+  let i = Number(card.dataset.sel || 0);
+  if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) { const chip = [...card.querySelectorAll("button.num")].find((b) => b.textContent === e.key); if (chip) { e.preventDefault(); chip.click(); } return; }
+  if (/^[1-9]$/.test(e.key)) { const b = bs[Number(e.key) - 1]; if (b) { e.preventDefault(); markSel(card, Number(e.key) - 1); b.click(); } return; }
+  if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); markSel(card, (i + 1) % bs.length); return; }
+  if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); markSel(card, (i + bs.length - 1) % bs.length); return; }
+  if (e.key === "Enter" && bs[i]) { e.preventDefault(); bs[i].click(); return; }
+  if (e.key === "Escape") {
+    const back = card.querySelector('[data-act="later"], [data-act="skip"], [data-plan*="back"], [data-plan*="later"]');
+    if (back) { e.preventDefault(); back.click(); }
+  }
+});
 
 function elapsed(s) { return s < 60 ? s + " s" : Math.floor(s / 60) + " min " + (s % 60) + " s"; }
 function drawStatus() {
@@ -466,7 +517,7 @@ function drawStatus() {
 }
 function setStatus(m) {
   status = m;
-  if (m.where) $("where").textContent = m.where;
+  if (m.where) setWhere(m.where);
   $("mode").value = m.mode;
   $("bypass").classList.toggle("hidden", !m.bypass);
   $("msg").placeholder = m.placeholder;

@@ -123,7 +123,15 @@ export class WebView {
   }
 
   cardsHtml(): string {
-    return this.slots.map((sl) => cardHtml(this.c(), sl)).join("");
+    const qs = this.slots.filter((sl) => sl.card.t === "question");
+    const rest = qs.length - 1;
+    return this.slots
+      .map((sl) => {
+        if (sl.card.t !== "question") return cardHtml(this.c(), sl);
+        if (sl !== qs[0]) return "";
+        return cardHtml(this.c(), sl) + (rest > 0 ? `<p class="dim small queued">${rest} more ${rest === 1 ? "question waits" : "questions wait"}. The next one opens after you answer this one.</p>` : "");
+      })
+      .join("");
   }
 
   private sendCards(): void {

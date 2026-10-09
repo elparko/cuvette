@@ -51,8 +51,18 @@ export function tableHtml(columns: string[], rows: string[][], cls = ""): string
     .join("")}</tbody></table>`;
 }
 
+const PATH = /(^|[\s(\[])((?:~|\/)[^\s<>"'`,;()\[\]]*\/[^\s<>"'`,;()\[\]]+?)(?=[.:]?(?:\s|$|[)\],;]))/g;
+
+export function shortPaths(html: string, n = 44): string {
+  return html.replace(PATH, (_m, pre: string, p: string) => {
+    if (p.length <= n) return pre + p;
+    const keep = Math.floor((n - 1) / 2);
+    return `${pre}<span class="path" title="${p}">${p.slice(0, keep)}…${p.slice(p.length - keep)}</span>`;
+  });
+}
+
 function inline(text: string): string {
-  return esc(text)
+  return shortPaths(esc(text))
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 }
@@ -174,7 +184,7 @@ export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: n
       return `<div class="msg agent">${md(it.text, opts)}</div>`;
     case "line": {
       const cls = `line ${it.color ?? ""} ${it.dim ? "dim" : ""}`;
-      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> ${esc(it.text)}`;
+      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> ${shortPaths(esc(it.text))}`;
       const sub = it.group && opts.sub ? opts.sub(it.group) : [];
       if (sub.length) return `<details class="${cls} house"><summary>${body}</summary><div class="sub">${sub.map((x) => itemHtml(c, x, opts)).join("")}</div></details>`;
       return `<div class="${cls}">${body}</div>`;
@@ -186,7 +196,7 @@ export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: n
       const detail = [it.route, it.settings].filter(Boolean).join(" · ");
       const fid = fidelityLabel(it.fidelity);
       return `<div class="step ${it.ok ? "ok" : "bad"}${it.n ? "" : " minor"}">
-<div class="stephead"><span class="badge">${esc(label)}</span> <span class="summary">${esc(it.ok ? it.summary : (it.error ?? it.summary))}</span></div>
+<div class="stephead"><span class="badge">${esc(label)}</span> <span class="summary">${shortPaths(esc(it.ok ? it.summary : (it.error ?? it.summary)))}</span></div>
 ${it.why ? `<div class="dim">Purpose: ${esc(it.why)}</div>` : ""}${detail ? `<div class="dim small">${esc(detail)}</div>` : ""}${fid ? `<div class="warn small">${esc(fid)}</div>` : ""}
 ${outputsHtml(c, it.outputs)}${opts.code && it.code ? `<details><summary>Code</summary><pre>${esc(it.code)}</pre></details>` : ""}</div>`;
     }
