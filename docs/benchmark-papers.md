@@ -18,9 +18,9 @@ An item with `in_answer: false` has a computed score only. The request does not 
 ### Item flags
 
 - `in_answer: false` — computed score only.
-- `from_comparison: true` — the computed score also reads the comparison runs. Use it for a value that exists only in a comparison run, such as the count for a database that the setup does not choose.
+- `from_comparison: true` — the computed score also reads the comparison runs. Use it for a value that only a comparison run gives. An example is the count for a database that the setup does not choose.
 - `tool: <name>` — the computed score reads only the nodes of that tool. Use it when another tool logs a number that is near the expected value by chance.
-- `reference: true` — the item shows a value that the request does not ask for, a trap value (the result of a wrong method), or a value from another method, such as a published number of a different program. The report shows "match" or "differs". The item is not in the pass counts.
+- `reference: true` — the item shows a value that is not part of the score. It can be a value that the request does not ask for, or a trap value (the result of a wrong method). It can also be a value from another method, such as a published number of a different program. The report shows "match" or "differs". The pass counts do not include the item.
 
 ### Matching rules
 
@@ -62,18 +62,18 @@ Environment variable `GA_BENCH_DATA` sets the data root. The default is `/Volume
 
 ## Limits
 
-- The scientist is simulated. The answers file fixes the method decisions. The benchmark does not test whether a model picks a good method.
-- The same answers file is used for every model. A model that asks different questions gets the same values or the harness default.
+- The answers file simulates the scientist. The answers file fixes the method decisions. The benchmark does not test whether a model picks a good method.
+- The benchmark uses the same answers file for every model. A model that asks different questions gets the same values or the harness default.
 - A small tolerance can reject a correct number that a model rounds. The rounding rule covers only the digits that the answer shows.
-- The claim check finds numbers in sentences. A number in a table or a list can be missed or labeled wrongly.
+- The claim check finds numbers in sentences. It can miss a number in a table or a list, or give it the wrong label.
 - Some prompts were rebuilt from the notes of the hand runs, because the original prompt files are gone. The files `bench.yaml` show the text that the benchmark sends.
 - Items with `in_answer: false` do not test the model.
 - One run is a sample. Small local models change from run to run. Use `--runs` of 3 or more before you compare models.
-- Tool errors, such as a program that is not installed, appear as failed computed items. Read the status and the failed tool calls before you blame the model.
-- Some papers are expected to fail for tool reasons (for example the adapter cannot reach the data). The report does not mark them.
+- Tool errors, such as a missing program, appear as failed computed items. Read the status and the failed tool calls before you blame the model.
+- We expect some papers to fail for tool reasons, such as an adapter that cannot reach the data. The report does not mark them.
 
 ## Items left out of the score
 
 - `trap: true`: a value that a wrong method gives (for example the unpaired Welch p for paired data). The review checks catch a trap in the answer. The value does not count as computed or reported.
-- `optional: true`: a value that the prompt does not ask for and that the requested analysis does not need (for example an EEG peak when the prompt asks about gradiometers, or a count from a different program).
-- A value from a comparison run counts as computed and is labelled "via comparison".
+- `optional: true`: a value that the prompt does not ask for and that the requested analysis does not need. Examples are an EEG (electroencephalography) peak when the prompt asks about gradiometers, and a count from a different program.
+- A value from a comparison run counts as computed. The report gives it the label "via comparison".

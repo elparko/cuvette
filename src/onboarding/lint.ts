@@ -3,6 +3,7 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
+import { checkText, type SteIssue } from "../core/ste.ts";
 
 export type Severity = "error" | "warning";
 
@@ -59,6 +60,7 @@ export const RULES: Record<string, { severity: Severity; rule: string }> = {
   "decision-type": { severity: "error", rule: "Each decision has choices or an explicit kind." },
   "decision-default": { severity: "error", rule: "Each decision has a default, or the scientist owns it, so the harness asks." },
   "decision-help": { severity: "error", rule: "Each decision has a plain help text." },
+  "text-style": { severity: "warning", rule: "Descriptions, decision help, STANDARDS.md and skills follow ASD-STE100: short sentences, active voice, approved words, must for a requirement." },
   "advice-limits": { severity: "warning", rule: 'A description does not give advice as an absolute ("Use X for Y", "for every") without the cases where it is wrong.' },
   "approval-code": { severity: "error", rule: "A tool that runs code that the model writes sets approval: true." },
   "fail-without-error": { severity: "warning", rule: "A result with ok false also has an error text." },
@@ -404,6 +406,32 @@ function toolCode(a: LoadedAdapter, tool: string): string {
   return codeFiles(a.root).map(read).join("\n");
 }
 
+function proseText(a: LoadedAdapter, tools: LintTool[]): { where: string; text: string; file: boolean }[] {
+  const m = a.manifest;
+  const out: { where: string; text: string; file: boolean }[] = [];
+  const push = (where: string, text: unknown, file = false) => {
+    if (typeof text === "string" && text.trim()) out.push({ where, text, file });
+  };
+  const unfront = (t: string) => t.replace(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/, (_, b: string) => b.split(/\r?\n/).join("\n\n") + "\n\n");
+  push("adapter.description", m.adapter.description);
+  push("standards", m.standards);
+  const std = join(a.root, "STANDARDS.md");
+  if (existsSync(std)) push("STANDARDS.md", readFileSync(std, "utf8"), true);
+  for (const s of a.skills()) push(`skills/${relative(join(a.root, "skills"), s.path)}`, unfront(readFileSync(s.path, "utf8")), true);
+  for (const t of tools) {
+    push(`tool "${t.name}" description`, t.description);
+    for (const [p, schema] of Object.entries(t.params)) push(`tool "${t.name}", argument "${p}" description`, schema.description);
+  }
+  for (const d of m.decisions) push(`decision "${d.key}" help`, d.help);
+  return out;
+}
+
+function steMessage(issues: SteIssue[], file: boolean): string {
+  const shown = issues.slice(0, 3).map((i) => (file ? `line ${i.line}: ${i.message.replace(/^Sentence \d+ /, "")}` : i.message));
+  const more = issues.length > 3 ? ` ${issues.length - 3} more.` : "";
+  return `${issues.length} text rule problem${issues.length === 1 ? "" : "s"}. ${shown.join(" ")}${more}`;
+}
+
 export function lint(input: LintInput): Finding[] {
   const { adapter: a, raw, tools } = input;
   const m = a.manifest;
@@ -521,6 +549,10 @@ export function lint(input: LintInput): Finding[] {
   }
   if (m.tests.length && !m.tests.some((t) => t.expect.some((e) => e.path === "ok" && e.equals === false)))
     add(out, "kat-failure-path", "tests", "no test expects a failure. Add one with bad input (an empty list, a pattern that matches no file, a missing column) and expect ok: false and a contains on error.");
+  for (const piece of proseText(a, tools)) {
+    const issues = checkText(piece.text);
+    if (issues.length) add(out, "text-style", piece.where, steMessage(issues, piece.file));
+  }
   lintData(a, out);
   return out;
 }

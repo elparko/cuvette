@@ -181,6 +181,14 @@ export const SETTINGS: SettingDef[] = [
     choices: () => ["mac", "emacs", "vim", "classic"],
   },
   {
+    name: "text_style",
+    group: "Session",
+    label: "Text style",
+    help: "ste: the agent writes in Simplified Technical English (ASD-STE100): short sentences, active voice, simple words. The review marks long or passive sentences in the answer. plain: no text rules in the prompt and no text review.",
+    scopes: ALL,
+    choices: () => ["ste", "plain"],
+  },
+  {
     name: "output_folder",
     group: "Outputs",
     label: "Save results in",

@@ -10,7 +10,7 @@ record, a manual route for each step, and a record of every number.
 
 ## Start
 
-Needs Node 22 or later. Java is needed only for ImageJ.
+Cuvette needs Node 22 or later. Only ImageJ needs Java.
 
 ```bash
 npm install
@@ -20,9 +20,9 @@ node bin/ga.js adapters
 
 ### First start and check
 
-The first time that you start `ga` with no Claude API key and no local model, `ga` asks one
-question: "Use Claude (needs an API key)" or "Use a local model (Ollama, free, runs on this
-Mac)". It saves the choice, checks this Mac, and offers a 2-minute sample analysis. The sample
+Start `ga` for the first time with no Claude API key and no local model. Then `ga` asks one
+question with two answers. The answers are "Use Claude (needs an API key)" and "Use a local
+model (Ollama, free, runs on this Mac)". It saves the choice, checks this Mac, and offers a 2-minute sample analysis. The sample
 is the Student (1908) sleep data in `samples/sleep/` (public domain).
 
 ```bash
@@ -90,9 +90,9 @@ names files, the harness adds a one-line hint with the adapters for those file t
 record keeps each load and its reason. In a run without the terminal UI, `"adapter": "biostats"`
 in the answers file answers the card. `--adapter <name>` still loads adapters before the start.
 
-Each session also loads the `tables` adapter: it reads CSV and Excel lab sheets, summarizes and
-reshapes tables, writes xlsx files and makes bar, box, scatter, line and histogram plots. Each
-step gives the manual route in Excel. The setting `defaultAdapters` changes this list.
+Each session also loads the `tables` adapter. It reads CSV and Excel lab sheets, and it
+summarizes and reshapes tables. It writes xlsx files and makes bar, box, scatter, line and
+histogram plots. Each step gives the manual route in Excel. The setting `defaultAdapters` changes this list.
 
 ### With Claude
 
@@ -116,10 +116,10 @@ ollama pull qwen3:8b                         # already present on this computer
 node bin/ga.js --adapter imagej --model ollama:qwen3:8b
 ```
 
-The harness talks to Ollama's own API and sets the context window (32k by default), because
-Ollama's OpenAI-style endpoint can cut the context without a warning. With a small model, the
-harness shows fewer tools at a time (the model uses `find_tools` for the rest), shortens tool
-results, and summarizes old turns near the context limit.
+The harness talks to Ollama's own API and sets the context window (32k by default). The
+OpenAI-style endpoint of Ollama can cut the context without a warning. With a small model, the
+harness shows fewer tools at a time. The model uses `find_tools` for the rest. The harness also
+shortens tool results and summarizes old turns near the context limit.
 
 ### Things to try
 
@@ -210,15 +210,15 @@ Bypass does not change these:
 
 - **Decisions.** Each adapter lists the choices that can change a result. Each choice has an owner:
   the scientist, the agent, or a fixed lab value. The harness fills the values into each tool
-  call. A different value is logged as a deviation. A tool call that needs a decision that the
-  scientist has not made stops; the harness first runs the options side by side (a sensitivity
-  check) and then asks the scientist.
+  call. The record logs a different value as a deviation. A tool call stops if it needs a
+  decision that the scientist has not made. The harness first runs the options side by side (a
+  sensitivity check). Then it asks the scientist.
 - **Manual routes.** Each step shows the menu path and the dialog values. `/export protocol`
   writes the steps as a protocol that a lab member can follow by hand.
 - **Records.** Each session has one append-only log, `~/.guided-analysis/sessions/<id>/log.jsonl`.
   Each result is a node with its arguments, its decisions, and the hashes of its input and output
   files. A changed decision marks the results that used the old value as out of date.
-- **Claims.** Each number in the final answer is matched to a logged result. A number with no
+- **Claims.** The harness matches each number in the final answer to a logged result. A number with no
   source gets a `[no source]` flag. Rule checks and a referee review the answer; the agent must
   fix error findings once before the answer reaches the scientist. The referee reads only the
   log, in a fresh context. By default it is the agent's own model; `--referee claude:claude-haiku-5-5`
@@ -265,8 +265,8 @@ checker. Check an adapter with `node bin/ga.js adapter check <dir> --run-tests`.
 ## Benchmark
 
 `node bin/ga.js bench all --model ollama:qwen3:8b --guidance both` runs the trap scenarios in
-`bench/` with the guidance on and off, and writes six scores for each run (answer, traps,
-decisions, asking, claims, manual route) to `bench/results/`.
+`bench/` with the guidance on and off. It writes six scores for each run to `bench/results/`:
+answer, traps, decisions, asking, claims and manual route.
 
 ## Development
 
@@ -274,11 +274,16 @@ decisions, asking, claims, manual route) to `bench/results/`.
 npm test                 # unit tests; no network, Java or model needed
 GA_LIVE=1 npm test       # also the live tests: ImageJ, SMILE MSI, Ollama
 npx tsc --noEmit
+npm run lint:text        # the text rules (ASD-STE100) for the README, docs and UI strings
 ```
+
+All text in this repository uses Simplified Technical English (ASD-STE100). See
+[CLAUDE.md](CLAUDE.md). The setting `text_style` (`ste` or `plain`) sets the text rules in the
+agent's prompt.
 
 ## Documents
 
-- [docs/status-2026-10-08.md](docs/status-2026-10-08.md): what was built and tested overnight, and
+- [docs/status-2026-10-08.md](docs/status-2026-10-08.md): what we built and tested overnight, and
   the known limits. Start here.
 - [docs/design.md](docs/design.md): the goals and all intended features.
 - [docs/architecture.md](docs/architecture.md): the modules and their contracts.

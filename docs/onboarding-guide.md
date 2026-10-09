@@ -54,7 +54,7 @@ Errors:
 Results and summaries:
 
 - Give each tool a summary template in the map, or write the summary in the tool code. Else the step shows "<tool> finished." [summary-template]
-- Put every value that the model must report in the summary, with the confidence interval and the test p values. fit_cox hid the proportional hazards p values, and the model took the wrong one.
+- Put every value that the model must report in the summary. Include the confidence interval and the test p values. fit_cox hid the proportional hazards p values, and the model took the wrong one.
 - Explain a zero or an empty result: give the count without the limit and the setting to change. MNE said "0 events" and the model said that the data had no events.
 - Return each part once. Do not repeat the table, the metrics or the summary in `data`.
 - Put key paths first. FastQC listed 40 images before `data_file`, and the model guessed the name.
@@ -70,12 +70,13 @@ Decisions:
 - Give each decision `choices` or an explicit `kind`. [decision-type]
 - Give a default, or let the scientist own the decision so that the harness asks. [decision-default]
 - Write a plain help text of one or two sentences. [decision-help]
+- Write descriptions, decision help, STANDARDS.md and skills in ASD-STE100 Simplified Technical English. Instructions have 20 words or fewer, descriptions 25 or fewer. Use the active voice and "must" for a requirement. [text-style]
 - Link each decision to a tool argument. A decision with no link changes nothing.
 - Write sensitivity `compare` entries as result paths: `metrics.n_peaks`. [sensitivity-compare]
 
 Batch and pilot:
 
-- A tool that takes a folder, a pattern or a list of files states `batch: true` (each call processes many files) or `batch: false` (one file; the harness finds a folder or 3 or more paths at run time). A `batch: true` tool waits for an approved one-sample pilot. [batch-flag]
+- A tool that takes a folder, a pattern or a list of files must state `batch`. Write `batch: true` if each call processes many files. Write `batch: false` for one file: the harness then finds a folder or 3 or more paths at run time. A `batch: true` tool waits for an approved one-sample pilot. [batch-flag]
 - For a tool from an MCP server or the module, list the batch tools in `batch_tools`. [batch-flag]
 - A tool that runs code from the model sets `approval: true`. [approval-code]
 
@@ -90,7 +91,7 @@ Data and tests:
 
 - Write known-answer tests. [kat-present]
 - Call each tool in at least one test. The drive test needs a test input for each tool. [kat-coverage]
-- Pin each test with `equals` or `approx` on a number from a trusted source, not only `ok` or a range. [kat-exact]
+- Pin each test with `equals` or `approx` on a number from a trusted source. Do not pin only `ok` or a range. [kat-exact]
 - Set `returns: text` on a tool that returns only text, such as converted molecules, a file listing or OME-XML. For a tool from the module or an MCP server, put its name in `text_tools`. A test that reads only these tools can pin the exact text with `contains`. [kat-exact]
 - If you calculate an expected value with a different program or language, save the script and its output in `checks/` in the adapter folder. Name both files in the test description.
 - Add a test with bad input that expects `ok: false` and a `contains` on the error. [kat-failure-path]
@@ -101,7 +102,7 @@ Data and tests:
 
 Blinding:
 
-- Put no number from a known-answer test or a benchmark answer in text that the model sees: STANDARDS.md, skills, descriptions, examples, decision help, the map. `calculate` showed `ratio(4696, 5007)`, the BBBC005 answer. [blinding-number]
+- Put no number from a known-answer test or a benchmark answer in text that the model sees. This text is STANDARDS.md, skills, descriptions, examples, decision help and the map. `calculate` showed `ratio(4696, 5007)`, the BBBC005 answer. [blinding-number]
 - Use made-up example numbers. Keep method advice; leave out results.
 - Keep result files out of the data folders.
 
@@ -112,16 +113,16 @@ GPU is free:
 ga adapter check <name> --drive --model ollama:qwen3:8b
 ```
 
-For each tool it writes one plain request from the description and a test input, runs a short
-session with this adapter only, and reports the tool choice, the arguments, the answer and each
-confusion with its record entry.
+For each tool it writes one plain request from the description and a test input. It runs a
+short session with this adapter only. It reports the tool choice, the arguments, the answer and
+each confusion with its record entry.
 
 ## Step 1. Find the program
 
 1. Ask the scientist for the program name and the version in use.
 2. Call `probe_program` with the name.
 3. If the program is a Python package, also call `python_api` with the module name.
-4. If the program is not found, ask for the install folder. Call `list_files` on it.
+4. If `probe_program` does not find the program, ask for the install folder. Call `list_files` on it.
 5. Write down the path, the version and the way to print the version.
 
 Show the scientist what you found. Ask if it is the right install.
@@ -184,7 +185,7 @@ Propose a list of tools before you write any file.
 - Mark a tool `read_only: true` if it changes nothing.
 - Mark a tool `approval: true` if it deletes or overwrites data.
 - Give each tool an `outputs` entry for each file it writes.
-- Leave out a tool for a step that the scientist should do by hand.
+- Leave out a tool for a step that the scientist does by hand.
 
 Show the list as a table: name, one line of purpose, arguments. Wait for approval.
 
@@ -198,7 +199,7 @@ The map gives the manual route for each tool. Write one entry for each tool.
    `ui_default`, the value that the program shows first.
 3. Write `fidelity`:
    - `exact` only if a test shows the same numbers by both routes.
-   - `close` if the method is the same and a difference is known. Write `difference`.
+   - `close` if the method is the same and you know of a difference. Write `difference`.
    - `code_only` if the program has no manual route.
 4. Write `evidence`: the source from step 3, and the name of the test when there is one.
 5. Write `summary` when the default sentence is not enough: `{metrics.n_objects} objects`.
@@ -230,13 +231,13 @@ bins for a plot.
 For each decision:
 
 1. Set `owner: human`. Change it only if the scientist says so.
-2. Set `stage: setup` when the choice must be made before the first result. Set
+2. Set `stage: setup` when the scientist must make the choice before the first result. Set
    `stage: when_needed` when it matters only for one tool.
 3. Link it to the arguments it sets with `links`. Use a dotted path for a nested argument.
 4. Set `default` to the value from the program's docs. Do not invent a default.
 5. Set `lo` and `hi` for a number. Set `choices` for a choice.
 6. Write `help` in one or two sentences that the scientist can read at a bench.
-7. Add `sensitivity` when the scientist should see how the result moves with other values.
+7. Add `sensitivity` when the scientist must see how the result moves with other values.
    List the values to try in `options`. Name the metrics to compare in `compare`.
 
 Set `owner: fixed` only for a value that the lab fixes for its instrument, such as a mass
@@ -247,7 +248,7 @@ scientist must approve each default.
 
 ## Step 7. Write the standards text
 
-`STANDARDS.md` tells the model how results in this field must be reported. Write 5 to 15 lines.
+`STANDARDS.md` tells the model how to report results in this field. Write 5 to 15 lines.
 
 - State what to report with each result: units, the unit of replication, the method name and
   its settings.
@@ -264,15 +265,15 @@ A check finds a common error in this field.
 - Use a `rule` when one tool argument decides the error: a missing argument, or a value above a
   limit.
 - Use `text` when a model must judge: "The report must say which control group it used."
-- Use a function in `adapter.ts` when the check needs the record: for example, "the same sample
-  is counted twice in the test."
+- Use a function in `adapter.ts` when the check needs the record: for example, "the test counts
+  the same sample twice."
 - Set `severity: error` only when the result is wrong. Use `warning` for a risk.
 
 Write at most five checks. Ask the scientist which errors they see most often.
 
 ## Step 9. Write the known-answer tests
 
-A test runs the tools on small data and compares the result with numbers that are known.
+A test runs the tools on small data and compares the result with known numbers.
 
 1. Find tutorial data. The program's docs, its sample data and its test suite are the best
    sources. Copy a small file into `data/`. Keep it under 1 MB when you can.
@@ -309,7 +310,7 @@ an error.
 
 Show each part to the scientist in this order. Wait for a clear yes on each one.
 
-1. The connection kind and the way the program is found.
+1. The connection kind and the way the harness finds the program.
 2. The tools, with their arguments.
 3. The tool code: the commands, the functions, the macros, the scripts.
 4. The map, with every fidelity level and the evidence for it.
@@ -381,9 +382,9 @@ decisions:
 Add the argument `seq_type` to the tool, with the template item `--seq-type {seq_type}`.
 
 **Step 7.** Write `STANDARDS.md`: "Report the sequence type, the number of sequences and the
-total length. Say if the sequence type was guessed."
+total length. Say if the program guessed the sequence type."
 
-**Step 8.** Write one text check: "The report must say whether the sequence type was guessed."
+**Step 8.** Write one text check: "The report must say whether the program guessed the sequence type."
 
 **Step 9.** Copy `example.fa` into `data/`. The docs example shows 8 sequences. Write:
 

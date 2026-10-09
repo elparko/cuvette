@@ -296,6 +296,20 @@ describe("lint: known-answer tests and data", () => {
   });
 });
 
+describe("lint: text style", () => {
+  test("text-style: a passive sentence in STANDARDS.md and filler in a description are warnings", async () => {
+    const std = await findings(make((y) => y, { "STANDARDS.md": "Report the trim fraction.\n\nThe trim fraction should be reported with each mean.\n" }), "text-style");
+    expect(std).toHaveLength(1);
+    expect(std[0].severity).toBe("warning");
+    expect(std[0].where).toBe("STANDARDS.md");
+    expect(std[0].message).toMatch(/line 3: uses the passive voice: "be reported"/);
+    expect(std[0].message).toMatch(/"should"/);
+    const desc = await findings(make((y) => tool(y, "description: Compute the mean of one column of a CSV file.", "description: Compute a robust mean of one column of a CSV file.")), "text-style");
+    expect(desc.map((f) => f.where)).toEqual(['tool "summarize" description']);
+    expect(desc[0].message).toMatch(/robust/);
+  });
+});
+
 describe("the rule list", () => {
   test("each rule has a severity and a reason, and the onboarding guide names it", () => {
     const guide = readFileSync("docs/onboarding-guide.md", "utf8");

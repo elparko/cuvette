@@ -7,8 +7,8 @@ The harness keeps the decision record, the question queue, and the audit trail.
 ## Prerequisites
 
 - Node 22 or later. Claude Desktop must find the `node` command.
-- The packages are installed: run `npm install` in `/Users/parker/Code/guided-analysis`.
-- The program of the adapter is installed. For `imagej`, ImageJ or Fiji must be on this computer.
+- The packages: run `npm install` in `/Users/parker/Code/guided-analysis`.
+- The program of the adapter. For `imagej`, ImageJ or Fiji must be on this computer.
 
 ## Set up
 
@@ -67,7 +67,7 @@ the tool list and sends a tool list change notice.
 - The MCP client cannot approve a permission request. The harness denies it. Run that step in the `ga` terminal.
 - Follow mode is not available. The harness skips manual instructions.
 - The server writes only protocol messages to stdout. Errors go to stderr.
-- The files of each session are in the folder `~/.guided-analysis/sessions` unless `GA_HOME` is set.
+- The files of each session are in the folder `~/.guided-analysis/sessions` unless you set `GA_HOME`.
   Add `"env": {"GA_HOME": "<folder>"}` to the entry to change it.
 
 ## Problems

@@ -19,7 +19,7 @@ The expected values (`items` in `bench.yaml`, and `expected.yaml`) stay with the
 ## What the agent can see
 
 - The request, the setup values and the answers of the decision cards.
-- The system prompt of the harness and the text of the loaded adapters that the harness sends: instructions, standards, tool descriptions, and a skill when the agent calls `load_skill`.
+- The system prompt of the harness and the text of the loaded adapters that the harness sends. This text is the instructions, the standards, the tool descriptions, and a skill when the agent calls `load_skill`.
 - The files on the allow list, through `read_file` and `list_dir`.
 - The outputs of the tools that it runs.
 
@@ -42,7 +42,7 @@ The folders of the loaded adapters (`catalog/<name>/`) are a special case. The a
 
 The deny list applies to every tool and to every child process:
 
-- the repository (`bench/`, `bench/results/`, `docs/`, `tests/`, `catalog/`, and the main checkout when the harness runs from a worktree), except the paths on the allow list above;
+- the repository, except the paths on the allow list above. This is `bench/`, `bench/results/`, `docs/`, `tests/`, `catalog/`, and the main checkout when the harness runs from a worktree;
 - the folder of the paper specs and the results folder of the run;
 - the past benchmark runs (`/Volumes/T7/guided-analysis/tools/bench-runs/`) and the other folders in `/Volumes/T7/guided-analysis/tools/`, except the program folders;
 - the reference folder (`/Volumes/T7/guided-analysis/reference/`). It holds the result files from the downloads, for example the vignettes and the reports;
@@ -129,7 +129,7 @@ These checks ran on 2026-10-08.
 - Unit tests: `tests/blind.test.ts` and `tests/papers-blind.test.ts`. A fake agent tries to read `expected.yaml` with an absolute path and with a relative path. Both reads stop. The record has two `blocked` entries. No tool result holds the expected value. A script that builds the path at run time gets "Operation not permitted". With `--no-blind`, the old behavior stays.
 - Adapter programs under the sandbox: the known-answer tests of all 24 paper adapters and ImageJ (Fiji) pass with the blind policy active. This includes R (lme4, deseq2, vegan, cardinal), Python (astropy, scanpy, mne and others), Java (ImageJ, CellProfiler) and command-line programs (bcftools, samtools, sage, iqtree).
 - A fake agent on the real astropy adapter (bradley-photutils): reads of `expected.yaml`, of `catalog/astropy/data/isolated_truth.csv`, of the reference folder, and of `~/.guided-analysis/sessions` from `run_script` all stop. The leak check shows 5 blocked reads and the 4 paths outside the allow list.
-- A real local model: `ollama:qwen3:8b` on bradley-photutils-100gaussians in blind mode (`bench/results/papers-2026-10-08-qwen3-blind-bradley.md`). The sandbox was on. The agent read 2 paths: the data file and a file in its work folder. 0 paths were outside the allow list. 0 reads were blocked. The answer had 0 unsourced and 0 literature claims. The score was 6 of 6 computed and 6 of 6 reported. The leak check found no source for the numbers other than the steps of the run.
+- A real local model: `ollama:qwen3:8b` on bradley-photutils-100gaussians in blind mode (`bench/results/papers-2026-10-08-qwen3-blind-bradley.md`). The sandbox was on. The agent read 2 paths: the data file and a file in its work folder. 0 paths were outside the allow list. The sandbox blocked 0 reads. The answer had 0 unsourced and 0 literature claims. The score was 6 of 6 computed and 6 of 6 reported. The leak check found no source for the numbers other than the steps of the run.
 
 ## Limits
 

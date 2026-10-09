@@ -34,6 +34,7 @@ export interface Settings {
   output_folder: string;
   defaultAdapters: string[];
   input_keys: "mac" | "emacs" | "vim" | "classic";
+  text_style: "ste" | "plain";
 }
 
 export const DEFAULTS: Settings = {
@@ -62,6 +63,7 @@ export const DEFAULTS: Settings = {
   output_folder: "cuvette",
   defaultAdapters: ["tables"],
   input_keys: "mac",
+  text_style: "ste",
 };
 
 export function xlsxOn(s: Pick<Settings, "export_xlsx">): boolean {

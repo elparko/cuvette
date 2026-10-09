@@ -467,7 +467,7 @@ export class Session {
   }
 
   private buildSystem(): string {
-    return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { project: this.cwd, work: this.workDir, output: this.outputDir, figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) } });
+    return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { project: this.cwd, work: this.workDir, output: this.outputDir, figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) }, textStyle: this.settings.text_style });
   }
 
   private defaultAdapters(): LoadedAdapter[] {
@@ -1005,7 +1005,7 @@ export class Session {
     let kept: string | undefined;
     let keptClaims: typeof claims | undefined;
     let keptFound: { f: FindingIn; source: Finding["source"] }[] | undefined;
-    const ctx = { record: this.record, decisions: this.decisions, adapters: this.adapters, answer, claims };
+    const ctx = { record: this.record, decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const found: { f: FindingIn; source: Finding["source"] }[] = [...(pre.findings ?? []).map((f) => ({ f, source: "hook" as const }))];
     for (const f of await runChecks(ctx)) found.push({ f, source: "rule" });
     if (this.refereeProvider && !signal.aborted) {
@@ -1736,7 +1736,7 @@ export class Session {
     this.provider = provider;
     this.refereeProvider = referee;
     if (name === "export_xlsx" || name === "figure_formats") this.dirs();
-    if (["model", "export_xlsx", "figure_formats"].includes(name)) this.system = this.buildSystem();
+    if (["model", "export_xlsx", "figure_formats", "text_style"].includes(name)) this.system = this.buildSystem();
   }
 
   setMode(mode: Mode): void {
@@ -2608,7 +2608,7 @@ export class Session {
   async review(): Promise<Finding[]> {
     const answer = this.lastAnswer || (this.record.entries(["assistant"]).filter((e) => e.data.final).at(-1)?.data.text as string) || "";
     const claims = checkAnswer(answer, this.record);
-    const ctx = { record: this.record, decisions: this.decisions, adapters: this.adapters, answer, claims };
+    const ctx = { record: this.record, decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const out: Finding[] = [];
     for (const f of await runChecks(ctx)) out.push(this.findings.add(f, "rule"));
     if (this.refereeProvider) for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));

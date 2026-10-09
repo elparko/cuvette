@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:live": "GA_LIVE=1 vitest run",
     "typecheck": "tsc --noEmit",
+    "lint:text": "tsx src/lint-text.ts",
     "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/cli.js"
   },
   "dependencies": {

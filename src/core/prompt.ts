@@ -1,5 +1,6 @@
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { outputRules } from "./results.ts";
+import { STE_PROMPT, STE_PROMPT_SMALL } from "./ste.ts";
 import type { Mode, ModelInfo } from "./types.ts";
 
 const RULES = `You are a guided analysis agent. You analyze data in existing science programs for a scientist. The scientist owns the method decisions. You do the work, and you show each step so the scientist can repeat it by hand in the program.
@@ -71,10 +72,12 @@ export function systemPrompt(opts: {
   guidance: boolean;
   pick?: boolean;
   folders?: Folders;
+  textStyle?: "ste" | "plain";
 }): string {
   if (!opts.guidance) return "You are a data analysis agent. Use the tools to answer the scientist's request." + (opts.pick ? " Call list_adapters, then use_adapter to load the program tools that fit the request." : "");
   const small = opts.model.small;
   const parts = [small ? SMALL_RULES : RULES, MODES[opts.mode]];
+  if (opts.textStyle !== "plain") parts.splice(1, 0, small ? STE_PROMPT_SMALL : STE_PROMPT);
   if (opts.pick) parts.push(PICK);
   if (opts.folders) parts.push(foldersText(opts.folders));
   for (const { adapter, programVersion, instructions } of opts.adapters) {

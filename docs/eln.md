@@ -1,6 +1,6 @@
 # eLabFTW and the .eln export
 
-This page tells you what the harness sends to an electronic lab notebook (ELN), how to set it up, and what was tested.
+This page tells you what the harness sends to an electronic lab notebook (ELN), how to set it up, and what we tested.
 
 ## What is sent
 
@@ -64,7 +64,7 @@ Before the harness sends anything, it shows a permission card. The card lists:
 - The title and tags.
 - Each file to send, with its size.
 - A short form of the content hash.
-- The data that is not sent.
+- The data that the harness does not send.
 
 Press `y` to send. Press `n` to stop. The card has no "always allow" key for this action. The terminal command asks `Send it? [y/N]`. Any other answer stops it.
 
@@ -88,11 +88,11 @@ Run `ga eln link <session> <id>`. In the app, type `/eln link <id>`.
 The harness reads the experiment and the items that it links to. It shows the title, the tags, the start of the text and the linked items.
 Then it compares each custom field (`metadata.extra_fields`) with the decisions.
 A field matches if its name equals a decision key or label. The match ignores case and punctuation.
-The experiment is checked first, then the linked items. The harness skips a value that does not fit the decision (wrong type, out of range, not a listed choice). It skips decisions that a lab profile fixes.
+The harness checks the experiment first, then the linked items. The harness skips a value that does not fit the decision (wrong type, out of range, not a listed choice). It skips decisions that a lab profile fixes.
 
 The harness does not apply any value by itself.
 
-- In the app, the setup card opens with the proposed values marked. Nothing is saved until you confirm the card.
+- In the app, the setup card opens with the proposed values marked. The harness saves nothing until you confirm the card.
 - In the terminal, the command asks `Apply these values to the setup? [y/N]`.
 
 The harness stores the link in the log as an `eln_link` entry.
@@ -146,5 +146,5 @@ These need a real eLabFTW server:
 - The exact response of your eLabFTW version. The mock follows the OpenAPI file, not a running server.
 - That the `Location` header has the form that the client reads.
 - That `bodyappend` works on your version.
-- That eLabFTW imports the `.eln` file that the harness writes. Only the layout was checked against the specification.
+- That eLabFTW imports the `.eln` file that the harness writes. We checked only the layout against the specification.
 - Team rules, upload size limits and permission errors.

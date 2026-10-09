@@ -2,6 +2,7 @@ import type { AdapterCheckContext, LoadedAdapter } from "../adapters/manifest.ts
 import type { DecisionRecord } from "./decisions.ts";
 import { approvedPlan, currentPlan, definitionFindings, planFindings, planText } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
+import { checkText, summary } from "./ste.ts";
 import type { Claim, Entry, Finding, FindingIn, Node, Provider } from "./types.ts";
 
 export interface ReviewContext {
@@ -10,6 +11,7 @@ export interface ReviewContext {
   adapters: LoadedAdapter[];
   answer: string;
   claims: Claim[];
+  textStyle?: "ste" | "plain";
 }
 
 const STATUS = { accept: "accepted", reject: "rejected", fix: "fixed" } as const;
@@ -296,6 +298,17 @@ function significanceWithoutTest(ctx: ReviewContext): FindingIn[] {
   }];
 }
 
+function textStyle(ctx: ReviewContext): FindingIn[] {
+  if (ctx.textStyle !== "ste") return [];
+  const issues = checkText(ctx.answer);
+  if (!issues.length) return [];
+  return [{
+    check: "text_style",
+    severity: "info",
+    message: `The answer breaks the text rules (ASD-STE100) in ${issues.length} place${issues.length === 1 ? "" : "s"}. ${summary(issues)}`,
+  }];
+}
+
 export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
   return [
     ...significanceWithoutTest(ctx),
@@ -311,6 +324,7 @@ export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
     ...definitionFindings(ctx.record, ctx.answer),
     ...ruleChecks(ctx),
     ...(await moduleChecks(ctx)),
+    ...textStyle(ctx),
   ];
 }
 
@@ -393,6 +407,7 @@ export function refereePrompt(ctx: ReviewContext): { system: string; text: strin
   const textChecks = ctx.adapters.flatMap((a) => a.manifest.checks.filter((c) => !c.rule && c.text.trim()).map((c) => `- ${c.id}: ${c.text.trim()}`));
   const standards = ctx.adapters.map((a) => a.standardsText()).filter(Boolean);
   let system = SYSTEM;
+  if (ctx.textStyle === "ste") system += "\nWrite each message in Simplified Technical English: short sentences, active voice, simple words, \"must\" for a requirement.";
   if (textChecks.length) system += `\n\nChecks from the adapter. Apply each one:\n${textChecks.join("\n")}`;
   if (standards.length) system += `\n\nStandards of the program:\n${standards.join("\n\n")}`;
   const claims = ctx.claims.map((c) => `- ${c.value ?? "(no number)"} [${c.label}${c.node ? " " + c.node : ""}] ${clip(c.text, 160)}`).join("\n");

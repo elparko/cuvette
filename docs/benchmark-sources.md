@@ -2,7 +2,7 @@
 
 This document tells where each expected value of the paper benchmark comes from.
 It covers the 28 papers in `bench/papers/` and their 183 scored items.
-The audit was done on 2026-10-08.
+We did the audit on 2026-10-08.
 
 ## Classes
 
@@ -23,14 +23,14 @@ Each computed item also has an independence class:
 - **same path**: the only computation uses the program that the adapter runs.
   Such an item tests whether the agent drives the program correctly.
   It does not test whether the program gives the correct result.
-- **unknown**: no record tells how the value was computed.
+- **unknown**: no record tells how someone computed the value.
 
 For published and tutorial items, the independence class is "not applicable".
 Many of these items also have a check, and the table shows it.
 
-The source class, the independence class and the check are in the `items` section of each `case.yaml`.
+The `items` section of each `case.yaml` gives the source class, the independence class and the check.
 The exception is `love2014-deseq2-airway`, which has another owner.
-Its classes are set in this document only.
+Only this document gives its classes.
 
 ## Totals
 
@@ -62,14 +62,14 @@ By the kind of case, after the audit:
 
 ## What the write-up can say
 
-- 69 of 183 items (38%) are printed in a publication or in official program documentation.
-- 99 items (54%) are computed by the benchmark authors and confirmed with a second program or code path.
-- 15 items (8%) are computed with only the program that the adapter runs.
-- In the 8 research papers, 15 of 39 items are printed in the paper.
+- 69 of 183 items (38%) come from a publication or from official program documentation.
+- 99 items (54%) come from the benchmark authors. A second program or code path confirms each one.
+- 15 items (8%) come only from the program that the adapter runs.
+- In the 8 research papers, the paper itself prints 15 of 39 items.
 
 "Cuvette reproduces published results" is true only for the 26 published items.
 A correct sentence for all items is:
-"Cuvette reproduces values that are published, printed in official documentation, or computed independently by the benchmark authors."
+"Cuvette reproduces values from publications, from official documentation, or from independent computation by the benchmark authors."
 
 ## The 15 same-path items
 
@@ -83,7 +83,7 @@ A correct sentence for all items is:
 
 ## Values that disagree
 
-No expected value in `bench.yaml` was changed.
+The audit did not change an expected value in `bench.yaml`.
 
 - **delaney2004-esol `zero_violations`** (expected 1018 ±5): Open Babel 3.1.0 gives 1000.
 - **delaney2004-esol `logp_above_5`** (expected 97 ±5): Open Babel 3.1.0 gives 111.
@@ -103,17 +103,18 @@ Values that agree, but with a known limit:
 - **mahbod2024-nuinsseg `mean_dice_otsu`** (0.538 ±0.02): the value depends on the stain matrix.
   - The hematoxylin, eosin and DAB matrix of the adapter gives 0.538.
   - A matrix with only hematoxylin and eosin gives 0.565.
-- **mahbod2024-nuinsseg `nuclei_label_masks`**: the released masks hold 35138 labels. Table 2 of the paper gives 30698. The cause is not known.
+- **mahbod2024-nuinsseg `nuclei_label_masks`**: the released masks hold 35138 labels. Table 2 of the paper gives 30698. We do not know the cause.
 - **palmer2017-metaspace-fdr**: the paper gives 73 formulas as the base for its count of 51.
   - The MTBLS313 table gives 66 formulas for sections 1 to 3, and 76 for sections 1 to 5.
-  - The number 73 is not reproduced.
+  - No table gives the number 73.
 - **bradley-photutils-100gaussians `sources_detected`** (82, exact): the adapter's smoothing kernel (13 by 13 pixels) gives 82.
   - The kernel of the segmentation guide (5 by 5 pixels) gives 83.
-  - A tolerance of 1 would accept both kernels. The tolerance was not changed.
-- **wolf2018-scanpy `leiden_clusters`** (7 ±1): leidenalg on an independently built neighbor graph gives 7 clusters for seven of the seeds 0 to 9, and 6 clusters for the other three.
+  - A tolerance of 1 would accept both kernels. The audit did not change the tolerance.
+- **wolf2018-scanpy `leiden_clusters`** (7 ±1): we ran leidenalg on a neighbor graph that we built independently.
+  - Seven of the seeds 0 to 9 give 7 clusters. The other three give 6 clusters.
   - All current and older tutorials print 8 at their own settings.
   - The tolerance accepts 6, 7 and 8.
-- **rouault-gdal-autotest `band_std`**: the old note gave 22.986 as the sample standard deviation. The correct value is 22.957, which is inside the tolerance. The note is corrected.
+- **rouault-gdal-autotest `band_std`**: the old note gave 22.986 as the sample standard deviation. The correct value is 22.957, which is inside the tolerance. We corrected the note.
 
 ## Scorer item flags
 
@@ -139,7 +140,7 @@ The effect of `bench rescore` on copies of the saved results:
 
 - qwen3, gramfort2013-mne-sample: the computed score falls from 2 of 14 to 0 of 14.
   The qwen3 run did not measure a peak. Its two passes matched filter settings.
-- qwen3, palmer2017-metaspace-fdr: the reference item changes from "matches" to "differs". Reference items are not scored.
+- qwen3, palmer2017-metaspace-fdr: the reference item changes from "matches" to "differs". The score does not include reference items.
 - All other matches keep their pass or fail result. They now name the correct step.
   - In wolf2018-scanpy, both runs now match `n_clusters = 7` of the Leiden step.
   - In bemis2015-cardinal, all three runs now match `n_segments_s64 = 3`.
@@ -175,11 +176,11 @@ Limits that a `tool:` flag cannot fix:
   - Michael et al. 2022 (Analytical Chemistry 94:17494), the paper of the METASPACE data sets. The full text needs a subscription.
   - Delaney 2004, for its R squared. The full text needs a subscription.
   - Allison's SAS book, for a log-rank value on the Rossi data.
-- No version number is given on the photutils guide pages.
+- The photutils guide pages give no version number.
 
 ## Data problem found during the audit
 
-These files are listed in `bench.yaml` but are not in the T7 data folder on 2026-10-08:
+`bench.yaml` lists these files, but they were not in the T7 data folder on 2026-10-08:
 
 - the four CSV files of alexandrov2019-metaspace;
 - the MTBLS313 metabolite table (MAF) of palmer2017-metaspace-fdr.
@@ -191,7 +192,7 @@ Run the `fetch.sh` of each paper again before the next benchmark run.
 
 Each table gives the item, the expected value with its tolerance, the source class, the independence class, and the citation.
 "Not asked" means that the request does not ask for the value (`in_answer: false`).
-"Trap" marks the result of a wrong method. "Reference" marks a value that is shown but not scored.
+"Trap" marks the result of a wrong method. "Reference" marks a value that the report shows but does not score.
 
 ### Alexandrov 2019: alexandrov2019-metaspace
 

@@ -220,10 +220,10 @@ tools: `list_files`, `read_table`, `image_info` and `wait_for_file`.
 
 Template rules for `command`, `macro` and `request`:
 
-- `{name}` is replaced by the argument `name`. `{a.b}` reads a nested value.
+- The harness replaces `{name}` with the argument `name`. `{a.b}` reads a nested value.
 - `{output.key}` is the path of the output file `key`.
-- If an optional argument is absent, its item is removed. A flag item just before it is removed
-  too.
+- If an optional argument is absent, the harness removes its item. It also removes a flag item
+  just before it.
 - An argument that is a list and is the whole item expands to several items.
 - The harness never passes a template to a shell. Each item is one argument.
 
@@ -257,7 +257,7 @@ Owners:
 | `fixed` | The lab profile gives the value. The harness overwrites any other value. A `fixed` decision needs a default. |
 
 Stages: `setup` decisions get a value before the first tool call. `when_needed` decisions wait
-until a linked tool is called.
+until the agent calls a linked tool.
 
 A link is `{ tool: <tool name>, arg: <argument name> }`. The `arg` can be a dotted path into a
 nested argument, such as `params.tol_ppm`. The first part of the path must be an argument of the
@@ -291,8 +291,9 @@ same result.
 | `evidence` | object | unverified | Where the entry came from. |
 | `summary` | text | `""` | Template for the one-line result. It can use `{arg}`, `{metrics.name}`, `{data.name}` and `{n_rows}`. |
 
-A param map entry has `arg` (required), `label` (required; the name of the field in the
-program), `ui_default` (the default that the program shows) and `note`. The `arg` can be a dotted
+A param map entry has `arg`, `label`, `ui_default` and `note`. Each entry must have `arg` and `label`.
+`label` is the name of the field in the program. `ui_default` is the default that the program
+shows. The `arg` can be a dotted
 path. If the tool default differs from `ui_default`, the step shows a warning.
 
 An evidence object has `source`, `test` and `note`.
@@ -334,8 +335,8 @@ module `checks`. The checker reports an error for a check with none of them.
 
 ### `tests`
 
-A known-answer test runs tools on small data and compares the result with numbers that are
-known.
+A known-answer test runs tools on small data and compares the result with known
+numbers.
 
 | Field | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -362,8 +363,8 @@ An expectation has `path` and one or more of these comparisons:
 | `max` | The value is at most this number. |
 | `contains` | A text value contains this text. For a list, one item contains it. |
 
-The `path` is a dotted path into the result of the last call. The result has the shape that is
-described under "Tool results". Examples: `ok`, `summary`, `metrics.n_peaks`, `data.rows[0].mz`,
+The `path` is a dotted path into the result of the last call. The result has the shape that
+"Tool results" describes. Examples: `ok`, `summary`, `metrics.n_peaks`, `data.rows[0].mz`,
 `outputs[0].path`, `table.n_rows`.
 
 To read an earlier call, start the path with `saved.<name>.`. The name comes from `save_as`.
@@ -437,7 +438,7 @@ five tools take about 2,000 tokens, and its standards take about 240 tokens.
   open no card.
 - The default adapters do not close the adapter choice. With no `--adapter`, `list_adapters` and
   `use_adapter` stay, and the agent can load a program adapter later.
-- If the program of a default adapter is not found, the session starts without it. The first
+- If the harness does not find the program of a default adapter, the session starts without it. The first
   message says why and gives the install hint.
 - The session record lists them under `defaults` in the `session` entry.
 - The benchmark does not use this setting. It loads only the adapters in each `bench.yaml`.
@@ -446,7 +447,7 @@ Change it with `ga config set defaultAdapters tables,biostats`. Type `none` for 
 
 ## Tool results
 
-Each tool returns this shape. Missing keys are allowed, except `ok`.
+Each tool returns this shape. Each key except `ok` can be missing.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
@@ -603,8 +604,10 @@ Rules:
 The checker prints errors and warnings. An error stops use. A warning does not. The checker
 also runs the adapter checklist rules. Each finding has a rule id in brackets, such as
 `[arg-units]`, and says how to fix it. `docs/onboarding-guide.md` lists the rules with the reason
-for each. The rules are in `src/onboarding/lint.ts`. Tools of an MCP server are checked only
-with `--run-tests`, because the server must start to list them.
+for each. The rules are in `src/onboarding/lint.ts`. The checker checks the tools of an MCP server only
+with `--run-tests`, because the server must start to list them. The `text-style` rule checks
+descriptions, decision help, STANDARDS.md and skills against ASD-STE100 Simplified Technical
+English. It gives a warning, not an error.
 
 | Check | Level |
 | --- | --- |
@@ -625,11 +628,11 @@ with `--run-tests`, because the server must start to list them.
 | The status is not `draft` and `tested_versions` is empty. | warning |
 | The installed version is not in `tested_versions`. | warning |
 | A checklist rule with level error fails: `field`, `file-types`, `install-hint`, `locate-identity`, `tool-description`, `arg-description` (required argument), `arg-schema`, `batch-flag`, `manual-route`, `approval-code`, `blinding-number`, `decision-type`, `decision-default`, `decision-help`, `sensitivity-compare`, `kat-present`, `kat-data-license`, `kat-gui`. | error |
-| A checklist rule with level warning fails: `tool-description-length` (over 600 characters), `tool-description-plain`, `advice-limits`, `arg-description` (optional argument), `arg-units`, `array-min-items`, `summary-template`, `error-text`, `fail-without-error`, `kat-coverage`, `kat-exact`, `kat-failure-path`, a license that is not confirmed. | warning |
+| A checklist rule with level warning fails: `tool-description-length` (over 600 characters), `tool-description-plain`, `advice-limits`, `arg-description` (optional argument), `arg-units`, `array-min-items`, `summary-template`, `error-text`, `fail-without-error`, `kat-coverage`, `kat-exact`, `kat-failure-path`, `text-style`, a license that is not confirmed. | warning |
 
 `ga adapter check <name> --drive [--model ollama:qwen3:8b] [--tool <name>]` is the drive test.
 For each tool, it makes one plain request from the tool description and the input of a
-known-answer test, and runs a short headless session with only this adapter. It reports whether
+known-answer test. Then it runs a short headless session with only this adapter. It reports whether
 the model called the right tool, whether the arguments were valid, and whether the result and
 the answer reached the known value. Each confusion names its record entry. The default model is
 `ollama:qwen3:8b`.
