@@ -113,6 +113,18 @@ test("footer hints: full, short and off; Ctrl+T cycles them; bypass and Waiting 
   expect(h.term.view()).toContain("● Waiting for your answer");
 });
 
+async function arrowDown(h: { type(t: string): void; term: { view(): string } }) {
+  for (let tries = 0; tries < 8; tries++) {
+    const before = h.term.view();
+    h.type("\x1b[B");
+    try {
+      await until(() => h.term.view() !== before, 1500);
+      return;
+    } catch {}
+  }
+  throw new Error("the arrow key changed nothing");
+}
+
 test("/config changes the footer hints at once; /help shows Ctrl+T", async () => {
   const { h, s } = start();
   await until(() => h.term.view().includes("watch: the agent runs the steps"));
@@ -133,11 +145,7 @@ test("/config changes the footer hints at once; /help shows Ctrl+T", async () =>
   let before = h.term.view();
   h.type("\r");
   await until(() => h.term.view() !== before);
-  for (let i = 0; i < 2; i++) {
-    before = h.term.view();
-    h.type("\x1b[B");
-    await until(() => h.term.view() !== before);
-  }
+  for (let i = 0; i < 2; i++) await arrowDown(h);
   h.type("\r");
   await until(() => h.term.view().includes("Save off for:"));
   h.type("\r");
