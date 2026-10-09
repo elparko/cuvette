@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { FakeSession } from "../src/tui/fake-session.ts";
+import { FakeSession } from "../src/ui/fake-session.ts";
 import { ntfyNotifier, setWindowUrl } from "../src/server/notify.ts";
 import { startWindow } from "../src/server/window.ts";
 import { createServer, request as httpRequest } from "node:http";

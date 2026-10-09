@@ -1,27 +1,16 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import type { Finding, Mode, PlanEvent, PlanResponse, Question, ReferenceChoice } from "../core/types.ts";
-import { codeOf, plainOf } from "./items.ts";
-import type { DecisionFieldLike, SessionLike } from "./types.ts";
+import type { Question } from "../core/types.ts";
+import {
+  choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, pilotGate, pilotQuestion, planHint, planInit,
+  planQuestions, planReduce, planResolve, planTitle, programSwitches, recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, setupValues, show,
+  type Card, type PlanAction, type PlanState,
+} from "../ui/cards.ts";
+import type { DecisionFieldLike, SessionLike } from "../ui/types.ts";
+import type { PlanResponse } from "../core/types.ts";
 
-export type Card =
-  | { t: "setup"; profiles: { name: string; version: number }[]; proposed?: Record<string, unknown>; proposedFrom?: string }
-  | { t: "eln" }
-  | { t: "permission"; rid: string; tool: string; args: Record<string, unknown>; code?: string; touches: string; search?: { root: string; purpose: string } }
-  | { t: "question"; q: Question }
-  | { t: "instruction"; step: number; tool: string; text: string }
-  | { t: "findings"; list: Finding[] }
-  | { t: "key"; reason?: string }
-  | { t: "config" }
-
-  | ({ t: "plan" } & Omit<PlanEvent, "type">);
-
-export function show(v: unknown): string {
-  if (v === undefined || v === null || v === "") return "not set";
-  if (typeof v === "string") return v;
-  return JSON.stringify(v);
-}
+export type { Card } from "../ui/cards.ts";
 
 function Frame({ title, color, children }: { title: string; color: string; children: React.ReactNode }) {
   return (
@@ -57,9 +46,8 @@ export function PermissionCard(props: {
   const { card } = props;
   const [asking, setAsking] = useState(false);
   const [showCode, setShowCode] = useState(false);
-  const always = card.tool !== "eln_push" && !card.search;
-  const { purpose, does } = plainOf(card.args);
-  const code = card.code ?? codeOf(card.args);
+  const v = permissionView(card);
+  const { always, purpose, does, code } = v;
   useInput(
     (input, key) => {
       if (input === "y") props.onAllow();
@@ -70,17 +58,14 @@ export function PermissionCard(props: {
     },
     { isActive: !asking },
   );
-  const hidden = new Set(["purpose", "does", "code", ...(code && purpose ? ["argv"] : [])]);
-  const args = Object.entries(card.args)
-    .filter(([k, v]) => !hidden.has(k) && !(code && typeof v === "string" && v.trim() === code.trim()))
-    .map(([k, v]) => `${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`);
+  const args = v.args;
   const lines = showCode && code ? code.split("\n") : [];
   return (
-    <Frame title={card.search ? "Search outside the project" : `Permission needed: ${card.tool}`} color="yellow">
+    <Frame title={v.title} color="yellow">
       {purpose ? <Text bold>{purpose}</Text> : null}
       {does ? <Text>{does}</Text> : null}
       {args.map((a, i) => (
-        <Text key={i}>{a.length > 160 ? a.slice(0, 157) + "..." : a}</Text>
+        <Text key={i}>{a}</Text>
       ))}
       {lines.length ? (
         <Box flexDirection="column" marginTop={1}>
@@ -93,7 +78,7 @@ export function PermissionCard(props: {
         </Box>
       ) : null}
       <Box marginTop={1}>
-        <Text>{card.search ? card.touches : `This will touch: ${card.touches}`}</Text>
+        <Text>{v.touches}</Text>
       </Box>
       {asking ? (
         <Prompt
@@ -119,7 +104,7 @@ export function QuestionCard(props: {
 }) {
   const q = props.card.q;
   const [other, setOther] = useState(false);
-  const recIndex = q.recommendation ? q.options.findIndex((o) => Object.is(o.value, q.recommendation!.value) || JSON.stringify(o.value) === JSON.stringify(q.recommendation!.value)) : -1;
+  const recIndex = recommendedIndex(q);
   useInput(
     (input, key) => {
       const n = Number(input);
@@ -220,7 +205,7 @@ export function FindingsCard(props: { card: Extract<Card, { t: "findings" }>; se
     );
   }
   return (
-    <Frame title={`Review finding ${i + 1} of ${list.length}`} color="yellow">
+    <Frame title={findingTitle(i, list.length)} color="yellow">
       <Text>
         <Text bold>{f.severity}</Text> · {f.check} · {f.fid}
         {done[f.fid] ? <Text color="green"> · {done[f.fid]}</Text> : null}
@@ -229,7 +214,7 @@ export function FindingsCard(props: { card: Extract<Card, { t: "findings" }>; se
       {f.nodes?.length ? <Text dimColor>Steps: {f.nodes.join(", ")}</Text> : null}
       {reason ? (
         <Prompt
-          label={reason === "reject" ? "Why do you reject it? (Enter to skip)" : "What did you fix? (Enter to skip)"}
+          label={findingReasonLabel(reason)}
           onSubmit={(v) => resolve(reason, v.trim() || undefined)}
           onCancel={() => setReason(undefined)}
         />
@@ -242,21 +227,6 @@ export function FindingsCard(props: { card: Extract<Card, { t: "findings" }>; se
   );
 }
 
-function fieldKind(f: DecisionFieldLike): "choice" | "bool" | "number" | "text" {
-  if (f.choices?.length) return "choice";
-  if (/bool/.test(f.kind)) return "bool";
-  if (/int|float|num|real/.test(f.kind)) return "number";
-  return "text";
-}
-
-function choiceValue(c: any): unknown {
-  return c !== null && typeof c === "object" && "value" in c ? c.value : c;
-}
-
-function choiceLabel(c: any): string {
-  return c !== null && typeof c === "object" && "label" in c ? String(c.label) : show(c);
-}
-
 export function SetupCard(props: {
   card: Extract<Card, { t: "setup" }>;
   fields: DecisionFieldLike[];
@@ -264,9 +234,7 @@ export function SetupCard(props: {
   onCancel: () => void;
 }) {
   const { fields } = props;
-  const [values, setValues] = useState<Record<string, unknown>>(() =>
-    Object.fromEntries(fields.map((f) => [f.key, f.key in (props.card.proposed ?? {}) ? props.card.proposed![f.key] : f.set ? f.value : (f.value ?? f.default)])),
-  );
+  const [values, setValues] = useState<Record<string, unknown>>(() => setupValues(fields, props.card));
   const [more, setMore] = useState(false);
   const [cursor, setCursor] = useState(0);
   const [profile, setProfile] = useState(-1);
@@ -291,11 +259,9 @@ export function SetupCard(props: {
   const finishEdit = (raw: string) => {
     if (!editField) return;
     if (kind === "number") {
-      const n = Number(raw);
-      if (raw.trim() === "" || Number.isNaN(n)) return setError("Type a number.");
-      if (editField.lo !== undefined && n < editField.lo) return setError(`The minimum is ${editField.lo}.`);
-      if (editField.hi !== undefined && n > editField.hi) return setError(`The maximum is ${editField.hi}.`);
-      setValue(editField.key, n);
+      const problem = numberProblem(editField, raw);
+      if (problem) return setError(problem);
+      setValue(editField.key, Number(raw));
     } else setValue(editField.key, raw);
     setError("");
     setEditing(undefined);
@@ -314,7 +280,8 @@ export function SetupCard(props: {
         else if (row.type === "done") props.onSubmit(values, profile >= 0 ? props.card.profiles[profile]!.name : undefined);
         else if (row.type === "field") {
           const f = row.f;
-          if (f.owner === "fixed") return setError(`${f.label} is fixed by the lab profile.`);
+          const fixed = fixedProblem(f);
+          if (fixed) return setError(fixed);
           setError("");
           const k = fieldKind(f);
           if (k === "bool") setValue(f.key, !values[f.key]);
@@ -447,86 +414,53 @@ export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string
   );
 }
 
-const RUN_MODES: Mode[] = ["watch", "follow", "teach"];
-
-type PlanStep = "restate" | "decisions" | "reference" | "refpath" | "refmode" | "actions" | "change" | "correct" | "program" | "definition";
-
-function fakeQuestion(qid: string, title: string, text: string, options: { value: string; label: string }[], rec?: string): Question {
-  return { qid, session: "", decisionKey: "", title, text, options, recommendation: rec ? { value: rec, reason: "" } : undefined, evidence: "", status: "open", created: "" };
-}
-
-export function parseReference(raw: string): ReferenceChoice | undefined {
-  const [path = "", sheet = "", cols = ""] = raw.split(";").map((x) => x.trim());
-  if (!path) return undefined;
-  return { mode: "compare", path, sheet: sheet || undefined, columns: cols ? cols.split(",").map((c) => c.trim()).filter(Boolean) : undefined };
-}
 
 export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: SessionLike; onRespond: (r: PlanResponse) => void }) {
   const { card } = props;
-  const respond = props.onRespond;
-  const [later, setLater] = useState<string[]>([]);
-  const [mode, setMode] = useState<Mode>(RUN_MODES.includes(card.mode) ? card.mode : "watch");
-  const [step, setStep] = useState<PlanStep>(card.stage === "plan" && card.restatement ? "restate" : "decisions");
-  const [ref, setRef] = useState<ReferenceChoice | undefined>();
-  const [defIndex, setDefIndex] = useState(-1);
+  const [raw, setSt] = useState<PlanState>(() => planInit(card));
   const [, setTick] = useState(0);
-  const open = props.session.questions.open().filter((q) => card.qids.includes(q.qid) && !later.includes(q.qid));
+  const all = props.session.questions.open();
+  const st = planResolve(card, raw, all);
+  const step = st.step;
+  const open = planQuestions(card, st, all);
   const q = step === "decisions" ? open[0] : undefined;
-  const after = () => setStep(card.reference && card.stage === "plan" ? "reference" : "actions");
-  if (step === "decisions" && !q && card.stage === "plan") after();
-  const switches = card.programs.flatMap((g) => g.alternatives.map((alt) => `Use ${alt} for ${g.part}, not ${g.adapter}.`));
+  const act = (a: PlanAction) => {
+    const r = planReduce(card, st, a);
+    if (r.respond) props.onRespond(r.respond);
+    else setSt(r.state);
+  };
+  const switches = programSwitches(card);
   const defs = card.definitions ?? [];
-  const pilot = card.stage === "plan" && card.pilot;
+  const pilot = pilotGate(card);
+  const mode = st.mode;
   useInput(
     (input, key) => {
       if (step === "restate") {
-        if (input === "y" || key.return) setStep("decisions");
-        else if (input === "n") setStep("correct");
+        if (input === "y" || key.return) act({ a: "restate", ok: true });
+        else if (input === "n") act({ a: "restate", ok: false });
         return;
       }
       if (step === "program") {
         const n = Number(input);
-        if (Number.isInteger(n) && n >= 1 && n <= switches.length) respond({ action: "change", text: switches[n - 1]! });
-        else if (key.escape) setStep("actions");
+        if (Number.isInteger(n) && n >= 1 && n <= switches.length) act({ a: "program", index: n - 1 });
+        else if (key.escape) act({ a: "back" });
         return;
       }
       const n = Number(input);
-      if (Number.isInteger(n) && n >= 1 && n <= defs.length) {
-        setDefIndex(n - 1);
-        setStep("definition");
-      } else if (input === (pilot ? "r" : "a") || key.return) respond({ action: pilot ? "pilot" : "approve", mode, reference: ref });
-      else if (input === "c") setStep("change");
-      else if (input === "x" || key.escape) respond({ action: "cancel" });
-      else if (input === "m") setMode((m) => RUN_MODES[(RUN_MODES.indexOf(m) + 1) % RUN_MODES.length]!);
-      else if (input === "p" && switches.length) setStep("program");
+      if (Number.isInteger(n) && n >= 1 && n <= defs.length) act({ a: "definition", index: n - 1 });
+      else if (input === (pilot ? "r" : "a") || key.return) act({ a: "run" });
+      else if (input === "c") act({ a: "change" });
+      else if (input === "x" || key.escape) act({ a: "cancel" });
+      else if (input === "m") act({ a: "mode" });
+      else if (input === "p" && switches.length) act({ a: "programs" });
     },
     { isActive: card.stage === "plan" && (step === "restate" || step === "actions" || step === "program") },
   );
-  const title = card.stage === "pilot" ? "Proposed analysis: pilot result" : `${card.update ? "Proposed change to the analysis" : "Proposed analysis"}, version ${card.version}`;
-  const refQ = () => {
-    const r = card.reference!;
-    const c = r.candidates[0];
-    const opts = c
-      ? [{ value: "compare", label: "Yes. Compare in the pilot" }, { value: "blind", label: "Yes. Hold it back (blind test)" }, { value: "none", label: "No, it is not a reference" }]
-      : [{ value: "none", label: "No reference" }, { value: "have", label: "Yes, I have one" }];
-    return (
-      <QuestionCard
-        key="ref"
-        card={{ t: "question", q: fakeQuestion("reference", "Reference", r.question, opts, c ? "compare" : "none") }}
-        onAnswer={(v) => {
-          const s = String(v);
-          if (s === "have") return setStep("refpath");
-          if (s === "none") return (setRef({ mode: "none" }), setStep("actions"));
-          if (s === "compare" || s === "blind") return (setRef({ mode: s, path: c!.path, sheet: c!.sheet }), setStep("actions"));
-          const typed = parseReference(s);
-          if (typed) (setRef(typed), setStep("refmode"));
-        }}
-        onDismiss={() => setStep("actions")}
-      />
-    );
-  };
+  const ask = (key: string, question: Question, onAnswer: (v: unknown) => void) => (
+    <QuestionCard key={key} card={{ t: "question", q: question }} onAnswer={onAnswer} onDismiss={() => act({ a: "back" })} />
+  );
   return (
-    <Frame title={title} color="cyan">
+    <Frame title={planTitle(card)} color="cyan">
       {step === "restate" ? (
         <Box flexDirection="column">
           <Text bold>You want: {card.restatement!.replace(/^you want:?\s*/i, "")}</Text>
@@ -539,65 +473,34 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
       )}
       {card.stage === "pilot" ? (
         step === "change" ? (
-          <Prompt label="What must change?" onSubmit={(v) => (v.trim() ? respond({ action: "change", text: v.trim() }) : setStep("decisions"))} onCancel={() => setStep("decisions")} />
+          <Prompt label="What must change?" onSubmit={(v) => act({ a: "changeText", text: v })} onCancel={() => act({ a: "back" })} />
         ) : (
-          <QuestionCard
-            key="pilot"
-            card={{
-              t: "question",
-              q: fakeQuestion("pilot", "Confirm the plan and run all?", "Does this look right?", [
-                { value: "confirm", label: "Confirm the plan and run all" },
-                { value: "change", label: "Change the method" },
-                { value: "another", label: "Try another sample" },
-              ]),
-            }}
-            onAnswer={(v) => {
-              const s = String(v);
-              if (s === "confirm") respond({ action: "confirm" });
-              else if (s === "another") respond({ action: "another" });
-              else if (s === "change") setStep("change");
-              else respond({ action: "change", text: s });
-            }}
-            onDismiss={() => {}}
-          />
+          <QuestionCard key="pilot" card={{ t: "question", q: pilotQuestion() }} onAnswer={(v) => act({ a: "pilot", value: String(v) })} onDismiss={() => {}} />
         )
       ) : step === "correct" ? (
-        <Prompt label="What do you want?" onSubmit={(v) => (v.trim() ? respond({ action: "change", text: `The scientist corrects the request. The scientist wants: ${v.trim()}` }) : setStep("restate"))} onCancel={() => setStep("restate")} />
+        <Prompt label="What do you want?" onSubmit={(v) => act({ a: "correct", text: v })} onCancel={() => act({ a: "back" })} />
       ) : q ? (
         <Box flexDirection="column" marginTop={1}>
           <Text dimColor>
-            Open decision {card.qids.length - open.length + 1} of {card.qids.length - later.length}. Answer it here, or press Esc to answer later.
+            Open decision {card.qids.length - open.length + 1} of {card.qids.length - st.later.length}. Answer it here, or press Esc to answer later.
           </Text>
           <QuestionCard
             key={q.qid}
             card={{ t: "question", q }}
             onAnswer={(value, note) => void props.session.answer(q.qid, value, note).then(() => setTick((x) => x + 1))}
-            onDismiss={() => setLater((x) => [...x, q.qid])}
+            onDismiss={() => act({ a: "later", qid: q.qid })}
           />
         </Box>
       ) : step === "reference" ? (
-        refQ()
+        ask("ref", referenceQuestion(card), (v) => act({ a: "reference", value: String(v) }))
       ) : step === "refpath" ? (
-        <Prompt label="File; sheet; value columns (for example /data/counts.xlsx; Set 1; Red dots, Total cells):" onSubmit={(v) => { const r = parseReference(v); if (r) (setRef(r), setStep("refmode")); else setStep("actions"); }} onCancel={() => setStep("actions")} />
+        <Prompt label={REFERENCE_PATH_LABEL} onSubmit={(v) => act({ a: "refpath", text: v })} onCancel={() => act({ a: "back" })} />
       ) : step === "refmode" ? (
-        <QuestionCard
-          key="refmode"
-          card={{ t: "question", q: fakeQuestion("refmode", "Reference", `How does the agent use ${ref?.path ?? "the reference"}?`, [{ value: "compare", label: "Compare in the pilot" }, { value: "blind", label: "Hold it back (blind test)" }], "compare") }}
-          onAnswer={(v) => (setRef((r) => (r ? { ...r, mode: String(v) === "blind" ? "blind" : "compare" } : r)), setStep("actions"))}
-          onDismiss={() => setStep("actions")}
-        />
+        ask("refmode", refModeQuestion(st), (v) => act({ a: "refmode", value: String(v) }))
       ) : step === "change" ? (
-        <Prompt label="What must change?" onSubmit={(v) => (v.trim() ? respond({ action: "change", text: v.trim() }) : setStep("actions"))} onCancel={() => setStep("actions")} />
-      ) : step === "definition" && defs[defIndex] ? (
-        <Prompt
-          label={`New definition of ${defs[defIndex]!.measure} (now: ${defs[defIndex]!.definition}):`}
-          onSubmit={(v) => {
-            const d = defs[defIndex]!;
-            if (!v.trim() || v.trim() === d.definition) return setStep("actions");
-            respond({ action: "change", text: `Change the definition of ${d.measure} to: ${v.trim()}`, definition: { measure: d.measure, old: d.definition, new: v.trim() } });
-          }}
-          onCancel={() => setStep("actions")}
-        />
+        <Prompt label="What must change?" onSubmit={(v) => act({ a: "changeText", text: v })} onCancel={() => act({ a: "back" })} />
+      ) : step === "definition" && definitionLabel(card, st) ? (
+        <Prompt label={definitionLabel(card, st)!} onSubmit={(v) => act({ a: "define", text: v })} onCancel={() => act({ a: "back" })} />
       ) : step === "program" ? (
         <Box flexDirection="column" marginTop={1}>
           {switches.map((t, i) => (
@@ -609,7 +512,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
         </Box>
       ) : step === "actions" ? (
         <Box flexDirection="column" marginTop={1}>
-          {ref && ref.mode !== "none" ? <Text dimColor>Reference: {ref.path} ({ref.mode === "blind" ? "held back for a blind test" : "compared in the pilot"})</Text> : null}
+          {referenceLine(st.ref) ? <Text dimColor>{referenceLine(st.ref)}</Text> : null}
           {defs.length ? <Text dimColor>Each definition is accepted unless you change it: press its number (1 to {defs.length}).</Text> : null}
           <Text>
             {pilot ? (
@@ -628,7 +531,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
               </Text>
             ) : null}
           </Text>
-          <Text dimColor>{pilot ? "The method runs on the pilot sample only. You check the result before the other samples run." : "No analysis step runs before you approve."}</Text>
+          <Text dimColor>{planHint(card)}</Text>
         </Box>
       ) : null}
     </Frame>

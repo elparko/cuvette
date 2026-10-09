@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useStdout } from "ink";
 import type { Mode } from "../core/types.ts";
-import { fidelityLabel, type Item } from "./items.ts";
+import { fidelityLabel, type Item } from "../ui/items.ts";
 import { Markdown } from "./markdown.tsx";
 import type { SessionLike } from "./types.ts";
 

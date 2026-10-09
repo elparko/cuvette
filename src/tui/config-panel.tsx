@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import { changeSetting, describe, scopeLabel, settingsPath, type Scope, type SettingCtx, type SettingDef } from "../core/settings.ts";
+import type { Scope, SettingCtx, SettingDef } from "../core/settings.ts";
+import { rowHelp, rowTag, saveSetting, scopeText, settingEditor, settingRows } from "../ui/config.ts";
 
 type Step =
   | { t: "list" }
@@ -13,7 +14,7 @@ const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…"
 
 export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (card: "key" | "eln") => void; onClose: () => void }) {
   const { ctx } = props;
-  const rows = describe(ctx).map((r) => ({ ...r, locked: !!(r.def.lockedInTurn && props.busy) }));
+  const rows = settingRows(ctx, props.busy);
   const [sel, setSel] = useState(0);
   const [step, setStep] = useState<Step>({ t: "list" });
   const [text, setText] = useState("");
@@ -22,12 +23,7 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
 
   const save = async (def: SettingDef, value: string, scope: Scope) => {
     setStep({ t: "list" });
-    try {
-      const r = await changeSetting(ctx, def.name, value, scope);
-      setMsg({ text: `${def.label} is now ${value} (${scopeLabel(scope)}).${r.note ? " " + r.note : ""}`, color: "green" });
-    } catch (e) {
-      setMsg({ text: (e as Error).message, color: "red" });
-    }
+    setMsg(await saveSetting(ctx, def, value, scope));
   };
 
   const pickScope = (def: SettingDef, value: string) => {
@@ -36,18 +32,12 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
   };
 
   const open = () => {
-    const d = row.def;
     setMsg(undefined);
-    if (row.locked) return setMsg({ text: `${d.label} is locked until the turn ends.`, color: "yellow" });
-    if (d.edit) return props.onEdit(d.edit);
-    if (!d.scopes.length) return setMsg({ text: "You cannot change this setting here." });
-    if (d.number || d.list) {
-      setText("");
-      return setStep({ t: "text", def: d });
-    }
-    const options = d.choices?.() ?? [];
-    const cur = options.indexOf(row.value);
-    setStep({ t: "value", def: d, options: cur < 0 && row.value !== "not set" ? [row.value, ...options] : options, sel: Math.max(0, cur) });
+    const e = settingEditor(row);
+    if (e.t === "message") return setMsg({ text: e.text, color: e.color });
+    if (e.t === "edit") return props.onEdit(e.card);
+    if (e.t === "text") setText("");
+    setStep(e);
   };
 
   useInput((ch, key) => {
@@ -88,7 +78,7 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
       );
     }
     const on = i === sel;
-    const tag = [r.source ? scopeLabel(r.source) : "", r.locked ? "locked" : ""].filter(Boolean).join(" · ");
+    const tag = rowTag(r);
     lines.push(
       <Box key={r.def.name}>
         <Text color={on ? "cyan" : undefined}>{on ? "▸ " : "  "}</Text>
@@ -123,7 +113,7 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
           <Text key={`s${j}`} color={j === step.sel ? "cyan" : undefined}>
             {"    "}
             {j === step.sel ? "▸ " : "  "}
-            {s === "session" ? "This session only" : s === "user" ? `User settings  ${settingsPath("user", ctx.cwd)}` : `Project settings  ${settingsPath("project", ctx.cwd)}`}
+            {scopeText(s, ctx.cwd)}
           </Text>,
         ),
       );
@@ -140,7 +130,7 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
       </Text>
       {lines}
       <Box marginTop={1} flexDirection="column">
-        <Text>{row.locked ? "Locked until the turn ends. " + row.def.help : row.def.help}</Text>
+        <Text>{rowHelp(row)}</Text>
         {(row.def.details?.(ctx) ?? []).map((d, i) => (
           <Text key={i} dimColor>
             {"  " + d}

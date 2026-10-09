@@ -3,16 +3,18 @@ import { Box, Static, Text, render, useApp, useInput, useStdout } from "ink";
 import TextInput from "ink-text-input";
 import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
-import { claudeKey, credentialsPath, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
+import { credentialsPath } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
-import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from "./commands.ts";
+import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from "../ui/commands.ts";
 import { imageProtocol, inlineImage } from "./image.ts";
-import { Collapser, Mapper, mainView, type Item, type Logged } from "./items.ts";
+import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
 import { Header, ItemView, RunningLine, StatusLine, activityText, type StaticItem } from "./view.tsx";
 import { Markdown } from "./markdown.tsx";
 import { ConfigPanel } from "./config-panel.tsx";
-import { find, recordSetting, type SettingSession } from "../core/settings.ts";
+import type { SettingSession } from "../core/settings.ts";
+import { applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
+import { inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
 
 const MODE_ORDER: Mode[] = ["watch", "follow", "teach", "plan"];
 const MAX_SUGGESTIONS = 8;
@@ -90,17 +92,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
       push({ key: `l${++counter.current}`, t: "line", sym, color, text, dim }),
     [push],
   );
-  const addCard = useCallback(
-    (c: Card) =>
-      setCards((x) => {
-        if (c.t === "question" && x.some((y) => (y.t === "question" && y.q.qid === c.q.qid) || (y.t === "plan" && y.qids.includes(c.q.qid)))) return x;
-        if (c.t === "plan") return [...x.filter((y) => !(y.t === "question" && c.qids.includes(y.q.qid)) && y.t !== "plan"), c];
-        if (c.t === "setup" && x.some((y) => y.t === "setup")) return x;
-        if (c.t === "key") return x.some((y) => y.t === "key") ? x : [c, ...x];
-        return [...x, c];
-      }),
-    [],
-  );
+  const addCard = useCallback((c: Card) => setCards((x) => pushCard(x, c)), []);
   const dropCard = useCallback((pred: (c: Card) => boolean) => setCards((x) => x.filter((c) => !pred(c))), []);
   const popCard = useCallback(() => setCards((x) => x.slice(1)), []);
   const refresh = useCallback(() => {
@@ -119,37 +111,28 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     }
   }, [session, exit, opts]);
 
+  const say: Say = useMemo(
+    () => ({ ok: (t) => line("✓", t, "green"), bad: (t) => line("✗", t, "red"), dim: (t) => line("·", t, undefined, true), warn: (t) => line("!", t, "yellow") }),
+    [line],
+  );
+
   useEffect(() => {
-    for (const q of session.questions.open()) addCard({ t: "question", q });
-    if (session.planFirst) line("▸", "The agent writes a proposed analysis first. You confirm it before any step runs.", undefined, true);
-    else line("▸", "Type /plan to get a proposed analysis before any step runs.", undefined, true);
+    const first = startCards(session, env);
+    line("▸", planIntro(session), undefined, true);
     if (opts.firstMessage) session.send(opts.firstMessage).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
-    if (opts.autoSetup !== false && session.decisions.fields().some((f) => f.essential && !f.set)) {
-      void openSetup({ openCard: addCard } as CommandCtx);
-    }
-    if (session.model.provider === "claude" && claudeKey(env).from === "none") {
-      addCard({ t: "key", reason: "No Claude API key is set. Add one now, or press Esc if you use `ant auth login`." });
-    }
+    if (opts.autoSetup !== false && needsSetup(session)) void openSetup({ openCard: addCard } as CommandCtx);
+    for (const c of first) addCard(c);
   }, []);
 
   const submitKey = useCallback(
     async (key: string) => {
       const problem = keyProblem(key);
-      if (problem) return line("✗", problem, "red");
+      if (problem) return say.bad(problem);
       popCard();
-      line("·", `Checking the key ${maskKey(key)} with the Claude API…`, undefined, true);
-      const r = await checkClaudeKey(key, session.model.provider === "claude" ? session.model.model : undefined);
-      if (!r.ok) {
-        line("✗", r.text, "red");
-        addCard({ t: "key", reason: r.text });
-        return;
-      }
-      const path = saveClaudeKey(key);
-      recordSetting(session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
-      line("✓", `${r.text} Saved to ${path}.`, "green");
-      if (env.ANTHROPIC_API_KEY) line("!", "ANTHROPIC_API_KEY is also set in this shell. The harness uses that one first.", "yellow");
+      const r = await saveKey(session, key, env, say, checkClaudeKey);
+      if (!r.ok) addCard({ t: "key", reason: r.text });
     },
-    [session, env],
+    [session, env, say],
   );
 
   useEffect(() => {
@@ -168,11 +151,8 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           record({ e: en, items: out });
           if (en.kind === "assistant") setLive("");
           if (en.kind === "usage") setTokens({ ...mapper.current.tokens });
-          if (en.kind === "answer") dropCard((c) => c.t === "question" && c.q.qid === en.data.qid);
-          if (en.kind === "permission") dropCard((c) => c.t === "permission" && c.rid === en.data.rid);
-          if (en.kind === "follow_step") dropCard((c) => c.t === "instruction" && c.step === en.data.step);
-          if (en.kind === "plan_approved" || en.kind === "pilot_approved" || en.kind === "pilot_rejected" || (en.kind === "plan" && ["change_requested", "cancelled", "pilot_requested"].includes(String(en.data.action)))) dropCard((c) => c.t === "plan");
-          if (en.kind === "mode" || en.kind === "permission_mode" || en.kind === "question" || en.kind === "answer") refresh();
+          dropCard((c) => closesCard(en, c));
+          if (refreshesStatus(en)) refresh();
           break;
         }
         case "delta":
@@ -185,29 +165,18 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
             show(collapser.current.flush());
             setPending([]);
             setLive("");
-            const [next, ...rest] = [...(session.takeSteered?.() ?? []), ...queueRef.current];
+            const { next, rest } = nextQueued(session, queueRef.current);
             if (next !== undefined) {
               updateQueue(rest);
               session.send(next).catch((err: Error) => line("✗", `The agent stopped: ${err.message}`, "red"));
             }
           }
           break;
-        case "permission":
-          addCard({ t: "permission", rid: e.rid, tool: e.tool, args: e.args, code: e.code, touches: e.touches, search: e.search });
-          break;
-        case "question":
-          addCard({ t: "question", q: e.question });
-          refresh();
-          break;
-        case "instruction":
-          addCard({ t: "instruction", step: e.step, tool: e.tool, text: e.text });
-          break;
-        case "plan":
-          {
-            const { type: _t, ...rest } = e;
-            addCard({ t: "plan", ...rest });
-          }
-          break;
+        default: {
+          const c = cardFromEvent(e);
+          if (c) addCard(c);
+          if (e.type === "question") refresh();
+        }
       }
     });
   }, [session]);
@@ -299,17 +268,15 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     setInput("");
     setSel(0);
     if (text.startsWith("/")) return void runCommand(text);
-    if (status.state !== "idle") {
-      const now = text.startsWith("!");
-      const body = now ? text.slice(1).trim() : text;
-      if (!body) return;
-      if (!session.steer || (!now && session.settings?.messages === "queue")) return updateQueue([...queueRef.current, body]);
-      session.steer(body, now);
-      push({ key: `u${++counter.current}`, t: "user", text: body });
-      return line("▸", now ? "Sent now. The current step stops, and the agent reads your message." : "Sent. The agent reads it after the current step.", undefined, true);
+    const r = routeMessage(session, text, status.state !== "idle");
+    if (r.t === "none") return;
+    if (r.t === "queue") return updateQueue([...queueRef.current, r.text]);
+    if (r.t === "steer") {
+      push({ key: `u${++counter.current}`, t: "user", text: r.text });
+      return line("▸", r.note, undefined, true);
     }
     setHint("");
-    session.send(text).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
+    session.send(r.text).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
   };
 
   useInput((ch, key) => {
@@ -326,8 +293,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     if (key.escape) {
       if (status.state !== "idle") {
         updateQueue([]);
-        session.takeSteered?.();
-        session.interrupt();
+        stopTurn(session);
       }
       else if (input) setText("");
     } else if (key.tab && key.shift) {
@@ -375,86 +341,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         </Box>
       ) : null}
       {status.state !== "idle" ? <RunningLine key={`${status.state}${status.tool ?? ""}${status.since ?? ""}`} tool={status.tool ?? ""} purpose={activityText(status.state, status.purpose, status.tool)} since={status.since} /> : null}
-      {card?.t === "setup" ? (
-        <SetupCard
-          key="setup"
-          card={card}
-          fields={session.decisions.fields()}
-          onCancel={popCard}
-          onSubmit={(values, profile) => {
-            try {
-              session.decisions.applySetup(values, { profile, how: "card" });
-            } catch (e) {
-              line("✗", `Setup failed: ${(e as Error).message}`, "red");
-            }
-            popCard();
-          }}
-        />
-      ) : null}
-      {card?.t === "permission" ? (
-        <PermissionCard
-          key={card.rid}
-          card={card}
-          onAllow={() => (session.respondPermission(card.rid, true), popCard())}
-          onAlways={() => (session.respondPermission(card.rid, true, "", true), popCard())}
-          onInterrupt={() => (session.interrupt(), popCard())}
-          onDeny={(note) => (session.respondPermission(card.rid, false, note), popCard())}
-        />
-      ) : null}
-      {card?.t === "question" ? (
-        <QuestionCard
-          key={card.q.qid}
-          card={card}
-          onAnswer={(value, note) => {
-            popCard();
-            session.answer(card.q.qid, value, note).catch((e: Error) => line("✗", e.message, "red"));
-          }}
-          onDismiss={popCard}
-        />
-      ) : null}
-      {card?.t === "instruction" ? (
-        <InstructionCard
-          key={card.step}
-          card={card}
-          program={program}
-          onDone={() => (popCard(), void session.followDone(card.step))}
-          onInterrupt={() => (session.interrupt(), popCard())}
-          onAgent={() => (popCard(), void session.followDone(card.step, "", true))}
-        />
-      ) : null}
-      {card?.t === "plan" ? (
-        <PlanCard
-          key={`plan${card.stage}${card.version}${card.text.length}`}
-          card={card}
-          session={session}
-          onRespond={(r) => (popCard(), session.respondPlan?.(r))}
-        />
-      ) : null}
-      {card?.t === "findings" ? <FindingsCard key="findings" card={card} session={session} onClose={popCard} /> : null}
-      {card?.t === "eln" ? (
-        <ElnCard
-          key="eln"
-          path={credentialsPath()}
-          onCancel={popCard}
-          onSubmit={(url, key) => {
-            const problem = elabftwProblem(url, key);
-            if (problem) return line("✗", problem, "red");
-            popCard();
-            line("✓", `Saved the eLabFTW address and key ${maskKey(key)} to ${saveElabftw(url, key)}.`, "green");
-            recordSetting(session as unknown as SettingSession, find("elabftw_key")!, undefined, undefined, "user");
-          }}
-        />
-      ) : null}
-      {card?.t === "config" ? (
-        <ConfigPanel
-          key="config"
-          ctx={{ cwd: session.cwd ?? process.cwd(), env, session: session as unknown as SettingSession, ui: { details: () => details.current, toggleDetails } }}
-          busy={status.state !== "idle"}
-          onClose={() => (popCard(), refresh())}
-          onEdit={(t) => setCards((x) => [t === "key" ? { t: "key" } : { t: "eln" }, ...x.slice(1)])}
-        />
-      ) : null}
-      {card?.t === "key" ? <KeyCard key="key" card={card} path={credentialsPath()} onSubmit={(k) => void submitKey(k)} onCancel={popCard} /> : null}
+      {card ? (cardViews({ session, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: status.state !== "idle", program })[card.t] as (c: Card) => React.ReactNode)(card) : null}
       <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
         <Text color="cyan">{"> "}</Text>
         {card ? (
@@ -468,7 +355,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
               setSel(0);
             }}
             onSubmit={submit}
-            placeholder={status.state === "idle" ? "Ask for an analysis step, or type / for commands" : session.settings?.messages === "queue" ? "The agent is working. Your message waits until the turn ends." : "The agent is working. Your message goes in after the current step."}
+            placeholder={inputPlaceholder(session, status.state !== "idle")}
           />
         )}
       </Box>
@@ -500,6 +387,88 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     </Box>
   );
 }
+
+interface CardDeps {
+  session: SessionLike;
+  env: Record<string, string | undefined>;
+  popCard(): void;
+  setCards: React.Dispatch<React.SetStateAction<Card[]>>;
+  line(sym: string, text: string, color?: string, dim?: boolean): void;
+  say: Say;
+  submitKey(key: string): Promise<void>;
+  refresh(): void;
+  details: { current: boolean };
+  toggleDetails(): void;
+  busy: boolean;
+  program: string;
+}
+
+type CardViews = { [K in CardType]: (c: Extract<Card, { t: K }>) => React.ReactNode };
+
+function cardViews(d: CardDeps): CardViews {
+  const { session, popCard } = d;
+  return {
+    setup: (card) => (
+      <SetupCard
+        key="setup"
+        card={card}
+        fields={session.decisions.fields()}
+        onCancel={popCard}
+        onSubmit={(values, profile) => {
+          const problem = applySetup(session, values, profile);
+          if (problem) d.line("✗", problem, "red");
+          popCard();
+        }}
+      />
+    ),
+    permission: (card) => (
+      <PermissionCard
+        key={card.rid}
+        card={card}
+        onAllow={() => (respondPermission(session, card, { ok: true }), popCard())}
+        onAlways={() => (respondPermission(session, card, { ok: true, always: true }), popCard())}
+        onInterrupt={() => (respondPermission(session, card, { stop: true }), popCard())}
+        onDeny={(note) => (respondPermission(session, card, { ok: false, note }), popCard())}
+      />
+    ),
+    question: (card) => (
+      <QuestionCard
+        key={card.q.qid}
+        card={card}
+        onAnswer={(value, note) => {
+          popCard();
+          session.answer(card.q.qid, value, note).catch((e: Error) => d.line("✗", e.message, "red"));
+        }}
+        onDismiss={popCard}
+      />
+    ),
+    instruction: (card) => (
+      <InstructionCard
+        key={card.step}
+        card={card}
+        program={d.program}
+        onDone={() => (popCard(), void session.followDone(card.step))}
+        onInterrupt={() => (session.interrupt(), popCard())}
+        onAgent={() => (popCard(), void session.followDone(card.step, "", true))}
+      />
+    ),
+    plan: (card) => <PlanCard key={`plan${card.stage}${card.version}${card.text.length}`} card={card} session={session} onRespond={(r) => (popCard(), session.respondPlan?.(r))} />,
+    findings: (card) => <FindingsCard key="findings" card={card} session={session} onClose={popCard} />,
+    eln: () => <ElnCard key="eln" path={credentialsPath()} onCancel={popCard} onSubmit={(url, key) => void (saveEln(session, url, key, { ...d.say, ok: (t) => (popCard(), d.say.ok(t)) }))} />,
+    config: () => (
+      <ConfigPanel
+        key="config"
+        ctx={{ cwd: session.cwd ?? process.cwd(), env: d.env, session: session as unknown as SettingSession, ui: { details: () => d.details.current, toggleDetails: d.toggleDetails } }}
+        busy={d.busy}
+        onClose={() => (popCard(), d.refresh())}
+        onEdit={(t) => d.setCards((x) => [t === "key" ? { t: "key" } : { t: "eln" }, ...x.slice(1)])}
+      />
+    ),
+    key: (card) => <KeyCard key="key" card={card} path={credentialsPath()} onSubmit={(k) => void d.submitKey(k)} onCancel={popCard} />,
+  };
+}
+
+export const TUI_CARD_TYPES = Object.keys(cardViews({} as CardDeps)) as CardType[];
 
 export async function runTui(session: SessionLike, opts: TuiOptions = {}): Promise<void> {
   const instance = render(<App session={session} opts={opts} />, {

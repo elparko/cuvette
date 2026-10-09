@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { runTui } from "../src/tui/app.tsx";
-import { FakeSession } from "../src/tui/fake-session.ts";
+import { FakeSession } from "../src/ui/fake-session.ts";
 import { imageProtocol, inlineImage } from "../src/tui/image.ts";
-import { Collapser, Mapper, mainView, settingsLine, type Item, type Logged } from "../src/tui/items.ts";
+import { Collapser, Mapper, mainView, settingsLine, type Item, type Logged } from "../src/ui/items.ts";
 import { tableLines } from "../src/tui/markdown.tsx";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
-import { renderGraph, suggestions } from "../src/tui/commands.ts";
+import { renderGraph, suggestions } from "../src/ui/commands.ts";
 import React from "react";
 import { render } from "ink";
 import { ItemView, activityText, busyHint, runningText } from "../src/tui/view.tsx";

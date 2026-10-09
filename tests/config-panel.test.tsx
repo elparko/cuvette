@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { saveClaudeKey } from "../src/core/credentials.ts";
 import { settingsPath } from "../src/core/settings.ts";
 import { runTui } from "../src/tui/app.tsx";
-import { FakeSession } from "../src/tui/fake-session.ts";
+import { FakeSession } from "../src/ui/fake-session.ts";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 
 const KEY = "sk-ant-api03-panelsecretpanel-QRST";

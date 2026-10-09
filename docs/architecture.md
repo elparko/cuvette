@@ -71,6 +71,8 @@ src/tools/
   generic.ts                 run_command, read_file, list_dir, write_file, screenshot [C]
   run_script.ts              sandboxed Python script that calls tools back            [C]
   task.ts                    subagents (referee, onboarding)                          [lead]
+src/ui/                      view-independent commands, cards, messages, settings;    [F]
+                             the terminal UI and the browser app both call them
 src/tui/                     Ink app                                                  [F]
 src/server/                  later: graph window (HTTP + SSE) and ntfy push           [F]
 src/mcp-server.ts            the harness as an MCP server                             [lead]

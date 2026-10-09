@@ -1,0 +1,373 @@
+import type { BusEvent, Entry, Finding, Mode, PlanEvent, PlanResponse, Question, ReferenceChoice } from "../core/types.ts";
+import { claudeKey, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
+import { find, recordSetting, type SettingSession } from "../core/settings.ts";
+import { codeOf, plainOf } from "./items.ts";
+import type { DecisionFieldLike, SessionLike } from "./types.ts";
+
+export type Card =
+  | { t: "setup"; profiles: { name: string; version: number }[]; proposed?: Record<string, unknown>; proposedFrom?: string }
+  | { t: "eln" }
+  | { t: "permission"; rid: string; tool: string; args: Record<string, unknown>; code?: string; touches: string; search?: { root: string; purpose: string } }
+  | { t: "question"; q: Question }
+  | { t: "instruction"; step: number; tool: string; text: string }
+  | { t: "findings"; list: Finding[] }
+  | { t: "key"; reason?: string }
+  | { t: "config" }
+  | ({ t: "plan" } & Omit<PlanEvent, "type">);
+
+export type CardType = Card["t"];
+
+export function show(v: unknown): string {
+  if (v === undefined || v === null || v === "") return "not set";
+  if (typeof v === "string") return v;
+  return JSON.stringify(v);
+}
+
+export function pushCard(list: Card[], c: Card): Card[] {
+  if (c.t === "question" && list.some((y) => (y.t === "question" && y.q.qid === c.q.qid) || (y.t === "plan" && y.qids.includes(c.q.qid)))) return list;
+  if (c.t === "plan") return [...list.filter((y) => !(y.t === "question" && c.qids.includes(y.q.qid)) && y.t !== "plan"), c];
+  if (c.t === "setup" && list.some((y) => y.t === "setup")) return list;
+  if (c.t === "key") return list.some((y) => y.t === "key") ? list : [c, ...list];
+  return [...list, c];
+}
+
+export function cardFromEvent(e: BusEvent): Card | undefined {
+  switch (e.type) {
+    case "permission":
+      return { t: "permission", rid: e.rid, tool: e.tool, args: e.args, code: e.code, touches: e.touches, search: e.search };
+    case "question":
+      return { t: "question", q: e.question };
+    case "instruction":
+      return { t: "instruction", step: e.step, tool: e.tool, text: e.text };
+    case "plan": {
+      const { type: _t, ...rest } = e;
+      return { t: "plan", ...rest };
+    }
+  }
+  return undefined;
+}
+
+const PLAN_ENDS = ["change_requested", "cancelled", "pilot_requested"];
+
+export function closesCard(en: Entry, c: Card): boolean {
+  if (en.kind === "answer") return c.t === "question" && c.q.qid === en.data.qid;
+  if (en.kind === "permission") return c.t === "permission" && c.rid === en.data.rid;
+  if (en.kind === "follow_step") return c.t === "instruction" && c.step === en.data.step;
+  if (en.kind === "plan_approved" || en.kind === "pilot_approved" || en.kind === "pilot_rejected" || (en.kind === "plan" && PLAN_ENDS.includes(String(en.data.action)))) return c.t === "plan";
+  return false;
+}
+
+export const refreshesStatus = (en: Entry) => en.kind === "mode" || en.kind === "permission_mode" || en.kind === "question" || en.kind === "answer";
+
+export function startCards(session: SessionLike, env: Record<string, string | undefined>): Card[] {
+  let list: Card[] = [];
+  for (const q of session.questions.open()) list = pushCard(list, { t: "question", q });
+  for (const e of session.openEvents?.() ?? []) {
+    const c = cardFromEvent(e);
+    if (c) list = pushCard(list, c);
+  }
+  if (session.model.provider === "claude" && claudeKey(env).from === "none") list = pushCard(list, { t: "key", reason: NO_KEY });
+  return list;
+}
+
+export const needsSetup = (session: SessionLike) => session.decisions.fields().some((f) => f.essential && !f.set);
+
+export const NO_KEY = "No Claude API key is set. Add one now, or press Esc if you use `ant auth login`.";
+
+export function planIntro(session: SessionLike): string {
+  return session.planFirst ? "The agent writes a proposed analysis first. You confirm it before any step runs." : "Type /plan to get a proposed analysis before any step runs.";
+}
+
+// ---------------------------------------------------------------- permission
+
+export function permissionView(card: Extract<Card, { t: "permission" }>) {
+  const always = card.tool !== "eln_push" && !card.search;
+  const { purpose, does } = plainOf(card.args);
+  const code = card.code ?? codeOf(card.args);
+  const hidden = new Set(["purpose", "does", "code", ...(code && purpose ? ["argv"] : [])]);
+  const args = Object.entries(card.args)
+    .filter(([k, v]) => !hidden.has(k) && !(code && typeof v === "string" && v.trim() === code.trim()))
+    .map(([k, v]) => `${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .map((a) => (a.length > 160 ? a.slice(0, 157) + "..." : a));
+  return {
+    title: card.search ? "Search outside the project" : `Permission needed: ${card.tool}`,
+    purpose,
+    does,
+    args,
+    code,
+    always,
+    touches: card.search ? card.touches : `This will touch: ${card.touches}`,
+  };
+}
+
+export type PermissionChoice = { ok: true; always?: boolean } | { ok: false; note?: string } | { stop: true };
+
+export function respondPermission(session: SessionLike, card: Extract<Card, { t: "permission" }>, c: PermissionChoice): void {
+  if ("stop" in c) return session.interrupt();
+  if (c.ok) session.respondPermission(card.rid, true, ...((c.always ? ["", true] : []) as [string?, boolean?]));
+  else session.respondPermission(card.rid, false, c.note);
+}
+
+// ---------------------------------------------------------------- question
+
+export function recommendedIndex(q: Question): number {
+  if (!q.recommendation) return -1;
+  return q.options.findIndex((o) => Object.is(o.value, q.recommendation!.value) || JSON.stringify(o.value) === JSON.stringify(q.recommendation!.value));
+}
+
+export function localQuestion(qid: string, title: string, text: string, options: { value: string; label: string }[], rec?: string): Question {
+  return { qid, session: "", decisionKey: "", title, text, options, recommendation: rec ? { value: rec, reason: "" } : undefined, evidence: "", status: "open", created: "" };
+}
+
+// ---------------------------------------------------------------- setup
+
+export type FieldKind = "choice" | "bool" | "number" | "text";
+
+export function fieldKind(f: DecisionFieldLike): FieldKind {
+  if (f.choices?.length) return "choice";
+  if (/bool/.test(f.kind)) return "bool";
+  if (/int|float|num|real/.test(f.kind)) return "number";
+  return "text";
+}
+
+export function choiceValue(c: any): unknown {
+  return c !== null && typeof c === "object" && "value" in c ? c.value : c;
+}
+
+export function choiceLabel(c: any): string {
+  return c !== null && typeof c === "object" && "label" in c ? String(c.label) : show(c);
+}
+
+export function setupValues(fields: DecisionFieldLike[], card: Extract<Card, { t: "setup" }>): Record<string, unknown> {
+  return Object.fromEntries(fields.map((f) => [f.key, f.key in (card.proposed ?? {}) ? card.proposed![f.key] : f.set ? f.value : (f.value ?? f.default)]));
+}
+
+export function numberProblem(f: DecisionFieldLike, raw: string): string | undefined {
+  const n = Number(raw);
+  if (raw.trim() === "" || Number.isNaN(n)) return "Type a number.";
+  if (f.lo !== undefined && n < f.lo) return `The minimum is ${f.lo}.`;
+  if (f.hi !== undefined && n > f.hi) return `The maximum is ${f.hi}.`;
+  return undefined;
+}
+
+export function fixedProblem(f: DecisionFieldLike): string | undefined {
+  return f.owner === "fixed" ? `${f.label} is fixed by the lab profile.` : undefined;
+}
+
+export function applySetup(session: SessionLike, values: Record<string, unknown>, profile?: string): string | undefined {
+  try {
+    session.decisions.applySetup(values, { profile, how: "card" });
+  } catch (e) {
+    return `Setup failed: ${(e as Error).message}`;
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------- key and eLabFTW
+
+export interface Say {
+  ok(text: string): void;
+  bad(text: string): void;
+  dim(text: string): void;
+  warn(text: string): void;
+}
+
+export { keyProblem };
+
+export type KeyCheck = (key: string, model?: string) => Promise<{ ok: boolean; text: string }>;
+
+export async function saveKey(session: SessionLike, key: string, env: Record<string, string | undefined>, say: Say, check: KeyCheck): Promise<{ ok: boolean; text: string }> {
+  say.dim(`Checking the key ${maskKey(key)} with the Claude API…`);
+  const r = await check(key, session.model.provider === "claude" ? session.model.model : undefined);
+  if (!r.ok) return (say.bad(r.text), r);
+  const path = saveClaudeKey(key);
+  recordSetting(session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");
+  say.ok(`${r.text} Saved to ${path}.`);
+  if (env.ANTHROPIC_API_KEY) say.warn("ANTHROPIC_API_KEY is also set in this shell. The harness uses that one first.");
+  return r;
+}
+
+export function saveEln(session: SessionLike, url: string, key: string, say: Say): boolean {
+  const problem = elabftwProblem(url, key);
+  if (problem) return (say.bad(problem), false);
+  say.ok(`Saved the eLabFTW address and key ${maskKey(key)} to ${saveElabftw(url, key)}.`);
+  recordSetting(session as unknown as SettingSession, find("elabftw_key")!, undefined, undefined, "user");
+  return true;
+}
+
+// ---------------------------------------------------------------- findings
+
+export type FindingAction = "accept" | "reject" | "fix";
+
+export function findingTitle(i: number, total: number): string {
+  return `Review finding ${i + 1} of ${total}`;
+}
+
+export function findingReasonLabel(a: "reject" | "fix"): string {
+  return a === "reject" ? "Why do you reject it? (Enter to skip)" : "What did you fix? (Enter to skip)";
+}
+
+// ---------------------------------------------------------------- the proposed analysis
+
+export const RUN_MODES: Mode[] = ["watch", "follow", "teach"];
+
+export type PlanStep = "restate" | "decisions" | "reference" | "refpath" | "refmode" | "actions" | "change" | "correct" | "program" | "definition";
+
+export interface PlanState {
+  step: PlanStep;
+  later: string[];
+  mode: Mode;
+  ref?: ReferenceChoice;
+  defIndex: number;
+}
+
+export type PlanCard = Extract<Card, { t: "plan" }>;
+
+export type PlanAction =
+  | { a: "restate"; ok: boolean }
+  | { a: "correct"; text: string }
+  | { a: "later"; qid: string }
+  | { a: "reference"; value: string }
+  | { a: "refpath"; text: string }
+  | { a: "refmode"; value: string }
+  | { a: "definition"; index: number }
+  | { a: "define"; text: string }
+  | { a: "run" }
+  | { a: "change" }
+  | { a: "changeText"; text: string }
+  | { a: "cancel" }
+  | { a: "mode"; mode?: Mode }
+  | { a: "programs" }
+  | { a: "program"; index: number }
+  | { a: "back" }
+  | { a: "pilot"; value: string };
+
+export function parseReference(raw: string): ReferenceChoice | undefined {
+  const [path = "", sheet = "", cols = ""] = raw.split(";").map((x) => x.trim());
+  if (!path) return undefined;
+  return { mode: "compare", path, sheet: sheet || undefined, columns: cols ? cols.split(",").map((c) => c.trim()).filter(Boolean) : undefined };
+}
+
+export function planInit(card: PlanCard): PlanState {
+  return { step: card.stage === "plan" && card.restatement ? "restate" : "decisions", later: [], mode: RUN_MODES.includes(card.mode) ? card.mode : "watch", defIndex: -1 };
+}
+
+export function planQuestions(card: PlanCard, st: PlanState, open: Question[]): Question[] {
+  return open.filter((q) => card.qids.includes(q.qid) && !st.later.includes(q.qid));
+}
+
+export function planResolve(card: PlanCard, st: PlanState, open: Question[]): PlanState {
+  if (st.step !== "decisions" || card.stage !== "plan" || planQuestions(card, st, open).length) return st;
+  return { ...st, step: card.reference ? "reference" : "actions" };
+}
+
+export function programSwitches(card: PlanCard): string[] {
+  return card.programs.flatMap((g) => g.alternatives.map((alt) => `Use ${alt} for ${g.part}, not ${g.adapter}.`));
+}
+
+export function planTitle(card: PlanCard): string {
+  return card.stage === "pilot" ? "Proposed analysis: pilot result" : `${card.update ? "Proposed change to the analysis" : "Proposed analysis"}, version ${card.version}`;
+}
+
+export function pilotGate(card: PlanCard): string | undefined {
+  return card.stage === "plan" ? card.pilot : undefined;
+}
+
+export function referenceQuestion(card: PlanCard): Question {
+  const r = card.reference!;
+  const c = r.candidates[0];
+  const opts = c
+    ? [{ value: "compare", label: "Yes. Compare in the pilot" }, { value: "blind", label: "Yes. Hold it back (blind test)" }, { value: "none", label: "No, it is not a reference" }]
+    : [{ value: "none", label: "No reference" }, { value: "have", label: "Yes, I have one" }];
+  return localQuestion("reference", "Reference", r.question, opts, c ? "compare" : "none");
+}
+
+export function refModeQuestion(st: PlanState): Question {
+  return localQuestion("refmode", "Reference", `How does the agent use ${st.ref?.path ?? "the reference"}?`, [{ value: "compare", label: "Compare in the pilot" }, { value: "blind", label: "Hold it back (blind test)" }], "compare");
+}
+
+export function pilotQuestion(): Question {
+  return localQuestion("pilot", "Confirm the plan and run all?", "Does this look right?", [
+    { value: "confirm", label: "Confirm the plan and run all" },
+    { value: "change", label: "Change the method" },
+    { value: "another", label: "Try another sample" },
+  ]);
+}
+
+export function referenceLine(ref: ReferenceChoice | undefined): string | undefined {
+  return ref && ref.mode !== "none" ? `Reference: ${ref.path} (${ref.mode === "blind" ? "held back for a blind test" : "compared in the pilot"})` : undefined;
+}
+
+export const REFERENCE_PATH_LABEL = "File; sheet; value columns (for example /data/counts.xlsx; Set 1; Red dots, Total cells):";
+
+export function definitionLabel(card: PlanCard, st: PlanState): string | undefined {
+  const d = (card.definitions ?? [])[st.defIndex];
+  return d ? `New definition of ${d.measure} (now: ${d.definition}):` : undefined;
+}
+
+export function planReduce(card: PlanCard, st: PlanState, act: PlanAction): { state: PlanState; respond?: PlanResponse } {
+  const to = (step: PlanStep, more: Partial<PlanState> = {}) => ({ state: { ...st, ...more, step } });
+  const respond = (r: PlanResponse) => ({ state: st, respond: r });
+  const defs = card.definitions ?? [];
+  const after = card.stage === "pilot" ? "decisions" : "actions";
+  switch (act.a) {
+    case "restate":
+      return to(act.ok ? "decisions" : "correct");
+    case "correct":
+      return act.text.trim() ? respond({ action: "change", text: `The scientist corrects the request. The scientist wants: ${act.text.trim()}` }) : to("restate");
+    case "later":
+      return { state: { ...st, later: [...st.later, act.qid] } };
+    case "reference": {
+      const s = act.value;
+      const c = card.reference?.candidates[0];
+      if (s === "have") return to("refpath");
+      if (s === "none") return to("actions", { ref: { mode: "none" } });
+      if ((s === "compare" || s === "blind") && c) return to("actions", { ref: { mode: s, path: c.path, sheet: c.sheet } });
+      const typed = parseReference(s);
+      return typed ? to("refmode", { ref: typed }) : { state: st };
+    }
+    case "refpath": {
+      const r = parseReference(act.text);
+      return r ? to("refmode", { ref: r }) : to("actions");
+    }
+    case "refmode":
+      return to("actions", { ref: st.ref ? { ...st.ref, mode: act.value === "blind" ? "blind" : "compare" } : st.ref });
+    case "definition":
+      return act.index >= 0 && act.index < defs.length ? to("definition", { defIndex: act.index }) : { state: st };
+    case "define": {
+      const d = defs[st.defIndex];
+      const v = act.text.trim();
+      if (!d || !v || v === d.definition) return to("actions");
+      return respond({ action: "change", text: `Change the definition of ${d.measure} to: ${v}`, definition: { measure: d.measure, old: d.definition, new: v } });
+    }
+    case "run":
+      return respond({ action: pilotGate(card) ? "pilot" : "approve", mode: st.mode, reference: st.ref });
+    case "change":
+      return to("change");
+    case "changeText":
+      return act.text.trim() ? respond({ action: "change", text: act.text.trim() }) : to(after);
+    case "cancel":
+      return respond({ action: "cancel" });
+    case "mode":
+      return { state: { ...st, mode: act.mode && RUN_MODES.includes(act.mode) ? act.mode : RUN_MODES[(RUN_MODES.indexOf(st.mode) + 1) % RUN_MODES.length]! } };
+    case "programs":
+      return programSwitches(card).length ? to("program") : { state: st };
+    case "program": {
+      const t = programSwitches(card)[act.index];
+      return t ? respond({ action: "change", text: t }) : { state: st };
+    }
+    case "back":
+      return st.step === "restate" || st.step === "correct" ? to("restate") : to(after);
+    case "pilot": {
+      const s = act.value;
+      if (s === "confirm") return respond({ action: "confirm" });
+      if (s === "another") return respond({ action: "another" });
+      if (s === "change") return to("change");
+      return respond({ action: "change", text: s });
+    }
+  }
+}
+
+export function planHint(card: PlanCard): string {
+  return pilotGate(card) ? "The method runs on the pilot sample only. You check the result before the other samples run." : "No analysis step runs before you approve.";
+}

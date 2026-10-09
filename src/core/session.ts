@@ -37,6 +37,7 @@ import {
   type Args,
   type Entry,
   type Finding,
+  type BusEvent,
   type FindingIn,
   type Message,
   type Mode,
@@ -233,6 +234,8 @@ export class Session {
   private refCandidates: Candidate[] = [];
   private pilotPlan?: { plan: AnalysisPlan; version: number; target: Mode; answers: string[] };
   private lastSaid = "";
+  private waiting = new Map<string, BusEvent>();
+  status: Extract<BusEvent, { type: "status" }> = { type: "status", state: "idle" };
 
   private constructor(id: string, cwd: string, settings: Settings, place: Place) {
     this.id = id;
@@ -246,6 +249,18 @@ export class Session {
     this.record = new AnalysisRecord(this.dir, id, place.legacy ? {} : { workDir: place.outDir, exportDir: place.outDir, project: inProject(place) ? place.project : undefined });
     this.workDir = this.record.workDir;
     this.record.onAppend = (entry: Entry) => this.bus.emit({ type: "entry", entry });
+    this.bus.on((e) => {
+      if (e.type === "status") this.status = e;
+    });
+  }
+
+  openEvents(): BusEvent[] {
+    return [...this.waiting.values()];
+  }
+
+  private emitWaiting(key: string, e: BusEvent) {
+    this.waiting.set(key, e);
+    this.bus.emit(e);
   }
 
   get outputDir(): string {
@@ -1469,7 +1484,7 @@ export class Session {
     const sha256 = code ? createHash("sha256").update(code).digest("hex") : undefined;
     const p = new Promise<{ ok: boolean; note: string; always: boolean }>((resolve) => this.permissionWaits.set(rid, { resolve }));
     if (search) touches = `The agent wants to search ${search.root}${search.purpose ? ` for this purpose: ${search.purpose.replace(/\.$/, "")}` : ""}. This can take minutes and reads folders outside your project.`;
-    this.bus.emit({ type: "permission", rid, tool: tool.name, args, code, touches, search });
+    this.emitWaiting(rid, { type: "permission", rid, tool: tool.name, args, code, touches, search });
     this.bus.emit({ type: "status", state: "waiting", tool: tool.name });
     let res: { ok: boolean; note: string; always: boolean };
     try {
@@ -1478,6 +1493,7 @@ export class Session {
       res = { ok: false, note: "the turn stopped", always: false };
     }
     this.permissionWaits.delete(rid);
+    this.waiting.delete(rid);
     if (res.ok && res.always && !search) this.sessionAllow.add(tool.name);
     this.record.append("permission", { rid, tool: tool.name, decision: res.ok ? "allowed" : "denied", by: "scientist", note: res.note, always: res.always && !search, sha256, ...(search ? { search: search.root } : {}) });
     if (res.ok) this.bus.emit({ type: "status", state: "running", tool: tool.name, purpose: activity(tool.name, args, tool.source === "adapter" ? tool.title : undefined), since: Date.now() });
@@ -1500,7 +1516,7 @@ export class Session {
     const text = instruction(adapter, remote, args, mod.manualRoute?.(remote, args));
     this.record.append("follow_step", { step, tool: remote, instruction: text, status: "waiting" });
     const p = new Promise<{ note: string; agentDoes: boolean }>((resolve) => this.followWaits.set(step, { resolve }));
-    this.bus.emit({ type: "instruction", step, tool: remote, text });
+    this.emitWaiting(`f${step}`, { type: "instruction", step, tool: remote, text });
     this.bus.emit({ type: "status", state: "waiting", tool: remote });
     let done: { note: string; agentDoes: boolean };
     try {
@@ -1509,6 +1525,7 @@ export class Session {
       return { text: "ERROR: the scientist stopped before doing this step.", isError: true };
     } finally {
       this.followWaits.delete(step);
+      this.waiting.delete(`f${step}`);
     }
     const out = await this.execute(tool, args, callId, signal, { applied });
     const r = this.render(tool, out.output);
@@ -1776,7 +1793,7 @@ export class Session {
 
   private async askPlanCard(event: Omit<import("./types.ts").PlanEvent, "type">): Promise<PlanResponse | undefined> {
     const wait = new Promise<PlanResponse>((resolve) => (this.planWait = { resolve }));
-    this.bus.emit({ type: "plan", ...event });
+    this.emitWaiting("plan", { type: "plan", ...event });
     this.bus.emit({ type: "status", state: "waiting", tool: event.stage === "pilot" ? "pilot_result" : "plan" });
     try {
       return await abortable(wait, this.abort?.signal);
@@ -1784,6 +1801,7 @@ export class Session {
       return undefined;
     } finally {
       this.planWait = undefined;
+      this.waiting.delete("plan");
     }
   }
 

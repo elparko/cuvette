@@ -1,4 +1,4 @@
-import { FakeSession } from "./fake-session.ts";
+import { FakeSession } from "../ui/fake-session.ts";
 import { runTui } from "./app.tsx";
 
 const session = new FakeSession({ mode: process.env.GA_DEMO_MODE === "follow" ? "follow" : "watch" });

@@ -6,8 +6,7 @@ import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, re
 import { stepNumbers } from "../core/housekeeping.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { listSessions, sessionLine } from "../core/sessions.ts";
-import type { Card } from "./cards.tsx";
-import { show } from "./cards.tsx";
+import { show, type Card } from "./cards.ts";
 import type { OutputRef } from "./items.ts";
 import type { SessionLike } from "./types.ts";
 
