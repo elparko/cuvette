@@ -225,6 +225,7 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
       {row && step.t === "list" ? (
         <>
           <Text>{row.detail}</Text>
+          {row.cite ? <Text dimColor wrap="truncate-end">How to cite: {row.cite}</Text> : null}
           <Text dimColor>{[originText(row), `adapter status: ${row.adapterStatus}`, row.access.off ? "turned off" : ""].filter(Boolean).join(" · ")}</Text>
         </>
       ) : null}

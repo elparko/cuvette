@@ -7,7 +7,6 @@ The project is in early development. Version numbers start at the first public r
 
 These items are being built and are not on main yet:
 - A desktop app for macOS (Tauri), about one third the size of an Electron app.
-- Citations for every program and method that a session uses: `/cite`, BibTeX, RIS, APA and Vancouver.
 - New analyses: ELISA standard curves, dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
 - A map of proprietary lab software and the open-source alternatives that Cuvette supports.
 - A warning before likely patient identifiers go to a cloud model, and the session cost in the status line.
@@ -18,6 +17,11 @@ These items are being built and are not on main yet:
 - `/rewind` returns the session to an earlier message or stage. Later results stay in the folder, marked "rewound", and later decisions return to their earlier values.
 - `/branch <name>` copies the session to try another method. `/branches` lists them, and `/compare` shows their numbers side by side.
 - `/save-method <name>` saves a confirmed analysis as a method. `ga --method <name> <folder>` runs it on new data: the answers come pre-filled for you to confirm, and the demonstration on a sample still runs first. Methods export as one file to share with a lab.
+
+### Citations
+- Each adapter cites its program in `program.citation`, and each tool cites the published methods that it uses. All 34 catalog adapters have checked references with DOIs. `ga adapter check` reports a program adapter without a citation as an error.
+- `/cite` lists the programs and methods that ran in the session. A method that ran only in a comparison run is listed apart. `/cite bibtex`, `/cite ris` and `/cite text` save the list. The setting `citation_style` is `apa` or `vancouver`.
+- The data book, the HTML report, the protocol, `results.xlsx` (sheet References) and `references.bib` in the output folder carry the references. The methods paragraph cites each program and method in the text. The app shows the list in the Results tab, and the Programs page shows how to cite each program.
 
 ### Security
 - Folder trust: settings, hooks and adapters in a data folder take effect only after you trust the folder. A card shows every setting, every command in full and every adapter that would replace a built-in one. Choose Trust, Trust once or Do not trust. If a trusted file changes, Cuvette asks again. `ga trust` and `/trust` manage the list.

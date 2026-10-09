@@ -118,8 +118,8 @@ A citation has these fields:
 | `kind` | `program`, `method`, `model`, `dataset` | `program` in `program.citation`, `method` in a tool | What the reference describes. |
 | `when` | argument name to value | `{}` | Only in a tool citation. The citation applies only to a call whose arguments have these values, such as `{ adjust: BH }`. A list of values matches any one of them. The value `set` matches an argument that is present and is not 0, false, empty or `none`. If the call does not give the argument, the harness uses the linked decision, then the `default` of the parameter. |
 
-Use the citation that the program asks for. Look on the program website, in `citation("Package")`
-for an R package, and in `CITATION.cff` or the package metadata for a Python package. Do not
+Use the citation that the program asks for. Look on the program website. For an R package, run
+`citation("Package")`. For a Python package, read `CITATION.cff` or the package metadata. Do not
 write a reference from memory. Check that each DOI resolves.
 
 Example:
@@ -209,9 +209,9 @@ A tool is one job. The harness shows each tool to the model with its parameters.
 An output spec has these fields: `kind` (`image`, `table`, `file`, `text`, `json`; default
 `file`), `ext` (default empty) and `description` (default empty).
 
-An `mcp` adapter declares no tools. The server lists them. To cite a method of a tool that the
-adapter does not declare in `tools`, such as a tool of an MCP server or of the module, add a
-citation to the top-level `citations` list with the field `tool` set to the tool name.
+An `mcp` adapter declares no tools. The server lists them. Some tools are not in `tools`, such as
+the tools of an MCP server or of the module. To cite a method of such a tool, add a citation to
+the top-level `citations` list. Set its field `tool` to the tool name.
 
 The harness cites only what ran. The program citations apply when the session loads the
 adapter. A tool citation applies when the tool runs with arguments that match `when`. A citation

@@ -13,7 +13,9 @@ import { exportProtocol } from "../src/core/exports.ts";
 import { exportHtml } from "../src/core/trail.ts";
 import type { NodeIn } from "../src/core/types.ts";
 import { citeCommand } from "../src/ui/commands.ts";
-import { citeHtml, doctorHtml } from "../src/server/app-html.ts";
+import { citeHtml, doctorHtml, programsHtml } from "../src/server/app-html.ts";
+import { listPrograms } from "../src/core/programs.ts";
+import { Manifest } from "../src/adapters/manifest.ts";
 import { doctorText, type Check } from "../src/core/doctor.ts";
 import type { SessionLike } from "../src/ui/types.ts";
 
@@ -251,5 +253,16 @@ describe("outputs", () => {
     const check: Check = { id: "program:deseq2", group: "Programs", name: "deseq2", status: "ok", detail: "DESeq2 1.52.0", cite: "Love, M. I., Huber, W., & Anders, S. (2014)." };
     expect(doctorHtml([check], true, [check])).toContain("How to cite: Love, M. I., Huber, W., &amp; Anders, S. (2014).");
     expect(doctorText([check])).toContain("           How to cite: Love, M. I., Huber, W., & Anders, S. (2014).");
+  });
+
+  test("the Programs page shows How to cite for each program", async () => {
+    const home = mkdtempSync(join(tmpdir(), "ga-cite-home-"));
+    const m = Manifest.parse({ adapter: { name: "deseq2", field: "genomics" }, program: { name: "DESeq2", citation: findAdapter("deseq2").manifest.program.citation }, connection: { kind: "cli" }, locate: { which: ["Rscript"] } });
+    const rows = await listPrograms({
+      home, env: {}, adapters: { deseq2: { manifest: m, root: "/x/deseq2" } },
+      locate: async () => ({ version: "", how: "not found" }), run: async () => ({ code: 0, stdout: "", stderr: "" }), find: () => undefined, size: async () => 0, lastUsed: () => new Map(),
+    } as never);
+    expect(rows[0]!.cite).toMatch(/^Love, M\. I\., Huber, W\., & Anders, S\. \(2014\)/);
+    expect(programsHtml(rows)).toContain('<div class="pcite small dim">How to cite: Love, M. I., Huber, W., &amp; Anders, S. (2014).');
   });
 });

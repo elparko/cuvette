@@ -400,6 +400,7 @@ export function programsHtml(rows: ProgramRow[], opts: { checking?: boolean; now
 <div class="phead"><span class="pname"><strong>${esc(r.program)}</strong> <span class="dim small">${esc(r.name)}</span></span><span class="pstat ${STATE_CLASS[r.state]}">${esc(STATE_LABEL[r.state])}</span>${tags}</div>
 <div class="pmeta small dim">${meta}</div>
 <div class="pdetail small">${shortPaths(esc(r.detail))}</div>
+${r.cite ? `<div class="pcite small dim">How to cite: ${esc(r.cite)}</div>` : ""}
 <div class="row pacts">${main.map((a) => b(a, a.action === "install" ? "primary" : a.action === "check" ? "quiet" : "")).join("")}${more.length ? `<details class="pmore"><summary>More</summary><div class="row">${more.map((a) => b(a, a.action === "remove" ? "danger" : "")).join("")}</div></details>` : ""}</div>
 <pre class="plog hidden" aria-live="polite"></pre></li>`;
         })

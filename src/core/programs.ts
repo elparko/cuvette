@@ -9,6 +9,7 @@ import { CUSTOM_HOW, findProgram, locate, type Located } from "../adapters/locat
 import { adapterDirs, gaHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
 import { defaultFind, defaultRun, ENVS, envNameIn, importCheck, older, PROGRAM_INSTALL, q, R_PACKAGES, rInstallCommand, rLibrary, uvCommand, versionParts, type Run } from "./doctor.ts";
 import { ageText } from "./sessions.ts";
+import { howToCite } from "./citations.ts";
 
 export type State = "installed" | "custom" | "found" | "missing" | "old" | "none";
 export type Action = "install" | "update" | "remove" | "path" | "enable" | "disable" | "network-on" | "network-off" | "code-on" | "code-off" | "approve" | "check";
@@ -52,6 +53,7 @@ export interface ProgramRow {
   code?: boolean;
   codeTools: string[];
   install?: Install;
+  cite?: string;
 }
 
 export interface Plan {
@@ -316,6 +318,7 @@ export async function listPrograms(opts: ProgramsOpts = {}): Promise<ProgramRow[
       code: codeTools(m).length ? acc.code !== false : undefined,
       codeTools: codeTools(m),
       install: installFor(name, m, home, lib, find),
+      cite: howToCite({ manifest: m, name }).join(" ") || undefined,
     };
   });
   return rows.sort((a, b) => a.field.localeCompare(b.field) || a.name.localeCompare(b.name));
