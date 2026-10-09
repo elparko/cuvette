@@ -378,7 +378,13 @@ export class WebView {
         if (value === undefined || value === "") return this.keep(slot, "Choose an answer or type one.");
         this.drop(slot);
         this.sendCards();
-        await s.answer(card.q.qid, value).catch((e: Error) => this.line("✗", e.message, "red"));
+        await s.answer(card.q.qid, value).catch((e: Error) => {
+          this.line("✗", `${e.message} Try again.`, "red");
+          if (!this.slots.some((x) => x.card.t === "question" && x.card.q.qid === card.q.qid)) {
+            this.slots = [{ ...slot, msg: `${e.message} Try again.` }, ...this.slots];
+            this.sendCards();
+          }
+        });
         return { ok: true };
       }
       case "instruction":

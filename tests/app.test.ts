@@ -196,6 +196,20 @@ describe("the app server", () => {
   });
 });
 
+test("a refused answer opens the question card again with the reason", async () => {
+  const s = new FakeSession();
+  s.answer = async () => {
+    throw new Error("Answer must be a number.");
+  };
+  const view = new WebView(s, { token: "t", env, url: (p) => p, quit: async () => {} });
+  const q: Question = { qid: "q5", session: s.id, decisionKey: "k", title: "Cutoff?", text: "", options: [{ value: 1, label: "1" }], evidence: "", status: "open", created: "" };
+  view.openCard({ t: "question", q });
+  const id = view.slots.find((x) => x.card.t === "question")!.id;
+  await view.act(id, { act: "other", fields: { other: "abc" } });
+  expect(view.cardsHtml()).toContain("Answer must be a number. Try again.");
+  view.close();
+});
+
 describe("parity of the browser app with the terminal", () => {
   test("the browser renders every card type", () => {
     expect(Object.keys(WEB_CARDS).sort()).toEqual([...CARDS].sort());
