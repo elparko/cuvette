@@ -8,7 +8,7 @@ import { CLAUDE_MODELS } from "../providers/index.ts";
 
 export type Editor =
   | { t: "message"; text: string; color?: string }
-  | { t: "edit"; card: "key" | "eln" }
+  | { t: "edit"; card: "key" | "eln" | "programs" }
   | { t: "text"; def: SettingDef }
   | { t: "value"; def: SettingDef; options: string[]; sel: number };
 

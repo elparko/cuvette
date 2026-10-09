@@ -33,6 +33,27 @@ node bin/ga.js doctor --fix    # asks once, then installs the missing Python env
 For each item that is missing or old, `ga doctor` shows the install command or a download link.
 `--fix` runs only the uv and R commands. It does not run Homebrew or download programs.
 
+### Programs
+
+`ga programs`, `/programs` in the terminal and the Programs page of the browser app show the
+same list: each adapter, its program, the status, the version, the size of its environment, the
+last use and the access settings, grouped by field.
+
+```bash
+ga programs                              # the list
+ga programs install|update|remove|check <adapter>
+ga programs path <adapter> <path|none>   # a program in a custom place, for example a Fiji in ~/Applications
+ga programs enable|disable|approve <adapter>
+ga programs network|code <adapter> on|off
+```
+
+Each change shows what it does and asks first. Bypass permissions does not skip this question.
+Cuvette runs uv and R installs itself. It runs Homebrew only after you confirm. For a download it
+shows the link. Remove deletes only a folder that Cuvette installs into, such as
+`~/.guided-analysis/envs/<name>`. For any other program it shows "Installed outside Cuvette".
+A turned-off adapter is not in `list_adapters`, and no session can load it. Each change goes in
+`~/.guided-analysis/programs-log.jsonl` and in the record of the open session.
+
 ### Start without the terminal (macOS)
 
 Do these steps one time, in Terminal:

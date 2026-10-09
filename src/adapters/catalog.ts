@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import { pathsIn } from "./blind.ts";
+import { accessAll } from "./access.ts";
 import { findProgram } from "./locate.ts";
 import { adapterDirs, loadAdapter, type Manifest } from "./manifest.ts";
 
@@ -47,7 +48,9 @@ export function installHint(m: Manifest): string {
 
 export function adapterIndex(cwd: string, cache: FoundCache = new Map()): AdapterSummary[] {
   const out: AdapterSummary[] = [];
+  const access = accessAll(cwd);
   for (const [name, root] of Object.entries(adapterDirs(cwd))) {
+    if (access[name]?.off) continue;
     try {
       const m = loadAdapter(root).manifest;
       out.push({

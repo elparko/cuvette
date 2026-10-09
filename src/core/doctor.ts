@@ -70,7 +70,7 @@ export const R_PACKAGES: Record<string, { cran?: string[]; bioc?: string[] }> = 
   vegan: { cran: ["vegan"] },
 };
 
-const PROGRAM_INSTALL: Record<string, Fix> = {
+export const PROGRAM_INSTALL: Record<string, Fix> = {
   bcftools: { command: "brew install bcftools" },
   bedtools: { command: "brew install bedtools" },
   samtools: { command: "brew install samtools" },
@@ -88,7 +88,7 @@ const PROGRAM_INSTALL: Record<string, Fix> = {
   sage: { link: "https://github.com/lazear/sage/releases" },
 };
 
-const q = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
+export const q = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
 const tilde = (p: string) => (p.startsWith(homedir() + "/") ? "~" + p.slice(homedir().length) : p);
 
 export function versionParts(v: string): number[] {
@@ -106,12 +106,12 @@ export function older(v: string, than: number[] | string): boolean {
   return false;
 }
 
-function defaultFind(env: Record<string, string | undefined>) {
+export function defaultFind(env: Record<string, string | undefined>) {
   const extra = ["/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".local/bin"), join(homedir(), ".cargo/bin"), "/Library/Frameworks/R.framework/Resources/bin", "/Applications/Ollama.app/Contents/Resources"];
   return (name: string) => which(name, [env.PATH ?? "", ...extra].join(":"));
 }
 
-const defaultRun: Run = (argv, timeoutMs = 60_000) => runProcess(argv, { timeoutMs });
+export const defaultRun: Run = (argv, timeoutMs = 60_000) => runProcess(argv, { timeoutMs });
 
 export function envPython(home: string, name: string): string {
   return join(home, "envs", name, "bin", "python");
@@ -161,7 +161,7 @@ function catalogManifests(): Record<string, Manifest> {
   return out;
 }
 
-async function importCheck(run: Run, python: string, modules: string[]): Promise<{ ok: boolean; missing: string[]; runs: boolean }> {
+export async function importCheck(run: Run, python: string, modules: string[]): Promise<{ ok: boolean; missing: string[]; runs: boolean }> {
   if (!existsSync(python)) return { ok: false, missing: modules, runs: false };
   const code = `import importlib.util as u\nfor m in ${JSON.stringify(modules)}:\n    print(m, u.find_spec(m) is not None)`;
   const r = await run([python, "-c", code], 60_000);
@@ -176,7 +176,7 @@ function envOf(path: string | undefined, home: string): string | undefined {
   return m && resolve(m[1]!) === resolve(home) ? m[2] : undefined;
 }
 
-function envNameIn(m: Manifest): string | undefined {
+export function envNameIn(m: Manifest): string | undefined {
   for (const p of m.locate.paths) {
     const hit = /\.guided-analysis\/envs\/([^/]+)\/bin\/python$/.exec(p);
     if (hit) return hit[1];

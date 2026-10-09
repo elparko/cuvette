@@ -30,7 +30,7 @@ function textHint(r: SettingRow): string {
   return parts.filter(Boolean).join(" ");
 }
 
-export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (card: "key" | "eln") => void; onClose: () => void }) {
+export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (card: "key" | "eln" | "programs") => void; onClose: () => void }) {
   const { ctx } = props;
   const [query, setQuery] = useState("");
   const all = settingRows(ctx, props.busy);

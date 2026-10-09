@@ -7,5 +7,6 @@ export interface TuiOptions {
   firstMessage?: string;
   env?: Record<string, string | undefined>;
   onQuit?: () => void;
+  programs?: import("../ui/programs.ts").ProgramHooks;
 }
 

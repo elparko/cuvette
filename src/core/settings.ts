@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { accessAll } from "../adapters/access.ts";
 import { CATALOG_DIR, gaHome } from "../adapters/manifest.ts";
 import { CLAUDE_MODELS } from "../providers/index.ts";
 import { DEFAULTS } from "./config.ts";
@@ -45,7 +46,7 @@ export interface SettingDef {
   def?: unknown;
   lockedInTurn?: boolean;
   secret?: boolean;
-  edit?: "key" | "eln";
+  edit?: "key" | "eln" | "programs";
   shown?: (ctx: SettingCtx) => boolean;
   read?: (ctx: SettingCtx) => { value: string; source: Source; file?: string };
   details?: (ctx: SettingCtx) => string[];
@@ -269,6 +270,21 @@ export const SETTINGS: SettingDef[] = [
     scopes: ["user", "project"],
     free: true,
     list: true,
+  },
+  {
+    name: "programs",
+    group: "Adapters",
+    label: "Programs",
+    help: "Install, update, remove, turn on or off each adapter and its program, and set a custom program path. Enter opens the Programs panel. On the command line: ga programs.",
+    scopes: [],
+    edit: "programs",
+    read: (ctx) => {
+      const all = Object.entries(accessAll(ctx.cwd));
+      const off = all.filter(([, a]) => a.off).length;
+      const paths = all.filter(([, a]) => a.path).length;
+      return { value: `${off} off, ${paths} custom ${paths === 1 ? "path" : "paths"}`, source: all.length ? "user" : "default" };
+    },
+    details: (ctx) => Object.entries(accessAll(ctx.cwd)).map(([n, a]) => `${n}: ${[a.off ? "off" : "", a.path ? `path ${a.path}` : "", a.network === undefined ? "" : a.network ? "network allowed" : "network blocked", a.code === false ? "own code blocked" : ""].filter(Boolean).join(", ")}`),
   },
   {
     name: "adapter_folders",

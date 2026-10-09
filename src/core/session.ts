@@ -21,6 +21,7 @@ import type { Dirs } from "../adapters/kinds/common.ts";
 import { ADAPTER_DECISION, decisionHook, DecisionRecord } from "./decisions.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
+import { accessOf, blocksCode, isCodeTool, usable } from "../adapters/access.ts";
 import { compareNote, instruction, teachReview, type TeachSummary } from "./modes.ts";
 import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
@@ -323,7 +324,8 @@ export class Session {
 
   private async init(opts: SessionOptions) {
     const resumed = this.record.entries(["session"]).length > 0;
-    this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd)));
+    const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
+    this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
     this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
@@ -473,7 +475,7 @@ export class Session {
     for (const name of this.settings.defaultAdapters ?? []) {
       if (this.adapters.some((a) => a.name === name)) continue;
       try {
-        const a = applyOverlay(findAdapter(name, this.cwd));
+        const a = usable(applyOverlay(findAdapter(name, this.cwd)), this.cwd);
         const l = a.manifest.locate;
         if (!(l.env || l.paths.length || l.which.length) || programFound(a.manifest, this.found).path) out.push(a);
         else this.notes.push(`The default adapter ${name} is not loaded: its program is not found. ${installHint(a.manifest)}`);
@@ -493,7 +495,9 @@ export class Session {
     this.adapterInfo.push({ name: a.name, title: a.manifest.adapter.title || a.manifest.program.name, version: a.manifest.adapter.version, programVersion: rt.programVersion });
     const mod = await a.module();
     const names: string[] = [];
+    const noCode = blocksCode(a.name, this.cwd);
     for (const t of [...(await rt.tools()), ...(mod.tools ?? []).map((t) => ({ ...t, adapter: t.adapter ?? a.name, source: "adapter" as const }))]) {
+      if (noCode && isCodeTool(t.remoteName ?? t.name, (t.inputSchema as { properties?: object }).properties)) continue;
       const name = this.tools.has(t.name) ? `${a.name.replace(/-/g, "_")}_${t.name}` : t.name;
       this.tools.set(name, { ...t, name, remoteName: t.remoteName ?? t.name });
       names.push(name);
@@ -513,7 +517,7 @@ export class Session {
     if (this.planning) return { ok: false, error: "Plan first: name the adapter in the programs section of the plan. When the scientist approves the plan, call use_adapter. The approval covers the adapters that the plan names." };
     let a: LoadedAdapter;
     try {
-      a = applyOverlay(findAdapter(name, this.cwd));
+      a = usable(applyOverlay(findAdapter(name, this.cwd)), this.cwd);
     } catch (e) {
       return { ok: false, error: `${(e as Error).message}. Call list_adapters to see the names.` };
     }
@@ -529,7 +533,7 @@ export class Session {
     for (const n of gate.load) {
       let b: LoadedAdapter;
       try {
-        b = n === a.name ? a : applyOverlay(findAdapter(n, this.cwd));
+        b = n === a.name ? a : usable(applyOverlay(findAdapter(n, this.cwd)), this.cwd);
       } catch (e) {
         ok = false;
         texts.push((e as Error).message);
@@ -612,7 +616,7 @@ export class Session {
   async changeProgram(name: string): Promise<{ ok: boolean; text: string }> {
     let a: LoadedAdapter;
     try {
-      a = applyOverlay(findAdapter(name, this.cwd));
+      a = usable(applyOverlay(findAdapter(name, this.cwd)), this.cwd);
     } catch (e) {
       return { ok: false, text: `${(e as Error).message}. /adapters lists the loaded programs.` };
     }

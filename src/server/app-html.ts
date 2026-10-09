@@ -13,6 +13,8 @@ import {
 import { settingsHtml } from "./app-settings.ts";
 import { fidelityLabel, type Item } from "../ui/items.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
+import { lastUseText, originText, sizeText, STATE_LABEL, type ProgramRow } from "../core/programs.ts";
+import { fieldTitle, groupRows, rowActions, summaryLine } from "../ui/programs.ts";
 import type { SessionLike } from "../ui/types.ts";
 
 export interface Slot {
@@ -367,6 +369,39 @@ function configCard(c: Ctx, slot: Slot): string {
   return frame(slot, "Settings", "cyan", `<div class="settings">${settingsHtml(c)}</div><div class="row end">${btn("Close", act("close"), "quiet")}</div>`);
 }
 
+function programsCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "programs" }>): string {
+  return frame(slot, "Programs", "cyan", `<p>The Programs page lists each adapter and its program: the status, the version, the size and the last use. Install, update, remove, set a path, turn an adapter on or off, or check again there.</p>
+<div class="row">${btn("Open the Programs page", `data-page-go="programs"${card.name ? ` data-prog-start="${esc(card.name)}"` : ""}`, "primary")}${btn("Close", act("close"), "quiet")}</div>`);
+}
+
+const STATE_CLASS: Record<string, string> = { installed: "ok", custom: "ok", found: "ok", missing: "bad", old: "warn", none: "none" };
+
+export function programsHtml(rows: ProgramRow[], opts: { checking?: boolean; now?: number } = {}): string {
+  const now = opts.now ?? Date.now();
+  const groups = groupRows(rows)
+    .map((g) => {
+      const items = g.rows
+        .map((r) => {
+          const acts = rowActions(r);
+          const main = acts.filter((a) => a.action === "install" || a.action === "update" || a.action === "check");
+          const more = acts.filter((a) => !main.includes(a));
+          const b = (a: { action: string; label: string }, cls = "") => btn(a.label, `data-prog-act="${esc(a.action)}"`, cls);
+          const meta = [r.version ? `<span title="${esc(r.version)}">${esc(r.version.length > 40 ? r.version.slice(0, 39) + "…" : r.version)}</span>` : "", r.size !== undefined ? esc(sizeText(r.size)) : "", `last use: ${esc(lastUseText(r.lastUsed, now))}`, esc(originText(r))].filter(Boolean).join(" · ");
+          const tags = [r.adapterStatus === "approved" ? "" : `<span class="tag">${esc(r.adapterStatus)}</span>`, r.access.off ? `<span class="tag warn">off</span>` : "", r.network !== undefined ? `<span class="tag">${r.network ? "network allowed" : "no network"}</span>` : "", r.code === false ? `<span class="tag">own code blocked</span>` : ""].join("");
+          return `<li class="prow${r.access.off ? " off" : ""}" data-prog="${esc(r.name)}" data-prog-path="${esc(r.access.path ?? "")}" data-prog-program="${esc(r.program)}">
+<div class="phead"><span class="pname"><strong>${esc(r.program)}</strong> <span class="dim small">${esc(r.name)}</span></span><span class="pstat ${STATE_CLASS[r.state]}">${esc(STATE_LABEL[r.state])}</span>${tags}</div>
+<div class="pmeta small dim">${meta}</div>
+<div class="pdetail small">${shortPaths(esc(r.detail))}</div>
+<div class="row pacts">${main.map((a) => b(a, a.action === "install" ? "primary" : a.action === "check" ? "quiet" : "")).join("")}${more.length ? `<details class="pmore"><summary>More</summary><div class="row">${more.map((a) => b(a, a.action === "remove" ? "danger" : "")).join("")}</div></details>` : ""}</div>
+<pre class="plog hidden" aria-live="polite"></pre></li>`;
+        })
+        .join("");
+      return `<section class="pgroup"><h3>${esc(fieldTitle(g.field))}</h3><ul class="plist">${items}</ul></section>`;
+    })
+    .join("");
+  return `<p class="dim small" id="progsummary">${esc(summaryLine(rows))}${opts.checking ? " Checking versions and sizes..." : ""}</p>${groups || `<p class="empty">No adapters.</p>`}`;
+}
+
 type WebCards = { [K in CardType]: (c: Ctx, slot: Slot, card: Extract<Card, { t: K }>) => string };
 
 export const WEB_CARDS: WebCards = {
@@ -380,6 +415,7 @@ export const WEB_CARDS: WebCards = {
   config: (c, slot) => configCard(c, slot),
   key: (c, slot, card) => keyCard(c, slot, card, credentialsPath()),
   clarify: clarifyCard,
+  programs: programsCard,
 };
 
 export function cardHtml(c: Ctx, slot: Slot): string {

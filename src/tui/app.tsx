@@ -8,9 +8,11 @@ import { commands, openPanels, openSetup, openWithOs, suggestions, table, type C
 import { imageProtocol, inlineImage } from "./image.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
+import type { ProgramHooks } from "../ui/programs.ts";
 import { Header, ItemView, RunningLine, StatusLine, activityText, animationsOn, liveLayout, type StaticItem } from "./view.tsx";
 import { Markdown } from "./markdown.tsx";
 import { ConfigPanel } from "./config-panel.tsx";
+import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
 import type { SettingSession } from "../core/settings.ts";
 import { applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
@@ -402,7 +404,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
       )}
       {card ? (
         <CardRows.Provider value={fit.card}>
-          {(cardViews({ session, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: running, program })[card.t] as (c: Card) => React.ReactNode)(card)}
+          {(cardViews({ session, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: running, program, programs: opts.programs })[card.t] as (c: Card) => React.ReactNode)(card)}
         </CardRows.Provider>
       ) : null}
       {fit.inputBox ? <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
@@ -473,6 +475,7 @@ interface CardDeps {
   toggleDetails(): void;
   busy: boolean;
   program: string;
+  programs?: ProgramHooks;
 }
 
 type CardViews = { [K in CardType]: (c: Extract<Card, { t: K }>) => React.ReactNode };
@@ -537,7 +540,17 @@ function cardViews(d: CardDeps): CardViews {
         ctx={{ cwd: session.cwd ?? process.cwd(), env: d.env, session: session as unknown as SettingSession, ui: { details: () => d.details.current, toggleDetails: d.toggleDetails } }}
         busy={d.busy}
         onClose={() => (popCard(), d.refresh())}
-        onEdit={(t) => d.setCards((x) => [t === "key" ? { t: "key" } : { t: "eln" }, ...x.slice(1)])}
+        onEdit={(t) => d.setCards((x) => [t === "key" ? { t: "key" } : t === "eln" ? { t: "eln" } : { t: "programs" }, ...x.slice(1)])}
+      />
+    ),
+    programs: (card) => (
+      <ProgramsPanel
+        key="programs"
+        cwd={session.cwd ?? process.cwd()}
+        start={card.name}
+        hooks={d.programs}
+        record={session.record as never}
+        onClose={() => (popCard(), d.refresh())}
       />
     ),
     key: (card) => <KeyCard key="key" card={card} path={credentialsPath()} onSubmit={(k) => void d.submitKey(k)} onCancel={popCard} />,

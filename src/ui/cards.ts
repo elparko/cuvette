@@ -13,6 +13,7 @@ export type Card =
   | { t: "findings"; list: Finding[] }
   | { t: "key"; reason?: string }
   | { t: "config" }
+  | { t: "programs"; name?: string }
   | ({ t: "plan" } & Omit<PlanEvent, "type">)
   | { t: "clarify"; found: string; qids: string[]; skipped: string[]; check?: string; notes?: string[] };
 

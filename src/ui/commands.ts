@@ -230,6 +230,12 @@ export const commands: Command[] = [
   { name: "setup", help: "Open the setup card for your choices.", run: (_, ctx) => openSetup(ctx) },
   { name: "config", help: "Show and change the settings.", run: (_, ctx) => ctx.openCard({ t: "config" }) },
   {
+    name: "programs",
+    args: "[adapter]",
+    help: "Show the programs that the adapters use. Install, update, remove, set a path, turn an adapter on or off, or check again.",
+    run: ([name], ctx) => ctx.openCard({ t: "programs", name }),
+  },
+  {
     name: "decisions",
     args: "[agent|me]",
     help: "Show every decision, its owner and who set it. agent gives all your decisions to the agent; me takes them back.",

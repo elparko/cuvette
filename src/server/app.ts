@@ -18,8 +18,10 @@ import type { Mode } from "../core/types.ts";
 import { commands, decisionRows, noOpen, openWithOs } from "../ui/commands.ts";
 import { removeSecret, resetRow, saveSetting } from "../ui/config.ts";
 import type { SessionLike } from "../ui/types.ts";
-import { decisionsHtml, doctorHtml, planTextHtml, resultsHtml, sessionsHtml, stepsHtml, type Ctx } from "./app-html.ts";
+import { decisionsHtml, doctorHtml, planTextHtml, programsHtml, resultsHtml, sessionsHtml, stepsHtml, type Ctx } from "./app-html.ts";
 import { settingsHtml } from "./app-settings.ts";
+import { isProgramAction, listPrograms } from "../core/programs.ts";
+import { planFor, runFor, type ProgramHooks } from "../ui/programs.ts";
 import { appPageHtml } from "./app-page.ts";
 import { WebView } from "./app-view.ts";
 import { hostAllowed, windowRoutes, type WindowSession } from "./window.ts";
@@ -38,6 +40,7 @@ export interface AppOptions {
   doctor?: () => Promise<Check[]>;
   fetch?: typeof fetch;
   onQuit?: () => void;
+  programs?: ProgramHooks;
 }
 
 export interface AppHandle {
@@ -220,6 +223,12 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     return "";
   };
 
+  const jobs = new Map<string, { lines: string[]; done?: { ok: boolean; text: string }; subs: Set<ServerResponse> }>();
+  const progHooks = (): ProgramHooks => ({ cwd: settingCtx().cwd, env, ...opts.programs });
+  const jobSend = (j: { subs: Set<ServerResponse> }, msg: unknown) => {
+    for (const r of j.subs) r.write(`data: ${JSON.stringify(msg)}\n\n`);
+  };
+
   const fsCtx = () => ({ cwd: current?.session.cwd ?? opts.folder ?? process.cwd(), env, fetch: opts.fetch });
 
   const route = async (req: IncomingMessage, res: ServerResponse, url: URL) => {
@@ -264,6 +273,20 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       return;
     }
     if (get && p === "/api/settings") return send(res, 200, settingsHtml(ctx()), "text/html; charset=utf-8");
+    if (get && p === "/api/programs") {
+      const quick = url.searchParams.get("quick") === "1";
+      return send(res, 200, programsHtml(await listPrograms({ ...progHooks(), quick }), { checking: quick }), "text/html; charset=utf-8");
+    }
+    if (get && p === "/api/programs/progress") {
+      const j = jobs.get(url.searchParams.get("job") ?? "");
+      if (!j) return send(res, 404, { error: "no such job" });
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
+      for (const line of j.lines) res.write(`data: ${JSON.stringify({ line })}\n\n`);
+      if (j.done) return res.end(`data: ${JSON.stringify({ done: true, ...j.done })}\n\n`);
+      j.subs.add(res);
+      res.on("close", () => j.subs.delete(res));
+      return;
+    }
     if (get && p === "/api/dirs") {
       const at = resolve(url.searchParams.get("p") || opts.folder || homedir());
       if (!existsSync(at) || !statSync(at).isDirectory()) return send(res, 404, { error: `No folder ${at}` });
@@ -338,6 +361,28 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       const r = p.endsWith("reset") ? await resetRow(settingCtx(), def) : removeSecret(settingCtx(), def);
       if (c) c.view.ctx.refresh();
       return send(res, r.color === "red" ? 400 : 200, r);
+    }
+    if (p === "/api/programs/plan" || p === "/api/programs/run") {
+      const name = String(body.name ?? "");
+      const action = String(body.action ?? "");
+      if (!isProgramAction(action)) return send(res, 400, { error: "unknown action" });
+      const hooks = progHooks();
+      const r = await planFor(name, action, { ...hooks, path: typeof body.path === "string" ? body.path : undefined });
+      if (!r.plan) return send(res, 404, { error: r.error });
+      if (p === "/api/programs/plan") return send(res, 200, { plan: r.plan });
+      const run = { ...hooks, confirmed: body.confirmed === true, record: current?.session.record as ProgramHooks["record"] };
+      const long = (action === "install" || action === "update") && r.plan.runs && !r.plan.refused && run.confirmed;
+      if (!long) return send(res, 200, await runFor(r.plan, "app", run));
+      const id = randomBytes(8).toString("hex");
+      const job = { lines: [] as string[], done: undefined as { ok: boolean; text: string } | undefined, subs: new Set<ServerResponse>() };
+      jobs.set(id, job);
+      void runFor(r.plan, "app", { ...run, onLine: (line) => (job.lines.push(line), jobSend(job, { line })) }).then((d) => {
+        job.done = { ok: d.ok, text: d.text };
+        jobSend(job, { done: true, ...job.done });
+        for (const x of job.subs) x.end();
+        job.subs.clear();
+      });
+      return send(res, 200, { job: id });
     }
     if (p === "/api/reveal") {
       const f = resolve(String(body.path ?? ""));

@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join, sep } from "node:path";
+import { accessOf } from "./access.ts";
 import { adapterDirs, type Manifest } from "./manifest.ts";
 import { runProcess } from "./kinds/common.ts";
 
@@ -94,9 +95,27 @@ function versionFrom(m: Manifest, text: string | undefined): string {
   return text.trim().split(/\r?\n/)[0] || fallback;
 }
 
-export function candidates(manifest: Manifest): { path: string; how: string }[] {
+export const CUSTOM_HOW = "custom path in settings";
+
+export function customPaths(manifest: Manifest, raw: string): string[] {
+  const p = expandPath(raw);
+  if (!existsSync(p)) return [];
+  const out: string[] = [];
+  if (statSync(p).isDirectory()) {
+    for (const pat of manifest.locate.paths) {
+      const parts = pat.split(/[\\/]/);
+      for (let k = 1; k < parts.length; k++) out.push(...globMatches(join(p, ...parts.slice(k))).filter(isFileOrBundle));
+    }
+    for (const name of manifest.locate.which) for (const c of [join(p, name), join(p, "bin", name)]) if (existsSync(c) && statSync(c).isFile()) out.push(c);
+  }
+  out.push(p);
+  return [...new Set(out)];
+}
+
+export function candidates(manifest: Manifest, custom = accessOf(manifest.adapter.name).path): { path: string; how: string }[] {
   const l = manifest.locate;
   const out: { path: string; how: string }[] = [];
+  if (custom) for (const p of customPaths(manifest, custom)) out.push({ path: p, how: CUSTOM_HOW });
   const fromEnv = l.env ? process.env[l.env] : undefined;
   if (fromEnv && isFileOrBundle(expandPath(fromEnv))) out.push({ path: expandPath(fromEnv), how: `environment variable ${l.env}` });
   for (const p of l.paths) {
@@ -110,19 +129,19 @@ export function candidates(manifest: Manifest): { path: string; how: string }[] 
   return out;
 }
 
-export function findProgram(manifest: Manifest): { path?: string; how: string } {
-  return candidates(manifest)[0] ?? { how: "not found" };
+export function findProgram(manifest: Manifest, custom?: string): { path?: string; how: string } {
+  return candidates(manifest, custom ?? accessOf(manifest.adapter.name).path)[0] ?? { how: "not found" };
 }
 
-export async function locate(manifest: Manifest, dir = ""): Promise<Located> {
+export async function locate(manifest: Manifest, dir = "", custom?: string): Promise<Located> {
   const l = manifest.locate;
   const adapterDir = dir || (l.version_command.some((a) => a.includes("{adapter_dir}")) ? (adapterDirs()[manifest.adapter.name] ?? "") : "");
   if (!l.identity || !l.version_command.length) {
-    const { path, how } = findProgram(manifest);
+    const { path, how } = findProgram(manifest, custom);
     return { path, version: versionFrom(manifest, await versionText(manifest, path, adapterDir)), how };
   }
   const id = new RegExp(l.identity);
-  const list: { path?: string; how: string }[] = l.version_command.some((a) => a.includes("{program_path}")) ? candidates(manifest) : [findProgram(manifest)];
+  const list: { path?: string; how: string }[] = l.version_command.some((a) => a.includes("{program_path}")) ? candidates(manifest, custom ?? accessOf(manifest.adapter.name).path) : [findProgram(manifest, custom)];
   const rejected: string[] = [];
   const seen = new Set<string>();
   let slow: { path?: string; how: string } | undefined;

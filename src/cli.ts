@@ -52,6 +52,12 @@ Usage
 
   ga doctor [--fix]                    check Node, the model, the Python environments, R, Java and each adapter's program;
                                        --fix installs the missing Python environments and R packages after it asks
+  ga programs                          list each adapter with its program: status, version, size, last use, access
+  ga programs install|update|remove|check <adapter>
+  ga programs path <adapter> <path|none>   use a program in a custom place (none: forget the path)
+  ga programs enable|disable|approve <adapter>
+  ga programs network|code <adapter> on|off   let the adapter use the network, or run code that the agent writes
+                                       Each change shows what it does and asks first. The log: ~/.guided-analysis/programs-log.jsonl
   ga install-finder-action             add "Analyze with Cuvette" to the Quick Actions of folders and files in Finder (macOS)
   ga uninstall-finder-action           remove it
   ga install-launcher                  add Cuvette.app to ~/Applications: double-click it, choose a folder (macOS)
@@ -512,6 +518,43 @@ async function main() {
         }
       }
       process.exitCode = dr.canStart(checks) ? 0 : 1;
+      return;
+    }
+    case "programs": {
+      const pr = await import("./core/programs.ts");
+      const { planFor, runFor } = await import("./ui/programs.ts");
+      const tty = process.stderr.isTTY;
+      if (!a1) {
+        if (tty) process.stderr.write("Checking the programs...");
+        const rows = await pr.listPrograms({ cwd: process.cwd() });
+        if (tty) process.stderr.write("\r".padEnd(30) + "\r");
+        console.log(pr.programsTable(rows));
+        return console.log(`\nLog: ${pr.logFile()}\nChange one: ga programs install|update|remove|path|enable|disable|check <adapter>`);
+      }
+      const verbs: Record<string, string> = { network: a3 === "off" ? "network-off" : "network-on", code: a3 === "off" ? "code-off" : "code-on" };
+      const action = verbs[a1] ?? a1;
+      if (!pr.isProgramAction(action) || ((a1 === "network" || a1 === "code") && a3 !== "on" && a3 !== "off")) return fail("usage: ga programs [install|update|remove|path|enable|disable|check|approve <adapter>] [network|code <adapter> on|off]");
+      if (!a2 && action === "check") {
+        const rows = await pr.listPrograms({ cwd: process.cwd() });
+        return console.log(pr.programsTable(rows));
+      }
+      if (!a2) return fail(`usage: ga programs ${a1} <adapter>${a1 === "path" ? " <path|none>" : ""}`);
+      if (action === "path" && !a3) return fail("usage: ga programs path <adapter> <path|none>");
+      const by = str(o.by) ?? process.env.USER ?? "scientist";
+      const r = await planFor(a2, action, { cwd: process.cwd(), path: action === "path" && a3 !== "none" ? a3 : undefined, by });
+      if (!r.plan) return fail(r.error ?? "no plan");
+      const plan = r.plan;
+      if (action !== "check") console.log(pr.planText(plan));
+      if (plan.refused) return void (process.exitCode = 1);
+      if (!plan.runs) return;
+      let confirmed = false;
+      if (plan.confirm) {
+        confirmed = /^y(es)?$/i.test((await ask(`${plan.confirm}? [y/N] `)).trim());
+        if (!confirmed) return console.log("Nothing changed.");
+      }
+      const done = await runFor(plan, "command line", { cwd: process.cwd(), by, confirmed, onLine: (l) => console.log(l) });
+      console.log(done.text);
+      process.exitCode = done.ok ? 0 : 1;
       return;
     }
     case "install-finder-action":

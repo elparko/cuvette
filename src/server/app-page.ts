@@ -216,6 +216,33 @@ li.ok .cstat, .okline { color: var(--ok); }
 li.missing .cstat { color: var(--bad); }
 li.old .cstat { color: var(--warn); }
 .pathrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.pgroup h3 { margin: 14px 0 6px; font-size: 15px; }
+ul.plist { list-style: none; margin: 0; padding: 0; }
+li.prow { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 0 0 8px; background: var(--panel); min-width: 0; }
+li.prow.off { opacity: .75; }
+.phead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.pname { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.pstat { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .02em; }
+.pstat.ok { color: var(--ok); }
+.pstat.bad { color: var(--bad); }
+.pstat.warn { color: var(--warn); }
+.pstat.none { color: var(--dim); }
+.tag.warn { color: var(--warn); border-color: var(--warn); }
+.pmeta, .pdetail { overflow-wrap: anywhere; margin: 2px 0; }
+.pacts { margin: 6px 0 0; }
+.pacts .btn { min-height: 30px; padding: 3px 10px; }
+details.pmore { display: inline-block; }
+details.pmore summary { cursor: pointer; color: var(--accent); font-size: 14px; padding: 4px 6px; list-style: none; }
+details.pmore summary::-webkit-details-marker { display: none; }
+details.pmore summary::after { content: " \25BE"; }
+details.pmore[open] { display: block; flex-basis: 100%; }
+dialog#progdlg { width: min(640px, 96vw); }
+#progdlg pre { max-height: 220px; }
+#progdlg .pcmd { display: flex; gap: 6px; align-items: flex-start; }
+#progdlg .pcmd pre { flex: 1; min-width: 0; margin: 0; }
+#progdlg ul { padding-left: 18px; margin: 6px 0; }
+#progdlg li { overflow-wrap: anywhere; }
+#progdlg.danger h3 { color: var(--bad); }
 .pathrow input { flex: 1; min-width: 180px; }
 #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; max-width: 90vw; z-index: 20; }
 dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); max-width: 96vw; max-height: 94vh; padding: 10px; }
@@ -247,6 +274,7 @@ ul.dirs li button .dim { margin-left: 6px; }
   <nav class="pages" aria-label="Pages">
     <button type="button" data-page="session" id="nav-session">Analysis</button>
     <button type="button" data-page="sessions">Sessions</button>
+    <button type="button" data-page="programs">Programs</button>
     <button type="button" data-page="settings">Settings</button>
   </nav>
   <label class="inline small" id="modewrap">Mode <select id="mode" aria-label="Mode">
@@ -334,6 +362,26 @@ ul.dirs li button .dim { margin-left: 6px; }
   <div class="panel"><h3>Programs on this computer</h3><p class="dim small">The same check as ga doctor in the terminal.</p><div id="doctorbody2"></div><div class="row"><button type="button" class="btn" data-doctor="doctorbody2">Check this computer</button><button type="button" class="btn quiet" data-doctor="doctorbody2" data-doctor-all="1">Show the full list</button></div></div>
 </main>
 
+<main class="page hidden" id="p-programs">
+  <div class="panel">
+    <div class="row" style="justify-content: space-between"><h2 style="margin:0">Programs</h2><button type="button" class="btn" id="progcheck">Check all again</button></div>
+    <p class="dim small">The programs that the adapters use, grouped by field. The same list as /programs in the terminal and ga programs. Each change asks first and shows what it does. It goes in the programs log and in the session record.</p>
+    <div id="programsbody"><p class="dim">Looking for the programs...</p></div>
+  </div>
+</main>
+
+<dialog id="progdlg" aria-labelledby="progtitle">
+  <h3 id="progtitle" style="margin-top:0"></h3>
+  <p class="cardmsg" id="progrefused" role="alert"></p>
+  <div id="progpath" class="hidden"><label class="field"><span>Path of the program, or of the folder that holds it</span><input type="text" id="progpathin" placeholder="~/Applications/Fiji.app"></label><div class="row"><button type="button" class="btn" id="progpathcheck">Check this path</button></div></div>
+  <ul id="proglines"></ul>
+  <div id="progcmdwrap" class="hidden"><div class="small dim">Command</div><div class="pcmd"><pre id="progcmd"></pre><button type="button" class="btn" id="progcopy">Copy</button></div></div>
+  <p id="proglinkwrap" class="hidden small">Link: <a id="proglink" target="_blank" rel="noopener"></a> <button type="button" class="link" id="proglinkcopy">Copy</button></p>
+  <pre id="proglog" class="hidden" aria-live="polite"></pre>
+  <p id="progresult" role="status"></p>
+  <div class="row end"><button type="button" class="btn quiet" id="progcancel">Cancel</button><button type="button" class="btn primary hidden" id="progok">Confirm</button></div>
+</dialog>
+
 <main class="page hidden" id="p-sessions">
   <div class="panel">
     <div class="row" style="justify-content: space-between"><h2 style="margin:0">Sessions</h2><button type="button" class="btn primary" id="openfolder">Open a folder</button></div>
@@ -383,7 +431,8 @@ function askNotify() {
 }
 
 let state = null;
-let page = "session";
+let page = new URLSearchParams(location.search).get("page") || "session";
+const OWN_PAGES = ["settings", "sessions", "programs"];
 let tab = "analysis";
 let status = { state: "idle" };
 let es = null;
@@ -394,9 +443,10 @@ let suggSel = 0;
 function show(p) {
   page = p;
   document.body.classList.toggle("fixed", p === "session");
-  for (const id of ["session", "start", "setup", "settings", "sessions"]) $("p-" + id).classList.toggle("hidden", id !== p);
-  for (const b of document.querySelectorAll("nav.pages button")) b.setAttribute("aria-current", b.dataset.page === p || (p !== "settings" && p !== "sessions" && b.dataset.page === "session") ? "page" : "false");
+  for (const id of ["session", "start", "setup", "settings", "sessions", "programs"]) $("p-" + id).classList.toggle("hidden", id !== p);
+  for (const b of document.querySelectorAll("nav.pages button")) b.setAttribute("aria-current", b.dataset.page === p || (!OWN_PAGES.includes(p) && b.dataset.page === "session") ? "page" : "false");
   if (p === "settings") loadSettings();
+  if (p === "programs") loadPrograms();
   if (p === "sessions") loadSessions($("sessionsbody"));
   if (p === "start") { loadSessions($("startsessions")); chooser($("chooser")); }
   if (p === "session") loadTab();
@@ -406,12 +456,12 @@ async function boot() {
   state = await call("api/state");
   $("modewrap").classList.toggle("hidden", !state.session);
   setWhere(state.session ? (state.session.folderLine || state.session.folder) + " · " + state.session.model : "No session open");
-  if (state.session) show(page === "settings" || page === "sessions" ? page : "session");
+  if (state.session) show(OWN_PAGES.includes(page) ? page : "session");
   else if (state.setup || page === "setup") { show("setup"); if (!fstate) setupPage(); }
   else {
     if (state.opening) { $("starterr").textContent = "Opening the session..."; setTimeout(boot, 800); }
     else $("starterr").textContent = state.error || "";
-    show(page === "settings" || page === "sessions" ? page : "start");
+    show(OWN_PAGES.includes(page) ? page : "start");
   }
   connect();
 }
@@ -628,11 +678,14 @@ document.addEventListener("click", async (e) => {
     for (const b of card.querySelectorAll("button")) b.disabled = false;
     return;
   }
+  const pa = t.closest("[data-prog-act]");
+  if (pa) { progAction(pa.closest("[data-prog]"), pa.dataset.progAct); return; }
   const ch = t.closest("[data-choice]");
   if (ch) { pickChoice(ch.dataset.choice); return; }
   const dd = t.closest("[data-doctor-all], [data-doctor]");
   if (dd) { doctor($(dd.dataset.doctor || "doctorbody"), !!dd.dataset.doctorAll); return; }
   const pg = t.closest("[data-page-go]");
+  if (pg && pg.dataset.progStart) progStart = pg.dataset.progStart;
   if (pg) {
     if (state.folder && pg.closest("#samplepanel")) { await post("api/open", { folder: state.folder }); page = "session"; setTimeout(boot, 300); }
     else show(pg.dataset.pageGo);
@@ -643,6 +696,7 @@ document.addEventListener("click", async (e) => {
   const os = t.closest("[data-open-session]");
   if (os) { await post("api/open", { id: os.dataset.openSession }); page = "session"; setTimeout(boot, 300); return; }
   const se = t.closest("[data-setting-edit]");
+  if (se && se.dataset.settingEdit === "programs") { show("programs"); return; }
   if (se) {
     if (!state.session) { if (se.dataset.settingEdit === "key") { show("setup"); setupPage(); } else toast("Open a session first."); return; }
     send(se.dataset.settingEdit === "key" ? "/key" : "/eln setup", false);
@@ -838,6 +892,112 @@ async function afterSetup() {
   $("samplepanel").classList.remove("hidden");
   doctor($("doctorbody"));
   if (state.folder) { $("samplepanel").querySelector("[data-page-go]").textContent = "Analyze " + state.folder; }
+}
+
+let progStart = "";
+let progRun = null;
+async function loadPrograms(quiet) {
+  const box = $("programsbody");
+  if (!quiet) { try { box.innerHTML = await call("api/programs?quick=1"); } catch (e) { box.textContent = e.message; return; } }
+  try { box.innerHTML = await call("api/programs"); } catch (e) { toast(e.message); }
+  if (progStart) { const li = box.querySelector('[data-prog="' + CSS.escape(progStart) + '"]'); progStart = ""; if (li) { li.scrollIntoView({ block: "center" }); const b = li.querySelector("button"); if (b) b.focus(); } }
+}
+$("progcheck").addEventListener("click", () => loadPrograms());
+function copy(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(() => toast("Copied."), () => fallbackCopy(text)); return; }
+  fallbackCopy(text);
+}
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text; document.body.append(ta); ta.select();
+  try { document.execCommand("copy"); toast("Copied."); } catch (e) { toast("Select the text and copy it."); }
+  ta.remove();
+}
+function drawPlan(plan) {
+  $("progdlg").classList.toggle("danger", !!plan.danger);
+  $("progtitle").textContent = plan.title;
+  $("progrefused").textContent = plan.refused || "";
+  const ul = $("proglines");
+  ul.replaceChildren();
+  for (const l of plan.lines) { const li = document.createElement("li"); li.textContent = l.trim(); ul.append(li); }
+  $("progcmdwrap").classList.toggle("hidden", !plan.command);
+  $("progcmd").textContent = plan.command || "";
+  $("proglinkwrap").classList.toggle("hidden", !plan.link);
+  $("proglink").textContent = plan.link || "";
+  $("proglink").href = plan.link || "#";
+  const ok = $("progok");
+  const can = plan.runs && !plan.refused;
+  ok.textContent = plan.confirm || "Run";
+  ok.className = "btn " + (plan.danger ? "danger" : "primary") + (can ? "" : " hidden");
+  ok.disabled = false;
+  $("progcancel").textContent = can ? "Cancel" : "Close";
+}
+function resetDialog() {
+  progRun = null;
+  $("proglog").classList.add("hidden");
+  $("proglog").textContent = "";
+  $("progresult").textContent = "";
+  $("progresult").className = "";
+  $("progpath").classList.add("hidden");
+  drawPlan({ title: "", lines: [], runs: false });
+}
+async function progAction(li, action) {
+  const name = li.dataset.prog;
+  resetDialog();
+  if (action === "check") {
+    li.querySelector(".pdetail").textContent = "Checking...";
+    try { const r = await call("api/programs/run", { name: name, action: "check" }); toast(r.text); } catch (e) { toast(e.message); }
+    return loadPrograms(true);
+  }
+  if (action === "path") {
+    $("progtitle").textContent = "Set path: " + li.dataset.progProgram + " (" + name + ")";
+    $("progpath").classList.remove("hidden");
+    $("progpathin").value = li.dataset.progPath || "";
+    progRun = { name: name, action: action };
+    $("progdlg").showModal();
+    $("progpathin").focus();
+    return;
+  }
+  let r;
+  try { r = await call("api/programs/plan", { name: name, action: action }); } catch (e) { toast(e.message); return; }
+  progRun = { name: name, action: action };
+  drawPlan(r.plan);
+  $("progdlg").showModal();
+}
+$("progpathcheck").addEventListener("click", async () => {
+  if (!progRun) return;
+  progRun.path = $("progpathin").value;
+  $("progresult").textContent = "Checking the path...";
+  try { const r = await call("api/programs/plan", progRun); drawPlan(r.plan); $("progresult").textContent = ""; } catch (e) { $("progresult").textContent = e.message; }
+});
+$("progpathin").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("progpathcheck").click(); } });
+$("progcopy").addEventListener("click", () => copy($("progcmd").textContent));
+$("proglinkcopy").addEventListener("click", () => copy($("proglink").textContent));
+$("progcancel").addEventListener("click", () => $("progdlg").close());
+$("progdlg").addEventListener("close", () => { progRun = null; });
+$("progok").addEventListener("click", async () => {
+  if (!progRun) return;
+  const ok = $("progok");
+  ok.disabled = true;
+  $("progresult").textContent = "Working...";
+  let r;
+  try { r = await call("api/programs/run", Object.assign({}, progRun, { confirmed: true })); } catch (e) { $("progresult").textContent = e.message; ok.disabled = false; return; }
+  if (!r.job) { finishRun(r); return; }
+  const log = $("proglog");
+  log.classList.remove("hidden");
+  const src = new EventSource(withT("api/programs/progress?job=" + r.job));
+  src.onmessage = (ev) => {
+    const m = JSON.parse(ev.data);
+    if (m.line !== undefined) { log.textContent += m.line + "\n"; log.scrollTop = log.scrollHeight; }
+    if (m.done) { src.close(); finishRun(m); }
+  };
+});
+function finishRun(r) {
+  $("progresult").textContent = r.text;
+  $("progresult").className = r.ok ? "okline" : "cardmsg";
+  $("progok").classList.add("hidden");
+  $("progcancel").textContent = "Close";
+  loadPrograms(true);
 }
 
 const theme = new URLSearchParams(location.search).get("theme");

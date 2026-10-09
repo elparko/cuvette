@@ -249,6 +249,8 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
   switch (e.kind) {
     case "adapter":
       return { icon: "setup", line: `Loaded the adapter ${show(d.name)} ${show(d.version ?? "")}${d.reason ? `: ${clip(String(d.reason))}` : ""}`, details: { programVersion: d.programVersion, status: d.status, programFound: d.programFound, tools: d.tools, notices: d.notices }, technical: tech() };
+    case "program":
+      return d.ok === false ? undefined : { icon: "setup", line: `Programs: ${clip(show(d.text))}`, details: { action: d.action, adapter: d.adapter, via: d.via }, technical: tech({ command: d.command, paths: d.paths, path: d.path }) };
     case "setup":
       return { icon: "setup", line: setupLine(d), details: { values: d.values, profile: d.profile, how: d.how, defaultsAccepted: d.defaultsAccepted }, technical: tech() };
     case "sensitivity": {

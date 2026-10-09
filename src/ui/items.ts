@@ -199,6 +199,8 @@ export class Mapper {
       case "adapter":
         if (d.by === "agent") return line("+", `Using ${d.program ?? d.name} through ${d.name}${d.reason ? `: ${String(d.reason).replace(/[.\s]+$/, "")}` : ""}. Change with /program.`, "cyan");
         return line("+", `Loaded the adapter ${d.name} ${d.version ?? ""}${d.programVersion ? ` (program ${d.programVersion})` : ""}${d.reason ? `: ${d.reason}` : ""}`, "cyan");
+      case "program":
+        return line("⚙", `Programs: ${String(d.text ?? d.action)}`, d.ok === false ? "red" : "cyan");
       case "error":
         return line("✗", String(d.message ?? d.text ?? "Error"), "red");
       case "usage":
