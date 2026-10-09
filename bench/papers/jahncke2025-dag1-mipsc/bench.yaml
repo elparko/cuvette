@@ -1,0 +1,42 @@
+adapters: [patch-clamp]
+prompt: |
+  I recorded miniature inhibitory postsynaptic currents (mIPSCs) from cerebellar Purkinje cells in mice at postnatal day 30. The cells were held at -70 mV in whole-cell voltage clamp, with NBQX and TTX in the bath. The folder {data}/jahncke2025-dag1-mipsc/cells has one Igor Pro file (.pxp) for each of 32 cells. The file {data}/jahncke2025-dag1-mipsc/cells_metadata.csv has the columns cell (the file name without .pxp), animal and group. The groups are Ctrl (control) and cKO (Dag1 conditional knockout).
+
+  Each file has 10 sweeps of 30 s at 10 kHz. The files hold no unit: the values are in pA. The first second of each sweep holds a test pulse. Analyze only the part from 1 s to 29.5 s of each sweep, and use all sweeps. The inhibitory events are inward (negative).
+
+  1. Detect the mIPSCs in each cell with the same settings. Give the number of cells and the number of animals in each group.
+  2. Give the mean mIPSC frequency (Hz) and the mean amplitude (pA) of the cells in each group.
+  3. Compare the two groups, with each cell as one observation and a Welch t-test. Give the p value for the frequency and for the amplitude.
+  4. Give the mean decay time constant (ms) of the Ctrl cells, and the p value of the group difference for the 10-90% rise time and for the decay time constant.
+
+  Write every number in your final answer text.
+answers:
+  event_method: template
+  event_threshold: 4
+  event_direction: inward
+  event_rise_ms: 0.7
+  event_decay_ms: 8
+  sweeps: all
+  replicate_unit: cells
+  group_test: t
+  alpha: 0.05
+  '*': Use the values in the decision record.
+allow: all
+timeout_s: 2400
+data:
+  - jahncke2025-dag1-mipsc/cells
+  - jahncke2025-dag1-mipsc/cells_metadata.csv
+items:
+  - {key: n_cells_ctrl, description: "Control cells", value: 16, exact: true, tool: detect_events_for_cells}
+  - {key: n_cells_cko, description: "cKO cells", value: 16, exact: true, tool: detect_events_for_cells}
+  - {key: n_animals_per_group, description: "Animals in each group", value: 6, exact: true, tool: compare_cell_groups}
+  - {key: p_frequency, description: "p value of the mIPSC frequency, cKO against Ctrl, cells as observations (the paper prints 0.018; the tolerance covers a different detection method)", value: 0.018, tolerance: 0.015, tool: compare_cell_groups}
+  - {key: p_amplitude, description: "p value of the mIPSC amplitude, cKO against Ctrl, cells as observations (the paper prints 0.017)", value: 0.017, tolerance: 0.015, tool: compare_cell_groups}
+  - {key: p_rise, description: "p value of the 10-90% rise time difference (the paper prints 0.38)", value: 0.38, tolerance: 0.2, tool: compare_cell_groups}
+  - {key: p_decay, description: "p value of the decay time constant difference (the paper prints 0.36)", value: 0.36, tolerance: 0.25, tool: compare_cell_groups}
+  - {key: decay_ctrl, description: "Mean decay time constant of the Ctrl cells, ms (the paper prints 7.87)", value: 7.87, tolerance: 0.5, tool: compare_cell_groups}
+  - {key: freq_ctrl, description: "Mean frequency of the Ctrl cells, Hz (not printed in the paper)", value: 2.97, tolerance: 0.6, tool: compare_cell_groups}
+  - {key: freq_cko, description: "Mean frequency of the cKO cells, Hz (not printed in the paper)", value: 1.76, tolerance: 0.5, tool: compare_cell_groups}
+  - {key: amp_ctrl, description: "Mean amplitude of the Ctrl cells, pA (not printed in the paper)", value: 51.9, tolerance: 7, tool: compare_cell_groups}
+  - {key: amp_cko, description: "Mean amplitude of the cKO cells, pA (not printed in the paper)", value: 38.3, tolerance: 6, tool: compare_cell_groups}
+  - {key: p_amplitude_animal_unit, description: "p value of the amplitude with the animal as the unit (6 against 6 animals): not significant at 0.05", value: 0.067, tolerance: 0.03, in_answer: false, reference: true, tool: compare_cell_groups}

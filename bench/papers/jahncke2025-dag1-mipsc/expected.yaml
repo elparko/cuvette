@@ -1,0 +1,28 @@
+tool: pyABF, Neo and SciPy (Python), through the patch-clamp adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells
+  - /Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells_metadata.csv
+decisions:
+  event_method: "template, threshold 4 times the noise SD of the detection trace"
+  template: "rise 0.7 ms, decay 8 ms, inward events"
+  window: "1 s to 29.5 s of each 30 s sweep, all 10 sweeps"
+  test: "Welch t-test, each cell as one observation"
+expected:
+  - {description: "Control cells", value: 16, tolerance: 0, source: "published"}
+  - {description: "cKO cells", value: 16, tolerance: 0, source: "published"}
+  - {description: "Animals in each group", value: 6, tolerance: 0, source: "published"}
+  - {description: "p value of the frequency, cells as observations", value: 0.018, tolerance: 0.015, source: "published"}
+  - {description: "p value of the amplitude, cells as observations", value: 0.017, tolerance: 0.015, source: "published"}
+  - {description: "p value of the 10-90% rise time", value: 0.38, tolerance: 0.2, source: "published"}
+  - {description: "p value of the decay time constant", value: 0.36, tolerance: 0.25, source: "published"}
+  - {description: "Mean decay time constant of the Ctrl cells, ms", value: 7.87, tolerance: 0.5, source: "published"}
+  - {description: "Mean frequency of the Ctrl cells, Hz", value: 2.97, tolerance: 0.6, source: "same-path"}
+  - {description: "Mean frequency of the cKO cells, Hz", value: 1.76, tolerance: 0.5, source: "same-path"}
+  - {description: "Mean amplitude of the Ctrl cells, pA", value: 51.9, tolerance: 7, source: "same-path"}
+  - {description: "Mean amplitude of the cKO cells, pA", value: 38.3, tolerance: 6, source: "same-path"}
+  - {description: "p value of the amplitude with the animal as the unit", value: 0.067, tolerance: 0.03, source: "independent"}
+notes: |
+  The p values of the paper come from its own detection, so the benchmark allows a wide tolerance (0.015 on the two main p values).
+  The two summary p values and the decay of the Ctrl cells are in Figure 2 and Table 1 of the paper. The group means are not printed.
+  With the animal as the unit, the amplitude p is 0.067 (R 4.6.1, catalog/patch-clamp/checks/check_groups.R).

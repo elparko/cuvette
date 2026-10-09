@@ -1,0 +1,140 @@
+kind: research paper
+short: Jahncke 2025
+field: Electrophysiology
+program: pyABF, Neo and SciPy (Python), through the patch-clamp adapter
+citation:
+  authors: Jahncke JN, Schnell E, Wright KM
+  title: Distinct functional domains of Dystroglycan regulate inhibitory synapse formation and maintenance in cerebellar Purkinje cells
+  venue: Communications Biology 8(1):878
+  year: 2025
+  doi: 10.1038/s42003-025-08323-1
+related:
+  - text: "Data: Jahncke JN, Schnell E, Wright KM. Cerebellar Purkinje cell whole cell voltage clamp mIPSC recordings in Dag1 conditional mutant mice. Figshare (2025), CC BY 4.0."
+    doi: 10.6084/m9.figshare.29083331
+measured: >-
+  Miniature inhibitory postsynaptic currents (mIPSCs) of Purkinje cells at P25 to P35, held at -70 mV with NBQX and TTX in the
+  bath. In the Calb1-Cre Dag1 experiment, 16 control and 16 conditional knockout (cKO) cells from 6 mice in each group. The paper
+  reports that the cKO cells have a lower mIPSC amplitude and frequency, with p = 0.017 and p = 0.018, and no difference in rise or
+  decay time (Table 1).
+instruction: >-
+  Detect the mIPSCs in each cell, compare the mean frequency and amplitude of the cells between control and cKO, and compare the
+  rise and decay times.
+instruction_basis: >-
+  Figure 2 (legend: N = 16 cells, 6 animals in each group; p Amp = 0.017, p Freq = 0.018) and Table 1 (rise and decay times with
+  their p values). The paper tests each cell as one observation, with a Shapiro-Wilk test to choose a t-test or a Mann-Whitney U test.
+answers:
+  event_method:
+    decision: Event detection method
+    value: template
+    source: The paper analyzes the files with an Igor Pro script (github.com/jnjahncke/mini_analysis), not with a template search. A template is the usual method for mIPSCs of this size.
+  event_threshold:
+    decision: Event detection threshold
+    value: 4
+    source: The adapter default. The Igor script uses its own cutoff of -12000 in internal units (the data record).
+  event_direction:
+    decision: Direction of the events
+    value: inward
+    source: The cells were held at -70 mV and the events are negative in the files.
+  event_rise_ms:
+    decision: Expected event rise time constant
+    value: 0.7
+    source: Table 1 gives a 10-90% rise time of 0.73 ms for the controls. A time constant of 0.7 ms is the same order.
+  event_decay_ms:
+    decision: Expected event decay time constant
+    value: 8
+    source: Table 1 gives a decay of 7.87 ms for the controls.
+  replicate_unit:
+    decision: Unit of replication
+    value: cells
+    source: The paper tests each cell (N = 16 cells, 6 animals). The animal as the unit is a reference item.
+  group_test:
+    decision: Test for the difference between two groups
+    value: t
+    source: The paper chose t or Mann-Whitney U from a Shapiro-Wilk test. The request names the Welch t-test.
+  sweeps:
+    decision: Sweeps to include
+    value: all
+    source: The files hold 10 sweeps of one cell. The request names the part of each sweep to analyze.
+  alpha:
+    decision: Significance level (alpha)
+    value: 0.05
+    source: The paper sets alpha to 0.05 (Methods, statistics).
+  '*':
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text.
+items:
+  n_cells_ctrl:
+    source: published
+    where: Figure 2 legend. Calb1-Cre Dag1 Ctrl N = 16 cells, 6 animals.
+    check: The metadata file lists 16 Ctrl cells.
+  n_cells_cko:
+    source: published
+    where: Figure 2 legend. Calb1-Cre Dag1 cKO N = 16 cells, 6 animals.
+    check: The metadata file lists 16 cKO cells.
+  n_animals_per_group:
+    source: published
+    where: Figure 2 legend. 6 animals in each group.
+    check: The metadata file lists 6 animals in each group.
+  p_frequency:
+    source: published
+    where: Figure 2 legend. p Freq = 0.018.
+    check: The adapter gives 0.0119 (Welch, cells). R 4.6.1 t.test on the cell table gives 0.01190575 (catalog/patch-clamp/checks/check_groups.R). The paper uses its own detection, so the p value differs.
+  p_amplitude:
+    source: published
+    where: Figure 2 legend. p Amp = 0.017.
+    check: The adapter gives 0.0277 (Welch, cells). R 4.6.1 t.test gives 0.02771289.
+  p_rise:
+    source: published
+    where: Table 1, row Calb1-Cre Dag1, column Rise p-val. 0.38.
+    check: The adapter gives 0.495 for the 10-90% rise time of its own events.
+  p_decay:
+    source: published
+    where: Table 1, row Calb1-Cre Dag1, column Decay p-val. 0.36.
+    check: The adapter gives 0.154 for the decay time constant of its own events.
+  decay_ctrl:
+    source: published
+    where: Table 1, row Calb1-Cre Dag1, column Decay Ctrl. 7.87 +/- 0.39 ms (mean +/- SEM).
+    check: The adapter gives 8.04 ms for the Ctrl cells. The cKO value of the paper (8.77 ms) is not an item, because the adapter gives 7.07 ms.
+  freq_ctrl:
+    source: computed
+    tool: the patch-clamp adapter
+    where: The paper shows the frequency as a bar chart and prints no value.
+    independence: same path
+    check: R 4.6.1 mean of the cell table gives 2.969298 Hz. The table comes from the adapter, so the check covers the statistics and not the detection.
+  freq_cko:
+    source: computed
+    tool: the patch-clamp adapter
+    where: Not printed in the paper.
+    independence: same path
+    check: R 4.6.1 gives 1.763158 Hz.
+  amp_ctrl:
+    source: computed
+    tool: the patch-clamp adapter
+    where: Not printed in the paper.
+    independence: same path
+    check: R 4.6.1 gives 51.8554 pA.
+  amp_cko:
+    source: computed
+    tool: the patch-clamp adapter
+    where: Not printed in the paper.
+    independence: same path
+    check: R 4.6.1 gives 38.2970 pA.
+  p_amplitude_animal_unit:
+    source: computed
+    tool: the patch-clamp adapter
+    where: Not in the paper. Each animal contributes the mean of its cells (6 against 6 animals).
+    independence: independent
+    check: R 4.6.1 t.test on the animal means gives 0.06672291 for the amplitude and 0.02549474 for the frequency (checks/check_groups.R).
+data:
+  source: >-
+    Figshare record 10.6084/m9.figshare.29083331. fetch.sh downloads the 32 Calb1 Dag1 P30 cells (12 MB each, 384 MB in all) and the
+    metadata file, checks the SHA-256 of each one, and writes cells_metadata.csv with the columns cell, animal and group.
+  url: https://doi.org/10.6084/m9.figshare.29083331
+  license: CC BY 4.0 for the data and the paper. The benchmark downloads the files and does not copy them into the repository.
+  size: 384 MB
+notes: >-
+  The paper analyzes the files with an Igor Pro script and a cutoff of -12000 (internal units). The adapter uses a template search,
+  so the counts differ, and the p values are the same order and the same direction, not equal. Cells from one animal are not
+  independent. The ICC (intraclass correlation) over animals is 0.26 for the frequency. With the animal as the unit, the amplitude
+  difference is no longer significant at 0.05 (p = 0.067).

@@ -1,0 +1,128 @@
+kind: research paper
+short: Gouwens 2019
+field: Electrophysiology
+program: pyABF, h5py and SciPy (Python), through the patch-clamp adapter
+citation:
+  authors: Gouwens NW, Sorensen SA, Berg J, Lee C, Jarsky T, Ting J, et al.
+  title: Classification of electrophysiological and morphological neuron types in the mouse visual cortex
+  venue: Nature Neuroscience 22(7):1182-1195
+  year: 2019
+  doi: 10.1038/s41593-019-0417-0
+related:
+  - text: "Data: Allen Cell Types Database, cell electrophysiology recordings (NWB files) and the feature table of each cell, api.brain-map.org. Allen Institute Terms of Use."
+    url: https://celltypes.brain-map.org/
+measured: >-
+  Whole-cell current-clamp recordings of mouse visual cortex neurons. The paper defines each electrophysiological feature (rheobase,
+  F-I slope, input resistance, membrane time constant, sag, spike shape) and classifies the cells. The Cell Types Database publishes
+  the value of each feature for each cell. The article prints distributions, not the value of one cell.
+instruction: >-
+  For three cells, give the rheobase, the F-I slope, the input resistance, the membrane time constant and the upstroke to downstroke
+  ratio of the first spike at rheobase, from the Long Square sweeps.
+instruction_basis: >-
+  The Methods of the paper and the Allen Institute electrophysiology white paper: the feature definitions of the ipfx package. The
+  database fields are ef__threshold_i_long_square, ef__f_i_curve_slope, ef__ri, ef__tau and ef__upstroke_downstroke_ratio_long_square.
+answers:
+  spike_threshold_method:
+    decision: Definition of the spike threshold
+    value: dvdt_fraction_of_upstroke
+    source: The Allen Institute definition (ipfx spike_detector.refine_threshold_indexes, 5 percent of the mean upstroke).
+  dvdt_cutoff_mv_per_ms:
+    decision: Spike threshold cutoff for dV/dt
+    value: 20
+    source: The ipfx default of dv_cutoff, 20 mV per ms.
+  min_peak_mv:
+    decision: Lowest spike peak
+    value: -30
+    source: The ipfx default of min_peak, -30 mV.
+  baseline_window:
+    decision: Baseline window before the step
+    value: "0.92,1.02"
+    source: The 0.1 s before the step, which starts at 1.02 s (the ipfx baseline interval).
+  sweeps:
+    decision: Sweeps to include
+    value: all
+    source: The request limits the sweeps to the Long Square label.
+  ljp_mv:
+    decision: Liquid junction potential correction
+    value: 0
+    source: The database values are not corrected, so the benchmark does not correct.
+  input_resistance_measure:
+    decision: Deflection that gives the input resistance
+    value: peak
+    source: ipfx subthresh_features.input_resistance uses the peak deflection.
+  '*':
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text.
+items:
+  c1_rheobase:
+    source: published
+    where: Cell Types Database, cell 567987585, field ef__threshold_i_long_square. 230. The article does not print it.
+    check: The adapter gives 230.
+  c1_fi_slope:
+    source: published
+    where: Same record, field ef__f_i_curve_slope. 1.07166364262164.
+    check: The adapter gives 1.07166365.
+  c1_ri:
+    source: published
+    where: Same record, field ef__ri. 129.843786358833.
+    check: The adapter gives 129.843763.
+  c1_tau:
+    source: published
+    where: Same record, field ef__tau. 8.25874032258183.
+    check: The adapter gives 8.223. The difference is 0.4 percent and its cause is not known.
+  c1_ratio:
+    source: published
+    where: Same record, field ef__upstroke_downstroke_ratio_long_square. 1.14581526994923.
+    check: The adapter gives 1.14581527.
+  c2_rheobase:
+    source: published
+    where: Cell 595511209, field ef__threshold_i_long_square. 70.
+    check: The adapter gives 70.
+  c2_fi_slope:
+    source: published
+    where: Same record, field ef__f_i_curve_slope. 0.115153631284916.
+    check: The adapter gives 0.115153630.
+  c2_ri:
+    source: published
+    where: Same record, field ef__ri. 187.187567353249.
+    check: The adapter gives 187.187566.
+  c2_tau:
+    source: published
+    where: Same record, field ef__tau. 32.555055567042.
+    check: The adapter gives 32.259, which is 0.9 percent lower.
+  c2_ratio:
+    source: published
+    where: Same record, field ef__upstroke_downstroke_ratio_long_square. 3.87456911022343.
+    check: The adapter gives 3.87456911.
+  c3_rheobase:
+    source: published
+    where: Cell 563220277, field ef__threshold_i_long_square. 90.
+    check: The adapter gives 90.
+  c3_fi_slope:
+    source: published
+    where: Same record, field ef__f_i_curve_slope. 0.207532397408207.
+    check: The adapter gives 0.207532393.
+  c3_ri:
+    source: published
+    where: Same record, field ef__ri. 128.515630960464.
+    check: The adapter gives 128.515623.
+  c3_ratio:
+    source: published
+    where: Same record, field ef__upstroke_downstroke_ratio_long_square. 3.22588602314736.
+    check: The adapter gives 3.22588602.
+  c3_tau:
+    source: published
+    where: Same record, field ef__tau. 14.8685687379896.
+    check: The adapter gives 15.79 from 2 sweeps (the tool gives no fit for the third), so the item is a reference.
+data:
+  source: >-
+    Allen Cell Types Database NWB files of the cells 567987585, 595511209 and 563220277. fetch.sh downloads them from
+    api.brain-map.org (16 to 21 MB each) and checks the SHA-256 of each one.
+  url: https://celltypes.brain-map.org/
+  license: Allen Institute Terms of Use (citation required). The benchmark downloads the files and does not copy them into the repository.
+  size: 55 MB
+notes: >-
+  The feature values come from the Cell Types Database, which is the data release of the paper. The adapter reproduces the rheobase,
+  the F-I slope, the input resistance and the upstroke to downstroke ratio of each cell to 6 or more digits, because it follows the ipfx
+  definitions. The membrane time constant differs by 0.4 to 6 percent. Cell 563220277 has no time constant fit for one sweep.

@@ -1,0 +1,43 @@
+adapters: [patch-clamp]
+prompt: |
+  The folder {data}/gouwens2019-allen-ephys has the whole-cell current-clamp recordings of three mouse visual cortex neurons from the Allen Cell Types Database, as NWB files: 567987585.nwb, 595511209.nwb and 563220277.nwb. Each file has many sweeps with different stimuli. Use only the sweeps whose label holds "Long Square" (a 1 s current step that starts at 1.02 s). The membrane potentials are not corrected for the liquid junction potential, and I do not correct them.
+
+  For each of the three cells, give:
+  1. The rheobase in pA: the smallest positive step with a spike.
+  2. The slope of the frequency-current (F-I) curve in Hz per pA, a straight line through the rate of every sweep with spikes.
+  3. The input resistance in MOhm, from the peak voltage deflection of the hyperpolarizing steps between -100 pA and 0 pA (exclusive). Use the 0.1 s before the step as the baseline.
+  4. The membrane time constant in ms from the same steps.
+  5. The ratio of the maximum upstroke to the maximum downstroke of the first spike at rheobase. Define the spike threshold as the Allen Institute does: the first point where dV/dt reaches 20 mV per ms, then back to the point where dV/dt is 5 percent of the mean upstroke. Count a deflection as a spike if its peak is at -30 mV or higher.
+
+  Write every number in your final answer text, with the cell number.
+answers:
+  spike_threshold_method: dvdt_fraction_of_upstroke
+  dvdt_cutoff_mv_per_ms: 20
+  min_peak_mv: -30
+  baseline_window: "0.92,1.02"
+  sweeps: all
+  ljp_mv: 0
+  input_resistance_measure: peak
+  '*': Use the values in the decision record.
+allow: all
+timeout_s: 1800
+data:
+  - gouwens2019-allen-ephys/567987585.nwb
+  - gouwens2019-allen-ephys/595511209.nwb
+  - gouwens2019-allen-ephys/563220277.nwb
+items:
+  - {key: c1_rheobase, description: "Cell 567987585: rheobase, pA", value: 230, exact: true, tool: measure_spikes}
+  - {key: c1_fi_slope, description: "Cell 567987585: F-I slope, Hz per pA", value: 1.0717, tolerance: 0.005, tool: measure_spikes}
+  - {key: c1_ri, description: "Cell 567987585: input resistance, MOhm", value: 129.84, tolerance: 0.5, tool: measure_passive}
+  - {key: c1_tau, description: "Cell 567987585: membrane time constant, ms", value: 8.26, tolerance: 0.3, tool: measure_passive}
+  - {key: c1_ratio, description: "Cell 567987585: upstroke to downstroke ratio", value: 1.1458, tolerance: 0.003, tool: measure_spikes}
+  - {key: c2_rheobase, description: "Cell 595511209: rheobase, pA", value: 70, exact: true, tool: measure_spikes}
+  - {key: c2_fi_slope, description: "Cell 595511209: F-I slope, Hz per pA", value: 0.1152, tolerance: 0.001, tool: measure_spikes}
+  - {key: c2_ri, description: "Cell 595511209: input resistance, MOhm", value: 187.19, tolerance: 0.5, tool: measure_passive}
+  - {key: c2_tau, description: "Cell 595511209: membrane time constant, ms", value: 32.56, tolerance: 0.6, tool: measure_passive}
+  - {key: c2_ratio, description: "Cell 595511209: upstroke to downstroke ratio", value: 3.8746, tolerance: 0.004, tool: measure_spikes}
+  - {key: c3_rheobase, description: "Cell 563220277: rheobase, pA", value: 90, exact: true, tool: measure_spikes}
+  - {key: c3_fi_slope, description: "Cell 563220277: F-I slope, Hz per pA", value: 0.2075, tolerance: 0.001, tool: measure_spikes}
+  - {key: c3_ri, description: "Cell 563220277: input resistance, MOhm", value: 128.52, tolerance: 0.5, tool: measure_passive}
+  - {key: c3_ratio, description: "Cell 563220277: upstroke to downstroke ratio", value: 3.2259, tolerance: 0.004, tool: measure_spikes}
+  - {key: c3_tau, description: "Cell 563220277: membrane time constant, ms (the tool gives no fit for one of the three sweeps)", value: 14.87, tolerance: 0.5, reference: true, tool: measure_passive}

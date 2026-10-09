@@ -1,0 +1,32 @@
+tool: pyABF, h5py and SciPy (Python), through the patch-clamp adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/gouwens2019-allen-ephys/567987585.nwb
+  - /Volumes/T7/guided-analysis/data/gouwens2019-allen-ephys/595511209.nwb
+  - /Volumes/T7/guided-analysis/data/gouwens2019-allen-ephys/563220277.nwb
+decisions:
+  threshold: "first point where dV/dt reaches 20 mV per ms, then back to 5 percent of the mean upstroke"
+  min_peak: "-30 mV"
+  sweeps: "Long Square sweeps; steps between -100 and 0 pA for the passive properties"
+  input_resistance: "peak deflection, baseline 0.92 to 1.02 s"
+  ljp: "0 mV (not corrected)"
+expected:
+  - {description: "Cell 567987585: rheobase, pA", value: 230, tolerance: 0, source: "published"}
+  - {description: "Cell 567987585: F-I slope, Hz per pA", value: 1.0717, tolerance: 0.005, source: "published"}
+  - {description: "Cell 567987585: input resistance, MOhm", value: 129.84, tolerance: 0.5, source: "published"}
+  - {description: "Cell 567987585: membrane time constant, ms", value: 8.26, tolerance: 0.3, source: "published"}
+  - {description: "Cell 567987585: upstroke to downstroke ratio", value: 1.1458, tolerance: 0.003, source: "published"}
+  - {description: "Cell 595511209: rheobase, pA", value: 70, tolerance: 0, source: "published"}
+  - {description: "Cell 595511209: F-I slope, Hz per pA", value: 0.1152, tolerance: 0.001, source: "published"}
+  - {description: "Cell 595511209: input resistance, MOhm", value: 187.19, tolerance: 0.5, source: "published"}
+  - {description: "Cell 595511209: membrane time constant, ms", value: 32.56, tolerance: 0.6, source: "published"}
+  - {description: "Cell 595511209: upstroke to downstroke ratio", value: 3.8746, tolerance: 0.004, source: "published"}
+  - {description: "Cell 563220277: rheobase, pA", value: 90, tolerance: 0, source: "published"}
+  - {description: "Cell 563220277: F-I slope, Hz per pA", value: 0.2075, tolerance: 0.001, source: "published"}
+  - {description: "Cell 563220277: input resistance, MOhm", value: 128.52, tolerance: 0.5, source: "published"}
+  - {description: "Cell 563220277: upstroke to downstroke ratio", value: 3.2259, tolerance: 0.004, source: "published"}
+  - {description: "Cell 563220277: membrane time constant, ms (the tool gives no fit for one of the three sweeps)", value: 14.87, tolerance: 0.5, source: "published"}
+notes: |
+  The values are the Allen Cell Types Database fields ef__threshold_i_long_square, ef__f_i_curve_slope, ef__ri, ef__tau and
+  ef__upstroke_downstroke_ratio_long_square of each cell. The database is the data release of Gouwens et al. 2019. The article does not
+  print the value of an individual cell. The time constant of cell 563220277 is not scored: the tool gives no fit for one of the three sweeps, so its mean differs from the database.
