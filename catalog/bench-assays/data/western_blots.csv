@@ -1,0 +1,7 @@
+Sample,Group,Experiment,Blot,Target,Target_bg,Reference,Reference_bg
+Lane 1,Control,1,Blot A,1000,100,2000,200
+Lane 2,Treated,1,Blot A,2100,100,2200,200
+Lane 3,Control,2,Blot B,1300,100,2200,200
+Lane 4,Treated,2,Blot B,3100,100,2700,200
+Lane 5,Control,3,Blot C,700,100,1700,200
+Lane 6,Treated,3,Blot C,1500,100,1200,200

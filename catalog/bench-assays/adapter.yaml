@@ -1,0 +1,814 @@
+adapter:
+  name: bench-assays
+  field: bench assays
+  file_types: [".xlsx", ".csv", ".tsv"]
+  title: Bench assays (protein assays, blot and reporter ratios, cell counts, nucleic acid QC)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Does basic wet-lab calculations on tables that labs export to Excel. It covers protein assay curves, blot and reporter ratios,
+    cell counts and NanoDrop quality control. The scientist chooses each method step that can change a number.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: pandas, numpy, scipy
+  version: "pandas 2.3.3, numpy 2.5.3, scipy 1.18.1, matplotlib 3.11.2"
+  tested_versions: ["1.18.1"]
+  homepage: https://scipy.org
+  docs:
+    - https://pandas.pydata.org/docs/
+    - https://numpy.org/doc/stable/
+    - https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html
+  install: >
+    The adapter uses the biostats Python environment. Add the packages that ga_bench_assays.py imports:
+    uv pip install --python ~/.cuvette/envs/biostats/bin/python numpy pandas scipy matplotlib openpyxl
+  citation:
+    - text: McKinney, W. (2010). Data Structures for Statistical Computing in Python. In Proceedings of the 9th Python in Science Conference (pp. 56–61). https://doi.org/10.25080/Majora-92bf1922-00a
+      doi: 10.25080/Majora-92bf1922-00a
+    - text: "Harris, C. R., Millman, K. J., van der Walt, S. J., et al. (2020). Array programming with NumPy. Nature, 585(7825), 357-362. https://doi.org/10.1038/s41586-020-2649-2"
+      doi: 10.1038/s41586-020-2649-2
+    - text: "Virtanen P, Gommers R, Oliphant TE, et al. SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods 17, 261-272 (2020)."
+      doi: 10.1038/s41592-019-0686-2
+    - text: "Hunter, J. D. (2007). Matplotlib: A 2D Graphics Environment. Computing in Science & Engineering, 9(3), 90–95. https://doi.org/10.1109/MCSE.2007.55"
+      doi: 10.1109/MCSE.2007.55
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 60
+  call_timeout_s: 300
+
+locate:
+  env: CUVETTE_BENCH_ASSAYS_PYTHON
+  paths:
+    - ~/.cuvette/envs/biostats/bin/python
+    - ~/.cuvette/envs/biostats/Scripts/python.exe
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import scipy, pandas, numpy; print('scipy', scipy.__version__)"]
+  version_pattern: 'scipy (\S+)'
+  identity: 'scipy \d'
+
+data_rules:
+  cloud_visibility: all
+  note: The tables are small lab sheets. The model sees the result table of each step.
+
+decisions:
+  - key: protein_blank
+    label: Blank correction of the protein assay
+    kind: choice
+    choices: [subtract, none]
+    default: subtract
+    group: Protein assay
+    help: >
+      subtract removes the mean of the blank wells from every well. If there are no blank wells, it uses the standard with concentration 0.
+      none fits the raw absorbance.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: protein_assay, arg: blank }
+
+  - key: protein_curve_model
+    label: Standard curve model of the protein assay
+    kind: choice
+    choices: [linear, linear_origin, quadratic, 4PL]
+    default: linear
+    group: Protein assay
+    help: >
+      linear is a straight line. linear_origin forces the line through zero. quadratic is a second order polynomial.
+      4PL is the four-parameter logistic. The kit manuals of BCA and Bradford assays describe these choices. BCA is nearly linear in a narrow range.
+      Bradford curves bend.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: protein_assay, arg: model }
+    sensitivity:
+      options: [linear, quadratic]
+      tool: protein_assay
+      compare: [metrics.r2, metrics.n_flagged]
+      max_runs: 2
+
+  - key: protein_cv_limit_pct
+    label: Highest accepted CV of replicate wells (percent)
+    kind: float
+    default: 20
+    lo: 1
+    hi: 100
+    group: Protein assay
+    help: A sample with a CV of the back-calculated concentration above this limit gets a flag. The CV is the SD divided by the mean.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: protein_assay, arg: cv_limit_pct }
+
+  - key: exclude_wells
+    label: Rows that you exclude as outliers
+    kind: text
+    default: none
+    group: Data
+    help: >
+      Name each Excel row number that you exclude, such as 5, 6, and the reason. The header is row 1. Write none to keep all rows.
+      Decide before you see the result.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: protein_assay, arg: exclude }
+      - { tool: ratio_normalize, arg: exclude }
+      - { tool: cell_counts, arg: exclude }
+      - { tool: nucleic_acid_qc, arg: exclude }
+
+  - key: ratio_background
+    label: Background subtraction before the ratio
+    kind: choice
+    choices: [none, subtract]
+    default: none
+    group: Ratios
+    help: >
+      subtract removes the background of each signal before the tool divides the target by the reference. For a blot, use the local or rolling
+      background of the band. For a reporter assay, use the mean of the untransfected wells. none uses the raw values.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: ratio_normalize, arg: background }
+
+  - key: control_group
+    label: Control group for the fold change
+    kind: text
+    group: Ratios
+    help: Name the group that has fold change 1, such as Control, Vehicle or Empty vector. Every fold change is relative to its mean.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: ratio_normalize, arg: control_group }
+
+  - key: normalize_scope
+    label: Where the control mean comes from
+    kind: choice
+    choices: [pooled, within_block]
+    default: pooled
+    group: Ratios
+    help: >
+      pooled uses the control mean of all blots. within_block divides each blot by its own control.
+      within_block removes the variation between blots. The control group then has no spread.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: ratio_normalize, arg: scope }
+
+  - key: trypan_dilution
+    label: Dilution factor of the count
+    kind: float
+    default: 2
+    lo: 1
+    hi: 1000
+    group: Cell counts
+    help: >
+      The dilution factor is the volume of the mixture divided by the volume of the cells. Cells and trypan blue in equal parts give 2.
+      Many counter exports already correct for the dilution. Then use 1.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: cell_counts, arg: dilution }
+
+  - key: chamber_factor
+    label: Cells per mL for one cell in one large square
+    kind: float
+    default: 10000
+    lo: 1
+    group: Cell counts
+    help: A large square of a Neubauer chamber has an area of 1 mm squared and a depth of 0.1 mm. This gives 10000. Use the value of your chamber.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: cell_counts, arg: chamber_factor }
+
+  - key: nucleic_acid_type
+    label: Type of nucleic acid
+    kind: choice
+    choices: [dsDNA, RNA, ssDNA, custom]
+    default: dsDNA
+    group: Nucleic acid
+    help: The type sets the factor for A260 (50 for dsDNA, 40 for RNA, 33 for ssDNA) and the usual range of A260/A280. Use custom with a factor for an oligonucleotide.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: nucleic_acid_qc, arg: sample_type }
+
+  - key: path_length_mm
+    label: Path length of the absorbance reading (mm)
+    kind: float
+    default: 10
+    lo: 0.01
+    group: Nucleic acid
+    help: A NanoDrop reports absorbance as 10 mm equivalent, so use 10. For a plate reader, use the path length of the well volume.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: nucleic_acid_qc, arg: path_length_mm }
+
+  - key: baseline
+    label: Baseline correction with A320
+    kind: choice
+    choices: [none, a320]
+    default: none
+    group: Nucleic acid
+    help: a320 subtracts the absorbance at 320 nm from A260, A280 and A230. It removes the offset that particles and scattering cause.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: nucleic_acid_qc, arg: baseline }
+
+checks:
+  - id: protein_outside_standards
+    description: The answer reports a protein concentration that the tool flagged as below or above the standard range.
+    severity: error
+    text: >
+      Report the answer if it gives a sample concentration as an exact number and the samples table flags the sample as below range,
+      above range or beyond curve, and the answer does not say so. The sample must be diluted and measured again.
+  - id: protein_dilution_not_applied
+    description: The answer gives the concentration in the well and calls it the sample concentration.
+    severity: warning
+    text: >
+      Report the answer if the samples have a dilution factor above 1 and the answer gives the column conc_in_well as the
+      concentration of the sample.
+  - id: protein_model_not_named
+    description: The answer gives protein concentrations and does not name the curve model and the blank correction.
+    severity: warning
+    text: Report the answer if it gives protein concentrations from a standard curve and does not name the model and the blank correction.
+  - id: ratio_pseudoreplication
+    description: Lanes or wells of one biological replicate are used as independent observations.
+    severity: error
+    text: >
+      Report the answer if it gives a p-value or a confidence interval for a fold change and the n is the number of lanes or wells
+      of the same sample, not the number of biological replicates. Technical replicates are not independent observations. The standard
+      errors are then too small.
+  - id: ratio_loading_control_unchecked
+    description: The answer normalizes a blot to a loading control and does not say that the control is in its linear range.
+    severity: warning
+    text: >
+      Report the answer if it normalizes bands to a loading control or total protein stain and does not say that the scientist checked
+      that the target and the control are not saturated and are linear with the amount of protein loaded.
+  - id: ratio_saturated_signal
+    description: The answer uses ratios of saturated bands or saturated wells.
+    severity: error
+    text: >
+      Report the answer if the tool warned about saturated signals, or the scientist said that bands are saturated, and the answer
+      still reports the fold change as a result.
+  - id: ratio_scope_not_named
+    description: The answer gives a fold change and does not say which group is the control and where the control mean comes from.
+    severity: warning
+    text: Report the answer if it gives a fold change and does not name the control group, the scope (pooled or within block) and the background step.
+  - id: cell_count_low_number
+    description: The answer reports a cell density from fewer than 100 counted cells.
+    severity: warning
+    text: >
+      Report the answer if it gives cells per mL from a hemocytometer count that the tool flagged with fewer than 100 cells counted,
+      and the answer does not say so.
+  - id: cell_dilution_not_confirmed
+    description: The answer gives cells per mL and does not state the dilution factor of the count.
+    severity: warning
+    text: Report the answer if it gives cells per mL and does not state the dilution factor, or does not say whether the counter export was already corrected for it.
+  - id: nucleic_purity_overclaim
+    description: The answer calls a sample pure or free of protein from the A260/A280 ratio alone.
+    severity: warning
+    text: >
+      Report the answer if it says a sample is pure, or has no protein contamination, from A260/A280 and A260/A230 alone.
+      The ratio ranges are rules of thumb. The ratio does not detect protein well.
+
+tools:
+  - name: protein_assay
+    title: Protein assay standard curve
+    description: >
+      Fit the standard curve of a BCA, Bradford or Lowry assay and back-calculate the samples. Subtract a blank, multiply by the dilution factor,
+      flag samples outside the standard range and give the replicate mean and CV. It can give the volume of each sample for an equal protein load.
+    read_only: true
+    function: "ga_bench_assays:protein_assay"
+    params:
+      path: { type: string, description: Absolute path of the CSV or xlsx file with one row for each well. }
+      sheet: { type: string, description: Sheet name of an xlsx file. Default is the first sheet. }
+      assay: { type: string, enum: [BCA, Bradford, Lowry], description: Name of the assay. It goes into the report and the manual route. }
+      sample_col: { type: string, description: Column with the sample name. Default Sample. }
+      type_col: { type: string, description: "Column with the well type: standard, blank or sample. Default Type." }
+      conc_col: { type: string, description: Column with the concentration of each standard. Default Concentration. }
+      signal_col: { type: string, description: Column with the absorbance. Default Absorbance. }
+      dilution_col: { type: string, description: Column with the dilution factor of each well. Leave out to use dilution. }
+      dilution: { type: number, minimum: 1, description: Dilution factor for all samples. It applies if you give no dilution_col. Default 1. }
+      blank: { type: string, enum: [subtract, none], description: Subtract the mean of the blank wells or not. }
+      model: { type: string, enum: [linear, linear_origin, quadratic, 4PL], description: Model of the standard curve. }
+      exclude: { type: string, description: "Excel row numbers to leave out, such as 5, 6. The header is row 1. Default none." }
+      cv_limit_pct: { type: number, minimum: 1, description: Samples with a CV above this percent get a flag. Default 20. }
+      conc_unit: { type: string, enum: [ug/mL, mg/mL, ug/uL], description: Unit of the standard concentrations. Default ug/mL. }
+      load_ug: { type: number, exclusiveMinimum: 0, description: "Target protein for each sample, in micrograms. It gives the volume of each sample." }
+      final_volume_ul: { type: number, exclusiveMinimum: 0, description: Final volume for each sample in microliters. It gives the volume of buffer to add. Needs load_ug. }
+      file_name: { type: string, description: Start of the output file names. Default protein. }
+    required: [path]
+    citations:
+      - text: "Smith PK, Krohn RI, Hermanson GT, Mallia AK, Gartner FH, Provenzano MD, Fujimoto EK, Goeke NM, Olson BJ, Klenk DC (1985). Measurement of protein using bicinchoninic acid. Analytical Biochemistry 150(1): 76-85."
+        doi: 10.1016/0003-2697(85)90442-7
+        when: { assay: BCA }
+      - text: "Bradford MM (1976). A rapid and sensitive method for the quantitation of microgram quantities of protein utilizing the principle of protein-dye binding. Analytical Biochemistry 72: 248-254."
+        doi: 10.1016/0003-2697(76)90527-3
+        when: { assay: Bradford }
+      - text: "Lowry OH, Rosebrough NJ, Farr AL, Randall RJ (1951). Protein measurement with the Folin phenol reagent. Journal of Biological Chemistry 193(1): 265-275."
+        doi: 10.1016/S0021-9258(19)52451-6
+        when: { assay: Lowry }
+
+  - name: ratio_normalize
+    title: Normalize a target signal to a reference signal
+    description: >
+      Divide the target signal by the reference signal for each lane or well. Then divide by the mean of the control group.
+      It handles Western blot densitometry (loading control) and dual-luciferase assays (Renilla). It gives the fold change and the mean, SD and n of each group.
+      It does not test hypotheses.
+    read_only: true
+    function: "ga_bench_assays:ratio_normalize"
+    params:
+      path: { type: string, description: Absolute path of the CSV or xlsx file with one row for each lane or well. }
+      sheet: { type: string, description: Sheet name of an xlsx file. Default is the first sheet. }
+      assay: { type: string, enum: [western, dual_luciferase], description: Type of assay. It goes into the report and the manual route. }
+      sample_col: { type: string, description: Column with the lane or well name. Default Sample. }
+      group_col: { type: string, description: Column with the group. Default Group. }
+      target_col: { type: string, description: Column with the target signal (band volume or firefly). Default Target. }
+      reference_col: { type: string, description: Column with the reference signal (loading control or Renilla). Default Reference. }
+      control_group: { type: string, description: Name of the control group in the group column. }
+      replicate_col: { type: string, description: Column with the biological replicate. The tool averages the rows of one replicate to one value. }
+      block_col: { type: string, description: Column with the blot or plate. Needed for the scope within_block. }
+      background: { type: string, enum: [none, subtract], description: Subtract the background of each signal or not. }
+      target_bg_col: { type: string, description: Column with the background of the target. Needed if background is subtract. }
+      reference_bg_col: { type: string, description: Column with the background of the reference. Needed if background is subtract. }
+      scope: { type: string, enum: [pooled, within_block], description: "Use the control mean of all blots or plates (pooled), or of each blot or plate (within_block)." }
+      log2: { type: boolean, description: Add the log2 fold change and its mean and SD. Default false. }
+      saturation_max: { type: number, description: The raw value at which the imager or luminometer saturates. The tool leaves out each row at or above it. }
+      exclude: { type: string, description: "Excel row numbers to leave out, such as 5, 6. The header is row 1. Default none." }
+      file_name: { type: string, description: Start of the output file names. Default ratio. }
+    required: [path, control_group]
+
+  - name: cell_counts
+    title: Cell counts and seeding volumes
+    description: >
+      Give cells per mL and viability from hemocytometer counts with trypan blue, or from a counter export. It gives the volume of cells and of medium
+      for a target number of cells or a target density.
+    read_only: true
+    function: "ga_bench_assays:cell_counts"
+    params:
+      path: { type: string, description: Absolute path of the CSV or xlsx file with one row for each count. }
+      sheet: { type: string, description: Sheet name of an xlsx file. Default is the first sheet. }
+      source: { type: string, enum: [hemocytometer, counter], description: Counts by hand or an export of an automated counter. }
+      sample_col: { type: string, description: Column with the sample name. Rows with the same name are counts of one sample. Default Sample. }
+      live_col: { type: string, description: Hemocytometer. Column with the live cells counted. Default Live. }
+      dead_col: { type: string, description: Hemocytometer. Column with the dead (blue) cells counted. Default Dead. }
+      squares_col: { type: string, description: Hemocytometer. Column with the number of large squares counted. Leave out to use squares. }
+      squares: { type: integer, minimum: 1, description: Hemocytometer. Number of large squares counted in each row. Default 4. }
+      dilution: { type: number, minimum: 1, description: "Dilution factor of the count. Cells and trypan blue in equal parts give 2." }
+      dilution_col: { type: string, description: Column with the dilution factor of each row. Leave out to use dilution. }
+      chamber_factor: { type: number, exclusiveMinimum: 0, description: Cells per mL for one cell in one large square. Default 10000 for a Neubauer chamber. }
+      live_per_ml_col: { type: string, description: Counter. Column with live cells per mL. Default Live/mL. }
+      total_per_ml_col: { type: string, description: Counter. Column with total cells per mL. Default Total/mL. }
+      viability_col: { type: string, description: Counter. Column with the viability in percent. Default Viability. }
+      target_cells: { type: number, exclusiveMinimum: 0, description: Number of live cells that you need. }
+      target_density: { type: number, exclusiveMinimum: 0, description: Cells per mL that you need. Needs final_volume_ml. Do not give it with target_cells. }
+      final_volume_ml: { type: number, exclusiveMinimum: 0, description: Final volume in mL for each sample. It gives the volume of medium to add. }
+      exclude: { type: string, description: "Excel row numbers to leave out, such as 5, 6. The header is row 1. Default none." }
+      file_name: { type: string, description: Start of the output file names. Default cell-counts. }
+    required: [path]
+
+  - name: nucleic_acid_qc
+    title: Nucleic acid concentration and purity ratios
+    description: >
+      Give the concentration from A260 and the ratios A260/A280 and A260/A230 for a NanoDrop or plate UV export.
+      It flags ratios outside the usual ranges. The ranges are rules of thumb.
+    read_only: true
+    function: "ga_bench_assays:nucleic_acid_qc"
+    params:
+      path: { type: string, description: Absolute path of the CSV or xlsx file with one row for each sample. }
+      sheet: { type: string, description: Sheet name of an xlsx file. Default is the first sheet. }
+      sample_type: { type: string, enum: [dsDNA, RNA, ssDNA, custom], description: Type of nucleic acid. It sets the factor. Use custom with factor. }
+      sample_col: { type: string, description: Column with the sample name. Default Sample. }
+      a260_col: { type: string, description: Column with A260. Default A260. }
+      a280_col: { type: string, description: Column with A280. Default A280. }
+      a230_col: { type: string, description: Column with A230. Default A230. The tool skips A260/A230 if the column is not in the table. }
+      a320_col: { type: string, description: Column with A320. Default A320. Used only if baseline is a320. }
+      baseline: { type: string, enum: [none, a320], description: Subtract A320 from the other absorbances or not. }
+      factor: { type: number, exclusiveMinimum: 0, description: "ng/uL for an absorbance of 1 at 10 mm. Default 50 for dsDNA, 40 for RNA and 33 for ssDNA." }
+      path_length_mm: { type: number, exclusiveMinimum: 0, description: Path length of the reading in mm. Default 10. }
+      dilution: { type: number, minimum: 1, description: Dilution factor of all samples. It applies if you give no dilution_col. Default 1. }
+      dilution_col: { type: string, description: Column with the dilution factor of each sample. }
+      a260_280_min: { type: number, description: Lowest A260/A280 without a flag. Default 1.7 for DNA and 1.9 for RNA. }
+      a260_280_max: { type: number, description: Highest A260/A280 without a flag. A ratio has no unit. Default 2.0 for DNA and 2.2 for RNA. }
+      a260_230_min: { type: number, description: Lowest A260/A230 without a flag. Default 2.0. }
+      a260_230_max: { type: number, description: Highest A260/A230 without a flag. A ratio has no unit. Default 2.2. }
+      exclude: { type: string, description: "Excel row numbers to leave out, such as 5, 6. The header is row 1. Default none." }
+      file_name: { type: string, description: Start of the output file names. Default nucleic-acid. }
+    required: [path]
+
+map:
+  - tool: protein_assay
+    route: "In Excel: blank-subtract the absorbances, fit the standards with SLOPE, INTERCEPT, RSQ (or LINEST for a quadratic), then back-calculate each sample and multiply by the dilution factor."
+    steps:
+      - "Excel: read the plate at 562 nm (BCA), 595 nm (Bradford) or 750 nm (Lowry). Subtract the mean of the blank wells from every well."
+      - "Excel linear: =SLOPE(abs, conc) and =INTERCEPT(abs, conc). Sample = (abs - intercept) / slope. R squared is =RSQ(abs, conc)."
+      - "Excel quadratic: =LINEST(abs, conc ^ {1, 2}) gives a, b and c. Sample = (-b + SQRT(b^2 - 4 a (c - abs))) / (2 a) on the branch of the standards."
+      - "Excel: multiply by the dilution factor. Replicate mean =AVERAGE, SD =STDEV.S, CV = SD / mean x 100."
+      - "Equal load: volume of sample (uL) = target ug / (concentration in ug/uL). Buffer = final volume - volume of sample."
+      - "Prism: enter the standards as X and Y, and the samples as Y with no X. Analyze > Interpolate a standard curve > Linear regression, Second order polynomial or Sigmoidal 4PL. Multiply the interpolated X by the dilution factor."
+    params:
+      - { arg: model, label: "Interpolate a standard curve in Prism; trendline type in an Excel chart", ui_default: "linear" }
+      - { arg: blank, label: "Subtract the blank wells", ui_default: "subtract" }
+      - { arg: dilution, label: "dilution factor of the sample", ui_default: 1 }
+    fidelity: close
+    difference: >
+      Excel and Prism fit each standard well, as the tool does. The Pierce BCA and Bio-Rad Bradford manuals also describe a point-to-point curve; the tool does not offer it.
+      The tool flags the range by the lowest and the highest standard. The Excel and Prism routes were not run.
+    evidence:
+      source: docs
+      test: protein-linear-bca
+      note: The expected values are the formulas of the line (slope 0.001, intercept 0) and numpy.polyfit on the same standards.
+
+  - tool: ratio_normalize
+    route: "In Excel: ratio = target / reference for each lane or well, divide by the control mean, then =AVERAGE, =STDEV.S and =COUNT for each group."
+    steps:
+      - "ImageJ: Analyze > Gels > Select First Lane, Plot Lanes. Close each peak with the line tool and click inside it with the Wand tool to read the band area. Do the same for the loading control."
+      - "Image Lab: Lane and Bands > Detect Bands. Read Adj. Volume (Int) of the target and of the loading control from the Analysis Table."
+      - "Luciferase: use the firefly and the Renilla counts of each well."
+      - "Excel: subtract the background of each signal if you chose that. Ratio = target / reference. Normalized = ratio / mean ratio of the control group (of the same blot if the scope is within block)."
+      - "Excel: log2 fold change =LOG(normalized, 2). Average the lanes of one biological replicate before the statistics."
+      - "Prism: a column table with one column for each group. Analyze > Transform to divide by the control mean, then Analyze > Column statistics. Use the biostats adapter or the Prism t test or one-way ANOVA for the test."
+    params:
+      - { arg: background, label: "Subtract the background", ui_default: "none" }
+      - { arg: scope, label: "Control mean of all blots or of each blot", ui_default: "pooled" }
+      - { arg: control_group, label: "Group with fold change 1" }
+    fidelity: exact
+    evidence:
+      source: docs
+      test: western-pooled
+      note: The expected means and SDs are computed by hand and with numpy in data/make_fixtures.py. The Excel and Prism routes use the same formulas.
+
+  - tool: cell_counts
+    route: "In Excel: cells per mL = live cells / squares x 10000 x dilution factor. Viability = live / (live + dead) x 100. Volume of cells = target cells / cells per mL."
+    steps:
+      - "Count the live (clear) and the dead (blue) cells in the large squares. Count the cells on the top and left lines. Skip the cells on the bottom and right lines."
+      - "Excel: live per large square = live / squares. Cells per mL = live per square x 10000 x dilution factor (2 for cells and trypan blue in equal parts)."
+      - "Excel: viability % = live / (live + dead) x 100. Average the counts of one sample with =AVERAGE and =STDEV.S."
+      - "Excel: volume of cells (mL) = target cells / cells per mL. Volume of medium (mL) = final volume - volume of cells."
+      - "Counter: read Live/mL, Total/mL and Viability from the export. Multiply by the dilution factor if the export is not corrected."
+    params:
+      - { arg: dilution, label: "dilution factor of the count", ui_default: 2 }
+      - { arg: chamber_factor, label: "cells per mL for one cell in one large square", ui_default: 10000 }
+      - { arg: squares, label: "number of large squares counted", ui_default: 4 }
+    fidelity: exact
+    evidence:
+      source: docs
+      test: cells-plan-cells
+      note: The expected values are the hand formulas in the test description.
+
+  - tool: nucleic_acid_qc
+    route: "In Excel: concentration (ng/uL) = A260 x factor x (10 / path length in mm) x dilution factor. Ratios are A260 / A280 and A260 / A230."
+    steps:
+      - "NanoDrop: the Nucleic Acid view shows ng/uL, A260/A280 and A260/A230 for the type that you choose. Export the table."
+      - "Excel: if you correct the baseline, subtract A320 from A260, A280 and A230 first."
+      - "Excel: concentration = (A260) x 50 (dsDNA), 40 (RNA) or 33 (ssDNA) x (10 / path length in mm) x dilution factor."
+      - "Excel: mark a ratio outside its range with Home > Conditional Formatting > Highlight Cells Rules > Between."
+      - "Prism: enter the table and use Analyze > Transform with the same formula."
+    params:
+      - { arg: sample_type, label: "Sample type of the NanoDrop Nucleic Acid view", ui_default: "dsDNA" }
+      - { arg: baseline, label: "Baseline correction (320 nm)" }
+      - { arg: path_length_mm, label: "path length", ui_default: 10 }
+    fidelity: close
+    difference: >
+      The NanoDrop software has its own baseline correction. Check that it matches the baseline setting of the tool.
+      The NanoDrop route was not run.
+    evidence:
+      source: docs
+      test: nucleic-dsdna
+      note: The expected values are the hand formulas in the test description.
+
+tests:
+  - id: protein-linear-bca
+    description: >
+      Synthetic BCA plate (data/make_fixtures.py). The blank is 0.100. The standards 200 to 1000 ug/mL have an absorbance of 0.100 + 0.001 x conc, plus or minus 0.01 in duplicate.
+      The fit is a slope of 0.001 and an intercept of 0 (numpy.polyfit gives the same). R squared is 1 - 0.001 / 0.801 = 0.99875.
+      S1 has a well concentration of 300 and a dilution of 2, so 600 ug/mL. The two wells differ by 0.01 in absorbance, so SD 7.0711 and CV 2.357 percent.
+      S low (100) is below the lowest standard. S high (1500) is above the highest.
+    data: [data/protein_linear.csv]
+    calls:
+      - tool: protein_assay
+        args: { path: "{adapter_dir}/data/protein_linear.csv", assay: BCA, dilution_col: Dilution, blank: subtract, model: linear }
+    expect:
+      - { path: metrics.slope, approx: 0.001, abs: 1.0e-12 }
+      - { path: metrics.intercept, approx: 0, abs: 1.0e-12 }
+      - { path: metrics.r2, approx: 0.99875, abs: 1.0e-5 }
+      - { path: metrics.n_standard_levels, equals: 5 }
+      - { path: "table.rows[0][3]", approx: 300, abs: 1.0e-6 }
+      - { path: "table.rows[0][5]", approx: 2.357023, abs: 1.0e-5 }
+      - { path: "table.rows[0][7]", approx: 600, abs: 1.0e-6 }
+      - { path: "table.rows[1][7]", approx: 800, abs: 1.0e-6 }
+      - { path: "table.rows[2][9]", equals: below range }
+      - { path: "table.rows[3][9]", equals: above range }
+      - { path: metrics.n_flagged, equals: 2 }
+      - { path: data.png, contains: "figures/" }
+
+  - id: protein-load
+    description: >
+      Equal protein load of 20 ug in a final volume of 30 uL. S2 has 800 ug/mL = 0.8 ug/uL, so 20 / 0.8 = 25 uL of sample and 5 uL of buffer.
+      S1 has 600 ug/mL = 0.6 ug/uL, so 33.33 uL. This is above the final volume, so the tool flags it and the buffer volume is -3.33 uL.
+    data: [data/protein_linear.csv]
+    calls:
+      - tool: protein_assay
+        args: { path: "{adapter_dir}/data/protein_linear.csv", dilution_col: Dilution, load_ug: 20, final_volume_ul: 30 }
+    expect:
+      - { path: "table.columns[10]", equals: load_volume_ul }
+      - { path: "table.rows[1][10]", approx: 25, abs: 1.0e-6 }
+      - { path: "table.rows[1][11]", approx: 5, abs: 1.0e-6 }
+      - { path: "table.rows[0][10]", approx: 33.33333, abs: 1.0e-4 }
+      - { path: "table.rows[0][11]", approx: -3.33333, abs: 1.0e-4 }
+      - { path: "table.rows[0][9]", contains: too dilute }
+
+  - id: protein-linear-origin
+    description: >
+      The same plate fitted through zero. The slope is the sum of conc x absorbance divided by the sum of conc squared. The duplicates are symmetric, so it is 0.001 and S1 is 600 ug/mL.
+    data: [data/protein_linear.csv]
+    calls:
+      - tool: protein_assay
+        args: { path: "{adapter_dir}/data/protein_linear.csv", dilution_col: Dilution, model: linear_origin }
+    expect:
+      - { path: metrics.slope, approx: 0.001, abs: 1.0e-12 }
+      - { path: "table.rows[0][7]", approx: 600, abs: 1.0e-6 }
+
+  - id: protein-quadratic
+    description: >
+      Synthetic standard curve y = 0.02 + 0.0012 x - 1.5e-7 x^2 with a blank of 0.070 and duplicates of plus or minus 0.004.
+      The fit recovers a = -1.5e-7, b = 0.0012, c = 0.02 (numpy.polyfit with degree 2 gives the same). Samples with well concentrations of 750 and 1250 return those values.
+    data: [data/protein_quadratic.csv]
+    calls:
+      - tool: protein_assay
+        args: { path: "{adapter_dir}/data/protein_quadratic.csv", model: quadratic }
+    expect:
+      - { path: metrics.a, approx: -1.5e-7, abs: 1.0e-12 }
+      - { path: metrics.b, approx: 0.0012, abs: 1.0e-9 }
+      - { path: metrics.c, approx: 0.02, abs: 1.0e-7 }
+      - { path: "table.rows[0][7]", approx: 750, abs: 1.0e-3 }
+      - { path: "table.rows[1][7]", approx: 1250, abs: 1.0e-3 }
+      - { path: metrics.n_flagged, equals: 0 }
+
+  - id: protein-4pl-bradford
+    description: >
+      Synthetic Bradford curve with a bottom of 0.02, a top of 1.60, a midpoint of 500 ug/mL and a slope of 1.4. It has no noise.
+      The 4PL fit recovers the four values. The samples at 200, 600 and 1200 ug/mL return those concentrations.
+    data: [data/protein_4pl.csv]
+    calls:
+      - tool: protein_assay
+        args: { path: "{adapter_dir}/data/protein_4pl.csv", assay: Bradford, model: 4PL }
+    expect:
+      - { path: metrics.bottom, approx: 0.02, abs: 1.0e-4 }
+      - { path: metrics.top, approx: 1.6, abs: 1.0e-4 }
+      - { path: metrics.midpoint, approx: 500, abs: 0.01 }
+      - { path: metrics.hill_slope, approx: 1.4, abs: 1.0e-4 }
+      - { path: "table.rows[0][7]", approx: 200, abs: 0.01 }
+      - { path: "table.rows[1][7]", approx: 600, abs: 0.01 }
+      - { path: "table.rows[2][7]", approx: 1200, abs: 0.05 }
+
+  - id: protein-missing-column
+    description: A signal column that is not in the table fails and lists the columns.
+    data: [data/protein_linear.csv]
+    calls:
+      - { tool: protein_assay, args: { path: "{adapter_dir}/data/protein_linear.csv", signal_col: Abs } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: Unknown column }
+
+  - id: protein-no-blank
+    description: Excluding the blank wells (rows 2 and 3) with blank subtract fails, because the table has no blank and no standard with concentration 0.
+    data: [data/protein_linear.csv]
+    calls:
+      - { tool: protein_assay, args: { path: "{adapter_dir}/data/protein_linear.csv", exclude: "2, 3" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: no blank wells }
+
+  - id: western-pooled
+    description: >
+      Three blots, one control lane and one treated lane each, with a background in each signal. The ratios after the background are 0.5, 0.6 and 0.4 for the control
+      and 1.0, 1.2 and 1.4 for the treated lanes. The control mean is 0.5. Treated fold changes are 2.0, 2.4 and 2.8, so mean 2.4 and SD 0.4.
+      The control values are 1.0, 1.2 and 0.8, so mean 1 and SD 0.2. The mean log2 of the treated values is (1 + 1.263034 + 1.485427) / 3 = 1.249487.
+    data: [data/western_blots.csv]
+    calls:
+      - tool: ratio_normalize
+        args: { path: "{adapter_dir}/data/western_blots.csv", control_group: Control, replicate_col: Experiment, block_col: Blot, background: subtract, target_bg_col: Target_bg, reference_bg_col: Reference_bg, scope: pooled, log2: true }
+    expect:
+      - { path: metrics.n_Treated, equals: 3 }
+      - { path: metrics.mean_Control, approx: 1, abs: 1.0e-9 }
+      - { path: metrics.sd_Control, approx: 0.2, abs: 1.0e-9 }
+      - { path: metrics.mean_Treated, approx: 2.4, abs: 1.0e-9 }
+      - { path: metrics.sd_Treated, approx: 0.4, abs: 1.0e-9 }
+      - { path: metrics.mean_log2_Treated, approx: 1.249487, abs: 1.0e-6 }
+      - { path: summary, contains: biostats }
+      - { path: summary, contains: biological replicates }
+      - { path: data.png, contains: "figures/" }
+
+  - id: western-within-block
+    description: >
+      The same blots, each divided by its own control. Treated fold changes are 1.0 / 0.5 = 2, 1.2 / 0.6 = 2 and 1.4 / 0.4 = 3.5. Mean 2.5, SD 0.866025.
+      The control is 1 on every blot, so its SD is 0.
+    data: [data/western_blots.csv]
+    calls:
+      - tool: ratio_normalize
+        args: { path: "{adapter_dir}/data/western_blots.csv", control_group: Control, replicate_col: Experiment, block_col: Blot, background: subtract, target_bg_col: Target_bg, reference_bg_col: Reference_bg, scope: within_block }
+    expect:
+      - { path: metrics.mean_Treated, approx: 2.5, abs: 1.0e-9 }
+      - { path: metrics.sd_Treated, approx: 0.866025, abs: 1.0e-6 }
+      - { path: metrics.sd_Control, approx: 0, abs: 1.0e-12 }
+      - { path: summary, contains: no spread }
+
+  - id: western-saturation
+    description: >
+      Raw signals of 3000 or more are saturated. Only the target of lane 4 (3100) is. The tool leaves lane 4 out, so the treated group has n = 2 and the summary says saturated.
+    data: [data/western_blots.csv]
+    calls:
+      - tool: ratio_normalize
+        args: { path: "{adapter_dir}/data/western_blots.csv", control_group: Control, replicate_col: Experiment, background: subtract, target_bg_col: Target_bg, reference_bg_col: Reference_bg, saturation_max: 3000 }
+    expect:
+      - { path: metrics.n_Treated, equals: 2 }
+      - { path: metrics.n_Control, equals: 3 }
+      - { path: summary, contains: saturated }
+
+  - id: western-no-background
+    description: >
+      With no background step the ratios are the raw ratios. Lane 1 is 1000 / 2000 = 0.5 and lane 2 is 2100 / 2200 = 0.954545.
+      Without replicate_col each lane is one unit and the tool warns that n counts lanes.
+    data: [data/western_blots.csv]
+    calls:
+      - tool: ratio_normalize
+        args: { path: "{adapter_dir}/data/western_blots.csv", control_group: Control, background: none }
+    expect:
+      - { path: "data.data.units[0].ratio", approx: 0.5, abs: 1.0e-9 }
+      - { path: "data.data.units[1].ratio", approx: 0.954545, abs: 1.0e-6 }
+      - { path: metrics.n_Control, equals: 3 }
+      - { path: summary, contains: n counts lanes or wells }
+
+  - id: luciferase-pooled
+    description: >
+      Dual-luciferase plate with two wells for each biological replicate. The firefly to Renilla ratios of the control are 2.2, 3.0 and 2.0 for the three replicates (mean 2.4).
+      The treated values are 8.4, 10.5 and 5.0. Treated fold changes are 3.5, 4.375 and 2.083333. Mean 3.319444, SD 1.156453.
+      The control values are 0.916667, 1.25 and 0.833333, so SD 0.220479.
+    data: [data/dual_luciferase.csv]
+    calls:
+      - tool: ratio_normalize
+        args: { path: "{adapter_dir}/data/dual_luciferase.csv", assay: dual_luciferase, control_group: Empty vector, group_col: Group, target_col: Firefly, reference_col: Renilla, replicate_col: Replicate }
+    expect:
+      - { path: metrics.n_units, equals: 6 }
+      - { path: "table.rows[0][0]", equals: Empty vector }
+      - { path: "table.rows[0][3]", approx: 0.220479, abs: 1.0e-6 }
+      - { path: "table.rows[1][2]", approx: 3.319444, abs: 1.0e-6 }
+      - { path: "table.rows[1][3]", approx: 1.156453, abs: 1.0e-6 }
+
+  - id: luciferase-missing-control
+    description: A control group that is not in the group column fails and lists the groups.
+    data: [data/dual_luciferase.csv]
+    calls:
+      - { tool: ratio_normalize, args: { path: "{adapter_dir}/data/dual_luciferase.csv", control_group: Vehicle, target_col: Firefly, reference_col: Renilla } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: not in column }
+
+  - id: ratio-needs-background-columns
+    description: The background step subtract without the background columns fails.
+    data: [data/western_blots.csv]
+    calls:
+      - { tool: ratio_normalize, args: { path: "{adapter_dir}/data/western_blots.csv", control_group: Control, background: subtract } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: target_bg_col }
+
+  - id: cells-plan-cells
+    description: >
+      Hemocytometer counts in an xlsx file, 4 large squares, trypan blue 1:1 (dilution 2). Sample A has two counts. Live 50 gives 50 / 4 x 10000 x 2 = 250000 cells/mL.
+      Live 60 gives 300000. The mean is 275000, SD 35355.34 and CV 12.856 percent. Viability is 110 / 130 = 84.615 percent.
+      For 1e6 live cells in 10 mL, A needs 1e6 / 275000 = 3.636364 mL of suspension and 6.363636 mL of medium. B has 500000 cells/mL, so 2 mL.
+    data: [data/cell_counts.xlsx]
+    calls:
+      - tool: cell_counts
+        args: { path: "{adapter_dir}/data/cell_counts.xlsx", squares_col: Squares, dilution: 2, target_cells: 1000000, final_volume_ml: 10 }
+    expect:
+      - { path: "table.rows[0][2]", approx: 275000, abs: 1.0e-6 }
+      - { path: "table.rows[0][3]", approx: 35355.34, abs: 0.01 }
+      - { path: "table.rows[0][4]", approx: 12.856487, abs: 1.0e-5 }
+      - { path: "table.rows[0][6]", approx: 84.615385, abs: 1.0e-5 }
+      - { path: "table.rows[0][9]", approx: 3.636364, abs: 1.0e-5 }
+      - { path: "table.rows[0][10]", approx: 6.363636, abs: 1.0e-5 }
+      - { path: "table.rows[1][2]", approx: 500000, abs: 1.0e-6 }
+      - { path: "table.rows[1][9]", approx: 2, abs: 1.0e-9 }
+      - { path: "table.rows[2][7]", contains: fewer than 100 cells }
+      - { path: data.png, contains: "figures/" }
+
+  - id: cells-plan-density
+    description: >
+      A target density of 200000 cells/mL in 10 mL needs 2e6 cells. A needs 2e6 / 275000 = 7.272727 mL of suspension and 2.727273 mL of medium. B needs 4 mL.
+      Sample C has 60000 cells/mL, so it needs 33.33 mL. This is more than 10 mL, so the tool flags it and the medium volume is -23.33 mL.
+    data: [data/cell_counts.xlsx]
+    calls:
+      - tool: cell_counts
+        args: { path: "{adapter_dir}/data/cell_counts.xlsx", squares_col: Squares, dilution: 2, target_density: 200000, final_volume_ml: 10 }
+    expect:
+      - { path: "table.rows[0][9]", approx: 7.272727, abs: 1.0e-5 }
+      - { path: "table.rows[0][10]", approx: 2.727273, abs: 1.0e-5 }
+      - { path: "table.rows[1][9]", approx: 4, abs: 1.0e-9 }
+      - { path: "table.rows[2][10]", approx: -23.33333, abs: 1.0e-3 }
+      - { path: "table.rows[2][7]", contains: too dilute }
+
+  - id: cells-counter
+    description: >
+      A counter export with live/mL, total/mL and viability, and no dilution (dilution 1). Sample X has 1.2e6 live of 1.5e6 total, so viability 80 percent.
+      Sample Y has no live value. The tool takes it as 2e6 x 90 / 100 = 1.8e6.
+    data: [data/counter_export.csv]
+    calls:
+      - tool: cell_counts
+        args: { path: "{adapter_dir}/data/counter_export.csv", source: counter, dilution: 1 }
+    expect:
+      - { path: "table.rows[0][2]", approx: 1200000, abs: 1.0e-6 }
+      - { path: "table.rows[0][5]", approx: 1500000, abs: 1.0e-6 }
+      - { path: "table.rows[0][6]", approx: 80, abs: 1.0e-9 }
+      - { path: "table.rows[1][2]", approx: 1800000, abs: 1.0e-6 }
+      - { path: "table.rows[1][6]", approx: 90, abs: 1.0e-9 }
+
+  - id: cells-missing-column
+    description: A live column that is not in the table fails and lists the columns.
+    data: [data/cell_counts.xlsx]
+    calls:
+      - { tool: cell_counts, args: { path: "{adapter_dir}/data/cell_counts.xlsx", live_col: Alive } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: Unknown column }
+
+  - id: cells-two-targets
+    description: A target number of cells and a target density together fail.
+    data: [data/cell_counts.xlsx]
+    calls:
+      - { tool: cell_counts, args: { path: "{adapter_dir}/data/cell_counts.xlsx", squares_col: Squares, target_cells: 1000000, target_density: 200000, final_volume_ml: 10 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: not both }
+
+  - id: nucleic-dsdna
+    description: >
+      NanoDrop table of four samples, dsDNA, 10 mm. N1 has A260 0.9, A280 0.5 and A230 0.45. Concentration = 0.9 x 50 = 45 ng/uL. A260/A280 = 1.8 and A260/A230 = 2.0, so no flag.
+      N2 has A260/A280 = 0.6 / 0.4 = 1.5 and A260/A230 = 1.2, so both ratios are low. N4 has A260 0.05 = 2.5 ng/uL, below 0.1, so the tool flags the low signal.
+    data: [data/nanodrop.csv]
+    calls:
+      - tool: nucleic_acid_qc
+        args: { path: "{adapter_dir}/data/nanodrop.csv", sample_type: dsDNA }
+    expect:
+      - { path: "table.rows[0][4]", approx: 45, abs: 1.0e-9 }
+      - { path: "table.rows[0][5]", approx: 1.8, abs: 1.0e-9 }
+      - { path: "table.rows[0][6]", approx: 2, abs: 1.0e-9 }
+      - { path: "table.rows[0][7]", equals: "" }
+      - { path: "table.rows[1][4]", approx: 30, abs: 1.0e-9 }
+      - { path: "table.rows[1][7]", contains: A260/A280 low }
+      - { path: "table.rows[1][7]", contains: A260/A230 low }
+      - { path: "table.rows[3][4]", approx: 2.5, abs: 1.0e-9 }
+      - { path: "table.rows[3][7]", contains: low A260 }
+      - { path: summary, contains: rules of thumb }
+      - { path: data.png, contains: "figures/" }
+
+  - id: nucleic-rna-path
+    description: >
+      The same table as RNA with a path length of 5 mm and a dilution of 2. N1 = 0.9 x 40 x (10 / 5) x 2 = 144 ng/uL. A260/A280 = 1.8 is below the RNA range from 1.9, so it has a flag.
+    data: [data/nanodrop.csv]
+    calls:
+      - tool: nucleic_acid_qc
+        args: { path: "{adapter_dir}/data/nanodrop.csv", sample_type: RNA, path_length_mm: 5, dilution: 2 }
+    expect:
+      - { path: "table.rows[0][4]", approx: 144, abs: 1.0e-9 }
+      - { path: "table.rows[0][7]", contains: A260/A280 low }
+      - { path: metrics.factor, equals: 40 }
+
+  - id: nucleic-baseline
+    description: >
+      With the A320 baseline, N3 has A260 0.52 - 0.02 = 0.50 and A280 0.32 - 0.02 = 0.30. Concentration = 0.5 x 50 = 25 ng/uL. A260/A280 = 1.666667. A260/A230 = 0.5 / 0.25 = 2.0.
+    data: [data/nanodrop.csv]
+    calls:
+      - tool: nucleic_acid_qc
+        args: { path: "{adapter_dir}/data/nanodrop.csv", baseline: a320 }
+    expect:
+      - { path: "table.rows[2][4]", approx: 25, abs: 1.0e-9 }
+      - { path: "table.rows[2][5]", approx: 1.666667, abs: 1.0e-6 }
+      - { path: "table.rows[2][6]", approx: 2, abs: 1.0e-9 }
+
+  - id: nucleic-missing-column
+    description: An A260 column that is not in the table fails and lists the columns.
+    data: [data/nanodrop.csv]
+    calls:
+      - { tool: nucleic_acid_qc, args: { path: "{adapter_dir}/data/nanodrop.csv", a260_col: OD260 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: Unknown column }
+
+  - id: nucleic-custom-needs-factor
+    description: The type custom without a factor fails.
+    data: [data/nanodrop.csv]
+    calls:
+      - { tool: nucleic_acid_qc, args: { path: "{adapter_dir}/data/nanodrop.csv", sample_type: custom } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: factor }

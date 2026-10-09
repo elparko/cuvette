@@ -36,6 +36,7 @@ The project is in early development. Version numbers start at the first public r
 - qPCR (qpcr): reference gene stability (geNorm and NormFinder), primer efficiencies, ΔΔCt and Pfaffl, with the Hildyard 2021 paper as the benchmark case.
 - Growth curves (growthcurver): logistic growth rate, lag time, carrying capacity and group comparison, with the Nair 2024 paper.
 - Image assays (image-assays): colony counts and clonogenic survival, colocalization (Pearson and Manders with the Costes threshold), and cell uptake indices, with three benchmark papers.
+- Bench assays (bench-assays): protein assay curves (BCA, Bradford, Lowry), blot and dual-luciferase ratios, hemocytometer and counter cell counts, and NanoDrop quality control. Each method choice is a decision.
 - Statistics in the style of Prism and SPSS (biostats): two-way and three-way ANOVA, repeated measures, Kruskal-Wallis with Dunn's test, Friedman, and exact rank tests.
 - Pathway and gene set enrichment (enrichment), to replace Ingenuity Pathway Analysis for common work.
 - Cloning and primers (cloning): primer design with melting temperatures and in-silico PCR, to replace basic SnapGene and Geneious work.

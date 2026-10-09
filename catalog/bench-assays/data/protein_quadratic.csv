@@ -1,0 +1,19 @@
+Sample,Type,Concentration,Absorbance,Dilution
+Blank,blank,0.0,0.07,1
+Blank,blank,0.0,0.07,1
+Std 100,standard,100.0,0.2125,1
+Std 100,standard,100.0,0.2045,1
+Std 250,standard,250.0,0.384625,1
+Std 250,standard,250.0,0.376625,1
+Std 500,standard,500.0,0.6565,1
+Std 500,standard,500.0,0.6485,1
+Std 1000,standard,1000.0,1.144,1
+Std 1000,standard,1000.0,1.136,1
+Std 1500,standard,1500.0,1.5565,1
+Std 1500,standard,1500.0,1.5485,1
+Std 2000,standard,2000.0,1.894,1
+Std 2000,standard,2000.0,1.886,1
+Q1,sample,,0.905625,1
+Q1,sample,,0.905625,1
+Q2,sample,,1.355625,1
+Q2,sample,,1.355625,1
