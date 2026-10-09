@@ -6,18 +6,24 @@ import { adapterDirs, loadAdapter, type Manifest } from "../src/adapters/manifes
 import { canStart, doctorText, older, rInstallCommand, runDoctor, safeFixes, uvCommand, type Check, type DoctorOpts } from "../src/core/doctor.ts";
 
 const oldHome = process.env.GA_HOME;
+const oldPath = process.env.PATH;
 let root = "";
 let home = "";
+
+const IMAGEJ_JAVA = `for a in "$@"; do case "$a" in *.jar) n=$(basename "$a" .jar); v=\${n#ij-}; [ "$v" = "ij" ] && v=1.53k; echo "ImageJ version=$v"; exit 0 ;; esac; done; echo 'openjdk version "17.0.18"' >&2`;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "ga-doctor-"));
   home = join(root, ".guided-analysis");
   mkdirSync(home, { recursive: true });
   process.env.GA_HOME = home;
+  exe(join(root, "pathbin/java"), IMAGEJ_JAVA);
+  process.env.PATH = `${join(root, "pathbin")}:${oldPath}`;
 });
 afterEach(() => {
   if (oldHome === undefined) delete process.env.GA_HOME;
   else process.env.GA_HOME = oldHome;
+  process.env.PATH = oldPath;
 });
 
 function exe(path: string, body: string): string {
@@ -63,7 +69,7 @@ test("found: every item is ok, ImageJ.app is found, and the text says Cuvette ca
   const r = rscript("4.6.1", "lme4 2.0.6 \\nlmerTest 3.2.1 \\n");
   const uv = exe(join(root, "bin/uv"), "echo uv 0.9");
   python("science", "numpy True\\npandas True\\n", "");
-  python("biostats", "statsmodels True\\nlifelines True\\n", "0.30.3");
+  python("biostats", "statsmodels True\\nlifelines True\\n", "lifelines 0.30.3");
   touch(join(root, "Applications/ImageJ.app/Contents/Java/ij.jar"));
   const bin = { java, Rscript: r, uv, ollama: undefined } as Record<string, string | undefined>;
   const checks = await runDoctor(base({
@@ -188,4 +194,14 @@ test("version comparison uses major and minor", () => {
   expect(older("20.11.0", [22])).toBe(true);
   expect(older("4.6.1", [4, 5])).toBe(false);
   expect(older("", "1.0")).toBe(false);
+});
+
+test("missing: a program with the same file name is not the adapter's program (leptonica fileinfo for OpenMS FileInfo)", async () => {
+  const file = join(root, "opt/homebrew/bin/FileInfo");
+  exe(file, "echo 'fileinfo: leptonica image file information'");
+  const m = real("openms");
+  const only = { openms: { ...m, locate: { ...m.locate, env: "", which: [], paths: [file] } } };
+  expect(byId(await runDoctor(base({ adapters: only })), "program:openms").status).toBe("missing");
+  exe(file, "echo 'FileInfo -- Shows basic information about the file.'; echo 'Version: 3.5.0'");
+  expect(byId(await runDoctor(base({ adapters: only })), "program:openms")).toMatchObject({ status: "ok", detail: expect.stringContaining("3.5.0") });
 });

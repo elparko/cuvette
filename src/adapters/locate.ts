@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join, sep } from "node:path";
-import type { Manifest } from "./manifest.ts";
+import { adapterDirs, type Manifest } from "./manifest.ts";
 import { runProcess } from "./kinds/common.ts";
 
 export interface Located {
@@ -114,8 +114,9 @@ export function findProgram(manifest: Manifest): { path?: string; how: string } 
   return candidates(manifest)[0] ?? { how: "not found" };
 }
 
-export async function locate(manifest: Manifest, adapterDir = ""): Promise<Located> {
+export async function locate(manifest: Manifest, dir = ""): Promise<Located> {
   const l = manifest.locate;
+  const adapterDir = dir || (l.version_command.some((a) => a.includes("{adapter_dir}")) ? (adapterDirs()[manifest.adapter.name] ?? "") : "");
   if (!l.identity || !l.version_command.length) {
     const { path, how } = findProgram(manifest);
     return { path, version: versionFrom(manifest, await versionText(manifest, path, adapterDir)), how };
