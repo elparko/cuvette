@@ -1,0 +1,30 @@
+adapters: [epi-rates]
+prompt: |
+  Did the age-adjusted death rate of the United States rise from 2019 to 2020, and how do men and women compare? The file {data}/kochanek2023-deaths-final-data-2020/nchs_2020_age_rates.csv has the death rate per 100,000 in 11 age groups, from under 1 year to 85 years and over, for five groups: all_2020 (all causes, 2020), all_2019 (all causes, 2019), heart_2020 (heart disease, 2020), male_2020 and female_2020 (all causes, 2020). The columns are group, age_group, rate_per_100000 and std_pop_2000. The column std_pop_2000 holds the year 2000 United States standard population of each age group. The file has rates and no counts. Give the age-adjusted death rate per 100,000 of each of the five groups with the direct method. Give the ratio of the age-adjusted rate of 2020 to the rate of 2019. Give the ratio of the male rate to the female rate.
+answers:
+  per: 100000
+  alpha: 0.05
+  ci_method: exact
+  rate_ratio_method: midp
+  wording: exposure
+  time_horizon: not stated
+  exposure_prevalence: sample
+  standardization_method: direct
+  standard_population: us2000_11
+  sir_ci: exact
+  reference_rates: not applicable
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1200
+data: [kochanek2023-deaths-final-data-2020/nchs_2020_age_rates.csv]
+items:
+  # Source of the values: National Vital Statistics Reports 72(10), Tables 2 and 5 (age-adjusted rate column, per 100,000 of the
+  # year 2000 United States standard population). check.py (NumPy, check.out) standardizes the printed age-specific rates and
+  # gives the same values to the printed digit.
+  - {key: adjusted_all_2020, description: "Age-adjusted death rate, all causes, 2020, per 100,000", value: 835.4, tolerance: 0.1, tool: standardize_rates}
+  - {key: adjusted_all_2019, description: "Age-adjusted death rate, all causes, 2019, per 100,000", value: 715.2, tolerance: 0.1, tool: standardize_rates}
+  - {key: adjusted_heart_2020, description: "Age-adjusted death rate, heart disease, 2020, per 100,000", value: 168.2, tolerance: 0.1, tool: standardize_rates}
+  - {key: adjusted_male_2020, description: "Age-adjusted death rate, males, 2020, per 100,000", value: 998.3, tolerance: 0.1, tool: standardize_rates}
+  - {key: adjusted_female_2020, description: "Age-adjusted death rate, females, 2020, per 100,000", value: 695.1, tolerance: 0.1, tool: standardize_rates}
+  - {key: ratio_2020_2019, description: "Ratio of the age-adjusted rate of 2020 to the rate of 2019", value: 1.168, tolerance: 0.003, tool: standardize_rates}
+  - {key: ratio_male_female, description: "Ratio of the age-adjusted male rate to the female rate", value: 1.436, tolerance: 0.003, tool: standardize_rates}

@@ -1,0 +1,26 @@
+tool: epitools (R), ageadjust.direct logic, through the epi-rates adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/kochanek2023-deaths-final-data-2020/nchs_2020_age_rates.csv
+decisions:
+  per: 100000
+  alpha: 0.05
+  standardization_method: direct
+  standard_population: us2000_11
+expected:
+  - {description: "Age-adjusted death rate, all causes, 2020", value: 835.4, tolerance: 0.1, source: "NVSR 72(10), Table 5 and Table 1; check.py"}
+  - {description: "Age-adjusted death rate, all causes, 2019", value: 715.2, tolerance: 0.1, source: "NVSR 72(10), Table 5 and Table 1; check.py"}
+  - {description: "Age-adjusted death rate, heart disease, 2020", value: 168.2, tolerance: 0.1, source: "NVSR 72(10), Table 5; check.py"}
+  - {description: "Age-adjusted death rate, males, 2020", value: 998.3, tolerance: 0.1, source: "NVSR 72(10), Table 1 and Table 2; check.py"}
+  - {description: "Age-adjusted death rate, females, 2020", value: 695.1, tolerance: 0.1, source: "NVSR 72(10), Table 1 and Table 2; check.py"}
+  - {description: "Ratio of the age-adjusted rate of 2020 to 2019", value: 1.168, tolerance: 0.003, source: "835.4 / 715.2 from the printed rates; check.py gives 1.16802 from the unrounded standardization"}
+  - {description: "Ratio of the age-adjusted male rate to the female rate", value: 1.436, tolerance: 0.003, source: "998.3 / 695.1 from the printed rates; check.py gives 1.43633"}
+notes: |
+  The expected values are the age-adjusted rates that the report prints, and two ratios of printed rates. Direct standardization
+  of the printed age-specific rates with the year 2000 United States standard population (13818, 55317, 145565, 138646, 135573,
+  162613, 134834, 87247, 66037, 44842, 15508; total 1,000,000) gives the same values to the printed digit. check.py does the
+  calculation with NumPy and no package.
+  The report prints rates and the numbers of deaths, but no age-specific populations. The tool therefore gives no interval for
+  these rates. Dividing a count by a rate gives a population that is only accurate to the rounding of the rate, so the benchmark
+  has no interval item.
+  Trap: the ratio of the crude rates (1,027.0 against 869.7, ratio 1.181) is not the ratio of the age-adjusted rates (1.168).

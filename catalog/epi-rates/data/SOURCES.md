@@ -1,0 +1,9 @@
+# Test data sources
+
+| File | Source | License |
+| --- | --- | --- |
+| nchs_2020_age_rates.csv | Kochanek KD, Murphy SL, Xu JQ, Arias E (2023). Deaths: Final data for 2020. National Vital Statistics Reports 72(10), DOI 10.15620/cdc:131355. Age-specific death rates of 11 age groups from Table 5 (all causes 2020 and 2019, heart disease 2020) and Table 2 (males and females 2020). The standard weights are the year 2000 United States standard population in the same 11 age groups. Written by data/make_fixtures.R. | Public domain. All material in the report is in the public domain. |
+| fay_feuer_births.csv | R package epitools 0.5-10.1, example of ageadjust.direct: births by birth order and age of the mother from Fleiss JL (1981), Statistical Methods for Rates and Proportions, page 249, as used in Fay MP, Feuer EJ (1997), Statistics in Medicine 16(7): 791-801, Table 1. The standard is the mean population of the five birth orders. Written by data/make_fixtures.R. | GPL-2 or GPL-3, the license of the package. |
+| selvin_us_deaths.csv | R package epitools 0.5-10.1, example of ageadjust.direct and ageadjust.indirect: United States deaths and population in 11 age groups in 1940 and 1960, from Selvin S (2004), Statistical Analysis of Epidemiologic Data. Written by data/make_fixtures.R. | GPL-2 or GPL-3, the license of the package. |
+| rothman_breast_cancer.csv | R package epitools 0.5-10.1, example of rateratio: 41 cases in 28010 person-years and 15 cases in 19017 person-years, from Rothman KJ, Greenland S (1998), Modern Epidemiology, page 238. Written by data/make_fixtures.R. | GPL-2 or GPL-3, the license of the package. |
+| tap_water.csv | R package epitools 0.5-10.1, example of riskratio: cases and totals by tap water exposure among patients with AIDS. Written by data/make_fixtures.R. | GPL-2 or GPL-3, the license of the package. |

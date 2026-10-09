@@ -1,0 +1,7 @@
+all_2020: age groups 11, standard total 1000000, age-adjusted rate 835.4200
+all_2019: age groups 11, standard total 1000000, age-adjusted rate 715.2437
+heart_2020: age groups 11, standard total 1000000, age-adjusted rate 168.1926
+male_2020: age groups 11, standard total 1000000, age-adjusted rate 998.3367
+female_2020: age groups 11, standard total 1000000, age-adjusted rate 695.0589
+ratio all_2020 / all_2019 = 1.16802 (printed rates 835.4 / 715.2 = 1.16806)
+ratio male_2020 / female_2020 = 1.43633 (printed rates 998.3 / 695.1 = 1.43620)

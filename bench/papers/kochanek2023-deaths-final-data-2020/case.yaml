@@ -1,0 +1,121 @@
+kind: research paper
+short: Kochanek 2023
+field: Statistics
+program: epitools (R), through the epi-rates adapter
+citation:
+  authors: Kochanek KD, Murphy SL, Xu JQ, Arias E
+  title: "Deaths: Final data for 2020"
+  venue: National Vital Statistics Reports 72(10). Hyattsville, MD, National Center for Health Statistics
+  year: 2023
+  doi: 10.15620/cdc:131355
+related:
+  - text: >-
+      Klein RJ, Schoenborn CA. Age adjustment using the 2000 projected U.S. population. Healthy People Statistical Notes 20 (2001).
+      Source of the year 2000 standard population weights.
+    url: https://www.cdc.gov/nchs/data/statnt/statnt20.pdf
+measured: >-
+  The report presents final 2020 death data of the United States: 3,383,729 deaths, a crude death rate of 1,027.0 and an
+  age-adjusted death rate of 835.4 per 100,000 of the year 2000 United States standard population. It prints age-specific
+  rates of 11 age groups and the age-adjusted rate for each year, each cause of death and each sex.
+instruction: >-
+  Did the age-adjusted death rate of the United States rise from 2019 to 2020, and how do men and women compare? Give the
+  age-adjusted death rate of each group with the direct method, the ratio of 2020 to 2019 and the ratio of the male rate to
+  the female rate.
+instruction_basis: >-
+  The abstract and Table 1 of the report. "The age-adjusted death rate ... was 835.4 deaths per 100,000 U.S. standard
+  population, an increase from 715.2 in 2019." Table 1 gives 998.3 for males and 695.1 for females.
+answers:
+  per:
+    decision: Rate multiplier
+    value: 100000
+    source: The report gives all rates per 100,000.
+  alpha:
+    decision: Significance level of the intervals
+    value: 0.05
+    source: Not in the report. The usual level. The tool gives no interval for a table of rates.
+  ci_method:
+    decision: Interval of a rate or a proportion
+    value: exact
+    source: Not in the report. The benchmark does not use the choice.
+  rate_ratio_method:
+    decision: Interval of the rate ratio
+    value: midp
+    source: Not in the report. The benchmark does not use the choice.
+  wording:
+    decision: Exposure or treatment wording
+    value: exposure
+    source: Not in the report. The benchmark does not use the choice.
+  time_horizon:
+    decision: Time horizon of the risks
+    value: not stated
+    source: Not in the report. The benchmark does not use the choice.
+  exposure_prevalence:
+    decision: Exposure prevalence for the population attributable fraction
+    value: sample
+    source: Not in the report. The benchmark does not use the choice.
+  standardization_method:
+    decision: Direct or indirect standardization
+    value: direct
+    source: The report adjusts the death rates by the direct method (Technical Notes).
+  standard_population:
+    decision: Standard population for direct standardization
+    value: us2000_11
+    source: The report uses the year 2000 United States standard population in 11 age groups.
+  sir_ci:
+    decision: Interval of the standardized ratio
+    value: exact
+    source: Not in the report. The direct method does not use the choice.
+  reference_rates:
+    decision: Source of the reference rates
+    value: not applicable
+    source: Not in the report. The direct method does not use the choice.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the report. The benchmark answers a free question with this text.
+items:
+  adjusted_all_2020:
+    source: published
+    where: Abstract and Table 1, all origins and races, 2020, age-adjusted death rate 835.4.
+    independence: independent
+    check: check.py standardizes the printed age-specific rates of Table 5 with NumPy and gives 835.4200 (check.out).
+  adjusted_all_2019:
+    source: published
+    where: Abstract and Table 1, 2019, age-adjusted death rate 715.2.
+    independence: independent
+    check: check.py gives 715.2437 (check.out).
+  adjusted_heart_2020:
+    source: published
+    where: Table 5, diseases of heart, 2020, age-adjusted rate 168.2.
+    independence: independent
+    check: check.py gives 168.1926 (check.out).
+  adjusted_male_2020:
+    source: published
+    where: Table 1 and Table 2, males, 2020, age-adjusted death rate 998.3.
+    independence: independent
+    check: check.py gives 998.3367 (check.out).
+  adjusted_female_2020:
+    source: published
+    where: Table 1 and Table 2, females, 2020, age-adjusted death rate 695.1.
+    independence: independent
+    check: check.py gives 695.0589 (check.out).
+  ratio_2020_2019:
+    source: computed
+    tool: ratio of two printed age-adjusted rates (835.4 and 715.2)
+    where: The abstract prints both rates. The ratio is not printed.
+    independence: independent
+    check: 835.4 / 715.2 = 1.1681. check.py gives 1.16802 from the unrounded standardization.
+  ratio_male_female:
+    source: computed
+    tool: ratio of two printed age-adjusted rates (998.3 and 695.1)
+    where: Table 1 prints both rates. The ratio is not printed.
+    independence: independent
+    check: 998.3 / 695.1 = 1.4362. check.py gives 1.43633.
+data:
+  source: >-
+    Tables 2 and 5 of the report: the age-specific death rates per 100,000 of 11 age groups for all causes in 2020 and 2019,
+    for diseases of heart in 2020, and for males and females in 2020. The year 2000 standard population is in the fifth
+    column. catalog/epi-rates/data/make_fixtures.R writes the CSV file and fetch.sh copies it.
+  url: https://www.cdc.gov/nchs/data/nvsr/nvsr72/nvsr72-10.pdf
+  license: Public domain. All material in the report is in the public domain and carries no restriction. The data are aggregate rates and hold no data of persons.
+  size: 55 rows, 3 kB

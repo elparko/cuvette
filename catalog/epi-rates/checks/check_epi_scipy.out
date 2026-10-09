@@ -1,0 +1,32 @@
+pois_exact 15/19017 per 1000 [0.788768, np.float64(0.441467), np.float64(1.300953)]
+pois_exact 0/500 per 1000 [0.0, 0.0, np.float64(7.377759)]
+binom_exact 12/18 [0.666667, np.float64(0.409925), np.float64(0.866573)]
+binom_exact 2/31 [0.064516, np.float64(0.007911), np.float64(0.214216)]
+wilson 12/18 [0.666667, np.float64(0.437495), np.float64(0.837212)]
+rr midp rothman [1.855759, 1.041075, 3.449423]
+rr exact rothman [np.float64(1.005684), np.float64(3.6093)]
+rate difference per 1000 0.674995 0.074927 1.275063
+rr wald [1.027226 3.352563]
+risk ratio 10.333333 [ 2.600475 41.060867]
+risk difference 0.602151 0.367834 0.836467
+nnh 1.660714 1.195504 2.718619
+odds ratio 29.0 [  5.110696 164.556857]
+af exposed 0.903226
+paf levin sample prevalence 0.774194 pe 0.367347
+fay-feuer 1 [np.float64(56.3475), np.float64(92.3045), np.float64(80.4417), np.float64(105.7633)]
+fay-feuer 2 [np.float64(67.6199), np.float64(91.1741), np.float64(82.3612), np.float64(100.8676)]
+fay-feuer 3 [np.float64(83.3305), np.float64(85.0692), np.float64(77.1835), np.float64(94.2236)]
+fay-feuer 4 [np.float64(115.4512), np.float64(92.7179), np.float64(80.01), np.float64(114.6694)]
+fay-feuer 5 or more [np.float64(167.1142), np.float64(75.529), np.float64(67.7021), np.float64(188.3002)]
+selvin direct 1940 to 1960 standard [np.float64(119.5286), np.float64(139.2505), np.float64(138.2141), np.float64(140.2938)]
+selvin indirect observed 71058.0 expected 85556.8888 sir 0.830535
+sir log ci [0.824451 0.836664]
+sir exact ci 0.82444 0.836665
+isr per 100000 137.9415
+nchs all_2020 835.42
+nchs all_2019 715.2437
+nchs heart_2020 168.1926
+nchs male_2020 998.3367
+nchs female_2020 695.0589
+nnt example rd -0.03 -0.118329 0.058329 nnt 33.333333 rrr 0.230769
+ratio 2020/2019 1.16802 male/female 1.43633
