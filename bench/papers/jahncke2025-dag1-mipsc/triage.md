@@ -8,6 +8,9 @@ Classes: a = tool or adapter fault, b = harness fault, c = benchmark spec fault,
 - Leak check: 36 paths read, 0 outside the allow list, 0 blocked reads, 0 unsourced claims.
 - The run used 1 sweep for each cell, not 10. See row 1. The reported numbers pass because the tolerances are wide, not because the run is right.
 
+- Rerun after the reader fix (all 10 sweeps of each cell): `20261009-053013-97c5`, 398 s, computed 10/10, reported 10/10. Report: `bench/results/papers-2026-10-09-jahncke-haiku-rerun.md`. Leak check: 0 outside, 0 blocked, 0 unsourced.
+- p_rise and p_decay are now reference items, not scored. With tolerances of 0.2 and 0.25, the nearest-number match took an ICC value (0.27) for both p values. The paper used a different event detection, so a tighter tolerance has no basis.
+
 | Run | Item | Class | Cause | Fix |
 | --- | --- | --- | --- | --- |
 | 1 | all items | a | The Igor reader took only the first analog signal of the first segment. A pxp file holds 10 signals (sweep32 to sweep41) in one segment. The tool said "1 sweep" and analyzed 28.5 s for each cell, not 285 s. The model saw the conflict with the prompt and said so. | `catalog/patch-clamp/pc_read.py` now reads every analog signal as one sweep. Cell 1 gives 1003 events in 285 s (3.52 Hz). Before the fix it gave 87 events in 28.5 s (3.05 Hz). The Haiku run must run again. |

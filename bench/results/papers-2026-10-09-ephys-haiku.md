@@ -5,14 +5,14 @@ Each cell: computed passes / reported passes. Computed: a logged number is withi
 
 | Model | Computed | Reported | Runs | Not answered |
 | --- | --- | --- | --- | --- |
-| claude:claude-haiku-5-5 | 26/26 | 26/26 | 2 | 0 |
+| claude:claude-haiku-5-5 | 24/24 | 24/24 | 2 | 0 |
 
 ## Matrix
 
 | Paper | claude:claude-haiku-5-5 |
 | --- | --- |
 | gouwens2019-allen-ephys | 14/14 / 14/14 |
-| jahncke2025-dag1-mipsc | 12/12 / 12/12 |
+| jahncke2025-dag1-mipsc | 10/10 / 10/10 |
 
 ## Process metrics
 
@@ -76,8 +76,8 @@ Leak check: 36 paths read, 0 outside the allow list, 0 blocked, 0 unsourced clai
 | n_animals_per_group | 6 exact | pass 6 (n12 table.rows[0][6], entry 117) | pass 6 via tolerance (n12, claim check 308) |
 | p_frequency | 0.018 ±0.015 | pass 0.01246003 (n12 metrics.min_p, entry 117) | pass 0.012 via tolerance (n12, claim check 308) |
 | p_amplitude | 0.017 ±0.015 | pass 0.01246003 (n12 metrics.min_p, entry 117) | pass 0.012 via tolerance (n12, claim check 308) |
-| p_rise | 0.38 ±0.2 | pass 0.3971269 (n12 table.rows[3][14], entry 117) | pass 0.3 via tolerance (n9, claim check 308) |
-| p_decay | 0.36 ±0.25 | pass 0.3971269 (n12 table.rows[3][14], entry 117) | pass 0.3 via tolerance (n9, claim check 308) |
+| p_rise (reference) | 0.38 ±0.2 | match 0.3971269 (n12 table.rows[3][14], entry 117) | not asked |
+| p_decay (reference) | 0.36 ±0.25 | match 0.3971269 (n12 table.rows[3][14], entry 117) | not asked |
 | decay_ctrl | 7.87 ±0.5 | pass 8.142494 (n12 table.rows[3][8], entry 117) | pass 8.14 via tolerance (n50, claim check 308) |
 | freq_ctrl | 2.97 ±0.6 | pass 2.622807 (n12 table.rows[0][8], entry 117) | pass 2.62 via tolerance (n11, claim check 308) |
 | freq_cko | 1.76 ±0.5 | pass 1.851845 (n12 table.rows[3][9], entry 117) | pass 1.64 via tolerance (n11, claim check 308) |

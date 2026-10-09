@@ -1,0 +1,514 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "jahncke2025-dag1-mipsc",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 398.448,
+   "session": "20261009-053013-97c5",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-053013-97c5",
+   "answer": "## Result: mIPSCs in Ctrl and cKO Purkinje cells (corrected)\n\n**What I did**\n\n1. I checked one file, P30_Calb1_DG_01_cell1.pxp. It holds voltage-clamp data: 10 sweeps, 10000 Hz, unit pA, no command step. I analysed 1 s to 29.5 s of all 10 sweeps, which is 285 s per cell. I excluded the macOS \"._\" files. I applied no liquid junction potential correction, because the values are currents.\n2. I detected inward miniature inhibitory postsynaptic currents (mIPSCs) in all 32 cells. The method was template (Clements and Bekkers). The threshold was 4 times the noise standard deviation (SD). The template rise was 0.7 ms and the decay was 8 ms. I used no filter. No cell failed.\n3. I compared the groups three ways:\n   - A Welch t-test with each cell as one observation. This is the test you asked for.\n   - A Welch t-test on the animal means, with 6 animals per group.\n   - A mixed model with the animal as a random effect.\n4. I adjusted the p values with the Benjamini-Hochberg (BH) method over the four features. Alpha is 0.05.\n5. I ran a threshold check at 3 SD and 5 SD. These are comparison runs. The recorded setting is 4 SD.\n\n**Answers (values from the recorded 4 SD setting)**\n\n1. Cells and animals: Ctrl has 16 cells from 6 animals. cKO has 16 cells from 6 animals.\n2. Mean of the cell values:\n   - Frequency: Ctrl 2.58 Hz (SD 1.14). cKO 1.66 Hz (SD 1.06).\n   - Amplitude: Ctrl 55.49 pA (SD 18.10). cKO 38.12 pA (SD 11.98).\n3. Welch t-test, cells as observations, cKO minus Ctrl:\n   - Frequency: p = 0.0257. BH-adjusted p = 0.0513. Difference −0.91 Hz, 95% confidence interval (CI) −1.71 to −0.12 Hz. Cohen d −0.83.\n   - Amplitude: p = 0.00359. BH-adjusted p = 0.0144. Difference −17.37 pA, 95% CI −28.53 to −6.22 pA. Cohen d −1.13.\n4. Ctrl decay time constant: mean 8.07 ms (SD 1.39, cell level).\n   - 10-90% rise time: p = 0.145 (cell level). Ctrl 0.92 ms, cKO 1.01 ms.\n   - Decay time constant: p = 0.102 (cell level). cKO 7.25 ms.\n\n**Checks with the animal as the unit**\n\n- Animal-level Welch test (6 vs 6 animals):\n  - Frequency: Ctrl 2.53 Hz, cKO 1.57 Hz. Difference −0.96 Hz, 95% CI −1.94 to 0.03 Hz. p = 0.0557. BH-adjusted p = 0.0557.\n  - Amplitude: Ctrl 54.12 pA, cKO 39.36 pA. Difference −14.76 pA, 95% CI −26.38 to −3.14 pA. p = 0.0194. BH-adjusted p = 0.0488.\n  - Rise: Ctrl 0.87 ms, cKO 1.01 ms. p = 0.0366. BH-adjusted p = 0.0488.\n  - Decay: Ctrl 8.62 ms, cKO 7.06 ms. p = 0.0337. BH-adjusted p = 0.0488.\n- Mixed model, feature ~ group + (1 | animal):\n  - Frequency: difference −0.93 Hz, 95% CI −1.84 to −0.01 Hz. p = 0.0470. BH-adjusted p = 0.0911.\n  - Amplitude: difference −17.37 pA, 95% CI −28.08 to −6.66 pA. p = 0.0015. BH-adjusted p = 0.006.\n  - Rise: p = 0.137. BH-adjusted p = 0.137.\n  - Decay: p = 0.0683. BH-adjusted p = 0.0911.\n  - The fit gave convergence warnings. Some variance estimates lie on the boundary.\n\n**Threshold check (mean over the 32 cells)**\n\n- 3 SD (comparison run): frequency 3.01 Hz, amplitude 37.01 pA.\n- 4 SD (recorded setting): frequency 2.12 Hz, amplitude 46.80 pA.\n- 5 SD (comparison run): frequency 1.58 Hz, amplitude 56.06 pA.\n\nFrequency changes strongly with the threshold. Amplitude also changes.\n\n**What I found**\n\n- The amplitude of cKO mIPSCs is smaller than the amplitude of Ctrl mIPSCs. The three tests agree on the direction. The amplitude difference is significant at alpha 0.05 in two tests with the adjusted p values. These are the animal-level test (BH-adjusted p = 0.0488, which is borderline) and the mixed model (BH-adjusted p = 0.006). The cell-level test does not give this result alone. Cells in one animal are not independent (intraclass correlation up to 0.27).\n- The frequency is lower in cKO. No test gives a BH-adjusted p below 0.05.\n- The rise and decay differences are small. The cell-level tests are not significant. The animal-level raw p values are below 0.05, but the BH-adjusted values are 0.0488.\n\n**What is uncertain**\n\n- Only 6 animals per group.\n- The mixed model had convergence warnings.\n- The animal-level BH values are at the edge of 0.05.\n- I did not run the group tests at 3 SD or 5 SD. The amplitude and frequency change with the threshold, so the group result can change too.\n- The frequency can be under-counted. Events closer than 5 decay constants count as one event.\n\n**What waits for you**\n\n- The record still sets the replicate unit to cells. The animal-level and mixed-model results come from my script, not from the record. Tell me which unit is the primary test, and I will record it.\n- Tell me if you want the group tests repeated at 3 SD and 5 SD.\n\n**Files**\n\n- cells.csv: the per-cell event table.\n- group_comparison.csv and group_comparison.png: the cell-level comparison.\n- animal_level_welch.csv: the animal-level test.\n- mixed_model_results.csv: the mixed model.\n\nStep results that the answer does not mention, from the record:\n- n13 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-053013-97c5/work and wrote 2 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-053013-97c5/work.\n\nSettings used, from the decision record: Sweeps to include: all · Event detection method: template · Event detection threshold (times the noise SD): 4 · Direction of the events: inward · Expected event rise time constant (ms): 0.7 · Expected event decay time constant (ms): 8 · Unit of replication for the group comparison: cells · Test for the difference between two groups: t · Significance level (alpha): 0.05.",
+   "items": [
+    {
+     "key": "n_cells_ctrl",
+     "description": "Control cells",
+     "expected": 16,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n9",
+      "path": "table.rows[0][4]",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 172,
+      "text": "Cells and animals: Ctrl has 16 cells from 6 animals."
+     }
+    },
+    {
+     "key": "n_cells_cko",
+     "description": "cKO cells",
+     "expected": 16,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n9",
+      "path": "table.rows[0][4]",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 172,
+      "text": "Cells and animals: Ctrl has 16 cells from 6 animals."
+     }
+    },
+    {
+     "key": "n_animals_per_group",
+     "description": "Animals in each group",
+     "expected": 6,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6,
+      "diff": 0,
+      "node": "n9",
+      "path": "table.rows[0][6]",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 6,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 172,
+      "text": "- A Welch t-test on the animal means, with 6 animals per group."
+     }
+    },
+    {
+     "key": "p_frequency",
+     "description": "p value of the mIPSC frequency, cKO against Ctrl, cells as observations (the paper prints 0.018; the tolerance covers a different detection method)",
+     "expected": 0.018,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.014365866012929818,
+      "diff": 0.0036341339870701803,
+      "node": "n9",
+      "path": "metrics.min_p_bh",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0194,
+      "diff": 0.001400000000000002,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 172,
+      "text": "p = 0.0194."
+     }
+    },
+    {
+     "key": "p_amplitude",
+     "description": "p value of the mIPSC amplitude, cKO against Ctrl, cells as observations (the paper prints 0.017)",
+     "expected": 0.017,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.014365866012929818,
+      "diff": 0.002634133987070183,
+      "node": "n9",
+      "path": "metrics.min_p_bh",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0194,
+      "diff": 0.0023999999999999994,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 172,
+      "text": "p = 0.0194."
+     }
+    },
+    {
+     "key": "p_rise",
+     "description": "p value of the 10-90% rise time difference (the paper prints 0.38)",
+     "expected": 0.38,
+     "tolerance": 0.2,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.27178572701435655,
+      "diff": 0.10821427298564346,
+      "node": "n9",
+      "path": "metrics.max_icc_animal",
+      "entry": 107
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 172,
+      "text": null
+     }
+    },
+    {
+     "key": "p_decay",
+     "description": "p value of the decay time constant difference (the paper prints 0.36)",
+     "expected": 0.36,
+     "tolerance": 0.25,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.27178572701435655,
+      "diff": 0.08821427298564344,
+      "node": "n9",
+      "path": "metrics.max_icc_animal",
+      "entry": 107
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 172,
+      "text": null
+     }
+    },
+    {
+     "key": "decay_ctrl",
+     "description": "Mean decay time constant of the Ctrl cells, ms (the paper prints 7.87)",
+     "expected": 7.87,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8.07125978537857,
+      "diff": 0.20125978537857048,
+      "node": "n9",
+      "path": "table.rows[3][8]",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 8.07,
+      "diff": 0.20000000000000018,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 172,
+      "text": "Ctrl decay time constant: mean 8.07 ms (SD 1.39, cell level)."
+     }
+    },
+    {
+     "key": "freq_ctrl",
+     "description": "Mean frequency of the Ctrl cells, Hz (not printed in the paper)",
+     "expected": 2.97,
+     "tolerance": 0.6,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.5765350877192983,
+      "diff": 0.3934649122807019,
+      "node": "n9",
+      "path": "table.rows[0][8]",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.01,
+      "diff": 0.03999999999999959,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 172,
+      "text": "- 3 SD (comparison run): frequency 3.01 Hz, amplitude 37.01 pA."
+     }
+    },
+    {
+     "key": "freq_cko",
+     "description": "Mean frequency of the cKO cells, Hz (not printed in the paper)",
+     "expected": 1.76,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.662719298245614,
+      "diff": 0.09728070175438597,
+      "node": "n9",
+      "path": "table.rows[0][10]",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.66,
+      "diff": 0.10000000000000009,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 172,
+      "text": "cKO 1.66 Hz (SD 1.06)."
+     }
+    },
+    {
+     "key": "amp_ctrl",
+     "description": "Mean amplitude of the Ctrl cells, pA (not printed in the paper)",
+     "expected": 51.9,
+     "tolerance": 7,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 55.4904324703076,
+      "diff": 3.5904324703076043,
+      "node": "n9",
+      "path": "table.rows[1][8]",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 54.12,
+      "diff": 2.219999999999999,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 172,
+      "text": "- Amplitude: Ctrl 54.12 pA, cKO 39.36 pA."
+     }
+    },
+    {
+     "key": "amp_cko",
+     "description": "Mean amplitude of the cKO cells, pA (not printed in the paper)",
+     "expected": 38.3,
+     "tolerance": 6,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 38.1183431538881,
+      "diff": 0.18165684611189903,
+      "node": "n9",
+      "path": "table.rows[1][10]",
+      "entry": 107
+     },
+     "reported": {
+      "pass": true,
+      "value": 38.12,
+      "diff": 0.17999999999999972,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 172,
+      "text": "cKO 38.12 pA (SD 11.98)."
+     }
+    },
+    {
+     "key": "p_amplitude_animal_unit",
+     "description": "p value of the amplitude with the animal as the unit (6 against 6 animals): not significant at 0.05",
+     "expected": 0.067,
+     "tolerance": 0.03,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.051346998303713406,
+      "diff": 0.015653001696286598,
+      "node": "n9",
+      "path": "table.rows[0][19]",
+      "entry": 107
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 172,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 14,
+    "inputTokens": 34,
+    "outputTokens": 19159,
+    "cacheRead": 470387,
+    "cacheWrite": 65894,
+    "toolCalls": 14,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 3,
+     "error": 5
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 7
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-053013-97c5/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1",
+     "/Users/parker/Code/guided-analysis/catalog/patch-clamp",
+     "/Users/parker/.guided-analysis/envs/patch-clamp",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/patch-clamp"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells/P30_Calb1_DG_01_cell1.pxp",
+     "/Volumes/T7/guided-analysis/data/jahncke2025-dag1-mipsc/cells_metadata.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-053013-97c5/work",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/jahncke2025-dag1-mipsc/run1/home/sessions/20261009-053013-97c5/work/detect_events_for_cells-1/cells.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-jahncke-haiku-rerun.md",
+  "json": "bench/results/papers-2026-10-09-jahncke-haiku-rerun.json"
+ },
+ "summary": {
+  "cells": {
+   "jahncke2025-dag1-mipsc": {
+    "claude:claude-haiku-5-5": {
+     "computed": 10,
+     "computedOf": 10,
+     "reported": 10,
+     "reportedOf": 10,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 10,
+    "computedOf": 10,
+    "reported": 10,
+    "reportedOf": 10,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 398.448,
+    "requests": 14,
+    "inputTokens": 34,
+    "outputTokens": 19159,
+    "cacheRead": 470387,
+    "cacheWrite": 65894,
+    "toolCalls": 14,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings_info": 3,
+    "findings_warning": 3,
+    "findings_error": 5,
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 7
+   }
+  },
+  "skipped": []
+ }
+}
