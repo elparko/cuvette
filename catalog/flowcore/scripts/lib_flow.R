@@ -12,7 +12,7 @@ list_files <- function(v, what = "files") {
   missing <- out[!file.exists(out)]
   if (length(missing)) fail(sprintf("file not found: %s", paste(head(missing, 5), collapse = ", ")))
   if (!length(out)) fail(sprintf("no FCS file in %s", paste(v, collapse = ", ")))
-  out
+  unique(out)
 }
 
 read_fcs <- function(path) {
@@ -91,4 +91,4 @@ parse_thresholds <- function(v) {
   out
 }
 
-pop_tag <- function(x) clean_name(gsub("-", "neg", gsub("\\+", "pos", x)))
+pop_tag <- function(x) clean_name(gsub("-( |$)", "neg\\1", gsub("\\+( |$)", "pos\\1", x)))

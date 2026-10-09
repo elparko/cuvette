@@ -1,0 +1,38 @@
+adapters: [flowcore]
+prompt: |
+  I edited HEK293T cells with a baculovirus that delivers a large DNA insert with an mCherry reporter. Two designs were tested, HDR and HITI-2c, each in three replicates, and the cells were read on day 10 on a BD LSRFortessa. The files are in {data}/aulicino2022-baculovirus-hdr/ : bv_hdr_rep1.fcs to bv_hdr_rep3.fcs (HDR), bv_hiti2c_rep1.fcs to bv_hiti2c_rep3.fcs (HITI-2c) and control_rep1.fcs to control_rep3.fcs (untransfected cells, use them as the negative control). The mCherry signal is in the channel PE-CF594-A. The values are already compensated and linear. Use the untransfected control cells to set the mCherry-positive cutoff. Give the cutoff, the mean percent of mCherry-positive cells of each design with its standard deviation, and the p value of a Welch t test that compares the two designs. Write every number in your final answer text.
+answers:
+  control_percentile: 99.9
+  pregate: none
+  compensation: none
+  transform: none
+  cofactor: 150
+  log_decades: 0
+  positive_percentile: 99
+  thresholds: none
+  test: welch
+  adjust: none
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1200
+data:
+  - aulicino2022-baculovirus-hdr/bv_hdr_rep1.fcs
+  - aulicino2022-baculovirus-hdr/bv_hdr_rep2.fcs
+  - aulicino2022-baculovirus-hdr/bv_hdr_rep3.fcs
+  - aulicino2022-baculovirus-hdr/bv_hiti2c_rep1.fcs
+  - aulicino2022-baculovirus-hdr/bv_hiti2c_rep2.fcs
+  - aulicino2022-baculovirus-hdr/bv_hiti2c_rep3.fcs
+  - aulicino2022-baculovirus-hdr/control_rep1.fcs
+  - aulicino2022-baculovirus-hdr/control_rep2.fcs
+  - aulicino2022-baculovirus-hdr/control_rep3.fcs
+items:
+  - {key: hdr_pct_printed, description: "Mean percent of mCherry-positive cells after the HDR design, day 10 (the paper prints about 5%)", value: 5, tolerance: 1.0}
+  - {key: hiti_pct_printed, description: "Mean percent of mCherry-positive cells after the HITI-2c design, day 10 (the paper prints about 20%)", value: 20, tolerance: 1.5}
+  - {key: control_cutoff, description: "mCherry cutoff: 99.9th percentile of the pooled untransfected control events, PE-CF594-A", value: 3791.17, tolerance: 0.5, tool: population_stats}
+  - {key: hdr_pct_mean, description: "Mean percent mCherry-positive, HDR, three replicates", value: 4.419, tolerance: 0.01}
+  - {key: hdr_pct_sd, description: "SD of the percent mCherry-positive, HDR", value: 0.146, tolerance: 0.01}
+  - {key: hiti_pct_mean, description: "Mean percent mCherry-positive, HITI-2c, three replicates", value: 20.903, tolerance: 0.01}
+  - {key: hiti_pct_sd, description: "SD of the percent mCherry-positive, HITI-2c", value: 2.256, tolerance: 0.02}
+  - {key: welch_p, description: "Welch t test p value, HITI-2c against HDR", value: 0.006018, tolerance: 0.0001, tool: compare_groups}
+  - {key: hdr_pct_mean_p99, description: "Trap: mean percent mCherry-positive, HDR, with the 99th percentile as the cutoff", value: 6.623, tolerance: 0.01, in_answer: false, trap: true}
+  - {key: hiti_pct_mean_p99, description: "Trap: mean percent mCherry-positive, HITI-2c, with the 99th percentile as the cutoff", value: 25.945, tolerance: 0.01, in_answer: false, trap: true}

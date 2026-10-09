@@ -1,0 +1,7 @@
+control events 36477
+percentile 99.0: cutoff 1686.61 bv_hdr values [6.113 7.09  6.667] mean 6.623 sd 0.490
+percentile 99.0: cutoff 1686.61 bv_hiti2c values [25.242 29.055 23.538] mean 25.945 sd 2.825
+percentile 99.0: Welch t 11.6736 p 0.005848
+percentile 99.9: cutoff 3791.17 bv_hdr values [4.335 4.588 4.336] mean 4.419 sd 0.146
+percentile 99.9: cutoff 3791.17 bv_hiti2c values [20.118 23.446 19.144] mean 20.903 sd 2.256
+percentile 99.9: Welch t 12.6302 p 0.006018

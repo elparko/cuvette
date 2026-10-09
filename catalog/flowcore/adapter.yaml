@@ -393,6 +393,16 @@ tests:
       - { path: saved.welch.metrics.p_CD8pos_ctl_trt, approx: 0.0018486, abs: 0.0000001 }
       - { path: metrics.p_CD4pos_ctl_trt, approx: 0.080856, abs: 0.000001 }
 
+  - id: population-named-like-marker
+    description: A combined population with the name of a single marker (CD4+) does not make a second row. n_populations stays 2 for CD4 and CD8.
+    data: [data/synthetic_ctl1.fcs]
+    calls:
+      - tool: population_stats
+        args: { data: ["{adapter_dir}/data/synthetic_ctl1.fcs", "{adapter_dir}/data/synthetic_ctl1.fcs"], markers: [CD4, CD8], thresholds: ["CD4=2500", "CD8=2500"], populations: ["CD4+"] }
+    expect:
+      - { path: metrics.n_samples, equals: 1 }
+      - { path: metrics.n_populations, equals: 2 }
+
   - id: stats-without-cutoff
     description: A marker with no threshold and no control file fails, and the error names the marker.
     data: [data/synthetic_ctl1.fcs]
@@ -457,7 +467,7 @@ tools:
       data: { type: [array, string], minItems: 1, items: { type: string }, description: "FCS files or a folder of FCS files, as a list or as comma text." }
       markers: { type: [array, string], items: { type: string }, description: "Markers or channel names to report, as a list or as comma text. Default the markers in thresholds." }
       thresholds: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Cutoffs such as CD4=2500, CD8=1800 in the scale after the transform." }
-      control: { type: string, description: "Path of a control FCS file (unstained or fluorescence minus one). The cutoff is a percentile of it, for each marker without a threshold." }
+      control: { type: [array, string], items: { type: string }, description: "Paths of control FCS files (unstained or fluorescence minus one), as a list or as comma text. The tool pools the events of all control files. The cutoff is a percentile of the pool, for each marker without a threshold." }
       control_percentile: { type: number, minimum: 50, maximum: 100, description: "Leave out. The harness sets it from the decision record. Percentile of the control that sets the cutoff." }
       populations: { type: [array, string], items: { type: string }, description: "Combined populations, such as CD3+ CD4-, as a list or as comma text. Each part is a marker from markers with + or -." }
       pregate: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Scatter gate such as FSC-A:50000:250000. none uses all events." }

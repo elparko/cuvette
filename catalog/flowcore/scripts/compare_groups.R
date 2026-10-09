@@ -13,6 +13,8 @@ run_tool(function() {
   metric <- pick(p, "metric", "percent_of_parent")
   if (!metric %in% METRICS) fail(sprintf("metric '%s' is not known. Choices: %s", metric, paste(METRICS, collapse = ", ")))
   need_column(st, metric, "metric")
+  dup <- st[duplicated(st[, c("sample", "population")]), ]
+  if (nrow(dup)) fail(sprintf("the stats table has the sample '%s' more than once for the population '%s'. Run population_stats again with each file once.", dup$sample[1], dup$population[1]))
   des <- read_table(p$design, "design")
   need_column(des, "sample", "design (the column sample)")
   group_col <- need_column(des, pick(p, "group_col", "group"), "group_col")

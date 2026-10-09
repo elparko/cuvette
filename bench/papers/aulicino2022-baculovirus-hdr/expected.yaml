@@ -1,0 +1,31 @@
+tool: flowCore data structures, population_stats and compare_groups of the flowcore adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hdr_rep1.fcs
+  - /Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hdr_rep2.fcs
+  - /Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hdr_rep3.fcs
+  - /Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hiti2c_rep1.fcs
+  - /Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hiti2c_rep2.fcs
+  - /Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hiti2c_rep3.fcs
+  - /Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/control_rep1.fcs
+  - /Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/control_rep2.fcs
+  - /Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/control_rep3.fcs
+decisions:
+  control_percentile: "99.9 (pooled untransfected control, channel PE-CF594-A)"
+  test: "welch"
+expected:
+  - {description: "Mean percent of mCherry-positive cells after the HDR design, day 10 (the paper prints about 5%)", value: 5, tolerance: 1.0, source: "paper, Results"}
+  - {description: "Mean percent of mCherry-positive cells after the HITI-2c design, day 10 (the paper prints about 20%)", value: 20, tolerance: 1.5, source: "paper, Results"}
+  - {description: "mCherry cutoff: 99.9th percentile of the pooled untransfected control events, PE-CF594-A", value: 3791.17, tolerance: 0.5, source: "computed by check.py"}
+  - {description: "Mean percent mCherry-positive, HDR, three replicates", value: 4.419, tolerance: 0.01, source: "computed by check.py"}
+  - {description: "SD of the percent mCherry-positive, HDR", value: 0.146, tolerance: 0.01, source: "computed by check.py"}
+  - {description: "Mean percent mCherry-positive, HITI-2c, three replicates", value: 20.903, tolerance: 0.01, source: "computed by check.py"}
+  - {description: "SD of the percent mCherry-positive, HITI-2c", value: 2.256, tolerance: 0.02, source: "computed by check.py"}
+  - {description: "Welch t test p value, HITI-2c against HDR", value: 0.006018, tolerance: 0.0001, source: "computed by check.py"}
+  - {description: "Trap: mean percent mCherry-positive, HDR, with the 99th percentile as the cutoff", value: 6.623, tolerance: 0.01, source: "computed by check.py"}
+  - {description: "Trap: mean percent mCherry-positive, HITI-2c, with the 99th percentile as the cutoff", value: 25.945, tolerance: 0.01, source: "computed by check.py"}
+notes: |
+  The paper prints the editing as about 5% (HDR) and about 20% (HITI-2c). The tolerances (1.0 and 1.5 percentage points) cover the rounding in the paper.
+  The paper gives no cutoff. A cutoff at the 99.9th percentile of the untransfected cells gives 4.42 (SD 0.15) and 20.90 (SD 2.26). The 99th percentile gives 6.62 and 25.95, which is further from the paper.
+  The controls of day 10 are three untransfected samples from the plasmid arm of the same experiment. The pooled 36477 control events set the cutoff.
+  Welch t test of HITI-2c against HDR: t 12.63, p 0.006018 (SciPy).

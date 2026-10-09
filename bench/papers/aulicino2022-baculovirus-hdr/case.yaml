@@ -1,0 +1,130 @@
+kind: research paper
+short: Aulicino 2022
+field: Flow cytometry
+program: flowCore (R), through the flowcore adapter
+citation:
+  authors: Aulicino F et al.
+  title: "Highly efficient CRISPR-mediated large DNA docking and multiplexed prime editing using a single baculovirus"
+  venue: Nucleic Acids Research
+  year: 2022
+  doi: 10.1093/nar/gkac587
+related:
+  - text: "Data: raw flow cytometry files of the paper on figshare, CC BY 4.0. fetch.sh downloads the files of Fig 2b for day 10."
+    doi: 10.6084/m9.figshare.20110364
+measured: >-
+  The study delivers a large DNA insert with an mCherry reporter into HEK293T cells with a baculovirus. It compares the
+  homology-directed repair design (HDR) with the HITI-2c design. Flow cytometry on day 10 counts the mCherry-positive cells. The
+  Results text gives the absolute editing as about 5% for HDR and about 20% for HITI-2c.
+instruction: >-
+  Set the mCherry-positive cutoff from the untransfected control and give the mean percent positive of each design with its SD.
+instruction_basis: >-
+  Results (Fig 2B text) and the figure legend. The paper does not state the exact cutoff, so the percentile of the control is a decision of the scientist.
+answers:
+  control_percentile:
+    decision: Percentile of the control for the cutoff
+    value: 99.9
+    source: Not in the paper. The 99.9th percentile of the pooled untransfected control gives 4.4% and 20.9%, which agree with the printed about 5% and about 20%. The 99th percentile gives 6.6% and 25.9%.
+  pregate:
+    decision: Parent gate on scatter
+    value: none
+    source: Not in the paper. The deposited files carry no gate.
+  compensation:
+    decision: Compensation of the samples
+    value: none
+    source: The reporter is read in one channel. The deposited files carry the identity matrix.
+  transform:
+    decision: Transform of the fluorescence channels
+    value: none
+    source: The cutoff is a percentile of the control, so the percent positive does not depend on a monotonic transform.
+  cofactor:
+    decision: Cofactor of the asinh transform
+    value: 150
+    source: Not used.
+  log_decades:
+    decision: Decades of a log-amplified scale
+    value: 0
+    source: The LSRFortessa writes linear values.
+  positive_percentile:
+    decision: Cutoff for positive events in a control
+    value: 99
+    source: Not used. The benchmark makes no spillover matrix.
+  thresholds:
+    decision: Cutoff between negative and positive
+    value: none
+    source: The cutoff comes from the control file.
+  test:
+    decision: Statistical test for the groups
+    value: welch
+    source: Not in the paper. Welch is the default of R t.test.
+  adjust:
+    decision: Correction for many comparisons
+    value: none
+    source: One planned comparison.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text, so that the record of decisions stays the only source of the settings.
+items:
+  hdr_pct_printed:
+    source: published
+    where: "Results, Fig 2B text: absolute editing of about 5% for HDR in HEK293T cells. The value is approximate in the paper."
+    check: check.py gives 5 or close to it from the data (check.out).
+  hiti_pct_printed:
+    source: published
+    where: "Results, Fig 2B text: absolute editing of about 20% for HITI-2c in HEK293T cells. The value is approximate in the paper."
+    check: check.py gives 20 or close to it from the data (check.out).
+  control_cutoff:
+    source: computed
+    tool: population_stats of the flowcore adapter
+    where: "Not printed. The paper gives no cutoff."
+    independence: independent
+    check: check.py (SciPy, fcsparser) gives the same value (check.out).
+  hdr_pct_mean:
+    source: computed
+    tool: compare_groups of the flowcore adapter
+    where: "Not printed as an exact value."
+    independence: independent
+    check: check.py (SciPy, fcsparser) gives the same value (check.out).
+  hdr_pct_sd:
+    source: computed
+    tool: compare_groups of the flowcore adapter
+    where: "Not printed."
+    independence: independent
+    check: check.py (SciPy, fcsparser) gives the same value (check.out).
+  hiti_pct_mean:
+    source: computed
+    tool: compare_groups of the flowcore adapter
+    where: "Not printed as an exact value."
+    independence: independent
+    check: check.py (SciPy, fcsparser) gives the same value (check.out).
+  hiti_pct_sd:
+    source: computed
+    tool: compare_groups of the flowcore adapter
+    where: "Not printed."
+    independence: independent
+    check: check.py (SciPy, fcsparser) gives the same value (check.out).
+  welch_p:
+    source: computed
+    tool: compare_groups of the flowcore adapter
+    where: "Not printed. The paper gives no test for this comparison."
+    independence: independent
+    check: check.py (SciPy, fcsparser) gives the same value (check.out).
+  hdr_pct_mean_p99:
+    source: computed
+    tool: population_stats of the flowcore adapter
+    where: "Not in the paper. The result of a cutoff at the 99th percentile of the control."
+    independence: independent
+    check: check.py gives the value (check.out).
+  hiti_pct_mean_p99:
+    source: computed
+    tool: population_stats of the flowcore adapter
+    where: "Not in the paper. The result of a cutoff at the 99th percentile of the control."
+    independence: independent
+    check: check.py gives the value (check.out).
+data:
+  source: >-
+    figshare record 10.6084/m9.figshare.20110364, the files Fig2b_BV_HEK_HDR_10d_rep001 to 003, Fig2b_BV_HEK_HITI-2c_10d_rep001 to 003 and
+    Fig2b_plasmid_control_HEK_untransfected_d10_rep001 to 003. fetch.sh writes them with short names.
+  url: https://doi.org/10.6084/m9.figshare.20110364.v1
+  license: CC BY 4.0, from the figshare record. The paper is CC BY 4.0.
+  size: 9 FCS files, 19 MB, 12000 to 20000 events each

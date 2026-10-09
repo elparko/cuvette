@@ -1,0 +1,390 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "aulicino2022-baculovirus-hdr",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 102.418,
+   "session": "20261009-040540-ac5a",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/aulicino2022-baculovirus-hdr/run1/home/sessions/20261009-040540-ac5a",
+   "answer": "**Result: mCherry-positive cells, HDR versus HITI-2c**\n\nHDR is homology-directed repair. HITI-2c is homology-independent targeted integration, design 2c.\n\n- HDR: 4.42 ± 0.15 % mCherry-positive (mean ± SD, n = 3).\n- HITI-2c: 20.90 ± 2.26 % mCherry-positive (mean ± SD, n = 3).\n- Difference, HITI-2c minus HDR: 16.48 percentage points.\n- Welch t test: p = 0.0060. There was one comparison, so no correction was needed.\n\nThe tool results do not show the software version. I removed the version number from this answer.\n\n**Cutoff**\n- The mCherry-positive cutoff is 3791.2 on the PE-CF594-A linear scale.\n- The source is the three untransfected control files, pooled.\n- The tool did not report the control percentile. It comes from the decision record, so I cannot confirm its value here.\n\n**Per sample** (one sample file equals one replicate)\n\n| Sample | Parent events | Positive events | % of parent | Median of positive events (MFI) |\n|---|---|---|---|---|\n| HDR rep1 | 15688 | 680 | 4.33 | 23660.7 |\n| HDR rep2 | 17504 | 803 | 4.59 | 23249.2 |\n| HDR rep3 | 17158 | 744 | 4.34 | 23016.6 |\n| HITI-2c rep1 | 16334 | 3286 | 20.12 | 26088.9 |\n| HITI-2c rep2 | 15815 | 3708 | 23.45 | 28286.8 |\n| HITI-2c rep3 | 14657 | 2806 | 19.14 | 29720.6 |\n\nThe untransfected controls give 0.18 %, 0.02 % and 0.10 % positive events with the same cutoff (rep1 to rep3).\n\n**Steps**\n1. Checked the nine FCS files and the sample sheet. The sheet groups files only as bv and control, so I made a design file with HDR and HITI-2c.\n2. Set the cutoff from the three untransfected controls, pooled. Linear data, no compensation, no transform.\n3. Counted the mCherry-positive events in the six bv files with population_stats. The parent gate was all events.\n4. Compared the designs with compare_groups, Welch t test, on percent of parent.\n\n**Uncertain**\n- The cutoff depends on the control percentile, which the tool did not show. A different percentile changes all percents.\n- Each group has n = 3. If the three tubes came from one transfection batch, the p value overstates how independent the replicates are.\n- The median of positive events is listed for each sample. I did not test the difference between designs for this value.\n\n**Waiting for you**\n- Confirm the control percentile in the decision record.\n- Confirm whether the three replicates are separate transfections on separate days.\n\nStep results that the answer does not mention, from the record:\n- n2 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/aulicino2022-baculovirus-hdr/run1/home/sessions/20261009-040540-ac5a/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/aulicino2022-baculovirus-hdr/run1/home/sessions/20261009-040540-ac5a/work.\n\nSettings used, from the decision record: Decades of a log-amplified scale: 0 · Parent gate on scatter: none · Compensation of the samples: none · Transform of the fluorescence channels: none · Cofactor of the asinh transform: 150 · Cutoff between negative and positive: none · Percentile of the control for the cutoff: 99.9 · Statistical test for the groups: welch · Correction for many comparisons: none.",
+   "items": [
+    {
+     "key": "hdr_pct_printed",
+     "description": "Mean percent of mCherry-positive cells after the HDR design, day 10 (the paper prints about 5%)",
+     "expected": 5,
+     "tolerance": 1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.58752285191956,
+      "diff": 0.41247714808044034,
+      "node": "n1",
+      "path": "metrics.pct_bv_hdr_rep2_PE_CF594_Apos",
+      "entry": 55
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.59,
+      "diff": 0.41000000000000014,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 120,
+      "text": "| HDR rep2 | 17504 | 803 | 4.59 | 23249.2 |"
+     }
+    },
+    {
+     "key": "hiti_pct_printed",
+     "description": "Mean percent of mCherry-positive cells after the HITI-2c design, day 10 (the paper prints about 20%)",
+     "expected": 20,
+     "tolerance": 1.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20.1175462226032,
+      "diff": 0.11754622260319891,
+      "node": "n1",
+      "path": "metrics.pct_bv_hiti2c_rep1_PE_CF594_Apos",
+      "entry": 55
+     },
+     "reported": {
+      "pass": true,
+      "value": 20.12,
+      "diff": 0.120000000000001,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 120,
+      "text": "| HITI-2c rep1 | 16334 | 3286 | 20.12 | 26088.9 |"
+     }
+    },
+    {
+     "key": "control_cutoff",
+     "description": "mCherry cutoff: 99.9th percentile of the pooled untransfected control events, PE-CF594-A",
+     "expected": 3791.17,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3791.16802929706,
+      "diff": 0.0019707029400706233,
+      "node": "n1",
+      "path": "table.rows[0][10]",
+      "entry": 55
+     },
+     "reported": {
+      "pass": true,
+      "value": 3791.2,
+      "diff": 0.02999999999974534,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 120,
+      "text": "- The mCherry-positive cutoff is 3791.2 on the PE-CF594-A linear scale."
+     }
+    },
+    {
+     "key": "hdr_pct_mean",
+     "description": "Mean percent mCherry-positive, HDR, three replicates",
+     "expected": 4.419,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.41940525703916,
+      "diff": 0.00040525703916038935,
+      "node": "n4",
+      "path": "metrics.mean_PE_CF594_Apos_HDR",
+      "entry": 83
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.42,
+      "diff": 0.001000000000000334,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 120,
+      "text": "- HDR: 4.42 ± 0.15 % mCherry-positive (mean ± SD, n = 3)."
+     }
+    },
+    {
+     "key": "hdr_pct_sd",
+     "description": "SD of the percent mCherry-positive, HDR",
+     "expected": 0.146,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.145596435511361,
+      "diff": 0.00040356448863898553,
+      "node": "n4",
+      "path": "metrics.sd_PE_CF594_Apos_HDR",
+      "entry": 83
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.15,
+      "diff": 0.0040000000000000036,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 120,
+      "text": "- HDR: 4.42 ± 0.15 % mCherry-positive (mean ± SD, n = 3)."
+     }
+    },
+    {
+     "key": "hiti_pct_mean",
+     "description": "Mean percent mCherry-positive, HITI-2c, three replicates",
+     "expected": 20.903,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20.902692602398,
+      "diff": 0.00030739760199693933,
+      "node": "n4",
+      "path": "metrics.mean_PE_CF594_Apos_HITI_2c",
+      "entry": 83
+     },
+     "reported": {
+      "pass": true,
+      "value": 20.9,
+      "diff": 0.0030000000000001137,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 120,
+      "text": "- HITI-2c: 20.90 ± 2.26 % mCherry-positive (mean ± SD, n = 3)."
+     }
+    },
+    {
+     "key": "hiti_pct_sd",
+     "description": "SD of the percent mCherry-positive, HITI-2c",
+     "expected": 2.256,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.25575031184392,
+      "diff": 0.0002496881560798414,
+      "node": "n4",
+      "path": "metrics.sd_PE_CF594_Apos_HITI_2c",
+      "entry": 83
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.26,
+      "diff": 0.0040000000000000036,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 120,
+      "text": "- HITI-2c: 20.90 ± 2.26 % mCherry-positive (mean ± SD, n = 3)."
+     }
+    },
+    {
+     "key": "welch_p",
+     "description": "Welch t test p value, HITI-2c against HDR",
+     "expected": 0.006018,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0060178228136038,
+      "diff": 1.7718639620020044e-7,
+      "node": "n4",
+      "path": "metrics.p_PE_CF594_Apos_HDR_HITI_2c",
+      "entry": 83
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.006,
+      "diff": 0.000017999999999999787,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 120,
+      "text": "- Welch t test: p = 0.0060."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 10,
+    "inputTokens": 26,
+    "outputTokens": 10655,
+    "cacheRead": 160235,
+    "cacheWrite": 26586,
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 3,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 4
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/aulicino2022-baculovirus-hdr/run1/home/sessions/20261009-040540-ac5a/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/aulicino2022-baculovirus-hdr/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/catalog/flowcore",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/catalog/flowcore"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr",
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hdr_rep1.fcs",
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hdr_rep2.fcs",
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hdr_rep3.fcs",
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hiti2c_rep1.fcs",
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hiti2c_rep2.fcs",
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/bv_hiti2c_rep3.fcs",
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/control_rep1.fcs",
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/control_rep2.fcs",
+     "/Volumes/T7/guided-analysis/data/aulicino2022-baculovirus-hdr/control_rep3.fcs",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/aulicino2022-baculovirus-hdr/run1/home/sessions/20261009-040540-ac5a/work/design.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/aulicino2022-baculovirus-hdr/run1/home/sessions/20261009-040540-ac5a/work/population_stats-1/stats.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-aulicino-run3.md",
+  "json": "bench/results/papers-aulicino-run3.json"
+ },
+ "summary": {
+  "cells": {
+   "aulicino2022-baculovirus-hdr": {
+    "claude:claude-haiku-5-5": {
+     "computed": 8,
+     "computedOf": 8,
+     "reported": 8,
+     "reportedOf": 8,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 8,
+    "computedOf": 8,
+    "reported": 8,
+    "reportedOf": 8,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 102.418,
+    "requests": 10,
+    "inputTokens": 26,
+    "outputTokens": 10655,
+    "cacheRead": 160235,
+    "cacheWrite": 26586,
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings_info": 2,
+    "findings_warning": 3,
+    "findings_error": 0,
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 4
+   }
+  },
+  "skipped": []
+ }
+}

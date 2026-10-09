@@ -14,12 +14,13 @@ run_tool(function() {
   decades <- as.numeric(pick(p, "log_decades", 0))
   pregate <- parse_ranges(p$pregate)
   thr <- parse_thresholds(p$thresholds)
-  control_path <- pick(p, "control", NULL)
+  control_paths <- if (is.null(p$control)) character() else list_files(p$control, "control")
   control_pct <- as.numeric(pick(p, "control_percentile", 99))
   markers <- as_list_arg(p$markers)
   if (!length(markers)) markers <- names(thr)
   if (!length(markers)) fail("give markers (the channels or markers to report) or thresholds")
   populations <- as_list_arg(p$populations)
+  populations <- populations[!populations %in% paste0(markers, "+")]
 
   prep <- function(path) {
     ff <- read_fcs(path)
@@ -50,10 +51,11 @@ run_tool(function() {
   }
 
   cutoff <- setNames(rep(NA_real_, length(markers)), markers)
-  if (!is.null(control_path)) {
-    if (!file.exists(control_path)) fail(sprintf("file not found: %s", control_path))
-    cc <- prep(control_path)
-    cx <- cc$x[gate(cc$x), , drop = FALSE]
+  if (length(control_paths)) {
+    cx <- do.call(rbind, lapply(control_paths, function(cp) {
+      cc <- prep(cp)
+      cc$x[gate(cc$x), , drop = FALSE]
+    }))
     cx <- tx(cx)
     for (i in seq_along(markers)) cutoff[i] <- quantile(cx[, chan[i]], control_pct / 100, names = FALSE)
   }
