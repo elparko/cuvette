@@ -4,6 +4,7 @@ Entry numbers (eNN) are ids in the log.jsonl of the session folder.
 Classes: a = tool or adapter fault, b = harness fault, c = benchmark spec fault, d = model fault.
 
 - qwen3:8b: `20261008-180057-ae49`, computed 10/10, reported 7/7
+- qwen3:8b, confirmation run on main 3f5e95b (after the fixes 0a27fc1, f962358, 4a94ac6): `20261008-193918-8cc9`, computed 0/10, reported 0/7. bench/results/confirm-fixes-andreasson2019-endotoxin-health.
 
 No item failed.
 
@@ -17,3 +18,9 @@ Other findings:
 - e33: the first Mann-Whitney call used the wrong rows (p 5.8e-05). The second call (e40) used endotoxin_exp2_general.csv and gave p 0.004163.
 - e62, e67: calculate failed. The model used the name of a value as a function ("unknown function p"). Model fault.
 - e84: -1.743 (a confidence bound for general health) has no source. Model fault.
+
+Confirmation run `20261008-193918-8cc9` (model fault, d):
+
+- e19 to e80: the model sent the same compare_two_groups call on current health (paired=true, test=t) six times. The answers file overrode it each time to the unpaired Mann-Whitney test (p 5.8e-05). The model never ran fit_mixed_model and never tested general health. The harness repeat notice exists for calculate, not for this tool.
+- e88: the answer gives the current-health p (5.8e-05) as the general-health p.
+- e86, e87: the two referee findings are correct (a rank test does not model the repeated ratings; the general-health p is not logged). The run did not exercise the fixes: no mixed model, no table rows, no scientific notation in the answer. The blank-row fix also cannot show here, because the benchmark file has no blank rows. A second endotoxin run and the MMP-14 run were stopped (pause for the computer).

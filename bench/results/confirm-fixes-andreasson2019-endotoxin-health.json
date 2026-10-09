@@ -1,0 +1,419 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "ollama:qwen3:8b"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "andreasson2019-endotoxin-health",
+   "model": "ollama:qwen3:8b",
+   "run": 1,
+   "status": "answer",
+   "durationS": 908.162,
+   "session": "20261008-193918-8cc9",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/ollama_qwen3_8b/andreasson2019-endotoxin-health/run1/home/sessions/20261008-193918-8cc9",
+   "answer": "The Mann-Whitney U test was incorrectly used for paired data, which is inappropriate. The correct approach is to use a paired test, such as a paired t-test, to compare the current health ratings of the same subjects before and after the LPS injection. However, the data provided does not include pre-injection ratings, so a paired test cannot be performed. \n\nGiven the data, the Mann-Whitney U test results indicate that the current health rating for the LPS group (1) is significantly lower than the placebo group (0) with a mean difference of -0.8666, a p-value of 0.00005846, and an alpha of 0.05. This indicates that LPS made current health worse compared to placebo. \n\nFor the general health rating at 90 minutes, the p-value is 0.00005846, which is also significant at the 0.05 level. This suggests that general health is worse after LPS than after placebo. \n\nThe final answer includes the p-value for the general health rating at 90 minutes, which is 0.00005846.\n\nStep results that the answer does not mention, from the record:\n- n1 inspect_table: 151 rows x 10 columns.\n- n2 inspect_table: 48 rows x 10 columns.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Paired test: false · Test family for two groups: wilcoxon · Assume equal variances (unpaired t-test): false · Sidedness: two-sided.",
+   "items": [
+    {
+     "key": "n_ratings",
+     "description": "Current health ratings in the model",
+     "expected": 151,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 88,
+      "text": null
+     }
+    },
+    {
+     "key": "n_subjects",
+     "description": "Subjects in the model",
+     "expected": 52,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 88,
+      "text": null
+     }
+    },
+    {
+     "key": "intercept",
+     "description": "Intercept (placebo at baseline)",
+     "expected": 6.238,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.05,
+      "diff": 6.188000000000001,
+      "via": null,
+      "node": "n9",
+      "claimEntry": 88,
+      "text": "For the general health rating at 90 minutes, the p-value is 0.00005846, which is also significant at the 0.05 level."
+     }
+    },
+    {
+     "key": "coef_lps",
+     "description": "LPS at baseline",
+     "expected": 0.02,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.00005846,
+      "diff": 0.01994154,
+      "via": null,
+      "node": "n9",
+      "claimEntry": 88,
+      "text": "Given the data, the Mann-Whitney U test results indicate that the current health rating for the LPS group (1) is significantly lower than the placebo group (0) with a mean difference of -0.8666, a p-value of 0.00005846, and an alpha of 0.05."
+     }
+    },
+    {
+     "key": "coef_time2",
+     "description": "Time 90 minutes, placebo",
+     "expected": -0.619,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
+     },
+     "reported": {
+      "pass": false,
+      "value": -0.8666,
+      "diff": 0.24760000000000004,
+      "via": null,
+      "node": "n9",
+      "claimEntry": 88,
+      "text": "Given the data, the Mann-Whitney U test results indicate that the current health rating for the LPS group (1) is significantly lower than the placebo group (0) with a mean difference of -0.8666, a p-value of 0.00005846, and an alpha of 0.05."
+     }
+    },
+    {
+     "key": "coef_time3",
+     "description": "Time 270 minutes, placebo",
+     "expected": -0.218,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.00005846,
+      "diff": 0.21805846,
+      "via": null,
+      "node": "n9",
+      "claimEntry": 88,
+      "text": "Given the data, the Mann-Whitney U test results indicate that the current health rating for the LPS group (1) is significantly lower than the placebo group (0) with a mean difference of -0.8666, a p-value of 0.00005846, and an alpha of 0.05."
+     }
+    },
+    {
+     "key": "coef_lps_time2",
+     "description": "LPS by 90 minutes interaction",
+     "expected": -1.786,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
+     },
+     "reported": {
+      "pass": false,
+      "value": -0.8666,
+      "diff": 0.9194,
+      "via": null,
+      "node": "n9",
+      "claimEntry": 88,
+      "text": "Given the data, the Mann-Whitney U test results indicate that the current health rating for the LPS group (1) is significantly lower than the placebo group (0) with a mean difference of -0.8666, a p-value of 0.00005846, and an alpha of 0.05."
+     }
+    },
+    {
+     "key": "coef_lps_time3",
+     "description": "LPS by 270 minutes interaction",
+     "expected": -0.906,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
+     },
+     "reported": {
+      "pass": false,
+      "value": -0.8666,
+      "diff": 0.03939999999999999,
+      "via": null,
+      "node": "n9",
+      "claimEntry": 88,
+      "text": "Given the data, the Mann-Whitney U test results indicate that the current health rating for the LPS group (1) is significantly lower than the placebo group (0) with a mean difference of -0.8666, a p-value of 0.00005846, and an alpha of 0.05."
+     }
+    },
+    {
+     "key": "se_lps_time2",
+     "description": "SE of the LPS by 90 minutes interaction, random intercept, ML",
+     "expected": 0.3157,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": null,
+      "diff": null,
+      "node": null,
+      "path": null,
+      "entry": null
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 88,
+      "text": null
+     }
+    },
+    {
+     "key": "mannwhitney_p",
+     "description": "Mann-Whitney p, general health at 90 minutes",
+     "expected": 0.00416,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": 0.00005845689526790912,
+      "diff": 0.00410154310473209,
+      "node": "n3",
+      "path": "metrics.p_value",
+      "entry": 33
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.00005846,
+      "diff": 0.00410154,
+      "via": null,
+      "node": "n9",
+      "claimEntry": 88,
+      "text": "Given the data, the Mann-Whitney U test results indicate that the current health rating for the LPS group (1) is significantly lower than the placebo group (0) with a mean difference of -0.8666, a p-value of 0.00005846, and an alpha of 0.05."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 11,
+    "inputTokens": 92204,
+    "outputTokens": 1091,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 9,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 0,
+     "warning": 0,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 11,
+    "overwritten": 11,
+    "nodes": 9
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/ollama_qwen3_8b/andreasson2019-endotoxin-health/run1/home/sessions/20261008-193918-8cc9/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/andreasson2019-endotoxin-health",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/ollama_qwen3_8b/andreasson2019-endotoxin-health/run1",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.guided-analysis/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/andreasson2019-endotoxin-health/endotoxin_exp2_current.csv",
+     "/Volumes/T7/guided-analysis/data/andreasson2019-endotoxin-health/endotoxin_exp2_general.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/confirm-fixes-andreasson2019-endotoxin-health.md",
+  "json": "bench/results/confirm-fixes-andreasson2019-endotoxin-health.json"
+ },
+ "summary": {
+  "cells": {
+   "andreasson2019-endotoxin-health": {
+    "ollama:qwen3:8b": {
+     "computed": 0,
+     "computedOf": 10,
+     "reported": 0,
+     "reportedOf": 7,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "ollama:qwen3:8b": {
+    "computed": 0,
+    "computedOf": 10,
+    "reported": 0,
+    "reportedOf": 7,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "ollama:qwen3:8b": {
+    "runs": 1,
+    "durationS": 908.162,
+    "requests": 11,
+    "inputTokens": 92204,
+    "outputTokens": 1091,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 9,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings_info": 0,
+    "findings_warning": 0,
+    "findings_error": 2,
+    "unsourced": 0,
+    "deviations": 11,
+    "overwritten": 11,
+    "nodes": 9
+   }
+  },
+  "skipped": []
+ }
+}
