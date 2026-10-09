@@ -46,5 +46,5 @@ get "cells/P30_Calb1_DG_11_cell2.pxp" 54585434 e30d718faf728f59db637ba48a1af5943
 get "cells/P30_Calb1_DG_11_cell3.pxp" 54585437 921984fbdb9745c6bfbe639f07e7f6f2d7daebf48f74dea6fc7af51b9e416dd4
 get "cells/P30_Calb1_DG_12_cell1.pxp" 54585440 2fc0f3229d9109b938d4db3be199bdae8e0f427fb6202d29205ba61f03ef5ae6
 get "cells/P30_Calb1_DG_12_cell2.pxp" 54585443 a5590f852700fc5799fc1a42bef4a4df92dc463337fb84093c3b3ee07f1f89ab
-awk -F, 'NR == 1 { print "cell,animal,group"; next } $1 == "P30 Calb1 DG" { a = $3; c = $4; gsub(/ /, "_", a); print a "_" c "," a "," $2 }' phys_metadata.csv > cells_metadata.csv
+awk -F, 'NR == 1 { print "cell,animal,group"; next } $1 == "P30 Calb1 DG" { a = $3; c = $4; gsub(/\r/, "", c); gsub(/ /, "_", a); print a "_" c "," a "," $2 }' phys_metadata.csv > cells_metadata.csv
 [ "$(wc -l < cells_metadata.csv | tr -d " ")" = "33" ] || { echo "metadata must list 32 cells" >&2; exit 1; }

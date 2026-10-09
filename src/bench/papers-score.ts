@@ -72,6 +72,26 @@ export function finalClaims(record: Pick<AnalysisRecord, "entries">): { entry: E
   return entry ? { entry, claims: (entry.data.claims ?? []) as Claim[] } : undefined;
 }
 
+export function computedFault(i: Pick<ItemScore, "expected" | "tolerance" | "abs" | "computed">): string | undefined {
+  const c = i.computed;
+  if (c.value === null) return c.diff !== null || c.pass ? "no value, but a difference or a pass" : undefined;
+  if (c.diff === null) return "a value without a difference";
+  const d = Math.abs((i.abs ? Math.abs(c.value) : c.value) - i.expected);
+  if (Math.abs(d - c.diff) > 1e-9 * Math.max(1, d)) return `value ${c.value} is ${d} from ${i.expected}, but diff is ${c.diff}`;
+  const limit = i.tolerance === "exact" ? 0 : i.tolerance;
+  if (c.pass !== d <= limit + EPS * Math.max(1, Math.abs(i.expected))) return `pass is ${c.pass} for diff ${c.diff} and tolerance ${i.tolerance}`;
+  return undefined;
+}
+
+export function checkComputed(items: ItemScore[]): ItemScore[] {
+  const faults = items.flatMap((i) => {
+    const f = computedFault(i);
+    return f ? [`${i.key}: ${f}`] : [];
+  });
+  if (faults.length) throw new Error(`computed score does not match its own value:\n${faults.join("\n")}`);
+  return items;
+}
+
 export function scoreComputed(item: PaperItem, record: Pick<AnalysisRecord, "numbers" | "nodes" | "node">): ComputedMatch {
   const nodes = record.nodes();
   const comparison = new Set(nodes.filter((n) => n.sensitivityOf).map((n) => n.id));
@@ -87,8 +107,8 @@ export function scoreComputed(item: PaperItem, record: Pick<AnalysisRecord, "num
   }
   const useComp = comp && within(item, comp.d) && !(main && within(item, main.d));
   const best = useComp ? comp : main ?? comp;
-  if (!best) return { pass: false, value: null, diff: null, node: null, path: null, entry: null };
-  return {
+  if (!best) return Object.freeze({ pass: false, value: null, diff: null, node: null, path: null, entry: null });
+  return Object.freeze({
     pass: within(item, best.d),
     via: within(item, best.d) ? (useComp || best === comp ? "comparison" : "main") : undefined,
     value: best.n.value,
@@ -96,7 +116,7 @@ export function scoreComputed(item: PaperItem, record: Pick<AnalysisRecord, "num
     node: best.n.node,
     path: best.n.path,
     entry: record.node(best.n.node)?.entry ?? null,
-  };
+  });
 }
 
 function reportedSteps(c: Claim): { value: number; step: number }[] {
@@ -140,7 +160,7 @@ export function scoreReported(item: PaperItem, found: { entry: Entry; claims: Cl
 export function scoreItems(items: PaperItem[], record: Pick<AnalysisRecord, "numbers" | "nodes" | "node" | "entries">): ItemScore[] {
   const claims = finalClaims(record);
   const answer = modelAnswer(String(finalAnswer(record)?.data.text ?? ""));
-  return items.filter((item) => !item.trap && !item.optional).map((item) => ({
+  return checkComputed(items.filter((item) => !item.trap && !item.optional).map((item) => ({
     key: item.key,
     description: item.description,
     expected: item.value,
@@ -150,7 +170,7 @@ export function scoreItems(items: PaperItem[], record: Pick<AnalysisRecord, "num
     reference: item.reference,
     computed: scoreComputed(item, record),
     reported: scoreReported(item, claims, answer),
-  }));
+  })));
 }
 
 export function processMetrics(record: Pick<AnalysisRecord, "entries" | "nodes">): ProcessMetrics {
@@ -196,7 +216,7 @@ export function modelAnswer(text: string): string {
 export function rescoreItems(items: PaperItem[], record: AnalysisRecord): ItemScore[] {
   const final = finalAnswer(record);
   const found = final ? { entry: final, claims: checkAnswer(modelAnswer(String(final.data.text ?? "")), { numbers: () => record.numbers(), nodes: () => record.nodes(), stale: () => record.stale(), entries: () => [], append: () => final } as never) } : undefined;
-  return items.filter((item) => !item.trap && !item.optional).map((item) => ({
+  return checkComputed(items.filter((item) => !item.trap && !item.optional).map((item) => ({
     key: item.key,
     description: item.description,
     expected: item.value,
@@ -206,5 +226,5 @@ export function rescoreItems(items: PaperItem[], record: AnalysisRecord): ItemSc
     reference: item.reference,
     computed: scoreComputed(item, record),
     reported: scoreReported(item, found, modelAnswer(String(final?.data.text ?? ""))),
-  }));
+  })));
 }

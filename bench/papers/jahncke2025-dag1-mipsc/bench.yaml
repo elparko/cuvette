@@ -27,8 +27,8 @@ data:
   - jahncke2025-dag1-mipsc/cells
   - jahncke2025-dag1-mipsc/cells_metadata.csv
 items:
-  - {key: n_cells_ctrl, description: "Control cells", value: 16, exact: true, tool: detect_events_for_cells}
-  - {key: n_cells_cko, description: "cKO cells", value: 16, exact: true, tool: detect_events_for_cells}
+  - {key: n_cells_ctrl, description: "Control cells", value: 16, exact: true, tool: compare_cell_groups}
+  - {key: n_cells_cko, description: "cKO cells", value: 16, exact: true, tool: compare_cell_groups}
   - {key: n_animals_per_group, description: "Animals in each group", value: 6, exact: true, tool: compare_cell_groups}
   - {key: p_frequency, description: "p value of the mIPSC frequency, cKO against Ctrl, cells as observations (the paper prints 0.018; the tolerance covers a different detection method)", value: 0.018, tolerance: 0.015, tool: compare_cell_groups}
   - {key: p_amplitude, description: "p value of the mIPSC amplitude, cKO against Ctrl, cells as observations (the paper prints 0.017)", value: 0.017, tolerance: 0.015, tool: compare_cell_groups}

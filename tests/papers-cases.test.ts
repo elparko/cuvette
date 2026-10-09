@@ -1,11 +1,23 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { buildCases, caseGaps, listedHashes, loadCase, makeSanitizer, sourceText } from "../src/bench/papers-cases.ts";
+import { computedFault, type ItemScore } from "../src/bench/papers-score.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
+
+test("in every committed result file, the value, diff and pass of each computed item agree", () => {
+  const dir = join(__dirname, "../bench/results");
+  const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+  expect(files.length).toBeGreaterThan(0);
+  for (const f of files) {
+    const result = JSON.parse(readFileSync(join(dir, f), "utf8")) as { runs?: { paper: string; items?: ItemScore[] }[] };
+    for (const run of result.runs ?? [])
+      for (const i of run.items ?? []) expect(computedFault(i), `${f} ${run.paper} ${i.key}`).toBeUndefined();
+  }
+});
 
 test("every paper has a case.yaml that covers each answer and each item", () => {
   const ids = paperIds();

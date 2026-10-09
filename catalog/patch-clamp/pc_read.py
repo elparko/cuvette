@@ -129,12 +129,9 @@ def _read_neo(path, channel, signal_unit=None):
     sweeps = []
     mode, unit, cunit = None, None, None
     rate = None
-    for seg in block.segments:
-        if not seg.analogsignals:
-            continue
-        sig = seg.analogsignals[0]
+    for sig in (s for seg in block.segments for s in seg.analogsignals):
         if channel >= sig.shape[1]:
-            raise ValueError("channel %d does not exist in %s. The first signal has %d channel(s)." % (channel, os.path.basename(path), sig.shape[1]))
+            raise ValueError("channel %d does not exist in %s. The signal has %d channel(s)." % (channel, os.path.basename(path), sig.shape[1]))
         raw_unit = str(sig.units.dimensionality)
         m, k, un = _scale(signal_unit if signal_unit else raw_unit)
         if m is None:

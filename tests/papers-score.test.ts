@@ -5,7 +5,7 @@ import { beforeEach, expect, test } from "vitest";
 import { checkAnswer } from "../src/core/claims.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import type { NodeIn } from "../src/core/types.ts";
-import { processMetrics, scoreItems } from "../src/bench/papers-score.ts";
+import { checkComputed, processMetrics, scoreItems } from "../src/bench/papers-score.ts";
 import type { PaperItem } from "../src/bench/papers-spec.ts";
 
 let record: AnalysisRecord;
@@ -27,6 +27,35 @@ function answer(text: string) {
   checkAnswer(text, record);
   record.append("assistant", { text, final: true });
 }
+
+test("the computed value and diff of each item belong to that item, also when items share a tool and a node", () => {
+  node({ metrics: { min_p: 0.01246 }, table: { rows: [[16, 16], [40.22686, 55.6]] } }, { tool: "cmp" });
+  const items = [
+    item({ key: "n_ctrl", value: 16, exact: true, tool: "cmp" }),
+    item({ key: "p", value: 0.018, tolerance: 0.015, tool: "cmp" }),
+    item({ key: "amp", value: 38.3, tolerance: 6, tool: "cmp" }),
+  ];
+  const scores = scoreItems(items, record);
+  expect(scores.map((s) => [s.computed.value, s.computed.pass])).toEqual([[16, true], [0.01246, true], [40.22686, true]]);
+  expect(scores.map((s) => s.computed.diff!.toFixed(5))).toEqual(["0.00000", "0.00554", "1.92686"]);
+});
+
+test("a computed match cannot change after scoring", () => {
+  node({ mean: 1.6 });
+  const [s] = scoreItems([item({ key: "mean", value: 1.58, tolerance: 0.5 })], record);
+  expect(() => {
+    s.computed.value = 99;
+  }).toThrow();
+});
+
+test("checkComputed fails when value and diff do not agree, or when pass does not follow the diff", () => {
+  node({ mean: 1.6, other: 40.2 });
+  const [s] = scoreItems([item({ key: "mean", value: 1.58, tolerance: 0.5 })], record);
+  expect(checkComputed([s])).toEqual([s]);
+  expect(() => checkComputed([{ ...s, computed: { ...s.computed, value: 40.2 } }])).toThrow(/mean: value 40.2 is/);
+  expect(() => checkComputed([{ ...s, computed: { ...s.computed, pass: false } }])).toThrow(/mean: pass is false/);
+  expect(() => checkComputed([{ ...s, computed: { ...s.computed, value: null } }])).toThrow(/mean: no value/);
+});
 
 test("computed passes when a logged number is within tolerance and names the node and entry", () => {
   const n = node({ stats: { mean: 1.5801, p: 0.0031 } });
