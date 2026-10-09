@@ -5,13 +5,15 @@ Each cell: computed passes / reported passes. Computed: a logged number is withi
 
 | Model | Computed | Reported | Runs | Not answered |
 | --- | --- | --- | --- | --- |
-| claude:claude-haiku-5-5 | 9/9 | 9/9 | 1 | 0 |
+| claude:claude-haiku-5-5 | 34/45 | 28/40 | 3 | 0 |
 
 ## Matrix
 
 | Paper | claude:claude-haiku-5-5 |
 | --- | --- |
-| elmasri2026-limit-maaslin2 | 9/9 / 9/9 |
+| wang2023-cuproptosis-oa | 13/14 / 12/13 |
+| chure2024-hplc-py | 7/12 / 6/11 |
+| oreshkova2024-qmp-honeybee | 14/19 / 10/16 |
 
 ## Process metrics
 
@@ -19,11 +21,11 @@ Sums over all runs of a model.
 
 | Model | runs | seconds | requests | input tokens | output tokens | cache read | tool calls | failed calls | nudges | plan reminders | revisions | info | warning | error | unsourced | deviations | overwritten |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| claude:claude-haiku-5-5 | 1 | 308 | 33 | 76 | 38562 | 1194640 | 33 | 2 | 0 | 1 | 1 | 2 | 8 | 9 | 1 | 2 | 2 |
+| claude:claude-haiku-5-5 | 3 | 640 | 42 | 100 | 79175 | 1211186 | 42 | 25 | 0 | 2 | 3 | 9 | 39 | 10 | 4 | 0 | 0 |
 
 Estimated Claude cost from the token counts (list prices, before any discount):
 
-- claude:claude-haiku-5-5: $0.04 for 1 runs
+- claude:claude-haiku-5-5: $0.07 for 3 runs
 
 ## Leak check
 
@@ -33,26 +35,81 @@ Paths read: the paths in the tool calls and steps of the agent. Outside: paths n
 
 | Paper | Model | Run | Sandbox | Paths read | Outside | Blocked | Unsourced | Literature |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| elmasri2026-limit-maaslin2 | claude:claude-haiku-5-5 | 1 | on | 5 | 0 | 1 | 1 | 0 |
+| wang2023-cuproptosis-oa | claude:claude-haiku-5-5 | 1 | on | 2 | 0 | 0 | 0 | 0 |
+| chure2024-hplc-py | claude:claude-haiku-5-5 | 1 | on | 2 | 0 | 0 | 2 | 0 |
+| oreshkova2024-qmp-honeybee | claude:claude-haiku-5-5 | 1 | on | 2 | 0 | 2 | 2 | 0 |
 
 ## Details
 
-### elmasri2026-limit-maaslin2 | claude:claude-haiku-5-5 | run 1
+### wang2023-cuproptosis-oa | claude:claude-haiku-5-5 | run 1
 
-Status: answer. 308 s. 33 requests, 33 tool calls (2 failed), 0 nudges, 1 plan reminders, 1 unsourced.
-Session: 20261009-035258-57f6. Record: /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/elmasri2026-limit-maaslin2/run1/home/sessions/20261009-035258-57f6/log.jsonl
-Leak check: 5 paths read, 0 outside the allow list, 1 blocked, 1 unsourced claims, 0 literature claims. Cwd: /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/elmasri2026-limit-maaslin2/run1/home/sessions/20261009-035258-57f6/work.
+Status: answer. 91 s. 6 requests, 6 tool calls (5 failed), 0 nudges, 0 plan reminders, 0 unsourced.
+Session: 20261008-234244-0a03. Record: /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run1/home/sessions/20261008-234244-0a03/log.jsonl
+Leak check: 2 paths read, 0 outside the allow list, 0 blocked, 0 unsourced claims, 0 literature claims. Cwd: /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run1/home/sessions/20261008-234244-0a03/work.
 
 | Item | Expected | Computed | Reported |
 | --- | --- | --- | --- |
-| samples_in_study | 168 exact | pass 168 (n1 metrics.n_samples, entry 11) | pass 168 via tolerance (n17, claim check 378) |
-| samples_in_model | 132 exact | pass 132 (n7 metrics.n_samples, entry 120) | pass 132 via tolerance (n20, claim check 378) |
-| significant_otus | 1 exact | pass 1 (n7 metrics.n_significant, entry 120) | pass 1 via tolerance (n20, claim check 378) |
-| top_q | 0.043 ±0.0005 | pass 0.04264705 (n7 metrics.min_q, entry 120) | pass 0.042647 via tolerance (n15, claim check 378) |
-| top_otu_samples | 7 exact | pass 7 (n7 table.rows[0][8], entry 120) | pass 7 via tolerance (n18, claim check 378) |
-| otus_tested (reference) | 65 exact | match 65 (n7 metrics.n_features_tested, entry 120) | match 65 via tolerance (n23, claim check 378) |
-| shannon_gwg_p | 0.9917 ±0.005 | pass 0.9916617 (n8 metrics.test_p, entry 141) | pass 0.9917 via tolerance (n10, claim check 378) |
-| permanova_gwg_r2 | 0.0104 ±0.0005 | pass 0.01040327 (n14 metrics.r2, entry 224) | pass 0.0104 via tolerance (n20, claim check 378) |
-| permanova_gwg_f | 0.678 ±0.005 | pass 0.6780651 (n14 metrics.f, entry 224) | pass 0.678 via tolerance (n20, claim check 378) |
-| permanova_gwg_p | 0.91 ±0.06 | pass 0.904 (n14 metrics.p, entry 224) | pass 0.904 via tolerance (n20, claim check 378) |
+| overlap_1 | 3 exact | FAIL 0.989 (n1 data.duration_s, entry 29) | FAIL 1 (n1, claim check 96) |
+| set_size_1 | 1578 exact | pass 1578 (n1 stdout, entry 29) | pass 1578 via tolerance (n1, claim check 96) |
+| p_value_1 | 0.0018453476993364856 ±0.000001 | pass 0.001845 (n1 stdout, entry 29) | pass 0.001845 via tolerance (n1, claim check 96) |
+| p_adjusted_1 | 0.11186607610867805 ±0.00001 | pass 0.111867 (n1 stdout, entry 29) | pass 0.111867 via tolerance (n1, claim check 96) |
+| odds_ratio_1 | 35.08761904761905 ±0.001 | pass 35.08762 (n1 stdout, entry 29) | pass 35.08762 via tolerance (n1, claim check 96) |
+| set_size_2 | 24 exact | pass 24 (n1 stdout, entry 29) | pass 24 via tolerance (n1, claim check 96) |
+| p_value_2 | 0.004791660011821214 ±0.000001 | pass 0.004792 (n1 stdout, entry 29) | pass 0.004792 via tolerance (n1, claim check 96) |
+| set_size_3 | 30 exact | pass 30 (n1 stdout, entry 29) | pass 30 via tolerance (n1, claim check 96) |
+| p_value_3 | 0.0059868860535258585 ±0.000001 | pass 0.005987 (n1 stdout, entry 29) | pass 0.005987 via tolerance (n1, claim check 96) |
+| set_size_4 | 649 exact | pass 649 (n1 stdout, entry 29) | pass 649 via tolerance (n1, claim check 96) |
+| p_value_4 | 0.0060396749482483575 ±0.000001 | pass 0.00604 (n1 stdout, entry 29) | pass 0.00604 via tolerance (n1, claim check 96) |
+| set_size_5 | 37 exact | pass 37 (n1 stdout, entry 29) | pass 37 via tolerance (n1, claim check 96) |
+| p_value_5 | 0.007379956522320185 ±0.000001 | pass 0.00738 (n1 stdout, entry 29) | pass 0.00738 via tolerance (n1, claim check 96) |
+| n_sets_tested | 4026 exact | pass 4026 (n2 stdout, entry 74) | not asked |
+
+### chure2024-hplc-py | claude:claude-haiku-5-5 | run 1
+
+Status: answer. 296 s. 21 requests, 21 tool calls (8 failed), 0 nudges, 1 plan reminders, 2 unsourced.
+Session: 20261008-234416-bd6c. Record: /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/chure2024-hplc-py/run1/home/sessions/20261008-234416-bd6c/log.jsonl
+Leak check: 2 paths read, 0 outside the allow list, 0 blocked, 2 unsourced claims, 0 literature claims. Cwd: /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/chure2024-hplc-py/run1/home/sessions/20261008-234416-bd6c/work.
+
+| Item | Expected | Computed | Reported |
+| --- | --- | --- | --- |
+| n_peaks | 6 exact | FAIL 4.087477 (n2 stdout, entry 75) | FAIL 4 (n2, claim check 222) |
+| peak1_retention_time | 10.9 ±0.005 | pass 10.903 (n3 stdout, entry 84) | pass 10.903 via tolerance (n9, claim check 222) |
+| peak1_area | 2800000 ±50000 | pass 2790511 (n3 stdout, entry 84) | pass 2790511 via tolerance (n3, claim check 222) |
+| peak1_amplitude | 23000 ±500 | pass 23245 (n3 stdout, entry 84) | FAIL 13519 (n7, claim check 222) |
+| peak1_scale | 0.16 ±0.005 | pass 0.158 (n3 stdout, entry 84) | pass 0.158 via tolerance (n9, claim check 222) |
+| peak1_skew | 0.7 ±0.005 | FAIL 0.689 (n3 stdout, entry 84) | FAIL 0.689 (n9, claim check 222) |
+| peak3_retention_time | 14.45 ±0.005 | pass 14.448 (n3 stdout, entry 84) | pass 14.448 via tolerance (n9, claim check 222) |
+| peak1_area_exact | 2805655.43 ±300 | FAIL 2790511 (n3 stdout, entry 84) | not asked |
+| calibration_slope | 156586.74 ±160 | FAIL 155993.4 (n7 stdout, entry 137) | FAIL 155993.4 (n7, claim check 222) |
+| calibration_intercept | 14624.94 ±150 | FAIL 14880.3 (n3 stdout, entry 84) | FAIL 13519 (n7, claim check 222) |
+| calibration_r_squared | 0.99887 ±0.00005 | pass 0.99887 (n7 stdout, entry 137) | pass 0.99887 via tolerance (n7, claim check 222) |
+| unknown_concentration | 1.8994 ±0.005 | pass 1.899 (n7 stdout, entry 137) | pass 1.899 via tolerance (n8, claim check 222) |
+
+### oreshkova2024-qmp-honeybee | claude:claude-haiku-5-5 | run 1
+
+Status: answer. 253 s. 15 requests, 15 tool calls (12 failed), 0 nudges, 1 plan reminders, 2 unsourced.
+Session: 20261008-234912-2395. Record: /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-234912-2395/log.jsonl
+Leak check: 2 paths read, 0 outside the allow list, 2 blocked, 2 unsourced claims, 0 literature claims. Cwd: /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-234912-2395/work.
+
+| Item | Expected | Computed | Reported |
+| --- | --- | --- | --- |
+| protein_f_age | 35.693 ±0.001 | pass 35.6928 (n1 stdout, entry 63) | pass 35.69 via rounding (n3, claim check 154) |
+| protein_f_treatment | 0.032 ±0.0005 | pass 0.0315645 (n1 stdout, entry 63) | pass 0.0316 via tolerance (n3, claim check 154) |
+| protein_f_replicate | 36 ±0.001 | pass 35.9995 (n1 stdout, entry 63) | pass 36 via tolerance (n3, claim check 154) |
+| protein_p_age | 1.356e-7 ±1e-7 | pass 1.35605e-7 (n1 stdout, entry 63) | not asked |
+| protein_p_treatment | 0.8596 ±0.0001 | pass 0.859585 (n1 stdout, entry 63) | pass 0.86 via rounding (n3, claim check 154) |
+| protein_f_age_x_treatment | 1.057 ±0.001 | pass 1.05665 (n1 stdout, entry 63) | pass 1.057 via tolerance (n3, claim check 154) |
+| protein_f_age_x_replicate | 2.809 ±0.001 | pass 2.80851 (n1 stdout, entry 63) | pass 2.809 via tolerance (n3, claim check 154) |
+| protein_df_residual | 60 exact | pass 60 (n1 stdout, entry 63) | not asked |
+| acini_f_age | 27.78 ±0.001 | FAIL 27.2445 (n1 stdout, entry 63) | FAIL 26.18 (n3, claim check 154) |
+| acini_f_treatment | 29.156 ±0.001 | FAIL 28.9676 (n1 stdout, entry 63) | FAIL 26.18 (n3, claim check 154) |
+| acini_f_replicate | 6.853 ±0.001 | FAIL 6.87311 (n1 stdout, entry 63) | FAIL 5.98 (n3, claim check 154) |
+| acini_p_replicate | 0.00209 ±0.00001 | FAIL 0.00205279 (n1 stdout, entry 63) | FAIL 0.000071 (n2, claim check 154) |
+| acini_f_three_way | 4.457 ±0.001 | pass 4.4572 (n1 stdout, entry 63) | FAIL 4.235 (n2, claim check 154) |
+| acini_p_three_way | 0.01568 ±0.00001 | pass 0.0156762 (n1 stdout, entry 63) | FAIL 0.00752 (n3, claim check 154) |
+| fas_kruskal_chi2 | 9.3498 ±0.0001 | pass 9.3498 (n2 stdout, entry 94) | pass 9.35 via rounding (n2, claim check 154) |
+| fas_kruskal_df | 3 exact | FAIL 3.0047 (n2 stdout, entry 94) | not asked |
+| fas_kruskal_p | 0.02498 ±0.00001 | pass 0.0249839 (n2 stdout, entry 94) | pass 0.025 via rounding (n2, claim check 154) |
+| fas_dunn_padj | 0.0397 ±0.0001 | pass 0.039693 (n2 stdout, entry 94) | pass 0.04 via rounding (n3, claim check 154) |
+| fas_replicate_chi2 | 23.87 ±0.005 | pass 23.8701 (n2 stdout, entry 94) | pass 23.87 via tolerance (n2, claim check 154) |
 
