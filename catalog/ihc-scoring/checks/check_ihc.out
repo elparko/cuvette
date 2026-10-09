@@ -1,0 +1,40 @@
+Shrout and Fleiss 1979 Table 2, pingouin 0.7.0. Published: ICC1 .17, ICC2 .29, ICC3 .71, ICC1k .44, ICC2k .62, ICC3k .91
+shrout_ICC1 = 0.165742 [-0.13, 0.72]
+shrout_ICC2 = 0.289764 [0.02, 0.76]
+shrout_ICC3 = 0.714841 [0.34, 0.95]
+shrout_ICC1k = 0.442797 [-0.88, 0.91]
+shrout_ICC2k = 0.620051 [0.07, 0.93]
+shrout_ICC3k = 0.909316 [0.68, 0.99]
+pix_rows_h_differs_by_more_than_1 = 5T4 01-0723 1-2 (printed 135, bins 220); P-cadherin F00082457 (printed 132, bins 300); P-cadherin F00082458 (printed 113, bins 131.6); P-cadherin F00082460 (printed 139, bins 113.2)
+spearman_5T4_pathologist_qupath = 0.789337 p=0.000021 n=21
+spearman_5T4_pathologist_halo = 0.749676
+spearman_P-cadherin_pathologist_qupath = 0.392301 p=0.032016 n=30
+spearman_P-cadherin_pathologist_halo = 0.495105
+spearman_PD-L1_pathologist_qupath = 0.739347 p=0.000037 n=24
+spearman_PD-L1_pathologist_halo = 0.701264
+kappa_pcad_linear = 0.018182
+kappa_pcad_quadratic = 0.010989
+kappa_pcad_None = 0.027027
+exact_agreement_pcad = 0.200000
+icc_pcad_ICC1 = -0.209057 [-0.52, 0.16]
+icc_pcad_ICC2 = 0.149255 [-0.09, 0.44]
+icc_pcad_ICC3 = 0.366459 [0.01, 0.64]
+icc_pcad_ICC2k = 0.259741 [-0.20, 0.61]
+pcad_mean_difference = 115.154978 sd 75.434556
+icc_5t4_three_raters_ICC3 = 0.685881 [0.47, 0.84]
+icc_5t4_three_raters_ICC3k = 0.867559 [0.73, 0.94]
+cells_slideA_whole = n=200 counts=[130, 24, 23, 23] H=69.500000 positive=35.000000 ki67=35.000000 allred_predominant=5 allred_average=6
+cells_slideA_Tumor = n=184 counts=[118, 22, 22, 22] H=71.739130 positive=35.869565 ki67=35.869565 allred_predominant=7 allred_average=6
+cells_slideB_whole = n=60 counts=[48, 1, 5, 6] H=48.333333 positive=20.000000 ki67=20.000000 allred_predominant=6 allred_average=5
+cells_slideB_Tumor = n=60 counts=[48, 1, 5, 6] H=48.333333 positive=20.000000 ki67=20.000000 allred_predominant=6 allred_average=5
+hotspot_slideA_tumor_side100_min40 = index=75.000000 n=40 x0=105 y0=100
+synthetic_image_mean_dab_class_0 = 0.051655 (design 0.05)
+synthetic_image_mean_dab_class_1 = 0.298050 (design 0.30)
+synthetic_image_mean_dab_class_2 = 0.497227 (design 0.50)
+synthetic_image_mean_dab_class_3 = 0.795204 (design 0.80)
+synthetic_image_region_mean_dab = 0.025166
+synthetic_image_region_mean_hematoxylin = 0.036893
+skimage_ihc_shape = (512, 512, 3)
+skimage_ihc_region_mean_dab = 0.342326
+skimage_ihc_region_mean_hematoxylin = 0.085364
+skimage_ihc_fraction_dab_od_at_least_0.2 = 0.582245

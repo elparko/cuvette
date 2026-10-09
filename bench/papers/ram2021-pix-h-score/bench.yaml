@@ -1,0 +1,28 @@
+adapters:
+  - ihc-scoring
+prompt: |
+  A pathologist scored three membrane markers (P-cadherin, PD-L1 and 5T4) by H-score on tumor resections. The file {data}/ram2021-pix-h-score/pix_h_score_table.csv has one row for each case. The columns are marker, case_id, pct_0, pct_1, pct_2 and pct_3 (the percent of tumor cells that the pathologist put at 0, 1+, 2+ and 3+), pathologist_h (the pathologist H-score), transcript (mRNA level), h_qupath (the H-score from QuPath) and h_halo (the H-score from HALO), and more columns that you do not need. Give the number of cases of each marker. Compute the H-score of the PD-L1 case with case_id 1 from its four percents. For each of the three markers, give the Spearman correlation of pathologist_h with h_qupath and of pathologist_h with h_halo. For the P-cadherin cases, give the weighted kappa (quadratic weights, three categories with cut points at 100 and 200) and the intraclass correlation ICC(2,1) of pathologist_h and h_qupath. Write every number in your final answer text.
+answers:
+  scoring_region: whole
+  min_cells: 0
+  kappa_weights: quadratic
+  icc_form: ICC2
+  kappa_cutpoints: "100,200"
+  "*": Use the values in the decision record.
+allow: all
+timeout_s: 1800
+data:
+  - ram2021-pix-h-score/pix_h_score_table.csv
+items:
+  - {key: n_pcad, description: "Cases scored for P-cadherin", value: 30, exact: true, tool: compare_scorers}
+  - {key: n_pdl1, description: "Cases scored for PD-L1", value: 24, exact: true, tool: compare_scorers}
+  - {key: n_5t4, description: "Cases scored for 5T4", value: 21, exact: true, tool: compare_scorers}
+  - {key: h_pdl1_case1, description: "H-score of PD-L1 case 1 from its percents (0, 20, 75 and 5 percent at 0, 1+, 2+, 3+)", value: 185, tolerance: 0.5, tool: score_h_score}
+  - {key: rho_pcad_qupath, description: "Spearman rho, P-cadherin, pathologist H-score and QuPath H-score", value: 0.39, tolerance: 0.01, tool: compare_scorers}
+  - {key: rho_pcad_halo, description: "Spearman rho, P-cadherin, pathologist H-score and HALO H-score", value: 0.5, tolerance: 0.01, tool: compare_scorers}
+  - {key: rho_pdl1_qupath, description: "Spearman rho, PD-L1, pathologist H-score and QuPath H-score", value: 0.74, tolerance: 0.01, tool: compare_scorers}
+  - {key: rho_pdl1_halo, description: "Spearman rho, PD-L1, pathologist H-score and HALO H-score (the paper prints 0.69, the data give 0.701)", value: 0.69, tolerance: 0.015, tool: compare_scorers}
+  - {key: rho_5t4_qupath, description: "Spearman rho, 5T4, pathologist H-score and QuPath H-score", value: 0.79, tolerance: 0.01, tool: compare_scorers}
+  - {key: rho_5t4_halo, description: "Spearman rho, 5T4, pathologist H-score and HALO H-score", value: 0.75, tolerance: 0.01, tool: compare_scorers}
+  - {key: kappa_pcad_qupath, description: "Weighted kappa (quadratic, cut points 100 and 200), P-cadherin, pathologist and QuPath", value: 0.010989, tolerance: 0.001, tool: compare_scorers}
+  - {key: icc2_pcad_qupath, description: "ICC(2,1), P-cadherin, pathologist and QuPath", value: 0.149255, tolerance: 0.002, tool: compare_scorers}

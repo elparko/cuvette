@@ -1,0 +1,1034 @@
+adapter:
+  name: ihc-scoring
+  field: histology
+  file_types: [".csv", ".tsv", ".png", ".tif", ".tiff", ".jpg", ".jpeg"]
+  title: IHC scoring (H-score, Allred, Ki-67)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Scores immunohistochemistry (IHC) stains with the H-score, the Allred score and the Ki-67 labeling index. It reads a
+    cell table, such as a QuPath detection export, or a brightfield image. It measures DAB with color deconvolution. It
+    also gives weighted kappa and the intraclass correlation (ICC) between two scorers.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: scikit-image with pandas
+  version: "0.26.0"
+  tested_versions: []
+  homepage: https://scikit-image.org
+  docs:
+    - https://scikit-image.org/docs/stable/api/skimage.color.html#skimage.color.separate_stains
+    - https://scikit-image.org/docs/stable/auto_examples/color_exposure/plot_ihc_color_separation.html
+    - https://doi.org/10.1371/journal.pone.0245638
+  install: >
+    The adapter uses its own Python environment at ~/.cuvette/envs/ihc-scoring, or the Python in CUVETTE_IHC_PYTHON. Make it
+    from the pinned file of the adapter: uv venv ~/.cuvette/envs/ihc-scoring && uv pip install --python
+    ~/.cuvette/envs/ihc-scoring/bin/python -r catalog/ihc-scoring/requirements.txt
+  citation:
+    - text: "van der Walt S, Schönberger JL, Nunez-Iglesias J, Boulogne F, Warner JD, Yager N, Gouillart E, Yu T (2014). scikit-image: image processing in Python. PeerJ 2: e453."
+      doi: 10.7717/peerj.453
+    - text: "McKinney W (2010). Data structures for statistical computing in Python. Proceedings of the 9th Python in Science Conference: 56-61."
+      doi: 10.25080/Majora-92bf1922-00a
+    - text: "Virtanen P, Gommers R, Oliphant TE, et al. (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods 17: 261-272."
+      doi: 10.1038/s41592-019-0686-2
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: CUVETTE_IHC_PYTHON
+  paths:
+    - ~/.cuvette/envs/ihc-scoring/bin/python
+    - ~/.cuvette/envs/ihc-scoring/Scripts/python.exe
+    - ~/.guided-analysis/envs/ihc-scoring/bin/python
+    - ~/.cuvette/envs/science/bin/python
+    - ~/.guided-analysis/envs/science/bin/python
+  which: []
+  version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import skimage, pandas, scipy; print('ihc-scoring skimage', skimage.__version__)"]
+  version_pattern: 'skimage (\S+)'
+  identity: 'ihc-scoring skimage \d'
+
+data_rules:
+  cloud_visibility: summaries
+  note: Slide images and cell tables can come from patients. A cloud model sees scores, counts, tables and small plots. It never sees the image files.
+
+standards: ""
+
+decisions:
+  - key: replication_unit
+    label: What is the unit of replication?
+    kind: choice
+    choices: [slide or core, patient or animal, region of a slide]
+    default: patient or animal
+    group: Design
+    help: >
+      Cells in one slide are not independent samples. Compare slides, cores, patients or animals in a test. Use cells only to
+      explore.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: scoring_region
+    label: Region to score
+    kind: text
+    default: whole
+    group: Design
+    help: >
+      Write whole, a column and a value such as Class=Tumor, or box:x,y,width,height. For an image you can also write
+      mask:path of a mask image. The region sets which cells count. A score of the whole slide includes stroma and necrosis.
+      Score the tumor region if the scoring guideline asks for tumor cells.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: measure_stain_intensity, arg: region }
+      - { tool: score_h_score, arg: region }
+      - { tool: score_allred, arg: region }
+      - { tool: score_ki67, arg: region }
+
+  - key: scoring_compartment
+    label: Stain compartment to score
+    kind: choice
+    choices: [nucleus, cytoplasm, membrane, cell]
+    group: Scoring
+    help: >
+      The part of the cell where the tool reads the DAB. Use the nucleus for a nuclear antigen such as Ki-67 or the estrogen
+      receptor. Use the cytoplasm or the membrane for antigens that sit there. The cytoplasm, the membrane and the cell need a
+      cell outline.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: measure_stain_intensity, arg: compartment }
+      - { tool: score_h_score, arg: compartment }
+      - { tool: score_allred, arg: compartment }
+      - { tool: score_ki67, arg: compartment }
+
+  - key: threshold_1plus
+    label: Threshold for 1+ (DAB optical density)
+    kind: float
+    default: 0.2
+    lo: 0.01
+    hi: 5
+    group: Scoring
+    help: >
+      A cell at or above this value is 1+ (weak). A cell below it is 0. Optical density has no unit. 0.2 is the QuPath
+      default. No threshold is valid for every antibody, stain and scanner. Check the overlay with a pathologist.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: threshold_1plus }
+      - { tool: score_h_score, arg: threshold_1plus }
+      - { tool: score_allred, arg: threshold_1plus }
+    sensitivity:
+      options: [0.1, 0.2, 0.3]
+      tool: score_h_score
+      compare: [metrics.mean_h_score, metrics.mean_pct_positive]
+      max_runs: 3
+
+  - key: threshold_2plus
+    label: Threshold for 2+ (DAB optical density)
+    kind: float
+    default: 0.4
+    lo: 0.01
+    hi: 5
+    group: Scoring
+    help: A cell at or above this value and below the 3+ threshold is 2+ (moderate). 0.4 is the QuPath default. It must be above the 1+ threshold.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: threshold_2plus }
+      - { tool: score_h_score, arg: threshold_2plus }
+      - { tool: score_allred, arg: threshold_2plus }
+
+  - key: threshold_3plus
+    label: Threshold for 3+ (DAB optical density)
+    kind: float
+    default: 0.6
+    lo: 0.01
+    hi: 5
+    group: Scoring
+    help: A cell at or above this value is 3+ (strong). 0.6 is the QuPath default. It must be above the 2+ threshold.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: threshold_3plus }
+      - { tool: score_h_score, arg: threshold_3plus }
+      - { tool: score_allred, arg: threshold_3plus }
+
+  - key: min_cells
+    label: Smallest number of cells for a score
+    kind: int
+    group: Scoring
+    lo: 0
+    help: >
+      A group with fewer cells gets no score and the table says so. A score from few cells is not stable. The Ki-67 working
+      group asks for several hundred cells. Write 0 to score every group.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: score_h_score, arg: min_cells }
+      - { tool: score_allred, arg: min_cells }
+      - { tool: score_ki67, arg: min_cells }
+
+  - key: allred_intensity_rule
+    label: Allred intensity score of the positive cells
+    kind: choice
+    choices: [predominant, average]
+    group: Scoring
+    help: >
+      Allred gives one intensity score for the slide. The predominant rule takes the most common class of the positive cells.
+      A tie goes to the higher class. The average rule takes the mean class of the positive cells, rounded half up. Pathologists
+      usually give the predominant intensity.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: score_allred, arg: intensity_rule }
+
+  - key: ki67_threshold
+    label: Ki-67 positive threshold (DAB optical density)
+    kind: float
+    default: 0.2
+    lo: 0.01
+    hi: 5
+    group: Ki-67
+    help: >
+      A nucleus at or above this value is Ki-67 positive. Any visible brown nuclear stain counts as positive in the Ki-67
+      guidelines, so a low threshold is usual. 0.2 is the QuPath default.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: score_ki67, arg: positive_threshold }
+    sensitivity:
+      options: [0.1, 0.2, 0.4]
+      tool: score_ki67
+      compare: [metrics.ki67_index, metrics.n_positive]
+      max_runs: 3
+
+  - key: ki67_hotspot
+    label: Ki-67 hot spot
+    kind: choice
+    choices: [none, hotspot]
+    group: Ki-67
+    help: >
+      none gives the index of all counted cells. hotspot also gives the index of the window with the highest index. The
+      hot spot index is higher than the global index. Say which one you report. The two give different cutoffs for risk groups.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: score_ki67, arg: hotspot_mode }
+
+  - key: ki67_hotspot_side
+    label: Hot spot window side (units of the x and y columns)
+    kind: float
+    group: Ki-67
+    lo: 1
+    help: >
+      The side of the square window. A QuPath export uses micrometers. A field at 40x is about 500 micrometers wide. The
+      window moves in steps of half a side.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: score_ki67, arg: hotspot_side }
+
+  - key: ki67_hotspot_min_cells
+    label: Smallest number of cells in a hot spot window
+    kind: int
+    group: Ki-67
+    lo: 1
+    help: A window with fewer cells cannot be the hot spot. A window of a few cells with a high index is noise. The Ki-67 working group counts at least 500 cells.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: score_ki67, arg: hotspot_min_cells }
+
+  - key: stain_vectors
+    label: Stain vectors (color deconvolution)
+    kind: text
+    default: ruifrok_hdab
+    group: Image
+    help: >
+      The colors of hematoxylin and DAB. ruifrok_hdab is the published Ruifrok and Johnston set. qupath_hdab is the QuPath
+      default set. For your own set, write six numbers: the red, green and blue of hematoxylin, then of DAB. A set that does
+      not fit your stain changes every score. Estimate the vectors in QuPath for a slide with unusual colors.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: stain_vectors }
+
+  - key: detection_image
+    label: Image that finds the nuclei
+    kind: choice
+    choices: [hematoxylin, od_sum]
+    default: hematoxylin
+    group: Image
+    help: >
+      hematoxylin finds nuclei from the hematoxylin stain, as QuPath does by default. od_sum adds the DAB. Choose od_sum if
+      strong DAB nuclei have almost no hematoxylin signal and the overlay misses them.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: detection_image }
+
+  - key: nucleus_threshold
+    label: Nucleus threshold (method name or a number)
+    kind: text
+    default: otsu
+    group: Image
+    help: >
+      A method (otsu, li, triangle, yen, isodata, mean) or a number in optical density of the detection image. Check the
+      overlay. The nucleus count changes with this value.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: nucleus_threshold }
+
+  - key: nucleus_min_diameter
+    label: Smallest nucleus (pixels across)
+    kind: float
+    group: Image
+    lo: 0
+    help: Objects narrower than this are left out as debris. Read a nucleus width from the image in pixels. 0 keeps all objects.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: min_diameter }
+
+  - key: nucleus_max_diameter
+    label: Largest nucleus (pixels across, 0 = no limit)
+    kind: float
+    default: 0
+    lo: 0
+    group: Image
+    help: Objects wider than this are left out, for example clumps that did not split. 0 sets no limit.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: max_diameter }
+
+  - key: split_touching_nuclei
+    label: Split touching nuclei
+    kind: bool
+    default: true
+    group: Image
+    help: A watershed on the distance map cuts touching nuclei apart. It can also cut one long nucleus in two.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: split_touching }
+
+  - key: cell_expand
+    label: Cell growth from the nucleus (pixels)
+    kind: float
+    default: 0
+    lo: 0
+    group: Image
+    help: >
+      The distance that each nucleus grows to make the cell. The cytoplasm, the membrane and the cell compartments need a
+      value above 0. This is a fixed ring, not a measured cell outline. For a measured outline, use QuPath.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: cell_expand }
+
+  - key: membrane_width
+    label: Membrane width (pixels)
+    kind: float
+    default: 2
+    lo: 0.5
+    group: Image
+    help: The width of the outer band of the cell that counts as membrane.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: membrane_width }
+
+  - key: pixel_size
+    label: Pixel size (micrometers per pixel, 0 = unknown)
+    kind: float
+    default: 0
+    lo: 0
+    group: Image
+    help: Micrometers for each pixel. With a value, the cell table has positions in micrometers for the Ki-67 hot spot. Write 0 if you do not know it.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_stain_intensity, arg: pixel_size }
+
+  - key: kappa_weights
+    label: Weights of the kappa
+    kind: choice
+    choices: [linear, quadratic, none]
+    group: Agreement
+    help: >
+      Linear weights count a one-step miss half as much as a two-step miss. Quadratic weights count far misses much more.
+      None gives the plain Cohen kappa, which treats every miss alike. Use linear or quadratic for ordered scores.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_scorers, arg: kappa_weights }
+
+  - key: icc_form
+    label: Form of the intraclass correlation
+    kind: choice
+    choices: [ICC1, ICC2, ICC3, ICC1k, ICC2k, ICC3k]
+    group: Agreement
+    help: >
+      ICC1 has a different set of raters for each subject. ICC2 has the same raters for all subjects, drawn from a larger
+      group. ICC3 has the same raters and no wish to generalize. The k forms give the reliability of the mean of k raters.
+      Two named scorers who score every case fit ICC3. A tool that stands for any scorer fits ICC2.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_scorers, arg: icc_form }
+
+  - key: kappa_cutpoints
+    label: Cut points that make categories from a continuous score
+    kind: text
+    default: none
+    group: Agreement
+    help: >
+      Weighted kappa needs categories. An H-score has 301 values, so write cut points, such as 100,200. Write none for
+      whole-number scores with 20 levels or fewer, such as the Allred score.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_scorers, arg: cutpoints }
+
+checks:
+  - id: threshold_reported
+    description: The report does not give the thresholds, the compartment and the region.
+    severity: warning
+    text: The report must give the intensity thresholds, the stain compartment, the stain vectors and the region that were scored.
+  - id: pseudoreplication
+    description: A p value or an interval treats cells as independent samples.
+    severity: error
+    text: The report must not give a p value or a confidence interval that uses cells as n. The unit of replication is the slide, the core, the patient or the animal.
+  - id: hotspot_named
+    description: A Ki-67 index is given with no word for global or hot spot.
+    severity: warning
+    text: The report must say if a Ki-67 index is global or from a hot spot, and the window size and the cell count of the hot spot.
+  - id: kappa_alone
+    description: Agreement is judged from the correlation alone.
+    severity: warning
+    text: The report must not call two scorers in agreement from a correlation alone. Give the weighted kappa or the intraclass correlation, and the mean difference.
+  - id: few_cells
+    description: A score comes from few cells.
+    severity: warning
+    text: The report must say how many cells each score uses, and must flag a score from fewer cells than the minimum.
+
+map:
+  - tool: inspect_cell_table
+    route: "QuPath: Measure > Show detection measurements, then read the column names. Excel: open the export and read the header row."
+    params:
+      - { arg: path, label: Detection export file }
+    fidelity: exact
+    evidence: { source: code, test: inspect_synthetic_cells, note: "The tool lists columns." }
+
+  - tool: measure_stain_intensity
+    route: "Fiji: Image > Color > Colour Deconvolution with H DAB, then Process > Binary on the hematoxylin image, Analyze > Analyze Particles to add nuclei to the ROI Manager, and Measure on the DAB image with the ROI Manager. QuPath: Analyze > Cell detection > Positive cell detection."
+    steps:
+      - "Fiji: Image > Color > Colour Deconvolution, Vectors = H DAB. The DAB image is in transmittance. Convert it to optical density with Process > Math > Log."
+      - "Fiji: threshold the hematoxylin image, then Process > Binary > Watershed and Analyze > Analyze Particles with Add to Manager."
+      - "Fiji: in the ROI Manager, Measure on the DAB optical density image. Read Mean."
+      - "QuPath: Analyze > Preprocessing > Estimate stain vectors, then Analyze > Cell detection > Positive cell detection. Read Nucleus: DAB OD mean in the detection measurements."
+      - "HALO, Visiopharm, Aperio ImageScope and inForm: run the nuclear or cytonuclear module. Each reports a DAB optical density for each cell with its own segmentation."
+    params:
+      - { arg: stain_vectors, label: "Vectors in Colour Deconvolution (Fiji); stain vectors (QuPath)", ui_default: H DAB }
+      - { arg: nucleus_threshold, label: "Threshold of the hematoxylin image (Fiji); Threshold in Positive cell detection (QuPath)" }
+      - { arg: min_diameter, label: "Size in Analyze Particles (Fiji); Minimum area (QuPath)" }
+      - { arg: cell_expand, label: Cell expansion (QuPath), ui_default: 5 }
+    fidelity: close
+    difference: >
+      The segmentation of the tool is a simple threshold with a watershed. QuPath, HALO and Visiopharm use their own cell
+      detectors, so the cell counts and the DAB means differ. The Fiji and QuPath routes were not run. The color
+      deconvolution matches the published Ruifrok and Johnston matrix.
+    evidence: { source: docs, test: synthetic_image_measure, note: "Designed stain densities and an independent NumPy deconvolution." }
+    summary: "{metrics.n_cells} cells, mean DAB optical density {metrics.mean_dab_od}"
+
+  - tool: score_h_score
+    route: "H-score = 1 x (percent 1+) + 2 x (percent 2+) + 3 x (percent 3+), from 0 to 300. QuPath: Analyze > Cell detection > Positive cell detection with three intensity thresholds; the annotation shows H-score. HALO: set the Weak, Moderate and Strong thresholds in the Cytonuclear or Membrane module and read H-Score."
+    steps:
+      - "Excel: count the cells in each class, divide each by the total, then =1*p1+2*p2+3*p3 multiplied by 100."
+      - "QuPath: Analyze > Cell detection > Positive cell detection. Set Score compartment, Threshold 1+, 2+ and 3+. Read H-score in the annotation measurements."
+      - "HALO (Indica Labs): Cytonuclear or Membrane module. Set the intensity thresholds. The report has H-Score."
+      - "Visiopharm and Aperio ImageScope: the nuclear and membrane algorithms report the percent of weak, moderate and strong cells. Apply the H-score formula."
+    params:
+      - { arg: threshold_1plus, label: "Threshold 1+ (QuPath); Weak threshold (HALO)", ui_default: 0.2 }
+      - { arg: threshold_2plus, label: "Threshold 2+ (QuPath); Moderate threshold (HALO)", ui_default: 0.4 }
+      - { arg: threshold_3plus, label: "Threshold 3+ (QuPath); Strong threshold (HALO)", ui_default: 0.6 }
+      - { arg: compartment, label: Score compartment (QuPath) }
+    fidelity: exact
+    difference: ""
+    evidence: { source: docs, test: h_score_bins_pdl1, note: "The formula gives the H-score that the pathologist printed for 71 of 75 cases of Ram 2021 (the other 4 are listed in checks/check_ihc.out). The QuPath, HALO and Visiopharm routes were not run." }
+    summary: "H-score of {n_rows} group(s). {metrics.n_groups_scored} scored"
+
+  - tool: score_allred
+    route: "Allred score = proportion score (0 to 5) + intensity score (0 to 3), from 0 to 8. Excel: =IF(p=0,0,IF(p<1,1,IF(p<=10,2,IF(p<=33.3,3,IF(p<=66.7,4,5))))) plus the intensity score."
+    steps:
+      - "Count the positive cells and divide by all tumor cells. Convert the percent to the proportion score: 0 none, 1 under 1 percent, 2 from 1 to 10, 3 above 10 to 33, 4 above 33 to 66, 5 above 66."
+      - "Give the intensity score of the positive cells: 1 weak, 2 intermediate, 3 strong."
+      - "Add the two scores. A total of 3 to 8 is positive in the ASCO and CAP guideline for hormone receptors."
+    params:
+      - { arg: intensity_rule, label: Intensity score of the positive cells }
+    fidelity: close
+    difference: "A pathologist estimates the percent and the intensity by eye. The tool gets them from cell classes and an intensity rule. The boundaries 1, 10, 33.3 and 66.7 percent are included in the lower score."
+    evidence: { source: docs, test: allred_synthetic_cells, note: "Designed cell table and a plain Python computation." }
+    summary: "Allred score of {n_rows} group(s). {metrics.n_groups_scored} scored"
+
+  - tool: score_ki67
+    route: "Ki-67 index = Ki-67 positive tumor nuclei / all tumor nuclei x 100. QuPath: Positive cell detection with one threshold; the annotation shows Positive %. Hot spot: move a field over the area with the most stained nuclei and count again."
+    steps:
+      - "QuPath: Analyze > Cell detection > Positive cell detection, one threshold. Read Num Positive per 100 cells or Positive %."
+      - "By hand: count at least 500 tumor nuclei in a global area, or in the hot spot, and divide the stained nuclei by all."
+      - "HALO, Visiopharm: the nuclear module reports the percent positive nuclei. Hot spot tools such as the Visiopharm Ki-67 app pick fields by the index."
+    params:
+      - { arg: positive_threshold, label: "Threshold 1+ (QuPath), single threshold", ui_default: 0.2 }
+      - { arg: hotspot_side, label: Field size }
+    fidelity: close
+    difference: "The tool finds the hot spot with a square window that moves in steps of half a side, not with a drawn field. Software hot spot tools use their own rules for the window shape."
+    evidence: { source: docs, test: ki67_synthetic_hotspot, note: "Designed cell table and a plain Python window search." }
+    summary: "Ki-67 index {metrics.ki67_index} percent"
+
+  - tool: compare_scorers
+    route: "Weighted kappa: Excel add-ins, GraphPad Prism (Analyze > Column statistics, Kappa), SPSS (Analyze > Descriptive Statistics > Crosstabs > Statistics > Kappa), R irr::kappa2(weight = squared). ICC: SPSS (Analyze > Scale > Reliability Analysis > Statistics > Intraclass correlation coefficient), R irr::icc or psych::ICC."
+    steps:
+      - "SPSS: Analyze > Scale > Reliability Analysis. Choose the model: Two-Way Mixed for ICC3, Two-Way Random for ICC2, One-Way Random for ICC1. Type: Consistency or Absolute Agreement."
+      - "R: psych::ICC(ratings) gives the six forms with their confidence intervals."
+      - "Bland-Altman: plot the difference of the two scores against their mean, with the mean difference and plus or minus 1.96 SD."
+    params:
+      - { arg: kappa_weights, label: "Weights (linear, squared)" }
+      - { arg: icc_form, label: Model and Type of the ICC }
+    fidelity: close
+    difference: "The kappa interval is a bootstrap interval (2000 resamples, seed 1). SPSS and R give an asymptotic interval. The ICC and its interval follow Shrout and Fleiss and McGraw and Wong. SPSS and R were not run."
+    evidence: { source: docs, test: icc_shrout_fleiss_published, note: "The six ICC values of Shrout and Fleiss 1979 Table 2 and the pingouin package." }
+    summary: "{metrics.n_subjects} subjects, weighted kappa {metrics.kappa}, ICC {metrics.icc}"
+
+tools:
+  - name: inspect_cell_table
+    title: Inspect a cell table
+    description: >-
+      Read a cell table, such as a QuPath detection export or a CSV. List its DAB intensity columns and its stain compartments.
+      List its position columns and the columns that can group cells. Run it before the scoring tools to find the column names.
+    read_only: true
+    batch: false
+    function: "ihc_tools:inspect_cell_table"
+    params:
+      path: { type: string, minLength: 1, description: "Path of a CSV or tab-separated file with one row for each cell." }
+    required: [path]
+
+  - name: measure_stain_intensity
+    title: Measure DAB in the nuclei of an image
+    description: >-
+      Separate hematoxylin and DAB in a brightfield image by color deconvolution. Find the nuclei. Write a cell table with
+      the DAB optical density of each nucleus. If cell_expand is above 0, the table also has the cytoplasm, the membrane and the cell.
+      It writes a QC overlay of the counted nuclei. For a whole slide image or a measured cell outline, run QuPath and give its export
+      to the scoring tools.
+    read_only: true
+    batch: false
+    function: "ihc_tools:measure_stain_intensity"
+    params:
+      path: { type: string, minLength: 1, description: "Path of one RGB image (PNG, TIFF or JPEG)." }
+      stain_vectors: { type: string, description: "Leave out. The harness sets it from the decision record. ruifrok_hdab, qupath_hdab, or six numbers for hematoxylin and DAB." }
+      compartment: { type: string, enum: [nucleus, cytoplasm, membrane, cell], description: "Leave out. The harness sets it from the decision record. The compartment for the overlay and the summary." }
+      region: { type: string, description: "Leave out. The harness sets it from the decision record. whole, box:x,y,width,height in pixels, or mask:path of a mask image." }
+      detection_image: { type: string, enum: [hematoxylin, od_sum], description: "Leave out. The harness sets it from the decision record. The image that finds the nuclei." }
+      nucleus_threshold: { type: string, description: "Leave out. The harness sets it from the decision record. Method name (otsu, li, triangle, yen, isodata, mean) or a number in optical density." }
+      min_diameter: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest nucleus, in pixels across." }
+      max_diameter: { type: number, minimum: 0, default: 0, description: "Largest nucleus, in pixels across. 0 means no limit." }
+      split_touching: { type: boolean, default: true, description: True to split touching nuclei with a watershed. }
+      cell_expand: { type: number, minimum: 0, default: 0, description: "Distance that each nucleus grows to make the cell, in pixels. 0 gives the nucleus only." }
+      membrane_width: { type: number, minimum: 0.5, default: 2, description: "Width of the outer cell band that counts as membrane, in pixels." }
+      smoothing_sigma: { type: number, minimum: 0, default: 1, description: "Blur of the detection image before the threshold, in pixels." }
+      pixel_size: { type: number, minimum: 0, default: 0, description: "Micrometers for each pixel. 0 means unknown, and the table has positions in pixels only." }
+      threshold_1plus: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 1+ cutoff in optical density (no unit). Colors the overlay." }
+      threshold_2plus: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 2+ cutoff in optical density (no unit)." }
+      threshold_3plus: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 3+ cutoff in optical density (no unit)." }
+    required: [path]
+    citations:
+      - text: "Ruifrok AC, Johnston DA (2001). Quantification of histochemical staining by color deconvolution. Analytical and Quantitative Cytology and Histology 23(4): 291-299."
+        url: https://pubmed.ncbi.nlm.nih.gov/11531144/
+      - text: "Bankhead P, Loughrey MB, Fernández JA, et al. (2017). QuPath: Open source software for digital pathology image analysis. Scientific Reports 7: 16878."
+        doi: 10.1038/s41598-017-17204-5
+        when: { stain_vectors: qupath_hdab }
+      - text: "Otsu N (1979). A threshold selection method from gray-level histograms. IEEE Transactions on Systems, Man, and Cybernetics 9(1): 62-66."
+        doi: 10.1109/TSMC.1979.4310076
+        when: { nucleus_threshold: otsu }
+      - text: "Zack GW, Rogers WE, Latt SA (1977). Automatic measurement of sister chromatid exchange frequency. Journal of Histochemistry and Cytochemistry 25(7): 741-753."
+        doi: 10.1177/25.7.70454
+        when: { nucleus_threshold: triangle }
+      - text: "Li CH, Lee CK (1993). Minimum cross entropy thresholding. Pattern Recognition 26(4): 617-625."
+        doi: 10.1016/0031-3203(93)90115-D
+        when: { nucleus_threshold: li }
+      - text: "Yen JC, Chang FJ, Chang S (1995). A new criterion for automatic multilevel thresholding. IEEE Transactions on Image Processing 4(3): 370-378."
+        doi: 10.1109/83.366472
+        when: { nucleus_threshold: yen }
+      - text: "Ridler TW, Calvard S (1978). Picture thresholding using an iterative selection method. IEEE Transactions on Systems, Man, and Cybernetics 8(8): 630-632."
+        doi: 10.1109/TSMC.1978.4310039
+        when: { nucleus_threshold: isodata }
+
+  - name: score_h_score
+    title: H-score
+    description: >-
+      Compute the H-score from 0 to 300 for each group of cells. It is 1 x percent of 1+ cells, plus 2 x percent of 2+ cells, plus
+      3 x percent of 3+ cells. The input is a cell table with a DAB intensity column. It can also be a table of percents for 0, 1+, 2+
+      and 3+ from a pathologist. The tool also gives the percent of positive cells and a bar plot of the classes.
+    read_only: true
+    batch: false
+    function: "ihc_tools:score_h_score"
+    params:
+      table: { type: string, minLength: 1, description: "Path of a cell table (one row for each cell) or of a table of percents (one row for each group)." }
+      threshold_1plus: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 1+ cutoff in optical density (no unit). Not used with bin_columns." }
+      threshold_2plus: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 2+ cutoff in optical density (no unit)." }
+      threshold_3plus: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 3+ cutoff in optical density (no unit)." }
+      compartment: { type: string, enum: [nucleus, cytoplasm, membrane, cell], description: "Leave out. The harness sets it from the decision record. Picks the column 'Compartment: DAB OD mean'." }
+      intensity_column: { type: string, description: "Column with the DAB intensity of each cell. Default: the column of the compartment." }
+      group_column: { type: string, description: "Column that names the group of each row, such as Image or case. Default: one group for all rows." }
+      region: { type: string, description: "Leave out. The harness sets it from the decision record. whole, column=value, or box:x,y,width,height." }
+      min_cells: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest number of cells for a score (count)." }
+      bin_columns: { type: string, description: "Four column names for 0, 1+, 2+ and 3+, separated by commas, such as pct_0,pct_1,pct_2,pct_3. Give them if the table holds percents or counts. Leave out for a cell table." }
+      bin_unit: { type: string, enum: [percent, fraction, count], description: "With bin_columns. The unit of the four columns. percent divides by 100 and does not rescale a row that adds to 99." }
+      x_column: { type: string, description: "Column with the x position, for a box region. Default: the QuPath centroid column." }
+      y_column: { type: string, description: "Column with the y position, for a box region. Default: the QuPath centroid column." }
+    required: [table]
+    outputs:
+      scores: { kind: table, ext: .csv, description: One row for each group. }
+      plot: { kind: image, ext: .png, description: Stacked bars of the intensity classes. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    citations:
+      - text: "McCarty KS Jr, Miller LS, Cox EB, Konrath J, McCarty KS Sr (1985). Estrogen receptor analyses. Correlation of biochemical and immunohistochemical methods using monoclonal antireceptor antibodies. Archives of Pathology and Laboratory Medicine 109(8): 716-721."
+        url: https://pubmed.ncbi.nlm.nih.gov/3893381/
+      - text: "Ruifrok AC, Johnston DA (2001). Quantification of histochemical staining by color deconvolution. Analytical and Quantitative Cytology and Histology 23(4): 291-299."
+        url: https://pubmed.ncbi.nlm.nih.gov/11531144/
+
+  - name: score_allred
+    title: Allred score
+    description: >-
+      Compute the Allred score from 0 to 8 for each group of cells. It adds a proportion score from 0 to 5 and an intensity score
+      from 0 to 3. The proportion score comes from the percent of positive cells. The intensity score comes from the positive cells. The input is a cell table with a DAB intensity
+      column, or a table of percents for 0, 1+, 2+ and 3+. The tool also gives the percent of positive cells.
+    read_only: true
+    batch: false
+    function: "ihc_tools:score_allred"
+    params:
+      table: { type: string, minLength: 1, description: "Path of a cell table (one row for each cell) or of a table of percents (one row for each group)." }
+      threshold_1plus: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 1+ cutoff in optical density (no unit). Not used with bin_columns." }
+      threshold_2plus: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 2+ cutoff in optical density (no unit)." }
+      threshold_3plus: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 3+ cutoff in optical density (no unit)." }
+      compartment: { type: string, enum: [nucleus, cytoplasm, membrane, cell], description: "Leave out. The harness sets it from the decision record. Picks the column 'Compartment: DAB OD mean'." }
+      intensity_column: { type: string, description: "Column with the DAB intensity of each cell. Default: the column of the compartment." }
+      group_column: { type: string, description: "Column that names the group of each row, such as Image or case. Default: one group for all rows." }
+      region: { type: string, description: "Leave out. The harness sets it from the decision record. whole, column=value, or box:x,y,width,height." }
+      min_cells: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest number of cells for a score (count)." }
+      intensity_rule: { type: string, enum: [predominant, average], description: "Leave out. The harness sets it from the decision record. How the intensity score comes from the positive cells." }
+      bin_columns: { type: string, description: "Four column names for 0, 1+, 2+ and 3+, separated by commas. Give them if the table holds percents or counts. Leave out for a cell table." }
+      bin_unit: { type: string, enum: [percent, fraction, count], description: "With bin_columns. The unit of the four columns." }
+      x_column: { type: string, description: "Column with the x position, for a box region. Default: the QuPath centroid column." }
+      y_column: { type: string, description: "Column with the y position, for a box region. Default: the QuPath centroid column." }
+    required: [table]
+    outputs:
+      scores: { kind: table, ext: .csv, description: One row for each group. }
+      plot: { kind: image, ext: .png, description: Stacked bars of the intensity classes. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    citations:
+      - text: "Allred DC, Harvey JM, Berardo M, Clark GM (1998). Prognostic and predictive factors in breast cancer by immunohistochemical analysis. Modern Pathology 11(2): 155-168."
+        url: https://pubmed.ncbi.nlm.nih.gov/9504686/
+      - text: "Harvey JM, Clark GM, Osborne CK, Allred DC (1999). Estrogen receptor status by immunohistochemistry is superior to the ligand-binding assay for predicting response to adjuvant endocrine therapy in breast cancer. Journal of Clinical Oncology 17(5): 1474-1481."
+        doi: 10.1200/JCO.1999.17.5.1474
+
+  - name: score_ki67
+    title: Ki-67 labeling index
+    description: >-
+      Compute the Ki-67 labeling index, the percent of cells at or above a DAB cutoff, for each group of cells. With the hot spot
+      option it also finds the square window with the highest index and gives its index, cell count and position. The input is a
+      cell table with a DAB intensity column and, for a hot spot, position columns.
+    read_only: true
+    batch: false
+    function: "ihc_tools:score_ki67"
+    params:
+      table: { type: string, minLength: 1, description: "Path of a cell table with one row for each cell." }
+      positive_threshold: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Cutoff for a positive nucleus, in optical density (no unit)." }
+      compartment: { type: string, enum: [nucleus, cytoplasm, membrane, cell], description: "Leave out. The harness sets it from the decision record. Picks the column 'Compartment: DAB OD mean'." }
+      intensity_column: { type: string, description: "Column with the DAB intensity of each cell. Default: the column of the compartment." }
+      group_column: { type: string, description: "Column that names the group of each row, such as Image. Default: one group for all rows." }
+      region: { type: string, description: "Leave out. The harness sets it from the decision record. whole, column=value such as Class=Tumor, or box:x,y,width,height." }
+      min_cells: { type: integer, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest number of cells for an index (count)." }
+      hotspot_mode: { type: string, enum: [none, hotspot], description: "Leave out. The harness sets it from the decision record." }
+      hotspot_side: { type: number, exclusiveMinimum: 0, description: "Leave out. The harness sets it from the decision record. Side of the hot spot window, in the units of the x and y columns." }
+      hotspot_min_cells: { type: integer, minimum: 1, description: "Leave out. The harness sets it from the decision record. Smallest number of cells in a hot spot window (count)." }
+      x_column: { type: string, description: "Column with the x position. Default: the QuPath centroid column." }
+      y_column: { type: string, description: "Column with the y position. Default: the QuPath centroid column." }
+    required: [table]
+    outputs:
+      index: { kind: table, ext: .csv, description: One row for each group. }
+      plot: { kind: image, ext: .png, description: "The hot spot on the cell map, or the index of each group." }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    citations:
+      - text: "Dowsett M, Nielsen TO, A'Hern R, et al. (2011). Assessment of Ki67 in breast cancer: recommendations from the International Ki67 in Breast Cancer Working Group. Journal of the National Cancer Institute 103(22): 1656-1664."
+        doi: 10.1093/jnci/djr393
+      - text: "Nielsen TO, Leung SCY, Rimm DL, et al. (2021). Assessment of Ki67 in breast cancer: updated recommendations from the International Ki67 in Breast Cancer Working Group. Journal of the National Cancer Institute 113(7): 808-819."
+        doi: 10.1093/jnci/djaa201
+        when: { hotspot_mode: hotspot }
+
+  - name: compare_scorers
+    title: Agreement of two scorers
+    description: >-
+      Measure the agreement of two scorers, such as a pathologist and this tool, on the same cases. It gives the weighted Cohen
+      kappa with a bootstrap interval. It gives all six intraclass correlations, and the chosen one with its interval. It also gives
+      the Spearman and Pearson correlations, the mean difference with the limits of agreement, and a Bland-Altman plot.
+    read_only: true
+    batch: false
+    function: "ihc_tools:compare_scorers"
+    params:
+      table: { type: string, minLength: 1, description: "Path of a table with one row for each case and one column for each scorer." }
+      scorer_a: { type: string, minLength: 1, description: "Column with the scores of the first scorer." }
+      scorer_b: { type: string, minLength: 1, description: "Column with the scores of the second scorer." }
+      extra_scorers: { type: string, description: "More scorer columns, separated by commas, or none. They enter the intraclass correlation only. The kappa, the correlations and the limits of agreement use scorer_a and scorer_b." }
+      subject_column: { type: string, description: "Column with the name of each case. Default: the row number." }
+      subset: { type: string, description: "Rows to compare, as column=value, such as marker=PD-L1. Default: all rows." }
+      kappa_weights: { type: string, enum: [linear, quadratic, none], description: "Leave out. The harness sets it from the decision record." }
+      icc_form: { type: string, description: "Leave out. The harness sets it from the decision record. ICC1, ICC2, ICC3, ICC1k, ICC2k or ICC3k." }
+      cutpoints: { type: string, description: "Leave out. The harness sets it from the decision record. Cut points that make categories, such as 100,200, or none for whole-number scores." }
+      ci_level: { type: number, minimum: 0.5, maximum: 0.999, default: 0.95, description: "Confidence level of the intervals (fraction)." }
+      bootstrap: { type: integer, minimum: 100, default: 2000, description: "Number of bootstrap resamples for the kappa interval (count)." }
+      seed: { type: integer, default: 1, description: "Random seed of the bootstrap (index)." }
+    required: [table, scorer_a, scorer_b]
+    outputs:
+      agreement: { kind: table, ext: .csv, description: One row for each statistic. }
+      pairs: { kind: table, ext: .csv, description: The paired scores and their categories. }
+      plot: { kind: image, ext: .png, description: Scatter and Bland-Altman plot. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    citations:
+      - text: "Cohen J (1968). Weighted kappa: nominal scale agreement with provision for scaled disagreement or partial credit. Psychological Bulletin 70(4): 213-220."
+        doi: 10.1037/h0026256
+        when: { kappa_weights: [linear, quadratic] }
+      - text: "Cohen J (1960). A coefficient of agreement for nominal scales. Educational and Psychological Measurement 20(1): 37-46."
+        doi: 10.1177/001316446002000104
+        when: { kappa_weights: none }
+      - text: "Shrout PE, Fleiss JL (1979). Intraclass correlations: uses in assessing rater reliability. Psychological Bulletin 86(2): 420-428."
+        doi: 10.1037/0033-2909.86.2.420
+      - text: "Koo TK, Li MY (2016). A guideline of selecting and reporting intraclass correlation coefficients for reliability research. Journal of Chiropractic Medicine 15(2): 155-163."
+        doi: 10.1016/j.jcm.2016.02.012
+      - text: "Bland JM, Altman DG (1986). Statistical methods for assessing agreement between two methods of clinical measurement. The Lancet 327(8476): 307-310."
+        doi: 10.1016/S0140-6736(86)90837-8
+
+tests:
+  - id: inspect_synthetic_cells
+    description: >
+      The synthetic cell table (data/make_synthetic.py) has 260 rows, one DAB column and position columns. Known answer from
+      the design.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - { tool: inspect_cell_table, args: { path: "{adapter_dir}/data/synthetic_cells.csv" } }
+    expect:
+      - { path: metrics.n_rows, equals: 260 }
+      - { path: metrics.n_dab_columns, equals: 1 }
+      - { path: metrics.n_compartments, equals: 1 }
+
+  - id: h_score_bins_pdl1
+    description: >
+      Ram 2021 (PLOS ONE, CC BY 4.0), S1 Table, PD-L1 sheet. The pathologist gave the percent of cells at 0, 1+, 2+ and 3+. The
+      table prints the pathologist H-score of each case: case 1 has 0, 20, 75 and 5 percent and the printed H-score 185; case 2
+      has 98, 2, 0, 0 and 2; case 4 has 85, 10, 4, 1 and 21. Source: published.
+    data: [data/pix_h_score_table.csv]
+    calls:
+      - tool: score_h_score
+        args: { table: "{adapter_dir}/data/pix_h_score_table.csv", bin_columns: "pct_0,pct_1,pct_2,pct_3", bin_unit: percent, group_column: case_id, region: "marker=PD-L1" }
+    expect:
+      - { path: metrics.n_groups, equals: 24 }
+      - { path: metrics.h_score_1, approx: 185, abs: 0.5 }
+      - { path: metrics.h_score_2, approx: 2, abs: 0.5 }
+      - { path: metrics.h_score_4, approx: 21, abs: 0.5 }
+
+  - id: h_score_bins_5t4_pcad
+    description: >
+      Ram 2021, S1 Table, the 5T4 sheet (case p574-Tp1, 19, 30 and 1 percent at 1+, 2+ and 3+, printed H-score 82) and the
+      P-cadherin sheet (case F00008242, 5, 17.6 and 73 percent, printed H-score 259). The printed values are rounded to whole
+      numbers. Source: published.
+    data: [data/pix_h_score_table.csv]
+    calls:
+      - tool: score_h_score
+        args: { table: "{adapter_dir}/data/pix_h_score_table.csv", bin_columns: "pct_0,pct_1,pct_2,pct_3", bin_unit: percent, group_column: case_id, region: "marker=5T4" }
+      - tool: score_h_score
+        args: { table: "{adapter_dir}/data/pix_h_score_table.csv", bin_columns: "pct_0,pct_1,pct_2,pct_3", bin_unit: percent, group_column: case_id, region: "marker=P-cadherin" }
+    expect:
+      - { path: metrics.h_score_f00008242, approx: 259, abs: 0.5 }
+      - { path: metrics.n_groups, equals: 30 }
+
+  - id: agreement_pix_pcad
+    description: >
+      Ram 2021, S1 Table, P-cadherin sheet, 30 cases. The paper text gives the Spearman correlation of the pathologist H-score
+      and the QuPath H-score as 0.39 (p = 0.03). Source: published. The exact value 0.392301 and the weighted kappa, ICC and
+      mean difference come from SciPy, scikit-learn and pingouin (checks/check_ihc.py and .out). Source: independent.
+    data: [data/pix_h_score_table.csv]
+    calls:
+      - tool: compare_scorers
+        args: { table: "{adapter_dir}/data/pix_h_score_table.csv", scorer_a: pathologist_h, scorer_b: h_qupath, subset: "marker=P-cadherin", subject_column: case_id, kappa_weights: quadratic, icc_form: ICC2, cutpoints: "100,200" }
+    expect:
+      - { path: metrics.n_subjects, equals: 30 }
+      - { path: metrics.spearman_rho, approx: 0.39, abs: 0.005 }
+      - { path: metrics.spearman_p, approx: 0.03, abs: 0.005 }
+      - { path: metrics.spearman_rho, approx: 0.392301, abs: 0.000001 }
+      - { path: metrics.kappa, approx: 0.010989, abs: 0.000001 }
+      - { path: metrics.icc, approx: 0.149255, abs: 0.000001 }
+      - { path: metrics.icc_lower, approx: -0.09, abs: 0.006 }
+      - { path: metrics.icc_upper, approx: 0.44, abs: 0.006 }
+      - { path: metrics.mean_difference, approx: 115.154978, abs: 0.00001 }
+
+  - id: agreement_pix_kappa_linear
+    description: >
+      The same 30 cases with linear weights. scikit-learn cohen_kappa_score gives 0.018182, and the plain kappa 0.027027, with
+      the labels 0, 1 and 2 (checks/check_ihc.out). Source: independent.
+    data: [data/pix_h_score_table.csv]
+    calls:
+      - tool: compare_scorers
+        args: { table: "{adapter_dir}/data/pix_h_score_table.csv", scorer_a: pathologist_h, scorer_b: h_qupath, subset: "marker=P-cadherin", kappa_weights: linear, icc_form: ICC3, cutpoints: "100,200" }
+      - tool: compare_scorers
+        args: { table: "{adapter_dir}/data/pix_h_score_table.csv", scorer_a: pathologist_h, scorer_b: h_qupath, subset: "marker=P-cadherin", kappa_weights: none, icc_form: ICC3, cutpoints: "100,200" }
+    expect:
+      - { path: metrics.kappa, approx: 0.027027, abs: 0.000001 }
+      - { path: metrics.exact_agreement_fraction, approx: 0.2, abs: 0.000001 }
+
+  - id: agreement_pix_three_raters
+    description: >
+      Ram 2021, 5T4 sheet, 21 cases, three scorers (pathologist, QuPath, HALO). The ICC(3,k) of the three is 0.867559 and ICC(3,1)
+      is 0.685881 from pingouin (checks/check_ihc.out). Source: independent.
+    data: [data/pix_h_score_table.csv]
+    calls:
+      - tool: compare_scorers
+        args: { table: "{adapter_dir}/data/pix_h_score_table.csv", scorer_a: pathologist_h, scorer_b: h_qupath, extra_scorers: h_halo, subset: "marker=5T4", kappa_weights: linear, icc_form: ICC3k, cutpoints: "100,200" }
+    expect:
+      - { path: metrics.n_scorers, equals: 3 }
+      - { path: metrics.icc, approx: 0.867559, abs: 0.000001 }
+      - { path: metrics.icc_icc3, approx: 0.685881, abs: 0.000001 }
+
+  - id: icc_shrout_fleiss_published
+    description: >
+      Shrout and Fleiss 1979, Table 2: 6 targets rated by 4 judges. The paper prints ICC(1,1) .17, ICC(2,1) .29, ICC(3,1) .71,
+      ICC(1,k) .44, ICC(2,k) .62 and ICC(3,k) .91. Source: published. pingouin gives 0.165742, 0.289764, 0.714841, 0.442797,
+      0.620051 and 0.909316 (checks/check_ihc.out). Source: independent.
+    data: [data/shrout_fleiss_1979.csv]
+    calls:
+      - tool: compare_scorers
+        args: { table: "{adapter_dir}/data/shrout_fleiss_1979.csv", scorer_a: judge1, scorer_b: judge2, extra_scorers: "judge3,judge4", kappa_weights: linear, icc_form: ICC2 }
+    expect:
+      - { path: metrics.icc_icc1, approx: 0.17, abs: 0.005 }
+      - { path: metrics.icc_icc2, approx: 0.29, abs: 0.005 }
+      - { path: metrics.icc_icc3, approx: 0.71, abs: 0.005 }
+      - { path: metrics.icc_icc1k, approx: 0.44, abs: 0.005 }
+      - { path: metrics.icc_icc2k, approx: 0.62, abs: 0.005 }
+      - { path: metrics.icc_icc3k, approx: 0.91, abs: 0.005 }
+      - { path: metrics.icc_icc2, approx: 0.289764, abs: 0.000001 }
+      - { path: metrics.icc_icc3k, approx: 0.909316, abs: 0.000001 }
+      - { path: metrics.icc_lower, approx: 0.02, abs: 0.006 }
+      - { path: metrics.icc_upper, approx: 0.76, abs: 0.006 }
+
+  - id: synthetic_image_measure
+    description: >
+      Synthetic image of 12 nuclei with designed stain densities (data/make_synthetic.py): 3 nuclei each at DAB 0.05, 0.30,
+      0.50 and 0.80 over hematoxylin 0.6, drawn with the Ruifrok vectors. Known answer from the design: 12 nuclei and 3 in each
+      class at the cutoffs 0.2, 0.4 and 0.6. The mean optical densities of the whole image and of the nuclei come from a NumPy
+      deconvolution that does not use scikit-image (checks/check_ihc.py and .out). Source: designed and independent.
+    data: [data/synthetic_ihc.png]
+    calls:
+      - tool: measure_stain_intensity
+        args: { path: "{adapter_dir}/data/synthetic_ihc.png", stain_vectors: ruifrok_hdab, compartment: nucleus, region: whole, detection_image: hematoxylin, nucleus_threshold: otsu, min_diameter: 10, threshold_1plus: 0.2, threshold_2plus: 0.4, threshold_3plus: 0.6 }
+    expect:
+      - { path: metrics.n_cells, equals: 12 }
+      - { path: metrics.n_class_0, equals: 3 }
+      - { path: metrics.n_class_1plus, equals: 3 }
+      - { path: metrics.n_class_2plus, equals: 3 }
+      - { path: metrics.n_class_3plus, equals: 3 }
+      - { path: metrics.region_mean_dab_od, approx: 0.025166, abs: 0.00001 }
+      - { path: metrics.region_mean_hematoxylin_od, approx: 0.036893, abs: 0.00001 }
+      - { path: metrics.mean_dab_od, approx: 0.410534, abs: 0.0005 }
+      - { path: "outputs[0].path", contains: "_cells.csv" }
+
+  - id: synthetic_image_chain
+    description: >
+      The cell table of the synthetic image goes to the H-score tool. With 3 nuclei in each class the designed H-score is
+      (3 x 1 + 3 x 2 + 3 x 3) / 12 x 100 = 150 and 75 percent are positive. Known answer from the design.
+    data: [data/synthetic_ihc.png]
+    calls:
+      - tool: measure_stain_intensity
+        args: { path: "{adapter_dir}/data/synthetic_ihc.png", stain_vectors: ruifrok_hdab, compartment: nucleus, region: whole, detection_image: hematoxylin, nucleus_threshold: otsu, min_diameter: 10 }
+        save_as: cells
+      - tool: score_h_score
+        args: { table: "{saved.cells.outputs[0].path}", threshold_1plus: 0.2, threshold_2plus: 0.4, threshold_3plus: 0.6, compartment: nucleus, region: whole, min_cells: 5 }
+    expect:
+      - { path: metrics.h_score, approx: 150, abs: 0.000001 }
+      - { path: metrics.pct_positive, approx: 75, abs: 0.000001 }
+
+  - id: synthetic_image_chain_ki67
+    description: The same cell table goes to the Ki-67 tool. 9 of 12 nuclei are at or above the cutoff 0.2, so the designed index is 75 percent. Known answer from the design.
+    data: [data/synthetic_ihc.png]
+    calls:
+      - tool: measure_stain_intensity
+        args: { path: "{adapter_dir}/data/synthetic_ihc.png", stain_vectors: ruifrok_hdab, compartment: nucleus, region: whole, detection_image: hematoxylin, nucleus_threshold: otsu, min_diameter: 10 }
+        save_as: cells
+      - tool: score_ki67
+        args: { table: "{saved.cells.outputs[0].path}", positive_threshold: 0.2, compartment: nucleus, region: whole, min_cells: 5, hotspot_mode: none }
+    expect:
+      - { path: metrics.ki67_index, approx: 75, abs: 0.000001 }
+
+  - id: skimage_ihc_deconvolution
+    description: >
+      The scikit-image sample image immunohistochemistry (512 by 512 pixels, colon glands with FHL2 stained with DAB, CMMI, no known
+      copyright restrictions). The mean DAB and hematoxylin optical densities of all pixels come from a NumPy deconvolution with
+      the Ruifrok and Johnston matrix (checks/check_ihc.py and .out). Source: independent. The image has no published score.
+    data: [data/skimage_immunohistochemistry.png]
+    calls:
+      - tool: measure_stain_intensity
+        args: { path: "{adapter_dir}/data/skimage_immunohistochemistry.png", stain_vectors: ruifrok_hdab, compartment: nucleus, region: whole, detection_image: od_sum, nucleus_threshold: otsu, min_diameter: 8, max_diameter: 60 }
+    expect:
+      - { path: metrics.region_mean_dab_od, approx: 0.342326, abs: 0.00001 }
+      - { path: metrics.region_mean_hematoxylin_od, approx: 0.085364, abs: 0.00001 }
+
+  - id: h_score_synthetic_cells
+    description: >
+      Synthetic cell table of two slides (data/make_synthetic.py). In the tumor class of slideA, 184 cells have 22 cells each at
+      1+, 2+ and 3+ with cutoffs 0.2, 0.4 and 0.6: H-score 71.739130. SlideB has 60 cells with 1, 5 and 6 cells: 48.333333. A plain
+      Python count gives the values (checks/check_ihc.py and .out). Source: independent.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - tool: score_h_score
+        args: { table: "{adapter_dir}/data/synthetic_cells.csv", threshold_1plus: 0.2, threshold_2plus: 0.4, threshold_3plus: 0.6, compartment: nucleus, group_column: Image, region: "Class=Tumor", min_cells: 10 }
+    expect:
+      - { path: metrics.h_score_slidea, approx: 71.739130, abs: 0.000001 }
+      - { path: metrics.h_score_slideb, approx: 48.333333, abs: 0.000001 }
+      - { path: metrics.n_outside_region, equals: 16 }
+
+  - id: allred_synthetic_cells
+    description: >
+      Two synthetic slides (data/make_synthetic.py), tumor class, intensity rule average. Percent positive 35.869565 in slideA gives
+      proportion score 4. The classes 22, 22 and 22 have mean class 2, so the total is 6. SlideB has 20 percent positive (score 3)
+      and classes 1, 5 and 6 with mean class 2.4, rounded to 2: total 5. A plain Python count gives the values
+      (checks/check_ihc.py and .out). Source: independent.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - tool: score_allred
+        args: { table: "{adapter_dir}/data/synthetic_cells.csv", threshold_1plus: 0.2, threshold_2plus: 0.4, threshold_3plus: 0.6, compartment: nucleus, group_column: Image, region: "Class=Tumor", min_cells: 10, intensity_rule: average }
+    expect:
+      - { path: metrics.allred_slidea, equals: 6 }
+      - { path: metrics.allred_slideb, equals: 5 }
+
+  - id: allred_predominant_cells
+    description: >
+      The predominant rule on the same two slides. The classes 22, 22 and 22 tie in slideA, so the rule takes 3 and the total is 7.
+      In slideB the largest class is 3+ with 6 cells: total 6. A plain Python count gives the values (checks/check_ihc.py and .out).
+      Source: independent.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - tool: score_allred
+        args: { table: "{adapter_dir}/data/synthetic_cells.csv", threshold_1plus: 0.2, threshold_2plus: 0.4, threshold_3plus: 0.6, compartment: nucleus, group_column: Image, region: "Class=Tumor", min_cells: 10, intensity_rule: predominant }
+    expect:
+      - { path: metrics.allred_slidea, equals: 7 }
+      - { path: metrics.allred_slideb, equals: 6 }
+
+  - id: ki67_synthetic_hotspot
+    description: >
+      SlideA tumor, 184 cells: 35.869565 percent positive at the cutoff 0.2. The designed hot spot is the window of side 100 that
+      holds a cluster of 40 cells with 30 positive: 75 percent. No other window has 40 cells. SlideB has 20 percent positive and
+      no window of 40 cells. A plain Python window search gives the values (checks/check_ihc.py and .out). Source: independent.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - tool: score_ki67
+        args: { table: "{adapter_dir}/data/synthetic_cells.csv", positive_threshold: 0.2, compartment: nucleus, group_column: Image, region: "Class=Tumor", min_cells: 10, hotspot_mode: hotspot, hotspot_side: 100, hotspot_min_cells: 40 }
+    expect:
+      - { path: metrics.ki67_index_slidea, approx: 35.869565, abs: 0.000001 }
+      - { path: metrics.hotspot_index_slidea, approx: 75, abs: 0.000001 }
+      - { path: metrics.ki67_index_slideb, approx: 20, abs: 0.000001 }
+      - { path: metrics.n_groups, equals: 2 }
+
+  - id: h_score_min_cells
+    description: A group with fewer cells than min_cells gets no score and the status says so. SlideB has 60 cells and min_cells is 100. Known answer from the design.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - tool: score_h_score
+        args: { table: "{adapter_dir}/data/synthetic_cells.csv", threshold_1plus: 0.2, threshold_2plus: 0.4, threshold_3plus: 0.6, compartment: nucleus, group_column: Image, region: whole, min_cells: 100 }
+    expect:
+      - { path: metrics.n_groups_scored, equals: 1 }
+      - { path: "table.rows[1][9]", equals: "below min_cells" }
+
+  - id: h_score_without_threshold
+    description: A cell table without the 1+ threshold fails and names the decision.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - { tool: score_h_score, args: { table: "{adapter_dir}/data/synthetic_cells.csv", compartment: nucleus, region: whole, min_cells: 5 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "threshold_1plus is not set" }
+      - { path: error, contains: "decision threshold_1plus" }
+
+  - id: h_score_thresholds_not_rising
+    description: Thresholds that do not rise fail and name the three values.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - { tool: score_h_score, args: { table: "{adapter_dir}/data/synthetic_cells.csv", threshold_1plus: 0.5, threshold_2plus: 0.4, threshold_3plus: 0.6, compartment: nucleus, region: whole, min_cells: 5 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "thresholds must rise" }
+
+  - id: score_wrong_compartment_column
+    description: A compartment with no column in the table fails and lists the DAB columns.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - { tool: score_h_score, args: { table: "{adapter_dir}/data/synthetic_cells.csv", threshold_1plus: 0.2, threshold_2plus: 0.4, threshold_3plus: 0.6, compartment: membrane, region: whole, min_cells: 5 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no column 'Membrane: DAB OD mean'" }
+      - { path: error, contains: "Nucleus: DAB OD mean" }
+
+  - id: score_unknown_region_column
+    description: A region that names a column that is not in the table fails and lists the columns.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - { tool: score_ki67, args: { table: "{adapter_dir}/data/synthetic_cells.csv", positive_threshold: 0.2, compartment: nucleus, region: "Tissue=Tumor", min_cells: 5, hotspot_mode: none } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "names the column Tissue" }
+
+  - id: ki67_hotspot_window_too_big
+    description: A hot spot minimum that no window reaches fails and gives the busiest window.
+    data: [data/synthetic_cells.csv]
+    calls:
+      - { tool: score_ki67, args: { table: "{adapter_dir}/data/synthetic_cells.csv", positive_threshold: 0.2, compartment: nucleus, region: whole, min_cells: 5, hotspot_mode: hotspot, hotspot_side: 100, hotspot_min_cells: 500 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no window of side 100" }
+
+  - id: kappa_continuous_without_cutpoints
+    description: Scores that are not whole numbers fail without cut points, and the error asks for them.
+    data: [data/pix_h_score_table.csv]
+    calls:
+      - { tool: compare_scorers, args: { table: "{adapter_dir}/data/pix_h_score_table.csv", scorer_a: pathologist_h, scorer_b: h_qupath, kappa_weights: linear, icc_form: ICC2, cutpoints: none } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Give cutpoints" }
+
+  - id: measure_missing_file
+    description: An image file that does not exist fails and the error names the file.
+    calls:
+      - { tool: measure_stain_intensity, args: { path: "{adapter_dir}/data/no_such_image.png", compartment: nucleus, region: whole, detection_image: hematoxylin, nucleus_threshold: otsu, min_diameter: 5 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_image.png" }
+
+  - id: measure_cytoplasm_without_expand
+    description: The cytoplasm compartment with cell_expand 0 fails and names the argument.
+    data: [data/synthetic_ihc.png]
+    calls:
+      - { tool: measure_stain_intensity, args: { path: "{adapter_dir}/data/synthetic_ihc.png", compartment: cytoplasm, region: whole, detection_image: hematoxylin, nucleus_threshold: otsu, min_diameter: 5, cell_expand: 0 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "needs cell_expand above 0" }

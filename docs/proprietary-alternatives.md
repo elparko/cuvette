@@ -70,6 +70,10 @@ of each package. The sources are at the end.
 | ZEN | Carl Zeiss, commercial (ZEN lite is free, closed) | Acquisition and analysis, `.czi` files. | Bio-Formats (GPL-2); czifile (BSD-3) | `bftools`, `imagej` | Covered for file reading and 2D analysis. |
 | LAS X | Leica, commercial | Confocal acquisition and analysis, `.lif` files. | Bio-Formats (GPL-2); readlif (GPL-3) | `bftools`, `imagej` | Covered for file reading and 2D analysis. |
 | Harmony and Columbus | Revvity, commercial. Columbus reached end of life on 2024-03-25. | High-content screening on Operetta and Opera Phenix. | CellProfiler (BSD-3); Cellpose (BSD-3); Fiji (GPL-3) | `cellprofiler`, `cellpose`, `image-assays` | Partial. Nuclei counts, positive-cell fractions, cargo per cell and phagocytic indices are covered by `image-assays` (count_cell_uptake) with `cellpose` labels as an option. Plate-level quality (Z' factor): in progress by another agent. |
+| HALO | Indica Labs, commercial | Digital pathology scoring: positive cells, H-score, Ki-67 index on whole slides. | QuPath (GPL-3); scikit-image (BSD-3); pandas (BSD-3) | `qupath`, `ihc-scoring` | Partial. `ihc-scoring` gives the H-score, the Allred score, the Ki-67 index with a hot spot, and the agreement with a pathologist, from a QuPath cell table or from an image. `qupath` finds the cells. Tissue classifiers and multiplex modules are open. |
+| Visiopharm | Visiopharm, commercial | Image analysis apps for IHC scoring, Ki-67 hot spots and tissue classes. | QuPath (GPL-3); scikit-image (BSD-3) | `qupath`, `ihc-scoring` | Partial. Same as HALO. The Visiopharm hot spot rules are its own. The `ihc-scoring` hot spot is a square window that moves in half steps. |
+| Aperio ImageScope | Leica Biosystems, the viewer is free, closed. The analysis algorithms are licensed. | Nuclear, membrane and positive pixel count algorithms. | QuPath (GPL-3); scikit-image (BSD-3) | `qupath`, `ihc-scoring` | Partial. Same as HALO. The positive pixel count algorithm is open. |
+| inForm | Akoya Biosciences, commercial | Tissue and cell segmentation and scoring for multiplex and brightfield slides. | QuPath (GPL-3); scikit-image (BSD-3) | `qupath`, `ihc-scoring` | Partial. Brightfield DAB scoring is covered as for HALO. Multiplex unmixing and tissue learning are open. |
 
 ## Flow cytometry
 
@@ -268,6 +272,16 @@ What stays open:
 
 - No ANCOM-BC, UniFrac or DADA2 read processing. The reasons are in `bench/papers/CANDIDATES-microbiome-cytometry.md`. Several papers failed because their printed numbers do not reproduce from the open data.
 - No viSNE, UMAP or Citrus for cytometry, and no differential state tests (marker levels inside a cell type).
+
+## Histology scoring
+
+One adapter from the work of 9 October 2026. It passes `cuvette adapter check ihc-scoring --run-tests`.
+
+| Adapter | Engine | Tools | Known-answer tests | Benchmark papers |
+| --- | --- | --- | --- | --- |
+| `ihc-scoring` | scikit-image color deconvolution and pandas | inspect_cell_table, measure_stain_intensity, score_h_score, score_allred, score_ki67, compare_scorers | 24 | Ram 2021, DOI 10.1371/journal.pone.0245638 |
+
+`qupath` already counts positive cells and gives an H-score. `ihc-scoring` does not repeat that step. It reads the cell table of QuPath, or a pathologist table of percents. It adds the Allred score, the Ki-67 hot spot and the agreement statistics.
 
 ## Sources
 

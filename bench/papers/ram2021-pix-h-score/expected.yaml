@@ -1,0 +1,30 @@
+tool: compare_scorers and score_h_score of the ihc-scoring adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/ram2021-pix-h-score/pix_h_score_table.csv
+decisions:
+  scoring_region: whole
+  min_cells: 0
+  kappa_weights: quadratic
+  icc_form: ICC2
+  kappa_cutpoints: "100,200"
+  "*": Use the values in the decision record.
+expected:
+  - {description: "Cases scored for P-cadherin", value: 30, tolerance: 0, source: "published, Fig 2 legend"}
+  - {description: "Cases scored for PD-L1", value: 24, tolerance: 0, source: "published, Fig 2 legend"}
+  - {description: "Cases scored for 5T4", value: 21, tolerance: 0, source: "published, Fig 2 legend"}
+  - {description: "H-score of PD-L1 case 1 from its percents (0, 20, 75 and 5 percent at 0, 1+, 2+, 3+)", value: 185, tolerance: 0.5, source: "published, S1 Table"}
+  - {description: "Spearman rho, P-cadherin, pathologist H-score and QuPath H-score", value: 0.39, tolerance: 0.01, source: "published, Results"}
+  - {description: "Spearman rho, P-cadherin, pathologist H-score and HALO H-score", value: 0.5, tolerance: 0.01, source: "published, Results"}
+  - {description: "Spearman rho, PD-L1, pathologist H-score and QuPath H-score", value: 0.74, tolerance: 0.01, source: "published, Results"}
+  - {description: "Spearman rho, PD-L1, pathologist H-score and HALO H-score (the paper prints 0.69, the data give 0.701)", value: 0.69, tolerance: 0.015, source: "published, Results"}
+  - {description: "Spearman rho, 5T4, pathologist H-score and QuPath H-score", value: 0.79, tolerance: 0.01, source: "published, Results"}
+  - {description: "Spearman rho, 5T4, pathologist H-score and HALO H-score", value: 0.75, tolerance: 0.01, source: "published, Results"}
+  - {description: "Weighted kappa (quadratic, cut points 100 and 200), P-cadherin, pathologist and QuPath", value: 0.010989, tolerance: 0.001, source: "independent, scikit-learn 1.9.1 (not printed in the paper)"}
+  - {description: "ICC(2,1), P-cadherin, pathologist and QuPath", value: 0.149255, tolerance: 0.002, source: "independent, pingouin 0.7.0 (not printed in the paper)"}
+notes: >-
+  The Spearman correlations of S1 Table match the paper to two digits, except PD-L1 with HALO (0.701 in the data, 0.69 in the paper text).
+  The pathologist percents give the printed pathologist H-score for 71 of 75 cases. Four rows differ: 5T4 case 01-0723 1-2 (printed 135, percents
+  give 220), P-cadherin F00082457 (132 and 300), F00082458 (113 and 131.6) and F00082460 (139 and 113.2). The paper does not explain the four rows.
+  The item for PD-L1 case 1 uses a case where the formula and the printed value agree. The kappa and the ICC are low because the QuPath H-score is
+  on a lower scale than the pathologist H-score (mean difference 115 points). The paper reports no kappa or ICC.

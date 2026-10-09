@@ -341,6 +341,7 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `diffbind` | DiffBind, DESeq2, edgeR | R scripts | ChIP-seq and ATAC-seq differential peaks |
 | `mendelianrandomization` | MendelianRandomization | R scripts | causal effects from variant summary statistics |
 | `qupath` | QuPath | Groovy scripts, one batch run for each step | histology |
+| `ihc-scoring` | scikit-image and pandas | Python library | IHC scores: H-score, Allred score, Ki-67 index with hot spot, agreement of two scorers |
 | `bftools` | Bio-Formats tools | command line | image formats |
 | `scanpy` | scanpy | Python library | single-cell RNA |
 | `harmony` | harmonypy | Python library | single-cell sample integration |

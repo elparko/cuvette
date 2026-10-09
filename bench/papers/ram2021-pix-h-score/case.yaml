@@ -1,0 +1,106 @@
+kind: research paper
+short: Ram 2021
+field: Imaging
+program: ihc-scoring adapter (pandas, SciPy). The paper used QuPath, HALO and Visiopharm.
+citation:
+  authors: Ram S, Vizcarra P, Whalen P, Deng S, Painter CL, Jackson-Fisher A, Pirie-Shepherd S, Xia X, Powell EL
+  title: "Pixelwise H-score: A novel digital image analysis-based metric to quantify membrane biomarker expression from immunohistochemistry images"
+  venue: PLOS ONE 16(9):e0245638
+  year: 2021
+  doi: 10.1371/journal.pone.0245638
+related:
+  - text: "Data: S1 Table of the paper (XLSX, CC BY 4.0). The whole slide images are on Zenodo (record 4900103). The benchmark does not use them."
+    url: https://zenodo.org/record/4900103
+measured: >-
+  The authors scored membrane markers on tumor resections with a pathologist H-score and with digital H-scores from QuPath and HALO. They
+  compared each digital score with the pathologist H-score by the Spearman correlation, and proposed the pixelwise H-score.
+instruction: >-
+  Compute the H-score of a case from the pathologist percents at 0, 1+, 2+ and 3+. Give the Spearman correlation of the pathologist H-score with
+  the QuPath and the HALO H-score for each marker. Add the weighted kappa and the ICC of the pathologist and QuPath scores for P-cadherin.
+instruction_basis: >-
+  Results of the paper (Spearman correlations and the case numbers) and S1 Table (the percents and the scores). The paper gives no kappa or ICC.
+  The benchmark adds these two items and takes the values from scikit-learn and pingouin.
+answers:
+  scoring_region:
+    decision: Region to score
+    value: whole
+    source: Not applicable. The table has one row for each case, not for each cell.
+  min_cells:
+    decision: Smallest number of cells for a score
+    value: 0
+    source: Not applicable. The table holds percents of cells, not cells.
+  kappa_weights:
+    decision: Weights of the kappa
+    value: quadratic
+    source: Not in the paper. The prompt names the weights.
+  icc_form:
+    decision: Form of the intraclass correlation
+    value: ICC2
+    source: Not in the paper. The prompt asks for ICC(2,1).
+  kappa_cutpoints:
+    decision: Cut points that make categories
+    value: "100,200"
+    source: Not in the paper. The prompt names the cut points.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with this text.
+items:
+  n_pcad:
+    source: published
+    where: Fig 2 legend. n = 30 cases for P-cadherin.
+    check: pix_h_score_table.csv has 30 P-cadherin rows (checks/check_ihc.out of the adapter).
+  n_pdl1:
+    source: published
+    where: Fig 2 legend. n = 24 cases for PD-L1.
+    check: 24 PD-L1 rows.
+  n_5t4:
+    source: published
+    where: Fig 2 legend. n = 21 cases for 5T4.
+    check: 21 5T4 rows.
+  h_pdl1_case1:
+    source: published
+    where: S1 Table, PD-L1 sheet, case 1. The pathologist H-score is 185 ("rounded up to the nearest integer").
+    independence: independent
+    check: The H-score formula on the percents 20, 75 and 5 gives 20 + 150 + 15 = 185.
+  rho_pcad_qupath:
+    source: published
+    where: Results, P-cadherin. Spearman rho 0.39 (p = 0.03) for the QuPath H-score.
+    check: SciPy spearmanr gives 0.392301 (checks/check_ihc.out of the adapter).
+  rho_pcad_halo:
+    source: published
+    where: Results, P-cadherin. Spearman rho 0.5 (p = 0.005) for the HALO H-score.
+    check: SciPy gives 0.495105.
+  rho_pdl1_qupath:
+    source: published
+    where: Results, PD-L1. Spearman rho 0.74 for the QuPath H-score.
+    check: SciPy gives 0.739347.
+  rho_pdl1_halo:
+    source: published
+    where: Results, PD-L1. Spearman rho 0.69 (p = 0.0002) for the HALO H-score.
+    check: SciPy gives 0.701264 on S1 Table. The paper prints 0.69, so the item has a tolerance of 0.015.
+  rho_5t4_qupath:
+    source: published
+    where: Results, 5T4. Spearman rho 0.79 for the QuPath H-score.
+    check: SciPy gives 0.789337.
+  rho_5t4_halo:
+    source: published
+    where: Results, 5T4. Spearman rho 0.75 for the HALO H-score.
+    check: SciPy gives 0.749676.
+  kappa_pcad_qupath:
+    source: computed
+    tool: scikit-learn 1.9.1 cohen_kappa_score
+    where: Not printed. The paper reports no kappa. The value is for the P-cadherin cases with cut points 100 and 200 and quadratic weights.
+    independence: independent
+    check: scikit-learn gives 0.010989 (checks/check_ihc.py and .out of the adapter).
+  icc2_pcad_qupath:
+    source: computed
+    tool: pingouin 0.7.0 intraclass_corr
+    where: Not printed. The paper reports no ICC. The value is ICC(2,1) of the pathologist H-score and the QuPath H-score for P-cadherin.
+    independence: independent
+    check: pingouin gives 0.149255.
+data:
+  source: S1 Table of the paper, journal.pone.0245638.s002.xlsx. fetch.sh checks the SHA-256 sum and joins the three sheets into one CSV.
+  url: https://doi.org/10.1371/journal.pone.0245638.s002
+  license: CC BY 4.0
+  size: 8 KB table with 75 cases.
