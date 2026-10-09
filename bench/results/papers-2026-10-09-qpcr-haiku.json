@@ -1,0 +1,676 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "hildyard2021-embryo-refgenes",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 170.153,
+   "session": "20261008-232410-da6e",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hildyard2021-embryo-refgenes/run1/home/sessions/20261008-232410-da6e",
+   "answer": "The review found two numbers with no logged source. I removed both. I also checked the outlier claim with a script, and the script output is now in the log. The corrected answer follows.\n\n**What I did**\n1. Ranked the 15 candidate genes over all 44 samples with geNorm and NormFinder, without groups (rank_reference_genes).\n2. Reran NormFinder with the samples grouped by tissue (E, H, FL) (rank_reference_genes).\n3. Ran geNorm on the 11 head (H) samples only (rank_reference_genes).\n4. Fitted the slope and efficiency of each gene from the dilution series (fit_efficiency).\n5. Checked the sample count per tissue and the outlier flags with a script. The script removed nothing.\n\n**Data and settings**\n- One replicate is one embryo sample. Each sample has one Cq per gene, so no technical replicates were averaged.\n- Samples per tissue: E 24, H 11, FL 9. Total 44. Confirmed by the script.\n- No Cq cutoff was applied. There were 0 non-detects and 0 excluded wells.\n- The stability ranking used efficiency 2 for every gene. This is the tool default in that run.\n- The NormqPCR version is 1.58.0. The tool results do not give the R version.\n\n**Outlier check (my script, not removed)**\n- With all genes pooled within each tissue, the modified z-score rule (above 3.5) flags 44 Cq values. The script reproduced this count.\n- With each gene checked alone within its tissue, 7 values are flagged. These are RPL13a in H (2 wells), HPRT1 in H (1 well), UBC in H (1 well), and B2M in H (3 wells).\n- Inference: the pooled count of 44 falls to 7 per gene. So most of the pooled flags reflect differences between genes. Seven flags remain, all in the head group of 11 samples.\n- All values stayed in the analysis.\n\n**geNorm, all 44 samples (15 genes)**\n- Best pair: HTATSF1 and CDC40. Average M = 0.2175.\n- Average M with the least stable gene (HPRT1) still in the set (15 genes): 0.5275.\n- Average M with the two least stable genes (HPRT1 and B2M) removed (13 genes): 0.4410.\n- Genes with their own M below 0.5: 8. These are SDHA, HTATSF1, CDC40, RPL13a, CSNK2A2, AP3D1, UBC and PAK1IP1. The tool metric of 14 counts set sizes with average M below 0.5, not genes.\n- V2/3 = 0.0686. This is below 0.15, so two genes add little more.\n\n**NormFinder (stability value, lower is more stable)**\n- No groups: most stable AP3D1 = 0.1348. Least stable HPRT1 = 0.4810.\n- Grouped by tissue: most stable UBC = 0.0810. Least stable B2M = 0.1805.\n\n**geNorm, head samples only (11 samples)**\n- Best pair: HTATSF1 and CDC40. Average M = 0.1142. V2/3 = 0.0359.\n\n**Amplification efficiency (dilution series, linear fit of Cq against log10 molecules, 8 levels unless noted)**\n\n| Gene | Slope | Efficiency | Efficiency (%) | R² |\n|---|---|---|---|---|\n| GAPDH | -3.4557 | 1.947 | 94.7 | 0.9987 |\n| HTATSF1 | -3.1799 | 2.063 | 106.3 | 0.9981 |\n| CDC40 | -3.2067 | 2.050 | 105.0 | 0.9986 |\n| RPL13a | -3.2923 | 2.013 | 101.3 | 0.9987 |\n| CSNK2A2 (6 levels) | -3.2359 | 2.037 | 103.7 | 0.9969 |\n| AP3D1 | -3.2235 | 2.043 | 104.3 | 0.9989 |\n| HPRT1 | -3.2105 | 2.049 | 104.9 | 0.9976 |\n| CYC1 (7 levels) | -3.4611 | 1.945 | 94.5 | 0.9987 |\n| EIF4A | -3.2491 | 2.031 | 103.1 | 0.9985 |\n| UBC (7 levels) | -3.3788 | 1.977 | 97.7 | 0.9924 |\n| PAK1IP1 | -3.2935 | 2.012 | 101.2 | 0.9996 |\n| ActB (named ACTB in file) | -3.2993 | 2.010 | 101.0 | 0.9986 |\n| 18S | -3.4209 | 1.960 | 96.0 | 0.9985 |\n| SDHA | -3.2331 | 2.038 | 103.8 | 0.9979 |\n\n- B2M is not in the dilution file. It has no efficiency value.\n- The fitted efficiencies range from 94.5 percent to 106.3 percent.\n\n**Uncertain**\n- The stability ranking used efficiency 2 for every gene. The fitted efficiencies are not used in that ranking. The tool did not rerun with them.\n- The two methods agree on HTATSF1 and CDC40 as the best pair. Both agree that B2M and HPRT1 are the least stable genes.\n- The methods disagree on the most stable single gene: AP3D1 without groups, UBC with tissue groups.\n- The head-only geNorm and the tissue-grouped NormFinder rest on small groups (11 and 9 samples in two of the groups).\n\n**Waiting for you**\n- Choose the reference genes. The analysis does not select them.\n- Decide whether to rerun the stability ranking with the fitted efficiencies.\n- Decide whether the 7 per-gene outlier flags in the head group need a check of the raw wells.\n\nStep results that the answer does not mention, from the record:\n- n5 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hildyard2021-embryo-refgenes/run1/home/sessions/20261008-232410-da6e/work and wrote 0 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hildyard2021-embryo-refgenes/run1/home/sessions/20261008-232410-da6e/work.\n\nSettings used, from the decision record: Amplification efficiencies: 2 · Technical replicates: mean · Wells that you exclude: none · Highest Cq that counts as detected: 40 · Column of the groups for NormFinder: .",
+   "items": [
+    {
+     "key": "samples",
+     "description": "Number of samples",
+     "expected": 44,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 44,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_samples",
+      "entry": 40
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 103,
+      "text": null
+     }
+    },
+    {
+     "key": "genorm_best_pair_m",
+     "description": "geNorm average M of the best pair HTATSF1 and CDC40, all samples",
+     "expected": 0.217549,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.217549,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 63
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.2175,
+      "diff": 0.00004899999999999349,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 103,
+      "text": "Average M = 0.2175."
+     }
+    },
+    {
+     "key": "genorm_m_all_genes",
+     "description": "geNorm average M of all 15 genes (step that removes HPRT1)",
+     "expected": 0.527538,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.527538,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 63
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.5275,
+      "diff": 0.00003799999999998249,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 103,
+      "text": "- Average M with the least stable gene (HPRT1) still in the set (15 genes): 0.5275."
+     }
+    },
+    {
+     "key": "genorm_m_13_genes",
+     "description": "geNorm average M of 13 genes (step that removes GAPDH)",
+     "expected": 0.440995,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.440995,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 63
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.441,
+      "diff": 0.000004999999999977245,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 103,
+      "text": "- Average M with the two least stable genes (HPRT1 and B2M) removed (13 genes): 0.4410."
+     }
+    },
+    {
+     "key": "genorm_m_actb_step",
+     "description": "geNorm average M of 3 genes (step that removes ACTB)",
+     "expected": 0.227746,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.227746,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 63
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 103,
+      "text": null
+     }
+    },
+    {
+     "key": "genorm_n_below_0_5",
+     "description": "Genes with geNorm average M below 0.5",
+     "expected": 14,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 14,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.genorm_n_genes_M_below_0_5",
+      "entry": 40
+     },
+     "reported": {
+      "pass": true,
+      "value": 14,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 103,
+      "text": "The tool metric of 14 counts set sizes with average M below 0.5, not genes."
+     }
+    },
+    {
+     "key": "genorm_v2_3",
+     "description": "geNorm pairwise variation V2/3",
+     "expected": 0.06864,
+     "tolerance": 0.0003,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.068639841924258,
+      "diff": 1.5807574200998875e-7,
+      "node": "n1",
+      "path": "metrics.genorm_V2_3",
+      "entry": 40
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0686,
+      "diff": 0.00004000000000001225,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 103,
+      "text": "- V2/3 = 0.0686."
+     }
+    },
+    {
+     "key": "normfinder_ap3d1",
+     "description": "NormFinder stability, no groups, AP3D1 (most stable)",
+     "expected": 0.134827,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.134826902345669,
+      "diff": 9.765433101049936e-8,
+      "node": "n1",
+      "path": "metrics.normfinder_AP3D1",
+      "entry": 40
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.1348,
+      "diff": 0.000026999999999999247,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 103,
+      "text": "- No groups: most stable AP3D1 = 0.1348."
+     }
+    },
+    {
+     "key": "normfinder_hprt1",
+     "description": "NormFinder stability, no groups, HPRT1 (least stable)",
+     "expected": 0.480987,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.480986951933909,
+      "diff": 4.806609099627934e-8,
+      "node": "n1",
+      "path": "metrics.normfinder_HPRT1",
+      "entry": 40
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.481,
+      "diff": 0.000012999999999985246,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 103,
+      "text": "Least stable HPRT1 = 0.4810."
+     }
+    },
+    {
+     "key": "normfinder_tissue_ubc",
+     "description": "NormFinder stability grouped by tissue, UBC (most stable)",
+     "expected": 0.081032,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0810316631320243,
+      "diff": 3.368679757087545e-7,
+      "node": "n2",
+      "path": "metrics.normfinder_UBC",
+      "entry": 48
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.081,
+      "diff": 0.00003200000000000425,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 103,
+      "text": "- Grouped by tissue: most stable UBC = 0.0810."
+     }
+    },
+    {
+     "key": "normfinder_tissue_b2m",
+     "description": "NormFinder stability grouped by tissue, B2M (least stable)",
+     "expected": 0.180476,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.180475889535385,
+      "diff": 1.1046461501074134e-7,
+      "node": "n2",
+      "path": "metrics.normfinder_B2M",
+      "entry": 48
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.1805,
+      "diff": 0.000023999999999996247,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 103,
+      "text": "Least stable B2M = 0.1805."
+     }
+    },
+    {
+     "key": "heads_best_pair_m",
+     "description": "geNorm average M of the best pair, head samples",
+     "expected": 0.114216,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.114215805214595,
+      "diff": 1.9478540499995312e-7,
+      "node": "n3",
+      "path": "metrics.genorm_best_pair_M",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.1142,
+      "diff": 0.000016000000000002124,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 103,
+      "text": "Average M = 0.1142."
+     }
+    },
+    {
+     "key": "slope_gapdh",
+     "description": "Standard curve slope, GAPDH",
+     "expected": -3.4557,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -3.45571898809524,
+      "diff": 0.000018988095239702574,
+      "node": "n4",
+      "path": "metrics.slope_GAPDH",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": -3.4557,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 103,
+      "text": "| GAPDH | -3.4557 | 1.947 | 94.7 | 0.9987 |"
+     }
+    },
+    {
+     "key": "slope_htatsf1",
+     "description": "Standard curve slope, HTATSF1",
+     "expected": -3.1799,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -3.17988597619048,
+      "diff": 0.000014023809519869701,
+      "node": "n4",
+      "path": "metrics.slope_HTATSF1",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": -3.1799,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 103,
+      "text": "| HTATSF1 | -3.1799 | 2.063 | 106.3 | 0.9981 |"
+     }
+    },
+    {
+     "key": "slope_ubc",
+     "description": "Standard curve slope, UBC",
+     "expected": -3.3788,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -3.37875017857143,
+      "diff": 0.0000498214285702403,
+      "node": "n4",
+      "path": "metrics.slope_UBC",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": -3.3788,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 103,
+      "text": "| UBC (7 levels) | -3.3788 | 1.977 | 97.7 | 0.9924 |"
+     }
+    },
+    {
+     "key": "efficiency_cyc1",
+     "description": "Efficiency, CYC1",
+     "expected": 1.945026,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.94501242310476,
+      "diff": 0.000013576895239841846,
+      "node": "n4",
+      "path": "metrics.efficiency_CYC1",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.945,
+      "diff": 0.00002599999999985947,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 103,
+      "text": "| CYC1 (7 levels) | -3.4611 | 1.945 | 94.5 | 0.9987 |"
+     }
+    },
+    {
+     "key": "efficiency_pak1ip1",
+     "description": "Efficiency, PAK1IP1",
+     "expected": 2.012002,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.01199381486635,
+      "diff": 0.000008185133649973864,
+      "node": "n4",
+      "path": "metrics.efficiency_PAK1IP1",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.012,
+      "diff": 0.0000019999999998354667,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 103,
+      "text": "| PAK1IP1 | -3.2935 | 2.012 | 101.2 | 0.9996 |"
+     }
+    },
+    {
+     "key": "slope_actb_computed",
+     "description": "Standard curve slope, ACTB, from the data",
+     "expected": -3.2993,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -3.29932375,
+      "diff": 0.000023749999999989058,
+      "node": "n4",
+      "path": "metrics.slope_ACTB",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": -3.2993,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 103,
+      "text": "| ActB (named ACTB in file) | -3.2993 | 2.010 | 101.0 | 0.9986 |"
+     }
+    },
+    {
+     "key": "slope_actb_printed",
+     "description": "Standard curve slope, ACTB, as printed (does not reproduce; the data give -3.2993)",
+     "expected": -3.2293,
+     "tolerance": 0.0006,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": -3.23312138095238,
+      "diff": 0.00382138095238016,
+      "node": "n4",
+      "path": "metrics.slope_SDHA",
+      "entry": 54
+     },
+     "reported": {
+      "pass": false,
+      "value": -3.2331,
+      "diff": 0.0038000000000000256,
+      "via": null,
+      "node": "n4",
+      "claimEntry": 103,
+      "text": "| SDHA | -3.2331 | 2.038 | 103.8 | 0.9979 |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 8,
+    "inputTokens": 20,
+    "outputTokens": 17634,
+    "cacheRead": 265671,
+    "cacheWrite": 60541,
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 6,
+     "error": 2
+    },
+    "unsourced": 2,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hildyard2021-embryo-refgenes/run1/home/sessions/20261008-232410-da6e/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/hildyard2021-embryo-refgenes",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hildyard2021-embryo-refgenes/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a179c5b614ede26de/catalog/qpcr",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a179c5b614ede26de/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a179c5b614ede26de/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a179c5b614ede26de/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a179c5b614ede26de/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a179c5b614ede26de",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a179c5b614ede26de/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a179c5b614ede26de/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a179c5b614ede26de/catalog/qpcr"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/hildyard2021-embryo-refgenes/embryo_cq.csv",
+     "/Volumes/T7/guided-analysis/data/hildyard2021-embryo-refgenes/embryo_dilution.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hildyard2021-embryo-refgenes/run1/home/sessions/20261008-232410-da6e/work/rank_reference_genes-1/genorm.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 2,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-qpcr-haiku.md",
+  "json": "bench/results/papers-2026-10-09-qpcr-haiku.json"
+ },
+ "summary": {
+  "cells": {
+   "hildyard2021-embryo-refgenes": {
+    "claude:claude-haiku-5-5": {
+     "computed": 18,
+     "computedOf": 18,
+     "reported": 16,
+     "reportedOf": 16,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 18,
+    "computedOf": 18,
+    "reported": 16,
+    "reportedOf": 16,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 170.153,
+    "requests": 8,
+    "inputTokens": 20,
+    "outputTokens": 17634,
+    "cacheRead": 265671,
+    "cacheWrite": 60541,
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings_info": 4,
+    "findings_warning": 6,
+    "findings_error": 2,
+    "unsourced": 2,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   }
+  },
+  "skipped": []
+ }
+}
