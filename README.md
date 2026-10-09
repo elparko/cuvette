@@ -331,6 +331,8 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `qupath` | QuPath | Groovy scripts, one batch run for each step | histology |
 | `bftools` | Bio-Formats tools | command line | image formats |
 | `scanpy` | scanpy | Python library | single-cell RNA |
+| `harmony` | harmonypy | Python library | single-cell sample integration |
+| `squidpy` | Squidpy | Python library | spatial transcriptomics |
 | `samtools` | samtools | command line | sequencing alignments |
 | `fastqc` | FastQC | command line | sequencing quality |
 | `rdkit` | RDKit | Python library | chemistry |

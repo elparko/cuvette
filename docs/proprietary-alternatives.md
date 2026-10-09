@@ -83,7 +83,8 @@ of each package. The sources are at the end.
 | --- | --- | --- | --- | --- | --- |
 | Ingenuity Pathway Analysis (IPA) | QIAGEN, commercial subscription | Pathway and upstream-regulator analysis of gene lists from RNA-seq and proteomics. | clusterProfiler (Artistic-2.0); fgsea (MIT); gseapy (BSD-3); GSEA desktop (BSD-style Broad license) | none | This work: over-representation analysis and preranked GSEA. IPA's upstream-regulator scores use a closed knowledge base and stay open. |
 | MetaCore | Clarivate, commercial subscription | Curated pathway enrichment. | clusterProfiler (Artistic-2.0); ReactomePA (GPL-2); gseapy (BSD-3) | none | This work (same tools as for IPA). |
-| Partek Flow and Genomics Suite | Partek (Illumina), commercial | Point-and-click bulk and single-cell RNA-seq. | DESeq2 (LGPL-3 or later); limma (GPL-2 or later); edgeR (GPL-2 or later); scanpy (BSD-3) | `deseq2`, `scanpy` | Partial. No limma adapter. |
+| Partek Flow and Genomics Suite | Partek (Illumina), commercial | Point-and-click bulk and single-cell RNA-seq. | DESeq2 (LGPL-3 or later); limma (GPL-2 or later); edgeR (GPL-2 or later); scanpy (BSD-3); harmonypy (GPL-3 or later); Squidpy (BSD-3) | `deseq2`, `scanpy`, `harmony`, `squidpy` | Partial. No limma adapter. Clustering, sample integration with Harmony and spatial statistics: this work. |
+| Loupe Browser | 10x Genomics, free, closed | Views Cell Ranger and Space Ranger results: clusters, gene expression, differential expression and spatial gene plots. | scanpy (BSD-3); Squidpy (BSD-3); harmonypy (GPL-3 or later) | `scanpy`, `harmony`, `squidpy` | Partial. Clustering, marker genes, sample integration with Harmony, Moran's I, neighborhood enrichment and spatial domains: this work. Selecting cells by hand on the screen is open. |
 | GeneSpring | Agilent, commercial | Microarray expression analysis. | limma (GPL-2 or later); oligo and affy (LGPL-2 or later) | none | Open (microarrays are less common now). |
 | CLC Genomics Workbench | QIAGEN, commercial | Read mapping, variant calls, RNA-seq in a GUI. | samtools, bcftools (MIT); bedtools (MIT); Galaxy (MIT); UGENE (GPL-2) | `samtools`, `bcftools`, `bedtools`, `fastqc`, `deseq2` | Partial. No read aligner adapter. |
 | MaxQuant and Perseus | Max Planck Institute of Biochemistry, free, closed | Label-free, SILAC and TMT protein quantification; statistics in Perseus. | Sage (MIT); OpenMS (BSD-3); MSstats (Artistic-2.0) | `sage`, `openms`, `pyopenms` | Partial. Protein-level statistics (MSstats) are open. |
@@ -164,6 +165,41 @@ What stays open:
 - No paper found that prints HPLC-UV peak areas with open traces under a license on the list. The
   chromatography benchmark uses the hplc-py paper itself, whose figure prints two significant figures.
 
+## Single-cell integration and spatial analysis
+
+Added on 9 October 2026. `ga adapter check <name> --run-tests` passes with no error for both adapters.
+
+| Part | Adapter | Tools | Known-answer tests | Benchmark paper |
+| --- | --- | --- | --- | --- |
+| Integration of samples | `harmony` (harmonypy, GPL-3 or later; scanpy for the steps before and after) | 7 | 13 | Korsunsky 2019, DOI 10.1038/s41592-019-0619-0 |
+| Spatial transcriptomics | `squidpy` (Squidpy, BSD-3) | 8 | 13 | Weber 2023, DOI 10.1038/s41467-023-39748-z |
+
+Why two adapters and not new scanpy tools: Harmony needs one more Python package. It works on the scanpy checkpoints, so the adapter `harmony` uses the scanpy environment and adds no environment. Squidpy needs many packages that scanpy does not need (numba, xarray, dask, zarr), so it has its own environment. The scanpy adapter changed in one place. `build_neighbors` takes `use_rep`, so that the neighbor graph can use the Harmony components.
+
+Where each test value comes from:
+
+- `harmony`, `compute_lisi`: the output of the R package lisi that the harmonypy tests store (`lisi_lisi.tsv.gz`, 400 points). The tool matches it to 0.01 for each point. An own implementation (`checks/lisi_check.py`) matches it to 0.002.
+- `harmony`, `integrate_harmony`: the output of R harmony2 on 3500 PBMC (peripheral blood mononuclear cell) components that the harmonypy tests store. The tool gives a Pearson r of 0.9985 or more in each of 30 dimensions (`checks/harmony_check.py`). The harmonypy test needs 0.99.
+- `harmony`, `label_by_reference` and `count_groups`: numpy calculations without scanpy (`checks/label_check.py`).
+- `squidpy`, `spatial_autocorr`: the Moran's I values that the Squidpy documentation prints for the Visium mouse brain sample (3110035E14Rik 0.665132, Resp18 0.649582). The tool matches them to 0.0001. A SciPy calculation without Squidpy (`checks/moran_check.py`) gives 0.665133 and 0.649583.
+- `squidpy`, `nhood_enrichment`: a numpy calculation of the pair counts and of the z scores with its own permutations on the imaging mass cytometry sample (`checks/nhood_check.py`). The pair counts are equal. The z scores agree within the error of the permutations.
+- `squidpy`, `filter_genes_by_spots`: a numpy calculation without scanpy (`checks/filter_check.py`).
+- `squidpy`, `find_spatial_domains`: scikit-learn and numpy recalculate the adjusted Rand index and the share of neighbor pairs in one domain (`checks/domains_check.py`). The number of domains is from a run of the tool.
+
+Faults that the work found:
+
+- `scanpy.external.pp.harmony_integrate` fails with harmonypy 2.1.0 (scanpy 1.12.4). harmonypy 2.x returns the corrected components with cells in the rows, and scanpy transposes them. The adapter calls harmonypy directly and reads the result in the shape of the input.
+
+Paper results:
+
+- Korsunsky 2019: median iLISI 1.06 before and 1.66 after Harmony, paper 1.01 and 1.59. The cell counts of the pure 293T data set (2885, paper 2859) and of the mix (3388, paper 3364) do not reproduce. The paper counts are references in the benchmark.
+- Weber 2023: 3639 spots in the tissue, MOBP at rank 4 and SNAP25 at rank 19. The paper puts both in the top 100. Two values do not reproduce. The genes that pass the filter are 3322 (paper 3396). The ranks of HBB, IGKC and NPY are 54, 33 and 260 (paper 100 to 1000). They are references in the benchmark.
+
+What stays open:
+
+- No adapter yet for annotation with CellTypist, trajectories (PAGA, RNA velocity with scVelo) or cell-cell communication (LIANA, CellChat). The search found no open paper whose printed number a run from processed data reproduces. The reasons are in `bench/papers/CANDIDATES-singlecell-spatial.md`.
+- No adapter yet for integration with scVI, for the same reason.
+
 ## Sources
 
 - [Q] Statistics program counts in PubMed Central, 2016 to 2021: https://quantifyinghealth.com/?p=7735
@@ -201,6 +237,9 @@ What stays open:
 - ApE: https://github.com/mwdavis2/ApE/blob/master/LICENSE.md
 - OpenChrom: https://github.com/OpenChrom/openchrom/blob/develop/LICENSE
 - hplc-py: https://github.com/cremerlab/hplc-py
+- harmonypy: https://pypi.org/project/harmonypy/ and https://github.com/slowkow/harmonypy
+- Squidpy: https://pypi.org/project/squidpy/
+- Loupe Browser: https://www.10xgenomics.com/support/software/loupe-browser
 - chromConverter: https://github.com/ethanbass/chromConverter
 - MZmine: https://github.com/mzmine/mzmine
 - OpenMS: https://github.com/OpenMS/OpenMS/blob/develop/LICENSE

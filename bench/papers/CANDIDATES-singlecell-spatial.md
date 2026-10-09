@@ -68,4 +68,31 @@ Status: searched on 2026-10-09. The sections "Selected" and "Outcome" show the c
 
 ## Outcome
 
-Filled after the builds. See the end of this file.
+Built on 2026-10-09. Both papers ran blind with claude:claude-haiku-5-5. The results are in `runs.md` of each paper.
+
+| Capability | Adapter | Paper | Scored items | Haiku (computed, reported) | Items that do not reproduce |
+| --- | --- | --- | --- | --- | --- |
+| Integration of samples, LISI | `harmony` (with scanpy) | `korsunsky2019-harmony` | 5 | 5 of 5, 5 of 5 | Cells of the pure 293T data set (2885, paper 2859). Jurkat cells in the mix (1773, paper 1799). 293T cells in the mix (1615, paper 1565). All three are references. |
+| Spatial transcriptomics | `squidpy` | `weber2023-nnsvg-dlpfc` | 4 | 4 of 4, 4 of 4 | Genes that pass the filter (3309 with the mitochondrial genes removed, 3322 with them, paper 3396). Reference. |
+
+Reasons for the choice:
+
+- Harmony and Squidpy have printed numbers that a run from processed data reproduces: the cells and the median LISI of the cell line test, and the spot count and the layer gene ranks of the nnSVG paper.
+- The test values come from the packages themselves (the R reference outputs in the harmonypy tests, the Moran's I values in the Squidpy documentation) and from independent numpy and SciPy calculations.
+
+Not built, with the reason:
+
+- CellTypist: the papers that use it train or test on large atlases (357,211 cells), or print figures only. The one paper with printed shares for PBMC (Zheng 2017) is from 2017.
+- PAGA, diffusion pseudotime and scVelo: the papers that print numbers print cell counts, not trajectory results. The documented outputs depend on the version of the package. The source paper of paul15 (Paul 2015) is not open access.
+- LIANA and CellChat: the Dimitrov 2022 text prints overlap values only. CellChat needs R. The wound data have no cluster labels in GEO.
+- scVI: no paper prints a value that a run on 15 minutes of data reproduces.
+
+Papers checked and rejected after a closer read:
+
+- nnSVG, olfactory bulb: the 7 known genes are not named in the text.
+- nnSVG, rank ranges for PCP4, HBB, IGKC and NPY: the ranges ("around 100", "roughly 100 to 1000") match the rank of any other gene in an answer, and the ranks of HBB, IGKC and NPY do not reproduce (54, 33 and 260).
+- Harmony paper, pancreas: the cell count of the scIB file differs from the 14,746 cells of the paper.
+
+Faults found in other software:
+
+- `scanpy.external.pp.harmony_integrate` fails with harmonypy 2.1.0. The adapter calls harmonypy directly.
