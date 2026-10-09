@@ -287,7 +287,7 @@ export class DecisionRecord {
     const coerced: Record<string, unknown> = {};
     for (const [k, raw] of Object.entries(given)) {
       const s = this.states.get(k);
-      if (s) coerced[k] = coerce(s.def, raw);
+      if (s && raw !== undefined && raw !== null) coerced[k] = coerce(s.def, raw);
     }
 
     if (this.setupDone) {

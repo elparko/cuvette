@@ -62,6 +62,11 @@ describe("coercion", () => {
     expect(dr.value("flag")).toBe(true);
     expect((dr.value("question") as string).length).toBe(500);
   });
+
+  test("setup skips a field with no value instead of failing", () => {
+    expect(() => dr.applySetup({ tol: 3, method: undefined, flag: null })).not.toThrow();
+    expect(dr.value("tol")).toBe(3);
+  });
 });
 
 describe("setup", () => {
