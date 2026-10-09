@@ -1,0 +1,484 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "ram2021-pix-h-score",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 157.744,
+   "session": "20261009-043818-5dd8",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/ram2021-pix-h-score/run1/home/sessions/20261009-043818-5dd8",
+   "answer": "## Results\n\n**Method:** I read the case table. It has 75 rows, one row for each case. The table holds percents, so no image analysis ran. The scoring tool computed the H-scores from the four percents of each case. The H-score formula is 1 x percent of 1+ cells, plus 2 x percent of 2+ cells, plus 3 x percent of 3+ cells. The range is 0 to 300. The agreement tool gave the Spearman correlations, the weighted kappa and the ICC. The pathologist is the reference scorer. A script step also read the source table to check two values.\n\n**Number of cases (n) for each marker:**\n- 5T4: 21 cases\n- P-cadherin: 30 cases\n- PD-L1: 24 cases\n- Total: 75 cases. One case is one row. The table does not say if a case is one patient or one animal.\n\n**H-score of PD-L1 case 1:** 185. The percents in the table were 0 % at 0, 20 % at 1+, 75 % at 2+ and 5 % at 3+. The calculation is 1 x 20 + 2 x 75 + 3 x 5. The pathologist_h column in the source table also gives 185.0 for this case. A script step read this value from the file.\n\n**Spearman correlation with the pathologist H-score:**\n\n| Marker | n | QuPath rho (p) | HALO rho (p) |\n|---|---|---|---|\n| 5T4 | 21 | 0.789 (p = 0.00002) | 0.750 (p = 0.00009) |\n| P-cadherin | 30 | 0.392 (p = 0.032) | 0.495 (p = 0.005) |\n| PD-L1 | 24 | 0.739 (p = 0.00004) | 0.701 (p = 0.0001) |\n\n**P-cadherin agreement, pathologist against QuPath (n = 30 cases):**\n- Weighted kappa, quadratic weights, cut points at 100 and 200: 0.011. The 95 % interval is −0.109 to 0.128.\n- ICC(2,1): 0.149. The 95 % interval is −0.091 to 0.437.\n- Mean difference, pathologist minus QuPath: +115.2 H-score units. A script step gave the same value, +115.15. The limits of agreement are −32.7 to 263.0.\n- The positive sign means the pathologist scores are about 115 units higher than the QuPath scores on average.\n\n## What the results show\n\n- The correlations are high for 5T4 and PD-L1. The P-cadherin correlations are moderate.\n- For P-cadherin, the QuPath scores agree poorly with the pathologist. The kappa and ICC are close to zero. The pathologist scores are about 115 units higher on average.\n- A correlation does not show agreement. The high correlations for 5T4 and PD-L1 do not show that the scores match.\n\n## Uncertain\n\n- The intervals are wide. The P-cadherin kappa and ICC intervals include zero.\n- The kappa depends on the cut points. The scientist chose the cut points at 100 and 200 in the request. Other cut points give other kappa values. I did not test other cut points.\n- The 2+ threshold (0.4) and the 3+ threshold (0.6) that the scientist answered do not apply to this case table. They apply to image analysis, which did not run.\n\n## Waiting for the scientist\n\n- Confirm that a row is one patient or one animal. The replication unit sets the n for each group.\n\nSettings used, from the decision record: Region to score: whole · Threshold for 1+ (DAB optical density): 0.2 · Threshold for 2+ (DAB optical density): 0.4 · Threshold for 3+ (DAB optical density): 0.6 · Smallest number of cells for a score: 0 · Weights of the kappa: quadratic · Form of the intraclass correlation: ICC2 · Cut points that make categories from a continuous score: 100,200.",
+   "items": [
+    {
+     "key": "n_pcad",
+     "description": "Cases scored for P-cadherin",
+     "expected": 30,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 30,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_subjects",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 30,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 154,
+      "text": "- P-cadherin: 30 cases"
+     }
+    },
+    {
+     "key": "n_pdl1",
+     "description": "Cases scored for PD-L1",
+     "expected": 24,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 24,
+      "diff": 0,
+      "node": "n8",
+      "path": "metrics.n_subjects",
+      "entry": 75
+     },
+     "reported": {
+      "pass": true,
+      "value": 24,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 154,
+      "text": "- PD-L1: 24 cases"
+     }
+    },
+    {
+     "key": "n_5t4",
+     "description": "Cases scored for 5T4",
+     "expected": 21,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 21,
+      "diff": 0,
+      "node": "n10",
+      "path": "metrics.n_subjects",
+      "entry": 81
+     },
+     "reported": {
+      "pass": true,
+      "value": 21,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 154,
+      "text": "- 5T4: 21 cases"
+     }
+    },
+    {
+     "key": "h_pdl1_case1",
+     "description": "H-score of PD-L1 case 1 from its percents (0, 20, 75 and 5 percent at 0, 1+, 2+, 3+)",
+     "expected": 185,
+     "tolerance": 0.5,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 185,
+      "diff": 0,
+      "node": "n5",
+      "path": "file:/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/ram2021-pix-h-score/run1/home/sessions/20261009-043818-5dd8/work/score_h_score-4/pix_h_score_table_h_score.csv",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 185,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 154,
+      "text": "**H-score of PD-L1 case 1:** 185."
+     }
+    },
+    {
+     "key": "rho_pcad_qupath",
+     "description": "Spearman rho, P-cadherin, pathologist H-score and QuPath H-score",
+     "expected": 0.39,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.39230085528419695,
+      "diff": 0.0023008552841969343,
+      "node": "n6",
+      "path": "metrics.spearman_rho",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.392,
+      "diff": 0.0020000000000000018,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 154,
+      "text": "| P-cadherin | 30 | 0.392 (p = 0.032) | 0.495 (p = 0.005) |"
+     }
+    },
+    {
+     "key": "rho_pcad_halo",
+     "description": "Spearman rho, P-cadherin, pathologist H-score and HALO H-score",
+     "expected": 0.5,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.5003622865708104,
+      "diff": 0.0003622865708103884,
+      "node": "n9",
+      "path": "metrics.icc_icc3k",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.495,
+      "diff": 0.0050000000000000044,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 154,
+      "text": "| P-cadherin | 30 | 0.392 (p = 0.032) | 0.495 (p = 0.005) |"
+     }
+    },
+    {
+     "key": "rho_pdl1_qupath",
+     "description": "Spearman rho, PD-L1, pathologist H-score and QuPath H-score",
+     "expected": 0.74,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.7398156419814201,
+      "diff": 0.00018435801857985545,
+      "node": "n7",
+      "path": "table.rows[5][3]",
+      "entry": 72
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.739,
+      "diff": 0.0010000000000000009,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 154,
+      "text": "| PD-L1 | 24 | 0.739 (p = 0.00004) | 0.701 (p = 0.0001) |"
+     }
+    },
+    {
+     "key": "rho_pdl1_halo",
+     "description": "Spearman rho, PD-L1, pathologist H-score and HALO H-score (the paper prints 0.69, the data give 0.701)",
+     "expected": 0.69,
+     "tolerance": 0.015,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.6924478628643476,
+      "diff": 0.0024478628643476164,
+      "node": "n9",
+      "path": "table.rows[4][3]",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.701,
+      "diff": 0.01100000000000001,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 154,
+      "text": "| PD-L1 | 24 | 0.739 (p = 0.00004) | 0.701 (p = 0.0001) |"
+     }
+    },
+    {
+     "key": "rho_5t4_qupath",
+     "description": "Spearman rho, 5T4, pathologist H-score and QuPath H-score",
+     "expected": 0.79,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.7895615579114952,
+      "diff": 0.00043844208850485344,
+      "node": "n11",
+      "path": "metrics.pearson_r",
+      "entry": 84
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.789,
+      "diff": 0.0010000000000000009,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 154,
+      "text": "| 5T4 | 21 | 0.789 (p = 0.00002) | 0.750 (p = 0.00009) |"
+     }
+    },
+    {
+     "key": "rho_5t4_halo",
+     "description": "Spearman rho, 5T4, pathologist H-score and HALO H-score",
+     "expected": 0.75,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.749675536327094,
+      "diff": 0.00032446367290595024,
+      "node": "n11",
+      "path": "metrics.spearman_rho",
+      "entry": 84
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.75,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 154,
+      "text": "The percents in the table were 0 % at 0, 20 % at 1+, 75 % at 2+ and 5 % at 3+."
+     }
+    },
+    {
+     "key": "kappa_pcad_qupath",
+     "description": "Weighted kappa (quadratic, cut points 100 and 200), P-cadherin, pathologist and QuPath",
+     "expected": 0.010989,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.01098901098901095,
+      "diff": 1.0989010949466471e-8,
+      "node": "n6",
+      "path": "metrics.kappa",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.011,
+      "diff": 0.000010999999999998858,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 154,
+      "text": "- Weighted kappa, quadratic weights, cut points at 100 and 200: 0.011."
+     }
+    },
+    {
+     "key": "icc2_pcad_qupath",
+     "description": "ICC(2,1), P-cadherin, pathologist and QuPath",
+     "expected": 0.149255,
+     "tolerance": 0.002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.14925451291022654,
+      "diff": 4.870897734599033e-7,
+      "node": "n6",
+      "path": "metrics.icc",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.149,
+      "diff": 0.0002550000000000052,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 154,
+      "text": "- ICC(2,1): 0.149."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 13,
+    "inputTokens": 36,
+    "outputTokens": 13542,
+    "cacheRead": 386407,
+    "cacheWrite": 45644,
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 2,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 7,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 2,
+    "overwritten": 2,
+    "nodes": 10
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/ram2021-pix-h-score/run1/home/sessions/20261009-043818-5dd8/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/ram2021-pix-h-score",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/ram2021-pix-h-score/run1",
+     "/Users/parker/Code/guided-analysis/catalog/ihc-scoring",
+     "/Users/parker/.guided-analysis/envs/ihc-scoring",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/ihc-scoring"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/ram2021-pix-h-score/pix_h_score_table.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/ram2021-pix-h-score/run1/home/sessions/20261009-043818-5dd8/work/score_h_score-4/pix_h_score_table_h_score.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-ihc-haiku.md",
+  "json": "bench/results/papers-2026-10-09-ihc-haiku.json"
+ },
+ "summary": {
+  "cells": {
+   "ram2021-pix-h-score": {
+    "claude:claude-haiku-5-5": {
+     "computed": 12,
+     "computedOf": 12,
+     "reported": 12,
+     "reportedOf": 12,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 12,
+    "computedOf": 12,
+    "reported": 12,
+    "reportedOf": 12,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 157.744,
+    "requests": 13,
+    "inputTokens": 36,
+    "outputTokens": 13542,
+    "cacheRead": 386407,
+    "cacheWrite": 45644,
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 2,
+    "revisions": 1,
+    "findings_info": 2,
+    "findings_warning": 7,
+    "findings_error": 0,
+    "unsourced": 0,
+    "deviations": 2,
+    "overwritten": 2,
+    "nodes": 10
+   }
+  },
+  "skipped": []
+ }
+}
