@@ -1,7 +1,8 @@
 # Cuvette adapter registry: template
 
 This folder is the template for the registry repository `elparko/cuvette-adapters`. The
-repository does not exist yet. Copy this folder to a new repository to start the registry.
+repository was made on 9 October 2026. It is private until the Cuvette repository becomes public.
+If you change a file here, copy it to the registry repository too.
 The layout and the index format are in `docs/adapter-registry.md` in the Cuvette repository.
 
 ## What the template holds
@@ -30,6 +31,13 @@ The layout and the index format are in `docs/adapter-registry.md` in the Cuvette
 8. In Settings, Actions, General, set "Fork pull request workflows" to "Require approval for all outside collaborators".
 9. Commit an empty `index.json` with `{"registry": "", "generated": "", "adapters": []}`. The first merge to `main` replaces it.
 10. Run `cuvette adapter list --registry` to test the address. The default address is `https://raw.githubusercontent.com/elparko/cuvette-adapters/main/index.json`. Set the setting `adapter_registry` to use another address.
+
+Status on 9 October 2026: steps 1 (private), 2, 3, 6 and 9 are done. These steps are open:
+- Step 1: make the repository public. Do this when the Cuvette repository becomes public.
+  The workflows check out `elparko/cuvette`, and they fail while it is private.
+- Step 4: `CUVETTE_REF` is `main`. Set it to the first release tag.
+- Step 5: the owner adds the secret `ANTHROPIC_API_KEY`.
+- Steps 7 and 8: GitHub allows them only for a public repository on the free plan.
 
 ## How a pull request is handled
 
