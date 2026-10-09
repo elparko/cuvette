@@ -411,8 +411,8 @@ agent's prompt.
 
 ## Documents
 
-- [docs/status-2026-10-08.md](docs/status-2026-10-08.md): what we built and tested overnight, and
-  the known limits. Start here.
+- [docs/benchmark-2026-10-09.md](docs/benchmark-2026-10-09.md): the paper benchmark of 9 October:
+  the method, the results for each model and paper, and the known limits.
 - [docs/design.md](docs/design.md): the goals and all intended features.
 - [docs/architecture.md](docs/architecture.md): the modules and their contracts.
 - [docs/harness-survey.md](docs/harness-survey.md): how Claude Code and OpenCode work, and what
