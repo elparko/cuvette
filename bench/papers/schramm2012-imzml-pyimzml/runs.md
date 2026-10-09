@@ -44,5 +44,4 @@ Result: pass. No findings.
 
 - Across the three runs every expected number that the model reported matches expected.yaml. The two-question prompt did not finish the guided question.
 - The ion image tolerance question never came up, because the questions did not need an ion image. The decision `ion_ppm` is `when_needed` and has no value until the scientist answers.
-- Smoke test of the tools on `/Volumes/T7/an unpublished lab file` (read only): 361271 pixels, 4952 x 771, 10 um, m/z 200.0040 to 2000.0, centroid, negative, processed, ibd 15953370940 bytes. Parse time 37 s. The mean spectrum of 100 pixels took 0.7 s. The strongest peak is m/z 381.178.
 - Harness note: the `decision_misreported` rule treats the word TIC in "total ion current (TIC)" as a normalization claim. Reproduction: run `get_tic_image` on `catalog/pyimzml/data/Example_Continuous.imzML` with the normalization decision set to none, and let the answer say "total ion current (TIC)".

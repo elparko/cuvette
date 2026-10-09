@@ -9,7 +9,7 @@ same numbers as the stage 1 chat in `smile_msi/agent/`. The harness must contain
 
 ## Starting point
 
-The stage 1 chat in the private SMILE MSI repository, `smile_msi/agent/` (about 3,400 lines):
+The stage 1 chat in elparko/SMILE-MSI, `smile_msi/agent/` (about 3,400 lines):
 
 | Module | Domain-free? | Plan |
 | --- | --- | --- |
