@@ -14,6 +14,8 @@ import { startMcp } from "./mcp.ts";
 export interface AdapterRuntime {
   adapter: LoadedAdapter;
   programVersion: string;
+  programPath?: string;
+  interpreter?: string[];
   instructions: string;
   running: boolean;
   tools(): Promise<Tool[]>;

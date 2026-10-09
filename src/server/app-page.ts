@@ -183,6 +183,9 @@ form.composer textarea { width: 100%; resize: vertical; min-height: 46px; max-he
 iframe.graph { width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 table.decisions select, table.decisions input { max-width: 150px; }
 .notice.warn { background: var(--warn-bg); border: 1px solid var(--warn); border-radius: 8px; padding: 6px 10px; }
+.rerun { margin: 6px 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.rerun table.changes td:not(:first-child), .rerun table.changes th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.status-line ul { margin: 4px 0 6px; padding-left: 18px; }
 main.page { flex: 1; padding: 16px; max-width: 900px; width: 100%; margin: 0 auto; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 0 0 14px; box-shadow: var(--shadow); }
 ${SETTINGS_CSS}

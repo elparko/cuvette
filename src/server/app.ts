@@ -15,10 +15,10 @@ import { listSessions, openLock } from "../core/sessions.ts";
 import { findPlace } from "../core/places.ts";
 import { find, recordSetting, type SettingCtx, type SettingSession } from "../core/settings.ts";
 import type { Mode } from "../core/types.ts";
-import { commands, decisionRows, noOpen, openWithOs } from "../ui/commands.ts";
+import { commands, decisionRows, freshStatus, noOpen, openWithOs } from "../ui/commands.ts";
 import { removeSecret, resetRow, saveSetting } from "../ui/config.ts";
 import type { SessionLike } from "../ui/types.ts";
-import { decisionsHtml, doctorHtml, planTextHtml, programsHtml, resultsHtml, sessionsHtml, stepsHtml, type Ctx } from "./app-html.ts";
+import { decisionsHtml, doctorHtml, planTextHtml, programsHtml, resultsHtml, sessionsHtml, statusHtml, stepsHtml, type Ctx } from "./app-html.ts";
 import { settingsHtml } from "./app-settings.ts";
 import { isProgramAction, listPrograms } from "../core/programs.ts";
 import { planFor, runFor, type ProgramHooks } from "../ui/programs.ts";
@@ -209,16 +209,17 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     }
   };
 
-  const tab = (name: string): string => {
+  const tab = async (name: string): Promise<string> => {
     const c = current!;
     const s = c.session;
     if (name === "analysis") {
+      const states = await freshStatus(s);
       const v = planView(s.record);
       const plan = v ? `<h4>${v.approved ? "Confirmed analysis" : "Proposed analysis"}, version ${v.version}</h4><div class="plantext">${planTextHtml(v.text)}</div>` : `<p class="empty">No proposed analysis yet. Type your question. The agent proposes the analysis first.</p>`;
-      return `${plan}<h4>Steps</h4>${stepsHtml(ctx())}<p class="dim small"><a href="graph/?t=${encodeURIComponent(token)}" target="_blank" rel="noopener">Open the step graph</a></p>`;
+      return `${plan}<h4>Steps</h4>${statusHtml(states)}${stepsHtml(ctx())}<p class="dim small"><a href="graph/?t=${encodeURIComponent(token)}" target="_blank" rel="noopener">Open the step graph</a></p>`;
     }
     if (name === "results") return resultsHtml(ctx(), outDir(), sheets());
-    if (name === "decisions") return decisionsHtml(ctx(), decisionRows(s), s.record.stale().size);
+    if (name === "decisions") return decisionsHtml(ctx(), decisionRows(s), await freshStatus(s));
     if (name === "record") return `<p class="dim small">Every step, with the housekeeping steps and the code. This is the same as /details.</p>${c.view.recordHtml()}`;
     return "";
   };
@@ -308,7 +309,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     }
     if (get && p === "/api/tab") {
       if (!c) return send(res, 409, { error: "no session" });
-      return send(res, 200, tab(url.searchParams.get("name") ?? ""), "text/html; charset=utf-8");
+      return send(res, 200, await tab(url.searchParams.get("name") ?? ""), "text/html; charset=utf-8");
     }
     if (!post) return send(res, 404, { error: "not found" });
     const body = await readBody(req);

@@ -382,6 +382,10 @@ export class FakeSession implements SessionLike {
     return stale;
   }
 
+  labels(): Record<string, string> {
+    return Object.fromEntries(this.fields.map((f) => [f.key, f.label]));
+  }
+
   setOwner(key: string, owner: Owner): void {
     const old = this.decisions.owner(key);
     this.owners.set(key, owner);

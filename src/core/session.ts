@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
@@ -37,6 +37,9 @@ import { applyEdit, designChecks, groupSummary, readSheet, SAMPLE_COLUMNS, sheet
 import { AnalysisRecord } from "./record.ts";
 import { Findings, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
+import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
+import { changeRows, fileSha, liveReasons, recordReasons, replacedNode, stepStatus, type Current, type Reason, type RerunData, type StepState } from "./status.ts";
+import { scriptPython } from "../tools/run_script.ts";
 import {
   ProviderError,
   type Args,
@@ -115,14 +118,6 @@ function newId(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${randomBytes(2).toString("hex")}`;
-}
-
-async function fileSha(path: string): Promise<string> {
-  const st = statSync(path);
-  if (st.size > 2_000_000_000) return createHash("sha256").update(`${path}:${st.size}:${st.mtimeMs}`).digest("hex");
-  const h = createHash("sha256");
-  for await (const chunk of createReadStream(path)) h.update(chunk as Buffer);
-  return h.digest("hex");
 }
 
 function extOf(p: string): string {
@@ -208,6 +203,8 @@ export class Session {
   setupPreset: Record<string, unknown> = {};
   history: Message[] = [];
   private runtimeInfo: { adapter: LoadedAdapter; programVersion: string; instructions: string }[] = [];
+  private envTargets = new Map<string, EnvTarget>();
+  private envNow = new Map<string, EnvLock>();
   private found: FoundCache = new Map();
   private index?: AdapterSummary[];
   private tools = new Map<string, Tool>();
@@ -418,6 +415,8 @@ export class Session {
         ...(defaults.length ? { defaults: defaults.map((a) => a.name) } : {}),
       });
     }
+    for (const a of this.adapterInfo) await this.envHashFor(a.name);
+    if (resumed) await this.checkStatus();
     if (this.permissionMode === "bypass") this.record.append("permission_mode", { old: "ask", new: "bypass", how: opts.settings?.permissionMode === "bypass" ? "the --bypass-permissions flag" : "a settings file" });
     await this.hooks.event("SessionStart", { session: this.id });
     this.markOpen({ app: undefined });
@@ -491,6 +490,7 @@ export class Session {
     const { startAdapter } = await import("../adapters/runtime.ts");
     const rt = await startAdapter(a, this.dirs());
     this.runtimes.push(rt);
+    this.envTargets.set(a.name, envTarget({ kind: a.manifest.connection.kind, interpreter: rt.interpreter ?? [], programPath: rt.programPath, program: a.manifest.program.name, programVersion: rt.programVersion }));
     this.runtimeInfo.push({ adapter: a, programVersion: rt.programVersion, instructions: rt.instructions });
     this.adapterInfo.push({ name: a.name, title: a.manifest.adapter.title || a.manifest.program.name, version: a.manifest.adapter.version, programVersion: rt.programVersion });
     const mod = await a.module();
@@ -660,7 +660,8 @@ export class Session {
     } else names.forEach((n) => this.active.add(n));
     this.system = this.buildSystem();
     const info = this.adapterInfo.at(-1)!;
-    this.record.append("adapter", { name: a.name, program: m.program.name, version: info.version, programVersion: info.programVersion, reason, by, status: m.adapter.status, path: a.root, programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
+    const envHash = await this.envHashFor(a.name);
+    this.record.append("adapter", { name: a.name, program: m.program.name, version: info.version, programVersion: info.programVersion, envHash, reason, by, status: m.adapter.status, path: a.root, programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
     const shown = names.filter((n) => this.active.has(n));
     const skills = a.skills();
     const brief = added.length ? this.decisions.brief(added) : "";
@@ -1283,6 +1284,8 @@ export class Session {
             return { path: p, size: st.size, mtime: st.mtime.toISOString(), sha256: await fileSha(p), ...(!this.place.legacy && outside(p, this.cwd) ? { outside: true } : {}) };
           }),
       );
+      const envHash = tool.adapter || tool.name === "run_script" ? await this.envHashFor(tool.adapter || "run_script") : undefined;
+      const before = await this.checkStatus();
       const n = this.record.addNode({
         entry: this.record.entries(["tool_result"]).at(-1)!.id,
         adapter: tool.adapter ?? "",
@@ -1294,6 +1297,7 @@ export class Session {
         codeHash: createHash("sha256").update(`${adapter?.name}@${adapter?.manifest.adapter.version}:${remote}:${JSON.stringify(entry ?? {})}`).digest("hex"),
         inputHashes: inputFiles.map((f) => f.sha256),
         inputFiles,
+        ...(envHash ? { envHash } : {}),
         outputs,
         result: { ok: output.ok, summary, metrics: output.metrics ?? {}, table: output.table, data: output.data },
         parents,
@@ -1304,8 +1308,60 @@ export class Session {
         sensitivityOf: sensitivityOf ?? "",
       });
       node = n.id;
+      if (!n.sensitivityOf) this.noteRerun(n, before);
     }
     return { output: { ...output, summary, manualRoute, fidelity, outputs }, node };
+  }
+
+  private noteRerun(n: import("./types.ts").Node, before: StepState[]) {
+    const out = before.filter((x) => !x.current);
+    const old = replacedNode(this.record, n, new Set(out.map((x) => x.node)));
+    if (!old) return;
+    const steps = stepNumbers(this.record.nodes());
+    const diff = changeRows(old.result, n.result);
+    const data: RerunData = { old: old.id, node: n.id, oldStep: steps.get(old.id) ?? 0, step: steps.get(n.id) ?? 0, tool: n.tool, reasons: out.find((x) => x.node === old.id)!.reasons.map((r) => r.text), rows: diff.rows, changed: diff.changed, unchanged: diff.unchanged };
+    this.record.append("rerun", data as unknown as Record<string, unknown>, { node: n.id });
+  }
+
+  private async envHashFor(key: string): Promise<string | undefined> {
+    const target = key === "run_script" ? envTarget({ kind: "python", interpreter: [scriptPython()], program: "", programVersion: "" }) : this.envTargets.get(key);
+    if (!target) return undefined;
+    const lock = await captureEnv(target).catch(() => undefined);
+    if (!lock) return undefined;
+    this.envNow.set(key, lock);
+    return this.record.addEnvironment(lock, key);
+  }
+
+  labels(): Record<string, string> {
+    return Object.fromEntries((this.decisions?.fields() ?? []).map((f) => [f.key, f.label || f.key]));
+  }
+
+  private currentInfo(): Current {
+    const cur: Current = new Map();
+    for (const a of this.adapters) {
+      const info = this.adapterInfo.find((x) => x.name === a.name);
+      cur.set(a.name, { version: a.manifest.adapter.version, programVersion: info?.programVersion, program: a.manifest.program.name, env: this.envNow.get(a.name) });
+    }
+    if (this.envNow.has("run_script")) cur.set("run_script", { env: this.envNow.get("run_script") });
+    return cur;
+  }
+
+  async checkStatus(): Promise<StepState[]> {
+    const live = await liveReasons(this.record, this.currentInfo());
+    const known = recordReasons(this.record, this.labels());
+    const fresh = new Map<string, { kind: Reason["kind"]; ids: string[] }>();
+    for (const [id, list] of live)
+      for (const r of list) {
+        if ((known.get(id) ?? []).some((x) => x.text === r.text)) continue;
+        const g = fresh.get(r.text) ?? { kind: r.kind, ids: [] };
+        g.ids.push(id);
+        fresh.set(r.text, g);
+      }
+    for (const [text, g] of fresh) {
+      const nodes = [...new Set([...g.ids, ...g.ids.flatMap((id) => this.record.descendants(id))])];
+      this.record.append("stale", { kind: g.kind, reason: text, nodes, direct: g.ids });
+    }
+    return stepStatus(this.record, { labels: this.labels() });
   }
 
   private render(tool: Tool, o: ToolOutput): { text: string; images?: string[] } {

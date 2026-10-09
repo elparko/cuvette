@@ -326,3 +326,28 @@ test("the sessions list shows the title, the sentence, the folder, the age and t
   expect(html).toContain("data-session-search");
   expect(html).toContain('data-open-session="s1"');
 });
+
+test("the Analysis tab has a status line with the reason and the rerun button; the step and the Decisions tab show the before and after table", async () => {
+  const s = new FakeSession();
+  const base = { entry: 1, adapter: "msi", adapterVersion: "1.0", programVersion: "2.0", tool: "find_peaks", args: {}, codeHash: "c", inputHashes: [], outputs: [], parents: [], model: "fake", manualRoute: "", fidelity: "none" as const };
+  const n1 = s.record.addNode({ ...base, decisions: { tolerance_ppm: 5 }, result: { ok: true, metrics: { peaks: 120 } }, summary: "Found 120 peaks." });
+  app = await startApp({ session: s, env });
+  const c = client(app);
+  expect(await (await c.get("api/tab?name=analysis")).text()).toContain("<strong>Status:</strong> The step is up to date.");
+  s.setDecision("tolerance_ppm", 10, "changed by the scientist");
+  const analysis = await (await c.get("api/tab?name=analysis")).text();
+  expect(analysis).toContain("<strong>Status:</strong> 1 of 1 step is out of date.");
+  expect(analysis).toContain("Step 1: The decision &quot;Mass tolerance (ppm)&quot; changed after this step ran.");
+  expect(analysis).toContain('data-rerun="1"');
+  expect(analysis).toContain("Run the out-of-date steps again");
+  const n2 = s.record.addNode({ ...base, decisions: { tolerance_ppm: 10 }, result: { ok: true, metrics: { peaks: 131 } }, summary: "Found 131 peaks." });
+  s.record.append("rerun", { old: n1.id, node: n2.id, oldStep: 1, step: 2, tool: "find_peaks", reasons: ['The decision "Mass tolerance (ppm)" changed after this step ran.'], rows: [{ name: "peaks", before: 120, after: 131, change: 11 }], changed: 1, unchanged: 0 });
+  const after = await (await c.get("api/tab?name=analysis")).text();
+  expect(after).toContain("replaced by step 2");
+  expect(after).toContain("Before and after: step 2 repeats step 1.");
+  expect(after).toContain(">+11 (+9.2%)<");
+  expect(after).toContain("<strong>Status:</strong> The step is up to date.");
+  const decisions = await (await c.get("api/tab?name=decisions")).text();
+  expect(decisions).toContain("Changes after a step ran again");
+  expect(decisions).toContain(">131<");
+});

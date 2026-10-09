@@ -1,6 +1,7 @@
 import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import type { DeckOptions, DeckWritten } from "../core/imagedeck.ts";
+import type { StepState } from "../core/status.ts";
 import type { BusEvent, Entry, Finding, Mode, ModelInfo, Owner, PlanResponse, Question } from "../core/types.ts";
 import type { SampleRow } from "../core/samples.ts";
 
@@ -71,6 +72,8 @@ export interface SessionLike {
   openEvents?(): BusEvent[];
   sampleSheet?(): { rows: SampleRow[]; path: string; from: string } | undefined;
   editSamples?(text: string): Promise<string>;
+  checkStatus?(): Promise<StepState[]>;
+  labels?(): Record<string, string>;
   markOpen?(extra?: Record<string, unknown>): void;
   close(): Promise<void>;
 }

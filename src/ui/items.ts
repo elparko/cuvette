@@ -2,6 +2,7 @@ import { activity, canMakeNode, purposeOf, role } from "../core/housekeeping.ts"
 import type { Entry, Fidelity } from "../core/types.ts";
 import { scopeLabel, type Scope } from "../core/settings.ts";
 import { pilotText } from "../core/pilot.ts";
+import { rerunBody, rerunTitle, type RerunData } from "../core/status.ts";
 import type { SessionLike } from "./types.ts";
 
 export interface OutputRef {
@@ -190,6 +191,12 @@ export class Mapper {
           : line("▸", "Bypass permissions is off. Tool calls that need permission show a card again.", "cyan");
       case "compaction":
         return line("▸", "Older messages were summarized to save space.", undefined, true);
+      case "rerun":
+        return [{ key, t: "block", title: rerunTitle(d as unknown as RerunData), text: rerunBody(d as unknown as RerunData) }];
+      case "environment": {
+        const n = ((d.packages as unknown[]) ?? []).length;
+        return d.kind === "program" ? [] : line("▸", `Recorded the package versions of the ${d.name} environment: ${d.language}, ${n} ${n === 1 ? "package" : "packages"}.`, undefined, true);
+      }
       case "stale":
         return line("⚠", `Out of date: ${((d.nodes as string[]) ?? []).join(", ")} (${d.reason ?? d.key})`, "yellow");
       case "note":

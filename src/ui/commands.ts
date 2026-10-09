@@ -4,6 +4,7 @@ import { pilotText } from "../core/pilot.ts";
 import { planView } from "../core/plan.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
+import { statusText, stepStatus, type StepState } from "../core/status.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { listSessions, sessionLine } from "../core/sessions.ts";
 import { groupSummary, sheetTable } from "../core/samples.ts";
@@ -78,12 +79,19 @@ export function parseDecision(f: { kind: string; choices?: any[] }, raw: string)
   return raw;
 }
 
-export function rerunText(session: SessionLike): string | undefined {
-  const stale = [...session.record.stale()];
-  if (!stale.length) return undefined;
-  const steps = stepNumbers(session.record.nodes());
-  const names = stale.map((id) => (steps.has(id) ? `step ${steps.get(id)}` : id));
-  return `I changed a decision. Run the steps that are out of date again with the recorded values: ${names.join(", ")}. Then update the answer.`;
+export function statusOf(session: SessionLike): StepState[] {
+  return stepStatus(session.record, { labels: session.labels?.() });
+}
+
+export async function freshStatus(session: SessionLike): Promise<StepState[]> {
+  return session.checkStatus ? session.checkStatus() : statusOf(session);
+}
+
+export function rerunText(session: SessionLike, states = statusOf(session)): string | undefined {
+  const out = states.filter((s) => !s.current);
+  if (!out.length) return undefined;
+  const lines = out.map((s) => `- Step ${s.step} (${s.tool}): ${s.reasons.map((r) => r.text).join(" ")}`);
+  return `These steps are out of date. Run each one again, in order, with the current decision values and the same input files:\n${lines.join("\n")}\nThen update the answer.`;
 }
 
 export function decisionRows(session: SessionLike): string[][] {
@@ -271,10 +279,17 @@ export const commands: Command[] = [
     },
   },
   {
+    name: "status",
+    help: "List each step as up to date or out of date, with the reason.",
+    async run(_, ctx) {
+      ctx.print(statusText(await freshStatus(ctx.session)), "Status");
+    },
+  },
+  {
     name: "rerun",
-    help: "Ask the agent to run the out-of-date steps again.",
-    run(_, ctx) {
-      const text = rerunText(ctx.session);
+    help: "Run the out-of-date steps again. /status shows them and the reasons.",
+    async run(_, ctx) {
+      const text = rerunText(ctx.session, await freshStatus(ctx.session));
       if (!text) return ctx.notice("No step is out of date.");
       if (ctx.session.busy) return ctx.error("The agent is busy. Wait, then type /rerun again.");
       void ctx.session.send(text).catch((e: Error) => ctx.error(`The agent stopped: ${e.message}`));

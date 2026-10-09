@@ -15,6 +15,7 @@ import { fidelityLabel, type Item } from "../ui/items.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
 import { lastUseText, originText, sizeText, STATE_LABEL, type ProgramRow } from "../core/programs.ts";
 import { fieldTitle, groupRows, rowActions, summaryLine } from "../ui/programs.ts";
+import { changeCell, num, reruns, stepStatus, type RerunData, type StepState } from "../core/status.ts";
 import type { SessionLike } from "../ui/types.ts";
 
 export interface Slot {
@@ -444,9 +445,27 @@ export function sessionsHtml(list: SessionInfo[], token: string, now = Date.now(
 
 const clipText = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
 
-export function decisionsHtml(c: Ctx, rows: string[][], stale: number): string {
+export function changeHtml(d: RerunData, limit = 12): string {
+  const rows = d.rows.filter((r) => r.change !== 0);
+  const shown = rows.slice(0, limit);
+  const table = shown.length ? tableHtml(["Number", "Before", "After", "Change"], shown.map((r) => [esc(r.name), esc(num(r.before)), esc(num(r.after)), esc(changeCell(r))]), "changes") : `<p class="dim small">No number changed.</p>`;
+  const more = rows.length > shown.length ? `<p class="dim small">${rows.length - shown.length} more changed. The Changes sheet of results.xlsx has all of them.</p>` : "";
+  const same = d.unchanged ? `<p class="dim small">${d.unchanged} ${d.unchanged === 1 ? "number did" : "numbers did"} not change.</p>` : "";
+  return `<div class="rerun"><p class="small"><strong>Before and after: step ${d.step} repeats step ${d.oldStep}.</strong>${d.reasons.length ? ` ${esc(d.reasons.join(" "))}` : ""}</p>${table}${more}${same}</div>`;
+}
+
+export function statusHtml(states: StepState[]): string {
+  if (!states.length) return "";
+  const out = states.filter((s) => !s.current);
+  if (!out.length) return `<p class="dim small status-line"><strong>Status:</strong> ${states.length === 1 ? "The step is up to date." : `All ${states.length} steps are up to date.`}</p>`;
+  return `<div class="notice warn status-line"><p><strong>Status:</strong> ${out.length} of ${states.length} ${states.length === 1 ? "step" : "steps"} ${out.length === 1 ? "is" : "are"} out of date.</p><ul class="small">${out.map((s) => `<li>Step ${s.step}: ${esc(s.reasons.map((r) => r.text).join(" "))}</li>`).join("")}</ul>${btn("Run the out-of-date steps again", `data-rerun="1"`, "primary")}</div>`;
+}
+
+export function decisionsHtml(c: Ctx, rows: string[][], states: StepState[] = stepStatus(c.session.record, { labels: c.session.labels?.() })): string {
   const fields = c.session.decisions.fields();
-  return `${stale ? `<div class="notice warn"><p>${stale} ${stale === 1 ? "step is" : "steps are"} out of date after a change.</p>${btn("Rerun the steps that changed", `data-rerun="1"`, "primary")}</div>` : ""}
+  const changes = reruns(c.session.record);
+  const out = states.filter((s) => !s.current);
+  return `${out.length ? statusHtml(states) : ""}${changes.length ? `<h4>Changes after a step ran again</h4>${changes.map((d) => changeHtml(d)).join("")}` : ""}
 <div class="decisions">${rows
     .map(([key, , owner, by]) => {
       const f = fields.find((x) => x.key === key)!;
@@ -471,14 +490,20 @@ export function stepsHtml(c: Ctx): string {
   const r = c.session.record;
   const nodes = r.nodes().filter((n) => !n.sensitivityOf);
   const steps = stepNumbers(nodes);
-  const stale = r.stale();
+  const state = new Map(stepStatus(r, { labels: c.session.labels?.() }).map((x) => [x.node, x]));
+  const changes = new Map(reruns(r).map((d) => [d.node, d]));
   const main = nodes.filter((n) => steps.has(n.id));
   if (!main.length) return `<p class="empty">No steps yet.</p>`;
   return `<ol class="steps">${main
     .map((n) => {
       const img = n.outputs.find((o) => o.kind === "image" || IMG.test(o.path));
       const purpose = typeof n.args.purpose === "string" && n.args.purpose.trim() ? n.args.purpose.trim() : "";
-      return `<li class="${stale.has(n.id) ? "stale" : ""}"><div><strong>Step ${steps.get(n.id)}</strong> ${esc(n.summary || n.tool.replace(/_/g, " "))}${stale.has(n.id) ? ` <span class="tag warn">out of date</span>` : ""}</div>${purpose ? `<div class="dim small">${esc(purpose)}</div>` : ""}${img && existsSync(img.path) ? `<div class="images">${imageHtml(c, img.path)}</div>` : ""}</li>`;
+      const st = state.get(n.id);
+      const newer = r.replacedBy(n.id) ? steps.get(r.latest(n.id)) : undefined;
+      const tag = newer ? ` <span class="tag">replaced by step ${newer}</span>` : st && !st.current ? ` <span class="tag warn">out of date</span>` : "";
+      const why = st && !st.current ? `<div class="small warn">${esc(st.reasons.map((x) => x.text).join(" "))}</div>` : "";
+      const change = changes.get(n.id);
+      return `<li class="${newer || (st && !st.current) ? "stale" : ""}"><div><strong>Step ${steps.get(n.id)}</strong> ${esc(n.summary || n.tool.replace(/_/g, " "))}${tag}</div>${why}${purpose ? `<div class="dim small">${esc(purpose)}</div>` : ""}${change ? changeHtml(change) : ""}${img && existsSync(img.path) ? `<div class="images">${imageHtml(c, img.path)}</div>` : ""}</li>`;
     })
     .join("")}</ol>`;
 }

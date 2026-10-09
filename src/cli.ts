@@ -90,6 +90,8 @@ Usage
   ga replay <flow.json> [--input name=path ...] [--session <id>]
   ga run-step <adapter> <tool> '<json args>'
   ga questions                         open questions in every session
+  ga status [session]                  list each step as up to date or out of date, with the reason
+                                       (a changed decision, input file, adapter, program or package version)
   ga bench [scenario|all] --model <model> [--guidance on|off|both]
   ga bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run] [--no-blind]
   ga bench site --results a.json[,b.json] --out <folder>
@@ -636,6 +638,22 @@ async function main() {
       const r = await run.call(a1, a2, a3 ? JSON.parse(a3) : {});
       console.log(JSON.stringify(r, null, 1));
       return run.close();
+    }
+    case "status": {
+      const { AnalysisRecord } = await import("./core/record.ts");
+      const { listSessions, defaultSession } = await import("./core/sessions.ts");
+      const { findPlace, inProject } = await import("./core/places.ts");
+      const st = await import("./core/status.ts");
+      const cwd = process.cwd();
+      const ref = a1 ?? defaultSession(listSessions(), cwd)?.info.id ?? fail("There is no session here. Give a session id or a session folder. See ga sessions.");
+      const place = findPlace(ref, { cwd }) ?? fail(`No session ${ref}. See ga sessions.`);
+      if (!existsSync(join(place.recordDir, "log.jsonl"))) fail(`No session ${ref}. See ga sessions.`);
+      const record = new AnalysisRecord(place.recordDir, place.id, place.legacy ? {} : { workDir: place.outDir, exportDir: place.outDir, project: inProject(place) ? place.project : undefined });
+      const { current, labels } = await st.currentFromDisk(record, place.legacy ? cwd : place.project);
+      const live = await st.liveReasons(record, current);
+      console.log(`Session ${place.id}\n`);
+      console.log(st.statusText(st.stepStatus(record, { live, labels }), `To run the out-of-date steps again, type ga resume ${place.id}, then type /rerun.`));
+      return;
     }
     case "questions": {
       const { allOpenQuestions } = await import("./core/questions.ts");

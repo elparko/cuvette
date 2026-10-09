@@ -762,9 +762,15 @@ export function makeRuntime(c: KindContext, parts: {
   close?: () => Promise<void> | void;
 }): AdapterRuntime {
   let closed = false;
+  let interpreter: string[] = [];
+  try {
+    interpreter = c.adapter.manifest.connection.interpreter.map((a) => expand(a, c.ph));
+  } catch {}
   return {
     adapter: c.adapter,
     programVersion: c.programVersion,
+    programPath: c.programPath,
+    interpreter,
     instructions: parts.instructions ?? c.adapter.manifest.adapter.description,
     get running() {
       return !closed && (parts.running?.() ?? true);

@@ -3,6 +3,7 @@ import { appendFileSync, closeSync, copyFileSync, existsSync, mkdirSync, openSyn
 import { extname, isAbsolute, join, relative } from "node:path";
 import { COPY_LIMIT_BYTES, local, portable } from "./places.ts";
 import { extractNumbers } from "./claims.ts";
+import type { EnvLock } from "./envlock.ts";
 import type { Entry, EntryKind, Message, Node, NodeIn } from "./types.ts";
 
 const MAX_NUMBERS_PER_NODE = 2000;
@@ -38,6 +39,8 @@ export class AnalysisRecord {
   private nodeList: Node[] = [];
   private nodeById = new Map<string, Node>();
   private staleIds = new Set<string>();
+  private envs = new Map<string, EnvLock & { name: string }>();
+  private replaced = new Map<string, string>();
   private nextNode = 1;
 
   constructor(sessionDir: string, readonly sessionId: string, places: RecordPlaces = {}) {
@@ -82,6 +85,11 @@ export class AnalysisRecord {
       if (num >= this.nextNode) this.nextNode = num + 1;
     } else if (e.kind === "stale") {
       for (const id of (e.data.nodes as string[] | undefined) ?? []) this.staleIds.add(id);
+    } else if (e.kind === "environment") {
+      const l = e.data as unknown as EnvLock & { name: string };
+      if (!this.envs.has(l.hash)) this.envs.set(l.hash, l);
+    } else if (e.kind === "rerun") {
+      this.replaced.set(String(e.data.old), String(e.data.node));
     }
   }
 
@@ -206,6 +214,29 @@ export class AnalysisRecord {
 
   stale(): Set<string> {
     return new Set(this.staleIds);
+  }
+
+  addEnvironment(lock: EnvLock, name: string): string {
+    if (!this.envs.has(lock.hash)) this.append("environment", { ...lock, name } as unknown as Record<string, unknown>);
+    return lock.hash;
+  }
+
+  environment(hash: string): (EnvLock & { name: string }) | undefined {
+    return this.envs.get(hash);
+  }
+
+  environments(): (EnvLock & { name: string })[] {
+    return [...this.envs.values()];
+  }
+
+  replacedBy(id: string): string | undefined {
+    return this.replaced.get(id);
+  }
+
+  latest(id: string): string {
+    let at = id;
+    for (let i = 0; i < 1000 && this.replaced.has(at); i++) at = this.replaced.get(at)!;
+    return at;
   }
 
   numbers(): { node: string; path: string; value: number }[] {

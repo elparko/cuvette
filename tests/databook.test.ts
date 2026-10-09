@@ -201,3 +201,19 @@ describe("databook", () => {
     expect(pdfPages(w.pdf!)).toBe(w.pages);
   }, 120000);
 });
+
+it("the appendix lists the package versions of each environment, and the checks show the before and after table", () => {
+  const r = session();
+  const lock = { hash: "a".repeat(64), kind: "python" as const, path: "/envs/biostats/bin/python", language: "Python 3.12.4", packages: [{ name: "lifelines", version: "0.30.3" }, { name: "numpy", version: "1.26.4" }] };
+  r.addEnvironment(lock, "biostats");
+  r.addNode({
+    entry: 0, adapter: "biostats", adapterVersion: "0.1.1", programVersion: "0.30.3", tool: "fit_cox", args: {}, decisions: {}, codeHash: "c", inputHashes: [], envHash: lock.hash,
+    outputs: [], result: { ok: true, metrics: { hr: 1.4 } }, parents: [], summary: "Fitted a Cox model.", model: "m", manualRoute: "", fidelity: "close",
+  });
+  r.append("rerun", { old: "n1", node: "n2", oldStep: 1, step: 2, tool: "fit_cox", reasons: ["The input file sleep.csv changed after this step ran."], rows: [{ name: "hr", before: 1.2, after: 1.4, change: 0.2 }], changed: 1, unchanged: 0 });
+  const html = book([r]).html;
+  expect(html).toContain("Package versions: environment biostats (Python 3.12.4, /envs/biostats/bin/python).");
+  expect(html).toMatch(/<td[^>]*>numpy<\/td><td[^>]*>1\.26\.4<\/td>/);
+  expect(html).toContain("Step 2 repeats step 1. The input file sleep.csv changed after this step ran.");
+  expect(html).toContain("lock aaaaaaaaaaaa");
+});

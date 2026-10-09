@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import { labelMap, loadAdapters, sha256File, sizeText } from "../bench/papers-cases.ts";
 import { extractNumbers } from "./claims.ts";
+import { envsUsed } from "./results.ts";
+import { changeCell, num, reruns, stepStatus } from "./status.ts";
 import { mainNodes, methodsSentence, stepLines } from "./exports.ts";
 import { stepNumbers } from "./housekeeping.ts";
 import { inProject, outputRoot, placeAt, readIndex } from "./places.ts";
@@ -614,15 +616,20 @@ function sectionChecks(w: Writer, p: Part, level: number): void {
   if (devs.length) w.table("Deviations from the recorded settings.", ["Tool", "Argument", "Recorded value", "Asked for", "Used", "What happened"], devs);
   const blocked = p.record.entries(["blocked"]);
   if (blocked.length) w.add(`<p>The harness stopped ${plural(blocked.length, "call")} until a decision was made:</p><ul>${blocked.map((e) => `<li>${esc(str(e.data.tool))}: ${esc(str(e.data.reason))}</li>`).join("")}</ul>`);
-  const stale = [...p.record.stale()].map((id) => p.steps.get(id)).filter((x): x is number => !!x);
-  if (stale.length) w.add(`<p>These steps are out of date because a decision changed after them: ${stale.map((s) => stepLink(p, s)).join(", ")}.</p>`);
+  const stale = stepStatus(p.record).filter((x) => !x.current);
+  if (stale.length) w.add(`<p>These steps are out of date:</p><ul>${stale.map((x) => `<li>${stepLink(p, x.step)}: ${esc(x.reasons.map((r) => r.text).join(" "))}</li>`).join("")}</ul>`);
+  const changes = reruns(p.record);
+  for (const d of changes) {
+    const rows = d.rows.filter((r) => r.change !== 0);
+    if (rows.length) w.table(`Step ${d.step} repeats step ${d.oldStep}. ${d.reasons.join(" ")} The numbers that changed.`, ["Number", "Before", "After", "Change"], rows.slice(0, 40).map((r) => [r.name, num(r.before), num(r.after), changeCell(r)]), rows.length > 40 ? `The table shows 40 of ${rows.length} numbers. The Changes sheet of results.xlsx has all of them.` : "");
+  }
   const check = p.record.entries(["claim_check"]).at(-1);
   if (check) {
     const cl = arr(check.data.claims) as Claim[];
     const count = (l: string) => cl.filter((c) => c.label === l).length;
     w.p(`The number check of the final answer found ${count("measured")} numbers from the steps, ${count("inferred")} inferred, ${count("literature")} from the literature and ${count("unsourced")} with no source.`);
   }
-  if (!findings.length && !devs.length && !blocked.length && !stale.length && !check) w.p("The record has no findings, deviations or warnings.");
+  if (!findings.length && !devs.length && !blocked.length && !stale.length && !changes.length && !check) w.p("The record has no findings, deviations or warnings.");
 }
 
 function sectionManual(w: Writer, p: Part, level: number): void {
@@ -653,6 +660,8 @@ function appendixSteps(w: Writer, p: Part, level: number): void {
       ["Outputs", outs.join("; ") || "none"],
       ["Code hash", n.codeHash],
     ];
+    const env = n.envHash ? p.record.environment(n.envHash) : undefined;
+    if (env) kv.push(["Environment", `${env.name}${env.language ? `, ${env.language}` : ""}, ${env.kind === "program" ? "program version only" : `${env.packages.length} packages`}, lock ${env.hash.slice(0, 12)}`]);
     if (n.sensitivityOf) kv.push(["Comparison for", n.sensitivityOf]);
     w.add(`<div class="step" id="${step ? anchor(p, step) : `p${p.k}-${n.id}`}"><h${Math.min(level + 2, 6)}>${esc(title)}: ${esc(n.tool)}</h${Math.min(level + 2, 6)}><dl>${kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}<dt>Arguments</dt><dd><pre>${esc(JSON.stringify(n.args, null, 1))}</pre></dd></dl></div>`);
   }
@@ -793,6 +802,12 @@ export function buildDatabook(input: BookInput): Book {
       return [p.record.entries()[0]?.session ?? "", f.adapters, f.model, f.referee];
     }),
   );
+  for (const p of parts) {
+    for (const e of envsUsed(p.record).filter((x) => x.kind !== "program")) {
+      const where = `${single ? "" : `Session ${p.record.entries()[0]?.session ?? p.k}, `}environment ${e.name}`;
+      w.table(`Package versions: ${where} (${e.language}, ${e.path}). Lock hash ${e.hash}.`, ["Package", "Version"], e.packages.map((x) => [x.name, x.version]));
+    }
+  }
   w.p(`This data book was made with Cuvette ${CUVETTE_VERSION}, Node.js ${process.version}, on ${platform()} ${release()}.`);
   w.head(1, "Record files");
   w.table(

@@ -7,7 +7,7 @@ export type Args = Record<string, unknown>;
 
 export type EntryKind =
   | "session" | "setup" | "user" | "message" | "assistant" | "thinking"
-  | "tool_call" | "tool_result" | "node" | "stale"
+  | "tool_call" | "tool_result" | "node" | "stale" | "environment" | "rerun"
   | "decision" | "owner_change" | "deviation" | "blocked" | "permission" | "permission_mode"
   | "question" | "answer" | "sensitivity"
   | "finding" | "finding_resolution" | "claim_check"
@@ -61,6 +61,7 @@ export interface NodeIn {
   codeHash: string;
   inputHashes: string[];
   inputFiles?: InputFile[];
+  envHash?: string;
   outputs: OutputFile[];
   result: unknown;
   parents: string[];
