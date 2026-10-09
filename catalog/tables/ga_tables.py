@@ -1,3 +1,4 @@
+import csv
 import os
 import re
 import textwrap
@@ -743,3 +744,292 @@ def _plot_route(kind, x, y, error_bars, points, fit, metrics):
     if kind == "line":
         return "In Excel: make a table of the mean %s for each %s (PivotTable, Average); Insert > Chart > Scatter with Straight Lines and Markers; %s." % (y, x, custom)
     return "In Excel: select the %s column; Insert > Chart > Histogram; Format Axis > Bin width %s." % (y, _fmt(metrics.get("bin_width", 0)))
+
+
+# ----------------------------------------------------------------- read_plate
+
+OVERFLOW = re.compile(r"^(ovr|over|sat|\*+$|>|\++$)", re.I)
+NUMBER = re.compile(r"[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?", re.I)
+WELL_COLUMNS = {"well", "well id", "wellid", "well position", "position"}
+
+
+def _raw(v):
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return None
+    if isinstance(v, str):
+        return v.strip() or None
+    if isinstance(v, (bool, int, float)):
+        return v
+    return str(v)
+
+
+def _number(v):
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str) and NUMBER.fullmatch(v):
+        return float(v)
+    return None
+
+
+def _int_of(v):
+    n = _number(v)
+    return int(n) if n is not None and n.is_integer() else None
+
+
+def _text_of(v):
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
+
+
+def _plate_sheets(path, sheet=None):
+    if _is_xlsx(path):
+        wb = load_workbook(path, data_only=True)
+        if sheet and sheet not in wb.sheetnames:
+            raise ValueError("No sheet %s. The sheets are: %s." % (sheet, ", ".join(wb.sheetnames)))
+        out = []
+        for n in [sheet] if sheet else wb.sheetnames:
+            cells = {}
+            for row in wb[n].iter_rows():
+                for c in row:
+                    v = _raw(c.value)
+                    if v is not None:
+                        cells[(c.row, c.column)] = v
+            out.append((n, cells))
+        return out
+    if path.lower().endswith(".xls"):
+        try:
+            book = pd.read_excel(path, sheet_name=sheet if sheet else None, header=None, dtype=object)
+        except ImportError:
+            raise ValueError("Python cannot read .xls files here (the xlrd package is missing). Save the file as .xlsx in Excel.")
+        book = {sheet: book} if sheet else book
+        out = []
+        for n, f in book.items():
+            cells = {}
+            for r, row in enumerate(f.itertuples(index=False, name=None), 1):
+                for c, v in enumerate(row, 1):
+                    v = _raw(v)
+                    if v is not None:
+                        cells[(r, c)] = v
+            out.append((n, cells))
+        return out
+    sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
+    cells = {}
+    with open(path, encoding="utf-8-sig", errors="replace", newline="") as f:
+        for r, row in enumerate(csv.reader(f, delimiter=sep), 1):
+            for c, v in enumerate(row, 1):
+                v = _raw(v)
+                if v is not None:
+                    cells[(r, c)] = v
+    return [(os.path.basename(path), cells)]
+
+
+def _plate_blocks(cells):
+    found = []
+    for (r, c) in sorted(cells):
+        if _int_of(cells[(r, c)]) != 1 or any(b["head"] <= r <= b["r1"] and b["c0"] <= c <= b["c1"] for b in found):
+            continue
+        n = 1
+        while _int_of(cells.get((r, c + n))) == n + 1:
+            n += 1
+        if n < 3:
+            continue
+        for lc in (c - 1, c - 2):
+            if lc < 1 or str(cells.get((r + 1, lc), "")).upper() != "A":
+                continue
+            k = 0
+            while str(cells.get((r + 1 + k, lc), "")).upper() == get_column_letter(k + 1):
+                k += 1
+            if k >= 2:
+                found.append({"head": r, "lc": lc, "c0": c, "c1": c + n - 1, "r0": r + 1, "r1": r + k, "by_order": False})
+                break
+        else:
+            m = 0
+            while any(_number(cells.get((r + 1 + m, cc))) is not None for cc in range(c, c + n)):
+                m += 1
+            k = 16 if m >= 16 else 8 if m >= 8 else 0
+            if k and n in (12, 24):
+                found.append({"head": r, "lc": max(c - 1, 1), "c0": c, "c1": c + n - 1, "r0": r + 1, "r1": r + k, "by_order": True})
+    return found
+
+
+def _plate_label(cells, blocks, b):
+    side = [o for o in blocks if o is not b and o["head"] == b["head"]]
+    floor = max([o["r1"] for o in blocks if o["r1"] < b["head"]], default=0)
+    lo = max([o["c1"] + 1 for o in side if o["c1"] < b["c0"]], default=1)
+    hi = min([o["lc"] - 1 for o in side if o["c0"] > b["c1"]], default=10**6)
+    lines, r, skipped_blank = [], b["head"] - 1, False
+    while r > floor and len(lines) < 2:
+        parts = [_text_of(cells[(r, c)]) for c in sorted({c for (rr, c) in cells if rr == r}) if lo <= c <= hi]
+        if parts:
+            lines.insert(0, " ".join(parts))
+        elif lines or skipped_blank:
+            break
+        else:
+            skipped_blank = True
+        r -= 1
+    return " | ".join(lines)
+
+
+def _well_key(text):
+    m = re.fullmatch(r"\s*([A-Za-z]{1,2})\s*0*(\d{1,2})\s*", str(text))
+    return m.group(1).upper() + m.group(2) if m else str(text).strip()
+
+
+def _read_map(map_path, map_sheet, well_column, map_name):
+    for name, cells in _plate_sheets(map_path, map_sheet):
+        blocks = _plate_blocks(cells)
+        if not blocks:
+            continue
+        b = blocks[0]
+        entries = {}
+        for i in range(b["r1"] - b["r0"] + 1):
+            for j in range(b["c1"] - b["c0"] + 1):
+                v = cells.get((b["r0"] + i, b["c0"] + j))
+                if v is not None:
+                    entries[get_column_letter(i + 1) + str(j + 1)] = _text_of(v)
+        frame = pd.DataFrame({"_key": list(entries), map_name: list(entries.values())})
+        extra = "; the sheet has %d blocks and the tool used the first" % len(blocks) if len(blocks) > 1 else ""
+        return frame, [map_name], "grid on %s at %s with text in %d wells%s" % (name, _rng(b["head"], b["lc"], b["r1"], b["c1"]), len(frame), extra)
+    if _is_xlsx(map_path) or map_path.lower().endswith(".xls"):
+        frame = pd.read_excel(map_path, sheet_name=map_sheet or 0, dtype=str, keep_default_na=False)
+    else:
+        frame = pd.read_csv(map_path, sep="\t" if map_path.lower().endswith((".tsv", ".tab")) else ",", dtype=str, keep_default_na=False)
+    frame.columns = [str(c).strip() for c in frame.columns]
+    col = well_column or next((c for c in frame.columns if c.lower() in WELL_COLUMNS), None)
+    if col not in frame.columns:
+        raise ValueError("The plate map has no row-letter and column-number grid and no well column. Its columns are: %s. Give map_well_column." % ", ".join(frame.columns))
+    frame["_key"] = frame[col].map(_well_key)
+    frame = frame[frame["_key"] != ""]
+    dup = frame["_key"][frame["_key"].duplicated()].unique()
+    if len(dup):
+        raise ValueError("The plate map lists these wells more than once: %s." % ", ".join(dup[:10]))
+    cols = [c for c in frame.columns if c not in (col, "_key")]
+    return frame[["_key"] + cols], cols, "long table with the well column %s and %d wells" % (col, len(frame))
+
+
+def _list_wells(wells, limit=10):
+    wells = list(wells)
+    return ", ".join(wells[:limit]) + (" and %d more" % (len(wells) - limit) if len(wells) > limit else "")
+
+
+def _well_order(w):
+    m = re.fullmatch(r"([A-Z]+)(\d+)", w)
+    return (len(m.group(1)), m.group(1), int(m.group(2))) if m else (99, w, 0)
+
+
+def read_plate(path, sheet=None, plate_map=None, map_sheet=None, map_well_column=None, map_name="map"):
+    path = os.path.expanduser(path)
+    if not os.path.exists(path):
+        return _fail("No file at %s." % path)
+    map_path = os.path.expanduser(plate_map) if plate_map else (path if map_sheet else None)
+    try:
+        sheets = _plate_sheets(path, sheet)
+        mapping = _read_map(map_path, map_sheet, map_well_column, map_name) if map_path else None
+    except ValueError as e:
+        return _fail("Cannot read the plate file or the plate map: %s" % e)
+    if mapping and os.path.abspath(map_path) == os.path.abspath(path) and map_sheet and not sheet:
+        sheets = [s for s in sheets if s[0] != map_sheet]
+    rows, blocks, skipped = [], [], []
+    map_keys = set(mapping[0]["_key"]) if mapping else set()
+    for plate, cells in sheets:
+        found = _plate_blocks(cells)
+        used = set()
+        for k, b in enumerate(found, 1):
+            name = _plate_label(cells, found, b) or "Block %d" % k
+            if name in used:
+                name = "%s (%d)" % (name, k)
+            used.add(name)
+            rng = _rng(b["head"], b["lc"], b["r1"], b["c1"])
+            grid = [[cells.get((b["r0"] + i, b["c0"] + j)) for j in range(b["c1"] - b["c0"] + 1)] for i in range(b["r1"] - b["r0"] + 1)]
+            if not any(_number(v) is not None for line in grid for v in line):
+                skipped.append("%s on %s" % (rng, plate))
+                continue
+            info = {"plate": plate, "block": name, "range": rng, "n_rows": len(grid), "n_cols": len(grid[0]), "n_wells": 0, "n_values": 0, "n_empty": 0, "n_text": 0, "n_overflow": 0, "letters_from_order": b["by_order"], "overflow_wells": [], "text_wells": [], "empty_wells": []}
+            have = set()
+            for i, line in enumerate(grid):
+                for j, v in enumerate(line):
+                    well = get_column_letter(i + 1) + str(j + 1)
+                    x = _number(v)
+                    flag = ""
+                    info["n_wells"] += 1
+                    if x is not None:
+                        info["n_values"] += 1
+                        have.add(well)
+                    elif v is None:
+                        flag = "empty"
+                        info["n_empty"] += 1
+                        info["empty_wells"].append(well)
+                    elif OVERFLOW.match(str(v)):
+                        flag = str(v)
+                        info["n_overflow"] += 1
+                        info["overflow_wells"].append('%s "%s"' % (well, v))
+                    else:
+                        flag = str(v)
+                        info["n_text"] += 1
+                        info["text_wells"].append('%s "%s"' % (well, v))
+                    rows.append({"plate": plate, "block": name, "well": well, "row": get_column_letter(i + 1), "col": j + 1, "value": x, "flag": flag})
+            info["map_without_value"] = sorted(map_keys - have, key=_well_order)
+            info["n_map_without_value"] = len(info["map_without_value"])
+            blocks.append(info)
+    if not blocks:
+        extra = " Text-only grids that the tool skipped: %s." % "; ".join(skipped) if skipped else ""
+        return _fail("No plate block found. A block has a row with the numbers 1, 2, 3 and so on, and the row letters A, B, C and so on in the column to its left.%s" % extra)
+    frame = pd.DataFrame(rows)
+    n_map_cols = 0
+    if mapping:
+        mframe, mcols, _ = mapping
+        taken = set(frame.columns) | {"_key"}
+        names = {c: ("map_" + c if c in taken else c) for c in mcols}
+        frame = frame.merge(mframe.rename(columns=names), how="left", left_on="well", right_on="_key").drop(columns="_key")
+        n_map_cols = len(mcols)
+    out = _save(frame, os.path.splitext(os.path.basename(path))[0] + "-plate")
+    lines = ["Sheets read: %s." %", ".join(s[0] for s in sheets), "Found %d plate blocks." % len(blocks)]
+    for b in blocks:
+        miss = []
+        if b["n_empty"]:
+            miss.append("%d empty (%s)" % (b["n_empty"], _list_wells(b["empty_wells"])))
+        if b["n_overflow"]:
+            miss.append("%d overflow (%s)" % (b["n_overflow"], _list_wells(b["overflow_wells"])))
+        if b["n_text"]:
+            miss.append("%d other text (%s)" % (b["n_text"], _list_wells(b["text_wells"])))
+        lines.append("Block %s on %s at %s: %d wells, %d with a value%s." % (
+            b["block"], b["plate"], b["range"], b["n_wells"], b["n_values"], ", missing: " + "; ".join(miss) if miss else ", none missing"))
+    by_order = [b["block"] for b in blocks if b["letters_from_order"]]
+    if by_order:
+        lines.append("The file has no row letters for %d blocks (%s). The row letters came from the row order, A for the first row." % (len(by_order), "; ".join(by_order)))
+    if skipped:
+        lines.append("Skipped text-only grids: %s." % "; ".join(skipped))
+    if mapping:
+        lines.append("Plate map: %s." % mapping[2])
+        for b in blocks:
+            if b["n_map_without_value"]:
+                lines.append("Block %s, mapped wells without a value: %d (%s)." % (b["block"], b["n_map_without_value"], _list_wells(b["map_without_value"])))
+        if not any(b["n_map_without_value"] for b in blocks):
+            lines.append("Every mapped well has a value.")
+    lines.append("A missing value stays empty in the file. It is not zero. The column flag shows the text of the cell.")
+    lines.append("Saved %s (%d rows, columns %s)." % (out, len(frame), ", ".join(map(str, frame.columns))))
+    route = "In Excel: open %s. " % os.path.basename(path)
+    route += "Select each block with its row letters and column numbers (%s). " % "; ".join("%s on %s" % (b["range"], b["plate"]) for b in blocks)
+    route += "Use Data > From Table/Range and make it a table with headers. In Power Query select the row letter column and use Transform > Unpivot Other Columns. "
+    route += "Rename Attribute to col and Value to value. Add a column well with the formula [Row] & [col]. "
+    route += "Text cells such as OVRFLW stay text. Filter them out. Do not turn them into zero. "
+    route += "Append the blocks to one query and add a column block with the label of each block."
+    if mapping:
+        route += " Unpivot the plate map grid the same way, or load its long table. Then use Home > Merge Queries on the column well (left outer join)."
+    return {
+        "ok": True,
+        "summary": " ".join(lines),
+        "metrics": {
+            "n_blocks": len(blocks), "n_plates": len({b["plate"] for b in blocks}), "n_wells": sum(b["n_wells"] for b in blocks), "n_values": sum(b["n_values"] for b in blocks),
+            "n_missing": sum(b["n_wells"] - b["n_values"] for b in blocks), "n_empty": sum(b["n_empty"] for b in blocks), "n_overflow": sum(b["n_overflow"] for b in blocks),
+            "n_text": sum(b["n_text"] for b in blocks), "n_map_without_value": sum(b["n_map_without_value"] for b in blocks), "n_map_columns": n_map_cols,
+        },
+        "path": out, "blocks": blocks, "skipped": skipped, "columns": _col_types(frame),
+        "table": _preview(frame, out),
+        "outputs": [{"path": out, "kind": "table", "name": os.path.basename(out)}],
+        "manualRoute": route,
+        "fidelity": "close",
+    }

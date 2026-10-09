@@ -1,9 +1,9 @@
 adapter:
   name: tables
   field: tables and figures
-  file_types: [".xlsx", ".csv", ".tsv", ".xlsm"]
+  file_types: [".xlsx", ".csv", ".tsv", ".xlsm", ".xls"]
   title: Tables, Excel and figures (pandas, openpyxl, matplotlib)
-  version: 0.1.1
+  version: 0.2.0
   spec: "1"
   description: >
     Reads CSV and Excel lab sheets, summarizes and reshapes tables, writes xlsx files and makes journal-style plots.
@@ -21,8 +21,8 @@ program:
     - https://openpyxl.readthedocs.io
     - https://matplotlib.org/stable/
   install: >
-    The adapter uses the biostats Python environment. Add openpyxl to it:
-    uv pip install --python ~/.cuvette/envs/biostats/bin/python openpyxl
+    The adapter uses the biostats Python environment. Add openpyxl, and xlrd for old .xls files, to it:
+    uv pip install --python ~/.cuvette/envs/biostats/bin/python openpyxl xlrd
   citation:
     - text: McKinney, W. (2010). Data Structures for Statistical Computing in Python. In Proceedings of the 9th Python in Science Conference (pp. 56–61). https://doi.org/10.25080/Majora-92bf1922-00a
       doi: 10.25080/Majora-92bf1922-00a
@@ -112,6 +112,23 @@ tools:
       groups_to_rows: { type: boolean, default: true, description: Turn group label blocks into rows with a Group column. }
     required: [path]
 
+  - name: read_plate
+    title: Read plate-reader grids
+    description: >
+      Read plate-reader data from a CSV, TSV or Excel file that holds grids. The tool finds each block by its row letters (A, B, C)
+      and its column numbers (1, 2, 3), with the label above it. It saves one long table with a row for each well and adds the plate map.
+      Text cells such as OVRFLW stay missing, and the tool counts them. They never become zero.
+    read_only: true
+    function: "ga_tables:read_plate"
+    params:
+      path: { type: string, description: Absolute path of the plate-reader export. }
+      sheet: { type: string, description: Sheet name. Default is all sheets. }
+      plate_map: { type: string, description: "Absolute path of a plate map file: a grid with the same layout, or a long table with a well column. Leave out to use the file itself with map_sheet." }
+      map_sheet: { type: string, description: Sheet that holds the plate map. The tool does not read this sheet as data. }
+      map_well_column: { type: string, description: Name of the well column of a long plate map. Default is the column Well. }
+      map_name: { type: string, default: map, description: Name of the column that holds the text of a grid plate map. }
+    required: [path]
+
   - name: summarize_table
     title: Summarize a table
     description: n, mean, SD, SEM, median, quartiles, IQR, min and max for each value column, by group.
@@ -171,6 +188,12 @@ map:
     fidelity: close
     difference: The tool finds the range itself, leaves out summary rows such as Average, and turns note cells inside the data into blanks.
     evidence: { source: docs, test: messy-sheet }
+
+  - tool: read_plate
+    route: "In Excel: select each plate block with its row letters and column numbers. Use Data > From Table/Range, then in Power Query select the row letter column and use Transform > Unpivot Other Columns. Rename Attribute to col and Value to value, and add a column well with [Row] & [col]. Merge the plate map on the column well."
+    fidelity: close
+    difference: The tool finds every block in one call and keeps text cells such as OVRFLW as missing. In Excel each block is a separate query.
+    evidence: { source: docs, test: plate-two-reads }
 
   - tool: summarize_table
     route: "In Excel: Insert > PivotTable; Rows: the group column; Values: Average, Count and StdDev. SEM = STDEV.S(range)/SQRT(COUNT(range)). Quartiles = QUARTILE.INC."
@@ -333,3 +356,124 @@ tests:
     expect:
       - { path: ok, equals: false }
       - { path: error, contains: unit }
+
+  - id: plate-two-reads
+    description: >
+      Synthetic Gen5-style sheet "Gen5" (data/make_test_data.py) with header lines and two 96-well reads, "Read 1:450" and "Read 2:630".
+      The value of well A1 is 0.1, of B3 0.31 and of C1 0.12. H12 of read 1 is the text OVRFLW. G3 of read 2 is empty and D6 of read 2 is "*".
+      That gives 192 wells, 189 values, 1 empty well and 2 overflow wells.
+    data: [data/plate_gen5.xlsx]
+    calls:
+      - tool: read_plate
+        args: { path: "{adapter_dir}/data/plate_gen5.xlsx", sheet: Gen5 }
+    expect:
+      - { path: metrics.n_blocks, equals: 2 }
+      - { path: metrics.n_wells, equals: 192 }
+      - { path: metrics.n_values, equals: 189 }
+      - { path: metrics.n_empty, equals: 1 }
+      - { path: metrics.n_overflow, equals: 2 }
+      - { path: metrics.n_missing, equals: 3 }
+      - { path: "data.blocks[0].block", equals: "Read 1:450" }
+      - { path: "data.blocks[1].block", equals: "Read 2:630" }
+      - { path: "data.blocks[0].range", equals: "A9:M17" }
+      - { path: "data.blocks[1].range", equals: "A21:M29" }
+      - { path: "data.blocks[0].overflow_wells[0]", equals: 'H12 "OVRFLW"' }
+      - { path: "data.blocks[1].empty_wells[0]", equals: G3 }
+      - { path: table.columns, equals: [plate, block, well, row, col, value, flag] }
+      - { path: "table.rows[0]", equals: [Gen5, "Read 1:450", A1, A, 1, 0.1, ""] }
+      - { path: "table.rows[14][5]", approx: 0.31, abs: 1.0e-9 }
+      - { path: summary, contains: 'H12 "OVRFLW"' }
+      - { path: summary, contains: not zero }
+
+  - id: plate-map-sheet
+    description: >
+      The plate map is the sheet "Plate map" of the same file. Its text stays as written: C1 is "Std3", B1 is "STD 2" and column 3 is "S01".
+      The map sheet is not read as data. The mapped wells without a value are H12 in read 1, and D6 and G3 in read 2.
+    data: [data/plate_gen5.xlsx]
+    calls:
+      - { tool: read_plate, args: { path: "{adapter_dir}/data/plate_gen5.xlsx", map_sheet: Plate map }, save_as: plate }
+      - tool: reshape_table
+        args: { path: "{saved.plate.data.path}", filter: "block == 'Read 1:450' and well in ['B1', 'C1', 'A3', 'H12']", sort: [well], select: [well, value, flag, map] }
+    expect:
+      - { path: saved.plate.metrics.n_blocks, equals: 2 }
+      - { path: saved.plate.metrics.n_map_columns, equals: 1 }
+      - { path: saved.plate.metrics.n_map_without_value, equals: 3 }
+      - { path: "saved.plate.data.blocks[0].map_without_value", equals: [H12] }
+      - { path: "saved.plate.data.blocks[1].map_without_value", equals: [D6, G3] }
+      - { path: saved.plate.summary, contains: "mapped wells without a value: 2 (D6, G3)" }
+      - { path: "saved.plate.table.columns", equals: [plate, block, well, row, col, value, flag, map] }
+      - { path: "table.rows[0]", equals: [A3, 0.3, null, S01] }
+      - { path: "table.rows[1]", equals: [B1, 0.11, null, STD 2] }
+      - { path: "table.rows[2]", equals: [C1, 0.12, null, Std3] }
+      - { path: "table.rows[3]", equals: [H12, null, OVRFLW, NC] }
+
+  - id: plate-softmax-long-map
+    description: >
+      SoftMax-style CSV with one 96-well block. A plate map as a long table (data/plate_softmax_map.csv) names the wells A01 to B03.
+      A01 is the same well as A1. The map also lists the well J1, which is not on the plate, so one mapped well has no value.
+      A1 is 0.05 with map Sample "Std 1" and Conc_uM "10". The map text stays as written.
+    data: [data/plate_softmax.csv, data/plate_softmax_map.csv]
+    calls:
+      - tool: read_plate
+        args: { path: "{adapter_dir}/data/plate_softmax.csv", plate_map: "{adapter_dir}/data/plate_softmax_map.csv" }
+    expect:
+      - { path: metrics.n_blocks, equals: 1 }
+      - { path: metrics.n_wells, equals: 96 }
+      - { path: metrics.n_values, equals: 96 }
+      - { path: metrics.n_map_columns, equals: 2 }
+      - { path: "data.blocks[0].block", contains: "Plate#1" }
+      - { path: "data.blocks[0].map_without_value", equals: [J1] }
+      - { path: table.columns, equals: [plate, block, well, row, col, value, flag, Sample, Conc_uM] }
+      - { path: "table.rows[0][2]", equals: A1 }
+      - { path: "table.rows[0][5]", approx: 0.05, abs: 1.0e-9 }
+      - { path: "table.rows[0][7]", equals: Std 1 }
+      - { path: "table.rows[0][8]", equals: "10" }
+      - { path: "table.rows[11][5]", approx: 0.072, abs: 1.0e-9 }
+
+  - id: plate-384
+    description: >
+      Tecan-style CSV with header lines and one 384-well grid (A to P, 1 to 24) under the label "Label: Label1".
+      The value of well A1 is 0.001 and of P24 is 0.384.
+    data: [data/plate_384.csv]
+    calls:
+      - { tool: read_plate, args: { path: "{adapter_dir}/data/plate_384.csv" }, save_as: plate }
+      - tool: reshape_table
+        args: { path: "{saved.plate.data.path}", filter: "well == 'P24'", select: [well, row, col, value] }
+    expect:
+      - { path: saved.plate.metrics.n_wells, equals: 384 }
+      - { path: saved.plate.metrics.n_values, equals: 384 }
+      - { path: "saved.plate.data.blocks[0].block", equals: "Label: Label1" }
+      - { path: "saved.plate.data.blocks[0].n_rows", equals: 16 }
+      - { path: "saved.plate.data.blocks[0].n_cols", equals: 24 }
+      - { path: "table.rows[0]", equals: [P24, P, 24, 0.384] }
+
+  - id: plate-no-block
+    description: A sheet with no row letters and column numbers gives an error. It does not guess.
+    data: [data/messy_lab.xlsx]
+    calls:
+      - { tool: read_plate, args: { path: "{adapter_dir}/data/messy_lab.xlsx" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: No plate block found }
+
+  - id: plate-softmax-no-letters
+    description: >
+      SoftMax Pro plate format export (tab-separated). Two "Plate:" sections, the Temperature cell, rows with no row letters and "~End" at the end.
+      The tool gives the rows A to H in order. A1 of Plate#1 is 0.05 and A12 is 0.072. Plate#2 has the values of Plate#1 times 2, and C4 is empty.
+    data: [data/plate_softmax_pro.tsv]
+    calls:
+      - { tool: read_plate, args: { path: "{adapter_dir}/data/plate_softmax_pro.tsv" } }
+    expect:
+      - { path: metrics.n_blocks, equals: 2 }
+      - { path: metrics.n_wells, equals: 192 }
+      - { path: metrics.n_values, equals: 191 }
+      - { path: metrics.n_empty, equals: 1 }
+      - { path: "data.blocks[0].block", contains: "Plate#1" }
+      - { path: "data.blocks[1].block", contains: "Plate#2" }
+      - { path: "data.blocks[0].range", equals: "A2:M10" }
+      - { path: "data.blocks[1].range", equals: "A13:M21" }
+      - { path: "data.blocks[0].letters_from_order", equals: true }
+      - { path: "data.blocks[1].empty_wells[0]", equals: C4 }
+      - { path: "table.rows[0][5]", approx: 0.05, abs: 1.0e-9 }
+      - { path: "table.rows[11][5]", approx: 0.072, abs: 1.0e-9 }
+      - { path: summary, contains: The row letters came from the row order }

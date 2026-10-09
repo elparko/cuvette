@@ -3,6 +3,10 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
+## Unreleased
+
+- Tables adapter 0.2.0: the tool `read_plate` reads plate-reader grids (96 or 384 wells, several blocks in a sheet, an optional plate map) into one long table. Text cells such as OVRFLW stay missing.
+
 ## 9 October 2026
 
 ### Adapters from others

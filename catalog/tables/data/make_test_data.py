@@ -36,3 +36,72 @@ with open(os.path.join(here, "slices.csv"), "w") as f:
     f.write("Sample,Section depth (um)\n")
     for i in range(5):
         f.write("Slice %d,%d\n" % (i + 1, 40 + 10 * i))
+
+
+def letters(n):
+    return [chr(65 + i) for i in range(n)]
+
+
+def gen5_value(i, j, scale=1):
+    return round((0.1 * (j + 1) + 0.01 * i) * scale, 4)
+
+
+def gen5_block(ws, top, label, scale, special):
+    ws.cell(top, 1, label)
+    for j in range(12):
+        ws.cell(top + 1, 2 + j, j + 1)
+    for i, letter in enumerate(letters(8)):
+        ws.cell(top + 2 + i, 1, letter)
+        for j in range(12):
+            ws.cell(top + 2 + i, 2 + j, special.get((i, j), gen5_value(i, j, scale)))
+
+
+wb = Workbook()
+ws = wb.active
+ws.title = "Gen5"
+for r, (a, b) in enumerate([("Software Version", "3.11"), ("Experiment File Path:", "C:\\synthetic\\elisa.xpt"), ("Plate Number", "Plate 1"), ("Date", "2026-09-01"), ("Reader Type:", "Synthetic reader")], 1):
+    ws.cell(r, 1, a)
+    ws.cell(r, 2, b)
+gen5_block(ws, 8, "Read 1:450", 1, {(7, 11): "OVRFLW"})
+gen5_block(ws, 20, "Read 2:630", 0.1, {(6, 2): None, (3, 5): "*"})
+pm = wb.create_sheet("Plate map")
+pm["A1"] = "Plate map (synthetic)"
+for j in range(12):
+    pm.cell(3, 2 + j, j + 1)
+standards = ["STD1", "STD 2", "Std3", "STD4", "STD5", "STD6", "BLK", "BLK"]
+for i, letter in enumerate(letters(8)):
+    pm.cell(4 + i, 1, letter)
+    for j in range(12):
+        pm.cell(4 + i, 2 + j, standards[i] if j < 2 else "S%02d" % (j - 1) if j < 10 else "NC")
+wb.save(os.path.join(here, "plate_gen5.xlsx"))
+
+with open(os.path.join(here, "plate_softmax.csv"), "w") as f:
+    f.write("Plate:,Plate#1,1.3,PlateFormat,Endpoint,Absorbance,Raw,TRUE,1,,,450,,,1,12,96,1,8,,,,\n")
+    f.write(",,Temperature(C),%s,\n" % ",".join(str(j + 1) for j in range(12)))
+    for i, letter in enumerate(letters(8)):
+        f.write(",%s,%s,%s,\n" % (letter, "24.3" if i == 0 else "", ",".join(str(round(0.05 * (i + 1) + 0.002 * j, 4)) for j in range(12))))
+    f.write("\n~End\n")
+
+with open(os.path.join(here, "plate_softmax_map.csv"), "w") as f:
+    f.write("Well,Sample,Conc_uM\n")
+    for i, letter in enumerate("AB"):
+        for j in range(3):
+            f.write("%s%02d,Std %d,%d\n" % (letter, j + 1, i * 3 + j + 1, 10 * (i * 3 + j + 1)))
+    f.write("J1,Extra,0\n")
+
+with open(os.path.join(here, "plate_384.csv"), "w") as f:
+    f.write("Tecan i-control,1.10\nDevice: synthetic\n\nMode,Absorbance\n\nLabel: Label1\n")
+    f.write("<>,%s\n" % ",".join(str(j + 1) for j in range(24)))
+    for i, letter in enumerate(letters(16)):
+        f.write("%s,%s\n" % (letter, ",".join(str(round((i * 24 + j + 1) / 1000, 3)) for j in range(24))))
+    f.write("\nEnd Time:,2026-09-01\n")
+
+with open(os.path.join(here, "plate_softmax_pro.tsv"), "w", encoding="utf-8") as f:
+    for name, nm, scale, gap in [("Plate#1", 450, 1, None), ("Plate#2", 650, 2, (2, 3))]:
+        f.write("Plate:\t%s\t1.3\tPlateFormat\tEndpoint\tAbsorbance\tRaw\tTRUE\t1\t\t\t%d\t\t\t1\t12\t96\t1\t8\t\t\t\t\t\t\n" % (name, nm))
+        f.write("Temperature(°C)\t%s\t\n" % "\t".join(str(j + 1) for j in range(12)))
+        for i in range(8):
+            cells = ["" if gap == (i, j) else str(round((0.05 * (i + 1) + 0.002 * j) * scale, 4)) for j in range(12)]
+            f.write("%s\t%s\t\n" % ("24.3" if i == 0 else "", "\t".join(cells)))
+        f.write("\n")
+    f.write("~End\n")
