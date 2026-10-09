@@ -113,3 +113,26 @@ Local model runs (ollama qwen3:8b, blind mode, one run each):
 - scanpy: the mitochondrial genes are found only by a name prefix. Species such as yak need a gene list. There is also no minimum UMI count filter.
 - phylo: one model for each session, so a run cannot build single-locus trees with different models. The tool does not report parsimony-informative sites.
 - mne: load_raw reads only .fif files. Most public EEG data (BrainVision, EDF, EEGLAB) cannot be used.
+
+## Gene set enrichment, checked on 2026-10-09
+
+The `enrichment` adapter needs a paper whose gene list and gene sets are both frozen, and that prints the
+overlap with the p values.
+
+Built:
+
+| Folder | Paper | Data | Result |
+|---|---|---|---|
+| `wang2023-cuproptosis-oa` | Wang Y et al. Cuproptosis-related gene signature in synovial inflammation during osteoarthritis. Biomolecules 13(1):127 (2023). DOI 10.3390/biom13010127 | Four hub genes from the abstract; DSigDB from Enrichr | All ten rows of Table 1 reproduce: overlap, p and adjusted p to about 5 significant figures, and the odds ratio exactly. |
+
+Rejected or not used:
+
+| Paper | Reason |
+|---|---|
+| Law CW et al. F1000Research 5:1408 (2016), limma camera on GEO GSE63310 | The gene set names, sizes, direction and order reproduce exactly. The p values drift 2 to 9 percent, because the Bioconductar release differs from the one in the paper. The adapter has no camera method. |
+| Chen Y et al. F1000Research 5:1438 (2016), goana and camera on GSE60450 | The sample-to-group table is not in the text, and the GO p values move with the org.Mm.eg.db release. |
+| Fang Z et al. Bioinformatics 39(1):btac757 (2023), the gseapy paper | It prints a normalized enrichment score, which depends on the permutations. The Scanpy steps before it are not pinned. |
+| Several PeerJ and PLOS ONE papers with a clusterProfiler table | They print GeneRatio and BgRatio, so the arithmetic checks from the table alone, but the gene list is not in a supplement. |
+
+Still open: no paper found that prints a preranked GSEA enrichment score with a frozen ranked list. The
+`run_gsea_prerank` tool has the fgsea vignette as its known answer instead.

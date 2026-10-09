@@ -131,6 +131,16 @@ items:
       0.0019842229 instead of the printed 0.0018453. A run that keeps the gseapy default reaches this value.
     independence: independent
     check: check_hypergeom.py computes the same value with scipy.
+data:
+  source: >-
+    The four hub genes are named in the abstract of the paper; fetch.sh writes them to a CSV file. The gene
+    sets come from the Enrichr web service as plain text (DSigDB). fetch.sh drops the lines with no name and
+    no gene, which gseapy.get_library silently drops as well, and checks the SHA-256 of the result.
+  url: https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=DSigDB
+  license: >-
+    The paper is CC BY 4.0. DSigDB is free for academic use through Enrichr; the benchmark downloads it and
+    does not copy it into the repository.
+  size: 2 MB
 notes: >-
   The printed p values and the computed ones agree to about 5 significant figures, not to the last digit.
   Enrichr uses its own hypergeometric code. The tolerances allow this difference.

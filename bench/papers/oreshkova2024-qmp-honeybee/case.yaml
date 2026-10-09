@@ -144,6 +144,14 @@ items:
       of the published 27.780. A run that uses the SPSS or Prism default reaches this value.
     independence: independent
     check: R 4.6.1 car::Anova(type = 3) gives 26.5282 (check_anova.R).
+data:
+  source: >-
+    figshare 10.6084/m9.figshare.24164316 (abdominal metrics) and 10.6084/m9.figshare.24164265 (acini area).
+    fetch.sh downloads both CSV files and checks the SHA-256 of each one. Both files start with a byte order
+    mark, which the tools read.
+  url: https://doi.org/10.6084/m9.figshare.24164316
+  license: CC BY 4.0
+  size: 10 kB
 notes: >-
   Section 3.2 has one printed value that does not reproduce. For the QMP treatment by replicate term of the
   abdominal fatty acid synthase activity the paper prints "F2,60 = 0.962, P = 0.29039". 0.9616 is the mean

@@ -28,7 +28,7 @@
 | Peak 1 retention time | 10.90 | 10.90 |
 | Peak 1 amplitude | 2.3e+4 | 23380.46 |
 | Peak 1 scale | 0.16 | 0.1588 |
-| Peak 1 skew | 0.70 | 0.6918 |
+| Peak 1 skew | 0.70 | 0.6918, which rounds to 0.69 |
 | Peak 1 area | 2.8e+6 | 2805655.43 |
 | Peak 3 retention time | 14.45 | 14.45 |
 | Peaks between 10 and 20 minutes | not printed | 6 |

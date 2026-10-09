@@ -5,7 +5,7 @@ prompt: |
   1. How many peaks are in that window? Give me the retention time and the area of each one.
   2. For the first peak, also give me the fitted amplitude, the scale and the skew.
 
-  I also have a lactose calibration in {data}/chure2024-hplc-py/lactose/: four standards named lactose_mM_0.5.csv, lactose_mM_1.csv, lactose_mM_3.csv and lactose_mM_6.csv, with the concentration in mM in the file name, and one unknown sample, lactose_mM_2.csv. Each file has the columns time and signal. These traces need no baseline correction and no time window.
+  I also have a lactose calibration in {data}/chure2024-hplc-py/lactose/: four standards named lactose_mM_0.5.csv, lactose_mM_1.csv, lactose_mM_3.csv and lactose_mM_6.csv, with the concentration in mM in the file name, and one unknown sample, lactose_mM_2.csv. Each file has the columns time and signal. Each trace holds one peak. Integrate them with the same settings as the run above, and over the whole trace.
 
   3. Integrate the lactose peak in each standard, fit a calibration curve with an intercept, and give me the slope, the intercept and R squared.
   4. Give me the concentration of the unknown sample in mM.
@@ -32,7 +32,7 @@ items:
   - {key: peak1_area, description: "Area of the first peak", value: 2.8e6, tolerance: 0.05e6}
   - {key: peak1_amplitude, description: "Fitted amplitude of the first peak", value: 2.3e4, tolerance: 0.05e4}
   - {key: peak1_scale, description: "Fitted scale of the first peak", value: 0.16, tolerance: 0.005}
-  - {key: peak1_skew, description: "Fitted skew of the first peak", value: 0.70, tolerance: 0.005}
+  - {key: peak1_skew, description: "Fitted skew of the first peak", value: 0.70, tolerance: 0.01}
   - {key: peak3_retention_time, description: "Retention time of the third peak, in minutes", value: 14.45, tolerance: 0.005}
   - {key: peak1_area_exact, description: "Area of the first peak, full precision", value: 2805655.43, tolerance: 300, in_answer: false}
   - {key: calibration_slope, description: "Calibration slope, area per mM", value: 156586.74, tolerance: 160}

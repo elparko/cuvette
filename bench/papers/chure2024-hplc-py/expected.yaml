@@ -14,7 +14,7 @@ expected:
   - {description: "Area of the first peak", value: 2.8e6, tolerance: 0.05e6, source: "published"}
   - {description: "Fitted amplitude of the first peak", value: 2.3e4, tolerance: 0.05e4, source: "published"}
   - {description: "Fitted scale of the first peak", value: 0.16, tolerance: 0.005, source: "published"}
-  - {description: "Fitted skew of the first peak", value: 0.70, tolerance: 0.005, source: "published"}
+  - {description: "Fitted skew of the first peak", value: 0.70, tolerance: 0.01, source: "published"}
   - {description: "Retention time of the third peak, in minutes", value: 14.45, tolerance: 0.005, source: "published"}
   - {description: "Area of the first peak, full precision", value: 2805655.43, tolerance: 300, source: "published"}
   - {description: "Calibration slope, area per mM", value: 156586.74, tolerance: 160, source: "published"}

@@ -35,4 +35,4 @@ items:
   - {key: pair2_length, description: "Length of the pair 2 product, first to last base", value: 919, exact: true}
   - {key: pair2_ecoli_position, description: "Start of the pair 2 forward primer in the E. coli 16S numbering", value: 8, exact: true}
   - {key: tm_primer3, description: "Melting temperature of CCTACGGGAGGCAGCAG, in degrees C", value: 61.39, tolerance: 0.01}
-  - {key: pair1_coordinate_difference, description: "Difference of the two primer start positions in the E. coli numbering (the published amplicon size)", value: 464, exact: true, in_answer: false}
+  - {key: pair1_coordinate_difference, description: "Difference of the two primer start positions in the E. coli numbering (the published amplicon size)", value: 464, exact: true, in_answer: false, reference: true}

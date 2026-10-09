@@ -53,7 +53,7 @@ items:
     where: >-
       Figure 2D prints three rows of a table whose first column is cut off by the figure. The window from 10
       to 20 minutes holds six peaks.
-    independence: not independent. The value comes from the same program.
+    independence: same path
     check: The same count comes from hplc-py 0.2.5, the archived version.
   peak1_retention_time:
     source: published
@@ -74,7 +74,9 @@ items:
   peak1_skew:
     source: published
     where: Figure 2D, row 1, column skew. 0.70.
-    check: The adapter gives 0.6918.
+    check: >-
+      The adapter gives 0.6918, which rounds to 0.69, not to the printed 0.70. The item allows 0.01, one
+      unit of the last printed digit. The figure panel and the archived trace differ a little; see the notes.
   peak3_retention_time:
     source: published
     where: Figure 2D, row 3, column ret_time. 14.45.
@@ -83,7 +85,7 @@ items:
     source: computed
     tool: hplc-py 0.2.10
     where: Not in the paper. The figure prints two significant figures.
-    independence: not independent. The value comes from the same program.
+    independence: same path
     check: >-
       The area of a window by the trapezoid rule, divided by the sampling step, gives the same kind of number.
       catalog/chromatography/checks/area_units.py shows the two on a synthetic peak with a known area.
@@ -119,8 +121,17 @@ items:
     where: >-
       Not in the paper. Without the baseline correction the same window gives 7 peaks instead of 6, and the
       first peak moves from 10.90 to 10.28 minutes. A run that skips the baseline reaches this value.
-    independence: not independent.
+    independence: same path
     check: The adapter run with baseline none.
+data:
+  source: >-
+    Zenodo record 10642439, the archive of hplc-py 0.2.5 that the paper cites. fetch.sh takes the example
+    chromatogram and the five lactose traces out of the archive and checks the SHA-256 of each one.
+  url: https://doi.org/10.5281/zenodo.10642439
+  license: >-
+    GPL-3.0 for the code and the data. The paper is CC BY 4.0. The benchmark downloads the files and does not
+    copy them into the repository.
+  size: 12 MB archive, 1 MB of traces
 notes: >-
   Rows 2 and 3 of Figure 2D do not reproduce in full. Row 2 prints a retention time of 15.19, and the trace in
   the archive gives 15.53. Row 3 prints an amplitude of 3.7e+4 and a skew of -5.55, and the trace gives

@@ -133,6 +133,13 @@ items:
     source: published
     where: 'Results. "the pair S-D-Bact-0341-b-S-17/S-D-Bact-0785-a-A-21 shows the best combination of domain and phylum coverage and can thus be recommended for 464 bp amplicons".'
     check: 785 minus 341 gives 464.
+data:
+  source: >-
+    GenBank J01695.2, the Escherichia coli rrnB operon. fetch.sh downloads it from NCBI and checks the
+    SHA-256. The primer sequences are printed in the Materials and Methods of the paper.
+  url: https://www.ncbi.nlm.nih.gov/nuccore/J01695.2
+  license: NCBI sequence data, no use restrictions. The paper is CC BY-NC.
+  size: 7 kB
 notes: >-
   The license of the paper is CC BY-NC. The data are a GenBank record, which has no use restriction.
   The two printed primer sequences are in the Materials and Methods: "S-D-Bact-0341-b-S-17,

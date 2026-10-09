@@ -1,0 +1,2032 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "wang2023-cuproptosis-oa",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 74.655,
+   "session": "20261008-235155-7a8d",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run1/home/sessions/20261008-235155-7a8d",
+   "answer": "**Corrections made**\n\n- Background: the value used was 20000 genes (Enrichr default). I do not use measured genes as the background. The text below states this value only.\n- Set size limit 100000: the run_ora result reports \"size 1 to 100000\". This matches your answer to the largest gene set size question.\n- The 0.25 value is removed. It came from the program standards, not from this run.\n\n**What I did**\n\n1. Checked the hub gene file. It has four unique gene symbols: DBT, DLST, FDX1 and LIPT1. All four are in DSigDB.gmt, which has 4026 gene sets with gene symbol IDs (human).\n2. Ran over-representation analysis (ORA) with the four genes as the list. The test is hypergeometric, with Benjamini-Hochberg (BH) correction.\n   - Gene set file: DSigDB.gmt (Drug Signatures Database).\n   - Background: 20000 genes (Enrichr default), as you asked.\n   - Set size: 1 to 100000 genes, as the run reports.\n   - Gene list: the four hub genes. Your answers set the adjusted p cutoff to 1, the fold change minimum to 0 and the direction to both. These settings do not remove any gene from a list of named genes.\n\n**Results**\n\nOf the 4026 sets, 106 have at least one of the four genes. No set has an adjusted p below 0.05. The top five by raw p-value are:\n\n| Rank | Term | Genes in set (overlap) | Set size | Raw p | Adjusted p (BH) | Genes on the list |\n|---|---|---|---|---|---|---|\n| 1 | latamoxef HL60 DOWN | 3 | 1578 | 0.0018454 | 0.11187 | DBT, DLST, FDX1 |\n| 2 | ethotoin HL60 DOWN | 1 | 24 | 0.0047917 | 0.11187 | DBT |\n| 3 | betulinic acid PC3 DOWN | 1 | 30 | 0.0059870 | 0.11187 | DBT |\n| 4 | staurosporine MCF7 DOWN | 2 | 649 | 0.0060398 | 0.11187 | DBT, LIPT1 |\n| 5 | cloperastine PC3 DOWN | 1 | 37 | 0.0073800 | 0.11187 | DBT |\n\n- Odds ratio of the first term (latamoxef HL60 DOWN): 35.09. The Haldane-corrected odds ratio, which the tool also reports, is 27.28.\n- Output files: ora_results.csv (full table), ora_dotplot.png and ora_dotplot.svg (dot plot).\n\n**What is uncertain**\n\n- Only four genes are on the list. The test has little power. The top terms have one to three genes each.\n- All five terms have the same adjusted p, 0.11187. None passes the 0.05 cutoff. Treat the top term as a weak signal.\n- The terms are DSigDB drug signatures. An overlap means the gene is in that drug's signature. It does not show that the drug acts on these genes, or that the genes are active or inhibited.\n- The 20000-gene background is a fixed number. The program standards prefer the measured genes as the background. A different background can change the p-values. I can run that comparison if you give me the path to the full table of measured genes.\n- Several top terms share genes. DBT appears in all five. Their results are not independent.\n\n**What waits for you**\n\nNothing waits. If you want the measured-gene background comparison, send the path to the full table of measured genes.\n\nSettings used, from the decision record: Gene set collection (GMT file):  · Background (universe) for over-representation: 20000 genes (the Enrichr default) · Adjusted p cutoff for a differentially expressed gene: 1 · Smallest absolute log2 fold change for the gene list: 0 · Up, down or both: both · Smallest gene set size: 1 · Largest gene set size: 100000.",
+   "items": [
+    {
+     "key": "overlap_1",
+     "description": "Genes of the list in the top term",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.top_overlap",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 3,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 1 | latamoxef HL60 DOWN | 3 | 1578 | 0.0018454 | 0.11187 | DBT, DLST, FDX1 |"
+     }
+    },
+    {
+     "key": "set_size_1",
+     "description": "Size of the top term",
+     "expected": 1578,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1578,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.top_set_size",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 1578,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 1 | latamoxef HL60 DOWN | 3 | 1578 | 0.0018454 | 0.11187 | DBT, DLST, FDX1 |"
+     }
+    },
+    {
+     "key": "p_value_1",
+     "description": "Raw p of the top term",
+     "expected": 0.0018453476993364856,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0018453839711629735,
+      "diff": 3.6271826487884254e-8,
+      "node": "n4",
+      "path": "metrics.top_p_value",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0018454,
+      "diff": 5.230066351443602e-8,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 1 | latamoxef HL60 DOWN | 3 | 1578 | 0.0018454 | 0.11187 | DBT, DLST, FDX1 |"
+     }
+    },
+    {
+     "key": "p_adjusted_1",
+     "description": "Adjusted p of the top term",
+     "expected": 0.11186607610867805,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.11186724021582133,
+      "diff": 0.0000011641071432783034,
+      "node": "n4",
+      "path": "metrics.top_p_adjusted",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.11187,
+      "diff": 0.000003923891321949702,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 1 | latamoxef HL60 DOWN | 3 | 1578 | 0.0018454 | 0.11187 | DBT, DLST, FDX1 |"
+     }
+    },
+    {
+     "key": "odds_ratio_1",
+     "description": "Odds ratio of the top term",
+     "expected": 35.08761904761905,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.08761904761905,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.top_odds_ratio",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 35.09,
+      "diff": 0.0023809523809532607,
+      "via": "rounding",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "- Odds ratio of the first term (latamoxef HL60 DOWN): 35.09."
+     }
+    },
+    {
+     "key": "set_size_2",
+     "description": "Size of the second term",
+     "expected": 24,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 24,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_2",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 24,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 2 | ethotoin HL60 DOWN | 1 | 24 | 0.0047917 | 0.11187 | DBT |"
+     }
+    },
+    {
+     "key": "p_value_2",
+     "description": "Raw p of the second term",
+     "expected": 0.004791660011821214,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.004791725657295827,
+      "diff": 6.564547461347658e-8,
+      "node": "n4",
+      "path": "metrics.p_value_2",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0047917,
+      "diff": 3.9988178786483364e-8,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 2 | ethotoin HL60 DOWN | 1 | 24 | 0.0047917 | 0.11187 | DBT |"
+     }
+    },
+    {
+     "key": "set_size_3",
+     "description": "Size of the third term",
+     "expected": 30,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 30,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_3",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 30,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 3 | betulinic acid PC3 DOWN | 1 | 30 | 0.0059870 | 0.11187 | DBT |"
+     }
+    },
+    {
+     "key": "p_value_3",
+     "description": "Raw p of the third term",
+     "expected": 0.0059868860535258585,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.005986961525182604,
+      "diff": 7.54716567453323e-8,
+      "node": "n4",
+      "path": "metrics.p_value_3",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.005987,
+      "diff": 1.1394647414161851e-7,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 3 | betulinic acid PC3 DOWN | 1 | 30 | 0.0059870 | 0.11187 | DBT |"
+     }
+    },
+    {
+     "key": "set_size_4",
+     "description": "Size of the fourth term",
+     "expected": 649,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 649,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_4",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 649,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 4 | staurosporine MCF7 DOWN | 2 | 649 | 0.0060398 | 0.11187 | DBT, LIPT1 |"
+     }
+    },
+    {
+     "key": "p_value_4",
+     "description": "Raw p of the fourth term",
+     "expected": 0.0060396749482483575,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.006039754232033397,
+      "diff": 7.928378503978956e-8,
+      "node": "n4",
+      "path": "metrics.p_value_4",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0060398,
+      "diff": 1.2505175164215926e-7,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 4 | staurosporine MCF7 DOWN | 2 | 649 | 0.0060398 | 0.11187 | DBT, LIPT1 |"
+     }
+    },
+    {
+     "key": "set_size_5",
+     "description": "Size of the fifth term",
+     "expected": 37,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 37,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_5",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 37,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 5 | cloperastine PC3 DOWN | 1 | 37 | 0.0073800 | 0.11187 | DBT |"
+     }
+    },
+    {
+     "key": "p_value_5",
+     "description": "Raw p of the fifth term",
+     "expected": 0.007379956522320185,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.007380042304537234,
+      "diff": 8.578221704844124e-8,
+      "node": "n4",
+      "path": "metrics.p_value_5",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00738,
+      "diff": 4.347767981489198e-8,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 70,
+      "text": "| 5 | cloperastine PC3 DOWN | 1 | 37 | 0.0073800 | 0.11187 | DBT |"
+     }
+    },
+    {
+     "key": "n_sets_tested",
+     "description": "Number of gene sets tested",
+     "expected": 4026,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4026,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_gene_sets",
+      "entry": 11
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 70,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 4,
+    "inputTokens": 14,
+    "outputTokens": 5404,
+    "cacheRead": 40358,
+    "cacheWrite": 22774,
+    "toolCalls": 2,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 2,
+     "error": 2
+    },
+    "unsourced": 4,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run1/home/sessions/20261008-235155-7a8d/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/enrichment",
+     "/Users/parker/.guided-analysis/envs/enrichment",
+     "/Volumes/ga-envs/enrichment",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/enrichment"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/DSigDB.gmt",
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/hub_genes.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 4,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "klindworth2013-16s-primers",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 65.599,
+   "session": "20261008-235310-8e4b",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/klindworth2013-16s-primers/run1/home/sessions/20261008-235310-8e4b",
+   "answer": "**Template:** J01695.2, *E. coli* rrnB operon, 7258 bp, linear (confirmed by you). File: ecoli_rrnb.fasta.\n\n**1. Products per pair (in-silico PCR, minimum 3' match 13 bp)**\n\n- **Pair 1** (CCTACGGGNGGCWGCAG / GACTACHVGGGTATCTAATCC): 1 product. It runs from base 1608 to base 2072 on the top strand. Product length: 465 bp.\n- **Pair 2** (AGAGTTTGATCMTGGC / CCGTCAATTCMTTTGAGTTT): 1 product. It runs from base 1275 to base 2193 on the top strand. Product length: 919 bp.\n\nEach primer binds once, with a full-length match. The forward footprints are 17 bp (pair 1) and 16 bp (pair 2). The reverse footprints are 21 bp (pair 1) and 20 bp (pair 2).\n\n**2. Forward primer position in the 16S gene**\n\nThe 16S gene starts at base 1268 of J01695.2. The gene position is the template start minus 1268, plus 1.\n\n- **Pair 1 forward primer:** position 341 (1608 − 1268 + 1 = 341).\n- **Pair 2 forward primer:** position 8 (1275 − 1268 + 1 = 8).\n\n**3. Melting temperature of CCTACGGGAGGCAGCAG**\n\nMethod: Primer3 (SantaLucia 1998) with SantaLucia salt correction. Conditions: Na+ 50 mM, Mg2+ 1.5 mM, dNTP 0.6 mM, primer 200 nM.\n\n- Tm: 61.39 °C.\n- GC content: 70.6 %.\n- Hairpin Tm: 38.96 °C. Hairpin ΔG: −0.11 kcal/mol.\n- Self-dimer ΔG: −3.48 kcal/mol.\n\nThis Tm is for the version with no ambiguity. The Tm of the degenerate primer was not calculated.\n\n**What I did**\n\n1. Ran in-silico PCR for both pairs on the linear template.\n2. Read the template file to confirm its length.\n3. Converted the product start positions to 16S gene numbering.\n4. Calculated the Tm of the unambiguous forward primer.\n\n**What is uncertain**\n\n- The in-silico PCR uses a 13 bp minimum 3' match. Real PCR can give products that this simulation does not show.\n- The simulation counts each primer as a single site, with IUPAC codes allowed. It does not show how the degenerate positions bind in practice.\n- The Tm is not an annealing temperature. Use the polymerase vendor rule for the annealing temperature.\n\n**What waits for the scientist**\n\n- Nothing waits. If you want Tm values for the degenerate primers, or a different Tm method or salt correction, tell me.\n\nSettings used, from the decision record: Monovalent cations (Na+ and K+) in the PCR buffer, mM: 50 · Mg2+ in the PCR buffer, mM: 1.5 · Total dNTP in the PCR, mM: 0.6 · Primer concentration, nM: 200 · Melting temperature method: primer3 · Salt correction of the Tm: santalucia · Shortest 3' match for a primer binding site, bp: 13 · Linear or circular template: linear.",
+   "items": [
+    {
+     "key": "pair1_products",
+     "description": "Number of products from pair 1",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.n_products",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 85,
+      "text": "**1."
+     }
+    },
+    {
+     "key": "pair1_start",
+     "description": "Start of the pair 1 product on J01695.2",
+     "expected": 1608,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1608,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.start_1based",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 1608,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 85,
+      "text": "It runs from base 1608 to base 2072 on the top strand."
+     }
+    },
+    {
+     "key": "pair1_end",
+     "description": "End of the pair 1 product on J01695.2",
+     "expected": 2072,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2072,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.end_1based",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 2072,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 85,
+      "text": "It runs from base 1608 to base 2072 on the top strand."
+     }
+    },
+    {
+     "key": "pair1_length",
+     "description": "Length of the pair 1 product, first to last base",
+     "expected": 465,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 465,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.product_bp",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 465,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 85,
+      "text": "Product length: 465 bp."
+     }
+    },
+    {
+     "key": "pair1_ecoli_position",
+     "description": "Start of the pair 1 forward primer in the E. coli 16S numbering",
+     "expected": 341,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 341,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.pair1_fwd_gene_pos",
+      "entry": 61
+     },
+     "reported": {
+      "pass": true,
+      "value": 341,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 85,
+      "text": "- **Pair 1 forward primer:** position 341 (1608 − 1268 + 1 = 341)."
+     }
+    },
+    {
+     "key": "pair2_products",
+     "description": "Number of products from pair 2",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.n_products",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 85,
+      "text": "**1."
+     }
+    },
+    {
+     "key": "pair2_start",
+     "description": "Start of the pair 2 product on J01695.2",
+     "expected": 1275,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1275,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.start_1based",
+      "entry": 28
+     },
+     "reported": {
+      "pass": true,
+      "value": 1275,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "It runs from base 1275 to base 2193 on the top strand."
+     }
+    },
+    {
+     "key": "pair2_end",
+     "description": "End of the pair 2 product on J01695.2",
+     "expected": 2193,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2193,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.end_1based",
+      "entry": 28
+     },
+     "reported": {
+      "pass": true,
+      "value": 2193,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "It runs from base 1275 to base 2193 on the top strand."
+     }
+    },
+    {
+     "key": "pair2_length",
+     "description": "Length of the pair 2 product, first to last base",
+     "expected": 919,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 919,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.product_bp",
+      "entry": 28
+     },
+     "reported": {
+      "pass": true,
+      "value": 919,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 85,
+      "text": "Product length: 919 bp."
+     }
+    },
+    {
+     "key": "pair2_ecoli_position",
+     "description": "Start of the pair 2 forward primer in the E. coli 16S numbering",
+     "expected": 8,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.pair2_fwd_gene_pos",
+      "entry": 61
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 85,
+      "text": "- **Pair 2 forward primer:** position 8 (1275 − 1268 + 1 = 8)."
+     }
+    },
+    {
+     "key": "tm_primer3",
+     "description": "Melting temperature of CCTACGGGAGGCAGCAG, in degrees C",
+     "expected": 61.39,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 61.386,
+      "diff": 0.003999999999997783,
+      "node": "n6",
+      "path": "metrics.tm_c_1",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 61.39,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 85,
+      "text": "- Tm: 61.39 °C."
+     }
+    },
+    {
+     "key": "pair1_coordinate_difference",
+     "description": "Difference of the two primer start positions in the E. coli numbering (the published amplicon size)",
+     "expected": 464,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": 465,
+      "diff": 1,
+      "node": "n3",
+      "path": "metrics.product_bp",
+      "entry": 25
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 85,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 4,
+    "inputTokens": 14,
+    "outputTokens": 5511,
+    "cacheRead": 46130,
+    "cacheWrite": 20900,
+    "toolCalls": 5,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 2,
+     "error": 2
+    },
+    "unsourced": 2,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/klindworth2013-16s-primers/run1/home/sessions/20261008-235310-8e4b/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/klindworth2013-16s-primers/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/cloning",
+     "/Users/parker/.guided-analysis/envs/cloning",
+     "/Volumes/ga-envs/cloning",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/cloning"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers/ecoli_rrnb.fasta"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 2,
+    "literature": 1
+   }
+  },
+  {
+   "paper": "chure2024-hplc-py",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 172.461,
+   "session": "20261008-235416-6b36",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/chure2024-hplc-py/run1/home/sessions/20261008-235416-6b36",
+   "answer": "## Summary\n\nI ran peak integration on the sample trace and on the lactose set. I fitted a four-point calibration line and quantified the unknown. The unknown lactose sample is 1.935 mM, inside the standard range. The baseline setting for the lactose numbers needs your decision, as explained below.\n\n## Part 1: Peaks in the 10 to 20 min window (sample.txt)\n\nSettings used:\n- File: sample.txt. Detector column: \"Intensity\". Time column: \"R.Time (min)\". Data starts at line 84.\n- Time window: 10 to 20 min.\n- Baseline: SNIP (sensitive nonlinear iterative peak clipping), as recorded and as you confirmed.\n- Peak width: 5, as you confirmed.\n- Prominence: 0.01, as recorded. My call used 0.02, but the run used the recorded 0.01.\n- Area: the fitted skew-normal peak area, summed over the window. It is in signal units, not signal times time.\n\nSix peaks were found:\n\n| Peak | Retention time (min) | Area | Area percent |\n|---|---|---|---|\n| 1 | 10.90 | 2805655 | 16.7 |\n| 2 | 13.17 | 5179895 | 30.9 |\n| 3 | 14.45 | 4163697 | 24.8 |\n| 4 | 15.53 | 1807420 | 10.8 |\n| 5 | 16.52 | 1312688 | 7.8 |\n| 6 | 17.29 | 1503119 | 9.0 |\n\nThe total area is 16772474.\n\nPeaks 2 and 3 are fitted centers of an overlapping pair. The fit gives their areas. The fit does not separate them cleanly, so their areas depend on the fit.\n\n## Part 2: Fitted values of the first peak (10.90 min)\n\n- Amplitude: 23380.46\n- Scale: 0.15876\n- Skew: 0.69180\n\n## Part 3: Lactose calibration\n\nSettings:\n- Four standards: 0.5, 1, 3 and 6 mM. Each file has one peak at 13.56 min.\n- Prominence: 0.01. No time window.\n- Weighting: none, as you confirmed.\n- Intercept: fitted, not forced through zero.\n\nBaseline setting, stated clearly:\n- You asked for no baseline correction on the lactose files, and you chose none for them.\n- The decision record still says SNIP. I could not change the record. The harness kept SNIP.\n- The numbers in this section are from comparison runs with baseline none. They are not from the recorded SNIP setting.\n- The recorded SNIP integration gave these standard areas: 89667.8 (0.5 mM), 184858 (1 mM), 467600 (3 mM) and 960534 (6 mM). The recorded SNIP area of the unknown is 312048. I did not fit a calibration on these SNIP areas.\n\nHow the no-baseline areas were made:\n1. I integrated each standard. The harness used the recorded SNIP setting.\n2. I ran the no-baseline comparison on that file with compare_options. The record did not change.\n3. The areas below are the no-baseline comparison results. The compare table rounds them.\n\n| Standard (mM) | Area, no baseline |\n|---|---|\n| 0.5 | 175800 |\n| 1 | 322500 |\n| 3 | 571900 |\n| 6 | 1059000 |\n\nResults of the calibration on the no-baseline areas:\n- Slope: 154699.67 area per mM.\n- Intercept: 126213.38.\n- R squared: 0.993645.\n- Residuals: 0.5 mM is -15.79%, 1 mM is +12.90%, 3 mM is -3.22%, 6 mM is +0.43%.\n- Estimated limit of detection: 0.8067 mM. Estimated limit of quantification: 2.4446 mM. These come from the calibration residuals only. They are not validated limits.\n\n## Part 4: Unknown sample (lactose_mM_2)\n\n- Area, no baseline (comparison run): 425600. The compare table rounds this value.\n- Concentration: 1.935 mM (tool value 1.935276 mM).\n- The value lies inside the standard range of 0.5 to 6 mM. No dilution is needed.\n\n## What I did\n\n1. Read the sample trace. Integrated peaks in the 10 to 20 min window with the recorded SNIP setting.\n2. Read one lactose standard. Integrated the peak in all five lactose files.\n3. Ran the no-baseline comparison for each lactose file, one at a time. The record did not change.\n4. Fitted the calibration line with an intercept on the no-baseline areas. Read the residuals.\n5. Converted the unknown area to a concentration and checked the standard range.\n\n## What I found\n\n- The sample trace has six peaks in the 10 to 20 min window. Their retention times and areas are listed in Part 1.\n- The lactose calibration gives 1.935 mM for the unknown, using the no-baseline comparison areas.\n\n## What is uncertain\n\n- The lactose result uses the no-baseline comparison areas. The record still says SNIP. With SNIP, the lactose areas differ, so the calibration and the unknown value would change. I did not compute that result.\n- The residuals at 0.5 mM and 1 mM are large. The line does not fit the low end well. The unknown lies near 1 mM, so its value carries a large uncertainty.\n- The confirmed peak width is 5 min. The peaks in the sample trace look narrower than 5 min on the plot. A width of 5 min can change the SNIP baseline.\n- The areas from the compare table are rounded. Exact values need the full peak table.\n- The limits of detection and quantification are estimates from the residuals, not validated limits.\n\n## What waits for you\n\n- Decide the baseline for the lactose files: none, as you chose, or SNIP, as recorded. If you choose SNIP, I rerun the calibration and the unknown with SNIP areas.\n- Decide whether the record should change to none for the lactose files.\n- Confirm the 5 min peak width for the sample trace.\n- Decide whether to add standards near the unknown, at about 1.9 mM, before you use the 1.935 mM result.\n\nStep results that the answer does not mention, from the record:\n- n1 read_trace: sample.txt: 4801 points from 0 to 40 (step 0.00833, even spacing). Signal -544 to 75508; it starts at 0 and ends at 19.\n- n7 read_trace: lactose_mM_1.csv: 601 points from 12 to 17 (step 0.00833, even spacing). Signal 685 to 3755; it starts at 685 and ends at 703.\n\nSettings used, from the decision record: Baseline correction: snip · Approximate peak width, in time units: 5 · Smallest peak height that counts, as a fraction of the largest peak: 0.01 · Force the calibration line through zero: false · Weighting of the calibration fit: none.",
+   "items": [
+    {
+     "key": "n_peaks",
+     "description": "Number of peaks between 10 and 20 minutes",
+     "expected": 6,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_peaks",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 6,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n24",
+      "claimEntry": 239,
+      "text": "| 6 | 17.29 | 1503119 | 9.0 |"
+     }
+    },
+    {
+     "key": "peak1_retention_time",
+     "description": "Retention time of the first peak, in minutes",
+     "expected": 10.9,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10.9,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.retention_time_1",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 10.9,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 239,
+      "text": "| 1 | 10.90 | 2805655 | 16.7 |"
+     }
+    },
+    {
+     "key": "peak1_area",
+     "description": "Area of the first peak",
+     "expected": 2800000,
+     "tolerance": 50000,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2805655.4319818616,
+      "diff": 5655.431981861591,
+      "node": "n6",
+      "path": "metrics.area_1",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 2805655,
+      "diff": 5655,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 239,
+      "text": "| 1 | 10.90 | 2805655 | 16.7 |"
+     }
+    },
+    {
+     "key": "peak1_amplitude",
+     "description": "Fitted amplitude of the first peak",
+     "expected": 23000,
+     "tolerance": 500,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 23380.461933188817,
+      "diff": 380.46193318881706,
+      "node": "n6",
+      "path": "table.rows[0][3]",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 23380.46,
+      "diff": 380.4599999999991,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 239,
+      "text": "- Amplitude: 23380.46"
+     }
+    },
+    {
+     "key": "peak1_scale",
+     "description": "Fitted scale of the first peak",
+     "expected": 0.16,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.1587618915028268,
+      "diff": 0.001238108497173207,
+      "node": "n6",
+      "path": "table.rows[0][4]",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.15876,
+      "diff": 0.0012399999999999911,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 239,
+      "text": "- Scale: 0.15876"
+     }
+    },
+    {
+     "key": "peak1_skew",
+     "description": "Fitted skew of the first peak",
+     "expected": 0.7,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": 0.6917995605487433,
+      "diff": 0.008200439451256702,
+      "node": "n6",
+      "path": "table.rows[0][5]",
+      "entry": 45
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.6918,
+      "diff": 0.008199999999999985,
+      "via": null,
+      "node": "n2",
+      "claimEntry": 239,
+      "text": "- Skew: 0.69180"
+     }
+    },
+    {
+     "key": "peak3_retention_time",
+     "description": "Retention time of the third peak, in minutes",
+     "expected": 14.45,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 14.45,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.retention_time_3",
+      "entry": 45
+     },
+     "reported": {
+      "pass": true,
+      "value": 14.45,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 239,
+      "text": "| 3 | 14.45 | 4163697 | 24.8 |"
+     }
+    },
+    {
+     "key": "peak1_area_exact",
+     "description": "Area of the first peak, full precision",
+     "expected": 2805655.43,
+     "tolerance": 300,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2805655.4319818616,
+      "diff": 0.001981861423701048,
+      "node": "n6",
+      "path": "metrics.area_1",
+      "entry": 45
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 239,
+      "text": null
+     }
+    },
+    {
+     "key": "calibration_slope",
+     "description": "Calibration slope, area per mM",
+     "expected": 156586.74,
+     "tolerance": 160,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": 154699.66555183948,
+      "diff": 1887.074448160507,
+      "node": "n24",
+      "path": "metrics.slope",
+      "entry": 198
+     },
+     "reported": {
+      "pass": false,
+      "value": 154699.67,
+      "diff": 1887.0699999999779,
+      "via": null,
+      "node": "n24",
+      "claimEntry": 239,
+      "text": "- Slope: 154699.67 area per mM."
+     }
+    },
+    {
+     "key": "calibration_intercept",
+     "description": "Calibration intercept, in area units",
+     "expected": 14624.94,
+     "tolerance": 150,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": 15061.835819408083,
+      "diff": 436.8958194080824,
+      "node": "n6",
+      "path": "table.rows[3][3]",
+      "entry": 45
+     },
+     "reported": {
+      "pass": false,
+      "value": 23380.46,
+      "diff": 8755.519999999999,
+      "via": null,
+      "node": "n2",
+      "claimEntry": 239,
+      "text": "- Amplitude: 23380.46"
+     }
+    },
+    {
+     "key": "calibration_r_squared",
+     "description": "R squared of the calibration",
+     "expected": 0.99887,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": 1,
+      "diff": 0.0011299999999999644,
+      "node": "n1",
+      "path": "table.rows[12][1]",
+      "entry": 13
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.993645,
+      "diff": 0.005225000000000035,
+      "via": null,
+      "node": "n24",
+      "claimEntry": 239,
+      "text": "- R squared: 0.993645."
+     }
+    },
+    {
+     "key": "unknown_concentration",
+     "description": "Concentration of the unknown lactose sample, in mM",
+     "expected": 1.8994,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": 1.935276466213529,
+      "diff": 0.03587646621352891,
+      "node": "n25",
+      "path": "metrics.mean_concentration",
+      "entry": 206
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.9,
+      "diff": 0.0005999999999999339,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 239,
+      "text": "- Decide whether to add standards near the unknown, at about 1.9 mM, before you use the 1.935 mM result."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 22,
+    "inputTokens": 54,
+    "outputTokens": 20045,
+    "cacheRead": 1066274,
+    "cacheWrite": 78034,
+    "toolCalls": 25,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 5,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 5,
+    "overwritten": 5,
+    "nodes": 14
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/chure2024-hplc-py/run1/home/sessions/20261008-235416-6b36/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/chure2024-hplc-py/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/chromatography",
+     "/Users/parker/.guided-analysis/envs/chromatography",
+     "/Volumes/ga-envs/chromatography",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/chromatography"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_0.5.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_1.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_2.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_3.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/lactose/lactose_mM_6.csv",
+     "/Volumes/T7/guided-analysis/data/chure2024-hplc-py/sample.txt"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "oreshkova2024-qmp-honeybee",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 188.658,
+   "session": "20261008-235708-3be9",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9",
+   "answer": "## Corrections to the review\n\n1. **Protein ANOVA numbers (0.373, 0.86, 0.0005, 36, 1.06, 0.308, 0.493, 0.023, 0.297):** These come from the anova_factorial run on qmp_pooled_data.csv (output folder anova_factorial-4). The harness recorded ss_type = 1, and the tool summary says type I. I made no comparison run. I passed ss_type 3 in the call, but the recorded value was used. The design is balanced, so the type does not change these results. A separate recalculation with type I sums of squares gives the same F values and p values.\n2. **Bonferroni for the factorial ANOVA:** I did not use Bonferroni for the factorial ANOVA. The record sets it to none, and I report no post-hoc comparisons. Bonferroni was used only in the Dunn tests for fas by order and by replicate, as you requested.\n3. **Medians 1.473, 2.633, 1.564, 2.569:** These are logged in the kruskal_dunn summaries. For order: A 2.704, B 2.813, C 1.473, D 1.966. For replicate: A 2.633, B 1.564, C 2.569. A recalculation script gives the same medians.\n\n## Summary\n\nThe unit of replication is one pooled sample of two abdomens. For acini area, one value per sample is the mean of that sample's glands. Alpha = 0.05 for every test. The acini sums-of-squares type is still open (see below).\n\n### 1. Abdominal protein (fb_mg): three-way ANOVA\n\nTool: anova_factorial. File: qmp_pooled_data.csv. n = 72 samples, balanced (12 cells of 6). Recorded type I sums of squares. Residual df = 60. Levene p = 0.163, so equal variances are not rejected. Post-hoc comparisons: none, as recorded.\n\n| Term | F (df) | p | Partial eta squared |\n|---|---|---|---|\n| Age | F(1, 60) = 35.69 | < 0.0001 (significant) | 0.373 |\n| Treatment (QMP) | F(1, 60) = 0.032 | 0.860 | 0.0005 |\n| Replicate | F(2, 60) = 36.0 | < 0.0001 (significant) | 0.545 |\n| Age x Treatment | F(1, 60) = 1.06 | 0.308 | 0.017 |\n| Age x Replicate | F(2, 60) = 2.81 | 0.068 | 0.086 |\n| Treatment x Replicate | F(2, 60) = 0.72 | 0.493 | 0.023 |\n| Age x Treatment x Replicate | F(2, 60) = 1.24 | 0.297 | 0.040 |\n\nAge and replicate change abdominal protein. QMP treatment does not. No interaction is significant. The seven terms come from one model, so no correction was applied.\n\n### 2. Acini area (Average): three-way ANOVA\n\nThe gland file has 72 glands. Each gland matched a pooled sample by gland ID, and all labels agreed. Thirty-seven samples have gland data: 35 with two glands and 2 with one. The design is unbalanced.\n\nMain analysis, one value per sample: anova_factorial, n = 37 samples, residual df = 25. Recorded type I sums of squares. Levene p = 0.041.\n\n| Term | F (df) | p | Partial eta squared |\n|---|---|---|---|\n| Age | F(1, 25) = 23.35 | < 0.0001 (significant) | 0.483 |\n| Treatment (QMP) | F(1, 25) = 26.78 | < 0.0001 (significant) | 0.517 |\n| Replicate | F(2, 25) = 6.01 | 0.007 (significant) | 0.325 |\n| Age x Treatment | F(1, 25) = 0.46 | 0.506 | 0.018 |\n| Age x Replicate | F(2, 25) = 1.21 | 0.315 | 0.088 |\n| Treatment x Replicate | F(2, 25) = 1.95 | 0.163 | 0.135 |\n| Age x Treatment x Replicate | F(2, 25) = 3.68 | 0.040 (significant) | 0.227 |\n\nCheck, gland as row (n = 72 glands): this treats glands from one sample as independent, so it overstates n. Age F(1, 60) = 27.78, p < 0.0001. Treatment F(1, 60) = 29.16, p < 0.0001. Replicate F(2, 60) = 6.85, p = 0.002. Three-way interaction F(2, 60) = 4.46, p = 0.016. Levene p = 0.015.\n\nThe three-way interaction in the main analysis is near alpha. Levene p = 0.041 shows unequal variances. Treat it as tentative. Use the per-sample result.\n\n### 3. Normalized FAS (fas): rank tests\n\nUnit: one pooled sample, n = 72. Tests: Kruskal-Wallis, with Dunn pairwise tests and Bonferroni correction.\n\n**Four treatment groups (order):** chi-squared = 9.35, df = 3, p = 0.025 (significant). Medians: A 2.704, B 2.813, C 1.473, D 1.966.\n\n| Pair | Mean ranks | z | Raw p | Bonferroni p (6 pairs) |\n|---|---|---|---|---|\n| A vs B | 42.4 vs 44.4 | 0.28 | 0.780 | 1.000 |\n| A vs C | 42.4 vs 25.4 | -2.44 | 0.015 | 0.089 |\n| A vs D | 42.4 vs 33.7 | -1.25 | 0.211 | 1.000 |\n| B vs C | 44.4 vs 25.4 | -2.72 | 0.007 | 0.040 (significant) |\n| B vs D | 44.4 vs 33.7 | -1.53 | 0.126 | 0.758 |\n| C vs D | 25.4 vs 33.7 | 1.19 | 0.235 | 1.000 |\n\nOnly B vs C is significant after Bonferroni correction.\n\n**Three replicates:** chi-squared = 23.87, df = 2, p < 0.0001 (significant). Medians: A 2.633, B 1.564, C 2.569.\n\n| Pair | Mean ranks | z | Raw p | Bonferroni p (3 pairs) |\n|---|---|---|---|---|\n| A vs B | 45.0 vs 19.5 | -4.23 | 2.4 x 10^-5 | 7.1 x 10^-5 (significant) |\n| A vs C | 45.0 vs 45.0 | 0.01 | 0.994 | 1.000 |\n| B vs C | 19.5 vs 45.0 | 4.23 | 2.3 x 10^-5 | 6.9 x 10^-5 (significant) |\n\nReplicate B differs from A and from C. A and C do not differ.\n\n## What I did\n1. Read the raw CSV files. The inspect_data tool failed, so I read the files as text. The automatic data check reported missing and extreme values for a summary table, not the data columns I used. The models dropped no rows.\n2. Ran the three-way ANOVA on fb_mg.\n3. Matched each gland to its pooled sample by gland ID, then averaged the glands per sample.\n4. Ran the three-way ANOVA on per-sample acini area, and on gland rows as a check.\n5. Ran the Kruskal-Wallis and Dunn tests on fas for order and for replicate.\n6. Recalculated the FAS medians and the type I protein ANOVA with a script. The results match the logged values.\n\n## What is uncertain\n- Acini analysis: 37 of 72 samples have gland data, and the design is unbalanced. The recorded type I sums of squares depend on factor order. Type III can give different results. The protein analysis is balanced, so the type does not change it.\n- The acini three-way interaction (p = 0.040) is borderline. Levene p = 0.041 suggests unequal variances.\n- The gland-level check treats glands as independent. Use the per-sample result.\n- The question 3 tests use pooled samples, not individual abdomens.\n\n## What waits for the scientist\n- Sums-of-squares type for the unbalanced acini ANOVA. The record has type 1. I can run type III after you approve a change to the record.\n- Confirm that one value per sample is the right unit for the acini analysis.\n\nStep results that the answer does not mention, from the record:\n- n7 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work.\n- n12 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work and wrote 0 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work.\n\nSettings used, from the decision record: Type of sums of squares: 1 · Comparisons of the cell means after a factorial ANOVA: none · Correction after a rank test over many groups: bonferroni.",
+   "items": [
+    {
+     "key": "protein_f_age",
+     "description": "Abdominal protein, F for age",
+     "expected": 35.693,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.6928,
+      "diff": 0.00019999999999953388,
+      "node": "n12",
+      "path": "stdout",
+      "entry": 146
+     },
+     "reported": {
+      "pass": true,
+      "value": 35.69,
+      "diff": 0.0030000000000001137,
+      "via": "rounding",
+      "node": "n6",
+      "claimEntry": 169,
+      "text": "| Age | F(1, 60) = 35.69 | < 0.0001 (significant) | 0.373 |"
+     }
+    },
+    {
+     "key": "protein_f_treatment",
+     "description": "Abdominal protein, F for QMP treatment",
+     "expected": 0.032,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03156445331095737,
+      "diff": 0.00043554668904263044,
+      "node": "n6",
+      "path": "metrics.F_treatment",
+      "entry": 63
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.032,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 169,
+      "text": "| Treatment (QMP) | F(1, 60) = 0.032 | 0.860 | 0.0005 |"
+     }
+    },
+    {
+     "key": "protein_f_replicate",
+     "description": "Abdominal protein, F for replicate",
+     "expected": 36,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.99952,
+      "diff": 0.0004800000000031446,
+      "node": "n12",
+      "path": "stdout",
+      "entry": 146
+     },
+     "reported": {
+      "pass": true,
+      "value": 36,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 169,
+      "text": "**Protein ANOVA numbers (0.373, 0.86, 0.0005, 36, 1.06, 0.308, 0.493, 0.023, 0.297):** These come from the anova_factorial run on qmp_pooled_data.csv (output folder anova_factorial-4)."
+     }
+    },
+    {
+     "key": "protein_p_age",
+     "description": "Abdominal protein, p for age",
+     "expected": 1.356e-7,
+     "tolerance": 1e-7,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.3560494352539e-7,
+      "diff": 4.943525390010357e-12,
+      "node": "n6",
+      "path": "metrics.p_age",
+      "entry": 63
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 169,
+      "text": null
+     }
+    },
+    {
+     "key": "protein_p_treatment",
+     "description": "Abdominal protein, p for QMP treatment",
+     "expected": 0.8596,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.85959,
+      "diff": 0.000010000000000065512,
+      "node": "n12",
+      "path": "stdout",
+      "entry": 146
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.86,
+      "diff": 0.00039999999999995595,
+      "via": "rounding",
+      "node": "n12",
+      "claimEntry": 169,
+      "text": "**Protein ANOVA numbers (0.373, 0.86, 0.0005, 36, 1.06, 0.308, 0.493, 0.023, 0.297):** These come from the anova_factorial run on qmp_pooled_data.csv (output folder anova_factorial-4)."
+     }
+    },
+    {
+     "key": "protein_f_age_x_treatment",
+     "description": "Abdominal protein, F for age by treatment",
+     "expected": 1.057,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0566528954730137,
+      "diff": 0.0003471045269862749,
+      "node": "n6",
+      "path": "metrics.F_age_x_treatment",
+      "entry": 63
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.06,
+      "diff": 0.0030000000000001137,
+      "via": "rounding",
+      "node": "n4",
+      "claimEntry": 169,
+      "text": "**Protein ANOVA numbers (0.373, 0.86, 0.0005, 36, 1.06, 0.308, 0.493, 0.023, 0.297):** These come from the anova_factorial run on qmp_pooled_data.csv (output folder anova_factorial-4)."
+     }
+    },
+    {
+     "key": "protein_f_age_x_replicate",
+     "description": "Abdominal protein, F for age by replicate",
+     "expected": 2.809,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.80851,
+      "diff": 0.0004900000000001015,
+      "node": "n12",
+      "path": "stdout",
+      "entry": 146
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.81,
+      "diff": 0.0009999999999998899,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 169,
+      "text": "| Age x Replicate | F(2, 60) = 2.81 | 0.068 | 0.086 |"
+     }
+    },
+    {
+     "key": "protein_df_residual",
+     "description": "Residual degrees of freedom of the three-way ANOVA",
+     "expected": 60,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 60,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.df_residual",
+      "entry": 63
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 169,
+      "text": null
+     }
+    },
+    {
+     "key": "acini_f_age",
+     "description": "Acini area, F for age",
+     "expected": 27.78,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 27.779909487507354,
+      "diff": 0.00009051249264757644,
+      "node": "n9",
+      "path": "metrics.F_Age",
+      "entry": 86
+     },
+     "reported": {
+      "pass": true,
+      "value": 27.78,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 169,
+      "text": "Age F(1, 60) = 27.78, p < 0.0001."
+     }
+    },
+    {
+     "key": "acini_f_treatment",
+     "description": "Acini area, F for QMP treatment",
+     "expected": 29.156,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 29.155534150533626,
+      "diff": 0.00046584946637295843,
+      "node": "n9",
+      "path": "metrics.F_Treatment",
+      "entry": 86
+     },
+     "reported": {
+      "pass": true,
+      "value": 29.16,
+      "diff": 0.004000000000001336,
+      "via": "rounding",
+      "node": "n9",
+      "claimEntry": 169,
+      "text": "Treatment F(1, 60) = 29.16, p < 0.0001."
+     }
+    },
+    {
+     "key": "acini_f_replicate",
+     "description": "Acini area, F for replicate",
+     "expected": 6.853,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6.853005833185857,
+      "diff": 0.000005833185857007095,
+      "node": "n9",
+      "path": "metrics.F_Replicate",
+      "entry": 86
+     },
+     "reported": {
+      "pass": true,
+      "value": 6.85,
+      "diff": 0.0030000000000001137,
+      "via": "rounding",
+      "node": "n9",
+      "claimEntry": 169,
+      "text": "Replicate F(2, 60) = 6.85, p = 0.002."
+     }
+    },
+    {
+     "key": "acini_p_replicate",
+     "description": "Acini area, p for replicate",
+     "expected": 0.00209,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.002086652666208499,
+      "diff": 0.0000033473337915008484,
+      "node": "n9",
+      "path": "metrics.p_Replicate",
+      "entry": 86
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.002,
+      "diff": 0.0000899999999999998,
+      "via": null,
+      "node": "n9",
+      "claimEntry": 169,
+      "text": "Replicate F(2, 60) = 6.85, p = 0.002."
+     }
+    },
+    {
+     "key": "acini_f_three_way",
+     "description": "Acini area, F for age by treatment by replicate",
+     "expected": 4.457,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.457195104998093,
+      "diff": 0.00019510499809349824,
+      "node": "n9",
+      "path": "metrics.F_Age_x_Treatment_x_Replicate",
+      "entry": 86
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.46,
+      "diff": 0.0030000000000001137,
+      "via": "rounding",
+      "node": "n9",
+      "claimEntry": 169,
+      "text": "Three-way interaction F(2, 60) = 4.46, p = 0.016."
+     }
+    },
+    {
+     "key": "acini_p_three_way",
+     "description": "Acini area, p for age by treatment by replicate",
+     "expected": 0.01568,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.015676170637107398,
+      "diff": 0.000003829362892601718,
+      "node": "n9",
+      "path": "metrics.p_Age_x_Treatment_x_Replicate",
+      "entry": 86
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.016,
+      "diff": 0.00032000000000000084,
+      "via": "rounding",
+      "node": "n9",
+      "claimEntry": 169,
+      "text": "Three-way interaction F(2, 60) = 4.46, p = 0.016."
+     }
+    },
+    {
+     "key": "fas_kruskal_chi2",
+     "description": "Kruskal-Wallis chi-squared for the four treatment groups",
+     "expected": 9.3498,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9.349822425164916,
+      "diff": 0.000022425164916128892,
+      "node": "n10",
+      "path": "metrics.H",
+      "entry": 98
+     },
+     "reported": {
+      "pass": true,
+      "value": 9.35,
+      "diff": 0.00019999999999953388,
+      "via": "rounding",
+      "node": "n10",
+      "claimEntry": 169,
+      "text": "**Four treatment groups (order):** chi-squared = 9.35, df = 3, p = 0.025 (significant)."
+     }
+    },
+    {
+     "key": "fas_kruskal_df",
+     "description": "Kruskal-Wallis degrees of freedom",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n1",
+      "path": "table.rows[0][3]",
+      "entry": 11
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 169,
+      "text": null
+     }
+    },
+    {
+     "key": "fas_kruskal_p",
+     "description": "Kruskal-Wallis p for the four treatment groups",
+     "expected": 0.02498,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.024983853117398966,
+      "diff": 0.000003853117398967126,
+      "node": "n10",
+      "path": "metrics.p_value",
+      "entry": 98
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.025,
+      "diff": 0.000020000000000002655,
+      "via": "rounding",
+      "node": "n10",
+      "claimEntry": 169,
+      "text": "**Four treatment groups (order):** chi-squared = 9.35, df = 3, p = 0.025 (significant)."
+     }
+    },
+    {
+     "key": "fas_dunn_padj",
+     "description": "Dunn adjusted p, the only significant pair",
+     "expected": 0.0397,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03969327143246251,
+      "diff": 0.00000672856753748674,
+      "node": "n10",
+      "path": "metrics.min_p_adjusted",
+      "entry": 98
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.04,
+      "diff": 0.00030000000000000165,
+      "via": "rounding",
+      "node": "n8",
+      "claimEntry": 169,
+      "text": "| Age x Treatment x Replicate | F(2, 60) = 1.24 | 0.297 | 0.040 |"
+     }
+    },
+    {
+     "key": "fas_replicate_chi2",
+     "description": "Kruskal-Wallis chi-squared for the three replicates",
+     "expected": 23.87,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 23.87005327245052,
+      "diff": 0.00005327245051844898,
+      "node": "n11",
+      "path": "metrics.H",
+      "entry": 101
+     },
+     "reported": {
+      "pass": true,
+      "value": 23.87,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 169,
+      "text": "**Three replicates:** chi-squared = 23.87, df = 2, p < 0.0001 (significant)."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 15,
+    "inputTokens": 38,
+    "outputTokens": 26336,
+    "cacheRead": 524334,
+    "cacheWrite": 59056,
+    "toolCalls": 19,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 10,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 2,
+    "overwritten": 2,
+    "nodes": 9
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/biostats",
+     "/Users/parker/.guided-analysis/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-add17459da301c015/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/hpg_data.csv",
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/qmp_pooled_data.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work/anova_factorial-4/anova_factorial.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work/anova_factorial-5/anova_factorial.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work/hpg_per_sample.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work/kruskal_dunn-1/dunn.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261008-235708-3be9/work/kruskal_dunn-2/dunn.csv"
+    ],
+    "outside": [],
+    "blocked": 2,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-new-adapters.md",
+  "json": "bench/results/papers-2026-10-09-new-adapters.json"
+ },
+ "summary": {
+  "cells": {
+   "wang2023-cuproptosis-oa": {
+    "claude:claude-haiku-5-5": {
+     "computed": 14,
+     "computedOf": 14,
+     "reported": 13,
+     "reportedOf": 13,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "klindworth2013-16s-primers": {
+    "claude:claude-haiku-5-5": {
+     "computed": 11,
+     "computedOf": 12,
+     "reported": 11,
+     "reportedOf": 11,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "chure2024-hplc-py": {
+    "claude:claude-haiku-5-5": {
+     "computed": 7,
+     "computedOf": 12,
+     "reported": 7,
+     "reportedOf": 11,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   },
+   "oreshkova2024-qmp-honeybee": {
+    "claude:claude-haiku-5-5": {
+     "computed": 19,
+     "computedOf": 19,
+     "reported": 15,
+     "reportedOf": 16,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 51,
+    "computedOf": 57,
+    "reported": 46,
+    "reportedOf": 51,
+    "runs": 4,
+    "statuses": {
+     "answer": 4
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 4,
+    "durationS": 501.37300000000005,
+    "requests": 45,
+    "inputTokens": 120,
+    "outputTokens": 57296,
+    "cacheRead": 1677096,
+    "cacheWrite": 180764,
+    "toolCalls": 51,
+    "failedToolCalls": 6,
+    "nudges": 0,
+    "planReminders": 2,
+    "revisions": 4,
+    "findings_info": 15,
+    "findings_warning": 19,
+    "findings_error": 7,
+    "unsourced": 6,
+    "deviations": 7,
+    "overwritten": 7,
+    "nodes": 30
+   }
+  },
+  "skipped": []
+ }
+}
