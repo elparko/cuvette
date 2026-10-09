@@ -460,6 +460,10 @@ export class Session {
       return { ok: false, error: `${(e as Error).message}. Call list_adapters to see the names.` };
     }
     if (have(a.name)) return already(a.name);
+    if (this.activePlan() && !this.planApproves(a)) {
+      this.record.append("notice", { text: `Not in the approved plan: the adapter ${a.name}. Reason: ${reason.trim() || "the agent gave none."}`, plan: "deviation", tool: "use_adapter", adapter: a.name });
+      this.notes.push(`The approved plan does not name the adapter ${a.name}. The scientist decides on the program card. If it loads, call plan to add it to programs, with the reason.`);
+    }
     const gate = await this.chooseProgram(a, reason);
     if (gate.blocked) return { ok: false, error: gate.blocked };
     const texts = gate.text ? [gate.text] : [];
@@ -497,8 +501,8 @@ export class Session {
       this.decisions.change(key, value(a.name), { by: "agent", reason });
       return { load: [a.name], by: "agent" };
     }
-    if (this.planApproves(a.name)) {
-      this.decisions.change(key, value(a.name), { by: "human", reason: `the scientist approved plan version ${this.planVersion}, which names ${a.name}` });
+    if (this.planApproves(a)) {
+      this.decisions.change(key, value(a.name), { by: "human", reason: `the scientist approved plan version ${this.pilotPlan?.version ?? this.planVersion}, which names ${a.name}` });
       return { load: [a.name], by: "human", text: `The approved plan names ${a.name}, so the plan approval covers this load.` };
     }
     const list = this.adapterList();
@@ -1618,6 +1622,7 @@ export class Session {
       this.mode = "plan";
     }
     this.notes.push(this.planUpdate ? PLAN_UPDATE_NOTE : PLAN_NOTE);
+    if (!this.planUpdate && this.pick && !this.adapters.length) this.notes.push("No adapter is loaded yet. Call list_adapters, then name the adapter for each part in programs, with its exact name. When the scientist confirms the plan, call use_adapter for it. The confirmation covers that load, so no second card shows.");
     if (!this.planUpdate && this.refCandidates.length)
       this.notes.push(`Files in the project folder that may be earlier results on the same data: ${this.refCandidates.map(describeCandidate).join("; ")}. If one fits, name it in the reference section, state each measure in the reference's own terms, and ask in reference.question whether your measure is the same as the reference's measure.`);
   }
@@ -1963,7 +1968,7 @@ export class Session {
       const changed = added.length > 0 || skipped.length > 0 || sections;
       if (changed && !reason && ![...added, ...skipped].every((x) => x.reason)) return { ok: false, error: "Give the reason for this change of the approved plan in reason. The scientist sees it." };
       const ran = this.record.nodes().filter((n) => n.entry > this.approvedEntry && !n.sensitivityOf).map((n) => n.tool);
-      for (const x of added) if (x.status === "todo" && ran.some((t) => matchStep({ steps: [x] }, t) === 0)) x.status = "done";
+      for (const x of added) if (x.status === "todo" && ran.some((t) => matchStep({ steps: [x] }, t, this.findTool(t)?.adapter) === 0)) x.status = "done";
       for (const d of given.definitions ?? []) {
         const old = prev.definitions?.find((x) => x.measure.toLowerCase() === d.measure.toLowerCase());
         if (old?.definition !== d.definition) this.record.append("decision", { key: `definition:${d.measure}`, old: old?.definition ?? null, new: d.definition, by: "agent", reason: reason || "the agent changed the definition" });
@@ -2048,7 +2053,8 @@ export class Session {
     if (!this.plan || this.planning || !this.approvedEntry) return;
     const name = tool.remoteName ?? tool.name;
     if (name === "calculate") return;
-    const i = matchStep(this.plan, name);
+    if (tool.readOnly) return;
+    const i = matchStep(this.plan, name, tool.adapter);
     if (i >= 0) {
       if (this.plan.steps[i]!.status !== "skipped") this.plan.steps[i]!.status = "done";
       return;
@@ -2083,8 +2089,16 @@ export class Session {
     this.record.append("notice", { text: on ? "Plan first is on. The agent writes a plan before any step runs." : "Plan first is off. Type /plan <request> to get a plan first." });
   }
 
-  planApproves(adapter: string): boolean {
-    return this.approvedEntry > 0 && !this.planning && plannedAdapters(this.plan).includes(adapter);
+  private activePlan(): AnalysisPlan | undefined {
+    if (this.planning) return undefined;
+    if (this.pilotStage && this.pilotPlan) return this.pilotPlan.plan;
+    return this.approvedEntry > 0 ? this.plan : undefined;
+  }
+
+  planApproves(adapter: string | LoadedAdapter): boolean {
+    const names = typeof adapter === "string" ? [adapter] : [adapter.name, adapter.manifest.adapter.title, adapter.manifest.adapter.title.replace(/\s*\(.*\)\s*$/, ""), adapter.manifest.program.name];
+    const want = names.map((n) => n.toLowerCase().trim()).filter((n) => n.length >= 3).map((n) => new RegExp(`(^|[^a-z0-9])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^a-z0-9])`));
+    return plannedAdapters(this.activePlan()).some((p) => want.some((w) => w.test(p.toLowerCase())));
   }
 
   async review(): Promise<Finding[]> {

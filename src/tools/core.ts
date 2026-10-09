@@ -59,7 +59,7 @@ const PLAN_FULL = {
     programs: {
       type: "array",
       description: "The program and adapter for each part of the work, and why.",
-      items: { type: "object", properties: { part: { type: "string" }, adapter: { type: "string" }, why: { type: "string" }, alternatives: { type: "array", items: { type: "string" }, description: "Other adapters that can do this part." } }, required: ["part", "adapter"] },
+      items: { type: "object", properties: { part: { type: "string" }, adapter: { type: "string", description: "The adapter name as list_adapters gives it, for example biostats." }, why: { type: "string" }, alternatives: { type: "array", items: { type: "string" }, description: "Other adapters that can do this part." } }, required: ["part", "adapter"] },
     },
     steps: {
       type: "array",

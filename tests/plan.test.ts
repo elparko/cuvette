@@ -67,6 +67,8 @@ test("a tool matches the plan step by tool name or by the step text", () => {
   expect(matchStep(plan, "compare_two_groups")).toBe(1);
   expect(matchStep(plan, "biostats_compare_two_groups")).toBe(1);
   expect(matchStep(plan, "fit_cox")).toBe(-1);
+  expect(matchStep({ steps: [{ step: "Paired t test", tool: "biostats", status: "todo" }] }, "compare_two_groups", "biostats")).toBe(0);
+  expect(matchStep({ steps: [{ step: "Paired t test", tool: "biostats", status: "todo" }] }, "compare_two_groups", "lme4")).toBe(-1);
   expect(matchStep({ steps: [{ step: "Run inspect table first", status: "todo" }] }, "inspect_table")).toBe(0);
 });
 

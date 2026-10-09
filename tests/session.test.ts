@@ -941,3 +941,39 @@ test("a script that only lists files makes no result node; a script that saves a
   expect(results.map((e) => e.node)).toEqual([undefined, "n1"]);
   expect(session.record.nodes().map((n) => n.tool)).toEqual(["run_script"]);
 });
+
+test("a confirmed plan covers the load of the adapter it names; an adapter that it does not name gets the program card and a note", async () => {
+  const cwd = pickCwd();
+  const provider = new FakeProvider([
+    { calls: [{ name: "use_adapter", args: { name: "lab", reason: "It counts." } }] },
+    { calls: [{ name: "list_adapters", args: {} }] },
+    { calls: [{ name: "plan", args: { question: "How many particles?", programs: [{ part: "Counting", adapter: "lab", why: "It counts particles." }], steps: [{ step: "Count the particles", tool: "count" }] } }] },
+    { calls: [{ name: "use_adapter", args: { name: "lab", reason: "The plan names it." } }] },
+    { calls: [{ name: "use_adapter", args: { name: "lab2", reason: "A second counter to check the first." } }] },
+    { text: "Both adapters are loaded." },
+    { text: "Both adapters are loaded." },
+  ]);
+  session = await Session.create({ adapters: [], provider, cwd, interactive: true });
+  const asked: { key: string; options: string[] }[] = [];
+  session.bus.on((e) => {
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+    if (e.type !== "question") return;
+    asked.push({ key: e.question.decisionKey, options: e.question.options.map((o) => o.label) });
+    setTimeout(() => session!.answer(e.question.qid, e.question.options[0]!.value), 0);
+  });
+  session.decisions.applySetup({ question: "How many particles?" });
+  await session.send("Count the particles in /data/a.lab");
+
+  const uses = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "use_adapter");
+  expect(String(uses[0]!.data.error)).toMatch(/^Plan first: name the adapter in the programs section of the plan/);
+  expect(uses.slice(1).map((e) => e.data.ok)).toEqual([true, true]);
+  expect(asked).toEqual([{ key: "adapter", options: expect.arrayContaining(["lab2"]) }]);
+  expect(asked[0]!.options[0]).toBe("lab2");
+  expect(session.adapters.map((a) => a.name)).toEqual(["lab", "lab2"]);
+  const labDecision = session.record.entries(["decision"]).find((e) => e.data.key === "adapter")!;
+  expect(labDecision.data).toMatchObject({ new: "lab", by: "human", reason: "the scientist approved plan version 1, which names lab" });
+  const notes = session.record.entries(["notice"]).filter((e) => e.data.plan === "deviation").map((e) => e.data.text);
+  expect(notes).toEqual(["Not in the approved plan: the adapter lab2. Reason: A second counter to check the first."]);
+  expect(session.planApproves("lab2")).toBe(false);
+  expect(session.planApproves("lab")).toBe(true);
+});

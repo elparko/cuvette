@@ -174,11 +174,12 @@ function toolWords(tool: string): string[] {
   return tool.toLowerCase().split(/[\s,;/()]+/).filter(Boolean);
 }
 
-export function matchStep(p: AnalysisPlan, tool: string): number {
+export function matchStep(p: AnalysisPlan, tool: string, adapter?: string): number {
   const t = tool.toLowerCase();
+  const a = adapter?.toLowerCase();
   const spaced = t.replace(/_/g, " ");
   const hit = (s: PlanStep) =>
-    (s.tool ? toolWords(s.tool).some((w) => w === t || t.endsWith(`_${w}`) || w.endsWith(`_${t}`)) : false) ||
+    (s.tool ? toolWords(s.tool).some((w) => w === t || t.endsWith(`_${w}`) || w.endsWith(`_${t}`) || (!!a && w === a)) : false) ||
     [s.step, s.method].some((x) => x && (x.toLowerCase().includes(t) || (spaced.includes(" ") && x.toLowerCase().includes(spaced))));
   const open = p.steps.findIndex((s) => s.status !== "done" && s.status !== "skipped" && hit(s));
   return open >= 0 ? open : p.steps.findIndex(hit);
@@ -241,11 +242,11 @@ export function planFindings(record: AnalysisRecord): FindingIn[] {
   const out: FindingIn[] = [];
   plan.steps.forEach((s, i) => {
     if (!s.tool || s.status === "done" || (s.status === "skipped" && s.reason)) return;
-    if (ran.some((n) => matchStep({ steps: [s] }, n.tool) === 0)) return;
+    if (ran.some((n) => matchStep({ steps: [s] }, n.tool, n.adapter) === 0)) return;
     out.push({ check: "plan_step_missing", severity: "warning", message: `The approved plan has step ${i + 1} (${s.step}), but it did not run and the plan gives no reason.` });
   });
   for (const tool of new Set(ran.filter((n) => n.entry > a.entry).map((n) => n.tool))) {
-    if (matchStep(plan, tool) >= 0) continue;
+    if (matchStep(plan, tool, ran.find((n) => n.tool === tool)?.adapter) >= 0) continue;
     out.push({ check: "plan_step_extra", severity: "warning", message: `The step ${tool} is not in the approved plan, and the plan was not updated with a reason.`, nodes: ran.filter((n) => n.tool === tool).map((n) => n.id) });
   }
   return out;

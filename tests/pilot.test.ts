@@ -18,6 +18,9 @@ test("a batch step is a declared batch tool, a list of files, a folder, or a scr
   expect(batchReason("count", { input: "/d/a.tif", output_dir: dir })).toBeUndefined();
   expect(batchReason("run_script", { code: "for f in glob.glob('/d/*.tif'):\n  count(f)" })).toBe("The script loops over the files in a folder.");
   expect(batchReason("run_script", { code: "print(1)" })).toBeUndefined();
+  expect(batchReason("run_script", { code: "import os\nprint(sorted(os.listdir(figdir)))" })).toBeUndefined();
+  expect(batchReason("run_script", { code: "for p in sorted(Path(d).glob('*.tif')):\n  count(p)" })).toBe("The script loops over the files in a folder.");
+  expect(batchReason("run_script", { code: "res <- lapply(list.files(d), count)" })).toBe("The script loops over the files in a folder.");
 });
 
 test("a pilot is out of date after a decision changes or a program loads, not after a first answer", () => {

@@ -5,7 +5,7 @@ import type { Args, Entry } from "./types.ts";
 export const BATCH_FILES = 3;
 
 const OUTPUT_ARG = /^(out|output|dest|save|work|session|cwd)/i;
-const LOOP = /\b(?:glob\s*\(|\.r?glob\s*\(|listdir\s*\(|os\.walk\s*\(|scandir\s*\(|list\.files\s*\(|dir\s*\()/;
+const LOOP = /\bfor\s+[\w, ()]+\s+in\s+[^\n:]*\b(?:glob|rglob|listdir|scandir|walk|iterdir|list\.files)\b|\b(?:lapply|sapply|map)\s*\(\s*(?:list\.files|glob|os\.listdir|sorted\s*\(\s*glob)/;
 
 const looksLikePath = (s: unknown) => typeof s === "string" && /^(?:\/|~\/|[A-Za-z]:\\)/.test(s);
 
