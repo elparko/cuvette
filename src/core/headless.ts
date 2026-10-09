@@ -25,7 +25,8 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
   s.bus.on((e) => {
     if (e.type === "question") {
       const q = e.question;
-      const wanted = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : "*" in answers ? answers["*"] : q.recommendation?.value;
+      const catchAll = "*" in answers && !(q.decisionKey && !q.options.length && q.recommendation?.value !== undefined);
+      const wanted = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : catchAll ? answers["*"] : q.recommendation?.value;
       const fallback = "The scientist is not available. Use your recommendation and state it as an assumption.";
       const v = q.decisionKey ? (q.options.length ? fitAnswer(q, wanted) : wanted) : wanted ?? fallback;
       if (v === undefined) return;

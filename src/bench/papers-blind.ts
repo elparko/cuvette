@@ -88,6 +88,7 @@ export function blindPolicyFor(opts: {
     ...homes.flatMap((h) => ["envs", "adapters", "R-library"].map((d) => join(h, d))),
     join(T7_ROOT, "tools", "R-library"),
     join(REPO_DIR, "src", "adapters"),
+    join(REPO_DIR, "src", "tools", "inspect_data.py"),
     ...[REPO_DIR, ...mainCheckout(REPO_DIR)].flatMap((r) => ["node_modules", "package.json", "tsconfig.json"].map((f) => join(r, f))),
     ...SYSTEM,
     tmpdir(),
