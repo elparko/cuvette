@@ -65,20 +65,14 @@ The project is in early development. Version numbers start at the first public r
 - Every adapter carries the citation that its program authors ask for, and each tool cites the published methods it uses: 174 citations, each with a DOI or a URL that was checked.
 - `/cite` lists what a session must cite, in APA or Vancouver style, and exports BibTeX and RIS. Only what ran is cited. Methods used only in a comparison are listed apart.
 - The data book methods paragraph cites each program and method inline. The HTML report, the protocol, the .eln export, `results.xlsx` (a References sheet) and `references.bib` carry the list.
-- The Programs page shows "How to cite" for each program.
+- The Programs page shows "How to cite" for each program, and the app shows the list in the Results tab.
+- The setting `citation_style` is `apa` or `vancouver`. `/cite bibtex`, `/cite ris` and `/cite text` save the list.
+- `cuvette adapter check` reports a program adapter without a citation as an error.
 
 ### Session control
 - `/rewind` returns the session to an earlier message or stage. Later results stay in the folder, marked "rewound", and later decisions return to their earlier values.
 - `/branch <name>` copies the session to try another method. `/branches` lists them, and `/compare` shows their numbers side by side.
-- `/save-method <name>` saves a confirmed analysis as a method. `ga --method <name> <folder>` runs it on new data: the answers come pre-filled for you to confirm, and the demonstration on a sample still runs first. Methods export as one file to share with a lab.
-
-### Citations
-- Each adapter cites its program in `program.citation`, and each tool cites the published methods that it uses. All 34 catalog adapters have checked references with DOIs. `ga adapter check` reports a program adapter without a citation as an error.
-- `/cite` lists the programs and methods that ran in the session. A method that ran only in a comparison run is listed apart. `/cite bibtex`, `/cite ris` and `/cite text` save the list. The setting `citation_style` is `apa` or `vancouver`.
-- The data book, the HTML report, the protocol, `results.xlsx` (sheet References) and `references.bib` in the output folder carry the references. The methods paragraph cites each program and method in the text. The app shows the list in the Results tab, and the Programs page shows how to cite each program.
-
-### Security
-- Folder trust: settings, hooks and adapters in a data folder take effect only after you trust the folder. A card shows every setting, every command in full and every adapter that would replace a built-in one. Choose Trust, Trust once or Do not trust. If a trusted file changes, Cuvette asks again. `ga trust` and `/trust` manage the list.
+- `/save-method <name>` saves a confirmed analysis as a method. `cuvette --method <name> <folder>` runs it on new data: the answers come pre-filled for you to confirm, and the demonstration on a sample still runs first. Methods export as one file to share with a lab.
 
 ### Writing
 - The agent writes to you in ASD-STE100 Simplified Technical English: short sentences, active voice and plain words. A checker reports long or passive sentences in answers, adapter text and docs (`npm run lint:text`). The setting `text_style` turns the rules off.
@@ -93,12 +87,11 @@ The project is in early development. Version numbers start at the first public r
 - Footer hints: full, short or off, with Ctrl+T.
 - Option+Backspace and the other word keys work in every text field, also when the key bytes arrive in pieces. `CUVETTE_KEYLOG=<file>` records raw key bytes for a bug report.
 
-
 ### Security
-- Folder trust: the settings, hooks and adapters in `.ga/` or `.cuvette/` of a project folder take effect only after you trust the folder. A card shows what the folder contains. A changed file asks again. `ga trust`, `/trust`, `--trust-folder`, and a Folder trust row in `/config` and the app Settings page.
+- Folder trust: the settings, hooks and adapters in `.ga/` or `.cuvette/` of a project folder take effect only after you trust the folder. A card shows every setting, every command in full and every adapter that would replace a built-in one. Choose Trust, Trust once or Do not trust. A changed file asks again. `cuvette trust`, `/trust`, `--trust-folder`, and a Folder trust row in `/config` and the app Settings page.
 
 ### Programs
-- A Programs manager in the app, in the terminal (`/programs`) and on the command line (`ga programs`). It shows each science program with its status, version, size, last use and access. It installs, updates and removes the environments that Cuvette made, sets a custom program path, turns adapters on or off, and controls whether an adapter may run code that the agent writes. Every change asks first. Cuvette never removes a program that you installed yourself.
+- A Programs manager in the app, in the terminal (`/programs`) and on the command line (`cuvette programs`). It shows each science program with its status, version, size, last use and access. It installs, updates and removes the environments that Cuvette made, sets a custom program path, turns adapters on or off, and controls whether an adapter may run code that the agent writes. Every change asks first. Cuvette never removes a program that you installed yourself.
 
 ### Outputs
 - Image decks: `/export images` compiles figures and QC images into a PowerPoint file or a PDF, one per page or in grids of 2, 4, 6 or 9. Each image has an editable caption from the record. The last page lists the methods and the record hash. The app has a "Make an image deck" button.
