@@ -57,6 +57,15 @@ const ALL: Scope[] = ["session", "user", "project"];
 const MODELS = () => CLAUDE_MODELS.map((m) => m.spec);
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
+export type Paper = "a4" | "letter";
+const LETTER_REGIONS = new Set(["US", "CA", "MX", "PH", "CL", "CO", "VE", "GT", "CR", "PR", "PA", "DO", "SV", "NI", "BZ"]);
+
+export function localePaper(env: Record<string, string | undefined> = process.env): Paper {
+  const raw = env.LC_PAPER || env.LC_ALL || env.LANG || Intl.DateTimeFormat().resolvedOptions().locale;
+  const region = /[-_]([A-Z]{2})\b/.exec(raw ?? "")?.[1];
+  return region && LETTER_REGIONS.has(region) ? "letter" : "a4";
+}
+
 export const SETTINGS: SettingDef[] = [
   {
     name: "model",
@@ -245,6 +254,23 @@ export const SETTINGS: SettingDef[] = [
     help: "Claude spend since the first day of this month, at list prices. ga spend shows each day.",
     scopes: [],
     read: () => ({ value: `$${totalSpend(monthStart()).toFixed(2)}`, source: "" }),
+  },
+  {
+    name: "databook_author",
+    group: "Data book",
+    label: "Data book author",
+    help: "The name on the title page of each data book. If it is not set, the data book uses the name in git config user.name.",
+    scopes: ["user", "project"],
+    free: true,
+  },
+  {
+    name: "databook_paper",
+    group: "Data book",
+    label: "Data book paper size",
+    help: "a4 or letter. The default follows the system locale.",
+    scopes: ["user", "project"],
+    choices: () => ["a4", "letter"],
+    def: localePaper(),
   },
   {
     name: "elabftw_url",

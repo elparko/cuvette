@@ -379,6 +379,35 @@ export const commands: Command[] = [
     },
   },
   {
+    name: "databook",
+    args: "[pdf|docx|html] [project] | author <name>",
+    help: "Write a data book: the question, data, methods, results, figures and checks of this session. Add project for all sessions of this project folder.",
+    async run(args, ctx) {
+      const cwd = ctx.session.cwd ?? process.cwd();
+      const { changeSetting } = await import("../core/settings.ts");
+      if (args[0] === "author") {
+        const name = args.slice(1).join(" ").trim();
+        if (!name) return ctx.error("Use: /databook author <name>");
+        await changeSetting({ cwd }, "databook_author", name, "user");
+        return ctx.notice(`Data book author saved in user settings: ${name}`);
+      }
+      const formats = args.filter((a) => ["pdf", "docx", "html"].includes(a)) as ("pdf" | "docx" | "html")[];
+      const project = args.includes("project");
+      const rest = args.filter((a) => !["pdf", "docx", "html", "project"].includes(a));
+      if (rest.length) return ctx.error("Use: /databook [pdf|docx|html] [project], or /databook author <name>");
+      const db = await import("../core/databook.ts");
+      const s = db.bookSettings(cwd);
+      ctx.notice("Writing the data book...");
+      try {
+        const w = await db.writeDatabook({ target: project ? cwd : ctx.session.dir, cwd, formats: formats.length ? formats : ["pdf"] });
+        const ask = s.author ? "" : "\nNo author is set. Type /databook author <name> to save it once.";
+        ctx.print(db.writtenLines(w).join("\n") + ask, "Data book");
+      } catch (e) {
+        ctx.error(`Data book failed: ${(e as Error).message}`);
+      }
+    },
+  },
+  {
     name: "open",
     args: "<n>",
     help: "Open output number n with the system viewer.",

@@ -120,7 +120,7 @@ export function methodsSentence(adapters: LoadedAdapter[], n: Node): string {
   return `${name} was applied${withParams}.`;
 }
 
-function programNames(adapters: LoadedAdapter[], nodes: Node[]): string {
+export function programNames(adapters: LoadedAdapter[], nodes: Node[]): string {
   const seen = new Map<string, string>();
   for (const n of nodes) {
     const a = adapterOf(adapters, n);

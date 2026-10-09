@@ -52,6 +52,9 @@ Usage
   ga eln link <session> <id>           read an eLabFTW experiment and propose setup values
   ga sessions                          list the sessions, newest first: folder, age, first request ("moved" if a folder is gone)
   ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx
+  ga databook [<session folder>|<project folder>] [--format pdf|docx|html] [--sessions all|<id,...>]
+                                       write a data book: the data, methods, results and figures of a session,
+                                       or of all sessions of a project folder (default: the current folder)
   ga replay <flow.json> [--input name=path ...] [--session <id>]
   ga run-step <adapter> <tool> '<json args>'
   ga questions                         open questions in every session
@@ -86,6 +89,7 @@ const { values: o, positionals: pos } = parseArgs({
     format: { type: "string" },
     input: { type: "string", multiple: true },
     session: { type: "string" },
+    sessions: { type: "string" },
     by: { type: "string" },
     docs: { type: "string", multiple: true },
     kind: { type: "string" },
@@ -356,6 +360,23 @@ async function main() {
       const s = await Session.resume(a1, { model: "fake:" });
       console.log(await s.exportAs((str(o.format) ?? "html") as never));
       return s.close();
+    }
+    case "databook": {
+      const db = await import("./core/databook.ts");
+      const formats = (str(o.format) ?? "pdf").split(",").map((f) => f.trim()) as ("pdf" | "html" | "docx")[];
+      if (formats.some((f) => !["pdf", "html", "docx"].includes(f))) fail("Use --format pdf, docx or html.");
+      const cwd = process.cwd();
+      const t = db.resolveTarget(a1, cwd, str(o.sessions)?.split(","));
+      let author = db.bookSettings(t.project).author;
+      if (!author && process.stdin.isTTY) {
+        const rl = (await import("node:readline/promises")).createInterface({ input: process.stdin, output: process.stdout });
+        author = (await rl.question("Author for the title page of each data book (saved in user settings): ")).trim() || undefined;
+        rl.close();
+        if (author) await (await import("./core/settings.ts")).changeSetting({ cwd }, "databook_author", author, "user");
+      }
+      const w = await db.writeDatabook({ target: a1, cwd, sessions: str(o.sessions)?.split(","), formats, author });
+      console.log(db.writtenLines(w).join("\n"));
+      return;
     }
     case "replay": {
       const { replayFlow } = await import("./core/replay.ts");

@@ -86,6 +86,7 @@ results, and summarizes old turns near the context limit.
 | `/graph`, `/window` | The analysis graph in the terminal, or in a browser window. |
 | `/review`, `/findings` | Run the rule checks and the referee; accept, reject or fix each finding. |
 | `/export html` | The trail as one HTML file. Also `md`, `jsonl`, `pdf`, `protocol`, `script`, `notebook`, `flow`. |
+| `/databook` | A data book (PDF and HTML): question, data, methods, results, figures, checks and the manual route. `/databook project` covers all sessions of the project folder. `/databook docx` needs pandoc. On the command line: `ga databook [<session folder>\|<project folder>]`. |
 | `/lab` | Approve or reject lab rules that the agent proposed. |
 
 ### Bypass permissions

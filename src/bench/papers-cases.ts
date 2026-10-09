@@ -105,7 +105,7 @@ export function sanitizedLog(entries: Entry[], san: (s: string) => string): stri
 
 // ---------------------------------------------------------------- hashes
 
-function sha256File(p: string): string | undefined {
+export function sha256File(p: string): string | undefined {
   if (!existsSync(p)) return undefined;
   const st = statSync(p);
   if (!st.isFile() || st.size > 2_000_000_000) return undefined;
@@ -170,7 +170,7 @@ export const modelLabel = (m: string) => (m.startsWith("ollama:") ? m.slice(7) :
 const tolText = (t: number | "exact") => (t === "exact" ? "exact" : `± ${num(t)}`);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-function sizeText(n: number | undefined): string {
+export function sizeText(n: number | undefined): string {
   if (n === undefined) return "-";
   if (n < 1024) return `${n} bytes`;
   if (n < 1024 ** 2) return `${(n / 1024).toFixed(1)} KB`;
@@ -249,10 +249,10 @@ function readEntries(dir: string | undefined): Entry[] {
     });
 }
 
-function loadAdapters(entries: Entry[]): LoadedAdapter[] {
+export function loadAdapters(entries: Entry[]): LoadedAdapter[] {
   const s = entries.find((e) => e.kind === "session");
-  const names = ((s?.data.adapters as { name: string }[] | undefined) ?? []).map((a) => a.name);
-  return names.flatMap((n) => {
+  const names = new Set([...((s?.data.adapters as { name: string }[] | undefined) ?? []).map((a) => a.name), ...entries.filter((e) => e.kind === "adapter").map((e) => String(e.data.name))]);
+  return [...names].flatMap((n) => {
     try {
       return [findAdapter(n)];
     } catch {
@@ -261,7 +261,7 @@ function loadAdapters(entries: Entry[]): LoadedAdapter[] {
   });
 }
 
-function labelMap(entries: Entry[], adapters: LoadedAdapter[], c: CaseSpec | undefined): Map<string, string> {
+export function labelMap(entries: Entry[], adapters: LoadedAdapter[], c: CaseSpec | undefined): Map<string, string> {
   const m = new Map<string, string>();
   for (const [k, v] of Object.entries(c?.answers ?? {})) m.set(k, v.decision);
   for (const a of adapters) for (const d of a.manifest.decisions) if (!m.has(d.key)) m.set(d.key, d.label);

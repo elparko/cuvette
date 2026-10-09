@@ -404,7 +404,7 @@ const ICONS: Record<TrailIcon, { sym: string; path: string; label: string }> = {
   note: { sym: "✎", label: "Note", path: "M4 4h16v12H8l-4 4z" },
 };
 
-function esc(s: unknown): string {
+export function esc(s: unknown): string {
   return show(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
@@ -413,7 +413,7 @@ function iconSvg(icon: TrailIcon): string {
   return `<svg class="ic ic-${icon}" viewBox="0 0 24 24" role="img" aria-label="${i.label}"><title>${i.label}</title><path d="${i.path}"/></svg>`;
 }
 
-function dataUri(record: AnalysisRecord, sha: string): string | undefined {
+export function dataUri(record: AnalysisRecord, sha: string): string | undefined {
   const p = record.blobPath(sha);
   if (!p) return undefined;
   const mime = MIME[extname(p).toLowerCase()];
@@ -782,7 +782,7 @@ function printWithChrome(chrome: string, profile: string, html: string, out: str
   return existsSync(out);
 }
 
-function findPandoc(): string | undefined {
+export function findPandoc(): string | undefined {
   return ["pandoc", "/opt/homebrew/bin/pandoc"].find((p) => runs(p, ["--version"]));
 }
 
@@ -791,6 +791,10 @@ const CHROMES = [
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   "google-chrome", "chromium", "chrome",
 ];
+
+export function findChrome(): string | undefined {
+  return CHROMES.find((c) => (c.startsWith("/") ? existsSync(c) : which(c)));
+}
 
 export function exportPdf(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
   const pandoc = findPandoc();
@@ -803,7 +807,7 @@ export function exportPdf(record: AnalysisRecord, adapters: LoadedAdapter[], pat
       if (!runs(engine, ["--version"])) continue;
       if (runs(pandoc, [md, "-o", path, `--pdf-engine=${engine}`])) return path;
     }
-    const chrome = CHROMES.find((c) => (c.startsWith("/") ? existsSync(c) : which(c)));
+    const chrome = findChrome();
     if (chrome) {
       const html = join(tmp, "trail.html");
       const css = join(tmp, "trail.css");
