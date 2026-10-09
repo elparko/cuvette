@@ -1,29 +1,38 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { EventEmitter } from "node:events";
-import { Box, Text, usePaste, useStdin } from "ink";
-import { decodeKey, emptyEd, layout, press, rowOf, step, type Ed, type InputKeys, type VimMode } from "./editor.ts";
+import { Box, Text, usePaste, useStdin, useWindowSize } from "ink";
+import { decodeKey, emptyEd, splitKeys, layout, press, rowOf, step, type Ed, type InputKeys, type VimMode } from "./editor.ts";
 
 export const INPUT_MAX_ROWS = 12;
 
+export const KeyStyle = createContext<InputKeys>("mac");
+
 export interface InputBoxProps {
-  style: Exclude<InputKeys, "classic">;
+  style?: InputKeys;
   value: string;
-  width: number;
-  placeholder: string;
+  width?: number;
+  placeholder?: string;
   arrowsOut?: boolean;
+  single?: boolean;
+  mask?: string;
+  active?: boolean;
   onChange(text: string): void;
   onSubmit(text: string): void;
-  onEscape(): void;
-  onEdge(dir: "up" | "down"): void;
+  onEscape?(): void;
+  onEdge?(dir: "up" | "down"): void;
   onVimMode?(mode: VimMode): void;
 }
 
 export function InputBox(props: InputBoxProps) {
   const stdin = useStdin() as unknown as { internal_eventEmitter: EventEmitter; setRawMode(on: boolean): void };
+  const shared = useContext(KeyStyle);
+  const { columns } = useWindowSize();
+  const style = props.style ?? shared;
+  const width = props.width ?? Math.max(10, columns - 12);
   const ed = useRef<Ed>(emptyEd(props.value));
   const [, render] = useState(0);
-  const latest = useRef(props);
-  latest.current = props;
+  const latest = useRef({ ...props, style, width });
+  latest.current = { ...props, style, width };
 
   if (props.value !== ed.current.text) ed.current = { ...ed.current, text: props.value, cur: props.value.length, goal: undefined, pending: undefined };
 
@@ -37,21 +46,25 @@ export function InputBox(props: InputBoxProps) {
   };
 
   useEffect(() => {
-    if (props.style !== "vim" && ed.current.vim !== "insert") commit({ ...ed.current, vim: "insert" });
+    if (style !== "vim" && ed.current.vim !== "insert") commit({ ...ed.current, vim: "insert" });
     latest.current.onVimMode?.(ed.current.vim);
-  }, [props.style]);
+  }, [style]);
 
   useEffect(() => {
     stdin.setRawMode(true);
     const onInput = (data: string) => {
+      if (latest.current.active === false) return;
+      for (const seq of splitKeys(data)) onKey(seq);
+    };
+    const onKey = (seq: string) => {
       const p = latest.current;
-      const k = decodeKey(data);
-      if (p.arrowsOut && (k.key === "up" || k.key === "down") && !k.alt && !k.cmd && !k.ctrl) return p.onEdge(k.key);
-      const r = press(ed.current, k, p.style, p.width);
+      const k = decodeKey(seq);
+      if (p.arrowsOut && (k.key === "up" || k.key === "down") && !k.alt && !k.cmd && !k.ctrl) return p.onEdge?.(k.key);
+      const r = press(ed.current, k, p.style, p.width, p.single);
       if (r.st !== ed.current) commit(r.st);
       if (r.out === "submit") p.onSubmit(r.st.text);
-      else if (r.out === "escape") p.onEscape();
-      else if (r.out) p.onEdge(r.out);
+      else if (r.out === "escape") p.onEscape?.();
+      else if (r.out) p.onEdge?.(r.out);
     };
     stdin.internal_eventEmitter.on("input", onInput);
     return () => {
@@ -60,11 +73,12 @@ export function InputBox(props: InputBoxProps) {
     };
   }, []);
 
-  usePaste((text) => commit(step(ed.current, { insert: text }, latest.current.width).st));
+  usePaste((text) => commit(step(ed.current, { insert: latest.current.single ? text.replace(/\r\n?|\n/g, " ") : text }, latest.current.width).st), { isActive: props.active !== false });
 
   const { text, cur } = ed.current;
+  const shown = props.mask ? props.mask.repeat(text.length) : text;
   if (!text) {
-    const ph = props.placeholder;
+    const ph = props.placeholder ?? "";
     return (
       <Text>
         <Text inverse>{ph[0] ?? " "}</Text>
@@ -72,15 +86,15 @@ export function InputBox(props: InputBoxProps) {
       </Text>
     );
   }
-  const rows = layout(text, props.width);
+  const rows = layout(shown, width);
   const r = rowOf(rows, cur);
   const top = rows.length <= INPUT_MAX_ROWS ? 0 : Math.min(Math.max(0, r - INPUT_MAX_ROWS + 1), rows.length - INPUT_MAX_ROWS);
-  const shown = rows.slice(top, top + INPUT_MAX_ROWS);
-  const hidden = rows.length - shown.length;
+  const visible = rows.slice(top, top + INPUT_MAX_ROWS);
+  const hidden = rows.length - visible.length;
   return (
     <Box flexDirection="column">
-      {shown.map((row, i) => {
-        const line = text.slice(row.start, row.end);
+      {visible.map((row, i) => {
+        const line = shown.slice(row.start, row.end);
         if (top + i !== r) return <Text key={top + i}>{line || " "}</Text>;
         const at = cur - row.start;
         return (
@@ -93,5 +107,12 @@ export function InputBox(props: InputBoxProps) {
       })}
       {hidden ? <Text dimColor>{`${hidden} more ${hidden === 1 ? "line" : "lines"}`}</Text> : null}
     </Box>
+  );
+}
+
+export function Field(props: { value: string; onChange: (v: string) => void; onSubmit: (v: string) => void; onCancel?: () => void; mask?: string; indent?: number }) {
+  const { columns } = useWindowSize();
+  return (
+    <InputBox single value={props.value} width={Math.max(10, columns - 8 - (props.indent ?? 0))} mask={props.mask} onChange={props.onChange} onSubmit={props.onSubmit} onEscape={props.onCancel} />
   );
 }

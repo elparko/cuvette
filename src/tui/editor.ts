@@ -74,6 +74,11 @@ function single(s: string): Stroke {
   return [...s].length === 1 ? { key: "char", text: s } : { key: "text", text: s };
 }
 
+export function splitKeys(data: string): string[] {
+  if (data.startsWith("\x1b") || data.length < 2) return [data];
+  return data.match(/[\x00-\x08\x0b\x0c\x0e-\x1f]|[^\x00-\x08\x0b\x0c\x0e-\x1f]+/g) ?? [];
+}
+
 export function decodeKey(seq: string): Stroke {
   if (seq === "\x1b\x1b") return { key: "escape", alt: true };
   if (seq.length > 1 && seq[0] === "\x1b" && (seq[1] === "\x1b" || (seq[1] !== "[" && seq[1] !== "O"))) {
@@ -182,7 +187,7 @@ function action(style: InputKeys, k: Stroke, vim: VimMode): Action | undefined {
     const t = k.text!;
     if (style === "mac" && k.cmd) return t === "z" && !k.shift ? "undo" : undefined;
     if (k.cmd) return undefined;
-    if (k.ctrl) return (style === "mac" ? MAC_CTRL : style === "emacs" ? EMACS_CTRL : vim === "insert" ? VIM_INSERT_CTRL : {})[t];
+    if (k.ctrl) return (style === "mac" ? MAC_CTRL : style === "emacs" ? EMACS_CTRL : style === "vim" && vim === "insert" ? VIM_INSERT_CTRL : {})[t];
     if (k.alt) return style === "vim" && vim === "normal" ? undefined : ALT[t];
     if (style === "vim" && vim === "normal") return VIM_NORMAL[t];
     return { insert: t };
@@ -451,20 +456,27 @@ export function step(st: Ed, a: Action, width: number): { st: Ed; out?: EdOut } 
   return { st: clampNormal(next) };
 }
 
-export function press(st: Ed, k: Stroke, style: InputKeys, width: number): { st: Ed; out?: EdOut } {
+const MULTILINE = new Set<Action>(["newline", "openBelow", "openAbove"]);
+
+export function press(st: Ed, k: Stroke, style: InputKeys, width: number, oneLine = false): { st: Ed; out?: EdOut } {
   if (style === "vim" && st.vim === "normal" && k.key === "text") {
     let cur: { st: Ed; out?: EdOut } = { st };
     for (const ch of k.text!) {
-      cur = press(cur.st, { key: "char", text: ch }, style, width);
+      cur = press(cur.st, { key: "char", text: ch }, style, width, oneLine);
       if (cur.out) return cur;
     }
     return cur;
   }
   if (k.key === "escape" && k.alt) {
-    const once = press(st, { key: "escape" }, style, width);
-    return once.out ? once : press(once.st, { key: "escape" }, style, width);
+    const once = press(st, { key: "escape" }, style, width, oneLine);
+    return once.out ? once : press(once.st, { key: "escape" }, style, width, oneLine);
   }
-  const a = action(style, k, st.vim);
+  let a = action(style, k, st.vim);
+  if (a && oneLine) {
+    if (typeof a === "object") a = { insert: a.insert.replace(/\r\n?|\n/g, " ") };
+    else if (MULTILINE.has(a)) a = undefined;
+    else if (a === "submit") return { st: { ...st, vim: "insert", pending: undefined }, out: "submit" };
+  }
   if (!a) return st.pending ? { st: { ...st, pending: undefined } } : { st };
   return step(st, a, width);
 }

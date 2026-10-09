@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, render, useApp, useInput, useStdout } from "ink";
+import { terminalStdin } from "./key-stream.ts";
 import { ageText, clip, clipStart, folderText, type SessionInfo } from "../core/sessions.ts";
 
 export function SessionPicker(props: { list: SessionInfo[]; initial: number; note?: string; onDone: (s?: SessionInfo) => void; now?: number }) {
@@ -42,7 +43,7 @@ export function SessionPicker(props: { list: SessionInfo[]; initial: number; not
 
 export async function pickSession(list: SessionInfo[], initial: number, note?: string, io: { stdin?: NodeJS.ReadStream; stdout?: NodeJS.WriteStream } = {}): Promise<SessionInfo | undefined> {
   let chosen: SessionInfo | undefined;
-  const app = render(<SessionPicker list={list} initial={initial} note={note} onDone={(s) => (chosen = s)} />, { stdin: io.stdin, stdout: io.stdout, exitOnCtrlC: false, patchConsole: false });
+  const app = render(<SessionPicker list={list} initial={initial} note={note} onDone={(s) => (chosen = s)} />, { stdin: io.stdin ?? terminalStdin(), stdout: io.stdout, exitOnCtrlC: false, patchConsole: false });
   await app.waitUntilExit();
   return chosen;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { decodeKey, emptyEd, footerKeys, inputKeys, keyRows, layout, press, type Ed, type EdOut, type InputKeys } from "../src/tui/editor.ts";
+import { decodeKey, emptyEd, footerKeys, splitKeys,inputKeys, keyRows, layout, press, type Ed, type EdOut, type InputKeys } from "../src/tui/editor.ts";
 
 function feed(style: InputKeys, keys: string[], start: string | Ed = "", width = 80) {
   let st = typeof start === "string" ? emptyEd(start) : start;
@@ -267,5 +267,22 @@ describe("help and footer", () => {
     expect(footerKeys("vim", "normal", true)).toBe("-- NORMAL -- · i: insert · Esc: stop the agent");
     expect(footerKeys("classic", "insert", false)).toBe("");
     expect(inputKeys("nonsense")).toBe("mac");
+  });
+});
+
+describe("splitKeys and one-line fields", () => {
+  test("a chunk with several control keys splits into single keys; text and escape sequences stay whole", () => {
+    expect(splitKeys("\x05\x15")).toEqual(["\x05", "\x15"]);
+    expect(splitKeys("ab\x17cd")).toEqual(["ab", "\x17", "cd"]);
+    expect(splitKeys("line one\rline two")).toEqual(["line one\rline two"]);
+    expect(splitKeys("\x1b[127;3u")).toEqual(["\x1b[127;3u"]);
+  });
+
+  test("one-line mode: Enter submits even after a backslash; new-line keys and pasted breaks add no line", () => {
+    const r = press(emptyEd("a\\"), decodeKey("\r"), "mac", 80, true);
+    expect(r).toMatchObject({ out: "submit", st: { text: "a\\" } });
+    expect(press(emptyEd("a"), decodeKey("\x1b[13;2u"), "mac", 80, true).st.text).toBe("a");
+    expect(press(emptyEd("a"), { key: "text", text: "b\nc" }, "mac", 80, true).st.text).toBe("ab c");
+    expect(press({ ...emptyEd("x"), vim: "normal", cur: 0 }, decodeKey("o"), "vim", 80, true).st.text).toBe("x");
   });
 });

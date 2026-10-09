@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Static, Text, render, useApp, useInput, useStdout, useWindowSize } from "ink";
-import TextInput from "ink-text-input";
 import type { BusEvent, Mode } from "../core/types.ts";
 import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
@@ -17,7 +16,8 @@ import type { SettingSession } from "../core/settings.ts";
 import { applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
 import { inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
-import { INPUT_MAX_ROWS, InputBox } from "./input-box.tsx";
+import { INPUT_MAX_ROWS, InputBox, KeyStyle } from "./input-box.tsx";
+import { terminalStdin } from "./key-stream.ts";
 
 const MODE_ORDER: Mode[] = ["watch", "follow", "teach", "plan"];
 const MAX_SUGGESTIONS = 8;
@@ -53,7 +53,6 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   const [status, setStatus] = useState<{ state: string; tool?: string; purpose?: string; since?: number }>({ state: "idle" });
   const [cards, setCards] = useState<Card[]>([]);
   const [input, setInput] = useState("");
-  const [inputKey, setInputKey] = useState(0);
   const [history, setHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState(-1);
   const [draft, setDraft] = useState("");
@@ -283,10 +282,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   const sugg = cards.length ? [] : suggestions(input).slice(0, MAX_SUGGESTIONS);
   const selected = sugg[Math.min(sel, sugg.length - 1)];
 
-  const setText = (v: string) => {
-    setInput(v);
-    setInputKey((k) => k + 1);
-  };
+  const setText = (v: string) => setInput(v);
 
   const submit = (raw: string) => {
     let text = raw.trim();
@@ -348,16 +344,14 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
     }
     if (key.ctrl && ch === "o") return toggleDetails();
     if (cards.length) return;
-    if (keyStyle !== "classic" && (key.escape || key.upArrow || key.downArrow)) return;
-    if (key.escape) escape();
-    else if (key.tab && key.shift) {
+    if (key.escape || key.upArrow || key.downArrow) return;
+    if (key.tab && key.shift) {
       const next = MODE_ORDER[(MODE_ORDER.indexOf(session.mode) + 1) % MODE_ORDER.length]!;
       session.setMode(next);
       setMode(next);
     } else if (key.tab) {
       if (selected) setText(`/${selected.name} `);
-    } else if (key.upArrow) arrow("up");
-    else if (key.downArrow) arrow("down");
+    }
   });
 
   const card = cards[0];
@@ -365,11 +359,12 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   const { columns, rows } = useWindowSize();
   const running = status.state !== "idle";
   const footKeys = card ? "" : footerKeys(keyStyle, vimMode, running);
-  const inputRows = keyStyle === "classic" ? undefined : Math.min(INPUT_MAX_ROWS + 1, layout(input, Math.max(10, columns - 6)).length);
+  const inputRows = Math.min(INPUT_MAX_ROWS + 1, layout(input, Math.max(10, columns - 6)).length);
   const fit = liveLayout({ rows, columns, card: !!card, running, input: input.length, inputRows, keys: !!footKeys, queue: queue.length, suggestions: sugg.length, text: !!live, pending: pending.length > 0 });
   const animate = animationsOn(opts.stdout ?? process.stdout, env, session.settings?.animations);
 
   return (
+    <KeyStyle.Provider value={keyStyle}>
     <Box flexDirection="column">
       <Static items={items} key={epoch}>
         {(item) => (
@@ -414,9 +409,10 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
         <Text color="cyan">{"> "}</Text>
         {card ? (
           <Text dimColor>Answer the card above.</Text>
-        ) : keyStyle !== "classic" ? (
+        ) : (
           <InputBox
             style={keyStyle}
+            single={keyStyle === "classic"}
             value={input}
             width={Math.max(10, columns - 6)}
             placeholder={inputPlaceholder(session, status.state !== "idle")}
@@ -429,17 +425,6 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
             onEscape={escape}
             onEdge={arrow}
             onVimMode={setVimMode}
-          />
-        ) : (
-          <TextInput
-            key={inputKey}
-            value={input}
-            onChange={(v) => {
-              setInput(v);
-              setSel(0);
-            }}
-            onSubmit={submit}
-            placeholder={inputPlaceholder(session, status.state !== "idle")}
           />
         )}
       </Box> : null}
@@ -471,6 +456,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
         esc={keyStyle === "vim" && vimMode === "insert" ? "Esc twice stops this step. " : undefined}
       />
     </Box>
+    </KeyStyle.Provider>
   );
 }
 
@@ -565,7 +551,7 @@ export async function runTui(session: SessionLike, opts: TuiOptions = {}): Promi
   const stdout = opts.stdout ?? process.stdout;
   if (stdout.isTTY) stdout.write(toBottom(stdout.rows));
   const instance = render(<App session={session} opts={opts} screen={screen} />, {
-    stdin: opts.stdin,
+    stdin: opts.stdin ?? terminalStdin(opts.env ?? process.env),
     stdout: opts.stdout,
     exitOnCtrlC: false,
     patchConsole: false,

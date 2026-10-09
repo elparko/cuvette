@@ -1,7 +1,7 @@
 import React, { useContext, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import { Field } from "./input-box.tsx";
 import type { Question } from "../core/types.ts";
 import {
   CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, questionCursor, questionEnter, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
@@ -38,13 +38,12 @@ function Frame({ title, color, children, arrows }: { title: string; color: strin
 function Prompt(props: { label: string; initial?: string; onSubmit: (v: string) => void; onCancel: () => void; onBack?: () => void }) {
   const [v, setV] = useState(props.initial ?? "");
   useInput((_, key) => {
-    if (key.escape) props.onCancel();
-    else if (key.tab && key.shift && props.onBack) props.onBack();
+    if (key.tab && key.shift && props.onBack) props.onBack();
   });
   return (
     <Box>
       <Text>{props.label} </Text>
-      <TextInput value={v} onChange={setV} onSubmit={props.onSubmit} />
+      <Field value={v} onChange={setV} onSubmit={props.onSubmit} onCancel={props.onCancel} indent={props.label.length + 1} />
     </Box>
   );
 }
@@ -347,8 +346,9 @@ export function SetupCard(props: {
 
   useInput(
     (_, key) => {
+      if (kind !== "choice" || !editField) return;
       if (key.escape) setEditing(undefined);
-      else if (kind === "choice" && editField) {
+      else {
         const n = editField.choices!.length;
         if (key.upArrow) setPick((p) => (p + n - 1) % n);
         else if (key.downArrow) setPick((p) => (p + 1) % n);
@@ -388,7 +388,7 @@ export function SetupCard(props: {
               {editing === f.key && kind !== "choice" ? (
                 <Box>
                   <Text>{"    "}</Text>
-                  <TextInput value={String(values[f.key] ?? "")} onChange={(v) => setValue(f.key, v)} onSubmit={finishEdit} />
+                  <Field value={String(values[f.key] ?? "")} onChange={(v) => setValue(f.key, v)} onSubmit={finishEdit} onCancel={() => setEditing(undefined)} indent={4} />
                 </Box>
               ) : null}
             </Box>
@@ -423,21 +423,18 @@ export function ElnCard(props: { path: string; onSubmit: (url: string, key: stri
   const [url, setUrl] = useState("");
   const [key, setKey] = useState("");
   const [step, setStep] = useState<"url" | "key">("url");
-  useInput((_, k) => {
-    if (k.escape) props.onCancel();
-  });
   return (
     <Frame title="eLabFTW notebook" color="cyan">
       <Text>Type the address of your eLabFTW server and an API key with write access.</Text>
       <Text dimColor>The harness saves both to {props.path}. Only your user can read that file. The screen shows the key masked.</Text>
       <Box marginTop={1}>
         <Text>URL: </Text>
-        {step === "url" ? <TextInput value={url} onChange={setUrl} onSubmit={() => url.trim() && setStep("key")} /> : <Text>{url}</Text>}
+        {step === "url" ? <Field value={url} onChange={setUrl} onSubmit={() => url.trim() && setStep("key")} onCancel={props.onCancel} indent={5} /> : <Text>{url}</Text>}
       </Box>
       {step === "key" ? (
         <Box>
           <Text>Key: </Text>
-          <TextInput value={key} onChange={setKey} onSubmit={(k) => props.onSubmit(url.trim(), k.trim())} mask="*" />
+          <Field value={key} onChange={setKey} onSubmit={(k) => props.onSubmit(url.trim(), k.trim())} onCancel={props.onCancel} mask="*" indent={5} />
         </Box>
       ) : null}
       <Text dimColor>Enter continues · Esc cancels</Text>
@@ -447,9 +444,6 @@ export function ElnCard(props: { path: string; onSubmit: (url: string, key: stri
 
 export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string; onSubmit: (key: string) => void; onCancel: () => void }) {
   const [v, setV] = useState("");
-  useInput((_, key) => {
-    if (key.escape) props.onCancel();
-  });
   return (
     <Frame title="Claude API key" color="cyan">
       {props.card.reason ? <Text>{props.card.reason}</Text> : null}
@@ -457,7 +451,7 @@ export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string
       <Text dimColor>The harness checks it with the API, then saves it to {props.path}. Only your user can read that file.</Text>
       <Box marginTop={1}>
         <Text>Key: </Text>
-        <TextInput value={v} onChange={setV} onSubmit={(k) => props.onSubmit(k.trim())} mask="*" />
+        <Field value={v} onChange={setV} onSubmit={(k) => props.onSubmit(k.trim())} onCancel={props.onCancel} mask="*" indent={5} />
       </Box>
       <Text dimColor>Enter saves · Esc cancels</Text>
     </Frame>

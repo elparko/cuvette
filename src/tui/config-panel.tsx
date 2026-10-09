@@ -1,7 +1,7 @@
 import React, { useContext, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import { Field } from "./input-box.tsx";
 import type { Scope, SettingCtx, SettingDef } from "../core/settings.ts";
 import { rowHelp, rowTag, saveSetting, scopeText, settingEditor, settingRows } from "../ui/config.ts";
 
@@ -43,10 +43,7 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
   };
 
   useInput((ch, key) => {
-    if (step.t === "text") {
-      if (key.escape) setStep({ t: "list" });
-      return;
-    }
+    if (step.t === "text") return;
     if (key.escape) return step.t === "list" ? props.onClose() : setStep({ t: "list" });
     const up = key.upArrow, down = key.downArrow;
     const choose = key.return || ch === " ";
@@ -110,7 +107,7 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
       lines.push(
         <Box key="text">
           <Text>{"    New value: "}</Text>
-          <TextInput value={text} onChange={setText} onSubmit={(v) => pickScope(r.def, v.trim())} />
+          <Field value={text} onChange={setText} onSubmit={(v) => pickScope(r.def, v.trim())} onCancel={() => setStep({ t: "list" })} indent={15} />
         </Box>,
       );
     if (on && step.t === "scope") {
