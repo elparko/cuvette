@@ -574,6 +574,15 @@ describe("pieces", () => {
     expect(new Mapper(s).map(e)).toEqual([{ key: `e${e.id}`, t: "line", sym: "+", color: "cyan", text: "Loaded the adapter biostats 0.1.1 (program 0.30.0): a paired test on a CSV file", dim: undefined }]);
   });
 
+  test("mapper shows the saved files in one green line, and the quiet view keeps it", () => {
+    const s = new FakeSession({ delayMs: 0 });
+    const text = "Saved: results.xlsx (4 sheets), 3 figures in figures/. Folder: ~/p/work";
+    const e = s.record.append("notice", { text, saved: { dir: "/p/work", sheets: 4, figures: 3 } });
+    expect(new Mapper(s).map(e)).toEqual([{ key: `e${e.id}`, t: "line", sym: "✓", color: "green", text, dim: undefined }]);
+    const { settled } = mainView([{ e, items: new Mapper(s).map(e) }], true);
+    expect(settled.map((i) => (i.t === "line" ? i.text : ""))).toEqual([text]);
+  });
+
   test("mapper numbers analysis steps and tracks outputs", () => {
     const s = new FakeSession({ delayMs: 0 });
     const m = new Mapper(s);

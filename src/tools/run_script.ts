@@ -1,13 +1,15 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
 import { gaHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
+import { outputRules } from "../core/results.ts";
 import { cap, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, type Dirs } from "../adapters/kinds/common.ts";
 
 export function scriptPython(): string {
@@ -24,6 +26,14 @@ import os
 _to_parent = os.fdopen(3, "w", buffering=1, encoding="utf-8")
 _from_parent = os.fdopen(4, "r", encoding="utf-8")
 _work = os.environ.get("WORK_DIR") or os.environ.get("GA_WORK_DIR") or os.getcwd()
+_out = os.environ.get("OUTPUT_DIR") or _work
+
+try:
+    import ga_figures
+
+    ga_figures.install()
+except Exception:
+    pass
 
 
 class ToolError(RuntimeError):
@@ -44,13 +54,15 @@ def call(tool, **args):
     return reply
 
 
-def _unique(name, ext):
+def _unique(name, ext, folder=None):
+    folder = folder or _out
+    os.makedirs(folder, exist_ok=True)
     stem = os.path.splitext(os.path.basename(name))[0]
-    path = os.path.join(_work, stem + ext)
+    path = os.path.join(folder, stem + ext)
     n = 1
     while os.path.exists(path):
         n += 1
-        path = os.path.join(_work, "%s-%d%s" % (stem, n, ext))
+        path = os.path.join(folder, "%s-%d%s" % (stem, n, ext))
     return path
 
 
@@ -73,13 +85,13 @@ def save_table(name, rows, columns=None):
     return path
 
 
-def save_figure(name, fig=None, dpi=150):
+def save_figure(name, fig=None, dpi=300):
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    path = _unique(name, ".png")
+    path = _unique(name, ".png", os.path.join(_out, "figures"))
     (fig or plt.gcf()).savefig(path, dpi=dpi, bbox_inches="tight")
     return path
 
@@ -114,6 +126,8 @@ def _install():
 
 _install()
 `;
+
+const FIGURES_PY = readFileSync(fileURLToPath(new URL("../adapters/kinds/ga_figures.py", import.meta.url)), "utf8");
 
 const BOOT = "import sys,runpy;d,s=sys.argv[1:3];sys.path.insert(0,d);import ga_api;sys.argv=[s];runpy.run_path(s,run_name='__main__')";
 
@@ -180,8 +194,9 @@ const SECRET = /key|token|secret|password|credential/i;
 function scriptEnv(dirs: Dirs, project: string): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !SECRET.test(k)) env[k] = v;
-  const folders = { PROJECT_DIR: project, WORK_DIR: dirs.workDir, SESSION_DIR: dirs.sessionDir };
+  const folders = { PROJECT_DIR: project, WORK_DIR: dirs.workDir, SESSION_DIR: dirs.sessionDir, OUTPUT_DIR: dirs.outputDir ?? dirs.workDir };
   for (const [k, v] of Object.entries(folders)) env[k] = env[`GA_${k}`] = env[`CUVETTE_${k}`] = v;
+  if (dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = dirs.figureFormats;
   return { ...env, MPLBACKEND: "Agg", MPLCONFIGDIR: join(tmpdir(), "ga-mpl"), PYTHONIOENCODING: "utf-8" };
 }
 
@@ -202,16 +217,18 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
   return {
     name: "run_script",
     title: "Run a Python script",
-    description:
-      "Run Python 3 code for statistics and plots. " +
+    get description() {
+      return "Run Python 3 code for statistics and plots. " +
       `The script runs in the project folder ${project}, so a relative path reads from there, the same as in list_dir and read_file. ` +
       `A relative path that the script opens for writing goes to the session work folder ${dirs.workDir}; new files there are returned. ` +
-      "os.environ['PROJECT_DIR'] and os.environ['WORK_DIR'] give the two folders. Do not search the home folder, / or /Volumes for files: use the paths from earlier results or ask the scientist. " +
+      "os.environ['PROJECT_DIR'], os.environ['WORK_DIR'] and os.environ['OUTPUT_DIR'] give the folders. Do not search the home folder, / or /Volumes for files: use the paths from earlier results or ask the scientist. " +
       "Give purpose and does in plain language: the scientist sees them, not the code. " +
       "Use `from ga_api import call, save_table, save_figure`. `call(tool, **args)` runs another tool and returns its result as a dict. " +
-      "`save_table(name, rows)` writes a CSV. `save_figure(name)` writes a PNG of the current figure. " +
+      "`save_table(name, rows)` writes a CSV. `save_figure(name)` writes the current figure to the figures folder. " +
+      outputRules({ output: dirs.outputDir ?? dirs.workDir, figureFormats: dirs.figureFormats ?? "png,svg", xlsx: dirs.xlsx ?? true }) + " " +
       (scriptPython().includes("science") ? "numpy, pandas, scipy, statsmodels, scikit-learn and matplotlib are installed. " : "Only the standard library is sure to exist; use csv and statistics. ") +
-      describeLimits(opts.network),
+      describeLimits(opts.network);
+    },
     inputSchema: schema,
     source: "harness",
     permission: "ask",
@@ -225,6 +242,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       const script = join(scriptDir, "script.py");
       writeFileSync(script, String(v.args.code));
       writeFileSync(join(scriptDir, "ga_api.py"), GA_API);
+      writeFileSync(join(scriptDir, "ga_figures.py"), FIGURES_PY);
       const before = snapshot(dirs.workDir, scriptDir);
       const python = scriptPython();
       const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network);

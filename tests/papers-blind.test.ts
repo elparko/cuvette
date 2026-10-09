@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -112,4 +112,14 @@ test("the leak check flags paths outside the allow list and counts unsourced and
   expect(k.read).toEqual(["/data/p/in.csv", "/repo/bench/p/expected.yaml", "/run/work/notes.txt"]);
   expect(k.outside).toEqual(["/repo/bench/p/expected.yaml"]);
   expect(k).toMatchObject({ blocked: 1, unsourced: 1, literature: 1 });
+});
+
+test("a blind run writes results.xlsx in the run folder, not in the data folder, and the leak check stays clean", async () => {
+  const counted = () => new FakeProvider([{ calls: [{ name: "count", args: { input: join(root, "data/lab/a.tif") } }] }, { text: "There are 66 particles (step 1)." }]);
+  const result = await runPapers({ ...options(), papers: ["lab-count"], models: ["fake:xlsx"], providerFor: counted });
+  const run = result.runs[0];
+  expect(run.dir!.startsWith(join(root, "scratch"))).toBe(true);
+  expect(existsSync(join(run.dir!, "work", "results.xlsx"))).toBe(true);
+  expect(readdirSync(join(root, "data/lab"))).toEqual(["a.tif"]);
+  expect(run.leaks).toMatchObject({ blocked: 0, outside: [] });
 });

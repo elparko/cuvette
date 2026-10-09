@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -774,4 +774,26 @@ test("a message with send now stops the running tool and the agent reads it next
   expect(parts[1]!.text).toMatch(/not run\. The scientist sent a message/);
   expect(parts.at(-1)!.text).toContain("Stop, wrong folder.");
   expect(session.record.entries(["user"]).at(-1)!.data).toMatchObject({ during: true, now: true });
+});
+
+test("a turn with results writes results.xlsx in the output folder and one saved line; export_xlsx off writes none", async () => {
+  const run = async (settings: Record<string, unknown>) => {
+    const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", method: "Default" } }] }, { text: "The count is 64 (step 1)." }]);
+    session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir(), settings: { guidance: false, ...settings } });
+    session.decisions.applySetup({ method: "Default" });
+    await session.send("Count the particles in a.tif");
+    const s = session;
+    const saved = s.record.entries(["notice"]).filter((e) => e.data.saved);
+    const out = { dir: s.outputDir, saved, xlsx: join(s.outputDir, "results.xlsx") };
+    await s.close();
+    session = undefined;
+    return out;
+  };
+  const on = await run({});
+  expect(on.dir).toBe(join(process.env.GA_HOME!, "sessions", on.dir.split("/").at(-2)!, "work"));
+  expect(readFileSync(on.xlsx).subarray(0, 2).toString()).toBe("PK");
+  expect(on.saved.map((e) => e.data.text)).toEqual([expect.stringMatching(/^Saved: results\.xlsx \(4 sheets\)\. Folder: /)]);
+  const off = await run({ export_xlsx: "off" });
+  expect(off.saved).toEqual([]);
+  expect(existsSync(off.xlsx)).toBe(false);
 });

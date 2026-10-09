@@ -12,6 +12,9 @@ export interface Dirs {
   workDir: string;
   sessionDir: string;
   projectDir?: string;
+  outputDir?: string;
+  figureFormats?: string;
+  xlsx?: boolean;
 }
 
 export interface KindContext {
@@ -73,6 +76,7 @@ export function childEnv(c: KindContext, extra: Record<string, string> = {}): Re
   env.GA_SESSION_DIR = c.dirs.sessionDir;
   env.GA_ADAPTER_DIR = c.adapter.root;
   env.GA_PROGRAM_PATH = c.programPath ?? "";
+  if (c.dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = c.dirs.figureFormats;
   return { ...env, ...extra };
 }
 

@@ -174,7 +174,7 @@ export class Mapper {
       case "note":
         return line("▸", String(d.text ?? ""), undefined, true);
       case "notice":
-        return d.plan ? line("⚠", String(d.text ?? ""), "yellow") : line("▸", String(d.text ?? d.message ?? ""));
+        return d.plan ? line("⚠", String(d.text ?? ""), "yellow") : d.saved ? line("✓", String(d.text ?? ""), "green") : line("▸", String(d.text ?? d.message ?? ""));
       case "adapter":
         return line("+", `Loaded the adapter ${d.name} ${d.version ?? ""}${d.programVersion ? ` (program ${d.programVersion})` : ""}${d.reason ? `: ${d.reason}` : ""}`, "cyan");
       case "error":

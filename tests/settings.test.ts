@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { saveClaudeKey, saveElabftw } from "../src/core/credentials.ts";
 import { changeSetting, describe, find, recordSetting, settingsPath, type SettingSession } from "../src/core/settings.ts";
 import { budgetUsd } from "../src/core/spend.ts";
+import { loadSettings, xlsxOn } from "../src/core/config.ts";
 
 const KEY = "sk-ant-api03-secretsecretsecret-WXYZ";
 const old = process.env.GA_HOME;
@@ -67,6 +68,20 @@ test("a session value that differs from the files shows as this session only", (
   expect(row(rows, "mode")).toMatchObject({ value: "teach", source: "session", locked: false });
   expect(row(rows, "referee").source).toBe("default");
   expect(row(rows, "adapters").value).toBe("imagej 0.3.0");
+});
+
+test("export_xlsx and figure_formats are in the registry, on and png,svg by default", async () => {
+  const rows = describe({ cwd, env: {} });
+  expect(row(rows, "export_xlsx")).toMatchObject({ value: "on", source: "default" });
+  expect(row(rows, "figure_formats")).toMatchObject({ value: "png,svg", source: "default" });
+  expect(row(rows, "export_xlsx").def.group).toBe("Outputs");
+  await changeSetting({ cwd, env: {} }, "export_xlsx", "off", "project");
+  await changeSetting({ cwd, env: {} }, "figure_formats", "png,pdf", "project");
+  await expect(changeSetting({ cwd, env: {} }, "export_xlsx", "maybe", "project")).rejects.toThrow(/on, off/);
+  const s = loadSettings(cwd);
+  expect(xlsxOn(s)).toBe(false);
+  expect(s.figure_formats).toBe("png,pdf");
+  expect(xlsxOn(loadSettings(mkdtempSync(join(tmpdir(), "ga-proj-"))))).toBe(true);
 });
 
 test("effort shows only for a Claude model", () => {

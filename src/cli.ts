@@ -41,7 +41,7 @@ Usage
   ga eln push <session>                send a session to eLabFTW after you approve the list
   ga eln link <session> <id>           read an eLabFTW experiment and propose setup values
   ga sessions                          list the sessions, newest first: folder, age, first request
-  ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln
+  ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx
   ga replay <flow.json> [--input name=path ...] [--session <id>]
   ga run-step <adapter> <tool> '<json args>'
   ga questions                         open questions in every session

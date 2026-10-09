@@ -75,7 +75,7 @@ export async function runMcpServer(opts: { adapters: string[] }) {
     {
       name: "ga_export",
       description: "Export the trail, the protocol, a script, a notebook or a flow. Returns the file path.",
-      inputSchema: obj({ format: { type: "string", enum: ["html", "md", "jsonl", "protocol", "script", "notebook", "flow", "eln"] } }, ["format"]),
+      inputSchema: obj({ format: { type: "string", enum: ["html", "md", "jsonl", "protocol", "script", "notebook", "flow", "eln", "xlsx"] } }, ["format"]),
       run: async (a) => ({ text: await session.exportAs(a.format as never) }),
     },
     {

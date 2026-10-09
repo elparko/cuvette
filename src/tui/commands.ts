@@ -35,7 +35,7 @@ export interface Command {
 
 const MODES: Mode[] = ["watch", "follow", "teach", "plan"];
 const OWNERS: Owner[] = ["human", "agent", "fixed"];
-const FORMATS = ["html", "md", "jsonl", "pdf", "protocol", "script", "notebook", "flow", "eln"];
+const FORMATS = ["html", "md", "jsonl", "pdf", "protocol", "script", "notebook", "flow", "eln", "xlsx"];
 
 async function lazy<T = any>(spec: string): Promise<T | undefined> {
   try {

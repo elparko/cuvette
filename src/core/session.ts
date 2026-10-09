@@ -12,7 +12,9 @@ import { taskTool } from "../tools/task.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
 import { compact, needsCompaction, summaryMessage } from "./compaction.ts";
-import { loadSettings, type Settings } from "./config.ts";
+import { loadSettings, xlsxOn, type Settings } from "./config.ts";
+import { outputDir, savedLine, writeResults, type Saved } from "./results.ts";
+import type { Dirs } from "../adapters/kinds/common.ts";
 import { ADAPTER_DECISION, decisionHook, DecisionRecord } from "./decisions.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
@@ -43,7 +45,7 @@ import {
   type ToolOutput,
 } from "./types.ts";
 
-export type ExportFormat = "html" | "md" | "jsonl" | "pdf" | "protocol" | "script" | "notebook" | "flow" | "eln";
+export type ExportFormat = "html" | "md" | "jsonl" | "pdf" | "protocol" | "script" | "notebook" | "flow" | "eln" | "xlsx";
 
 export interface SessionOptions {
   adapters: string[];
@@ -228,6 +230,17 @@ export class Session {
     this.record.onAppend = (entry: Entry) => this.bus.emit({ type: "entry", entry });
   }
 
+  get outputDir(): string {
+    return outputDir(this);
+  }
+
+  dirs(): Dirs {
+    this.sharedDirs ??= { workDir: this.workDir, sessionDir: this.dir, projectDir: this.cwd } as Dirs;
+    return Object.assign(this.sharedDirs, { outputDir: this.outputDir, figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) });
+  }
+
+  private sharedDirs?: Dirs;
+
   get model(): ModelInfo {
     return this.provider.info;
   }
@@ -291,7 +304,7 @@ export class Session {
     } catch {}
     try {
       const { runScriptTool } = await import("../tools/run_script.ts");
-      extra.push(runScriptTool({ workDir: this.workDir, sessionDir: this.dir, projectDir: this.cwd }, { network: this.settings.networkForScripts }));
+      extra.push(runScriptTool(this.dirs(), { network: this.settings.networkForScripts }));
     } catch {}
     extra.push((await import("../tools/calculate.ts")).calculateTool());
     extra.push(
@@ -355,12 +368,12 @@ export class Session {
   }
 
   private buildSystem(): string {
-    return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { project: this.cwd, work: this.workDir } });
+    return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { project: this.cwd, work: this.workDir, output: this.outputDir, figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) } });
   }
 
   private async startOne(a: LoadedAdapter): Promise<string[]> {
     const { startAdapter } = await import("../adapters/runtime.ts");
-    const rt = await startAdapter(a, { workDir: this.workDir, sessionDir: this.dir });
+    const rt = await startAdapter(a, this.dirs());
     this.runtimes.push(rt);
     this.runtimeInfo.push({ adapter: a, programVersion: rt.programVersion, instructions: rt.instructions });
     this.adapterInfo.push({ name: a.name, title: a.manifest.adapter.title || a.manifest.program.name, version: a.manifest.adapter.version, programVersion: rt.programVersion });
@@ -580,6 +593,7 @@ export class Session {
     let lastSig = "";
     let repeats = 0;
     let forceAnswer = false;
+    const turnStart = this.record.entries().length;
     try {
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
@@ -719,9 +733,30 @@ export class Session {
     } finally {
       if (this.planning) this.endPlanning();
       this.stopTurn = false;
+      this.saveResults(turnStart);
       this.busy = false;
       this.bus.emit({ type: "status", state: "idle" });
       await this.hooks.event("Stop", { session: this.id }).catch(() => {});
+    }
+  }
+
+  saveResults(since = 0, force = false): Saved | undefined {
+    if (!force && !this.record.nodes().some((n) => n.entry > since && !n.sensitivityOf)) return undefined;
+    try {
+      const saved = writeResults({
+        record: this.record,
+        adapters: this.adapters,
+        fields: this.decisions?.fields() ?? [],
+        programs: this.adapterInfo.map((a) => ({ name: a.title || a.name, version: a.version, programVersion: a.programVersion })),
+        dir: this.outputDir,
+        xlsx: force || xlsxOn(this.settings),
+        toolText: Object.fromEntries([...this.tools.values()].map((t) => [t.remoteName ?? t.name, t.description.split(/(?<=\.)\s/)[0]!.trim()])),
+      });
+      if (saved.xlsx || saved.figures) this.record.append("notice", { text: savedLine(saved), saved: { ...saved } });
+      return saved;
+    } catch (e) {
+      this.record.append("notice", { text: `The harness could not save results.xlsx and the figures: ${(e as Error).message}` });
+      return undefined;
     }
   }
 
@@ -1472,7 +1507,8 @@ export class Session {
     this.settings = next;
     this.provider = provider;
     this.refereeProvider = referee;
-    if (name === "model") this.system = this.buildSystem();
+    if (name === "export_xlsx" || name === "figure_formats") this.dirs();
+    if (["model", "export_xlsx", "figure_formats"].includes(name)) this.system = this.buildSystem();
   }
 
   setMode(mode: Mode): void {
@@ -1698,6 +1734,11 @@ export class Session {
       case "script": return ex.exportScript(this.record, a, join(out, "replay.ts"));
       case "notebook": return ex.exportNotebook(this.record, a, join(out, "analysis.ipynb"));
       case "flow": return ex.exportFlow(this.record, a, join(out, "flow.json"));
+      case "xlsx": {
+        const saved = this.saveResults(0, true);
+        if (!saved?.xlsx) throw new Error("the harness could not write results.xlsx");
+        return saved.xlsx;
+      }
       case "eln": {
         const eln = await import("../eln/export.ts");
         return eln.exportEln(this, join(out, `${this.id}.eln`));

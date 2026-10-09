@@ -111,7 +111,7 @@ export function stepLines(adapters: LoadedAdapter[], n: Node): string[] {
   return out;
 }
 
-function methodsSentence(adapters: LoadedAdapter[], n: Node): string {
+export function methodsSentence(adapters: LoadedAdapter[], n: Node): string {
   const me = adapterOf(adapters, n)?.mapEntry(n.tool, n.args);
   const r = me ? describeRoute(me, n.args) : undefined;
   if (me?.summary) return fillTemplate(me.summary, n.args).replace(/\.?$/, ".");

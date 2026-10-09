@@ -25,6 +25,8 @@ export interface Settings {
   messages: "after-step" | "queue";
   hooks: Partial<Record<HookEvent, { matcher?: string; command: string[] }[]>>;
   notify: { ntfy?: string };
+  export_xlsx: "on" | "off" | boolean;
+  figure_formats: string;
 }
 
 export const DEFAULTS: Settings = {
@@ -48,7 +50,13 @@ export const DEFAULTS: Settings = {
   messages: "after-step",
   hooks: {},
   notify: {},
+  export_xlsx: "on",
+  figure_formats: "png,svg",
 };
+
+export function xlsxOn(s: Pick<Settings, "export_xlsx">): boolean {
+  return s.export_xlsx !== false && s.export_xlsx !== "off";
+}
 
 function readJson(path: string): Partial<Settings> {
   if (!existsSync(path)) return {};

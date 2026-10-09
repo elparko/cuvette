@@ -1,4 +1,5 @@
 import type { LoadedAdapter } from "../adapters/manifest.ts";
+import { outputRules } from "./results.ts";
 import type { Mode, ModelInfo } from "./types.ts";
 
 const RULES = `You are a guided analysis agent. You analyze data in existing science programs for a scientist. The scientist owns the method decisions. You do the work, and you show each step so the scientist can repeat it by hand in the program.
@@ -47,11 +48,15 @@ The session started with no program adapter. An adapter gives the tools, standar
 - Do not guess tool names. The program tools appear after use_adapter.
 - If no adapter fits, say so and use the generic tools.`;
 
-export function foldersText(f: { project: string; work: string }): string {
+type Folders = { project: string; work: string; output?: string; figureFormats?: string; xlsx?: boolean };
+
+export function foldersText(f: Folders): string {
+  const out = f.output ?? f.work;
   return [
     "# Folders",
     `- The project folder is ${f.project}. A relative path in read_file, list_dir, run_script and run_command starts there.`,
     `- Files that scripts write go to the session work folder ${f.work}.`,
+    `- The output folder is ${out}. ${outputRules({ output: out, figureFormats: f.figureFormats ?? "png,svg", xlsx: f.xlsx ?? true })}`,
     "- Use the absolute paths from earlier tool results. Never search the whole disk for a file. If you cannot find a file, ask the scientist for the path.",
     "- For run_script and run_command, give purpose (one short line) and does (what the code does, in plain words for a scientist, with no code terms).",
   ].join("\n");
@@ -64,7 +69,7 @@ export function systemPrompt(opts: {
   lab: string;
   guidance: boolean;
   pick?: boolean;
-  folders?: { project: string; work: string };
+  folders?: Folders;
 }): string {
   if (!opts.guidance) return "You are a data analysis agent. Use the tools to answer the scientist's request." + (opts.pick ? " Call list_adapters, then use_adapter to load the program tools that fit the request." : "");
   const small = opts.model.small;

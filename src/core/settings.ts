@@ -132,6 +132,23 @@ export const SETTINGS: SettingDef[] = [
     def: "cuvette",
   },
   {
+    name: "export_xlsx",
+    group: "Outputs",
+    label: "Save results.xlsx",
+    help: "on: at the end of each turn with results, the harness writes results.xlsx in the output folder, with a summary, one sheet for each table, the steps and the files.",
+    scopes: ALL,
+    choices: () => ["on", "off"],
+  },
+  {
+    name: "figure_formats",
+    group: "Outputs",
+    label: "Figure formats",
+    help: "The file types for each figure in figures/. PNG is always at 300 dpi. SVG, PDF or EPS adds a vector copy of each matplotlib figure.",
+    scopes: ALL,
+    choices: () => ["png,svg", "png,pdf", "png,svg,pdf", "png"],
+    free: true,
+  },
+  {
     name: "permissionMode",
     group: "Permissions",
     label: "Permission mode",
