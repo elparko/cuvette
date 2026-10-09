@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { setBlindPolicy } from "../adapters/blind.ts";
+import { blindPolicy, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterDirs, gaHome } from "../adapters/manifest.ts";
 import { applyHeadlessSetup, attachHeadless } from "../core/headless.ts";
 import type { Provider } from "../core/types.ts";
@@ -142,6 +142,8 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: R
     thrown = (e as Error).message;
   }
   const durationS = (Date.now() - started) / 1000;
+  const grown = blindPolicy();
+  if (blind && grown) blind = { ...blind, allow: grown.allow, hide: grown.hide };
   const record = session?.record;
   const final = record ? finalAnswer(record) : undefined;
   const errors = record?.entries(["error"]) ?? [];

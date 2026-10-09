@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { isAbsolute } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
+import { ADAPTER_DECISION } from "./decisions.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Node } from "./types.ts";
 import { describeRoute, fillTemplate, show, writeOut } from "./trail.ts";
@@ -55,9 +56,12 @@ function group(nodes: Node[]): Group[] {
 }
 
 export function setupValues(record: AnalysisRecord): Record<string, unknown> {
-  const s = record.entries(["setup"]);
-  const v = s[s.length - 1]?.data.values;
-  return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
+  const out: Record<string, unknown> = {};
+  for (const e of record.entries(["setup", "decision"])) {
+    if (e.kind === "decision") out[String(e.data.key)] = e.data.new;
+    else if (e.data.values && typeof e.data.values === "object") Object.assign(out, e.data.values);
+  }
+  return out;
 }
 
 function sessionInfo(record: AnalysisRecord) {
@@ -66,6 +70,7 @@ function sessionInfo(record: AnalysisRecord) {
 }
 
 function labelOf(adapters: LoadedAdapter[], key: string): string {
+  if (key === ADAPTER_DECISION.key) return ADAPTER_DECISION.label;
   for (const a of adapters) {
     const d = a.manifest.decisions.find((x) => x.key === key);
     if (d) return d.label;
@@ -134,6 +139,11 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
     lines.push("| Decision | Value |", "| --- | --- |");
     for (const [k, v] of setup) lines.push(`| ${labelOf(adapters, k).replace(/\|/g, "\\|")} | ${show(v).replace(/\|/g, "\\|")} |`);
   } else lines.push("No setup values were recorded.");
+  const loads = record.entries(["adapter"]);
+  if (loads.length) {
+    lines.push("", "## Programs", "");
+    for (const e of loads) lines.push(`- ${show(e.data.name)} adapter ${show(e.data.version)}, program ${show(e.data.programVersion) || "version unknown"}: ${show(e.data.reason)}`);
+  }
   lines.push("", "## Steps", "");
   const groups = group(nodes);
   const sentences: string[] = [];

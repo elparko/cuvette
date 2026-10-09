@@ -1,5 +1,7 @@
 adapter:
   name: bedtools
+  field: genomics
+  file_types: [".bed", ".gff", ".gtf", ".bedgraph"]
   title: bedtools
   version: 0.1.0
   spec: "1"

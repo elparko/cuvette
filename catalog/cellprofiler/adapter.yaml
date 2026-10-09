@@ -1,5 +1,7 @@
 adapter:
   name: cellprofiler
+  field: microscopy
+  file_types: [".tif", ".tiff", ".png", ".cppipe"]
   title: CellProfiler
   version: 0.1.2
   spec: "1"

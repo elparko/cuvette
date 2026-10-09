@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { BLIND_REASON, blindCheck } from "../adapters/blind.ts";
+import { allowAdapter, BLIND_REASON, blindCheck } from "../adapters/blind.ts";
+import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
 import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { makeProvider } from "../providers/index.ts";
@@ -11,7 +12,7 @@ import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
 import { compact, needsCompaction, summaryMessage } from "./compaction.ts";
 import { loadSettings, type Settings } from "./config.ts";
-import { decisionHook, DecisionRecord } from "./decisions.ts";
+import { ADAPTER_DECISION, decisionHook, DecisionRecord } from "./decisions.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
 import { compareNote, instruction, teachReview, type TeachSummary } from "./modes.ts";
@@ -51,6 +52,7 @@ export interface SessionOptions {
   provider?: Provider;
   refereeProvider?: Provider;
   generic?: boolean;
+  pick?: boolean;
 }
 
 interface Pending<T> {
@@ -155,7 +157,12 @@ export class Session {
   adapters: LoadedAdapter[] = [];
   runtimes: AdapterRuntime[] = [];
   adapterInfo: { name: string; title: string; version: string; programVersion: string }[] = [];
+  pick = false;
+  setupPreset: Record<string, unknown> = {};
   history: Message[] = [];
+  private runtimeInfo: { adapter: LoadedAdapter; programVersion: string; instructions: string }[] = [];
+  private found: FoundCache = new Map();
+  private index?: AdapterSummary[];
   private tools = new Map<string, Tool>();
   private active = new Set<string>();
   private hooks!: HookRunner;
@@ -200,9 +207,11 @@ export class Session {
   static async resume(id: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
     const log = join(gaHome(), "sessions", id, "log.jsonl");
     if (!existsSync(log)) throw new Error(`no session ${id}`);
-    const first = readFileSync(log, "utf8").split("\n").map((l) => (l ? JSON.parse(l) : null)).find((e) => e?.kind === "session");
-    const adapters = opts.adapters ?? ((first?.data.adapters ?? []) as { name: string; path?: string }[]).map((a) => (a.path && existsSync(a.path) ? a.path : a.name));
-    return Session.create({ ...opts, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? first?.data.mode });
+    const entries = readFileSync(log, "utf8").split("\n").map((l) => (l ? JSON.parse(l) : null));
+    const first = entries.find((e) => e?.kind === "session");
+    const loaded = entries.filter((e) => e?.kind === "adapter").map((e) => e.data);
+    const adapters = opts.adapters ?? [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded].map((a) => (a.path && existsSync(a.path) ? a.path : a.name));
+    return Session.create({ ...opts, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? first?.data.mode, pick: opts.pick ?? !!first?.data.pick });
   }
 
   private async init(opts: SessionOptions) {
@@ -213,21 +222,10 @@ export class Session {
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
     else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
 
-    const { startAdapter } = await import("../adapters/runtime.ts");
-    const runtimeInfo: { adapter: LoadedAdapter; programVersion: string; instructions: string }[] = [];
-    for (const a of this.adapters) {
-      const rt = await startAdapter(a, { workDir: this.workDir, sessionDir: this.dir });
-      this.runtimes.push(rt);
-      runtimeInfo.push({ adapter: a, programVersion: rt.programVersion, instructions: rt.instructions });
-      this.adapterInfo.push({ name: a.name, title: a.manifest.adapter.title || a.manifest.program.name, version: a.manifest.adapter.version, programVersion: rt.programVersion });
-      const mod = await a.module();
-      for (const t of [...(await rt.tools()), ...(mod.tools ?? []).map((t) => ({ ...t, adapter: t.adapter ?? a.name, source: "adapter" as const }))]) {
-        const name = this.tools.has(t.name) ? `${a.name.replace(/-/g, "_")}_${t.name}` : t.name;
-        this.tools.set(name, { ...t, name, remoteName: t.remoteName ?? t.name });
-      }
-    }
+    this.pick = opts.pick ?? opts.adapters.length === 0;
+    for (const a of this.adapters) await this.startOne(a);
 
-    this.decisions = new DecisionRecord(this.adapters, this.record);
+    this.decisions = new DecisionRecord(this.adapters, this.record, this.pick ? [ADAPTER_DECISION] : []);
     let notify: ((q: Question) => Promise<void>) | undefined;
     if (this.settings.notify.ntfy) {
       try {
@@ -244,7 +242,7 @@ export class Session {
       const { genericTools } = await import("../tools/generic.ts");
       const generic = genericTools({ workDir: this.workDir, sessionDir: this.dir });
       const always = new Set(["read_file", "list_dir"]);
-      extra.push(...generic.filter((t) => opts.generic || this.adapters.length === 0 || always.has(t.name)));
+      extra.push(...generic.filter((t) => opts.generic || this.pick || this.adapters.length === 0 || always.has(t.name)));
     } catch {}
     try {
       const { runScriptTool } = await import("../tools/run_script.ts");
@@ -267,6 +265,7 @@ export class Session {
       }),
     );
     if (this.adapters.some((a) => a.manifest.connection.history_tool)) extra.push(this.reviewTool());
+    if (this.pick) extra.push(...this.adapterTools());
     if (!this.provider.info.small) extra.push(taskTool({ provider: () => this.provider, tools: () => [...this.tools.values()], run: (t, a, id, sig) => this.pipeline(t, a, id, sig) }));
     for (const t of extra) if (!this.tools.has(t.name)) this.tools.set(t.name, t);
     this.chooseActiveTools();
@@ -278,7 +277,7 @@ export class Session {
       this.cwd,
     );
 
-    this.system = systemPrompt({ adapters: runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance });
+    this.system = this.buildSystem();
     if (resumed) {
       this.history = this.record.messages();
       this.notes.push("The session was resumed after a restart. Program state may have reset; outputs from earlier steps are still on disk.");
@@ -292,6 +291,7 @@ export class Session {
         mode: this.mode,
         cwd: this.cwd,
         guidance: this.settings.guidance,
+        ...(this.pick ? { pick: true } : {}),
       });
     }
     await this.hooks.event("SessionStart", { session: this.id });
@@ -306,10 +306,182 @@ export class Session {
     }
   }
 
+  private buildSystem(): string {
+    return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick });
+  }
+
+  private async startOne(a: LoadedAdapter): Promise<string[]> {
+    const { startAdapter } = await import("../adapters/runtime.ts");
+    const rt = await startAdapter(a, { workDir: this.workDir, sessionDir: this.dir });
+    this.runtimes.push(rt);
+    this.runtimeInfo.push({ adapter: a, programVersion: rt.programVersion, instructions: rt.instructions });
+    this.adapterInfo.push({ name: a.name, title: a.manifest.adapter.title || a.manifest.program.name, version: a.manifest.adapter.version, programVersion: rt.programVersion });
+    const mod = await a.module();
+    const names: string[] = [];
+    for (const t of [...(await rt.tools()), ...(mod.tools ?? []).map((t) => ({ ...t, adapter: t.adapter ?? a.name, source: "adapter" as const }))]) {
+      const name = this.tools.has(t.name) ? `${a.name.replace(/-/g, "_")}_${t.name}` : t.name;
+      this.tools.set(name, { ...t, name, remoteName: t.remoteName ?? t.name });
+      names.push(name);
+    }
+    return names;
+  }
+
+  adapterList(): AdapterSummary[] {
+    this.index ??= adapterIndex(this.cwd, this.found);
+    return this.index;
+  }
+
+  async useAdapter(name: string, reason: string): Promise<ToolOutput> {
+    const have = (n: string) => this.adapters.some((a) => a.name === n);
+    const already = (n: string) => ({ ok: true, summary: `The adapter ${n} is already loaded. Nothing changed.` });
+    if (have(name)) return already(name);
+    let a: LoadedAdapter;
+    try {
+      a = applyOverlay(findAdapter(name, this.cwd));
+    } catch (e) {
+      return { ok: false, error: `${(e as Error).message}. Call list_adapters to see the names.` };
+    }
+    if (have(a.name)) return already(a.name);
+    const gate = await this.chooseProgram(a, reason);
+    if (gate.blocked) return { ok: false, error: gate.blocked };
+    const texts = gate.text ? [gate.text] : [];
+    let ok = true;
+    for (const n of gate.load) {
+      let b: LoadedAdapter;
+      try {
+        b = n === a.name ? a : applyOverlay(findAdapter(n, this.cwd));
+      } catch (e) {
+        ok = false;
+        texts.push((e as Error).message);
+        continue;
+      }
+      const why = n === a.name ? reason : `chosen by the scientist instead of ${a.name} (the agent's reason: ${reason})`;
+      const r = await this.loadOne(b, why, gate.by);
+      ok &&= r.ok;
+      texts.push(r.ok ? r.text! : r.error!);
+    }
+    if (!gate.load.length) texts.push("No adapter was loaded.");
+    const text = texts.join("\n\n");
+    return ok && gate.load.length ? { ok: true, summary: `Loaded ${gate.load.join(", ")}.`, text } : { ok: false, error: text };
+  }
+
+  private async chooseProgram(a: LoadedAdapter, reason: string): Promise<{ load: string[]; by: string; text?: string; blocked?: string }> {
+    const key = ADAPTER_DECISION.key;
+    if (!this.decisions.has(key)) return { load: [a.name], by: "agent" };
+    const split = (v: unknown) => String(v ?? "").split(/[,\s]+/).filter(Boolean);
+    const loaded = this.adapters.map((x) => x.name);
+    const chosen = this.decisions.isSet(key) ? split(this.decisions.value(key)) : [];
+    if (chosen.includes(a.name)) return { load: [a.name], by: "human" };
+    const owner = this.decisions.owner(key);
+    if (owner === "fixed") return { load: [], by: "fixed", blocked: `The lab fixed the program: ${chosen.join(", ") || "none"}. Load one of these adapters, or ask the scientist.` };
+    const value = (n: string) => [...new Set([...loaded, n])].join(", ");
+    if (owner === "agent") {
+      this.decisions.change(key, value(a.name), { by: "agent", reason });
+      return { load: [a.name], by: "agent" };
+    }
+    const list = this.adapterList();
+    const request = String(this.record.entries(["user"]).at(-1)?.data.text ?? "");
+    const me = list.find((x) => x.name === a.name);
+    const files = me ? filesFor(request, me, this.cwd) : [];
+    const why = [reason.trim().replace(/([^.])$/, "$1."), files.length ? `The request names ${files.join(", ")}, and ${a.name} reads that file type.` : ""].filter(Boolean).join(" ");
+    const others = [...new Set([...chosen.filter((n) => !loaded.includes(n) && n !== a.name), ...alternatives(list, a.name, [...loaded, ...chosen])])].slice(0, 4);
+    const options = [a.name, ...others].map((n) => ({ value: value(n), label: n }));
+    const q = await this.questions.ask({
+      decisionKey: key,
+      title: ADAPTER_DECISION.label,
+      text: `The agent wants to use ${a.manifest.program.name} through the ${a.name} adapter: ${why}`,
+      options,
+      recommendation: { value: options[0].value, reason: why },
+      evidence: others.length ? `Other adapters that read the same file types: ${others.join(", ")}.` : "",
+    });
+    this.bus.emit({ type: "question", question: q });
+    this.record.append("blocked", { tool: "use_adapter", reason: `waiting for the scientist: ${key}`, qid: q.qid });
+    if (!this.settings.askWaits) return { load: [], by: "human", blocked: `BLOCKED: the choice of program belongs to the scientist. Question ${q.qid} waits for the answer. Call use_adapter again after the answer.` };
+    this.waitedQids.add(q.qid);
+    this.bus.emit({ type: "status", state: "waiting", tool: "use_adapter" });
+    try {
+      await abortable(this.questions.wait(q.qid), this.abort?.signal);
+    } catch {
+      return { load: [], by: "human", blocked: `The question ${q.qid} about the program is still open.` };
+    }
+    const now = split(this.decisions.value(key)).filter((n) => !loaded.includes(n));
+    return { load: now, by: "human", text: now.includes(a.name) ? undefined : `The scientist chose ${now.join(", ") || "no new adapter"} instead of ${a.name}.` };
+  }
+
+  private async loadOne(a: LoadedAdapter, reason: string, by: string): Promise<ToolOutput> {
+    const m = a.manifest;
+    const where = programFound(m, this.found);
+    const checked = Boolean(m.locate.env || m.locate.paths.length || m.locate.which.length);
+    const missing = checked && !where.path;
+    const notices: string[] = [];
+    if (m.adapter.status === "draft") notices.push(`The adapter ${a.name} is a draft. No one approved it yet. Check its results with care.`);
+    if (missing) notices.push(`The program ${m.program.name} was not found on this computer. Its tools can fail. ${installHint(m)}`);
+    allowAdapter(a.root, where.path);
+    let names: string[];
+    try {
+      names = await this.startOne(a);
+    } catch (e) {
+      const msg = `The adapter ${a.name} did not start: ${(e as Error).message}${missing ? ` ${installHint(m)}` : ""}`;
+      this.record.append("notice", { text: msg });
+      return { ok: false, error: msg };
+    }
+    this.adapters.push(a);
+    const added = this.decisions.addAdapter(a, this.setupPreset);
+    this.hooks.add((await a.module()).hooks ?? []);
+    if (m.connection.history_tool && !this.tools.has("review_my_steps")) {
+      this.tools.set("review_my_steps", this.reviewTool());
+      this.active.add("review_my_steps");
+    }
+    if (this.deferred()) {
+      this.active.add("find_tools");
+      this.chooseActiveTools(String(this.record.entries(["user"]).at(-1)?.data.text ?? ""));
+    } else names.forEach((n) => this.active.add(n));
+    this.system = this.buildSystem();
+    const info = this.adapterInfo.at(-1)!;
+    this.record.append("adapter", { name: a.name, version: info.version, programVersion: info.programVersion, reason, by, status: m.adapter.status, path: a.root, programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
+    const shown = names.filter((n) => this.active.has(n));
+    const skills = a.skills();
+    const brief = added.length ? this.decisions.brief(added) : "";
+    const text = [
+      `Loaded the adapter ${a.name} ${info.version} (${info.title} ${info.programVersion}).`,
+      ...notices,
+      `Tools now in your list: ${shown.join(", ") || "none"}.${shown.length < names.length ? ` Find the other ${names.length - shown.length} with find_tools.` : ""}`,
+      skills.length ? `Skills (read one with load_skill): ${skills.map((x) => x.name).join(", ")}.` : "",
+      brief ? `Decisions of this adapter:\n${brief}` : "",
+      "The standards of this program are now in your instructions. Follow them.",
+    ].filter(Boolean).join("\n");
+    return { ok: true, summary: `Loaded ${a.name} ${info.version}: ${names.length} tools.`, text };
+  }
+
+  private adapterTools(): Tool[] {
+    const base = { source: "harness" as const, readOnly: true, permission: "allow" as const };
+    return [
+      {
+        ...base,
+        name: "list_adapters",
+        description: "List the program adapters on this computer: name, program, field, what it does, the input file types, the status, and whether the program is found. Give a filter, such as a file type or a method, to list fewer.",
+        inputSchema: { type: "object", properties: { filter: { type: "string", description: "Optional words, such as .bam or mixed model." } }, required: [] },
+        execute: async (a) => ({ ok: true, summary: "Listed the adapters.", text: formatIndex(this.adapterList(), typeof a.filter === "string" ? a.filter : "") }),
+      },
+      {
+        ...base,
+        name: "use_adapter",
+        description: "Load one program adapter into this session: its tools, standards, skills and decisions. Give the adapter name from list_adapters and, in one sentence, the reason that it fits the request.",
+        inputSchema: { type: "object", properties: { name: { type: "string" }, reason: { type: "string" } }, required: ["name", "reason"] },
+        execute: async (a) => this.useAdapter(String(a.name), String(a.reason ?? "")),
+      },
+    ];
+  }
+
+  private deferred(): boolean {
+    const n = [...this.tools.values()].filter((t) => t.source === "adapter").length;
+    return this.settings.toolExposure === "search" || (this.settings.toolExposure === "auto" && this.provider.info.small && n > 24);
+  }
+
   private chooseActiveTools(request = "") {
     const all = [...this.tools.values()];
     const adapterTools = all.filter((t) => t.source === "adapter");
-    const deferred = this.settings.toolExposure === "search" || (this.settings.toolExposure === "auto" && this.provider.info.small && adapterTools.length > 24);
+    const deferred = this.deferred();
     if (!this.active.size) this.active = new Set(all.filter((t) => t.source !== "adapter" || !deferred).map((t) => t.name));
     if (!deferred) {
       this.active.delete("find_tools");
@@ -360,6 +532,10 @@ export class Session {
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode]);
       this.chooseActiveTools(text);
+      if (this.pick) {
+        const hint = fileTypeHint(text, this.adapterList(), this.cwd, this.adapters.map((a) => a.name));
+        if (hint) this.notes.push(hint);
+      }
       this.record.append("user", { text });
       const notes = this.drainNotes();
       this.push({ role: "user", parts: [{ type: "text", text: notes ? `${notes}\n\n${text}` : text }] });

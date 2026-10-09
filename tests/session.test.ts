@@ -1,7 +1,9 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
+import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts";
+import { applyHeadlessSetup, attachHeadless } from "../src/core/headless.ts";
 import { Session, announcesStep, endsWithPromise } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 
@@ -410,4 +412,132 @@ test("an empty answer keeps the agent's argument in the comparison runs and in t
   expect(comps.map((n) => n.args.terms)).toEqual(["A + B", "A + B"]);
   const main = session.record.nodes().filter((n) => !n.sensitivityOf);
   expect(main.map((n) => [n.args.terms, n.args.perms])).toEqual([["A + B", 999]]);
+});
+
+function pickCwd(): string {
+  const cwd = mkdtempSync(join(tmpdir(), "ga-pick-"));
+  const yaml = readFileSync(join(__dirname, "fixtures/lab/adapter.yaml"), "utf8");
+  for (const name of ["lab", "lab2"]) {
+    const dir = join(cwd, ".ga", "adapters", name);
+    mkdirSync(join(dir, "skills"), { recursive: true });
+    writeFileSync(
+      join(dir, "adapter.yaml"),
+      yaml.replace('adapter: { name: lab, title: Lab counter, version: "0.2.0" }', `adapter: { name: ${name}, title: Lab counter, version: "0.2.0", field: microscopy, file_types: [".lab", ".tif"] }\nstandards: "Count each image twice."`),
+    );
+    symlinkSync(join(__dirname, "fixtures/lab/server.ts"), join(dir, "server.ts"));
+    writeFileSync(join(dir, "skills", "recount.md"), "---\nname: recount\ndescription: Count again with another method.\n---\nCount again.\n");
+  }
+  return cwd;
+}
+
+const toolNames = (p: FakeProvider, i: number) => p.requests[i].tools.map((t) => t.name);
+
+test("with no adapter, use_adapter asks the scientist, then adds the tools, standards, skills and decisions of the adapter", async () => {
+  const cwd = pickCwd();
+  const provider = new FakeProvider([
+    { calls: [{ name: "list_adapters", args: { filter: ".lab" } }] },
+    { calls: [{ name: "use_adapter", args: { name: "lab", reason: "The request names a lab image" } }] },
+    { calls: [{ name: "count", args: { input: "/data/a.lab", method: "Otsu" } }] },
+    { text: "There are 66 particles (step 1)." },
+  ]);
+  session = await Session.create({ adapters: [], provider, cwd });
+  const asked: { key: string; text: string; options: string[] }[] = [];
+  session.bus.on((e) => {
+    if (e.type !== "question") return;
+    asked.push({ key: e.question.decisionKey, text: e.question.text, options: e.question.options.map((o) => o.label) });
+    setTimeout(() => session!.answer(e.question.qid, e.question.decisionKey === "adapter" ? "lab" : "Triangle"), 0);
+  });
+  session.decisions.applySetup({ question: "How many particles?" });
+  await session.send("Count the particles in /data/a.lab");
+
+  const first = toolNames(provider, 0);
+  expect(first).toEqual(expect.arrayContaining(["list_adapters", "use_adapter", "read_file", "run_script"]));
+  expect(first).not.toContain("count");
+  expect(provider.requests[0].system).toMatch(/# Programs/);
+  expect(provider.requests[0].system).not.toMatch(/Count each image twice/);
+  expect(JSON.stringify(provider.requests[0].messages[0])).toMatch(/a\.lab -> lab, lab2/);
+  expect(JSON.stringify(provider.requests[1].messages.at(-1))).toMatch(/- lab \| Lab counter \| microscopy/);
+
+  const after = toolNames(provider, 2);
+  expect(after.slice(0, first.length)).toEqual(first);
+  expect(after.slice(first.length)).toEqual(expect.arrayContaining(["blur", "count", "state"]));
+  expect(provider.requests[2].system).toMatch(/Count each image twice/);
+  expect(provider.requests[2].system).toMatch(/recount: Count again with another method/);
+  const loadText = JSON.stringify(provider.requests[2].messages.at(-1));
+  expect(loadText).toMatch(/Loaded the adapter lab 0\.2\.0/);
+  expect(loadText).toMatch(/is a draft/);
+  expect(loadText).toMatch(/Smallest particle \(min_size\): 5/);
+
+  expect(asked[0]).toEqual({ key: "adapter", text: "The agent wants to use Lab counter through the lab adapter: The request names a lab image. The request names a.lab, and lab reads that file type.", options: expect.arrayContaining(["lab", "lab2"]) });
+  expect(asked[0].options[0]).toBe("lab");
+  expect(asked[1].key).toBe("method");
+  const node = session.record.nodes().find((n) => n.tool === "count" && !n.sensitivityOf)!;
+  expect(node.decisions.method).toBe("Triangle");
+  expect(node.decisions.min_size).toBe(5);
+  expect(session.decisions.value("adapter")).toBe("lab");
+  const loaded = session.record.entries(["adapter"]);
+  expect(loaded).toHaveLength(1);
+  expect(loaded[0].data).toMatchObject({ name: "lab", version: "0.2.0", programVersion: "1.0", reason: "The request names a lab image", by: "human", status: "draft", programFound: null });
+  expect(session.record.entries(["setup"]).at(-1)!.data).toMatchObject({ values: { min_size: 5 }, adapter: "lab", defaultsAccepted: ["min_size"] });
+  expect(session.record.entries(["session"])[0].data.pick).toBe(true);
+});
+
+test("a second load of the same adapter does nothing; an agent-owned program choice loads without a card; resume loads it again", async () => {
+  const cwd = pickCwd();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd });
+  session.decisions.applySetup({});
+  session.setOwner("adapter", "agent");
+  const r = await session.useAdapter("lab", "it reads .lab files");
+  expect(r.ok).toBe(true);
+  const again = await session.useAdapter("lab", "again");
+  expect(again).toMatchObject({ ok: true, summary: "The adapter lab is already loaded. Nothing changed." });
+  expect(session.record.entries(["question"])).toHaveLength(0);
+  expect(session.record.entries(["adapter"])).toHaveLength(1);
+  expect(session.record.entries(["decision"]).find((e) => e.data.key === "adapter")!.data).toMatchObject({ new: "lab", by: "agent", reason: "it reads .lab files" });
+  expect(session.allTools().filter((t) => t.name === "count")).toHaveLength(1);
+  const id = session.id;
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
+  expect(session.pick).toBe(true);
+  expect(session.adapters.map((a) => a.name)).toEqual(["lab"]);
+  expect(session.allTools().map((t) => t.name)).toEqual(expect.arrayContaining(["count", "use_adapter"]));
+  expect(session.decisions.value("adapter")).toBe("lab");
+});
+
+test("the answers file can change the program choice", async () => {
+  const cwd = pickCwd();
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { headless: true } });
+  attachHeadless(session, { answers: { adapter: "lab2" }, allow: new Set() });
+  applyHeadlessSetup(session, undefined, { adapter: "lab2" });
+  const r = await session.useAdapter("lab", "it reads .lab files");
+  expect(r.ok).toBe(true);
+  expect(r.text).toMatch(/The scientist chose lab2 instead of lab/);
+  expect(session.adapters.map((a) => a.name)).toEqual(["lab2"]);
+  expect(session.record.entries(["adapter"])[0].data.reason).toMatch(/chosen by the scientist instead of lab/);
+  expect(session.record.entries(["answer"]).at(-1)!.data.note).toBe("answered from the answers file");
+  expect(session.decisions.value("adapter")).toBe("lab2");
+});
+
+test("blind mode adds a mid-session adapter folder to the allow list and hides it from the file tools", async () => {
+  const cwd = pickCwd();
+  setBlindPolicy({ allow: [cwd], deny: [] });
+  try {
+    session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd });
+    session.decisions.applySetup({});
+    session.setOwner("adapter", "agent");
+    await session.useAdapter("lab", "test");
+    const p = blindPolicy()!;
+    const root = session.adapters[0].root;
+    expect(p.allow).toContain(canonical(root));
+    expect(p.hide).toContain(canonical(root));
+  } finally {
+    setBlindPolicy(undefined);
+  }
+});
+
+test("with --adapter, the session has no adapter tools and no program decision", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: tmpdir() });
+  expect(session.pick).toBe(false);
+  expect(session.allTools().map((t) => t.name)).not.toContain("use_adapter");
+  expect(session.decisions.has("adapter")).toBe(false);
 });

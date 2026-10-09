@@ -83,7 +83,9 @@ or tool name is an error. Two map entries with the same tool and the same `match
 | `title` | text | `""` | Name for people to read. |
 | `version` | text | `0.1.0` | Version of this adapter. |
 | `spec` | text | `1` | Version of this spec. |
-| `description` | text | `""` | One sentence. |
+| `description` | text | `""` | One sentence. `list_adapters` shows the first sentence. |
+| `field` | text | `""` | The science field, such as `statistics` or `mass spectrometry imaging`. `list_adapters` shows it. |
+| `file_types` | list of text | `[]` | The input files that the adapter reads. An entry that starts with a dot is a file ending, such as `.bam` or `.vcf.gz`. Another entry is a file name, such as `quant.sf` or `matrix.mtx.gz`. Case does not matter. Put the main type first. The harness uses the list for the file-type hint and for the other options on the program card. |
 | `authors` | list of text | `[]` | Who wrote the adapter. |
 | `status` | `draft`, `approved`, `locked` | `draft` | Approval state. See "Versioning and approval". |
 | `approved_by` | text | `""` | Who approved the adapter. |
@@ -98,6 +100,7 @@ or tool name is an error. Two map entries with the same tool and the same `match
 | `tested_versions` | list of text | `[]` | Versions that passed the known-answer tests. |
 | `homepage` | text | `""` | Web address. |
 | `docs` | list of text | `[]` | Documentation addresses. |
+| `install` | text | `""` | How to install the program, in one or two sentences. If the program is not found when the agent loads the adapter, the harness shows this text. If it is empty, the harness makes a hint from `homepage` and `locate`. |
 
 ### `locate`
 
@@ -358,6 +361,29 @@ tests:
 | --- | --- | --- | --- |
 | `cloud_visibility` | `all`, `summaries`, `none` | `all` | What a cloud model can see: all results, only summaries and metrics, or nothing. |
 | `note` | text | `""` | Reason, for example a data use agreement. |
+
+## Loading an adapter during a session
+
+With no `--adapter`, a session starts with the generic tools and two harness tools:
+
+- `list_adapters(filter?)` lists each adapter: name, program, field, the first sentence of the
+  description, `file_types`, status, and whether the harness finds the program. The program check
+  uses `locate` with no version command, and runs once for each adapter in a session.
+- `use_adapter(name, reason)` loads one adapter: its tools, standards, skills, decisions, checks
+  and hooks, the same as `--adapter`.
+
+The choice of program is a decision with the key `adapter`. The scientist owns it by default, so
+`use_adapter` opens a card: "The agent wants to use <program> through the <adapter> adapter:
+<reason>." The other options are the adapters that share a file type with it. The scientist
+accepts or picks another. If the scientist gives the decision to the agent, the load goes ahead
+and the record shows an agent choice. In a headless run, the answers file can set it, such as
+`"adapter": "biostats"`. `--adapter` still names the adapters before the start, with no card.
+
+After a load, the record has an `adapter` entry with the name, the adapter version, the program
+version, the reason and who chose it. Setup-stage decisions of the new adapter get their defaults,
+or the values from the setup and answers files, in a new `setup` entry. New tools go to the end of
+the tool list. A second load of the same adapter does nothing. In blind mode, the folder of the
+adapter and the install folder of its program go on the allow list.
 
 ## Tool results
 

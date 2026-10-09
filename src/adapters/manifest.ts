@@ -14,6 +14,7 @@ const Program = z.strictObject({
   tested_versions: z.array(z.string()).default([]),
   homepage: z.string().default(""),
   docs: z.array(z.string()).default([]),
+  install: z.string().default(""),
 });
 
 const Locate = z.strictObject({
@@ -167,6 +168,8 @@ const AdapterInfo = z.strictObject({
   version: z.string().default("0.1.0"),
   spec: z.string().default(SPEC_VERSION),
   description: z.string().default(""),
+  field: z.string().default(""),
+  file_types: z.array(z.string()).default([]),
   authors: z.array(z.string()).default([]),
   status: z.enum(["draft", "approved", "locked"]).default("draft"),
   approved_by: z.string().default(""),

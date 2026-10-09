@@ -78,7 +78,7 @@ async function versionOf(m: Manifest, path: string | undefined): Promise<string>
   return text.trim().split(/\r?\n/)[0] || fallback;
 }
 
-export async function locate(manifest: Manifest): Promise<Located> {
+export function findProgram(manifest: Manifest): { path?: string; how: string } {
   const l = manifest.locate;
   let path: string | undefined;
   let how = "not found";
@@ -107,5 +107,10 @@ export async function locate(manifest: Manifest): Promise<Located> {
       }
     }
   }
+  return { path, how };
+}
+
+export async function locate(manifest: Manifest): Promise<Located> {
+  const { path, how } = findProgram(manifest);
   return { path, version: await versionOf(manifest, path), how };
 }

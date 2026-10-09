@@ -36,16 +36,27 @@ const MODES: Record<Mode, string> = {
   plan: "Mode: plan. Make a plan with the plan tool. You can run only read-only tools. Do not run analysis steps.",
 };
 
+const PICK = `# Programs
+The session started with no program adapter. An adapter gives the tools, standards, skills and decisions of one science program.
+- Look at the request and the files that it names.
+- Call list_adapters. Then call use_adapter with the adapter that fits and the reason.
+- The choice of program belongs to the scientist. use_adapter shows your choice and your reason to the scientist, who accepts it or picks another adapter. Do not ask about the program with ask_scientist.
+- Load only the adapters that the request needs. You can load a second adapter later.
+- Do not guess tool names. The program tools appear after use_adapter.
+- If no adapter fits, say so and use the generic tools.`;
+
 export function systemPrompt(opts: {
   adapters: { adapter: LoadedAdapter; programVersion: string; instructions: string }[];
   model: ModelInfo;
   mode: Mode;
   lab: string;
   guidance: boolean;
+  pick?: boolean;
 }): string {
-  if (!opts.guidance) return "You are a data analysis agent. Use the tools to answer the scientist's request.";
+  if (!opts.guidance) return "You are a data analysis agent. Use the tools to answer the scientist's request." + (opts.pick ? " Call list_adapters, then use_adapter to load the program tools that fit the request." : "");
   const small = opts.model.small;
   const parts = [small ? SMALL_RULES : RULES, MODES[opts.mode]];
+  if (opts.pick) parts.push(PICK);
   for (const { adapter, programVersion, instructions } of opts.adapters) {
     const m = adapter.manifest;
     const lines = [`# Program: ${m.adapter.title || m.program.name} ${programVersion || m.program.version}`.trim()];

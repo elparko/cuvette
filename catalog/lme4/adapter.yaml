@@ -1,5 +1,7 @@
 adapter:
   name: lme4
+  field: statistics
+  file_types: [".csv"]
   title: lme4 (linear mixed models)
   version: 0.1.0
   spec: "1"

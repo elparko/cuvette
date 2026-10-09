@@ -1,5 +1,7 @@
 adapter:
   name: bcftools
+  field: genomics
+  file_types: [".vcf", ".vcf.gz", ".bcf"]
   title: bcftools
   version: 0.1.0
   spec: "1"

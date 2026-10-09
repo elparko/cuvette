@@ -1,5 +1,7 @@
 adapter:
   name: qgis
+  field: geospatial
+  file_types: [".geojson", ".gpkg", ".shp", ".tif"]
   title: QGIS Processing
   version: 0.1.0
   spec: "1"

@@ -1,5 +1,7 @@
 adapter:
   name: deseq2
+  field: transcriptomics
+  file_types: ["quant.sf", "abundance.tsv", ".genes.results", ".rds"]
   title: DESeq2 (RNA-seq differential expression)
   version: 0.2.0
   spec: "1"

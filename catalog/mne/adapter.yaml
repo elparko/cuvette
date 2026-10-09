@@ -1,5 +1,7 @@
 adapter:
   name: mne
+  field: neurophysiology
+  file_types: [".fif", ".edf", ".bdf", ".set", ".vhdr"]
   title: MNE-Python
   version: 0.1.2
   spec: "1"

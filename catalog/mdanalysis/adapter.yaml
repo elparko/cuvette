@@ -1,5 +1,7 @@
 adapter:
   name: mdanalysis
+  field: structural biology
+  file_types: [".pdb", ".dcd", ".psf", ".xtc", ".gro", ".cif"]
   title: MDAnalysis and Bio.PDB
   version: 0.1.0
   spec: "1"

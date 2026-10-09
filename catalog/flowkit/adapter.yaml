@@ -1,5 +1,7 @@
 adapter:
   name: flowkit
+  field: flow cytometry
+  file_types: [".fcs", ".wsp"]
   title: FlowKit (flow cytometry)
   version: 0.1.0
   spec: "1"

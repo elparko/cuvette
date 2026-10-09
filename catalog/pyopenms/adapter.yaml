@@ -1,5 +1,7 @@
 adapter:
   name: pyopenms
+  field: metabolomics
+  file_types: [".mzml"]
   title: pyOpenMS for LC-MS files and formula masses
   version: 0.1.3
   description: Reads mzML files, picks peaks, finds LC-MS features with the OpenMS metabolite feature finder, and calculates monoisotopic masses, adduct m/z values and isotope patterns of a formula.

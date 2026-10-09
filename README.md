@@ -18,6 +18,20 @@ node bin/ga.js --help
 node bin/ga.js adapters
 ```
 
+### With no adapter
+
+```bash
+node bin/ga.js --model claude
+node bin/ga.js -p "Is drug 2 better than drug 1? Paired data: /data/sleep.csv" --model claude --answers answers.json
+```
+
+With no `--adapter`, the agent reads the request, calls `list_adapters`, and asks to load the
+adapter that fits with `use_adapter`. The choice of program is your decision: a card shows the
+adapter, the reason, and the other adapters that read the same file types. When the request
+names files, the harness adds a one-line hint with the adapters for those file types. The
+record keeps each load and its reason. In a run without the terminal UI, `"adapter": "biostats"`
+in the answers file answers the card. `--adapter <name>` still loads adapters before the start.
+
 ### With Claude
 
 ```bash

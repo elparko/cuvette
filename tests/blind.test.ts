@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { agentRules, blindArgv, blindCheck, blindPolicy, canonical, decide, pathsIn, sandboxDenials, sandboxReadRules, setBlindPolicy } from "../src/adapters/blind.ts";
+import { agentRules, allowAdapter, blindArgv, blindCheck, blindPolicy, canonical, decide, pathsIn, sandboxDenials, sandboxReadRules, setBlindPolicy } from "../src/adapters/blind.ts";
 import { runProcess } from "../src/adapters/kinds/common.ts";
 import type { Entry, ToolContext } from "../src/core/types.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
@@ -106,4 +106,15 @@ test.runIf(darwin)("run_script under blind mode reads the data, cannot read the 
   expect(bad.ok).toBe(false);
   expect(bad.text).not.toContain("0.752");
   expect(logged).toContainEqual({ kind: "blocked", data: expect.objectContaining({ path, reason: "blind mode", tool: "run_script" }) });
+});
+
+test("a mid-session adapter adds its folder and the install root of its program to the allow list", () => {
+  expect(allowAdapter(adapter, "/x/bin/tool")).toBeUndefined();
+  setBlindPolicy({ allow: [data], deny: [join(root, "repo")], hide: [] });
+  const p = allowAdapter(adapter, join(root, "envs", "tool", "bin", "python"))!;
+  expect(p.allow).toEqual(expect.arrayContaining([data, adapter, join(root, "envs", "tool")]));
+  expect(p.hide).toContain(adapter);
+  expect(blindPolicy()).toBe(p);
+  expect(blindCheck({ name: "read_file", source: "generic" }, { path: join(adapter, "skill.md") })).toBeDefined();
+  expect(decide(join(adapter, "skill.md"), p)).toBe("allow");
 });

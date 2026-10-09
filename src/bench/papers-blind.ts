@@ -1,14 +1,14 @@
 import { existsSync, statSync } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { agentRules, BLIND_REASON, canonical, decide, pathsIn, sandboxDenials, type BlindPolicy } from "../adapters/blind.ts";
+import { agentRules, BLIND_REASON, decide, installRoot, T7_ROOT, pathsIn, sandboxDenials, type BlindPolicy } from "../adapters/blind.ts";
 import { locate } from "../adapters/locate.ts";
 import { adapterDirs, loadAdapter } from "../adapters/manifest.ts";
 import type { Entry, Node } from "../core/types.ts";
 import { finalClaims } from "./papers-score.ts";
 import { dataRoot, fillPrompt, PAPERS_DIR, resolveData, type Paper } from "./papers-spec.ts";
 
-export const T7_ROOT = "/Volumes/T7/guided-analysis";
+export { T7_ROOT };
 export const REPO_DIR = resolve(PAPERS_DIR, "../..");
 const SYSTEM = ["/usr", "/bin", "/sbin", "/opt", "/Library", "/System", "/Applications", "/etc", "/private/etc", "/dev"];
 
@@ -51,18 +51,6 @@ export function dataFolders(paper: Paper): string[] {
     else if (isAbsolute(p)) out.add(existsSync(p) && statSync(p).isDirectory() ? p : dirname(p));
   }
   return [...out];
-}
-
-function installRoot(path: string): string[] {
-  const tools = join(T7_ROOT, "tools");
-  return [path, canonical(path)].map((p) => {
-    const rel = relative(tools, p);
-    if (rel && !rel.startsWith("..") && !isAbsolute(rel)) return join(tools, rel.split(sep)[0]);
-    const env = /^(.*\/envs\/[^/]+)\/bin\//.exec(p);
-    if (env) return env[1];
-    const bin = /^(.*)\/bin\/[^/]+$/.exec(p);
-    return bin ? bin[1] : dirname(p);
-  });
 }
 
 export async function adapterPaths(paper: Paper): Promise<{ roots: string[]; programs: string[] }> {

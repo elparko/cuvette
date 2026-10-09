@@ -1,5 +1,7 @@
 adapter:
   name: cellpose
+  field: microscopy
+  file_types: [".tif", ".tiff", ".png", ".jpg"]
   title: Cellpose
   version: 0.1.0
   spec: "1"

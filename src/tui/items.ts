@@ -121,6 +121,8 @@ export class Mapper {
         return line("▸", String(d.text ?? ""), undefined, true);
       case "notice":
         return line("▸", String(d.text ?? d.message ?? ""));
+      case "adapter":
+        return line("+", `Loaded the adapter ${d.name} ${d.version ?? ""}${d.programVersion ? ` (program ${d.programVersion})` : ""}${d.reason ? `: ${d.reason}` : ""}`, "cyan");
       case "error":
         return line("✗", String(d.message ?? d.text ?? "Error"), "red");
       case "usage":

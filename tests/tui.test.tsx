@@ -386,6 +386,12 @@ describe("pieces", () => {
     expect(inlineImage("/missing.png", "iterm")).toBeUndefined();
   });
 
+  test("mapper shows a line when the agent loads an adapter, with the reason", () => {
+    const s = new FakeSession({ delayMs: 0 });
+    const e = s.record.append("adapter", { name: "biostats", version: "0.1.1", programVersion: "0.30.0", reason: "a paired test on a CSV file" });
+    expect(new Mapper(s).map(e)).toEqual([{ key: `e${e.id}`, t: "line", sym: "+", color: "cyan", text: "Loaded the adapter biostats 0.1.1 (program 0.30.0): a paired test on a CSV file", dim: undefined }]);
+  });
+
   test("mapper numbers adapter steps and tracks outputs", () => {
     const s = new FakeSession({ delayMs: 0 });
     const m = new Mapper(s);

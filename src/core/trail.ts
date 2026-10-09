@@ -244,6 +244,8 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
   const d = e.data;
   const tech = (extra: Record<string, unknown> = {}) => ({ entry: e.id, kind: e.kind, ts: e.ts, ...extra });
   switch (e.kind) {
+    case "adapter":
+      return { icon: "setup", line: `Loaded the adapter ${show(d.name)} ${show(d.version ?? "")}${d.reason ? `: ${clip(String(d.reason))}` : ""}`, details: { programVersion: d.programVersion, status: d.status, programFound: d.programFound, tools: d.tools, notices: d.notices }, technical: tech() };
     case "setup":
       return { icon: "setup", line: setupLine(d), details: { values: d.values, profile: d.profile, how: d.how, defaultsAccepted: d.defaultsAccepted }, technical: tech() };
     case "sensitivity": {
@@ -350,14 +352,14 @@ interface Meta {
 function meta(record: AnalysisRecord): Meta {
   const all = record.entries();
   const s = record.entries(["session"])[0];
-  const list = (s?.data.adapters as { name: string; version?: string; programVersion?: string }[] | undefined) ?? [];
+  const list = [...((s?.data.adapters as { name: string; version?: string; programVersion?: string }[] | undefined) ?? []), ...record.entries(["adapter"]).map((e) => e.data as { name: string; version?: string; programVersion?: string })];
   const setups = record.entries(["setup"]);
   return {
     id: all[0]?.session ?? "",
     adapters: list.map((a) => `${a.name}${a.version ? " " + a.version : ""}${a.programVersion ? " (program " + a.programVersion + ")" : ""}`).join(", ") || "none",
     model: show(s?.data.model ?? "unknown"),
     date: (all[0]?.ts ?? new Date().toISOString()).slice(0, 10),
-    setup: asRecord(setups[setups.length - 1]?.data.values),
+    setup: Object.assign({}, ...setups.map((x) => asRecord(x.data.values))),
   };
 }
 

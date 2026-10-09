@@ -1,5 +1,7 @@
 adapter:
   name: mzmine
+  field: metabolomics
+  file_types: [".mzml", ".mzxml"]
   title: MZmine
   version: 0.1.0
   spec: "1"

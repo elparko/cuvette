@@ -1,5 +1,7 @@
 adapter:
   name: vegan
+  field: ecology
+  file_types: [".csv"]
   title: vegan (community ecology)
   version: 0.1.0
   spec: "1"

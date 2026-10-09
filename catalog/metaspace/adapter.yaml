@@ -1,5 +1,7 @@
 adapter:
   name: metaspace
+  field: mass spectrometry imaging
+  file_types: []
   title: METASPACE public annotations
   version: 0.1.5
   spec: "1"

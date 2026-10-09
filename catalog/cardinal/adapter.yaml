@@ -1,5 +1,7 @@
 adapter:
   name: cardinal
+  field: mass spectrometry imaging
+  file_types: [".imzml", ".ibd"]
   title: Cardinal (mass spectrometry imaging)
   version: 0.1.0
   spec: "1"

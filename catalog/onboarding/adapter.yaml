@@ -1,5 +1,7 @@
 adapter:
   name: onboarding
+  field: adapter authoring
+  file_types: []
   title: Onboarding a new program
   version: 0.1.0
   description: Finds a program, reads its help and docs, and writes an adapter folder for it.

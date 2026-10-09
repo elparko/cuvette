@@ -42,6 +42,16 @@ const QUESTION_DECISION: Decision = Decision.parse({
   stage: "setup",
 });
 
+export const ADAPTER_DECISION: Decision = Decision.parse({
+  key: "adapter",
+  label: "Program (adapter)",
+  kind: "text",
+  owner: "human",
+  group: "Method",
+  stage: "when_needed",
+  help: "The programs that do the analysis, as adapter names. The agent proposes one with use_adapter; the scientist accepts or changes it.",
+});
+
 export function getPath(obj: unknown, path: string): unknown {
   let cur: any = obj;
   for (const part of path.split(".")) {
@@ -131,7 +141,8 @@ export class DecisionRecord {
   private states = new Map<string, State>();
   private setupDone = false;
 
-  constructor(private adapters: LoadedAdapter[], private record: AnalysisRecord) {
+  constructor(private adapters: LoadedAdapter[], private record: AnalysisRecord, harness: Decision[] = []) {
+    for (const def of harness) this.states.set(def.key, { def, adapters: [], owner: def.owner, value: undefined, set: false });
     this.states.set(QUESTION_DECISION.key, {
       def: QUESTION_DECISION,
       adapters: [],
@@ -139,20 +150,47 @@ export class DecisionRecord {
       value: undefined,
       set: false,
     });
-    for (const a of adapters) {
-      for (const def of a.manifest.decisions) {
-        const s = this.states.get(def.key);
-        if (!s) this.states.set(def.key, { def, adapters: [a.name], owner: def.owner, value: undefined, set: false });
-        else {
-          if (s.adapters.length === 0) {
-            s.def = def;
-            s.owner = def.owner;
-          }
-          if (!s.adapters.includes(a.name)) s.adapters.push(a.name);
+    for (const a of adapters) this.register(a);
+    this.restore();
+  }
+
+  private register(a: LoadedAdapter): string[] {
+    const added: string[] = [];
+    for (const def of a.manifest.decisions) {
+      const s = this.states.get(def.key);
+      if (!s) {
+        this.states.set(def.key, { def, adapters: [a.name], owner: def.owner, value: undefined, set: false });
+        added.push(def.key);
+      } else {
+        if (s.adapters.length === 0) {
+          s.def = def;
+          s.owner = def.owner;
         }
+        if (!s.adapters.includes(a.name)) s.adapters.push(a.name);
       }
     }
-    this.restore();
+    return added;
+  }
+
+  addAdapter(a: LoadedAdapter, preset: Record<string, unknown> = {}, how = ""): string[] {
+    if (!this.adapters.includes(a)) this.adapters.push(a);
+    const added = this.register(a);
+    if (!this.setupDone) return added;
+    const values: Record<string, unknown> = {};
+    const defaultsAccepted: string[] = [];
+    for (const k of added) {
+      const s = this.state(k);
+      if (s.def.stage !== "setup") continue;
+      if (k in preset) values[k] = coerce(s.def, preset[k]);
+      else if (s.def.default !== undefined) {
+        values[k] = coerce(s.def, s.def.default);
+        defaultsAccepted.push(k);
+      }
+    }
+    if (!Object.keys(values).length) return added;
+    for (const [k, v] of Object.entries(values)) this.put(k, v);
+    this.record.append("setup", { values, owners: {}, profile: null, how: how || `when the adapter ${a.name} was loaded`, defaultsAccepted, adapter: a.name });
+    return added;
   }
 
   private restore(): void {
@@ -204,6 +242,10 @@ export class DecisionRecord {
       set: s.set,
       default: s.def.default,
     }));
+  }
+
+  has(key: string): boolean {
+    return this.states.has(key);
   }
 
   value(key: string): unknown {
@@ -348,8 +390,8 @@ export class DecisionRecord {
     return { args: out, applied, deviations, waiting };
   }
 
-  brief(): string {
-    const fields = this.fields();
+  brief(keys?: string[]): string {
+    const fields = this.fields().filter((f) => (!keys || keys.includes(f.key)) && f.key !== ADAPTER_DECISION.key);
     const lines: string[] = [];
     const groups = new Map<string, DecisionField[]>();
     for (const f of fields.filter((f) => f.set)) groups.set(f.group, [...(groups.get(f.group) ?? []), f]);

@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export interface BlindPolicy {
   allow: string[];
@@ -13,6 +13,7 @@ export interface BlindPolicy {
 type Rules = Pick<BlindPolicy, "allow" | "deny">;
 
 export const BLIND_REASON = "blind mode";
+export const T7_ROOT = "/Volumes/T7/guided-analysis";
 
 let active: BlindPolicy | undefined;
 
@@ -24,6 +25,24 @@ function probe(): "on" | "off" {
 
 export function setBlindPolicy(p: { allow: string[]; deny: string[]; hide?: string[] } | undefined): BlindPolicy | undefined {
   active = p ? { allow: unique(p.allow), deny: unique(p.deny), hide: unique(p.hide ?? []), sandbox: probe() } : undefined;
+  return active;
+}
+
+export function installRoot(path: string): string[] {
+  const tools = join(T7_ROOT, "tools");
+  return [path, canonical(path)].map((p) => {
+    const rel = relative(tools, p);
+    if (rel && !rel.startsWith("..") && !isAbsolute(rel)) return join(tools, rel.split(sep)[0]);
+    const env = /^(.*\/envs\/[^/]+)\/bin\//.exec(p);
+    if (env) return env[1];
+    const bin = /^(.*)\/bin\/[^/]+$/.exec(p);
+    return bin ? bin[1] : dirname(p);
+  });
+}
+
+export function allowAdapter(root: string, programPath?: string): BlindPolicy | undefined {
+  if (!active) return undefined;
+  active = { ...active, allow: unique([...active.allow, root, ...(programPath ? installRoot(programPath) : [])]), hide: unique([...active.hide, root]) };
   return active;
 }
 

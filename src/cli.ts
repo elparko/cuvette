@@ -9,8 +9,14 @@ const HELP = `ga - a guided analysis agent for science programs
 
 Usage
   ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume <id>]
-  ga -p "<request>" --adapter imagej --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json]
-  ga adapters                          list the adapters
+  ga -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json]
+
+  With no --adapter, the agent calls list_adapters and asks to load the adapter that fits
+  the request with use_adapter. The program is your decision: accept or change it on the
+  card, or set "adapter": "<name>" in the answers file. The record keeps each load and its
+  reason. With --adapter, the session has only the adapters that you name.
+
+  ga adapters                        list the adapters (name, kind, status, field, program)
   ga adapter check <name|dir> [--run-tests]
   ga adapter approve <name|dir> --by <name>
   ga onboard <program> --model <model> [--docs <url>] [--kind cli]
@@ -30,7 +36,7 @@ Usage
   ga bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run] [--no-blind]
   ga bench site --results a.json[,b.json] --out <folder>
   ga bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]
-  ga mcp                               run the harness as an MCP server on stdio
+  ga mcp [--adapter <name>]            run the harness as an MCP server on stdio (no --adapter: the client loads adapters with use_adapter)
 
 Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
 
@@ -102,7 +108,7 @@ async function interactive() {
   const { Session } = await import("./core/session.ts");
   const { runTui } = await import("./tui/app.tsx");
   const adapters = (o.adapter as string[]) ?? [];
-  if (!adapters.length && !o.resume) console.error("No adapter given. The agent can use only the generic tools. Use --adapter <name>; see `ga adapters`.");
+  if (!adapters.length && !o.resume) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
   const s = o.resume
     ? await Session.resume(str(o.resume)!, { model: str(o.model) })
     : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic });
@@ -124,7 +130,7 @@ async function main() {
         try {
           const a = loadAdapter(dir);
           const m = a.manifest;
-          console.log(`${name.padEnd(16)} ${m.connection.kind.padEnd(7)} ${m.adapter.status.padEnd(9)} ${m.program.name} ${m.program.tested_versions.join(", ")}  ${dir}`);
+          console.log(`${name.padEnd(16)} ${m.connection.kind.padEnd(7)} ${m.adapter.status.padEnd(9)} ${m.adapter.field.padEnd(28)} ${m.program.name} ${m.program.tested_versions.join(", ")}  ${dir}`);
         } catch (e) {
           console.log(`${name.padEnd(16)} invalid: ${(e as Error).message.split("\n")[0]}`);
         }
@@ -251,7 +257,8 @@ async function main() {
         const lines = readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
         const first = lines.find((e) => e.kind === "session");
         const ask = lines.find((e) => e.kind === "user");
-        console.log(`${id}  ${(first?.data.adapters ?? []).map((a: { name: string }) => a.name).join(",").padEnd(12)} ${String(first?.data.model ?? "").padEnd(18)} ${String(ask?.data.text ?? "").slice(0, 60)}`);
+        const used = [...(first?.data.adapters ?? []), ...lines.filter((e) => e.kind === "adapter").map((e) => e.data)];
+        console.log(`${id}  ${used.map((a: { name: string }) => a.name).join(",").padEnd(12)} ${String(first?.data.model ?? "").padEnd(18)} ${String(ask?.data.text ?? "").slice(0, 60)}`);
       }
       return;
     }

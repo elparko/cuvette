@@ -1,5 +1,7 @@
 adapter:
   name: rdkit
+  field: chemistry
+  file_types: [".csv"]
   title: RDKit descriptors, rule of five and solubility model
   version: 0.1.2
   description: Reads SMILES from a CSV file, computes descriptors, counts rule of five violations and fits or scores an ESOL solubility equation.

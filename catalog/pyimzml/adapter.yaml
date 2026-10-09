@@ -1,5 +1,7 @@
 adapter:
   name: pyimzml
+  field: mass spectrometry imaging
+  file_types: [".imzml", ".ibd"]
   title: pyimzML reader for imzML mass spectrometry imaging files
   version: 0.1.1
   description: Reads any imzML file with pyimzML. It gives file facts, the total ion current image, ion images at an m/z with a ppm window, the mean spectrum and the strongest peaks.

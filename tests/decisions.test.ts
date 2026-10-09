@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, test } from "vitest";
 import { Decision } from "../src/adapters/manifest.ts";
-import { DecisionRecord, decisionHook } from "../src/core/decisions.ts";
+import { ADAPTER_DECISION, DecisionRecord, decisionHook } from "../src/core/decisions.ts";
 
 class FakeRecord {
   items: any[] = [];
@@ -184,4 +184,32 @@ test("an empty value for a number decision means no limit", async () => {
   dr.applySetup({ px: "" });
   expect(dr.enforce("a", "warp", { px: 0.001 }).args.px).toBe(0.001);
   expect(() => dr.applySetup({ px: "abc" })).toThrow(/must be a number/);
+});
+
+test("an adapter added after the setup records its setup defaults and the answers-file values in a new setup entry", () => {
+  dr.applySetup({ question: "q" });
+  const added = dr.addAdapter(adapter("y", [
+    { key: "tol", label: "Tolerance", kind: "float", default: 9 },
+    { key: "alpha", label: "Alpha", kind: "float", default: 0.05 },
+    { key: "test", label: "Test", kind: "choice", choices: ["t", "w"], default: "t" },
+    { key: "pairs", label: "Pairs", kind: "text", stage: "when_needed" },
+  ]), { test: "w", unrelated: 1 });
+  expect(added).toEqual(["alpha", "test", "pairs"]);
+  expect(dr.value("alpha")).toBe(0.05);
+  expect(dr.value("test")).toBe("w");
+  expect(dr.isSet("pairs")).toBe(false);
+  expect(dr.fields().find((f) => f.key === "tol")!.adapters).toEqual(["x", "y"]);
+  const setup = rec.entries(["setup"]).at(-1).data;
+  expect(setup).toMatchObject({ values: { alpha: 0.05, test: "w" }, defaultsAccepted: ["alpha"], adapter: "y" });
+  expect(dr.brief(added)).toMatch(/Alpha \(alpha\): 0\.05/);
+  expect(dr.brief(added)).not.toMatch(/Tolerance/);
+});
+
+test("before the setup, an added adapter only registers its decisions; the program decision stays out of the brief", () => {
+  const d2 = new DecisionRecord([], rec as any, [ADAPTER_DECISION]);
+  expect(d2.addAdapter(adapter("z", [{ key: "k", label: "K", kind: "int", default: 3 }]))).toEqual(["k"]);
+  expect(d2.isSet("k")).toBe(false);
+  expect(rec.entries(["setup"])).toHaveLength(0);
+  expect(d2.has("adapter")).toBe(true);
+  expect(d2.brief()).not.toMatch(/Program/);
 });

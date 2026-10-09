@@ -1,5 +1,7 @@
 adapter:
   name: samtools
+  field: genomics
+  file_types: [".bam", ".sam", ".cram"]
   title: samtools
   version: 0.1.2
   spec: "1"

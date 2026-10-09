@@ -99,6 +99,10 @@ export class HookRunner {
     private cwd: string = process.cwd(),
   ) {}
 
+  add(hooks: Hook[]): void {
+    this.hooks.push(...hooks);
+  }
+
   private runners(event: HookEvent, name: unknown): Runner[] {
     const builtin = this.hooks
       .filter((h) => h.event === event && matches(h.matcher, name))

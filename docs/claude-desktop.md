@@ -34,6 +34,10 @@ The harness keeps the decision record, the question queue, and the audit trail.
 
 To use more than one adapter, repeat the option: `"--adapter", "imagej", "--adapter", "smile-msi"`.
 To use an adapter from a folder, give the folder path.
+With no `--adapter`, the server has `list_adapters` and `use_adapter`. The first `use_adapter`
+call returns BLOCKED and opens a question about the program. Answer it with `ga_answer` after
+the scientist chooses, then call `use_adapter` again. The server then adds the adapter tools to
+the tool list and sends a tool list change notice.
 
 ## Tools
 

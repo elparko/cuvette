@@ -8,7 +8,7 @@ import { FakeProvider } from "./providers/fake.ts";
 
 type Handler = (a: Args) => Promise<{ text: string; isError?: boolean }>;
 
-const SHARED = new Set(["read_file", "list_dir", "load_skill", "note", "plan", "propose_change", "compare_options", "calculate"]);
+const SHARED = new Set(["read_file", "list_dir", "load_skill", "note", "plan", "propose_change", "compare_options", "calculate", "list_adapters", "use_adapter"]);
 
 export async function runMcpServer(opts: { adapters: string[] }) {
   const session = await Session.create({
@@ -23,19 +23,28 @@ export async function runMcpServer(opts: { adapters: string[] }) {
   const json = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v, null, 1));
   const defs: { name: string; description: string; inputSchema: Record<string, unknown>; annotations?: Record<string, unknown>; run: Handler }[] = [];
   let n = 0;
-  for (const tool of session.allTools()) {
-    if (tool.source !== "adapter" && !SHARED.has(tool.name)) continue;
-    defs.push({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-      annotations: { readOnlyHint: !!tool.readOnly, title: tool.title },
-      run: async (a) => {
-        const r = await session.pipeline(tool, a, `mcp${++n}`, new AbortController().signal);
-        return { text: r.text, isError: r.isError };
-      },
-    });
-  }
+  let server: Server | undefined;
+  const addSessionTools = () => {
+    for (const tool of session.allTools()) {
+      if ((tool.source !== "adapter" && !SHARED.has(tool.name)) || defs.some((d) => d.name === tool.name)) continue;
+      defs.push({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: { readOnlyHint: !!tool.readOnly, title: tool.title },
+        run: async (a) => {
+          const before = session.adapters.length;
+          const r = await session.pipeline(tool, a, `mcp${++n}`, new AbortController().signal);
+          if (session.adapters.length > before) {
+            addSessionTools();
+            await server?.sendToolListChanged().catch(() => {});
+          }
+          return { text: r.text, isError: r.isError };
+        },
+      });
+    }
+  };
+  addSessionTools();
   const obj = (props: Record<string, unknown>, required: string[] = []) => ({ type: "object", properties: props, required });
   defs.push(
     {
@@ -83,12 +92,13 @@ export async function runMcpServer(opts: { adapters: string[] }) {
       },
     },
   );
-  const server = new Server(
+  server = new Server(
     { name: "guided-analysis", version: "0.1.0" },
     {
-      capabilities: { tools: {} },
+      capabilities: { tools: { listChanged: true } },
       instructions:
-        "Guided analysis harness. Program tools run under the scientist's decision record: the harness fills decisions, logs deviations, and blocks a call when a decision belongs to the scientist. Call ga_setup first. Ask the scientist before you call ga_answer. Each result has a manual route that the scientist can repeat by hand.",
+        "Guided analysis harness. Program tools run under the scientist's decision record: the harness fills decisions, logs deviations, and blocks a call when a decision belongs to the scientist. Call ga_setup first. Ask the scientist before you call ga_answer. Each result has a manual route that the scientist can repeat by hand." +
+        (session.pick ? " No adapter is loaded at the start. Call list_adapters, then use_adapter with the adapter that fits the request. The program tools of that adapter are added to the tool list." : ""),
     },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

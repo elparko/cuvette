@@ -1,5 +1,7 @@
 adapter:
   name: sage
+  field: proteomics
+  file_types: [".mzml", ".fasta"]
   title: Sage peptide search
   version: 0.1.1
   spec: "1"

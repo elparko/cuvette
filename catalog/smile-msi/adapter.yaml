@@ -1,5 +1,7 @@
 adapter:
   name: smile-msi
+  field: mass spectrometry imaging
+  file_types: [".imzml", ".ibd"]
   title: SMILE MSI
   version: 0.1.0
   description: MALDI mass spectrometry imaging of lipids. The agent uses the SMILE MSI engine through its MCP server. Each

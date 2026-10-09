@@ -1,5 +1,7 @@
 adapter:
   name: bftools
+  field: microscopy
+  file_types: [".czi", ".nd2", ".lif", ".lsm", ".oib", ".vsi", ".ome.tif", ".ome.tiff"]
   title: Bio-Formats command line tools
   version: 0.1.0
   spec: "1"

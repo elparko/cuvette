@@ -144,3 +144,14 @@ test("replay without a session dir reports no differences, and a missing input t
   expect(out.steps.every((s) => s.diffs.length === 0 && s.before === undefined)).toBe(true);
   await expect(replayFlow(flowPath, { input_1: a }, { runtimeFactory: rt.factory })).rejects.toThrow(/input_2/);
 });
+
+test("the protocol lists the programs that the agent loaded, with the reason, and the later decisions", () => {
+  const r = new AnalysisRecord(mkdtempSync(join(tmpdir(), "ga-exp-pick-")), "s2");
+  r.append("setup", { values: { question: "q" } });
+  r.append("decision", { key: "adapter", old: null, new: "biostats", by: "human", reason: "answer to q1" });
+  r.append("adapter", { name: "biostats", version: "0.1.1", programVersion: "0.30.0", reason: "The request is a paired test on a CSV file." });
+  const md = readFileSync(exportProtocol(r, [], join(dir, "p2.md")), "utf8");
+  expect(md).toContain("| Program (adapter) | biostats |");
+  expect(md).toContain("## Programs");
+  expect(md).toContain("- biostats adapter 0.1.1, program 0.30.0: The request is a paired test on a CSV file.");
+});

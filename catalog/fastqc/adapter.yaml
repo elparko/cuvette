@@ -1,5 +1,7 @@
 adapter:
   name: fastqc
+  field: genomics
+  file_types: [".fastq", ".fq", ".fastq.gz", ".fq.gz"]
   title: FastQC
   version: 0.1.1
   spec: "1"

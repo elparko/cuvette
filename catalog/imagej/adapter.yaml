@@ -1,5 +1,7 @@
 adapter:
   name: imagej
+  field: microscopy
+  file_types: [".tif", ".tiff", ".png", ".jpg"]
   title: ImageJ
   version: 0.1.0
   spec: "1"

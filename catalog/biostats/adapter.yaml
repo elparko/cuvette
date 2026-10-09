@@ -1,5 +1,7 @@
 adapter:
   name: biostats
+  field: statistics
+  file_types: [".csv", ".tsv"]
   title: Biostatistics (statsmodels, pingouin, lifelines)
   version: 0.1.1
   spec: "1"

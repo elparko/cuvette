@@ -22,6 +22,7 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
 export function applyHeadlessSetup(s: Session, setup: Record<string, unknown> | undefined, answers: Record<string, unknown>): void {
   const setupKeys = new Set(s.decisions.fields().filter((f) => f.stage === "setup").map((f) => f.key));
   const fromAnswers = Object.fromEntries(Object.entries(answers).filter(([k]) => setupKeys.has(k)));
+  s.setupPreset = { ...answers, ...(setup ?? {}) };
   if (setup || Object.keys(fromAnswers).length || s.setupNeeded())
     s.decisions.applySetup({ ...fromAnswers, ...(setup ?? {}) }, { how: setup || Object.keys(fromAnswers).length ? "from the setup and answers files" : "defaults accepted (headless)" });
 }

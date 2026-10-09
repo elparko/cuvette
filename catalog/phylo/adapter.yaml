@@ -1,5 +1,7 @@
 adapter:
   name: phylo
+  field: phylogenetics
+  file_types: [".fasta", ".fa", ".phy", ".aln"]
   title: MAFFT and IQ-TREE
   version: 0.1.1
   spec: "1"

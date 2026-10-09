@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const root = resolve(__dirname, "..");
 const ga = join(root, "bin/ga.js");
@@ -16,10 +17,10 @@ let home = "";
 const transportErrors: Error[] = [];
 const stderr: string[] = [];
 
-async function connect(adapter: string) {
+async function connect(adapter?: string) {
   const transport = new StdioClientTransport({
     command: "node",
-    args: [ga, "mcp", "--adapter", adapter],
+    args: [ga, "mcp", ...(adapter ? ["--adapter", adapter] : [])],
     env: { ...(process.env as Record<string, string>), GA_HOME: home },
     stderr: "pipe",
   });
@@ -61,6 +62,34 @@ test("lists adapter tools with their schemas and the ga tools", async () => {
     expect(t.inputSchema.type).toBe("object");
     expect(t.description).toBeTruthy();
   }
+  expect(transportErrors).toEqual([]);
+});
+
+test("with no adapter, the client lists the adapters, the scientist answers the program card, and the tool list grows", async () => {
+  mkdirSync(join(home, "adapters"), { recursive: true });
+  symlinkSync(lab, join(home, "adapters", "lab"));
+  const c = await connect();
+  const changed: number[] = [];
+  c.setNotificationHandler(ToolListChangedNotificationSchema, async () => void changed.push(1));
+  expect(c.getInstructions()).toMatch(/list_adapters/);
+  const names = (await c.listTools()).tools.map((t) => t.name);
+  expect(names).toEqual(expect.arrayContaining(["list_adapters", "use_adapter", "ga_setup"]));
+  expect(names).not.toContain("count");
+  expect((await call("list_adapters", { filter: "lab" })).text).toMatch(/- lab \| Lab counter/);
+  await call("ga_setup", { values: { question: "q" } });
+  const blocked = await call("use_adapter", { name: "lab", reason: "it counts particles" });
+  expect(blocked.isError).toBe(true);
+  expect(blocked.text).toMatch(/BLOCKED: the choice of program belongs to the scientist/);
+  const open = JSON.parse((await call("ga_questions")).text) as { qid: string; text: string }[];
+  expect(open[0].text).toBe("The agent wants to use Lab counter through the lab adapter: it counts particles.");
+  await call("ga_answer", { qid: open[0].qid, value: "lab" });
+  const ok = await call("use_adapter", { name: "lab", reason: "it counts particles" });
+  expect(ok.isError).toBe(false);
+  expect(ok.text).toMatch(/Loaded the adapter lab/);
+  const after = (await c.listTools()).tools.map((t) => t.name);
+  expect(after.slice(0, names.length)).toEqual(names);
+  expect(after).toEqual(expect.arrayContaining(["count", "blur"]));
+  await vi.waitFor(() => expect(changed.length).toBeGreaterThan(0));
   expect(transportErrors).toEqual([]);
 });
 
