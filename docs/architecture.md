@@ -107,14 +107,17 @@ docs/adapter-spec.md docs/onboarding-guide.md                                   
 
 ## Session folder
 
-`CUVETTE_HOME/sessions/<id>/`: `log.jsonl` (the record), `blobs/<sha256><ext>`, `work/` (the
-adapters write here), `exports/`. A session id is `YYYYMMDD-HHMMSS-<4 hex>`.
+A session folder is `<project>/cuvette/<date>-<title>/`. The adapters write results and exports in this folder.
+The record is in `.record/`: `log.jsonl`, `blobs/<sha256><ext>` and `meta.json`.
+If the project folder is not writable, the session folder is in `CUVETTE_HOME/projects/<project>/`.
+A session from an older version is in `CUVETTE_HOME/sessions/<id>/` with `log.jsonl`, `blobs/`, `work/` and `exports/`.
+A session id is `YYYYMMDD-HHMMSS-<4 hex>`.
 
 ## AnalysisRecord (`core/record.ts`)
 
 ```ts
 class AnalysisRecord {
-  constructor(sessionDir: string, sessionId: string)   // reads an existing log.jsonl (resume)
+  constructor(sessionDir: string, sessionId: string)   // reads an existing log.jsonl (resume); sessionDir is .record/ in the session folder
   readonly dir: string; readonly workDir: string
   onAppend?: (e: Entry) => void
   append(kind: EntryKind, data: Record<string, unknown>, opts?: { refs?: number[]; node?: string }): Entry

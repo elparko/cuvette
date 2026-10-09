@@ -27,15 +27,15 @@ of each package. The sources are at the end.
 
 | Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
 | --- | --- | --- | --- | --- | --- |
-| GraphPad Prism | GraphPad (Dotmatics), commercial | Bar and scatter graphs, t-tests, one-way and two-way ANOVA with post hoc tests, nonparametric tests, dose-response fits. Third most named statistics program in papers (17.4%) [Q]. | R with ggplot2 (GPL-2 or GPL-3; MIT); statsmodels (BSD-3); pingouin (GPL-3); SciPy (BSD-3); jamovi (AGPL-3, GUI); JASP (AGPL-3, GUI) | `biostats`, `tables` | Partial. t-tests, one-way ANOVA, mixed models and survival are covered. Two-way ANOVA, repeated-measures ANOVA, Kruskal-Wallis with Dunn, Friedman and exact rank tests: this work. Dose-response, IC50 and 4PL fits: in progress by another agent. |
-| IBM SPSS Statistics | IBM, commercial | Menu-driven statistics for clinical and survey studies. Most named statistics program in papers (40.5%) [Q]. | PSPP (GPL-3, GUI clone); jamovi (AGPL-3); JASP (AGPL-3); statsmodels (BSD-3) | `biostats` | Partial. Repeated-measures ANOVA and rank tests: this work. Logistic regression, chi-square, Fisher and McNemar tests: in progress by another agent. |
-| SAS | SAS Institute, commercial | Clinical trials, epidemiology, regulatory submissions. 9.0% of papers [Q]. | R with survival (LGPL-2 or later); survRM2 (GPL-3); statsmodels (BSD-3); lifelines (MIT) | `biostats`, `lme4`, `trial-endpoints` | Partial. `trial-endpoints` covers the PROC FREQ risk difference, Mantel-Haenszel and non-inferiority work and the PROC PHREG and restricted mean survival time work. Survival and mixed models are covered. Logistic regression and power analysis: in progress by another agent. Regulatory output formats (CDISC) are open. |
-| Stata | StataCorp, commercial | Epidemiology and regression. 8.3% of papers [Q]. | R (GPL-2 or GPL-3); epitools (GPL-2 or later); statsmodels (BSD-3) | `biostats`, `epi-rates`, `trial-endpoints` | Partial. `epi-rates` covers the `ir`, `cs` and `dstdize` style work: exact rates, rate ratios and standardization. Logistic regression and meta-analysis: in progress by another agent. |
+| GraphPad Prism | GraphPad (Dotmatics), commercial | Bar and scatter graphs, t-tests, one-way and two-way ANOVA with post hoc tests, nonparametric tests, dose-response fits. Third most named statistics program in papers (17.4%) [Q]. | R with ggplot2 (GPL-2 or GPL-3; MIT); statsmodels (BSD-3); pingouin (GPL-3); SciPy (BSD-3); jamovi (AGPL-3, GUI); JASP (AGPL-3, GUI) | `biostats`, `tables` | Partial. t-tests, one-way ANOVA, mixed models and survival are covered. Two-way ANOVA, repeated-measures ANOVA, Kruskal-Wallis with Dunn, Friedman and exact rank tests: this work. Dose-response, IC50 and 4PL fits: `drc`. |
+| IBM SPSS Statistics | IBM, commercial | Menu-driven statistics for clinical and survey studies. Most named statistics program in papers (40.5%) [Q]. | PSPP (GPL-3, GUI clone); jamovi (AGPL-3); JASP (AGPL-3); statsmodels (BSD-3) | `biostats` | Partial. Repeated-measures ANOVA and rank tests: this work. Logistic regression, chi-square, Fisher and McNemar tests: `biostats` (fit_logistic, chi_square_test, fisher_exact, mcnemar_test). |
+| SAS | SAS Institute, commercial | Clinical trials, epidemiology, regulatory submissions. 9.0% of papers [Q]. | R with survival (LGPL-2 or later); survRM2 (GPL-3); statsmodels (BSD-3); lifelines (MIT) | `biostats`, `lme4`, `trial-endpoints` | Partial. `trial-endpoints` covers the PROC FREQ risk difference, Mantel-Haenszel and non-inferiority work and the PROC PHREG and restricted mean survival time work. Survival and mixed models are covered. Logistic regression: `biostats`. Power analysis: `pwr`. Regulatory output formats (CDISC) are open. |
+| Stata | StataCorp, commercial | Epidemiology and regression. 8.3% of papers [Q]. | R (GPL-2 or GPL-3); epitools (GPL-2 or later); statsmodels (BSD-3) | `biostats`, `epi-rates`, `trial-endpoints`, `metafor` | Partial. `epi-rates` covers the `ir`, `cs` and `dstdize` style work: exact rates, rate ratios and standardization. Logistic regression: `biostats`. Meta-analysis: `metafor`. |
 | OpenEpi | Emory University (Dean AG, Sullivan KM, Soe MM), free web tool | Rates, 2 by 2 tables, stratified tables and standardized rates. | epitools (GPL-2 or later); base R | `epi-rates` | This work: exact rate intervals, rate ratio, risk measures, attributable fractions, number needed to treat, direct and indirect standardization. Sample size and the web tool stay open. |
 | JMP | JMP Statistical Discovery (SAS), commercial | Design of experiments, exploratory statistics. 1.5% of papers [Q]. | R (GPL-2 or GPL-3); jamovi (AGPL-3); JASP (AGPL-3) | `biostats`, `tables` | Open for design of experiments. |
 | MATLAB | MathWorks, commercial | Custom analysis scripts for signals and images. 7.3% of papers [Q]. | GNU Octave (GPL-3); SciPy (BSD-3); scikit-image (BSD-3) | `scikit-image`, `mne` | Partial. No Octave adapter. The `run_script` tool runs Python. |
-| Excel Solver and Analysis ToolPak | Microsoft, commercial | Quick t-tests, regression, curve fits by Solver. Excel is in 6.6% of papers [Q]. | LibreOffice Calc Solver (MPL-2.0); scipy.optimize (BSD-3); statsmodels (BSD-3) | `tables`, `biostats` | Partial. Curve fits: in progress by another agent. |
-| G*Power | Heinrich Heine University Düsseldorf, free, closed | A priori power and sample size for grants and ethics boards. | pwr (GPL-3 or later); statsmodels.stats.power (BSD-3); pingouin (GPL-3) | none | In progress by another agent. |
+| Excel Solver and Analysis ToolPak | Microsoft, commercial | Quick t-tests, regression, curve fits by Solver. Excel is in 6.6% of papers [Q]. | LibreOffice Calc Solver (MPL-2.0); scipy.optimize (BSD-3); statsmodels (BSD-3) | `tables`, `biostats`, `drc` | Partial. Curve fits: `drc` (dose-response, standard curves, enzyme kinetics). |
+| G*Power | Heinrich Heine University Düsseldorf, free, closed | A priori power and sample size for grants and ethics boards. | pwr (GPL-3 or later); statsmodels.stats.power (BSD-3); pingouin (GPL-3) | `pwr` | Partial. The tools are power for t tests, proportions, chi-square tests, correlations and one-way ANOVA. Other G*Power test families are open. |
 | REDCap | Vanderbilt University, free for non-profits under a license, not open source | Electronic data capture. The analysis is done on the export. | REDCapR (MIT); PyCap (MIT); then R or pandas | `tables`, `biostats` (on the CSV export) | Covered for the analysis of a CSV export. No API connection. |
 | NVivo | Lumivero, commercial | Qualitative coding of interviews. Not quantitative work. | QualCoder (LGPL-3); Taguette (BSD-3) | none | Not in scope. |
 
@@ -43,10 +43,10 @@ of each package. The sources are at the end.
 
 | Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
 | --- | --- | --- | --- | --- | --- |
-| SoftMax Pro | Molecular Devices, commercial, comes with SpectraMax readers | ELISA 4PL and 5PL standard curves, kinetics. | drc (GPL-2); dr4pl (GPL-2 or later); plater (GPL-3); SciPy (BSD-3) | none | In progress by another agent. |
-| Gen5 | Agilent BioTek, commercial, comes with the reader | Plate kinetics, ELISA, growth curves. | drc (GPL-2); gcplyr (MIT); SciPy (BSD-3) | none | In progress by another agent. |
-| CFX Maestro | Bio-Rad, comes with CFX instruments | qPCR Cq, delta-delta Cq, melt curves. | qpcR (GPL-2 or later); pcr (GPL-3); HTqPCR (Artistic-2.0); NormqPCR (LGPL-3) | none | In progress by another agent. |
-| QuantStudio Design and Analysis | Thermo Fisher, closed | qPCR analysis. | qpcR, pcr, HTqPCR (as above) | none | In progress by another agent. |
+| SoftMax Pro | Molecular Devices, commercial, comes with SpectraMax readers | ELISA 4PL and 5PL standard curves, kinetics. | drc (GPL-2); dr4pl (GPL-2 or later); plater (GPL-3); SciPy (BSD-3) | `drc` | Partial. `drc` fits standard curves (4PL and 5PL) from a table of plate values. It does not read SoftMax Pro files. Kinetic reads are open. |
+| Gen5 | Agilent BioTek, commercial, comes with the reader | Plate kinetics, ELISA, growth curves. | drc (GPL-2); gcplyr (MIT); SciPy (BSD-3) | `drc`, `growthcurver` | Partial. `drc` fits standard curves and normalizes plates. `growthcurver` fits growth curves. Neither tool reads Gen5 files. |
+| CFX Maestro | Bio-Rad, comes with CFX instruments | qPCR Cq, delta-delta Cq, melt curves. | qpcR (GPL-2 or later); pcr (GPL-3); HTqPCR (Artistic-2.0); NormqPCR (LGPL-3) | `qpcr` | Partial. `qpcr` ranks reference genes, fits efficiency and gives relative expression from a table of Cq values. Melt curves are open. |
+| QuantStudio Design and Analysis | Thermo Fisher, closed | qPCR analysis. | qpcR, pcr, HTqPCR (as above) | `qpcr` | Partial (as for CFX Maestro). |
 | Seahorse Wave and Seahorse Analytics | Agilent, closed | Oxygen consumption rate (OCR), extracellular acidification rate (ECAR), Mito Stress Test. | ceas (MIT, R); seahtrue (Artistic-2.0, R) | none | Open. |
 | Synbiosis ProtoCOL, Interscience Scan | Synbiosis, Interscience, commercial, with the counter hardware | Colony counts on agar plates and clonogenic dishes. | OpenCFU (GPL-3); Fiji Analyze Particles (GPL-3); scikit-image (BSD-3) | `image-assays` | Covered for plate photos: colony counts with a QC overlay, hand-count comparison, plating efficiency and surviving fraction. |
 
@@ -69,7 +69,7 @@ of each package. The sources are at the end.
 | NIS-Elements | Nikon, commercial (the viewer is free, closed) | Acquisition and analysis, `.nd2` files. | Bio-Formats (GPL-2); nd2 (BSD-3); napari (BSD-3) | `bftools`, `imagej`, `calcium-imaging` | Covered for file reading and 2D analysis. Calcium traces from the Time Measurement export are covered by `calcium-imaging`. |
 | ZEN | Carl Zeiss, commercial (ZEN lite is free, closed) | Acquisition and analysis, `.czi` files. | Bio-Formats (GPL-2); czifile (BSD-3) | `bftools`, `imagej`, `calcium-imaging` | Covered for file reading and 2D analysis. Calcium traces from the exported ROI table are covered by `calcium-imaging`. |
 | LAS X | Leica, commercial | Confocal acquisition and analysis, `.lif` files. | Bio-Formats (GPL-2); readlif (GPL-3) | `bftools`, `imagej` | Covered for file reading and 2D analysis. |
-| Harmony and Columbus | Revvity, commercial. Columbus reached end of life on 2024-03-25. | High-content screening on Operetta and Opera Phenix. | CellProfiler (BSD-3); Cellpose (BSD-3); Fiji (GPL-3) | `cellprofiler`, `cellpose`, `image-assays` | Partial. Nuclei counts, positive-cell fractions, cargo per cell and phagocytic indices are covered by `image-assays` (count_cell_uptake) with `cellpose` labels as an option. Plate-level quality (Z' factor): in progress by another agent. |
+| Harmony and Columbus | Revvity, commercial. Columbus reached end of life on 2024-03-25. | High-content screening on Operetta and Opera Phenix. | CellProfiler (BSD-3); Cellpose (BSD-3); Fiji (GPL-3) | `cellprofiler`, `cellpose`, `image-assays` | Partial. Nuclei counts, positive-cell fractions, cargo per cell and phagocytic indices are covered by `image-assays` (count_cell_uptake) with `cellpose` labels as an option. Plate-level quality (Z' factor): `drc` (normalize_plate). |
 | HALO | Indica Labs, commercial | Digital pathology scoring: positive cells, H-score, Ki-67 index on whole slides. | QuPath (GPL-3); scikit-image (BSD-3); pandas (BSD-3) | `qupath`, `ihc-scoring` | Partial. `ihc-scoring` gives the H-score, the Allred score, the Ki-67 index with a hot spot, and the agreement with a pathologist, from a QuPath cell table or from an image. `qupath` finds the cells. Tissue classifiers and multiplex modules are open. |
 | Visiopharm | Visiopharm, commercial | Image analysis apps for IHC scoring, Ki-67 hot spots and tissue classes. | QuPath (GPL-3); scikit-image (BSD-3) | `qupath`, `ihc-scoring` | Partial. Same as HALO. The Visiopharm hot spot rules are its own. The `ihc-scoring` hot spot is a square window that moves in half steps. |
 | Aperio ImageScope | Leica Biosystems, the viewer is free, closed. The analysis algorithms are licensed. | Nuclear, membrane and positive pixel count algorithms. | QuPath (GPL-3); scikit-image (BSD-3) | `qupath`, `ihc-scoring` | Partial. Same as HALO. The positive pixel count algorithm is open. |
@@ -96,8 +96,8 @@ of each package. The sources are at the end.
 
 | Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
 | --- | --- | --- | --- | --- | --- |
-| Ingenuity Pathway Analysis (IPA) | QIAGEN, commercial subscription | Pathway and upstream-regulator analysis of gene lists from RNA-seq and proteomics. | clusterProfiler (Artistic-2.0); fgsea (MIT); gseapy (BSD-3); GSEA desktop (BSD-style Broad license) | none | This work: over-representation analysis and preranked GSEA. IPA's upstream-regulator scores use a closed knowledge base and stay open. |
-| MetaCore | Clarivate, commercial subscription | Curated pathway enrichment. | clusterProfiler (Artistic-2.0); ReactomePA (GPL-2); gseapy (BSD-3) | none | This work (same tools as for IPA). |
+| Ingenuity Pathway Analysis (IPA) | QIAGEN, commercial subscription | Pathway and upstream-regulator analysis of gene lists from RNA-seq and proteomics. | clusterProfiler (Artistic-2.0); fgsea (MIT); gseapy (BSD-3); GSEA desktop (BSD-style Broad license) | `enrichment` | This work: over-representation analysis and preranked GSEA. IPA's upstream-regulator scores use a closed knowledge base and stay open. |
+| MetaCore | Clarivate, commercial subscription | Curated pathway enrichment. | clusterProfiler (Artistic-2.0); ReactomePA (GPL-2); gseapy (BSD-3) | `enrichment` | This work (same tools as for IPA). |
 | Partek Flow and Genomics Suite | Partek (Illumina), commercial | Point-and-click bulk and single-cell RNA-seq. | DESeq2 (LGPL-3 or later); limma (GPL-2 or later); edgeR (GPL-2 or later); scanpy (BSD-3); harmonypy (GPL-3 or later); Squidpy (BSD-3) | `deseq2`, `scanpy`, `harmony`, `squidpy`, `diffbind`, `limma-proteomics` | Partial. `limma-proteomics` runs limma on protein tables. Limma on microarray or RNA-seq tables is open. Clustering, sample integration with Harmony and spatial statistics: this work. ChIP-seq and ATAC-seq peak counts and differential peaks: `diffbind` (DiffBind with DESeq2 or edgeR). |
 | Loupe Browser | 10x Genomics, free, closed | Views Cell Ranger and Space Ranger results: clusters, gene expression, differential expression and spatial gene plots. | scanpy (BSD-3); Squidpy (BSD-3); harmonypy (GPL-3 or later) | `scanpy`, `harmony`, `squidpy` | Partial. Clustering, marker genes, sample integration with Harmony, Moran's I, neighborhood enrichment and spatial domains: this work. Selecting cells by hand on the screen is open. |
 | Golden Helix SVS and other genetics suites | Golden Helix, commercial | Association tests and Mendelian randomization from summary statistics of genetic variants. | MendelianRandomization (GPL-2 or GPL-3); TwoSampleMR (MIT); PLINK 2 (GPL-3) | `mendelianrandomization` | This work: inverse-variance, MR-Egger, median, mode and maximum likelihood estimates from summary statistics. The PLINK 2 association test on genotypes stays open. |
@@ -113,16 +113,16 @@ of each package. The sources are at the end.
 
 | Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
 | --- | --- | --- | --- | --- | --- |
-| SnapGene | GSL Biotech (Dotmatics), commercial. SnapGene Viewer is free, closed. | Plasmid maps, primer design, PCR and restriction cloning simulation. | Biopython (Biopython License); primer3 and primer3-py (GPL-2); pydna (BSD); UGENE (GPL-2). ApE is free but not open source. | none | This work: primers and melting temperature, in-silico PCR, restriction digests, SnapGene `.dna` reading. Plasmid map drawing stays open. |
-| Geneious Prime | Biomatters (Dotmatics), commercial | Alignment, cloning, Sanger trace review. | Biopython; UGENE (GPL-2); sangeranalyseR (GPL-2) | `phylo` (alignment for trees only) | This work: Sanger read alignment to a reference, with quality trimming. |
+| SnapGene | GSL Biotech (Dotmatics), commercial. SnapGene Viewer is free, closed. | Plasmid maps, primer design, PCR and restriction cloning simulation. | Biopython (Biopython License); primer3 and primer3-py (GPL-2); pydna (BSD); UGENE (GPL-2). ApE is free but not open source. | `cloning` | This work: primers and melting temperature, in-silico PCR, restriction digests, SnapGene `.dna` reading. Plasmid map drawing stays open. |
+| Geneious Prime | Biomatters (Dotmatics), commercial | Alignment, cloning, Sanger trace review. | Biopython; UGENE (GPL-2); sangeranalyseR (GPL-2) | `cloning`, `phylo` (alignment for trees only) | This work: Sanger read alignment to a reference, with quality trimming. |
 
 ## Chromatography and mass spectrometry
 
 | Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
 | --- | --- | --- | --- | --- | --- |
-| Chromeleon CDS | Thermo Fisher, commercial | HPLC, ion and gas chromatography: control, peak integration, calibration. | hplc-py (GPL-3); chromatographR (GPL-2 or later); OpenChrom (EPL-2.0, GUI) | none | This work: peak integration and calibration of exported traces. Instrument control and 21 CFR Part 11 audit trails stay open. |
-| Empower | Waters, commercial | Regulated HPLC data system. | hplc-py (GPL-3); chromatographR (GPL-2 or later) | none | This work (as for Chromeleon). No open program is a Part 11 data system. |
-| OpenLab CDS | Agilent, commercial | HPLC and GC data system. | hplc-py (GPL-3); OpenChrom (EPL-2.0) | none | This work (as for Chromeleon). |
+| Chromeleon CDS | Thermo Fisher, commercial | HPLC, ion and gas chromatography: control, peak integration, calibration. | hplc-py (GPL-3); chromatographR (GPL-2 or later); OpenChrom (EPL-2.0, GUI) | `chromatography` | This work: peak integration and calibration of exported traces. Instrument control and 21 CFR Part 11 audit trails stay open. |
+| Empower | Waters, commercial | Regulated HPLC data system. | hplc-py (GPL-3); chromatographR (GPL-2 or later) | `chromatography` | This work (as for Chromeleon). No open program is a Part 11 data system. |
+| OpenLab CDS | Agilent, commercial | HPLC and GC data system. | hplc-py (GPL-3); OpenChrom (EPL-2.0) | `chromatography` | This work (as for Chromeleon). |
 | MassHunter | Agilent, commercial | LC-MS and GC-MS qualitative and quantitative work. | MZmine (MIT); xcms (GPL-2 or later); OpenMS and pyOpenMS (BSD-3) | `mzmine`, `pyopenms`, `openms` | Covered for features. Targeted quantification is partial. |
 | Xcalibur and FreeStyle | Thermo Fisher. Xcalibur commercial. FreeStyle free, closed. | Raw file viewing, targeted quantification. | ProteoWizard msconvert (Apache-2.0; the vendor readers are closed); pyteomics (Apache-2.0) | `pyopenms`, `openms` | Partial. `.raw` files need a conversion to mzML first. |
 | Spectronaut | Biognosys, commercial | Data-independent acquisition (DIA) proteomics. | EncyclopeDIA (Apache-2.0); OpenSWATH in OpenMS (BSD-3); alphaDIA (Apache-2.0). DIA-NN is free for academia but closed. | `openms`, `limma-proteomics` | Partial. `limma-proteomics` covers the post-analysis (filter, normalize, test, volcano plot) of an exported protein group table. Extraction of the DIA data is open. |
@@ -148,8 +148,7 @@ The order of value follows the table. The choice leaves out what the other agent
    PCR, restriction digests, Sanger read alignment. It replaces the basic work in SnapGene and
    Geneious.
 3. `chromatography` (hplc-py, GPL-3, and SciPy): baseline correction, peak integration and a
-   calibration curve for HPLC-UV traces that the scientist exports from Chromeleon, Empower or
-   OpenLab.
+   calibration curve. The traces are HPLC-UV exports from Chromeleon, the Waters data system or OpenLab.
 4. New tools in `biostats`: two-way ANOVA with post hoc tests, repeated-measures ANOVA,
    Kruskal-Wallis with Dunn, Friedman and exact rank tests. These are the Prism and SPSS menus
    that the other agents do not cover.
@@ -257,7 +256,7 @@ What stays open:
 
 ## Microbiome tables and mass cytometry
 
-Added on 9 October 2026. `ga adapter check <name> --run-tests` passes with no error for both adapters.
+Added on 9 October 2026. `cuvette adapter check <name> --run-tests` passes with no error for both adapters.
 
 | Part | Adapter | Tools | Known-answer tests | Benchmark paper |
 | --- | --- | --- | --- | --- |
@@ -374,7 +373,7 @@ The vendor names of these programs come from general knowledge, not from a web c
 
 - microscopy and gels: Imaris, MetaMorph, NIS-Elements, ZEN, LAS X, ImageQuant TL, Inscopix Data Processing, MetaFluor.
 - plate readers and pathways: SoftMax Pro, Gen5, MetaCore.
-- chromatography and mass spectrometry: Chromeleon, Empower, OpenLab, MassHunter, Xcalibur, Spectronaut,
+- chromatography and mass spectrometry: Chromeleon, the Waters data system, OpenLab, MassHunter, Xcalibur, Spectronaut,
   Proteome Discoverer, PEAKS.
 - electrophysiology: pCLAMP and Clampfit, Igor Pro and NeuroMatic, Mini Analysis.
 - qualitative work: NVivo.

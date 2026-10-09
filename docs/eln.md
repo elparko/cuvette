@@ -25,7 +25,7 @@ The export works with any ELN that reads the ELN Consortium format. It sends not
 - In the app: `/export eln`
 - MCP: `cuvette_export` with `format: "eln"`
 
-The file is `exports/<session>.eln` in the session folder. It is a ZIP file with one top folder.
+The file is `<session id>.eln` in the session folder, for example `cuvette/<date>-<title>/<session id>.eln`. A session from an older version has it in `exports/`. It is a ZIP file with one top folder.
 The folder holds `ro-crate-metadata.json` and an `analysis/` folder with the files.
 Each step has its own folder `analysis/steps/NN-tool/` with `step.md` and its figures and tables.
 

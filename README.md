@@ -207,7 +207,7 @@ node bin/cuvette.js --adapter imagej --bypass-permissions
 
 To start bypass in a session, type `/permissions bypass`. To stop it, type `/permissions ask`.
 To start each session in bypass, put `"permissions": "bypass"` in
-`~/.cuvette/settings.json` or in `.ga/settings.json` of the project. A project file
+`~/.cuvette/settings.json` or in `.cuvette/settings.json` of the project. A project file
 applies only after you trust the folder (see Folder trust). To keep rules in
 the same file, use `"permissionMode": "bypass"` and keep the rules in `"permissions"`.
 
@@ -270,7 +270,7 @@ In a session, `/trust` shows the folder and its files. `/trust on`, `/trust once
 `/trust off` change the trust. `/config` and the Settings page of the app have a "Folder trust" row.
 
 The benchmark (`cuvette bench papers`) trusts its own checkout. It passes the model options `think`,
-`numCtx` and `effort` from the `.ga` settings of the checkout to each run.
+`numCtx` and `effort` from the `.cuvette` settings of the checkout to each run.
 
 ### Old names
 
@@ -290,7 +290,7 @@ The old name of Cuvette is guided-analysis. Cuvette still reads the old names:
   sensitivity check). Then it asks the scientist.
 - **Manual routes.** Each step shows the menu path and the dialog values. `/export protocol`
   writes the steps as a protocol that a lab member can follow by hand.
-- **Records.** Each session has one append-only log, `~/.cuvette/sessions/<id>/log.jsonl`.
+- **Records.** Each session has one append-only log, `.record/log.jsonl`, in the session folder `cuvette/<date>-<title>/` of the project. If the project folder is not writable, the session folder is in `~/.cuvette/projects/<project>/`. Sessions from older versions stay in `~/.cuvette/sessions/<id>/`.
   Each result is a node with its arguments, its decisions, and the hashes of its input and output
   files. A changed decision marks the results that used the old value as out of date.
 - **Claims.** The harness matches each number in the final answer to a logged result. A number with no

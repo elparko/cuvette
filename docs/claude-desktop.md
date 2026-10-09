@@ -67,8 +67,9 @@ the tool list and sends a tool list change notice.
 - The MCP client cannot approve a permission request. The harness denies it. Run that step in the `cuvette` terminal.
 - Follow mode is not available. The harness skips manual instructions.
 - The server writes only protocol messages to stdout. Errors go to stderr.
-- The files of each session are in the folder `~/.cuvette/sessions` unless you set `CUVETTE_HOME`.
-  Add `"env": {"CUVETTE_HOME": "<folder>"}` to the entry to change it.
+- Each session has a folder `cuvette/<date>-<title>/` in the project folder. The record is in `.record/log.jsonl`.
+- If the project folder is not writable, the session folder is in `~/.cuvette/projects/`.
+  Add `"env": {"CUVETTE_HOME": "<folder>"}` to the entry to change `~/.cuvette`.
 
 ## Problems
 
