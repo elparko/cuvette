@@ -9,6 +9,7 @@ import type { DecisionField } from "../core/decisions.ts";
 import { exportProtocol, mainNodes, setupValues, stepLines } from "../core/exports.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import { exportHtml, show } from "../core/trail.ts";
+import { allRefs, sessionCitations, toBibtex, type CitationStyle } from "../core/citations.ts";
 import type { Finding } from "../core/types.ts";
 import { zip, type ZipFile } from "./zip.ts";
 
@@ -18,6 +19,7 @@ export interface ElnSource {
   adapters: LoadedAdapter[];
   decisions: { fields(): DecisionField[] };
   findings: { list(): Finding[] };
+  citationStyle?(): CitationStyle;
 }
 
 export interface ElnFile {
@@ -116,8 +118,10 @@ export function collect(src: ElnSource): ElnContent {
     .map((f) => ({ key: f.key, label: f.label, value: show(f.value), owner: f.owner, setBy: by[f.key] ?? "setup" }));
   const settings = decisionRows.filter((r) => r.key !== "question").map((r) => `${r.label} ${r.value}`).join(" · ");
   const findings = src.findings.list();
-  const protocolPath = exportProtocol(record, adapters, join(exp, "protocol.md"));
-  const trailPath = exportHtml(record, adapters, join(exp, "trail.html"));
+  const style = src.citationStyle?.() ?? "apa";
+  const protocolPath = exportProtocol(record, adapters, join(exp, "protocol.md"), style);
+  const trailPath = exportHtml(record, adapters, join(exp, "trail.html"), style);
+  const refs = allRefs(sessionCitations(record, adapters));
   const logBuf = readFileSync(join(record.dir, "log.jsonl"));
   const plan = planMarkdown(record);
   const files: ElnFile[] = [
@@ -128,6 +132,7 @@ export function collect(src: ElnSource): ElnContent {
     file("trail.html", readFileSync(trailPath), "Audit trail"),
     file("decisions.csv", csv([["key", "label", "value", "owner", "set_by"], ...decisionRows.map((r) => [r.key, r.label, r.value, r.owner, r.setBy])]), "Each decision and who set it"),
     file("findings.md", findingsMd(findings), "Review findings"),
+    ...(record.nodes().some((n) => n.adapter) ? [file("references.bib", toBibtex(refs), "BibTeX references for the programs and methods that ran")] : []),
     file("log.jsonl", logBuf, "The append-only session log"),
   ];
   const steps: ElnStep[] = mainNodes(record).map((n, i) => {

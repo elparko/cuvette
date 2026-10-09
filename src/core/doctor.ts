@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { locate, which } from "../adapters/locate.ts";
 import { adapterDirs, gaHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
 import { runProcess } from "../adapters/kinds/common.ts";
+import { howToCite } from "./citations.ts";
 import { claudeKey, credentialsPath } from "./credentials.ts";
 
 export type Status = "ok" | "missing" | "old";
@@ -23,6 +24,7 @@ export interface Check {
   status: Status;
   detail: string;
   fix?: Fix;
+  cite?: string;
 }
 
 export interface Run {
@@ -310,7 +312,11 @@ export async function runDoctor(opts: DoctorOpts = {}): Promise<Check[]> {
     if (R_PACKAGES[name]) return { id: `program:${name}`, group: "Programs", name, status: "ok", detail: `${label} runs in R (${where}). The R packages are listed above.` };
     return { id: `program:${name}`, group: "Programs", name, status: "ok", detail: `${label}${version ? ` ${version}` : ""} (${where})` };
   });
-  checks.push(...programs);
+  checks.push(...programs.map((c) => {
+    const m = adapters[c.name];
+    const how = m ? howToCite({ manifest: m, name: c.name }) : [];
+    return how.length ? { ...c, cite: how.join(" ") } : c;
+  }));
   return checks;
 }
 
@@ -339,6 +345,7 @@ export function doctorText(checks: Check[], opts: { only?: Status[] } = {}): str
     lines.push(`  ${c.status.padEnd(8)} ${c.name}: ${c.detail}`);
     if (c.status !== "ok" && c.fix?.command) lines.push(`           Install: ${c.fix.command}`);
     if (c.status !== "ok" && c.fix?.link) lines.push(`           ${c.fix.command ? "Or download" : "Download"}: ${c.fix.link}`);
+    if (c.cite) lines.push(`           How to cite: ${c.cite}`);
   }
   const n = (s: Status) => checks.filter((c) => c.status === s).length;
   lines.push("", `${n("ok")} ok, ${n("missing")} missing, ${n("old")} old.`);

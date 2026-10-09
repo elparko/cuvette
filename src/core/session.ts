@@ -27,6 +27,8 @@ import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
 import { definitionsOf } from "./plan.ts";
 import { goalOnly, settingsOf } from "./plan.ts";
+import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
+import { citationStyle, type CitationStyle } from "./citations.ts";
 import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
@@ -484,7 +486,7 @@ export class Session {
     if (this.place.legacy || provisional(this.place)) return;
     try {
       const trail = await import("./trail.ts");
-      trail.exportHtml(this.record, this.adapters, join(this.place.outDir, "index.html"));
+      trail.exportHtml(this.record, this.adapters, join(this.place.outDir, "index.html"), this.citationStyle());
     } catch {}
   }
 
@@ -970,6 +972,7 @@ export class Session {
         programs: this.adapterInfo.map((a) => ({ name: a.title || a.name, version: a.version, programVersion: a.programVersion })),
         dir: this.outputDir,
         xlsx: force || xlsxOn(this.settings),
+        citationStyle: this.citationStyle(),
         toolText: Object.fromEntries([...this.tools.values()].map((t) => [t.remoteName ?? t.name, t.description.split(/(?<=\.)\s/)[0]!.trim()])),
       });
       if (saved.xlsx || saved.figures || saved.decks?.length) this.record.append("notice", { text: savedLine(saved), saved: { ...saved } });
@@ -2870,6 +2873,10 @@ export class Session {
     await this.maybeCompact(new AbortController().signal, true);
   }
 
+  citationStyle(): CitationStyle {
+    return citationStyle(resolveSetting(findSetting("citation_style")!, { cwd: this.cwd, session: this as never }).value);
+  }
+
   async exportAs(fmt: ExportFormat): Promise<string> {
     const out = this.record.exportDir;
     mkdirSync(out, { recursive: true });
@@ -2877,11 +2884,11 @@ export class Session {
     const ex = await import("./exports.ts");
     const a = this.adapters;
     switch (fmt) {
-      case "html": return trail.exportHtml(this.record, a, join(out, "trail.html"));
-      case "md": return trail.exportMarkdown(this.record, a, join(out, "trail.md"));
+      case "html": return trail.exportHtml(this.record, a, join(out, "trail.html"), this.citationStyle());
+      case "md": return trail.exportMarkdown(this.record, a, join(out, "trail.md"), this.citationStyle());
       case "jsonl": return trail.exportJsonl(this.record, join(out, "log.jsonl"));
-      case "pdf": return trail.exportPdf(this.record, a, join(out, "trail.pdf"));
-      case "protocol": return ex.exportProtocol(this.record, a, join(out, "protocol.md"));
+      case "pdf": return trail.exportPdf(this.record, a, join(out, "trail.pdf"), this.citationStyle());
+      case "protocol": return ex.exportProtocol(this.record, a, join(out, "protocol.md"), this.citationStyle());
       case "script": return ex.exportScript(this.record, a, join(out, "replay.ts"));
       case "notebook": return ex.exportNotebook(this.record, a, join(out, "analysis.ipynb"));
       case "flow": return ex.exportFlow(this.record, a, join(out, "flow.json"));

@@ -201,11 +201,11 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   };
 
   const sheets = () => {
-    const s = current?.session as unknown as { record: never; adapters?: never[]; decisions: { fields(): never[] }; adapterInfo: { name: string; title: string; version: string; programVersion: string }[] };
+    const s = current?.session as unknown as { record: never; adapters?: never[]; decisions: { fields(): never[] }; adapterInfo: { name: string; title: string; version: string; programVersion: string }[]; citationStyle?(): "apa" | "vancouver" };
     const dir = outDir();
     if (!existsSync(join(dir, "results.xlsx"))) return undefined;
     try {
-      return buildWorkbook({ record: s.record, adapters: s.adapters ?? [], fields: s.decisions.fields(), programs: s.adapterInfo.map((a) => ({ name: a.title || a.name, version: a.version, programVersion: a.programVersion })), dir, figures: copyFigures(s.record, dir) });
+      return buildWorkbook({ record: s.record, adapters: s.adapters ?? [], fields: s.decisions.fields(), programs: s.adapterInfo.map((a) => ({ name: a.title || a.name, version: a.version, programVersion: a.programVersion })), dir, figures: copyFigures(s.record, dir), citationStyle: s.citationStyle?.() });
     } catch {
       return undefined;
     }

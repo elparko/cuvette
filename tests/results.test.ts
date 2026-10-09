@@ -109,7 +109,7 @@ test("the workbook has Summary, one sheet for each step table, Steps, Metrics an
   ] as never;
   record.append("setup", { values: { alpha: 0.05 }, owners: {}, profile: null, defaultsAccepted: ["alpha"] });
   const sheets = buildWorkbook({ record, adapters: [], fields, programs: [{ name: "Biostatistics", version: "0.1.1", programVersion: "0.30.0" }], dir: out, figures: copyFigures(record, out) });
-  expect(sheets.map((s) => s.name)).toEqual(["Summary", "Step 1 Summary statistics", "Step 2 means", "Steps", "Metrics", "Files"]);
+  expect(sheets.map((s) => s.name)).toEqual(["Summary", "Step 1 Summary statistics", "Step 2 means", "Steps", "Metrics", "Files", "References"]);
   const summary = sheets[0]!.rows;
   expect(summary[0]).toEqual(["Question", "Question", "Does the drug change sleep?", ""]);
   expect(summary).toContainEqual(["Program", "Biostatistics", "0.30.0", "adapter 0.1.1"]);
@@ -134,10 +134,10 @@ test("writeResults writes results.xlsx and the line names the sheets, the figure
   const saved = writeResults({ record, adapters: [], fields: [], programs: [], dir: out, xlsx: true });
   expect(existsSync(join(out, "results.xlsx"))).toBe(true);
   const book = readBook(readFileSync(join(out, "results.xlsx")));
-  expect(book.map((s) => s.name)).toEqual(["Summary", "Step 1 Summary statistics", "Step 2 means", "Steps", "Metrics", "Files"]);
+  expect(book.map((s) => s.name)).toEqual(["Summary", "Step 1 Summary statistics", "Step 2 means", "Steps", "Metrics", "Files", "References"]);
   expect(book[2]!.rows[1]!.map((c) => c.t)).toEqual([undefined, undefined, undefined]);
-  expect(saved).toMatchObject({ sheets: 6, figures: 2 });
-  expect(savedLine(saved, "")).toBe(`Saved: results.xlsx (6 sheets), 2 figures in figures/. Folder: ${out}`);
+  expect(saved).toMatchObject({ sheets: 7, figures: 2 });
+  expect(savedLine(saved, "")).toBe(`Saved: results.xlsx (7 sheets), 2 figures in figures/. Folder: ${out}`);
   expect(savedLine({ dir: "/home/me/p", sheets: 0, figures: 1 }, "/home/me")).toBe("Saved: 1 figure in figures/. Folder: ~/p");
   const off = writeResults({ record, adapters: [], fields: [], programs: [], dir: join(out, "other"), xlsx: false });
   expect(off.xlsx).toBeUndefined();

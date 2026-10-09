@@ -5,6 +5,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path
 import { fileURLToPath } from "node:url";
 import { gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import { labelMap, loadAdapters, sha256File, sizeText } from "../bench/papers-cases.ts";
+import { citationStyle, cuvetteRef, Markers, nodeCitations, programCitations, referencesHtml, sessionCitations, type CitationStyle, type Ref, type SessionCitations } from "./citations.ts";
 import { extractNumbers } from "./claims.ts";
 import { envsUsed } from "./results.ts";
 import { changeCell, num, reruns, stepStatus } from "./status.ts";
@@ -88,67 +89,28 @@ function imageSrc(record: AnalysisRecord, ref: unknown): string | undefined {
 
 // ---------------------------------------------------------------- references
 
-interface Credit {
-  heading: string;
-  cites: string[];
-}
-
-function readCredits(): Credit[] {
-  const p = join(ROOT, "CREDITS.md");
-  if (!existsSync(p)) return [];
-  let text = readFileSync(p, "utf8");
-  const start = text.indexOf("### Programs that adapters run");
-  if (start >= 0) {
-    const end = text.indexOf("\n### ", start + 10);
-    text = text.slice(start, end < 0 ? undefined : end);
-  }
-  return text
-    .split(/^#### /m)
-    .slice(1)
-    .map((block) => {
-      const [heading, ...lines] = block.split("\n");
-      const cites = lines.map((l) => /^- (?:Cite|Also)[^:]*:\s*(.+)$/.exec(l)?.[1]).filter((x): x is string => !!x && !/as above\.?$/.test(x));
-      return { heading: heading!.trim(), cites };
-    });
-}
-
-const COMMON = new Set(["and", "the", "tools", "tool", "line", "command", "python", "package", "library", "open", "source", "data", "program"]);
-const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter((w) => w.length >= 3 && !COMMON.has(w));
-
-function cuvetteCitation(): string {
-  const p = join(ROOT, "docs", "references.bib");
-  const bib = existsSync(p) ? readFileSync(p, "utf8") : "";
-  const block = /@\w+\{smith2026cuvette,([\s\S]*?)\n\}/.exec(bib)?.[1] ?? "";
-  const field = (k: string) => new RegExp(`\\b${k}\\s*=\\s*\\{([^}]*)\\}`).exec(block)?.[1];
-  if (!block) return `Cuvette, version ${CUVETTE_VERSION}.`;
-  const author = (field("author") ?? "").split(",").map((s) => s.trim());
-  const who = author.length > 1 ? `${author[0]} ${author[1]![0]}` : author[0];
-  return `${who}. ${field("title") ?? "Cuvette"}, version ${CUVETTE_VERSION} (${field("year") ?? ""}).${field("url") ? ` ${field("url")}` : ""}`;
-}
-
 class References {
-  list: string[] = [];
-  private credits = readCredits();
-  add(text: string): number {
-    const i = this.list.indexOf(text);
-    if (i >= 0) return i + 1;
-    this.list.push(text);
-    return this.list.length;
+  markers: Markers;
+  cited = new Map<string, Ref>();
+  other = new Map<string, Ref>();
+  constructor(public style: CitationStyle) {
+    this.markers = new Markers(style);
   }
-  forAdapter(a: LoadedAdapter | undefined, name: string, version: string): number[] {
-    const own = new Set(words(`${name} ${a?.manifest.program.name ?? ""}`));
-    const hit = this.credits.filter((c) => words(c.heading).some((w) => own.has(w)) || words(c.heading).join("") === name.replace(/[^a-z0-9]/gi, "").toLowerCase());
-    const cites = hit.flatMap((c) => c.cites);
-    if (cites.length) return cites.map((c) => this.add(c));
-    const prog = a?.manifest.program;
-    return [this.add(`${prog?.name ?? name}${version ? `, version ${version}` : ""}.${prog?.homepage ? ` ${prog.homepage}` : ""}`)];
+  cite(refs: Ref[]): string {
+    for (const r of refs) {
+      this.cited.set(r.id, r);
+      this.other.delete(r.id);
+    }
+    return this.markers.cite(refs);
+  }
+  note(c: SessionCitations): void {
+    for (const r of [...c.comparison, ...c.outOfDate]) if (!this.cited.has(r.id) && !this.other.has(r.id)) this.other.set(r.id, r);
+  }
+  citations(): SessionCitations {
+    const rest = [...this.other.values()].filter((r) => !this.cited.has(r.id));
+    return { used: this.markers.list([...this.cited.values()]), comparison: rest.filter((r) => r.group === "comparison"), outOfDate: rest.filter((r) => r.group === "out_of_date"), notRun: [] };
   }
 }
-
-const refText = (ns: number[]) => {
-  const u = [...new Set(ns)].sort((a, b) => a - b);
-  return u.length ? ` [${u.join(", ")}]` : "";
-};
 
 // ---------------------------------------------------------------- the writer
 
@@ -402,20 +364,23 @@ function programRows(p: Part): { name: string; version: string; adapter: string;
 function sectionMethods(w: Writer, p: Part, level: number, refs: References): void {
   w.head(level, "Methods");
   const progs = programRows(p);
-  const cuv = refs.add(cuvetteCitation());
   const sentences: string[] = [];
+  refs.note(sessionCitations(p.record, p.adapters, p.steps));
+  const progCite = (g: (typeof progs)[number]) => refs.cite(g.a ? programCitations(g.a) : nodeCitations(p.adapters, { adapter: g.adapter, tool: "", args: {} }).program);
   if (progs.length) {
-    const named = progs.map((g) => `${g.name}${g.version ? ` (version ${g.version})` : ""}${refText(refs.forAdapter(g.a, g.adapter, g.version))}`);
+    const named = progs.map((g) => `${g.name}${g.version ? ` version ${g.version}` : ""}${progCite(g)}`);
     sentences.push(`The analysis used ${named.join(" and ")}.`);
     const ads = [...new Set(progs.map((g) => `${g.adapter} ${g.adapterVersion}`))];
-    sentences.push(`Cuvette ${CUVETTE_VERSION} [${cuv}] ran the program steps through the ${ads.join(" and ")} adapter${ads.length === 1 ? "" : "s"} and kept a record of each step.`);
-  } else sentences.push(`Cuvette ${CUVETTE_VERSION} [${cuv}] kept the record of this session.${p.nodes.length ? "" : " The record has no analysis steps."}`);
+    sentences.push(`Cuvette ${CUVETTE_VERSION}${refs.cite([cuvetteRef(CUVETTE_VERSION)])} ran the program steps through the ${ads.join(" and ")} adapter${ads.length === 1 ? "" : "s"} and kept a record of each step.`);
+  } else sentences.push(`Cuvette ${CUVETTE_VERSION}${refs.cite([cuvetteRef(CUVETTE_VERSION)])} kept the record of this session.${p.nodes.length ? "" : " The record has no analysis steps."}`);
+  const stale = p.record.stale();
   const scripts = p.nodes.filter((n) => !n.adapter).map((n) => p.steps.get(n.id));
   if (scripts.length) sentences.push(`${scripts.length === 1 ? "Step" : "Steps"} ${scripts.join(", ")} ran ${scripts.length === 1 ? "a script" : "scripts"} that the agent wrote. Appendix A has the code.`);
   for (const n of p.nodes) {
     let m = fillTemplate(methodsSentence(p.adapters, n), rec(n.result));
     if (looksLikeCode(m) || /\{[\w.]+\}/.test(m)) m = n.summary || n.tool;
-    sentences.push(`Step ${p.steps.get(n.id)} (${n.tool}): ${sentence(m)}`);
+    const cites = stale.has(n.id) ? "" : refs.cite(nodeCitations(p.adapters, n).methods);
+    sentences.push(`Step ${p.steps.get(n.id)} (${n.tool}): ${sentence(m).replace(/\.$/, `${cites}.`)}`);
   }
   const rows = decisionRows(p);
   const by = (who: RegExp) => rows.filter((r) => who.test(r.by)).map((r) => `${r.label.replace(/\?$/, "")} = ${show(r.value)}`);
@@ -687,6 +652,7 @@ export interface BookInput {
   paper: Paper;
   date?: string;
   outDirs?: (string | undefined)[];
+  citationStyle?: CitationStyle;
 }
 
 export interface Book {
@@ -757,7 +723,7 @@ sup{font-size:7pt}
 
 export function buildDatabook(input: BookInput): Book {
   const w = new Writer();
-  const refs = new References();
+  const refs = new References(input.citationStyle ?? "apa");
   const single = input.records.length === 1;
   const date = input.date ?? new Date().toISOString().slice(0, 10);
   const project = basename(input.project) || input.project;
@@ -784,7 +750,8 @@ export function buildDatabook(input: BookInput): Book {
     if (!single) w.add(`</section>`);
   }
   w.head(1, "References");
-  w.add(`<ol class="refs">${refs.list.map((r) => `<li>${esc(r)}</li>`).join("")}</ol>`);
+  const cited = refs.citations();
+  w.add(referencesHtml(cited, refs.style, "h2").replace(/^<h2 id="references">References<\/h2>\n/, ""));
 
   w.add(`<section class="session">`);
   w.startAppendix();
@@ -967,13 +934,14 @@ export function gitAuthor(cwd: string): string | undefined {
   return !r.error && r.status === 0 && r.stdout.trim() ? r.stdout.trim() : undefined;
 }
 
-export function bookSettings(cwd: string): { author?: string; authorFrom: "setting" | "git" | ""; paper: Paper } {
+export function bookSettings(cwd: string): { author?: string; authorFrom: "setting" | "git" | ""; paper: Paper; style: CitationStyle } {
   const ctx = { cwd };
   const a = str(resolveSetting(find("databook_author")!, ctx).value);
   const paper = str(resolveSetting(find("databook_paper")!, ctx).value) === "letter" ? "letter" : "a4";
-  if (a) return { author: a, authorFrom: "setting", paper };
+  const style = citationStyle(resolveSetting(find("citation_style")!, ctx).value);
+  if (a) return { author: a, authorFrom: "setting", paper, style };
   const g = gitAuthor(cwd);
-  return { author: g, authorFrom: g ? "git" : "", paper };
+  return { author: g, authorFrom: g ? "git" : "", paper, style };
 }
 
 // ---------------------------------------------------------------- output
@@ -990,6 +958,7 @@ export interface WriteOptions {
   formats?: BookFormat[];
   author?: string;
   paper?: Paper;
+  citationStyle?: CitationStyle;
 }
 
 export interface Written {
@@ -1061,6 +1030,7 @@ export async function writeDatabook(o: WriteOptions): Promise<Written> {
     project: t.project,
     author: o.author ?? s.author,
     paper: o.paper ?? s.paper,
+    citationStyle: o.citationStyle ?? s.style,
     outDirs: t.found.map((f) => (basename(f.recordDir) === ".record" ? f.outDir : undefined)),
   });
   mkdirSync(t.outDir, { recursive: true });

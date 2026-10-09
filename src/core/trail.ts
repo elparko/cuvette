@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import type { LoadedAdapter, MapEntry } from "../adapters/manifest.ts";
+import { referencesHtml, referencesMarkdown, sessionCitations, type CitationStyle } from "./citations.ts";
 import { roleInRecord, stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Entry, Node } from "./types.ts";
@@ -666,7 +667,7 @@ function planHtml(record: AnalysisRecord): string {
   return `<section class="plan" id="plan"><h2>Proposed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${p.version}.</p>${updates}${validation}</section>`;
 }
 
-export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
+export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
   const m = meta(record);
   const labels = new Map<string, string>();
   for (const a of adapters) for (const d of a.manifest.decisions) labels.set(d.key, d.label);
@@ -697,6 +698,7 @@ ${title ? `<p class="question"><b>Question</b> ${esc(title)}</p>` : ""}
 ${planHtml(record)}
 ${settingRowsHtml ? `<h3>Settings</h3><div class="scroll"><table><thead><tr><th>Decision</th><th>Value</th><th>Set by</th></tr></thead><tbody>${settingRowsHtml}</tbody></table></div>` : ""}
 ${sections.join("\n")}
+<section id="cite">${referencesHtml(sessionCitations(record, adapters, stepNumbers(record.nodes())), style)}</section>
 </main></body></html>
 `;
   return writeOut(path, html);
@@ -740,7 +742,7 @@ function mdDetails(record: AnalysisRecord, d: Record<string, unknown>): string[]
   return out;
 }
 
-function markdownText(record: AnalysisRecord, adapters: LoadedAdapter[]): string {
+function markdownText(record: AnalysisRecord, adapters: LoadedAdapter[], style: CitationStyle = "apa"): string {
   const m = meta(record);
   const labels = new Map<string, string>();
   for (const a of adapters) for (const d of a.manifest.decisions) labels.set(d.key, d.label);
@@ -765,11 +767,12 @@ function markdownText(record: AnalysisRecord, adapters: LoadedAdapter[]): string
     lines.push(`${t.n}. ${t.line.replace(/\n/g, " ")}${t.badges.map((b) => ` [${b}]`).join("")}`);
     if (t.details) lines.push(...mdDetails(record, t.details));
   }
+  lines.push("", ...referencesMarkdown(sessionCitations(record, adapters, stepNumbers(record.nodes())), style));
   return lines.join("\n") + "\n";
 }
 
-export function exportMarkdown(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
-  return writeOut(path, markdownText(record, adapters));
+export function exportMarkdown(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
+  return writeOut(path, markdownText(record, adapters, style));
 }
 
 export function exportJsonl(record: AnalysisRecord, path: string): string {
@@ -810,13 +813,13 @@ export function findChrome(): string | undefined {
   return CHROMES.find((c) => (c.startsWith("/") ? existsSync(c) : which(c)));
 }
 
-export function exportPdf(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
+export function exportPdf(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
   const pandoc = findPandoc();
   if (!pandoc) throw new Error("PDF export needs pandoc. Install pandoc, then try again.");
   const tmp = mkdtempSync(join(tmpdir(), "ga-pdf-"));
   try {
     const md = join(tmp, "trail.md");
-    writeFileSync(md, markdownText(record, adapters));
+    writeFileSync(md, markdownText(record, adapters, style));
     for (const engine of ENGINES) {
       if (!runs(engine, ["--version"])) continue;
       if (runs(pandoc, [md, "-o", path, `--pdf-engine=${engine}`])) return path;

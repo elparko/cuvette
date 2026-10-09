@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileS
 import { basename, extname, isAbsolute, join, relative } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { zip } from "../eln/zip.ts";
+import { allRefs, formatRef, sessionCitations, toBibtex, type CitationStyle, type Ref } from "./citations.ts";
 import { checkAnswer } from "./claims.ts";
 import type { DecisionField } from "./decisions.ts";
 import { mainNodes, methodsSentence, stepLines } from "./exports.ts";
@@ -324,6 +325,24 @@ export interface WorkbookInput {
   dir: string;
   figures: FigureFile[];
   toolText?: Record<string, string>;
+  citationStyle?: CitationStyle;
+}
+
+const GROUP_LABEL: Record<Ref["group"], string> = { used: "used", comparison: "used in a comparison", out_of_date: "used only in steps that are out of date" };
+
+export function referenceSheet(record: AnalysisRecord, adapters: LoadedAdapter[], style: CitationStyle = "apa"): Sheet {
+  const c = sessionCitations(record, adapters, stepNumbers(record.nodes()));
+  const rows: Cell[][] = allRefs(c).map((r, i) => [i + 1, formatRef(r, style), r.kind, r.program === "Cuvette" && !r.adapter ? "Cuvette" : r.kind === "program" ? r.program : r.tools.join(", "), r.steps.join(", "), GROUP_LABEL[r.group], r.doi, r.url, r.key]);
+  return { name: "References", columns: ["Number", "Reference", "Kind", "Used for", "Steps", "Status", "DOI", "URL", "BibTeX key"], rows };
+}
+
+export function writeReferences(record: AnalysisRecord, adapters: LoadedAdapter[], dir: string): string | undefined {
+  const c = sessionCitations(record, adapters);
+  if (!record.nodes().some((n) => n.adapter)) return undefined;
+  const path = join(dir, "references.bib");
+  const head = (t: string, refs: Ref[]) => (refs.length ? `% ${t}\n\n${toBibtex(refs)}\n` : "");
+  writeFileSync(path, `% References for session ${record.entries()[0]?.session ?? ""}. Cuvette writes this file; it lists only what ran.\n\n${head("Used", c.used)}${head("Used in a comparison only", c.comparison)}${head("Used only in steps that are out of date", c.outOfDate)}`);
+  return path;
 }
 
 const LABEL_BEFORE = /\b(?:group|step|id|subject|run|q|question|figure|fig|table|column|row|channel|day|week)\s*$/i;
@@ -399,7 +418,7 @@ export function checkSheets(record: AnalysisRecord): Sheet[] {
 
 export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const { record, adapters, dir } = w;
-  const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation", "data check", "samples", "changes", "packages"]);
+  const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation", "data check", "samples", "changes", "packages", "references"]);
   const steps = stepNumbers(record.nodes());
   const status = new Map(stepStatus(record, { labels: Object.fromEntries(w.fields.map((f) => [f.key, f.label || f.key])) }).map((x) => [x.node, x]));
   const rewound = record.rewound();
@@ -520,6 +539,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     { name: "Files", columns: ["Step", "Kind", "Path", "Copied from"], rows: fileRows },
     ...(changeRowsOut.length ? [{ name: "Changes", columns: ["Step", "Repeats step", "Tool", "Number", "Before", "After", "Change", "Change shown", "Why it ran again"], rows: changeRowsOut }] : []),
     ...(packageRows.length ? [{ name: "Packages", columns: ["Environment", "Language", "Package", "Version", "Path", "Lock"], rows: packageRows }] : []),
+    referenceSheet(record, adapters, w.citationStyle),
   ];
 }
 
@@ -570,6 +590,7 @@ export function writeResults(w: Omit<WorkbookInput, "figures"> & { xlsx: boolean
   const figures = copyFigures(w.record, w.dir);
   for (const f of lockFiles(w.record)) writeFileSync(join(w.dir, f.name), f.text);
   const shown = figures.filter((f) => !/\.(svg|pdf|eps)$/i.test(f.path) || !figures.some((g) => g !== f && g.path.replace(/\.[^.]+$/, "") === f.path.replace(/\.[^.]+$/, "")));
+  writeReferences(w.record, w.adapters, w.dir);
   const decks = DECKS.filter((d) => existsSync(join(w.dir, d)));
   if (!w.xlsx) return { dir: w.dir, sheets: 0, figures: shown.length, decks };
   const sheets = buildWorkbook({ ...w, figures });

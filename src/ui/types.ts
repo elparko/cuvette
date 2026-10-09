@@ -72,6 +72,9 @@ export interface SessionLike {
   compact(): Promise<void>;
   exportAs(fmt: any): Promise<string>;
   exportImages?(options: DeckOptions): Promise<DeckWritten>;
+  adapters?: import("../adapters/manifest.ts").LoadedAdapter[];
+  outputDir?: string;
+  citationStyle?(): import("../core/citations.ts").CitationStyle;
   elnPush?(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }>;
   elnLink?(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }>;
   rewind?(n: number): RewindResult;

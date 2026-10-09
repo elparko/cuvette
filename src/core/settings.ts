@@ -227,6 +227,16 @@ export const SETTINGS: SettingDef[] = [
     free: true,
   },
   {
+    name: "citation_style",
+    group: "Outputs",
+    label: "Citation style",
+    help: "apa or vancouver. The style of the references in /cite, the data book, the report, the protocol and results.xlsx. Many medical journals use vancouver.",
+    brief: "The style of the references in each output.",
+    scopes: ["session", "user", "project"],
+    choices: () => ["apa", "vancouver"],
+    def: "apa",
+  },
+  {
     name: "databook_paper",
     group: "Outputs",
     label: "Data book paper size",

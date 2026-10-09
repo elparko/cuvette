@@ -77,7 +77,8 @@ test("protocol lists decisions, route steps, warnings, grouped repeats and a met
   expect(md).toContain("Only available in code.");
   expect(md).not.toContain("Type 3");
   expect(md).toContain("## Draft methods paragraph");
-  expect(md).toContain("Data were analyzed in FakeJ 1.0.");
+  expect(md).toContain("Data were analyzed in FakeJ 1.0 (FakeJ, n.d.). Cuvette (Smith, 2026) ran the steps and kept the record.");
+  expect(md).toContain("## References");
   expect(md).toContain("Blur was applied with Sigma (Radius) = 2.");
 });
 

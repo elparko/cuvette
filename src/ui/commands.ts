@@ -82,6 +82,42 @@ export function parseDecision(f: { kind: string; choices?: any[] }, raw: string)
   return raw;
 }
 
+export async function citeCommand(args: string[], session: SessionLike): Promise<string> {
+  const c = await import("../core/citations.ts");
+  const sub = (args[0] ?? "").toLowerCase();
+  const style = c.CITATION_STYLES.includes(sub as never) ? (sub as "apa" | "vancouver") : c.citationStyle(args[1] ?? session.citationStyle?.() ?? "apa");
+  if (sub === "programs" || sub === "program") {
+    const { adapterDirs, loadAdapter } = await import("../adapters/manifest.ts");
+    const want = args[1];
+    const out: string[] = [];
+    for (const [name, dir] of Object.entries(adapterDirs(session.cwd))) {
+      if (want && name !== want) continue;
+      try {
+        const a = loadAdapter(dir);
+        const how = c.howToCite(a, style);
+        out.push(`${a.manifest.program.name} (${name})`, ...(how.length ? how.map((h) => `  ${h}`) : ["  No citation. Cite the program by name and version."]), "");
+      } catch {}
+    }
+    if (!out.length) throw new Error(want ? `No adapter named ${want}.` : "No adapters found.");
+    return out.join("\n").trim();
+  }
+  const cites = c.sessionCitations(session.record, session.adapters ?? [], stepNumbers(session.record.nodes()));
+  if (["bibtex", "bib", "ris", "text", "txt"].includes(sub)) {
+    const all = c.allRefs(cites);
+    if (!all.some((r) => r.adapter)) throw new Error("No program step ran yet. Nothing to cite except Cuvette.");
+    const dir = session.outputDir ?? session.workDir;
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    mkdirSync(dir, { recursive: true });
+    const [file, text] = sub.startsWith("bib") ? ["references.bib", c.toBibtex(all)] : sub === "ris" ? ["references.ris", c.toRis(all)] : ["references.txt", c.citeList(cites, style)];
+    const path = join(dir, file);
+    writeFileSync(path, text);
+    return `Saved ${all.length} references: ${path}`;
+  }
+  if (sub && !c.CITATION_STYLES.includes(sub as never)) throw new Error("Use: /cite, /cite apa, /cite vancouver, /cite bibtex, /cite ris, /cite text [apa|vancouver] or /cite programs [adapter].");
+  return c.citeText(cites, style);
+}
+
 export function statusOf(session: SessionLike): StepState[] {
   return stepStatus(session.record, { labels: session.labels?.() });
 }
@@ -642,6 +678,19 @@ export const commands: Command[] = [
         ctx.notice(`Exported: ${await ctx.session.exportAs(fmt)}`);
       } catch (e) {
         ctx.error(`Export failed: ${(e as Error).message}`);
+      }
+    },
+  },
+  {
+    name: "cite",
+    args: "[apa|vancouver|bibtex|ris|text|programs]",
+    help: "List the programs and methods to cite for this session. bibtex, ris and text save the list in the output folder. programs shows how to cite each program.",
+    async run(args, ctx) {
+      try {
+        const r = await citeCommand(args, ctx.session);
+        ctx.print(r, "Cite");
+      } catch (e) {
+        ctx.error((e as Error).message);
       }
     },
   },

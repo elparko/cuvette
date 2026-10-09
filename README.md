@@ -164,6 +164,7 @@ shortens tool results and summarizes old turns near the context limit.
 | `/review`, `/findings` | Run the rule checks and the referee; accept, reject or fix each finding. |
 | `/export html` | The trail as one HTML file. Also `md`, `jsonl`, `pdf`, `protocol`, `script`, `notebook`, `flow`. |
 | `/databook` | A data book (PDF and HTML): question, data, methods, results, figures, checks and the manual route. `/databook project` covers all sessions of the project folder. `/databook docx` needs pandoc. On the command line: `ga databook [<session folder>\|<project folder>]`. |
+| `/cite` | The programs and methods to cite for this session. Only what ran is listed. A method that ran only in a comparison run is listed apart. `/cite vancouver` or `/cite apa` changes the style for one list; the setting `citation_style` changes it for all outputs. `/cite bibtex`, `/cite ris` and `/cite text` save the list in the output folder. `/cite programs` shows how to cite each program. In the app: the Cite section of the Results tab. |
 | `/lab` | Approve or reject lab rules that the agent proposed. |
 
 ### Input box keys

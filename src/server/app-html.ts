@@ -17,6 +17,7 @@ import { pointTime } from "../core/rewind.ts";
 import { lastUseText, originText, sizeText, STATE_LABEL, type ProgramRow } from "../core/programs.ts";
 import { fieldTitle, groupRows, rowActions, summaryLine } from "../ui/programs.ts";
 import { changeCell, num, reruns, stepStatus, type RerunData, type StepState } from "../core/status.ts";
+import { formatRef, sessionCitations, type CitationStyle, type Ref } from "../core/citations.ts";
 import type { SessionLike } from "../ui/types.ts";
 
 export interface Slot {
@@ -525,6 +526,22 @@ export function listFiles(dir: string, filter: (name: string) => boolean = () =>
     .sort();
 }
 
+export function citeHtml(c: Ctx): string {
+  const s = c.session;
+  if (!s?.record) return "";
+  const style: CitationStyle = s.citationStyle?.() ?? "apa";
+  const cites = sessionCitations(s.record, s.adapters ?? [], stepNumbers(s.record.nodes()));
+  if (!cites.used.some((r) => r.adapter)) return `<h4 id="cite">Cite</h4><p class="empty">No program step ran yet. The list of programs and methods to cite appears after the first step.</p>`;
+  const tag = style === "vancouver" ? "ol" : "ul";
+  const item = (r: Ref) => `<li>${esc(formatRef(r, style))}<div class="dim small">${esc(r.kind === "program" ? (r.adapter ? r.program : "Cuvette") : `${r.kind}: ${r.tools.join(", ")}`)}${r.steps.length ? ` · ${esc(r.steps.join(", "))}` : ""}</div></li>`;
+  const used = style === "apa" ? [...cites.used].sort((a, b) => formatRef(a).localeCompare(formatRef(b))) : cites.used;
+  const parts = [`<h4 id="cite">Cite</h4><p class="dim small">The programs and methods that ran in this session. Style: ${style === "apa" ? "APA" : "Vancouver"}. The same list as /cite.</p>`, `<${tag} class="refs">${used.map(item).join("")}</${tag}>`];
+  if (cites.comparison.length) parts.push(`<p class="small"><strong>Used in a comparison.</strong> Cite these only if you report the comparison.</p><${tag} class="refs"${tag === "ol" ? ` start="${used.length + 1}"` : ""}>${cites.comparison.map(item).join("")}</${tag}>`);
+  if (cites.outOfDate.length) parts.push(`<p class="small"><strong>Used only in steps that are out of date.</strong></p><${tag} class="refs">${cites.outOfDate.map(item).join("")}</${tag}>`);
+  parts.push(`<div class="row">${btn("Save BibTeX", `data-command="/cite bibtex"`)}${btn("Save RIS", `data-command="/cite ris"`)}${btn("Save the list", `data-command="/cite text"`)}${btn(style === "apa" ? "Show in Vancouver" : "Show in APA", `data-command="/cite ${style === "apa" ? "vancouver" : "apa"}"`, "quiet")}</div>`);
+  return parts.join("");
+}
+
 export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; columns: string[]; rows: unknown[][] }[] | undefined): string {
   const xlsx = join(outDir, "results.xlsx");
   const figures = listFiles(join(outDir, "figures"));
@@ -553,6 +570,7 @@ export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; colu
   const raster = figures.filter((f) => IMG.test(f) && !(/\.svg$/i.test(f) && figures.some((g) => g !== f && g.replace(/\.[^.]+$/, "") === f.replace(/\.[^.]+$/, ""))));
   if (figures.length) parts.push(`<h4>Figures</h4><div class="images">${raster.map((f) => imageHtml(c, f)).join("")}</div><ul class="files">${figures.map((f) => `<li>${fileLink(c, f)}</li>`).join("")}</ul>`);
   if (files.length) parts.push(`<h4>Files</h4><ul class="files">${files.map((f) => `<li>${fileLink(c, f)} <span class="dim small">${esc(extname(f).slice(1))}</span></li>`).join("")}</ul>`);
+  parts.push(citeHtml(c));
   parts.push(`<p class="dim small">Folder: ${midPath(outDir, 40)} <button type="button" class="link" data-reveal="${esc(outDir)}">Show in folder</button></p>`);
   return parts.join("");
 }
@@ -561,7 +579,7 @@ export function doctorHtml(shown: Check[], ready: boolean, all: Check[]): string
   const n = (st: string) => all.filter((x) => x.status === st).length;
   const groups = [...new Set(shown.map((x) => x.group))];
   const rows = groups
-    .map((g) => `<h4>${esc(g)}</h4><ul class="checks">${shown.filter((x) => x.group === g).map((x) => `<li class="${esc(x.status)}"><span class="cstat">${esc(x.status)}</span> <strong>${esc(x.name)}</strong>: ${esc(x.detail)}${x.status !== "ok" && x.fix?.command ? `<div class="small">Install: <code>${esc(x.fix.command)}</code></div>` : ""}${x.status !== "ok" && x.fix?.link ? `<div class="small">${x.fix.command ? "Or download" : "Download"}: <a href="${esc(x.fix.link)}" target="_blank" rel="noopener">${esc(x.fix.link)}</a></div>` : ""}</li>`).join("")}</ul>`)
+    .map((g) => `<h4>${esc(g)}</h4><ul class="checks">${shown.filter((x) => x.group === g).map((x) => `<li class="${esc(x.status)}"><span class="cstat">${esc(x.status)}</span> <strong>${esc(x.name)}</strong>: ${esc(x.detail)}${x.status !== "ok" && x.fix?.command ? `<div class="small">Install: <code>${esc(x.fix.command)}</code></div>` : ""}${x.status !== "ok" && x.fix?.link ? `<div class="small">${x.fix.command ? "Or download" : "Download"}: <a href="${esc(x.fix.link)}" target="_blank" rel="noopener">${esc(x.fix.link)}</a></div>` : ""}${x.cite ? `<div class="small dim">How to cite: ${esc(x.cite)}</div>` : ""}</li>`).join("")}</ul>`)
     .join("");
   return `<p class="${ready ? "okline" : "warn"}"><strong>${ready ? "Cuvette can start: Node is new enough and a model is ready." : "Cuvette cannot start yet. It needs Node 22 or later, and a Claude API key or an Ollama model."}</strong></p>
 <p class="dim small">${n("ok")} ok, ${n("missing")} missing, ${n("old")} old. A missing program matters only if your analysis uses it.</p>${rows || `<p class="dim">Nothing is missing.</p>`}`;

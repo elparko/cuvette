@@ -3,6 +3,7 @@ import { existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { isAbsolute } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
+import { cuvetteRef, Markers, nodeCitations, programCitations, referencesMarkdown, sessionCitations, type CitationStyle, type Ref } from "./citations.ts";
 import { ADAPTER_DECISION } from "./decisions.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Node } from "./types.ts";
@@ -120,19 +121,28 @@ export function methodsSentence(adapters: LoadedAdapter[], n: Node): string {
   return `${name} was applied${withParams}.`;
 }
 
-export function programNames(adapters: LoadedAdapter[], nodes: Node[]): string {
-  const seen = new Map<string, string>();
+export function programNames(adapters: LoadedAdapter[], nodes: Node[], cite?: (a: LoadedAdapter) => string): string {
+  const seen = new Map<string, { version: string; a?: LoadedAdapter }>();
   for (const n of nodes) {
+    if (!n.adapter) continue;
     const a = adapterOf(adapters, n);
     const name = a?.manifest.program.name ?? n.adapter;
-    seen.set(name, n.programVersion || a?.manifest.program.version || "");
+    seen.set(name, { version: n.programVersion || a?.manifest.program.version || "", a });
   }
-  return [...seen].map(([k, v]) => (v ? `${k} ${v}` : k)).join(" and ");
+  return [...seen].map(([k, v]) => `${v.version ? `${k} ${v.version}` : k}${cite && v.a ? cite(v.a) : ""}`).join(" and ");
 }
 
-export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {
+export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
+  const marks = new Markers(style);
+  const cited = new Map<string, Ref>();
+  const cite = (refs: Ref[]) => {
+    for (const r of refs) cited.set(r.id, r);
+    return marks.cite(refs);
+  };
   const info = sessionInfo(record);
   const nodes = mainNodes(record);
+  const prog = programNames(adapters, nodes, (a) => cite(programCitations(a)));
+  const cuvette = cite([cuvetteRef()]);
   const lines = ["# Protocol", "", `Session ${info.id}, ${info.date}.`, "", ...planMarkdown(record)];
   const setup = Object.entries(setupValues(record));
   lines.push("## Decision record", "");
@@ -153,7 +163,7 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
     num++;
     lines.push(`${num}. ${g.first.summary ? g.first.summary : g.first.tool}`);
     for (const l of stepLines(adapters, g.first)) lines.push(`   ${l}`);
-    sentences.push(methodsSentence(adapters, g.first));
+    sentences.push(methodsSentence(adapters, g.first).replace(/\.?$/, `${cite(nodeCitations(adapters, g.first).methods)}.`));
     if (g.rest.length && g.key) {
       const here = num;
       num += g.rest.length;
@@ -166,15 +176,18 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
   if (!groups.length) lines.push("No steps were recorded.");
   const chosen = setup.map(([k, v]) => `${labelOf(adapters, k)} = ${show(v)}`).join("; ");
   lines.push("", "## Draft methods paragraph", "", "Draft. Check each sentence before you use it.", "");
-  const prog = programNames(adapters, nodes);
   lines.push(
     [
       prog ? `Data were analyzed in ${prog}.` : "",
+      `Cuvette${cuvette} ran the steps and kept the record.`,
       chosen ? `Settings chosen before the analysis: ${chosen}.` : "",
       ...sentences,
     ].filter(Boolean).join(" "),
     "",
   );
+  const all = sessionCitations(record, adapters);
+  const extra = (refs: Ref[]) => refs.filter((r) => !cited.has(r.id));
+  lines.push(...referencesMarkdown({ used: marks.list([...cited.values()]), comparison: extra(all.comparison), outOfDate: extra(all.outOfDate), notRun: [] }, style));
   return writeOut(path, lines.join("\n"));
 }
 
