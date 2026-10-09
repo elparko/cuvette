@@ -1,0 +1,10 @@
+PropCIs 0.3.0 ratesci 1.1.1 
+56/70 against 48/80
+  Mee score (PropCIs diffscoreci, no N/(N-1) factor): 0.052830 0.338173
+  Miettinen-Nurminen (ratesci scoreci, skew = FALSE, bcf = TRUE): 0.052830 0.338173
+71/152 against 84/150
+  Mee score (PropCIs diffscoreci, no N/(N-1) factor): -0.203460 0.020017
+  Miettinen-Nurminen (ratesci scoreci, skew = FALSE, bcf = TRUE): -0.203460 0.020017
+30/200 against 36/200
+  Mee score (PropCIs diffscoreci, no N/(N-1) factor): -0.103671 0.043379
+  Miettinen-Nurminen (ratesci scoreci, skew = FALSE, bcf = TRUE): -0.103671 0.043379

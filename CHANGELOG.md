@@ -35,6 +35,9 @@ These items are being built and are not on main yet:
 - Settings that you confirm in the proposed metrics count as answered when the steps run, so no card asks again.
 
 ### New analyses
+- Metabolomics statistics (metabolomics-stats): PQN and total area normalization, PCA, PLS-DA and OPLS-DA with permutation tests and VIP scores, and feature tests with FDR. The Thevenot 2015 urine data are the benchmark case.
+- Epidemiology rates (epi-rates): exact rate intervals, rate ratios, attributable fractions, number needed to treat, and direct and indirect standardization. The benchmark case is the NCHS final death data for 2020.
+- Trial endpoints (trial-endpoints): risk difference with Wald, Newcombe or Miettinen-Nurminen intervals, Mantel-Haenszel strata, hazard ratio, restricted mean survival time and non-inferiority checks. The benchmark case is the SHOCK trial.
 - qPCR (qpcr): reference gene stability (geNorm and NormFinder), primer efficiencies, ΔΔCt and Pfaffl, with the Hildyard 2021 paper as the benchmark case.
 - Growth curves (growthcurver): logistic growth rate, lag time, carrying capacity and group comparison, with the Nair 2024 paper.
 - Image assays (image-assays): colony counts and clonogenic survival, colocalization (Pearson and Manders with the Costes threshold), and cell uptake indices, with three benchmark papers.

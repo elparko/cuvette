@@ -1,0 +1,8 @@
+meta 8.5.0 
+Warning message:
+Zero values in seTE replaced by NAs. 
+MH risk difference 0.228036 CI 0.085398 0.370673
+Warning message:
+Zero values in seTE replaced by NAs. 
+MH risk ratio 1.552632 CI 1.030638 2.339002
+MH odds ratio 7.000000 CI 1.026713 47.725133

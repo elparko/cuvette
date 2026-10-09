@@ -1,0 +1,7 @@
+patients 152 150
+30-day mortality 0.4671 0.5600 difference -0.0929 Wald CI -0.2051 0.0194
+chi-square p 0.1063
+hazard ratio 0.7437 CI 0.5712 0.9684
+log-rank p 0.02735
+1-year survival 0.4671 0.3356 difference 0.1315 CI 0.0218 0.2413
+RMST to 1825 days 779.550 555.289 difference 224.262

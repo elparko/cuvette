@@ -1,0 +1,173 @@
+kind: research paper
+short: Hochman 1999
+field: Cardiology, clinical trial statistics
+program: survRM2, survival and base R, through the trial-endpoints adapter
+citation:
+  authors: Hochman JS, Sleeper LA, Webb JG, Sanborn TA, White HD, Talley JD, Buller CE, Jacobs AK, Slater JN, Col J, McKinlay SM, LeJemtel TH
+  title: "Early revascularization in acute myocardial infarction complicated by cardiogenic shock"
+  venue: New England Journal of Medicine 341(9):625-634
+  year: 1999
+  doi: 10.1056/NEJM199908263410901
+related:
+  - text: >-
+      Hochman JS et al. One-year survival following early revascularization for cardiogenic shock. JAMA 285(2):190-192 (2001).
+      The abstract prints the 1-year survival of 46.7% and 33.6% and the difference of 13.2 points (95% interval 2.2 to 24.1).
+    doi: 10.1001/jama.285.2.190
+  - text: >-
+      Hochman JS et al. Early revascularization and long-term survival in cardiogenic shock complicating acute myocardial infarction.
+      JAMA 295(21):2511-2515 (2006). The abstract prints the hazard ratio of 0.74 (95% interval 0.57 to 0.97) and the log-rank P of .03.
+    doi: 10.1001/jama.295.21.2511
+measured: >-
+  The trial randomized 302 patients with cardiogenic shock to early revascularization (152 patients) or initial medical stabilization (150 patients).
+  The primary endpoint was death from any cause within 30 days. The follow-up papers report the survival at 1 year and the survival over 6 to 11 years.
+instruction: >-
+  Compare death within 30 days (numbers in each arm, risk difference with the Wald interval, chi-square p value), the hazard ratio of death over
+  the whole follow-up with its interval and the log-rank p value, and the Kaplan-Meier survival at 1 year with the difference and its interval.
+instruction_basis: >-
+  The abstract of the 1999 paper (30-day numbers: 46.7% and 56.0%, difference -9.3 points, interval -20.5 to 1.9, P = 0.11), the abstract of the 2001 paper
+  (1-year survival) and the abstract of the 2006 paper (hazard ratio and log-rank P).
+answers:
+  endpoint_definition:
+    decision: Primary endpoint
+    value: death from any cause within 30 days of randomization (primary); death during follow-up (long-term survival)
+    source: The 1999 paper names 30-day all-cause mortality as the primary endpoint. The 2006 paper uses all-cause mortality during follow-up.
+  analysis_population:
+    decision: Analysis population
+    value: intention to treat
+    source: The papers analyze the patients in the arm of randomization.
+  stratum_column:
+    decision: Stratification factor
+    value: none
+    source: The abstracts print unstratified comparisons.
+  missing_outcome:
+    decision: Patients with a missing outcome
+    value: exclude
+    source: The Zenodo file has no follow-up time for one patient of the medical stabilization arm. The tool drops that patient from the survival analysis.
+  rd_ci_method:
+    decision: Confidence interval method for the risk difference
+    value: wald
+    source: The interval -20.5 to 1.9 of the 1999 abstract equals the Wald interval of the data (-20.5 to 1.9).
+  binary_test:
+    decision: Test of the two proportions
+    value: chi_square
+    source: The chi-square test without correction gives p = 0.106. The abstract prints P = 0.11.
+  alpha:
+    decision: Two-sided significance level
+    value: 0.05
+    source: The papers print 95% intervals.
+  outcome_direction:
+    decision: Direction of the binary outcome
+    value: event is bad
+    source: The event is death.
+  ni_margin:
+    decision: Non-inferiority margin
+    value: 0
+    source: The trial tests superiority. No margin.
+  ni_scale_binary:
+    decision: Scale of the margin for a binary endpoint
+    value: risk_difference
+    source: Not used. The margin is 0.
+  ni_scale_survival:
+    decision: Scale of the margin for a time-to-event endpoint
+    value: hazard_ratio
+    source: Not used. The margin is 0.
+  ni_alpha:
+    decision: One-sided level of the non-inferiority test
+    value: 0.025
+    source: Not used. The margin is 0.
+  rmst_tau:
+    decision: Time limit tau of the restricted mean survival time
+    value: 1825 days (5 years)
+    source: Not in the papers. The benchmark asks for it so that the tool with survRM2 runs. The value is a reference item.
+  landmark_time:
+    decision: Time of the survival comparison
+    value: 365 days
+    source: The 2001 paper compares the survival at 1 year.
+  cox_ties:
+    decision: Handling of tied event times in the Cox model
+    value: efron
+    source: The default of R. The choice does not change the hazard ratio at the printed digits.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: The benchmark answers a free question with this text.
+items:
+  n_early:
+    source: published
+    tool: Hochman et al. 1999, abstract
+    where: "Methods: 152 patients assigned to emergency revascularization."
+  n_medical:
+    source: published
+    tool: Hochman et al. 1999, abstract
+    where: "Methods: 150 patients assigned to initial medical stabilization."
+  mortality30_early:
+    source: published
+    tool: Hochman et al. 1999, abstract
+    where: "Results: overall mortality at 30 days, 46.7 percent in the revascularization group."
+  mortality30_medical:
+    source: published
+    tool: Hochman et al. 1999, abstract
+    where: "Results: overall mortality at 30 days, 56.0 percent in the medical-therapy group."
+  rd30:
+    source: published
+    tool: Hochman et al. 1999, abstract
+    where: "Results: difference, -9.3 percent."
+  rd30_ci_low:
+    source: published
+    tool: Hochman et al. 1999, abstract
+    where: "Results: 95 percent confidence interval for the difference, -20.5 to 1.9 percent."
+  rd30_ci_high:
+    source: published
+    tool: Hochman et al. 1999, abstract
+    where: "Results: 95 percent confidence interval for the difference, -20.5 to 1.9 percent."
+  p30:
+    source: published
+    tool: Hochman et al. 1999, abstract
+    where: "Results: P = 0.11. The chi-square test without correction on the data gives 0.106."
+  hr:
+    source: published
+    tool: Hochman et al. 2006, abstract
+    where: "Results: hazard ratio 0.74."
+  hr_ci_low:
+    source: published
+    tool: Hochman et al. 2006, abstract
+    where: "Results: 95% confidence interval 0.57-0.97."
+  hr_ci_high:
+    source: published
+    tool: Hochman et al. 2006, abstract
+    where: "Results: 95% confidence interval 0.57-0.97."
+  logrank_p:
+    source: published
+    tool: Hochman et al. 2006, abstract
+    where: "Results: log-rank P = .03."
+  surv1_early:
+    source: published
+    tool: Hochman et al. 2001, abstract
+    where: "Results: one-year survival was 46.7% for patients in the ERV group."
+  surv1_medical:
+    source: published
+    tool: Hochman et al. 2001, abstract
+    where: "Results: 33.6% in the IMS group."
+  surv1_diff:
+    source: published
+    tool: Hochman et al. 2001, abstract
+    where: "Results: absolute difference in survival, 13.2%."
+  surv1_diff_ci_low:
+    source: published
+    tool: Hochman et al. 2001, abstract
+    where: "Results: 95% confidence interval, 2.2%-24.1%."
+  surv1_diff_ci_high:
+    source: published
+    tool: Hochman et al. 2001, abstract
+    where: "Results: 95% confidence interval, 2.2%-24.1%."
+  rmst_diff:
+    source: computed
+    tool: check.py (NumPy step integral of the Kaplan-Meier curve)
+    where: Not in the papers.
+    independence: independent
+    check: check.py integrates the Kaplan-Meier curve with NumPy and gives the same value as survRM2 (check.out).
+data:
+  source: Iturrate E. SHOCK Trial - Early Revascularization in Acute Myocardial Infarction Complicated by Cardiogenic Shock. Zenodo, files trial_deident.csv and survival_deident.csv, joined by fetch.sh
+  url: https://doi.org/10.5281/zenodo.14046978
+  license: CC BY 4.0. The data are de-identified. The table that the benchmark reads has no patient identifier.
+  size: 302 rows, 11 kB

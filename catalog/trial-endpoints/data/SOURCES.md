@@ -1,0 +1,7 @@
+# Test data sources
+
+| File | Source | License |
+| --- | --- | --- |
+| shock_endpoints.csv | SHOCK trial, de-identified data of 302 patients. Iturrate E (2024). SHOCK Trial - Early Revascularization in Acute Myocardial Infarction Complicated by Cardiogenic Shock. Zenodo, DOI 10.5281/zenodo.14046978 (files trial_deident.csv and survival_deident.csv). Trial paper: Hochman JS et al. (1999) N Engl J Med 341: 625-634, DOI 10.1056/NEJM199908263410901. The table keeps the arm, the death within 30 days, the age flag (under 75 years), the follow-up time in days (realsurv) and the death flag (1 minus realcens). It has no patient identifier. One patient of the medical stabilization arm has no follow-up time in the Zenodo file. Written by data/make_fixtures.R. | CC BY 4.0, the license of the Zenodo record. Cite the record and the trial paper. |
+| pbc_rmst.csv | R package survRM2 1.0-4, function rmst2.sample.data(): 312 patients of the Mayo Clinic trial of D-penicillamine in primary biliary cirrhosis (the pbc data). Columns time (years), status and arm. Written by data/make_fixtures.R. | GPL-2, the license of the package |
+| rabbits_penicillin.csv | The Rabbits array of the help page of mantelhaen.test in R (Agresti, Categorical Data Analysis): cure of rabbits after penicillin, with and without a delay, at 5 penicillin levels. The array is a table of counts, expanded to one row for each rabbit by data/make_fixtures.R. | Part of R, GPL (version 2 or later) |

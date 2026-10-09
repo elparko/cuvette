@@ -1,0 +1,15 @@
+== PBC sample data of survRM2
+n_a 158 n_b 154 events_a 65 events_b 60
+hazard ratio 1.058893 CI 0.745327 1.504379 p 0.749429
+logrank chi2 0.101705 p 0.749793
+tau 10 rmst_a 7.146493 se 0.282775 rmst_b 7.283416 se 0.295478 diff -0.136923 CI -0.938519 0.664674
+rmst ratio 0.981201 CI 0.878052 1.096466
+rmtl ratio 1.050403 CI 0.787242 1.401533
+== SHOCK trial, all follow-up
+n_a 152 n_b 149 events_a 105 events_b 119
+hazard ratio 0.743734 CI 0.571207 0.968369 p 0.027903
+logrank chi2 4.868350 p 0.027354
+landmark 365 surv_a 0.467105 se 0.040467 surv_b 0.335570 se 0.038683 diff 0.131535 CI 0.021812 0.241258
+tau 1000 rmst_a 463.662239 se 38.896899 rmst_b 339.421832 se 36.808601 diff 124.240407 CI 19.279955 229.200860
+rmst ratio 1.366035 CI 1.044137 1.787172
+rmtl ratio 0.811922 CI 0.678680 0.971322

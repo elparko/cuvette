@@ -183,14 +183,20 @@ items:
     source: computed
     tool: SciPy (checks/check_metab.py in the adapter) and R t.test (check.R)
     where: Welch test of gender with the Benjamini-Hochberg adjustment, 42 metabolites below 0.05.
+    independence: independent
+    check: check.R runs t.test and p.adjust in base R, and checks/check_metab.py in the adapter uses SciPy (check.out).
   n_up:
     source: computed
     tool: SciPy and R
     where: 11 of the 42 are higher in men.
+    independence: independent
+    check: check.R runs t.test and p.adjust in base R, and checks/check_metab.py in the adapter uses SciPy (check.out).
   n_down:
     source: computed
     tool: SciPy and R
     where: 31 of the 42 are lower in men.
+    independence: independent
+    check: check.R runs t.test and p.adjust in base R, and checks/check_metab.py in the adapter uses SciPy (check.out).
 data:
   source: R package ropls 1.44.0, data sacurine (dataMatrix and sampleMetadata), written to CSV by catalog/metabolomics-stats/data/make_fixtures.R. Public data of MetaboLights MTBLS404.
   url: https://bioconductor.org/packages/ropls

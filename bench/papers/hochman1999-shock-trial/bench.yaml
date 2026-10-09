@@ -1,0 +1,44 @@
+adapters: [trial-endpoints]
+prompt: |
+  The SHOCK trial randomized 302 patients with cardiogenic shock after a heart attack to early revascularization or to initial medical stabilization. The file {data}/hochman1999-shock-trial/shock_endpoints.csv has one row for each patient. The columns are arm (early_revascularization or medical_stabilization), died_30d (1 if the patient died within 30 days of randomization), age_lt75 (1 if the patient is younger than 75 years), time_days (days from randomization to death or to the last contact, blank if unknown) and death (1 if the patient died, 0 if the time is censored). Early revascularization is the test arm. All patients stay in the arm of randomization (intention to treat). Please analyze two endpoints. First, the primary endpoint, death within 30 days: give the number of patients in each arm, the 30-day mortality in each arm in percent, the risk difference in percentage points with its 95% confidence interval (Wald method) and the p value of the chi-square test without continuity correction. Second, survival during the whole follow-up: give the hazard ratio of early revascularization with its 95% confidence interval and the log-rank p value. Also compare the Kaplan-Meier survival at 1 year (365 days): the survival in each arm in percent, and the difference in percentage points with its 95% confidence interval. Write every proportion, risk difference and survival difference as a number with the % sign after it, such as -4.5%. Put the % sign after each limit of an interval, such as -10.2% to 1.3%. Do not write the word points. Add the restricted mean survival time up to 1825 days if you can.
+answers:
+  endpoint_definition: "death from any cause within 30 days of randomization (primary); death from any cause during follow-up (long-term survival)"
+  analysis_population: intention to treat
+  stratum_column: none
+  missing_outcome: exclude
+  rd_ci_method: wald
+  binary_test: chi_square
+  alpha: 0.05
+  outcome_direction: event is bad
+  ni_margin: 0
+  ni_scale_binary: risk_difference
+  ni_scale_survival: hazard_ratio
+  ni_alpha: 0.025
+  rmst_tau: 1825
+  landmark_time: 365
+  cox_ties: efron
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data: [hochman1999-shock-trial/shock_endpoints.csv]
+items:
+  # Sources: Hochman et al., N Engl J Med 341:625-634 (1999), abstract (30-day numbers); Hochman et al., JAMA 285:190-192 (2001), abstract (1-year survival);
+  # Hochman et al., JAMA 295:2511-2515 (2006), abstract (hazard ratio and log-rank P). check.py (SciPy, lifelines) reproduces each value from the Zenodo data.
+  - {key: n_early, description: "Patients in the early revascularization arm", value: 152, exact: true, tool: compare_binary_endpoint}
+  - {key: n_medical, description: "Patients in the medical stabilization arm", value: 150, exact: true, tool: compare_binary_endpoint}
+  - {key: mortality30_early, description: "30-day mortality, early revascularization (fraction)", value: 0.467, tolerance: 0.001, tool: compare_binary_endpoint}
+  - {key: mortality30_medical, description: "30-day mortality, medical stabilization (fraction)", value: 0.560, tolerance: 0.001, tool: compare_binary_endpoint}
+  - {key: rd30, description: "30-day risk difference (fraction, early minus medical)", value: -0.093, tolerance: 0.001, tool: compare_binary_endpoint}
+  - {key: rd30_ci_low, description: "Lower limit of the 95% interval of the 30-day risk difference", value: -0.205, tolerance: 0.001, tool: compare_binary_endpoint}
+  - {key: rd30_ci_high, description: "Upper limit of the 95% interval of the 30-day risk difference", value: 0.019, tolerance: 0.001, tool: compare_binary_endpoint}
+  - {key: p30, description: "p value of the 30-day chi-square test (the paper prints 0.11)", value: 0.11, tolerance: 0.006, tool: compare_binary_endpoint}
+  - {key: hr, description: "Hazard ratio of death, early revascularization against medical stabilization", value: 0.74, tolerance: 0.005, tool: compare_survival_endpoint}
+  - {key: hr_ci_low, description: "Lower limit of the 95% interval of the hazard ratio", value: 0.57, tolerance: 0.005, tool: compare_survival_endpoint}
+  - {key: hr_ci_high, description: "Upper limit of the 95% interval of the hazard ratio", value: 0.97, tolerance: 0.005, tool: compare_survival_endpoint}
+  - {key: logrank_p, description: "Log-rank p value (the paper prints P = .03)", value: 0.03, tolerance: 0.005, tool: compare_survival_endpoint}
+  - {key: surv1_early, description: "Kaplan-Meier survival at 1 year, early revascularization (fraction)", value: 0.467, tolerance: 0.001, tool: compare_survival_endpoint}
+  - {key: surv1_medical, description: "Kaplan-Meier survival at 1 year, medical stabilization (fraction)", value: 0.336, tolerance: 0.001, tool: compare_survival_endpoint}
+  - {key: surv1_diff, description: "Difference in 1-year survival (fraction)", value: 0.132, tolerance: 0.001, tool: compare_survival_endpoint}
+  - {key: surv1_diff_ci_low, description: "Lower limit of the 95% interval of the 1-year survival difference", value: 0.022, tolerance: 0.001, tool: compare_survival_endpoint}
+  - {key: surv1_diff_ci_high, description: "Upper limit of the 95% interval of the 1-year survival difference", value: 0.241, tolerance: 0.001, tool: compare_survival_endpoint}
+  - {key: rmst_diff, description: "Difference of the restricted mean survival time up to 1825 days (days; no published value, check.py)", value: 224.26, tolerance: 0.5, reference: true, in_answer: false, tool: compare_survival_endpoint}

@@ -1,0 +1,826 @@
+adapter:
+  name: trial-endpoints
+  field: clinical trial statistics
+  file_types: [".csv"]
+  title: Clinical trial endpoints (risk difference, stratified analysis, restricted mean survival time, non-inferiority)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Analyzes the primary endpoint of a two-arm trial from a table of patients or from event counts. A binary endpoint gives the risk difference,
+    the relative risk, the odds ratio, the number needed to treat, Mantel-Haenszel estimates over strata and non-inferiority tests.
+    A time-to-event endpoint gives the hazard ratio, the log-rank test, the restricted mean survival time and the survival at one time.
+    The scientist decides the endpoint, the population, the margin and the time limit.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: survRM2
+  version: "1.0-4"
+  tested_versions: []
+  homepage: https://cran.r-project.org/package=survRM2
+  docs:
+    - https://cran.r-project.org/web/packages/survRM2/survRM2.pdf
+    - https://doi.org/10.1200/JCO.2014.55.2208
+  install: >
+    Install R (brew install r on macOS). Then install the R packages survRM2 and jsonlite into a library folder that the adapter
+    reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("survRM2", "jsonlite"), repos = "https://cloud.r-project.org")'
+  citation:
+    - text: "Uno, H., Tian, L., Horiguchi, M., Cronin, A., Battioui, C., & Bell, J. (2022). survRM2: Comparing Restricted Mean Survival Time. R package version 1.0-4. https://doi.org/10.32614/CRAN.package.survRM2"
+      doi: 10.32614/CRAN.package.survRM2
+      bibtex: |
+        @Manual{uno2022survrm2,
+          title  = {{survRM2}: Comparing Restricted Mean Survival Time},
+          author = {Uno, Hajime and Tian, Lu and Horiguchi, Miki and Cronin, Angel and Battioui, Chakib and Bell, James},
+          year   = {2022},
+          note   = {R package version 1.0-4},
+          doi    = {10.32614/CRAN.package.survRM2}
+        }
+    - text: "Uno, H., Claggett, B., Tian, L., Inoue, E., Gallo, P., Miyata, T., Schrag, D., Takeuchi, M., Uyama, Y., Zhao, L., Skali, H., Solomon, S., Jacobus, S., Hughes, M., Packer, M., & Wei, L.-J. (2014). Moving beyond the hazard ratio in quantifying the between-group difference in survival analysis. Journal of Clinical Oncology, 32(22), 2380-2385. https://doi.org/10.1200/JCO.2014.55.2208"
+      doi: 10.1200/JCO.2014.55.2208
+      kind: method
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 600
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that exists of these:
+  GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library. The program version in this
+  adapter is the version of the R package survRM2, not of R. The tools analyze the rows that they receive. The scientist must decide
+  and state the analysis population before the first run.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools read a table with one row for each patient. Use de-identified trial data only. The tools return counts, estimates and intervals.
+
+decisions:
+  - key: endpoint_definition
+    label: Primary endpoint
+    kind: text
+    group: Endpoint
+    help: >
+      State the event that the endpoint counts and the time of the assessment. Example: death from any cause within 30 days of randomization.
+      Decide before you see the data. The tools use the text as a label only.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: false
+    links:
+      - { tool: compare_binary_endpoint, arg: endpoint }
+      - { tool: compare_survival_endpoint, arg: endpoint }
+
+  - key: analysis_population
+    label: Analysis population
+    kind: text
+    default: intention to treat
+    group: Endpoint
+    help: >
+      Name the patients in the table. Intention to treat keeps every randomized patient in the arm of randomization. Per protocol keeps
+      only patients who followed the protocol. The tools analyze all rows that they receive, so you must filter the table first.
+    essential: true
+    owner: human
+    stage: setup
+    changes_conclusion: false
+    links:
+      - { tool: compare_binary_endpoint, arg: population }
+      - { tool: compare_survival_endpoint, arg: population }
+
+  - key: stratum_column
+    label: Stratification factor
+    kind: text
+    default: none
+    group: Endpoint
+    help: >
+      Name the column of the factor that stratified the randomization, or write none. A column gives Mantel-Haenszel estimates for a
+      binary endpoint. It gives a stratified Cox model and log-rank test for a time-to-event endpoint. The restricted mean survival time ignores the strata.
+    owner: human
+    stage: setup
+    links:
+      - { tool: compare_binary_endpoint, arg: stratum_col }
+      - { tool: compare_survival_endpoint, arg: stratum_col }
+
+  - key: missing_outcome
+    label: Patients with a missing outcome
+    kind: choice
+    choices: [exclude, count_as_event, count_as_no_event]
+    default: exclude
+    group: Endpoint
+    help: >
+      exclude drops the patient. count_as_event gives the worst case if an event is bad. count_as_no_event gives the best case.
+      Run the other two choices as a check. If the result changes with the choice, report that.
+    owner: human
+    stage: setup
+    links:
+      - { tool: compare_binary_endpoint, arg: missing_outcome }
+    sensitivity:
+      options: [exclude, count_as_event, count_as_no_event]
+      tool: compare_binary_endpoint
+      compare: [metrics.rd, metrics.rd_ci_low, metrics.rd_ci_high]
+      max_runs: 3
+
+  - key: rd_ci_method
+    label: Confidence interval method for the risk difference
+    kind: choice
+    choices: [wald, newcombe, miettinen_nurminen]
+    default: newcombe
+    group: Binary endpoint
+    help: >
+      wald is the simple normal interval. It is too narrow for small groups or for risks near 0 or 1. newcombe combines the Wilson intervals of the
+      two arms. miettinen_nurminen inverts a score test. SAS and Stata name the method in the output. Name the method in the report.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_binary_endpoint, arg: rd_ci_method }
+    sensitivity:
+      options: [wald, newcombe, miettinen_nurminen]
+      tool: compare_binary_endpoint
+      compare: [metrics.rd_ci_low, metrics.rd_ci_high]
+      max_runs: 3
+
+  - key: binary_test
+    label: Test of the two proportions
+    kind: choice
+    choices: [chi_square, chi_square_continuity, fisher]
+    default: chi_square
+    group: Binary endpoint
+    help: >
+      chi_square is the Pearson test without continuity correction. chi_square_continuity applies the Yates correction. fisher is the exact test.
+      Use fisher if an expected count is below 5.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_binary_endpoint, arg: binary_test }
+
+  - key: alpha
+    label: Two-sided significance level
+    kind: float
+    default: 0.05
+    lo: 0.001
+    hi: 0.5
+    group: Test
+    help: The confidence intervals have the level one minus this value. The unit is a fraction. A p value below this value is significant.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_binary_endpoint, arg: alpha }
+      - { tool: compare_survival_endpoint, arg: alpha }
+
+  - key: outcome_direction
+    label: Direction of the binary outcome
+    kind: choice
+    choices: [event is bad, event is good]
+    default: event is bad
+    group: Non-inferiority
+    help: >
+      event is bad means that a higher risk harms the patient, such as death. event is good means that a higher risk helps, like cure.
+      The direction decides which limit of the interval the margin tests.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_binary_endpoint, arg: outcome_direction }
+
+  - key: ni_margin
+    label: Non-inferiority margin
+    kind: float
+    default: 0
+    lo: 0
+    hi: 100
+    group: Non-inferiority
+    help: >
+      The largest loss that you accept for the new treatment. 0 means no non-inferiority test. The scale of the number depends on the scale
+      decision. Fix the margin in the protocol before you see the data. A margin that you choose after the result has no meaning.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_binary_endpoint, arg: ni_margin }
+      - { tool: compare_survival_endpoint, arg: ni_margin }
+
+  - key: ni_scale_binary
+    label: Scale of the margin for a binary endpoint
+    kind: choice
+    choices: [risk_difference, risk_ratio]
+    default: risk_difference
+    group: Non-inferiority
+    help: >
+      risk_difference takes the margin as a fraction, such as 0.10 for 10 points. risk_ratio takes the margin as a ratio above 1,
+      such as 1.25.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_binary_endpoint, arg: ni_scale }
+
+  - key: ni_scale_survival
+    label: Scale of the margin for a time-to-event endpoint
+    kind: choice
+    choices: [hazard_ratio, rmst_difference]
+    default: hazard_ratio
+    group: Non-inferiority
+    help: >
+      hazard_ratio takes the margin as a ratio above 1, such as 1.3. rmst_difference takes the margin as a loss of restricted mean survival time.
+      Use the unit of the time column. The second choice needs the time limit tau.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_survival_endpoint, arg: ni_scale }
+
+  - key: ni_alpha
+    label: One-sided level of the non-inferiority test
+    kind: float
+    default: 0.025
+    lo: 0.001
+    hi: 0.25
+    group: Non-inferiority
+    help: The test uses the one-sided interval at this level. 0.025 equals the upper limit of a two-sided 95% interval. The unit is a fraction.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_binary_endpoint, arg: ni_alpha }
+      - { tool: compare_survival_endpoint, arg: ni_alpha }
+
+  - key: rmst_tau
+    label: Time limit tau of the restricted mean survival time
+    kind: float
+    default: 0
+    lo: 0
+    hi: 100000
+    group: Time to event
+    help: >
+      The restricted mean survival time is the area under the survival curve up to tau. Use the unit of the time column. 0 gives no restricted
+      mean survival time. Fix tau in the protocol. It must not be later than the last time of the shorter arm.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_survival_endpoint, arg: rmst_tau }
+
+  - key: landmark_time
+    label: Time of the survival comparison
+    kind: float
+    default: 0
+    lo: 0
+    hi: 100000
+    group: Time to event
+    help: >
+      The tool compares the Kaplan-Meier survival of the two arms at this time. Use the unit of the time column. 0 gives no comparison at a time.
+      Choose the time before you see the curves.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_survival_endpoint, arg: landmark_time }
+
+  - key: cox_ties
+    label: Handling of tied event times in the Cox model
+    kind: choice
+    choices: [efron, breslow, exact]
+    default: efron
+    group: Time to event
+    help: >
+      efron is the default of R and Stata. breslow is the default of SAS PROC PHREG. The two give nearly the same hazard ratio
+      if few event times repeat. exact is slow for many ties.
+    owner: agent
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: compare_survival_endpoint, arg: cox_ties }
+
+checks:
+  - id: population_not_stated
+    description: The answer gives a result and does not name the analysis population.
+    severity: warning
+    text: Report the answer if it gives an effect estimate and does not say if the analysis is intention to treat, modified intention to treat or per protocol.
+  - id: margin_after_result
+    description: The answer chooses or changes the non-inferiority margin after it sees the interval.
+    severity: error
+    text: >
+      Report the answer if the non-inferiority margin comes from the result, or if the answer tries several margins and keeps the one that
+      shows non-inferiority.
+  - id: ci_method_not_named
+    description: The answer gives a risk difference interval and does not name the method.
+    severity: warning
+    text: Report the answer if it gives a confidence interval for a risk difference and does not name the method (Wald, Newcombe or Miettinen-Nurminen).
+  - id: hazard_ratio_without_ph
+    description: The answer gives a hazard ratio while the proportional hazards test is significant, and does not mention it.
+    severity: warning
+    text: >
+      Report the answer if the result lists a proportional hazards test p value below 0.05 and the answer gives one hazard ratio without
+      a warning or without the restricted mean survival time.
+  - id: subgroup_claim
+    description: The answer claims a subgroup effect from a separate test in each subgroup.
+    severity: warning
+    text: Report the answer if it claims that a treatment works in one subgroup and not in another without a test of interaction.
+  - id: non_significant_as_equal
+    description: The answer says that two treatments are equal because the test is not significant.
+    severity: warning
+    text: Report the answer if it says that two arms are equal or have no difference because a p value is above the level, and it ran no non-inferiority test.
+
+map:
+  - tool: compare_binary_endpoint
+    match: { stratum_col: set }
+    route: "SAS: PROC FREQ DATA=d; TABLES stratum*arm*event / CMH COMMONRISKDIFF(CL=MH); EXACT ... ; Stata: cs event arm, by(stratum); mhodds event arm, by(stratum)"
+    steps:
+      - "SAS: PROC FREQ; TABLES stratum*arm*event / CMH RISKDIFF COMMONRISKDIFF. The output shows the Cochran-Mantel-Haenszel statistics, the Mantel-Haenszel relative risk and odds ratio with the Breslow-Day test, and the common risk difference."
+      - "Stata: cs event arm, by(stratum) gives the Mantel-Haenszel risk difference and risk ratio with a test of homogeneity. mhodds event arm, by(stratum) gives the odds ratio."
+      - "R: mantelhaen.test(table) gives the Cochran-Mantel-Haenszel test (continuity correction on by default) and the common odds ratio."
+    params:
+      - { arg: stratum_col, label: "TABLES stratum*arm*event in PROC FREQ, or by(stratum) in Stata" }
+      - { arg: rd_ci_method, label: "RISKDIFF(CL=...) in PROC FREQ", ui_default: wald }
+    fidelity: close
+    difference: >
+      The Mantel-Haenszel risk difference uses the variance of Greenland and Robins. SAS COMMONRISKDIFF(CL=MH) uses the variance of
+      Sato, so its interval differs a little. The Cochran-Mantel-Haenszel statistic has no continuity correction, as in SAS. R mantelhaen.test
+      applies the correction by default. The SAS and Stata routes were not run.
+    evidence:
+      source: docs
+      test: stratified-penicillin-rabbits
+      note: The estimates equal the R package meta (metabin, method MH) and Python statsmodels StratifiedTable (checks/check_binary.out, checks/check_mh_rd.out).
+
+  - tool: compare_binary_endpoint
+    route: "SAS: PROC FREQ DATA=d; TABLES arm*event / RISKDIFF(CL=(WALD NEWCOMBE MN)) CHISQ RELRISK; Stata: cs event arm, or; cii proportions; R: prop.test(), fisher.test()"
+    steps:
+      - "SAS: PROC FREQ; TABLES arm*event / RISKDIFF(CL=(WALD NEWCOMBE MN) NORISK) CHISQ RELRISK FISHER. RISKDIFF gives the risk difference with the chosen interval methods. RELRISK gives the relative risk and the odds ratio."
+      - "SAS non-inferiority: add RISKDIFF(EQUIV NONINF MARGIN=0.1 METHOD=MN) to test the risk difference against the margin. The test uses the one-sided level."
+      - "Stata: cs event arm gives the risk difference, the risk ratio and the attributable risk with Wald intervals. cc event arm gives the odds ratio."
+      - "OpenEpi: the Two by Two Table module gives the risk difference and the relative risk with Wald and score intervals."
+      - "R: prop.test(c(x1, x0), c(n1, n0), correct = FALSE) gives a score interval for the risk difference (Wilson-type, not Miettinen-Nurminen)."
+    params:
+      - { arg: rd_ci_method, label: "RISKDIFF(CL=...) in PROC FREQ", ui_default: wald }
+      - { arg: binary_test, label: "CHISQ or FISHER option in PROC FREQ", ui_default: chi_square }
+      - { arg: ni_margin, label: "MARGIN= of RISKDIFF(NONINF) in PROC FREQ" }
+      - { arg: ni_alpha, label: "ALPHA= of PROC FREQ (the one-sided level is half of it)", ui_default: 0.05 }
+    fidelity: close
+    difference: >
+      The tool shows the interval at the one-sided level for the non-inferiority check. SAS tests the margin with a score test of
+      Miettinen and Nurminen, and the tool compares the interval limit with the margin. The two agree when the interval is the score interval.
+      The SAS, Stata and OpenEpi routes were not run.
+    evidence:
+      source: docs
+      test: risk-difference-methods-independent
+      note: Python statsmodels gives the same Wald and Newcombe intervals (checks/check_binary.out). The R packages PropCIs and ratesci give the same score interval (checks/check_mn.out).
+
+  - tool: compare_survival_endpoint
+    route: "R: survRM2::rmst2(time, status, arm, tau); coxph(Surv(time, status) ~ arm); survdiff(); SAS: PROC PHREG; PROC LIFETEST; Stata: stcox, sts test, strmst2"
+    steps:
+      - "SAS: PROC LIFETEST; TIME time*event(0); STRATA arm / TEST=LOGRANK; gives the log-rank test and the Kaplan-Meier estimates. The option TIMELIST=365 gives the survival at one time."
+      - "SAS: PROC PHREG; MODEL time*event(0) = arm / RISKLIMITS TIES=EFRON; gives the hazard ratio. TIES=BRESLOW is the SAS default. Add a STRATA statement for a stratified model."
+      - "SAS: PROC LIFETEST; RMST option (SAS/STAT 15.1 and later) gives the restricted mean survival time up to tau."
+      - "Stata: stset time, failure(event); stcox arm gives the hazard ratio; sts test arm gives the log-rank test; strmst2 time arm, tau(10) gives the restricted mean survival time."
+      - "R: library(survRM2); rmst2(time, status, arm, tau = 10) gives the restricted mean survival time per arm, the difference, the ratio and the ratio of restricted mean time lost."
+    params:
+      - { arg: rmst_tau, label: "tau of rmst2() or tau() of strmst2" }
+      - { arg: cox_ties, label: "TIES= of PROC PHREG", ui_default: breslow }
+      - { arg: landmark_time, label: "TIMELIST= of PROC LIFETEST" }
+      - { arg: stratum_col, label: "STRATA statement of PROC PHREG and PROC LIFETEST" }
+      - { arg: ni_margin, label: "margin of the non-inferiority check" }
+    fidelity: close
+    difference: >
+      The hazard ratio equals R coxph and Stata stcox (Efron ties). SAS PROC PHREG uses Breslow ties by default, so its hazard ratio differs
+      a little with many tied times. The difference of the survival at one time uses the Greenwood standard errors and a plain interval.
+      The SAS and Stata routes were not run.
+    evidence:
+      source: docs
+      test: pbc-rmst-independent
+      note: The restricted mean survival time and the hazard ratio equal an independent Python calculation (checks/check_survival.out, lifelines and NumPy).
+
+tests:
+  - id: shock-30-day-published
+    description: >
+      SHOCK trial, death within 30 days, early revascularization against initial medical stabilization (Hochman et al., N Engl J Med 1999,
+      DOI 10.1056/NEJM199908263410901, abstract). The paper prints 46.7% and 56.0% (152 and 150 patients), a difference of -9.3 points
+      with the 95% interval -20.5 to 1.9 (Wald) and P = 0.11. Data: Zenodo 10.5281/zenodo.14046978 (see data/SOURCES.md).
+    data: [data/shock_endpoints.csv]
+    calls:
+      - tool: compare_binary_endpoint
+        args: { data: "{adapter_dir}/data/shock_endpoints.csv", arm_col: arm, event_col: died_30d, group_a: early_revascularization, group_b: medical_stabilization, rd_ci_method: wald, binary_test: chi_square }
+    expect:
+      - { path: metrics.n_a, equals: 152 }
+      - { path: metrics.n_b, equals: 150 }
+      - { path: metrics.events_a, equals: 71 }
+      - { path: metrics.events_b, equals: 84 }
+      - { path: metrics.risk_a, approx: 0.467, abs: 0.0005 }
+      - { path: metrics.risk_b, approx: 0.560, abs: 0.0005 }
+      - { path: metrics.rd, approx: -0.093, abs: 0.0005 }
+      - { path: metrics.rd_ci_low, approx: -0.205, abs: 0.0005 }
+      - { path: metrics.rd_ci_high, approx: 0.019, abs: 0.0005 }
+      - { path: metrics.test_p, approx: 0.11, abs: 0.006 }
+
+  - id: shock-30-day-independent
+    description: >
+      The same counts, 71 of 152 against 84 of 150, with SciPy and NumPy (checks/check_binary.py, checks/check_binary.out): relative risk,
+      odds ratio and the chi-square, continuity-corrected and Fisher p values.
+    data: [data/shock_endpoints.csv]
+    calls:
+      - tool: compare_binary_endpoint
+        args: { data: "{adapter_dir}/data/shock_endpoints.csv", arm_col: arm, event_col: died_30d, group_a: early_revascularization, group_b: medical_stabilization, rd_ci_method: wald, binary_test: fisher }
+    expect:
+      - { path: metrics.rr, approx: 0.834117, abs: 0.000001 }
+      - { path: metrics.rr_ci_low, approx: 0.668554, abs: 0.000001 }
+      - { path: metrics.rr_ci_high, approx: 1.040680, abs: 0.000001 }
+      - { path: metrics.or, approx: 0.688713, abs: 0.000001 }
+      - { path: metrics.or_ci_low, approx: 0.437703, abs: 0.000001 }
+      - { path: metrics.or_ci_high, approx: 1.083669, abs: 0.000001 }
+      - { path: metrics.test_p, approx: 0.109054, abs: 0.000001 }
+      - { path: metrics.nnt, approx: 10.7649, abs: 0.0001 }
+
+  - id: risk-difference-methods-independent
+    description: >
+      Counts 56 of 70 against 48 of 80 with the three interval methods. Python statsmodels confint_proportions_2indep gives the Wald limits
+      0.057505 to 0.342495 and the Newcombe limits 0.052431 to 0.333873 (checks/check_binary.out). The R packages PropCIs (diffscoreci) and
+      ratesci (scoreci, Miettinen-Nurminen) give the score limits 0.052830 to 0.338173 (checks/check_mn.R and check_mn.out). The statsmodels
+      score method gives different limits, so the test does not use them. The interval of the risk difference excludes 0, so the
+      number needed to treat has a finite interval (1/0.333873 to 1/0.052431).
+    calls:
+      - tool: compare_binary_endpoint
+        args: { events_a: 56, n_a: 70, events_b: 48, n_b: 80, rd_ci_method: wald, binary_test: chi_square }
+        save_as: wald
+      - tool: compare_binary_endpoint
+        args: { events_a: 56, n_a: 70, events_b: 48, n_b: 80, rd_ci_method: newcombe, binary_test: chi_square }
+        save_as: newcombe
+      - tool: compare_binary_endpoint
+        args: { events_a: 56, n_a: 70, events_b: 48, n_b: 80, rd_ci_method: miettinen_nurminen, binary_test: chi_square_continuity }
+    expect:
+      - { path: saved.wald.metrics.rd_ci_low, approx: 0.057505, abs: 0.000001 }
+      - { path: saved.wald.metrics.rd_ci_high, approx: 0.342495, abs: 0.000001 }
+      - { path: saved.newcombe.metrics.rd_ci_low, approx: 0.052431, abs: 0.000001 }
+      - { path: saved.newcombe.metrics.rd_ci_high, approx: 0.333873, abs: 0.000001 }
+      - { path: saved.newcombe.metrics.nnt, approx: 5, abs: 0.000001 }
+      - { path: saved.newcombe.metrics.nnt_ci_low, approx: 2.995151, abs: 0.000001 }
+      - { path: saved.newcombe.metrics.nnt_ci_high, approx: 19.0725, abs: 0.001 }
+      - { path: metrics.rd_ci_low, approx: 0.052830, abs: 0.000001 }
+      - { path: metrics.rd_ci_high, approx: 0.338173, abs: 0.000001 }
+      - { path: metrics.test_p, approx: 0.013409, abs: 0.000001 }
+      - { path: metrics.rr, approx: 1.333333, abs: 0.000001 }
+      - { path: metrics.rr_ci_low, approx: 1.076626, abs: 0.000001 }
+      - { path: metrics.or, approx: 2.666667, abs: 0.000001 }
+      - { path: metrics.or_ci_high, approx: 5.572020, abs: 0.000001 }
+
+  - id: stratified-penicillin-rabbits
+    description: >
+      Rabbits data of the R help page of mantelhaen.test (Agresti): cure after penicillin with and without a delay, 5 penicillin levels.
+      The common odds ratio 7 and its interval 1.026713 to 47.725133 equal the R mantelhaen.test output. The other values come from
+      Python statsmodels StratifiedTable and the R package meta (checks/check_binary.out, checks/check_mh_rd.out). Two strata have no
+      cure in either arm or in both arms, so the Breslow-Day test uses 3 strata and 2 degrees of freedom.
+    data: [data/rabbits_penicillin.csv]
+    calls:
+      - tool: compare_binary_endpoint
+        args: { data: "{adapter_dir}/data/rabbits_penicillin.csv", arm_col: delay, event_col: cured, group_a: None, group_b: 1.5h, stratum_col: level, rd_ci_method: miettinen_nurminen, binary_test: fisher }
+    expect:
+      - { path: metrics.n_strata, equals: 5 }
+      - { path: metrics.mh_or, approx: 7, abs: 0.000001 }
+      - { path: metrics.mh_or_ci_low, approx: 1.026713, abs: 0.000001 }
+      - { path: metrics.mh_or_ci_high, approx: 47.725133, abs: 0.000001 }
+      - { path: metrics.mh_rr, approx: 1.552632, abs: 0.000001 }
+      - { path: metrics.mh_rr_ci_low, approx: 1.030638, abs: 0.000001 }
+      - { path: metrics.mh_rr_ci_high, approx: 2.339002, abs: 0.000001 }
+      - { path: metrics.mh_rd, approx: 0.228036, abs: 0.000001 }
+      - { path: metrics.mh_rd_ci_low, approx: 0.085398, abs: 0.000001 }
+      - { path: metrics.mh_rd_ci_high, approx: 0.370673, abs: 0.000001 }
+      - { path: metrics.cmh_chisq, approx: 5.657143, abs: 0.000001 }
+      - { path: metrics.cmh_p, approx: 0.017384, abs: 0.000001 }
+      - { path: metrics.breslow_day_chisq, approx: 8.627332, abs: 0.000001 }
+      - { path: metrics.tarone_chisq, approx: 8.358316, abs: 0.000001 }
+      - { path: metrics.homogeneity_df, equals: 2 }
+      - { path: metrics.homogeneity_p, approx: 0.015311, abs: 0.000001 }
+
+  - id: noninferiority-risk-difference
+    description: >
+      Counts 30 of 200 against 36 of 200 with a bad event. The one-sided 97.5% upper limit of the Newcombe interval is 0.043187
+      (checks/check_binary.out). A margin of 0.10 shows non-inferiority, and a margin of 0.04 does not.
+    calls:
+      - tool: compare_binary_endpoint
+        args: { events_a: 30, n_a: 200, events_b: 36, n_b: 200, rd_ci_method: newcombe, binary_test: chi_square, ni_margin: 0.1, ni_scale: risk_difference, outcome_direction: event is bad, ni_alpha: 0.025 }
+        save_as: wide
+      - tool: compare_binary_endpoint
+        args: { events_a: 30, n_a: 200, events_b: 36, n_b: 200, rd_ci_method: newcombe, binary_test: chi_square, ni_margin: 0.04, ni_scale: risk_difference, outcome_direction: event is bad, ni_alpha: 0.025 }
+    expect:
+      - { path: saved.wide.metrics.ni_limit, approx: 0.043187, abs: 0.000001 }
+      - { path: saved.wide.metrics.ni_shown, equals: 1 }
+      - { path: metrics.ni_limit, approx: 0.043187, abs: 0.000001 }
+      - { path: metrics.ni_shown, equals: 0 }
+      - { path: summary, contains: "Non-inferiority is not shown" }
+
+  - id: noninferiority-good-outcome-and-ratio
+    description: >
+      With a good outcome (cure), non-inferiority needs the lower limit above minus the margin. The lower Newcombe limit of 30 of 200 against
+      36 of 200 is -0.103020 (checks/check_binary.out), so a margin of 0.12 shows it. On the risk ratio scale the upper log limit is 1.297945
+      and the lower limit is 0.535034 (checks/check_binary.out): a bad event with margin 1.3 shows non-inferiority, and a good event with margin 1.3 does not (1/1.3 = 0.769).
+    calls:
+      - tool: compare_binary_endpoint
+        args: { events_a: 30, n_a: 200, events_b: 36, n_b: 200, rd_ci_method: newcombe, binary_test: chi_square, ni_margin: 0.12, ni_scale: risk_difference, outcome_direction: event is good }
+        save_as: good
+      - tool: compare_binary_endpoint
+        args: { events_a: 30, n_a: 200, events_b: 36, n_b: 200, rd_ci_method: newcombe, binary_test: chi_square, ni_margin: 1.3, ni_scale: risk_ratio, outcome_direction: event is bad }
+        save_as: ratio_bad
+      - tool: compare_binary_endpoint
+        args: { events_a: 30, n_a: 200, events_b: 36, n_b: 200, rd_ci_method: newcombe, binary_test: chi_square, ni_margin: 1.3, ni_scale: risk_ratio, outcome_direction: event is good }
+    expect:
+      - { path: saved.good.metrics.ni_limit, approx: -0.103020, abs: 0.000001 }
+      - { path: saved.good.metrics.ni_shown, equals: 1 }
+      - { path: saved.ratio_bad.metrics.ni_limit, approx: 1.297945, abs: 0.000001 }
+      - { path: saved.ratio_bad.metrics.ni_shown, equals: 1 }
+      - { path: metrics.ni_limit, approx: 0.535034, abs: 0.000001 }
+      - { path: metrics.ni_shown, equals: 0 }
+
+  - id: missing-outcome-choices
+    description: >
+      In the SHOCK table, one patient of the medical stabilization arm has no follow-up time and no death status. exclude leaves 119 of 149 deaths in that
+      arm. count_as_event gives 120 of 150. The counts come from the table (checks/check_survival.out lists the 149 patients).
+    data: [data/shock_endpoints.csv]
+    calls:
+      - tool: compare_binary_endpoint
+        args: { data: "{adapter_dir}/data/shock_endpoints.csv", arm_col: arm, event_col: death, group_a: early_revascularization, group_b: medical_stabilization, rd_ci_method: wald, binary_test: chi_square, missing_outcome: exclude }
+        save_as: excluded
+      - tool: compare_binary_endpoint
+        args: { data: "{adapter_dir}/data/shock_endpoints.csv", arm_col: arm, event_col: death, group_a: early_revascularization, group_b: medical_stabilization, rd_ci_method: wald, binary_test: chi_square, missing_outcome: count_as_event }
+    expect:
+      - { path: saved.excluded.metrics.n_b, equals: 149 }
+      - { path: saved.excluded.metrics.events_b, equals: 119 }
+      - { path: saved.excluded.metrics.n_missing_outcome, equals: 1 }
+      - { path: metrics.n_b, equals: 150 }
+      - { path: metrics.events_b, equals: 120 }
+
+  - id: shock-survival-published
+    description: >
+      SHOCK trial, all-cause death during follow-up (Hochman et al., JAMA 2006, DOI 10.1001/jama.295.21.2511, and JAMA 2001, DOI 10.1001/jama.285.2.190).
+      The 2006 paper prints a hazard ratio of 0.74 (95% interval 0.57 to 0.97) and a log-rank P of .03. The 2001 paper prints the survival at 1 year,
+      46.7% and 33.6%, a difference of 13.2 points (95% interval 2.2 to 24.1). The table has 301 patients with a time (the Zenodo file
+      misses one patient of the medical stabilization arm).
+    data: [data/shock_endpoints.csv]
+    calls:
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/shock_endpoints.csv", arm_col: arm, time_col: time_days, event_col: death, group_a: early_revascularization, group_b: medical_stabilization, landmark_time: 365, cox_ties: efron }
+    expect:
+      - { path: metrics.n_a, equals: 152 }
+      - { path: metrics.n_b, equals: 149 }
+      - { path: metrics.n_dropped, equals: 1 }
+      - { path: metrics.hr, approx: 0.74, abs: 0.005 }
+      - { path: metrics.hr_ci_low, approx: 0.57, abs: 0.005 }
+      - { path: metrics.hr_ci_high, approx: 0.97, abs: 0.005 }
+      - { path: metrics.logrank_p, approx: 0.03, abs: 0.005 }
+      - { path: metrics.surv_a, approx: 0.467, abs: 0.0005 }
+      - { path: metrics.surv_b, approx: 0.336, abs: 0.0005 }
+      - { path: metrics.surv_diff, approx: 0.132, abs: 0.0005 }
+      - { path: metrics.surv_diff_ci_low, approx: 0.022, abs: 0.0005 }
+      - { path: metrics.surv_diff_ci_high, approx: 0.241, abs: 0.0005 }
+
+  - id: shock-survival-independent
+    description: >
+      The same table with an independent Python calculation (checks/check_survival.py and checks/check_survival.out; lifelines for the Cox model
+      and the log-rank test, NumPy for the Kaplan-Meier curve and the restricted mean survival time). Tau is 1000 days.
+    data: [data/shock_endpoints.csv]
+    calls:
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/shock_endpoints.csv", arm_col: arm, time_col: time_days, event_col: death, group_a: early_revascularization, group_b: medical_stabilization, landmark_time: 365, rmst_tau: 1000, cox_ties: efron }
+    expect:
+      - { path: metrics.events_a, equals: 105 }
+      - { path: metrics.events_b, equals: 119 }
+      - { path: metrics.hr, approx: 0.743734, abs: 0.000001 }
+      - { path: metrics.hr_ci_low, approx: 0.571207, abs: 0.000001 }
+      - { path: metrics.hr_ci_high, approx: 0.968369, abs: 0.000001 }
+      - { path: metrics.hr_p, approx: 0.027903, abs: 0.000001 }
+      - { path: metrics.logrank_chisq, approx: 4.868350, abs: 0.000001 }
+      - { path: metrics.logrank_p, approx: 0.027354, abs: 0.000001 }
+      - { path: metrics.surv_se_a, approx: 0.040467, abs: 0.000001 }
+      - { path: metrics.surv_se_b, approx: 0.038683, abs: 0.000001 }
+      - { path: metrics.rmst_a, approx: 463.662239, abs: 0.00001 }
+      - { path: metrics.rmst_se_a, approx: 38.896899, abs: 0.00001 }
+      - { path: metrics.rmst_b, approx: 339.421832, abs: 0.00001 }
+      - { path: metrics.rmst_diff, approx: 124.240407, abs: 0.00001 }
+      - { path: metrics.rmst_diff_ci_low, approx: 19.279955, abs: 0.00001 }
+      - { path: metrics.rmst_diff_ci_high, approx: 229.200860, abs: 0.00001 }
+      - { path: metrics.rmst_ratio, approx: 1.366035, abs: 0.000001 }
+      - { path: metrics.rmtl_ratio, approx: 0.811922, abs: 0.000001 }
+      - { path: metrics.rmtl_ratio_ci_high, approx: 0.971322, abs: 0.000001 }
+
+  - id: pbc-rmst-independent
+    description: >
+      The sample data of the R package survRM2 (rmst2.sample.data(), from the Mayo Clinic trial of primary biliary cirrhosis), 312 patients, tau 10
+      years. The package function rmst2 and the independent Python calculation (checks/check_survival.out) give the same numbers.
+    data: [data/pbc_rmst.csv]
+    calls:
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/pbc_rmst.csv", arm_col: arm, time_col: time, event_col: status, group_a: "1", group_b: "0", rmst_tau: 10 }
+    expect:
+      - { path: metrics.rmst_a, approx: 7.146493, abs: 0.000001 }
+      - { path: metrics.rmst_se_a, approx: 0.282775, abs: 0.000001 }
+      - { path: metrics.rmst_b, approx: 7.283416, abs: 0.000001 }
+      - { path: metrics.rmst_se_b, approx: 0.295478, abs: 0.000001 }
+      - { path: metrics.rmst_diff, approx: -0.136923, abs: 0.000001 }
+      - { path: metrics.rmst_diff_ci_low, approx: -0.938519, abs: 0.000001 }
+      - { path: metrics.rmst_diff_ci_high, approx: 0.664674, abs: 0.000001 }
+      - { path: metrics.rmst_ratio, approx: 0.981201, abs: 0.000001 }
+      - { path: metrics.rmst_ratio_ci_low, approx: 0.878052, abs: 0.000001 }
+      - { path: metrics.rmtl_ratio, approx: 1.050403, abs: 0.000001 }
+      - { path: metrics.rmtl_ratio_ci_high, approx: 1.401533, abs: 0.000001 }
+      - { path: metrics.hr, approx: 1.058893, abs: 0.000001 }
+      - { path: metrics.hr_ci_low, approx: 0.745327, abs: 0.000001 }
+      - { path: metrics.hr_ci_high, approx: 1.504379, abs: 0.000001 }
+      - { path: metrics.logrank_chisq, approx: 0.101705, abs: 0.000001 }
+
+  - id: noninferiority-survival
+    description: >
+      PBC sample data. The hazard ratio is 1.058893 with the upper one-sided 97.5% limit 1.504379 (checks/check_survival.out), so a margin of 1.6
+      shows non-inferiority and a margin of 1.3 does not. On the restricted mean survival time, the lower one-sided limit of the difference
+      is -0.938519, so a margin of 1.5 years shows it and a margin of 0.5 years does not.
+    data: [data/pbc_rmst.csv]
+    calls:
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/pbc_rmst.csv", arm_col: arm, time_col: time, event_col: status, group_a: "1", group_b: "0", ni_margin: 1.6, ni_scale: hazard_ratio, ni_alpha: 0.025 }
+        save_as: hr_wide
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/pbc_rmst.csv", arm_col: arm, time_col: time, event_col: status, group_a: "1", group_b: "0", ni_margin: 1.3, ni_scale: hazard_ratio, ni_alpha: 0.025 }
+        save_as: hr_narrow
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/pbc_rmst.csv", arm_col: arm, time_col: time, event_col: status, group_a: "1", group_b: "0", rmst_tau: 10, ni_margin: 1.5, ni_scale: rmst_difference, ni_alpha: 0.025 }
+        save_as: rmst_wide
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/pbc_rmst.csv", arm_col: arm, time_col: time, event_col: status, group_a: "1", group_b: "0", rmst_tau: 10, ni_margin: 0.5, ni_scale: rmst_difference, ni_alpha: 0.025 }
+    expect:
+      - { path: saved.hr_wide.metrics.ni_limit, approx: 1.504379, abs: 0.000001 }
+      - { path: saved.hr_wide.metrics.ni_shown, equals: 1 }
+      - { path: saved.hr_narrow.metrics.ni_shown, equals: 0 }
+      - { path: saved.rmst_wide.metrics.ni_limit, approx: -0.938519, abs: 0.000001 }
+      - { path: saved.rmst_wide.metrics.ni_shown, equals: 1 }
+      - { path: metrics.ni_shown, equals: 0 }
+
+  - id: stratified-survival
+    description: >
+      A stratified Cox model and log-rank test on the SHOCK table, with the age flag as the stratum. The age flag is 1 for patients under 75 years. The stratified
+      values equal a direct run of R coxph with strata(age_lt75) and survdiff outside the tool (checks/check_stratified.R and checks/check_stratified.out).
+    data: [data/shock_endpoints.csv]
+    calls:
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/shock_endpoints.csv", arm_col: arm, time_col: time_days, event_col: death, group_a: early_revascularization, group_b: medical_stabilization, stratum_col: age_lt75 }
+    expect:
+      - { path: metrics.hr, approx: 0.768681, abs: 0.000001 }
+      - { path: metrics.hr_ci_low, approx: 0.588893, abs: 0.000001 }
+      - { path: metrics.hr_ci_high, approx: 1.003358, abs: 0.000001 }
+      - { path: metrics.hr_p, approx: 0.052953, abs: 0.000001 }
+      - { path: metrics.logrank_chisq, approx: 3.765213, abs: 0.000001 }
+      - { path: metrics.logrank_p, approx: 0.052329, abs: 0.000001 }
+
+  - id: survival-tau-too-late
+    description: A tau later than the last time of the shorter arm fails, and the error names the argument and both last times.
+    data: [data/pbc_rmst.csv]
+    calls:
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/pbc_rmst.csv", arm_col: arm, time_col: time, event_col: status, group_a: "1", group_b: "0", rmst_tau: 30 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "rmst_tau 30 is later than the last time of an arm" }
+
+  - id: survival-unknown-arm
+    description: A group that is not a value of the arm column fails, and the error lists the values.
+    data: [data/pbc_rmst.csv]
+    calls:
+      - tool: compare_survival_endpoint
+        args: { data: "{adapter_dir}/data/pbc_rmst.csv", arm_col: arm, time_col: time, event_col: status, group_a: drug, group_b: "0" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "group 'drug' is not a value of arm_col 'arm'. Values: 0, 1" }
+
+  - id: binary-wrong-column
+    description: An arm column that is not in the file fails, and the error names the argument and the columns.
+    data: [data/shock_endpoints.csv]
+    calls:
+      - tool: compare_binary_endpoint
+        args: { data: "{adapter_dir}/data/shock_endpoints.csv", arm_col: treatment, event_col: died_30d, rd_ci_method: wald, binary_test: chi_square }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "arm_col 'treatment' is not a column of the data. Columns: arm, died_30d" }
+
+  - id: binary-method-not-set
+    description: A call without the interval method fails, and the error names the decision.
+    calls:
+      - tool: compare_binary_endpoint
+        args: { events_a: 10, n_a: 50, events_b: 20, n_b: 50, binary_test: chi_square }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "rd_ci_method is not set. It is the decision" }
+
+  - id: binary-empty-stratum-arm
+    description: A stratum with patients in only one arm fails, and the error names the stratum.
+    data: [data/rabbits_penicillin.csv]
+    calls:
+      - tool: compare_binary_endpoint
+        args: { data: "{adapter_dir}/data/rabbits_penicillin.csv", arm_col: delay, event_col: cured, group_a: None, group_b: 1.5h, stratum_col: delay, rd_ci_method: wald, binary_test: chi_square }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "has no patients in one arm" }
+
+tools:
+  - name: compare_binary_endpoint
+    title: Compare a binary endpoint between two arms
+    description: >
+      Compare the risk of an event in two trial arms. The input is a CSV file with one row for each patient, or the event counts of both arms.
+      It gives the risk difference with a Wald, Newcombe or Miettinen-Nurminen interval. It also gives the relative risk, the odds ratio, the number needed to treat and a test.
+      A stratum column adds Mantel-Haenszel estimates. A margin adds a non-inferiority check.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each patient and a header row. Leave out if you give the four counts." }
+      arm_col: { type: string, description: "Column with the arm of each patient." }
+      event_col: { type: string, description: "Column with the outcome of each patient. A blank cell is a missing outcome." }
+      group_a: { type: string, description: "Value of arm_col for the test arm (the numerator of the differences and ratios)." }
+      group_b: { type: string, description: "Value of arm_col for the reference arm." }
+      event_value: { type: string, description: "Value of event_col that marks an event. Default 1, for a column that holds only 0 and 1." }
+      events_a: { type: integer, minimum: 0, description: "Count of events in the test arm (count). Use with n_a, events_b and n_b instead of data." }
+      n_a: { type: integer, minimum: 1, description: "Count of patients in the test arm (count)." }
+      events_b: { type: integer, minimum: 0, description: "Count of events in the reference arm (count)." }
+      n_b: { type: integer, minimum: 1, description: "Count of patients in the reference arm (count)." }
+      endpoint: { type: string, description: "Leave out. The harness sets it from the decision record. Name of the endpoint, for labels only." }
+      population: { type: string, description: "Leave out. The harness sets it from the decision record. Name of the analysis population, for labels only." }
+      stratum_col: { type: string, description: "Leave out. The harness sets it from the decision record. Column with the stratum, or none." }
+      missing_outcome: { type: string, enum: [exclude, count_as_event, count_as_no_event], description: "Leave out. The harness sets it from the decision record." }
+      rd_ci_method: { type: string, enum: [wald, newcombe, miettinen_nurminen], description: "Leave out. The harness sets it from the decision record." }
+      binary_test: { type: string, enum: [chi_square, chi_square_continuity, fisher], description: "Leave out. The harness sets it from the decision record." }
+      alpha: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. Two-sided level as a fraction." }
+      outcome_direction: { type: string, enum: [event is bad, event is good], description: "Leave out. The harness sets it from the decision record." }
+      ni_margin: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Non-inferiority margin (unitless, on the scale of ni_scale). 0 means no test." }
+      ni_scale: { type: string, enum: [risk_difference, risk_ratio], description: "Leave out. The harness sets it from the decision record." }
+      ni_alpha: { type: number, minimum: 0.001, maximum: 0.25, description: "Leave out. The harness sets it from the decision record. One-sided level as a fraction." }
+    required: []
+    read_only: true
+    batch: false
+    outputs:
+      results: { kind: table, ext: .csv, description: "One row for each measure with the estimate and the confidence interval." }
+    script: scripts/compare_binary_endpoint.R
+    parse: json
+    citations:
+      - text: "Miettinen, O., & Nurminen, M. (1985). Comparative analysis of two rates. Statistics in Medicine, 4(2), 213-226. https://doi.org/10.1002/sim.4780040211"
+        doi: 10.1002/sim.4780040211
+        when: { rd_ci_method: miettinen_nurminen }
+      - text: "Newcombe, R. G. (1998). Interval estimation for the difference between independent proportions: comparison of eleven methods. Statistics in Medicine, 17(8), 873-890. https://doi.org/10.1002/(SICI)1097-0258(19980430)17:8<873::AID-SIM779>3.0.CO;2-I"
+        doi: "10.1002/(SICI)1097-0258(19980430)17:8<873::AID-SIM779>3.0.CO;2-I"
+        when: { rd_ci_method: newcombe }
+      - text: "Altman, D. G. (1998). Confidence intervals for the number needed to treat. BMJ, 317(7168), 1309-1312. https://doi.org/10.1136/bmj.317.7168.1309"
+        doi: 10.1136/bmj.317.7168.1309
+      - text: "Mantel, N., & Haenszel, W. (1959). Statistical aspects of the analysis of data from retrospective studies of disease. Journal of the National Cancer Institute, 22(4), 719-748. https://doi.org/10.1093/jnci/22.4.719"
+        doi: 10.1093/jnci/22.4.719
+        when: { stratum_col: set }
+      - text: "Greenland, S., & Robins, J. M. (1985). Estimation of a common effect parameter from sparse follow-up data. Biometrics, 41(1), 55-68. https://doi.org/10.2307/2530643"
+        doi: 10.2307/2530643
+        when: { stratum_col: set }
+      - text: "Robins, J., Breslow, N., & Greenland, S. (1986). Estimators of the Mantel-Haenszel variance consistent in both sparse data and large-strata limiting models. Biometrics, 42(2), 311-323. https://doi.org/10.2307/2531052"
+        doi: 10.2307/2531052
+        when: { stratum_col: set }
+      - text: "Tarone, R. E. (1985). On heterogeneity tests based on efficient scores. Biometrika, 72(1), 91-95. https://doi.org/10.1093/biomet/72.1.91"
+        doi: 10.1093/biomet/72.1.91
+        when: { stratum_col: set }
+
+  - name: compare_survival_endpoint
+    title: Compare a time-to-event endpoint between two arms
+    description: >
+      Compare the time to an event in two trial arms. The input is a CSV file with a time, an event flag and an arm for each patient. It gives the Cox hazard ratio,
+      the log-rank test, the proportional hazards test, and the survival at one time with the difference. A time limit tau adds the restricted mean
+      survival time. A margin adds a non-inferiority check.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each patient and a header row." }
+      arm_col: { type: string, description: "Column with the arm of each patient." }
+      time_col: { type: string, description: "Column with the follow-up time to the event or to censoring, in one unit (days, months or years). A blank cell drops the row." }
+      event_col: { type: string, description: "Column with the event flag. 1 is an event and 0 is a censored time, unless you give event_value." }
+      group_a: { type: string, description: "Value of arm_col for the test arm (the numerator of the hazard ratio)." }
+      group_b: { type: string, description: "Value of arm_col for the reference arm." }
+      event_value: { type: string, description: "Value of event_col that marks an event. Default 1." }
+      endpoint: { type: string, description: "Leave out. The harness sets it from the decision record. Name of the endpoint, for labels only." }
+      population: { type: string, description: "Leave out. The harness sets it from the decision record. Name of the analysis population, for labels only." }
+      stratum_col: { type: string, description: "Leave out. The harness sets it from the decision record. Column with the stratum, or none." }
+      alpha: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. Two-sided level as a fraction." }
+      cox_ties: { type: string, enum: [efron, breslow, exact], description: "Leave out. The harness sets it from the decision record." }
+      landmark_time: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Time of the survival comparison, in the unit of time_col. 0 means none." }
+      rmst_tau: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Time limit tau of the restricted mean survival time, in the unit of time_col. 0 means none." }
+      ni_margin: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Non-inferiority margin on the scale of ni_scale. 0 means no test." }
+      ni_scale: { type: string, enum: [hazard_ratio, rmst_difference], description: "Leave out. The harness sets it from the decision record." }
+      ni_alpha: { type: number, minimum: 0.001, maximum: 0.25, description: "Leave out. The harness sets it from the decision record. One-sided level as a fraction." }
+    required: [data, arm_col, time_col, event_col]
+    read_only: true
+    batch: false
+    outputs:
+      results: { kind: table, ext: .csv, description: "One row for each measure with the estimate and the confidence interval." }
+    script: scripts/compare_survival_endpoint.R
+    parse: json
+    citations:
+      - text: "Cox, D. R. (1972). Regression models and life-tables. Journal of the Royal Statistical Society: Series B, 34(2), 187-202. https://doi.org/10.1111/j.2517-6161.1972.tb00899.x"
+        doi: 10.1111/j.2517-6161.1972.tb00899.x
+      - text: "Royston, P., & Parmar, M. K. B. (2013). Restricted mean survival time: an alternative to the hazard ratio for the design and analysis of randomized trials with a time-to-event outcome. BMC Medical Research Methodology, 13, 152. https://doi.org/10.1186/1471-2288-13-152"
+        doi: 10.1186/1471-2288-13-152
+        when: { rmst_tau: set }
+      - text: "Uno, H., Claggett, B., Tian, L., Inoue, E., Gallo, P., Miyata, T., Schrag, D., Takeuchi, M., Uyama, Y., Zhao, L., Skali, H., Solomon, S., Jacobus, S., Hughes, M., Packer, M., & Wei, L.-J. (2014). Moving beyond the hazard ratio in quantifying the between-group difference in survival analysis. Journal of Clinical Oncology, 32(22), 2380-2385. https://doi.org/10.1200/JCO.2014.55.2208"
+        doi: 10.1200/JCO.2014.55.2208
+        when: { rmst_tau: set }

@@ -1,0 +1,42 @@
+tool: survRM2, survival and base R, trial-endpoints adapter (compare_binary_endpoint, compare_survival_endpoint)
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/hochman1999-shock-trial/shock_endpoints.csv
+decisions:
+  endpoint_definition: "death from any cause within 30 days (primary); death during follow-up"
+  analysis_population: intention to treat
+  stratum_column: none
+  missing_outcome: exclude
+  rd_ci_method: wald
+  binary_test: chi_square
+  alpha: 0.05
+  rmst_tau: 1825
+  landmark_time: 365
+  cox_ties: efron
+expected:
+  - {description: "Patients, early revascularization", value: 152, tolerance: 0, source: "NEJM 1999 abstract"}
+  - {description: "Patients, medical stabilization", value: 150, tolerance: 0, source: "NEJM 1999 abstract"}
+  - {description: "30-day mortality, early revascularization", value: 0.467, tolerance: 0.001, source: "NEJM 1999 abstract (46.7 percent); check.py 0.4671"}
+  - {description: "30-day mortality, medical stabilization", value: 0.560, tolerance: 0.001, source: "NEJM 1999 abstract (56.0 percent); check.py 0.5600"}
+  - {description: "30-day risk difference", value: -0.093, tolerance: 0.001, source: "NEJM 1999 abstract (-9.3 percent); check.py -0.0929"}
+  - {description: "Lower limit of the 95% Wald interval", value: -0.205, tolerance: 0.001, source: "NEJM 1999 abstract (-20.5); check.py -0.2051"}
+  - {description: "Upper limit of the 95% Wald interval", value: 0.019, tolerance: 0.001, source: "NEJM 1999 abstract (1.9); check.py 0.0194"}
+  - {description: "30-day chi-square p value", value: 0.11, tolerance: 0.006, source: "NEJM 1999 abstract (P = 0.11); check.py 0.1063"}
+  - {description: "Hazard ratio of death", value: 0.74, tolerance: 0.005, source: "JAMA 2006 abstract; check.py 0.7437"}
+  - {description: "Lower limit of the hazard ratio interval", value: 0.57, tolerance: 0.005, source: "JAMA 2006 abstract; check.py 0.5712"}
+  - {description: "Upper limit of the hazard ratio interval", value: 0.97, tolerance: 0.005, source: "JAMA 2006 abstract; check.py 0.9684"}
+  - {description: "Log-rank p value", value: 0.03, tolerance: 0.005, source: "JAMA 2006 abstract (P = .03); check.py 0.02735"}
+  - {description: "1-year survival, early revascularization", value: 0.467, tolerance: 0.001, source: "JAMA 2001 abstract (46.7%); check.py 0.4671"}
+  - {description: "1-year survival, medical stabilization", value: 0.336, tolerance: 0.001, source: "JAMA 2001 abstract (33.6%); check.py 0.3356"}
+  - {description: "1-year survival difference", value: 0.132, tolerance: 0.001, source: "JAMA 2001 abstract (13.2%); check.py 0.1315"}
+  - {description: "Lower limit of the difference interval", value: 0.022, tolerance: 0.001, source: "JAMA 2001 abstract (2.2%); check.py 0.0218"}
+  - {description: "Upper limit of the difference interval", value: 0.241, tolerance: 0.001, source: "JAMA 2001 abstract (24.1%); check.py 0.2413"}
+  - {description: "Difference of the restricted mean survival time up to 1825 days (days; no published value)", value: 224.26, tolerance: 0.5, source: "check.py (NumPy step integral of the Kaplan-Meier curve)"}
+notes: |
+  The Zenodo file has no follow-up time for one patient of the medical stabilization arm, so the survival analyses use 301 patients (152 and 149).
+  The 30-day numbers use all 302 patients. The Wald interval of the abstract equals the Wald interval of the data. The Newcombe and
+  Miettinen-Nurminen intervals differ in the second digit (-20.2 to 2.0).
+  Items that do not reproduce and are not in the benchmark: the 6-month mortality of the early revascularization arm (the abstract prints 50.3 percent,
+  the data give 49.3 percent as a count and as a Kaplan-Meier estimate), the 6-year survival (32.8% and 19.6% printed; 32.4% and 19.4% in the data),
+  the 1-year relative risk of death 0.72 (0.54 to 0.95; a Cox model that stops at 1 year gives 0.75 (0.56 to 1.01)), and the age under 75 years stratum of the 2001 paper
+  (33.3% printed for the medical arm; 33.9% in the data).

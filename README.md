@@ -355,6 +355,8 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `limma-proteomics` | R limma | R scripts | differential proteins from a protein table |
 | `mofa` | MOFA+ (mofapy2) | Python library | multi-omics factor analysis |
 | `metabolomics-stats` | R ropls | R scripts | metabolite feature tables: normalization, PCA, PLS-DA, OPLS-DA, univariate tests |
+| `epi-rates` | R epitools | R scripts | rates with exact intervals, rate ratios, standardized rates, number needed to treat |
+| `trial-endpoints` | R survRM2, survival | R scripts | trial endpoints: risk difference, Mantel-Haenszel, hazard ratio, restricted mean survival time, non-inferiority |
 | `chromatography` | hplc-py | Python library | chromatogram peaks |
 | `flowcore` | flowCore | R scripts | flow cytometry: spillover from single-stain controls, percent positive and MFI, group tests |
 | `amr` | AMR | R scripts | MIC tables: EUCAST and CLSI S, I, R, MIC50 and MIC90 |

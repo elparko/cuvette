@@ -1,0 +1,41 @@
+== SHOCK 30-day deaths: 71/152 against 84/150
+risk difference -0.092895
+rd wald -0.205149 0.019360
+rd newcombe -0.202129 0.019606
+rd miettinen_nurminen -0.203491 0.020018
+rr 0.834117 0.668554 1.040680
+or 0.688713 0.437703 1.083669
+chi2 uncorrected p 0.106339
+chi2 continuity p 0.133682
+fisher p 0.109054
+== made-up non-inferiority counts: 30/200 against 36/200
+risk difference -0.030000
+rd wald -0.102691 0.042691
+rd newcombe -0.103020 0.043187
+rd miettinen_nurminen -0.102528 0.043240
+rr 0.833333 0.535034 1.297945
+or 0.803922 0.473248 1.365649
+chi2 uncorrected p 0.418957
+chi2 continuity p 0.500612
+fisher p 0.500831
+== made-up counts 2: 56/70 against 48/80
+risk difference 0.200000
+rd wald 0.057505 0.342495
+rd newcombe 0.052431 0.333873
+rd miettinen_nurminen 0.052552 0.344039
+rr 1.333333 1.076626 1.651249
+or 2.666667 1.276218 5.572020
+chi2 uncorrected p 0.008045
+chi2 continuity p 0.013409
+fisher p 0.012521
+== Rabbits (penicillin), strata ['1', '1/2', '1/4', '1/8', '4']
+a [5, 6, 3, 0, 2] n1 [6, 6, 6, 6, 2] c [6, 2, 0, 0, 5] n0 [6, 6, 6, 5, 5]
+pooled OR 7.000000 CI 1.026713 47.725133
+pooled RR 1.552632
+CMH no correction 5.657143 p 0.017384
+CMH correction 3.928571 p 0.047472
+strata with events in both outcome classes: 3 of 5; pooled OR of these 7.000000
+Breslow-Day 8.627332 p 0.013384
+Tarone 8.358316 p 0.015311
+MH risk difference 0.228036 se 0.072776 CI 0.085398 0.370673
+MH risk ratio 1.552632 CI 1.030638 2.339002

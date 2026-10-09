@@ -69,4 +69,9 @@ Scope decision: the three capabilities do not repeat biostats. Biostats has t-te
 
 ## Outcome
 
-Filled in at the end of the work.
+Built on 2026-10-09. Each benchmark paper passed all items in a blind run with claude:claude-haiku-5-5.
+
+- metabolomics-stats (M1): the ropls vignette values reproduce with ropls 1.44.0. A NumPy script reproduces R2X, R2Y, VIP, the PCA variance and the univariate tests. Paper `thevenot2015-ropls-sacurine`, 21 items (21/21 computed and reported). Report: `bench/results/papers-2026-10-09-metabolomics-haiku.md`.
+- epi-rates (E1): the printed age-adjusted rates reproduce by direct standardization. Paper `kochanek2023-deaths-final-data-2020`, 7 items (7/7). Report: `bench/results/papers-2026-10-09-epi-haiku.md`. E2 gives the known-answer tests.
+- trial-endpoints (T1): the 30-day mortality, the 1-year survival and the hazard ratio of the SHOCK trial reproduce. Paper `hochman1999-shock-trial`, 17 scored items (see `bench/results/papers-2026-10-09-trials-haiku.md`). Not reproduced, and left out: 6-month mortality of the revascularization arm (paper 50.3%, data 49.3%), 6-year survival (paper 32.8% and 19.6%, data 32.4% and 19.4%) and the 1-year risk ratio. The Zenodo survival file lacks one medical-arm patient, so survival uses 301 patients. T2 gives the known-answer tests.
+- M2 and M3 were not built.
