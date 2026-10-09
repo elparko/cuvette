@@ -1,0 +1,418 @@
+adapter:
+  name: chromatography
+  field: chromatography
+  file_types: [".csv", ".txt", ".tsv"]
+  title: Chromatogram peaks and calibration (hplc-py, SciPy)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Integrates peaks in a chromatogram that the scientist exported as a table, and fits a calibration curve.
+    It does the peak integration and quantification steps of a chromatography data system on an exported trace.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: hplc-py
+  version: "hplc-py 0.2.10, scipy 1.18.1"
+  tested_versions: []
+  homepage: https://cremerlab.github.io/hplc-py/
+  docs:
+    - https://cremerlab.github.io/hplc-py/quickstart.html
+    - https://cremerlab.github.io/hplc-py/methodology/fitting.html
+    - https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.trapezoid.html
+  install: >
+    The adapter uses a Python environment in ~/.guided-analysis/envs/chromatography. Make it and install the packages:
+    uv venv ~/.guided-analysis/envs/chromatography && uv pip install --python ~/.guided-analysis/envs/chromatography/bin/python
+    hplc-py scipy pandas matplotlib
+  citation:
+    - text: "Chure, G., & Cremer, J. (2024). hplc-py: A Python Utility For Rapid Quantification of Complex Chemical Chromatograms. Journal of Open Source Software, 9(94), 6270."
+      doi: 10.21105/joss.06270
+    - text: "Virtanen, P., Gommers, R., Oliphant, T. E., Haberland, M., Reddy, T., Cournapeau, D., et al. (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods, 17(3), 261-272."
+      doi: 10.1038/s41592-019-0686-2
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1200
+
+locate:
+  env: GA_CHROMATOGRAPHY_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/chromatography/bin/python
+    - ~/.guided-analysis/envs/chromatography/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import importlib.metadata as m; print('hplc-py', m.version('hplc-py'))"]
+  version_pattern: 'hplc-py (\S+)'
+  identity: 'hplc-py \d'
+
+decisions:
+  - key: baseline
+    label: Baseline correction
+    kind: choice
+    choices: [snip, none]
+    default: snip
+    group: Integration
+    help: >
+      snip removes a drifting baseline with the SNIP method before the fit. none keeps the signal as it is.
+      The baseline changes every peak area. Use none only for a trace that the instrument already corrected.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: integrate_peaks, arg: baseline }
+    sensitivity:
+      options: [snip, none]
+      tool: integrate_peaks
+      compare: [metrics.n_peaks, metrics.total_area, metrics.area_1]
+      max_runs: 2
+
+  - key: peak_width
+    label: Approximate peak width, in time units
+    kind: float
+    default: 1
+    lo: 0.0001
+    hi: 1000
+    group: Integration
+    help: >
+      The width of a usual peak, in the time unit of the file (often minutes). The SNIP baseline uses it as its window.
+      A value that is too large leaves the baseline under the peaks. A value that is too small cuts the peak tops.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: integrate_peaks, arg: peak_width }
+
+  - key: prominence
+    label: Smallest peak height that counts, as a fraction of the largest peak
+    kind: float
+    default: 0.01
+    lo: 0.000001
+    hi: 1
+    group: Integration
+    help: >
+      A fraction between 0 and 1. 0.01 keeps a peak that rises 1% of the largest peak above its local background.
+      A smaller value finds more small peaks and more noise. Report the value with the result.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: integrate_peaks, arg: prominence }
+    sensitivity:
+      options: [0.001, 0.01, 0.05]
+      tool: integrate_peaks
+      compare: [metrics.n_peaks, metrics.total_area]
+      max_runs: 3
+
+  - key: through_origin
+    label: Force the calibration line through zero
+    kind: bool
+    default: false
+    group: Calibration
+    help: >
+      false fits a line with an intercept, as most chromatography data systems do. true forces the line through
+      the origin. Use true only if the method says so. The choice changes every concentration.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: calibration_curve, arg: through_origin }
+    sensitivity:
+      options: [true, false]
+      tool: calibration_curve
+      compare: [metrics.slope, metrics.intercept, metrics.r_squared]
+      max_runs: 2
+
+  - key: weighting
+    label: Weighting of the calibration fit
+    kind: choice
+    choices: [none, 1/x, 1/x2]
+    default: none
+    group: Calibration
+    help: >
+      none gives each standard the same weight, so the highest standard decides the line. 1/x and 1/x2 give more
+      weight to the low standards. Use a weighting when the range covers more than two orders of magnitude.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: calibration_curve, arg: weighting }
+
+tools:
+  - name: read_trace
+    title: Read a chromatogram
+    description: >
+      Read a chromatogram that the scientist exported as a table. Report the number of points, the time range,
+      the signal range and the sampling step. Use it before integrate_peaks.
+    read_only: true
+    function: "ga_chromatography:read_trace"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the exported table (CSV or text)." }
+      time_column: { type: string, description: "Name of the time column. The default is the first column." }
+      signal_column: { type: string, description: "Name of the signal column, such as the absorbance in mAU. The default is the second column." }
+      delimiter: { type: string, description: "Column separator: a comma, a semicolon or a tab. The default comes from the file ending." }
+      skip_rows: { type: integer, minimum: 0, default: 0, description: "Number of header lines to skip before the column names (count)." }
+    required: [path]
+    outputs:
+      plot: { kind: image, ext: png, description: "The trace (PNG and SVG)." }
+
+  - name: integrate_peaks
+    title: Find and integrate the peaks
+    description: >
+      Find peaks in a chromatogram and give the retention time and the area of each one. It fits a skew-normal
+      peak to each window, so it separates peaks that overlap. The area is the summed signal, not the signal times time.
+    function: "ga_chromatography:integrate_peaks"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the exported table. }
+      baseline: { type: string, enum: [snip, none], description: "snip removes a drifting baseline first. none keeps the signal." }
+      prominence: { type: number, minimum: 0.000001, maximum: 1, description: "Smallest peak height that counts, as a fraction of the largest peak (0 to 1)." }
+      peak_width: { type: number, minimum: 0.0001, description: "Approximate peak width in the time unit of the file. The SNIP baseline needs it." }
+      time_column: { type: string, description: "Name of the time column. The default is the first column." }
+      signal_column: { type: string, description: "Name of the signal column. The default is the second column." }
+      delimiter: { type: string, description: "Column separator: a comma, a semicolon or a tab." }
+      skip_rows: { type: integer, minimum: 0, default: 0, description: Number of header lines to skip (count). }
+      time_window: { type: array, items: { type: number }, minItems: 2, maxItems: 2, description: "Start and end time. The tool cuts the trace to this range first." }
+      integration_window: { type: array, items: { type: number }, minItems: 2, maxItems: 2, description: "Start and end time over which the tool adds the fitted peak. The default is the whole trace." }
+      known_peaks: { type: array, items: { type: number }, minItems: 1, description: Retention times of peaks that the tool must find even if they are small. }
+      buffer: { type: integer, minimum: 0, default: 0, description: Extra points on each side of a peak window (count of time steps). }
+    required: [path]
+    outputs:
+      peaks: { kind: table, ext: csv, description: One row for each peak. }
+      plot: { kind: image, ext: png, description: "The trace with the baseline and the peaks (PNG and SVG)." }
+
+  - name: area_in_window
+    title: Area between two times
+    description: >
+      Add the signal between two times with the trapezoid rule, with an optional straight baseline between two points.
+      Use it to check one peak of integrate_peaks by hand, or for a peak that the fit does not handle.
+    read_only: true
+    function: "ga_chromatography:area_in_window"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the exported table. }
+      start: { type: number, description: "Start time, in the time unit of the file." }
+      end: { type: number, description: "End time, in the time unit of the file." }
+      baseline_points: { type: array, items: { type: number }, minItems: 2, maxItems: 2, description: "Two times, one on each side of the peak. The tool draws a straight line between the signal at those times and subtracts it." }
+      time_column: { type: string, description: "Name of the time column. The default is the first column." }
+      signal_column: { type: string, description: "Name of the signal column. The default is the second column." }
+      delimiter: { type: string, description: "Column separator: a comma, a semicolon or a tab." }
+      skip_rows: { type: integer, minimum: 0, default: 0, description: Number of header lines to skip (count). }
+    required: [path, start, end]
+
+  - name: calibration_curve
+    title: Fit a calibration curve
+    description: >
+      Fit peak area against the concentration of the standards. Reports the slope, the intercept, R squared, the
+      residual of each standard, and an estimate of the limits of detection and quantification.
+    read_only: true
+    function: "ga_chromatography:calibration_curve"
+    params:
+      concentrations: { type: array, items: { type: number }, minItems: 3, description: "Concentration of each standard, in the unit of the method." }
+      areas: { type: array, items: { type: number }, minItems: 3, description: "Peak area of each standard, in the same order." }
+      through_origin: { type: boolean, description: true forces the line through zero. false fits an intercept. }
+      weighting: { type: string, enum: [none, 1/x, 1/x2], default: none, description: Weight of each standard in the fit. }
+      unit: { type: string, default: unit, description: "Unit of the concentration, such as mM or ug/mL. It goes in the summary and the plot." }
+    required: [concentrations, areas]
+    outputs:
+      standards: { kind: table, ext: csv, description: "One row for each standard, with its residual." }
+      plot: { kind: image, ext: png, description: "The curve with the residuals (PNG and SVG)." }
+
+  - name: quantify_areas
+    title: Concentration from the calibration
+    description: >
+      Turn peak areas into concentrations with the slope and the intercept of a calibration curve. It flags each
+      sample that falls outside the range of the standards.
+    read_only: true
+    function: "ga_chromatography:quantify_areas"
+    params:
+      areas: { type: array, items: { type: number }, minItems: 1, description: Peak area of each sample. }
+      slope: { type: number, description: "Slope of the calibration, in area per concentration unit." }
+      intercept: { type: number, description: "Intercept of the calibration, in area units. It is 0 only for a curve through the origin." }
+      unit: { type: string, default: unit, description: Unit of the concentration. }
+      labels: { type: array, items: { type: string }, minItems: 1, description: "Name of each sample, in the same order as the areas." }
+      lowest_standard: { type: number, description: "Concentration of the lowest standard, in the same unit." }
+      highest_standard: { type: number, description: "Concentration of the highest standard, in the same unit." }
+    required: [areas, slope, intercept]
+    outputs:
+      concentrations: { kind: table, ext: csv, description: One row for each sample. }
+
+map:
+  - tool: read_trace
+    route: 'df = pandas.read_csv(path); df.describe()'
+    steps:
+      - "In Chromeleon, Empower or OpenLab: open the injection and read the chromatogram window."
+      - "Export the trace first: Chromeleon File > Export > ASCII; Empower uses the Export Method; OpenLab writes a CSV or an AIA (netCDF) file."
+    params:
+      - { arg: path, label: file }
+      - { arg: time_column, label: time axis }
+      - { arg: signal_column, label: detector channel }
+    fidelity: exact
+    evidence: { source: docs, test: read-trace }
+
+  - tool: integrate_peaks
+    route: |
+      chrom = hplc.quant.Chromatogram(df, cols={"time": "time", "signal": "signal"})
+      chrom.fit_peaks(correct_baseline=True, approx_peak_width=1, prominence=0.01)
+    steps:
+      - "In Chromeleon: Processing Method > Detection, set the parameters, then read the Integration Results table."
+      - "In Empower: the Processing Method with ApexTrack, then the Peak Results table."
+      - "In OpenLab CDS: Data Analysis > Integration Events, then the Integration Results."
+    params:
+      - { arg: baseline, label: baseline correction, ui_default: "on (the data systems correct the baseline by default)" }
+      - { arg: prominence, label: minimum peak height or threshold, ui_default: "instrument default" }
+      - { arg: peak_width, label: peak width, ui_default: "instrument default" }
+      - { arg: integration_window, label: integration start and stop }
+    fidelity: close
+    difference: >
+      hplc-py fits a skew-normal curve to each peak and reports the area of the fit. Chromeleon, Empower and OpenLab
+      drop a baseline and add the signal between the peak limits. The two agree for a separated, symmetric peak and
+      differ for an overlapping or a tailing peak. The vendor numbers were not run.
+    evidence: { source: docs, test: integration-window-area }
+
+  - tool: area_in_window
+    route: 'scipy.integrate.trapezoid(signal[mask], time[mask])'
+    steps:
+      - "In a data system: set the peak start and end by hand, with a straight baseline between them."
+    params:
+      - { arg: start, label: peak start }
+      - { arg: end, label: peak end }
+      - { arg: baseline_points, label: baseline start and end }
+    fidelity: close
+    difference: "The trapezoid area is in signal times time. A data system usually reports the summed signal, which is this value divided by the sampling step. checks/area_units.py shows both."
+    evidence: { source: code, test: trapezoid-area }
+
+  - tool: calibration_curve
+    route: 'numpy.linalg.solve for the weighted least squares fit of area on concentration'
+    steps:
+      - "R: lm(area ~ conc) or lm(area ~ conc + 0)."
+      - "In Chromeleon: Processing Method > Calibration, with the curve type and the weighting."
+      - "In Empower: the Processing Method calibration tab."
+    params:
+      - { arg: through_origin, label: force through zero, ui_default: false }
+      - { arg: weighting, label: weighting, ui_default: none }
+    fidelity: exact
+    evidence: { source: docs, test: lactose-calibration, note: "R lm gives the same slope, intercept and R squared (checks/calibration_r.R)." }
+
+  - tool: quantify_areas
+    route: "concentration = (area - intercept) / slope"
+    steps:
+      - "The data system does this step for each named peak after the calibration."
+    params:
+      - { arg: slope, label: calibration slope }
+      - { arg: intercept, label: calibration intercept }
+    fidelity: exact
+    evidence: { source: docs, test: lactose-calibration }
+
+checks:
+  - id: integration_settings_not_reported
+    severity: warning
+    description: A peak area is reported without the baseline and the peak detection settings.
+    text: >
+      If the answer gives peak areas or retention times, it must name the baseline correction, the prominence, the
+      peak width and the time window. Two settings give two different areas for the same trace. Flag the answer if one is missing.
+  - id: outside_calibration_range
+    severity: error
+    description: A concentration is reported for a sample outside the range of the standards.
+    text: >
+      If quantify_areas flags a sample as outside the calibration range, the answer must say so. A concentration
+      above the highest standard or below the lowest one is an extrapolation. Flag the answer if it reports such a value as measured.
+  - id: r_squared_alone
+    severity: warning
+    description: The calibration is called linear from R squared alone.
+    text: >
+      R squared is high even for a curve that bends. If the answer calls a calibration linear, it must also give the
+      residual of each standard, or the largest residual in percent. Flag the answer if it gives R squared alone.
+
+tests:
+  - id: read-trace
+    description: >
+      The hplc-py test file test_integration_window_chrom.csv (one synthetic peak). It has 2000 points from 0 to 19.99
+      with a step of 0.01. The peak amplitude is 500 and the scale 1.5 (tests/generate_test_data.py of hplc-py).
+    data: [data/hplc_py_integration_chrom.csv]
+    calls:
+      - tool: read_trace
+        args: { path: "{adapter_dir}/data/hplc_py_integration_chrom.csv" }
+    expect:
+      - { path: metrics.n_points, equals: 2000 }
+      - { path: metrics.time_start, approx: 0, abs: 0.000001 }
+      - { path: metrics.time_end, approx: 19.99, abs: 0.000001 }
+      - { path: metrics.time_step, approx: 0.01, abs: 0.000001 }
+
+  - id: integration-window-area
+    description: >
+      The ground truth of the hplc-py test test_variable_integration_area. Its file test_integration_window_areas.csv
+      (data/hplc_py_integration_areas.csv) gives 49999.983 for the whole trace and 49957.609 for the window 5 to 15.
+      The hplc-py test accepts 1.5%; this test uses 0.05%.
+    data: [data/hplc_py_integration_chrom.csv, data/hplc_py_integration_areas.csv]
+    calls:
+      - tool: integrate_peaks
+        args: { path: "{adapter_dir}/data/hplc_py_integration_chrom.csv", baseline: none, prominence: 0.01 }
+        save_as: whole
+      - tool: integrate_peaks
+        args: { path: "{adapter_dir}/data/hplc_py_integration_chrom.csv", baseline: none, prominence: 0.01, integration_window: [5.0, 15.0] }
+    expect:
+      - { path: saved.whole.metrics.n_peaks, equals: 1 }
+      - { path: saved.whole.metrics.area_1, approx: 49999.983, rel: 0.0005 }
+      - { path: metrics.area_1, approx: 49957.609, rel: 0.0005 }
+
+  - id: two-peaks
+    description: >
+      The ground truth of the hplc-py test test_shallow_signal. Its file test_shallow_signal_peaks.csv
+      (data/hplc_py_two_peaks_truth.csv) gives a peak at 10 with area 10000, scale 1 and amplitude 100, and a peak
+      at 50 with area 1000, scale 3 and amplitude 10. The second peak is 1% of the first.
+    data: [data/hplc_py_two_peaks_chrom.csv, data/hplc_py_two_peaks_truth.csv]
+    calls:
+      - tool: integrate_peaks
+        args: { path: "{adapter_dir}/data/hplc_py_two_peaks_chrom.csv", baseline: none, prominence: 0.001, time_column: x, signal_column: y }
+    expect:
+      - { path: metrics.n_peaks, equals: 2 }
+      - { path: metrics.retention_time_1, approx: 10, abs: 0.01 }
+      - { path: metrics.area_1, approx: 10000, rel: 0.005 }
+      - { path: metrics.retention_time_2, approx: 50, abs: 0.01 }
+      - { path: metrics.area_2, approx: 1000, rel: 0.005 }
+
+  - id: trapezoid-area
+    description: >
+      The same synthetic peak by the trapezoid rule, between 5 and 15. checks/area_units.py gives 499.571 in signal
+      times time; divided by the 0.01 step it is 49957.1, which matches the hplc-py ground truth 49957.609 to 0.001
+      (checks/area_units.out). The amplitude of the peak is 500 and the maximum signal 132.981.
+    data: [data/hplc_py_integration_chrom.csv]
+    calls:
+      - tool: area_in_window
+        args: { path: "{adapter_dir}/data/hplc_py_integration_chrom.csv", start: 5, end: 15 }
+    expect:
+      - { path: metrics.area, approx: 499.571, abs: 0.001 }
+      - { path: metrics.height, approx: 132.981, abs: 0.001 }
+      - { path: metrics.retention_time, approx: 10, abs: 0.0001 }
+
+  - id: lactose-calibration
+    description: >
+      The lactose calibration of the hplc-py tutorial: four traces at 0.5, 1, 3 and 6 mM and a test trace at 2 mM.
+      R 4.6.1 lm(area ~ conc) on the four areas gives slope 156586.7415, intercept 14624.93792 and R squared
+      0.9988678581, and back-calculates the test trace as 1.89941477 mM (checks/calibration_r.R, output
+      checks/calibration_r.out). The areas come from this adapter, so the test checks the fit, not the integration.
+    data: [data/lactose/lactose_mM_0.5.csv, data/lactose/lactose_mM_1.csv, data/lactose/lactose_mM_3.csv, data/lactose/lactose_mM_6.csv, data/lactose/lactose_mM_2.csv]
+    calls:
+      - tool: integrate_peaks
+        args: { path: "{adapter_dir}/data/lactose/lactose_mM_6.csv", baseline: snip, prominence: 0.01, peak_width: 5 }
+        save_as: six
+      - tool: calibration_curve
+        args: { concentrations: [0.5, 1, 3, 6], areas: [89667.793812, 184858.171138, 467600.286834, 960534.285710], through_origin: false, unit: mM }
+        save_as: fit
+      - tool: quantify_areas
+        args: { areas: [312048.107553], slope: 156586.7415, intercept: 14624.93792, unit: mM, labels: [test 2 mM], lowest_standard: 0.5, highest_standard: 6 }
+    expect:
+      - { path: saved.six.metrics.area_1, approx: 960534.2857, rel: 0.0001 }
+      - { path: saved.six.metrics.retention_time_1, approx: 13.56, abs: 0.01 }
+      - { path: saved.fit.metrics.slope, approx: 156586.7415, rel: 0.0000001 }
+      - { path: saved.fit.metrics.intercept, approx: 14624.93792, rel: 0.0000001 }
+      - { path: saved.fit.metrics.r_squared, approx: 0.9988678581, abs: 0.0000000005 }
+      - { path: metrics.concentration_1, approx: 1.89941477, abs: 0.0000001 }
+
+  - id: window-outside-the-trace
+    description: A time window outside the trace fails, and the error gives the range of the trace.
+    data: [data/hplc_py_integration_chrom.csv]
+    calls:
+      - tool: integrate_peaks
+        args: { path: "{adapter_dir}/data/hplc_py_integration_chrom.csv", baseline: none, prominence: 0.01, time_window: [25, 30] }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "is outside the trace" }

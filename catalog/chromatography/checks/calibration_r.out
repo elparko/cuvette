@@ -1,0 +1,38 @@
+R version 4.6.1 (2026-06-24) 
+
+## Areas from hplc-py 0.2.10 on the four lactose calibration traces
+  conc      area
+1  0.5  89667.79
+2  1.0 184858.17
+3  3.0 467600.29
+4  6.0 960534.29
+
+## lm(area ~ conc), an intercept, no weighting
+
+Call:
+lm(formula = area ~ conc)
+
+Residuals:
+     1      2      3      4 
+ -3251  13646 -16785   6389 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    14625      12675   1.154 0.367839    
+conc          156587       3728  42.007 0.000566 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 16110 on 2 degrees of freedom
+Multiple R-squared:  0.9989,	Adjusted R-squared:  0.9983 
+F-statistic:  1765 on 1 and 2 DF,  p-value: 0.0005662
+
+slope 156586.7415 intercept 14624.93792 r_squared 0.9988678581 residual_se 16114.32064
+LOD (3.3 x residual se / slope) 0.3396025589  LOQ (10 x) 1.029098663
+
+## lm(area ~ conc + 0), through the origin
+[1] "slope 159906.9977 r_squared 0.9992690822"
+
+## Back-calculation of the 2 mM test trace, area 312048.107553 (hplc-py 0.2.10)
+with an intercept: 1.89941477 mM
+through the origin: 1.951434972 mM

@@ -1,0 +1,16 @@
+time step 0.009999999999999787
+hplc-py test ground truth (test_integration_window_areas.csv):
+ t_start  t_end      area  window
+     0.0  19.99 49999.983       1
+     2.5  17.50 49999.983       2
+     5.0  15.00 49957.609       3
+     7.5  12.50 45254.069       4
+     9.0  11.00 24857.155       5
+window  0.00 to 19.99  trapezoid (signal x time)     499.9998  divided by the step      49999.983
+window  2.50 to 17.50  trapezoid (signal x time)     499.9998  divided by the step      49999.983
+window  5.00 to 15.00  trapezoid (signal x time)     499.5710  divided by the step      49957.095
+window  7.50 to 12.50  trapezoid (signal x time)     452.2091  divided by the step      45220.910
+window  9.00 to 11.00  trapezoid (signal x time)     247.5067  divided by the step      24750.672
+
+The hplc-py area is the summed signal over the window, not the signal times time.
+The trapezoid area divided by the time step gives the same number.
