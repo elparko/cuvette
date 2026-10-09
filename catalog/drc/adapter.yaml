@@ -6,9 +6,9 @@ adapter:
   version: 0.1.0
   spec: "1"
   description: >
-    Fits ELISA and other immunoassay standard curves (4PL and 5PL) with the R package drc. It back-calculates
-    the samples with the dilution factor and gives the LOD, LLOQ and ULOQ. The scientist chooses the model,
-    the weighting, the blank and the outlier wells.
+    Fits ELISA standard curves, dose-response curves (IC50 and EC50) and enzyme kinetics with the R package drc.
+    It also normalizes plates to their controls and gives the Z' factor. The scientist chooses the model, the
+    weighting, the blank, the normalization and the outlier wells.
   authors: [Parker Smith]
   status: draft
 
@@ -98,6 +98,7 @@ decisions:
     links:
       - { tool: fit_standard_curve, arg: weighting }
       - { tool: compare_models, arg: weighting }
+      - { tool: fit_dose_response, arg: weighting }
 
   - key: blank
     label: Blank correction
@@ -185,6 +186,103 @@ decisions:
     stage: when_needed
     links:
       - { tool: fit_standard_curve, arg: exclude }
+      - { tool: normalize_plate, arg: exclude }
+
+  - key: dr_model
+    label: Dose-response model
+    kind: choice
+    choices: [4PL, 3PL, 4PL-normalized, 5PL, Weibull1, Weibull2]
+    default: 4PL
+    group: Dose-response
+    help: >
+      4PL is the Prism model log(inhibitor) vs. response, Variable slope. 3PL fixes the bottom at 0 (drc LL.3).
+      4PL-normalized fixes the bottom at 0 and the top at 100, for responses in percent of control.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_dose_response, arg: model }
+
+  - key: ic50_type
+    label: Relative or absolute IC50
+    kind: choice
+    choices: [relative, absolute]
+    default: relative
+    group: Dose-response
+    help: >
+      The relative IC50 is the dose halfway between the fitted top and bottom, as in Prism. The absolute IC50 is the dose
+      where the curve crosses a fixed response, such as 50 percent of control.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_dose_response, arg: ic50_type }
+
+  - key: response_level
+    label: Response level of an absolute IC50
+    kind: float
+    default: 50
+    group: Dose-response
+    help: The response value that defines an absolute IC50, in the unit of the response column. It has no effect on a relative IC50.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_dose_response, arg: response_level }
+
+  - key: ci_method
+    label: Confidence interval of the IC50
+    kind: choice
+    choices: [delta, log]
+    default: delta
+    group: Dose-response
+    help: >
+      The delta interval is the drc default. It is symmetric on the dose scale. The log interval is symmetric on the log
+      dose scale, as Prism reports it for the logIC50.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_dose_response, arg: ci }
+
+  - key: kinetic_model
+    label: Enzyme kinetic model
+    kind: choice
+    choices: [michaelis-menten, competitive, noncompetitive, uncompetitive, mixed]
+    default: michaelis-menten
+    group: Enzyme kinetics
+    help: >
+      michaelis-menten fits Vmax and Km on rows without inhibitor. The inhibition models also fit Ki. Choose the model
+      from the mechanism that you test. The tool gives the AICc of all four inhibition models for comparison.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_enzyme_kinetics, arg: model }
+
+  - key: normalization
+    label: Normalization of the plate signal
+    kind: choice
+    choices: [percent_activity, percent_inhibition, fraction, percent_of_high, none]
+    default: percent_activity
+    group: Plate
+    help: >
+      The choice percent_activity sets the low control to 0 and the high control to 100. The choice percent_inhibition is
+      100 minus that. The choice fraction uses the same scale from 0 to 1. The choice percent_of_high divides by the high control only.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: normalize_plate, arg: normalization }
+
+  - key: zprime_stat
+    label: Statistics for the Z' factor
+    kind: choice
+    choices: [mean_sd, median_mad]
+    default: mean_sd
+    group: Plate
+    help: >
+      The choice mean_sd is the formula of Zhang et al. 1999. The choice median_mad uses the median and the MAD, so one outlier
+      well changes it less.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: normalize_plate, arg: zprime_stat }
 
 checks:
   - id: lod_without_blanks
@@ -205,6 +303,16 @@ checks:
     text: >
       Report the answer if the samples have a dilution factor above 1 and the answer gives the column
       conc_in_well as the sample concentration.
+  - id: extrapolated_ic50
+    description: The answer reports an IC50 outside the tested doses as a measured value.
+    severity: warning
+    text: >
+      Report the answer if fit_dose_response warns that an IC50 is outside the tested doses and the answer gives that
+      IC50 without saying that it is an extrapolation.
+  - id: lineweaver_burk_fit
+    description: The answer takes Km or Vmax from a Lineweaver-Burk line.
+    severity: warning
+    text: Report the answer if it gives Km or Vmax from a linear fit of 1/v against 1/S instead of the nonlinear fit.
   - id: model_named
     description: The answer does not name the curve model and the weighting.
     severity: warning
@@ -255,6 +363,61 @@ map:
       source: docs
       test: compare-dnase-3pl-4pl
       note: R help ?DNase compares the 3-parameter and the 4-parameter logistic with anova(); the tool gives the same F and p.
+
+  - tool: fit_dose_response
+    route: "library(drc); fit <- drm(response ~ dose, compound, data = d, fct = LL.4(), control = drmc(relTol = 1e-12)); ED(fit, 50, interval = \"delta\")"
+    steps:
+      - "R: run drm() with LL.4() (LL.3() for a bottom of 0) for each compound, then ED(fit, 50, interval = \"delta\")."
+      - "Prism: XY table with log(dose) as X and the replicates as Y. Analyze, Nonlinear regression, Dose-response - Inhibition, log(inhibitor) vs. response - Variable slope (four parameters)."
+      - "Prism: for a bottom of 0, set Bottom to constant 0 on the Constrain tab. For normalized data, use log(inhibitor) vs. normalized response - Variable slope."
+      - "Prism: to compare compounds, on the Compare tab test whether LogIC50 differs between data sets (extra sum-of-squares F test)."
+    params:
+      - { arg: model, label: "fct of drm(); the equation in Prism", ui_default: "4PL" }
+      - { arg: ci, label: "interval of ED(); the confidence interval in Prism", ui_default: "delta" }
+      - { arg: compare_ic50, label: "Compare tab in Prism" }
+    fidelity: close
+    difference: >
+      The R route uses the same model. The tool sets a strict tolerance and polishes each fit. drc fits a shared IC50
+      with curveid and pmodels, but that joint fit can stop early; the tool fits the shared model with nls and gives a
+      smaller residual. The log interval uses the Gauss-Newton covariance, as nls and Prism do. The Prism route was not run.
+    evidence:
+      source: docs
+      test: dose-ryegrass-4pl
+      note: drc help ?ED and Ritz et al. 2015 print the ryegrass ED50 and its interval. SciPy gives the same values.
+
+  - tool: fit_enzyme_kinetics
+    route: "library(drc); fit <- drm(rate ~ substrate, data = d, fct = MM.2(), control = drmc(relTol = 1e-12)); summary(fit)"
+    steps:
+      - "R: drm(rate ~ substrate, fct = MM.2()); d is Vmax and e is Km. For inhibition: nls(rate ~ Vmax * S / (Km * (1 + I / Ki) + S), algorithm = \"port\")."
+      - "Prism: XY table with substrate as X. Analyze, Nonlinear regression, Enzyme kinetics - Velocity as a function of substrate, Michaelis-Menten."
+      - "Prism: for inhibition, one data set for each inhibitor concentration. Enzyme kinetics - Inhibition, Competitive inhibition (or Noncompetitive, Uncompetitive, Mixed model)."
+    params:
+      - { arg: model, label: "the equation in Prism", ui_default: "michaelis-menten" }
+    fidelity: close
+    difference: >
+      The standard errors use the Gauss-Newton covariance, as nls and Prism do; drc summary() gives slightly larger
+      standard errors from the full Hessian. The Prism route was not run.
+    evidence:
+      source: docs
+      test: kinetics-puromycin
+      note: Bates and Watts 1988 and R help ?Puromycin print Vmax and Km of the treated cells.
+
+  - tool: normalize_plate
+    route: "Excel: =AVERAGE() and =STDEV.S() of the control wells; Z' = 1 - 3*(SD_high + SD_low)/ABS(mean_high - mean_low)"
+    steps:
+      - "Excel: on each plate, take the mean and the SD of the high and the low control wells."
+      - "Excel: normalized = 100*(signal - mean_low)/(mean_high - mean_low); Z' = 1 - 3*(SD_high + SD_low)/ABS(mean_high - mean_low)."
+      - "Prism: Analyze, Normalize, with 0 percent and 100 percent set to the means of the low and the high controls."
+      - "SoftMax Pro or Gen5: a custom formula in the data reduction with the same means; the Z' formula as above."
+    params:
+      - { arg: normalization, label: "the formula of the normalized value", ui_default: "percent_activity" }
+      - { arg: zprime_stat, label: "AVERAGE and STDEV.S, or MEDIAN and MAD", ui_default: "mean_sd" }
+    fidelity: close
+    difference: The tool uses the sample SD (n - 1), as STDEV.S in Excel. The spreadsheet and GUI routes were not run.
+    evidence:
+      source: docs
+      test: normalize-splitluc
+      note: Zhang et al. 1999 define Z'. The Z' of each plate matches the summary table of Cooley et al. 2020.
 
 tests:
   - id: elisa-dnase-4pl
@@ -383,6 +546,121 @@ tests:
       - { path: ok, equals: false }
       - { path: error, contains: "no_such_plate.csv" }
 
+  - id: dose-ryegrass-4pl
+    description: >
+      drc data set ryegrass, 4PL. ED50 3.05795 with the delta interval 2.67053 to 3.44538 and the parameters b 2.98222,
+      c 0.48141, d 7.79296 are the values in drc help ?ED and in Ritz et al. 2015 (PLOS ONE). SciPy gives the same estimates
+      (checks/check_dose_kinetics.py and .out).
+    data: [data/ryegrass.csv]
+    calls:
+      - tool: fit_dose_response
+        args: { data: "{adapter_dir}/data/ryegrass.csv", dose_col: conc, response_col: rootl, model: 4PL, ci: delta }
+    expect:
+      - { path: metrics.ic50, approx: 3.05795, abs: 0.00001 }
+      - { path: metrics.ci_low, approx: 2.67053, abs: 0.00002 }
+      - { path: metrics.ci_high, approx: 3.44538, abs: 0.00002 }
+      - { path: metrics.b, approx: 2.98222, abs: 0.00002 }
+      - { path: metrics.c, approx: 0.48141, abs: 0.00002 }
+      - { path: metrics.d, approx: 7.79296, abs: 0.00002 }
+      - { path: metrics.hill_slope, approx: -2.98222, abs: 0.00002 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: dose-ryegrass-log-ci
+    description: >
+      The same fit with the interval on the log scale (Gauss-Newton covariance). The bounds 2.69389 and 3.47123 are from
+      SciPy (checks/check_dose_kinetics.py and .out).
+    data: [data/ryegrass.csv]
+    calls:
+      - tool: fit_dose_response
+        args: { data: "{adapter_dir}/data/ryegrass.csv", dose_col: conc, response_col: rootl, model: 4PL, ci: log }
+    expect:
+      - { path: metrics.ci_low, approx: 2.69389, abs: 0.00002 }
+      - { path: metrics.ci_high, approx: 3.47123, abs: 0.00002 }
+
+  - id: dose-salba-shared-ic50
+    description: >
+      drc data set S.alba, bentazone and glyphosate, 4PL for each herbicide and a model with one shared ED50. The ED50
+      values and the F of 19.617 are from SciPy (checks/check_dose_kinetics.py and .out). drc anova() of a curveid fit gives
+      F 20.355, because its joint fit stops at a larger residual (11.1799 against 11.0773).
+    data: [data/s_alba.csv]
+    calls:
+      - tool: fit_dose_response
+        args: { data: "{adapter_dir}/data/s_alba.csv", dose_col: Dose, response_col: DryMatter, group_col: Herbicide, model: 4PL, ci: delta, compare_ic50: true }
+    expect:
+      - { path: metrics.Bentazone_ic50, approx: 29.26482, abs: 0.0001 }
+      - { path: metrics.Glyphosate_ic50, approx: 62.04804, abs: 0.0001 }
+      - { path: metrics.F_shared_ic50, approx: 19.617, abs: 0.002 }
+      - { path: metrics.n_groups, equals: 2 }
+
+  - id: kinetics-puromycin
+    description: >
+      R data set Puromycin, Michaelis-Menten for each state. Vmax 212.68 (SE 6.947) and Km 0.06412 (SE 0.008281) for the
+      treated cells are in Bates and Watts (1988, Nonlinear Regression Analysis and Its Applications) and in R help
+      ?Puromycin. The untreated values and the digits are from SciPy (checks/check_dose_kinetics.py and .out).
+    data: [data/puromycin.csv]
+    calls:
+      - tool: fit_enzyme_kinetics
+        args: { data: "{adapter_dir}/data/puromycin.csv", substrate_col: conc, rate_col: rate, group_col: state, model: michaelis-menten }
+    expect:
+      - { path: metrics.treated_Vmax, approx: 212.6837, abs: 0.001 }
+      - { path: metrics.treated_Km, approx: 0.064121, abs: 0.000002 }
+      - { path: metrics.treated_Vmax_se, approx: 6.9472, abs: 0.0005 }
+      - { path: metrics.treated_Km_se, approx: 0.008281, abs: 0.000002 }
+      - { path: metrics.untreated_Vmax, approx: 160.2800, abs: 0.001 }
+      - { path: metrics.untreated_Km, approx: 0.047708, abs: 0.000002 }
+
+  - id: kinetics-competitive-synthetic
+    description: >
+      Synthetic competitive inhibition data (data/make_fixtures.R, fixed seed). Vmax, Km, Ki and the AICc values are from
+      SciPy (checks/check_dose_kinetics.py and .out). The mixed model has alpha going to infinity and no AICc.
+    data: [data/competitive_synthetic.csv]
+    calls:
+      - tool: fit_enzyme_kinetics
+        args: { data: "{adapter_dir}/data/competitive_synthetic.csv", substrate_col: substrate, rate_col: rate, inhibitor_col: inhibitor, model: competitive }
+    expect:
+      - { path: metrics.Ki, approx: 0.484042, abs: 0.000005 }
+      - { path: metrics.Km, approx: 2.174216, abs: 0.000005 }
+      - { path: metrics.Vmax, approx: 103.241412, abs: 0.0001 }
+      - { path: metrics.Ki_se, approx: 0.025475, abs: 0.000005 }
+      - { path: metrics.aicc_competitive, approx: 89.7640, abs: 0.001 }
+      - { path: metrics.aicc_noncompetitive, approx: 187.1975, abs: 0.001 }
+
+  - id: kinetics-needs-inhibitor
+    description: An inhibition model without an inhibitor column fails, and the error names the argument.
+    data: [data/puromycin.csv]
+    calls:
+      - tool: fit_enzyme_kinetics
+        args: { data: "{adapter_dir}/data/puromycin.csv", substrate_col: conc, rate_col: rate, model: competitive }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "needs inhibitor_col" }
+
+  - id: normalize-splitluc
+    description: >
+      Split-luciferase plates of Cooley et al. 2020 (Wellcome Open Research, OSF data, CC BY 4.0), 10 µl wells, first read.
+      The summary table of the authors prints Z' 0.54 for plate 1 and 0.73 for plate 3, with means 2471 and 417 for plate 1.
+      The digits are from pandas (bench/papers/cooley2020-splitluc-zprime/check.py and check.out).
+    data: [data/splitluc_plates.csv]
+    calls:
+      - tool: normalize_plate
+        args: { data: "{adapter_dir}/data/splitluc_plates.csv", signal_col: signal, type_col: type, plate_col: plate, high_control: pos_10ul, low_control: neg_10ul, normalization: percent_activity, zprime_stat: mean_sd }
+    expect:
+      - { path: metrics.n_plates, equals: 10 }
+      - { path: metrics.p1_z_prime, approx: 0.5413, abs: 0.0001 }
+      - { path: metrics.p3_z_prime, approx: 0.7275, abs: 0.0001 }
+      - { path: metrics.p1_mean_high, approx: 2471.2, abs: 0.01 }
+      - { path: metrics.p1_mean_low, approx: 416.8, abs: 0.01 }
+
+  - id: normalize-unknown-label
+    description: A control label that is not in the type column fails, and the error lists the values.
+    data: [data/splitluc_plates.csv]
+    calls:
+      - tool: normalize_plate
+        args: { data: "{adapter_dir}/data/splitluc_plates.csv", signal_col: signal, type_col: type, high_control: vehicle, low_control: neg_10ul, normalization: percent_activity }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "the label 'vehicle' is not a value of 'type'" }
+
 tools:
   - name: fit_standard_curve
     title: Fit an ELISA standard curve and back-calculate samples
@@ -455,3 +733,92 @@ tools:
       plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
     script: scripts/compare_models.R
     parse: json
+
+  - name: fit_dose_response
+    title: Fit dose-response curves and IC50 values
+    description: >
+      Fit a dose-response curve for each compound or group and give the IC50 or EC50 with a confidence interval. It also
+      gives the Hill slope, the top, the bottom and R-squared. With compare_ic50 it tests one shared IC50 for all groups by
+      the extra sum-of-squares F test. It saves the plot as PNG and SVG. Normalize the plate first with normalize_plate if the
+      response is a raw signal.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each well or point." }
+      dose_col: { type: string, description: "Column with the dose or the concentration (not the log). The tool keeps dose 0 rows as controls. Default dose." }
+      response_col: { type: string, description: "Column with the response, raw or normalized. Default response." }
+      group_col: { type: string, description: "Column with the compound or the group. The tool fits one curve for each value." }
+      model: { type: string, enum: [4PL, 3PL, 4PL-normalized, 5PL, Weibull1, Weibull2], description: "Leave out. The harness sets it from the decision record." }
+      ic50_type: { type: string, enum: [relative, absolute], description: "Leave out. The harness sets it from the decision record." }
+      response_level: { type: number, description: "Leave out. The harness sets it from the decision record. Response value for an absolute IC50, in the unit of response_col." }
+      ci: { type: string, enum: [delta, log], description: "Leave out. The harness sets it from the decision record." }
+      ci_level: { type: number, minimum: 0.5, maximum: 0.999, description: "Confidence level as a fraction. Default 0.95." }
+      weighting: { type: string, enum: [none, 1/y, 1/y^2], description: "Leave out. The harness sets it from the decision record." }
+      compare_ic50: { type: boolean, description: "true tests whether all groups share one IC50. Default false." }
+      dose_unit: { type: string, description: "Unit of the dose, such as µg/mL. Used for labels only." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      plot: { kind: image, ext: .png, description: The points and the fitted curve of each group. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+      results: { kind: table, ext: .csv, description: One row for each group with the IC50 and the parameters. }
+    script: scripts/fit_dose_response.R
+    parse: json
+    citations:
+      - text: "Ritz C, Baty F, Streibig JC, Gerhard D (2015). Dose-Response Analysis Using R. PLOS ONE 10(12): e0146021."
+        doi: 10.1371/journal.pone.0146021
+
+  - name: fit_enzyme_kinetics
+    title: Fit Michaelis-Menten and inhibition models
+    description: >
+      Fit the Michaelis-Menten model or an inhibition model to initial rates against substrate concentration. It gives
+      Vmax, Km and Ki with standard errors and confidence intervals. With an inhibitor column it gives the AICc of the
+      competitive, noncompetitive, uncompetitive and mixed models. It saves the fit and a Lineweaver-Burk view as PNG and SVG.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each rate." }
+      substrate_col: { type: string, description: "Column with the substrate concentration. Default substrate." }
+      rate_col: { type: string, description: "Column with the initial rate (velocity). Default rate." }
+      inhibitor_col: { type: string, description: "Column with the inhibitor concentration, 0 for rows without inhibitor. Needed by the inhibition models." }
+      group_col: { type: string, description: "Column with the enzyme or the condition. The tool fits each value apart." }
+      model: { type: string, enum: [michaelis-menten, competitive, noncompetitive, uncompetitive, mixed], description: "Leave out. The harness sets it from the decision record." }
+      ci_level: { type: number, minimum: 0.5, maximum: 0.999, description: "Confidence level as a fraction. Default 0.95." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      plot: { kind: image, ext: .png, description: "Rate against substrate with the fit, and the Lineweaver-Burk view." }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+      results: { kind: table, ext: .csv, description: One row for each parameter. }
+    script: scripts/fit_enzyme_kinetics.R
+    parse: json
+
+  - name: normalize_plate
+    title: Normalize a plate to its controls and give the Z' factor
+    description: >
+      Normalize each well to the high and the low control wells of its plate and give the Z' factor of each plate. It
+      gives the mean, SD and CV of each control and the signal to background ratio. It writes a CSV with a normalized
+      column for fit_dose_response, and a plot as PNG and SVG.
+    params:
+      data: { type: string, description: "Path of a CSV file with one row for each well." }
+      signal_col: { type: string, description: "Column with the raw signal. Default signal." }
+      type_col: { type: string, description: "Column that marks the control wells and the sample wells. Default type." }
+      high_control: { type: string, description: "Value of type_col for the 100 percent control, such as vehicle or no inhibitor." }
+      low_control: { type: string, description: "Value of type_col for the 0 percent control, such as full kill or no enzyme." }
+      blank_label: { type: string, description: "Value of type_col for blank wells. The tool subtracts their mean first. Leave out for no blank." }
+      plate_col: { type: string, description: "Column with the plate name. The tool uses the controls of each plate." }
+      well_col: { type: string, description: "Column with the well name, used by exclude. Default well, if the column exists." }
+      normalization: { type: string, enum: [percent_activity, percent_inhibition, fraction, percent_of_high, none], description: "Leave out. The harness sets it from the decision record." }
+      zprime_stat: { type: string, enum: [mean_sd, median_mad], description: "Leave out. The harness sets it from the decision record." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Well names to drop, as a list or as comma text." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      normalized: { kind: table, ext: .csv, description: The input rows with a normalized column and an excluded column. }
+      plates: { kind: table, ext: .csv, description: One row for each plate with the control statistics and Z'. }
+      plot: { kind: image, ext: .png, description: The control and sample wells of each plate. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    script: scripts/normalize_plate.R
+    parse: json
+    citations:
+      - text: "Zhang JH, Chung TD, Oldenburg KR (1999). A simple statistical parameter for use in evaluation and validation of high throughput screening assays. Journal of Biomolecular Screening 4(2): 67-73."
+        doi: 10.1177/108705719900400206

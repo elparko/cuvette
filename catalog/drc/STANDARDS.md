@@ -26,8 +26,29 @@ Follow these rules in each answer. The review checks look for the same errors.
 - R-squared near 1 does not show that the low standards fit. Read the recovery of each standard.
 - The 5PL forms of SoftMax Pro (and Gen5) and of Prism are different equations. Name the form.
 
+## What to report for a dose-response curve
+
+- The model (4PL, 3PL with the bottom at 0, or 4PL-normalized), the response (raw or normalized, and to which controls).
+- For each group: the IC50 or EC50 with the unit and the confidence interval, the interval method, the Hill slope, the top and the bottom.
+- Say if an IC50 is relative or absolute. A relative IC50 is the midpoint of the fitted curve.
+- Say if an IC50 lies outside the tested doses. It is then an extrapolation.
+- For a comparison of groups: the F test, its degrees of freedom and p.
+
+## What to report for enzyme kinetics
+
+- Vmax and Km with units and confidence intervals, from the nonlinear fit. Ki for an inhibition model.
+- The model, and the AICc of the other inhibition models when the scientist asks which model fits.
+- A Lineweaver-Burk plot is a view. Do not take Km or Vmax from a straight line through 1/v against 1/S.
+
+## What to report for plate quality
+
+- For each plate: the mean, SD and number of the high and the low control wells, and Z'.
+- The Z' formula (mean and SD, or median and MAD) and each excluded well.
+- Z' of 0.5 or more is the usual limit for an excellent screening assay (Zhang et al. 1999). Name the limit that the lab uses.
+
 ## Do not claim
 
 - Do not report a concentration from a curve that the scientist did not approve.
 - Do not remove a well as an outlier unless the scientist names it.
 - Do not compare concentrations from plates with different curves without a plate control or a bridging sample.
+- Do not call two IC50 values different without the F test or the confidence intervals.

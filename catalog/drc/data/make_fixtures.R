@@ -1,6 +1,7 @@
 # Writes the test data files from data sets that ship with R.
 # DNase: ELISA of recombinant DNase in rat serum (Davidian and Giltinan 1995), R package datasets.
 # ryegrass: root length against ferulic acid (Inderjit et al. 2002), R package drc.
+# S.alba: dry matter of white mustard against bentazone and glyphosate (Christensen et al. 2003), R package drc.
 # Puromycin: enzyme velocity against substrate (Treloar 1974; Bates and Watts 1988), R package datasets.
 out <- if (length(commandArgs(TRUE))) commandArgs(TRUE)[1] else "."
 d <- datasets::DNase
@@ -10,4 +11,9 @@ r2 <- d[d$Run == 2, ]
 smp <- data.frame(plate = "run1", well = sprintf("U%02d", seq_len(nrow(r2))), type = "sample", sample = sprintf("serum_%02d", as.integer(factor(r2$conc))), conc = NA, signal = r2$density, dilution = 10)
 write.csv(rbind(std, smp), file.path(out, "dnase_elisa.csv"), row.names = FALSE, na = "")
 write.csv(drc::ryegrass, file.path(out, "ryegrass.csv"), row.names = FALSE)
+write.csv(drc::S.alba, file.path(out, "s_alba.csv"), row.names = FALSE)
 write.csv(datasets::Puromycin, file.path(out, "puromycin.csv"), row.names = FALSE)
+set.seed(20261009)
+inh <- expand.grid(rep = 1:2, substrate = c(0.25, 0.5, 1, 2, 4, 8, 16), inhibitor = c(0, 0.5, 1, 2))
+inh$rate <- round(100 * inh$substrate / (2 * (1 + inh$inhibitor / 0.5) + inh$substrate) + rnorm(nrow(inh), 0, 2), 3)
+write.csv(inh[, c("inhibitor", "substrate", "rep", "rate")], file.path(out, "competitive_synthetic.csv"), row.names = FALSE)
