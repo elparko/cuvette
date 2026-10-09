@@ -40,9 +40,10 @@ const MODES: Record<Mode, string> = {
 };
 
 const PICK = `# Programs
-The session started with no program adapter. An adapter gives the tools, standards, skills and decisions of one science program.
+The session started with no adapter for a science program. An adapter gives the tools, standards, skills and decisions of one program.
+- The adapters under "# Program" below are loaded in every session. If their tools do the request, use them. Do not call list_adapters or use_adapter for them.
 - Look at the request and the files that it names.
-- Call list_adapters. Then call use_adapter with the adapter that fits and the reason.
+- If the request needs another program, call list_adapters. Then call use_adapter with the adapter that fits and the reason.
 - The choice of program belongs to the scientist. use_adapter shows your choice and your reason to the scientist, who accepts it or picks another adapter. Do not ask about the program with ask_scientist.
 - Load only the adapters that the request needs. You can load a second adapter later.
 - Do not guess tool names. The program tools appear after use_adapter.

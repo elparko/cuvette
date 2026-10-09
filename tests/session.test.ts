@@ -544,6 +544,32 @@ test("with --adapter, the session has no adapter tools and no program decision",
   expect(session.decisions.has("adapter")).toBe(false);
 });
 
+test("a session with defaults loads the default adapters, keeps the adapter choice open, and reports a missing one", async () => {
+  const cwd = pickCwd();
+  const provider = new FakeProvider([{ text: "Done." }]);
+  session = await Session.create({ adapters: [], provider, cwd, defaults: true, settings: { defaultAdapters: ["lab2", "no-such-adapter"] } });
+  expect(session.pick).toBe(true);
+  expect(session.adapters.map((a) => a.name)).toEqual(["lab2"]);
+  expect(session.allTools().map((t) => t.name)).toEqual(expect.arrayContaining(["count", "list_adapters", "use_adapter"]));
+  expect(session.record.entries(["session"])[0].data).toMatchObject({ pick: true, defaults: ["lab2"] });
+  session.decisions.applySetup({});
+  await session.send("Count the particles");
+  expect(provider.requests[0].system).toMatch(/loaded in every session\. If their tools do the request, use them/);
+  expect(provider.requests[0].system).toMatch(/Count each image twice/);
+  expect(JSON.stringify(provider.requests[0].messages[0])).toMatch(/The default adapter no-such-adapter is not loaded/);
+});
+
+test("without defaults, as in the benchmark, only the named adapters load; a named default loads once", async () => {
+  const cwd = pickCwd();
+  session = await Session.create({ adapters: ["lab"], provider: new FakeProvider([]), cwd, settings: { defaultAdapters: ["lab2"] } });
+  expect(session.adapters.map((a) => a.name)).toEqual(["lab"]);
+  await session.close();
+  session = await Session.create({ adapters: ["lab"], provider: new FakeProvider([]), cwd, defaults: true, settings: { defaultAdapters: ["lab", "lab2"] } });
+  expect(session.pick).toBe(false);
+  expect(session.adapters.map((a) => a.name)).toEqual(["lab", "lab2"]);
+  expect(session.allTools().filter((t) => t.name === "count")).toHaveLength(1);
+});
+
 test("a script that walks a large folder asks first, even after always allow", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "ga-cwd-"));
   const plain = { purpose: "Count the files", does: "Counts the files in the project folder.", code: "import os\nprint(len(os.listdir('.')))" };

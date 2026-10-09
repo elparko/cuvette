@@ -77,6 +77,7 @@ export function childEnv(c: KindContext, extra: Record<string, string> = {}): Re
   env.GA_ADAPTER_DIR = c.adapter.root;
   env.GA_PROGRAM_PATH = c.programPath ?? "";
   if (c.dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = c.dirs.figureFormats;
+  if (c.dirs.outputDir) env.GA_OUTPUT_DIR = c.dirs.outputDir;
   return { ...env, ...extra };
 }
 

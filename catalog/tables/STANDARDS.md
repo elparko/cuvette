@@ -1,0 +1,5 @@
+- Say what one row is (a cell, a slice, an animal) and what n counts.
+- Report SD or SEM by name, with n for each group.
+- A summary row (Average, Total) in a lab sheet is not data. read_table leaves it out; say so.
+- Cells that look like notes are not data. List them for the scientist.
+- Every plot axis has a label with its unit.

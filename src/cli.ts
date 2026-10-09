@@ -133,7 +133,7 @@ async function headless(prompt: string) {
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = FORMATS.has(str(o.output) ?? "") ? str(o.output)! : "text";
-  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: { headless: true, ...bypass(), ...planSetting() } });
+  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, settings: { headless: true, ...bypass(), ...planSetting() } });
   attachHeadless(s, { answers, allow });
   s.bus.on((e) => {
     if (out === "stream-json") process.stdout.write(JSON.stringify(e) + "\n");
@@ -176,7 +176,7 @@ async function interactive(resumeId?: string) {
   if (!adapters.length && !resumeId) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
   const s = resumeId
     ? await Session.resume(resumeId, { model: str(o.model), interactive: true, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See ga sessions.`))
-    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, interactive: true, settings: { ...bypass(), ...planSetting() } });
+    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, settings: { ...bypass(), ...planSetting() } });
   await runTui(s as never, {});
   await s.close();
 }

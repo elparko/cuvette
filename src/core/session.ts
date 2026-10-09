@@ -68,6 +68,7 @@ export interface SessionOptions {
   interactive?: boolean;
   home?: boolean;
   place?: Place;
+  defaults?: boolean;
 }
 
 interface Pending<T> {
@@ -301,7 +302,16 @@ export class Session {
     else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
 
     this.pick = opts.pick ?? opts.adapters.length === 0;
+    const defaults = opts.defaults ? this.defaultAdapters() : [];
     for (const a of this.adapters) await this.startOne(a);
+    for (const a of [...defaults])
+      try {
+        await this.startOne(a);
+      } catch (e) {
+        this.adapters = this.adapters.filter((x) => x !== a);
+        defaults.splice(defaults.indexOf(a), 1);
+        this.notes.push(`The default adapter ${a.name} did not start: ${(e as Error).message}`);
+      }
 
     this.decisions = new DecisionRecord(this.adapters, this.record, this.pick ? [ADAPTER_DECISION] : []);
     this.interactive = !!opts.interactive;
@@ -374,6 +384,7 @@ export class Session {
         cwd: this.cwd,
         guidance: this.settings.guidance,
         ...(this.pick ? { pick: true } : {}),
+        ...(defaults.length ? { defaults: defaults.map((a) => a.name) } : {}),
       });
     }
     if (this.permissionMode === "bypass") this.record.append("permission_mode", { old: "ask", new: "bypass", how: opts.settings?.permissionMode === "bypass" ? "the --bypass-permissions flag" : "a settings file" });
@@ -425,6 +436,23 @@ export class Session {
 
   private buildSystem(): string {
     return systemPrompt({ adapters: this.runtimeInfo, model: this.provider.info, mode: this.mode, lab: labText(this.cwd), guidance: this.settings.guidance, pick: this.pick, folders: { project: this.cwd, work: this.workDir, output: this.outputDir, figureFormats: this.settings.figure_formats, xlsx: xlsxOn(this.settings) } });
+  }
+
+  private defaultAdapters(): LoadedAdapter[] {
+    const out: LoadedAdapter[] = [];
+    for (const name of this.settings.defaultAdapters ?? []) {
+      if (this.adapters.some((a) => a.name === name)) continue;
+      try {
+        const a = applyOverlay(findAdapter(name, this.cwd));
+        const l = a.manifest.locate;
+        if (!(l.env || l.paths.length || l.which.length) || programFound(a.manifest, this.found).path) out.push(a);
+        else this.notes.push(`The default adapter ${name} is not loaded: its program is not found. ${installHint(a.manifest)}`);
+      } catch (e) {
+        this.notes.push(`The default adapter ${name} is not loaded: ${(e as Error).message}.`);
+      }
+    }
+    this.adapters.push(...out);
+    return out;
   }
 
   private async startOne(a: LoadedAdapter): Promise<string[]> {

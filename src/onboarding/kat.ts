@@ -170,6 +170,7 @@ export async function runTests(adapter: LoadedAdapter, runtime: RuntimeLike, opt
     byName.set(t.name, t);
     if (t.remoteName) byName.set(t.remoteName, t);
   }
+  for (const t of (await adapter.module()).tools ?? []) if (!byName.has(t.name)) byName.set(t.name, t);
   const base = opts.workDir ?? mkdtempSync(join(tmpdir(), "ga-kat-"));
   const resolved = { workDir: base, sessionDir: opts.sessionDir ?? base, callTimeoutMs: opts.callTimeoutMs ?? 600_000 };
   const selected = adapter.manifest.tests.filter((t) => !opts.only || opts.only.includes(t.id));

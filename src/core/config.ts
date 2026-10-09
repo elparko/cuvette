@@ -30,6 +30,7 @@ export interface Settings {
   export_xlsx: "on" | "off" | boolean;
   figure_formats: string;
   output_folder: string;
+  defaultAdapters: string[];
 }
 
 export const DEFAULTS: Settings = {
@@ -56,6 +57,7 @@ export const DEFAULTS: Settings = {
   export_xlsx: "on",
   figure_formats: "png,svg",
   output_folder: "cuvette",
+  defaultAdapters: ["tables"],
 };
 
 export function xlsxOn(s: Pick<Settings, "export_xlsx">): boolean {

@@ -13,6 +13,7 @@ const SHARED = new Set(["read_file", "list_dir", "load_skill", "note", "plan", "
 export async function runMcpServer(opts: { adapters: string[] }) {
   const session = await Session.create({
     adapters: opts.adapters,
+    defaults: true,
     provider: new FakeProvider([]),
     settings: { askWaits: false, autoResume: false, guidance: true },
   });

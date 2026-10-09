@@ -194,6 +194,14 @@ describe("known-answer runner", () => {
     expect(out[0].outputs).toHaveLength(2);
   });
 
+  test("a tool from the adapter module runs in a known-answer test", async () => {
+    const a = loadAdapter(GOOD);
+    const tool = fake(() => ({ ok: true, metrics: { mean: 2 } }));
+    a.module = async () => ({ tools: await tool.tools() });
+    const out = await runTests(a, { tools: async () => [] });
+    expect(out[0].failures).toEqual([]);
+  });
+
   test("substitute reports a missing saved name", () => {
     expect(() => substitute("{saved.nope.x}", {}, "/a")).toThrow(/no saved result/);
   });

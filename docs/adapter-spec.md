@@ -306,7 +306,8 @@ known.
 | `data` | list of text | `[]` | Files in the adapter folder that the test needs. They must exist. |
 | `manual_route_checked` | true or false | `false` | `true` if a person ran the manual route and got the same numbers. |
 
-A call has `tool`, `args` (default `{}`) and `save_as` (default empty).
+A call has `tool`, `args` (default `{}`) and `save_as` (default empty). The tool can be a program tool
+or a tool of the module.
 
 An expectation has `path` and one or more of these comparisons:
 
@@ -384,6 +385,23 @@ version, the reason and who chose it. Setup-stage decisions of the new adapter g
 or the values from the setup and answers files, in a new `setup` entry. New tools go to the end of
 the tool list. A second load of the same adapter does nothing. In blind mode, the folder of the
 adapter and the install folder of its program go on the allow list.
+
+## Adapters in every session
+
+The setting `defaultAdapters` names adapters that each session loads at the start. The default
+is `["tables"]`: read CSV and Excel sheets, summarize, reshape, write xlsx and make plots. Its
+five tools take about 2,000 tokens, and its standards take about 240 tokens.
+
+- `ga`, `ga -p` and `ga mcp` load the default adapters next to the `--adapter` adapters. They
+  open no card.
+- The default adapters do not close the adapter choice. With no `--adapter`, `list_adapters` and
+  `use_adapter` stay, and the agent can load a program adapter later.
+- If the program of a default adapter is not found, the session starts without it. The first
+  message says why and gives the install hint.
+- The session record lists them under `defaults` in the `session` entry.
+- The benchmark does not use this setting. It loads only the adapters in each `bench.yaml`.
+
+Change it with `ga config set defaultAdapters tables,biostats`. Type `none` for no adapter.
 
 ## Tool results
 

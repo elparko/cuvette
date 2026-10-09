@@ -41,7 +41,7 @@ export function ConfigPanel(props: { ctx: SettingCtx; busy: boolean; onEdit: (ca
     if (row.locked) return setMsg({ text: `${d.label} is locked until the turn ends.`, color: "yellow" });
     if (d.edit) return props.onEdit(d.edit);
     if (!d.scopes.length) return setMsg({ text: "You cannot change this setting here." });
-    if (d.number) {
+    if (d.number || d.list) {
       setText("");
       return setStep({ t: "text", def: d });
     }

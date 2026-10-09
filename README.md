@@ -32,6 +32,10 @@ names files, the harness adds a one-line hint with the adapters for those file t
 record keeps each load and its reason. In a run without the terminal UI, `"adapter": "biostats"`
 in the answers file answers the card. `--adapter <name>` still loads adapters before the start.
 
+Each session also loads the `tables` adapter: it reads CSV and Excel lab sheets, summarizes and
+reshapes tables, writes xlsx files and makes bar, box, scatter, line and histogram plots. Each
+step gives the manual route in Excel. The setting `defaultAdapters` changes this list.
+
 ### With Claude
 
 ```bash

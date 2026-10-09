@@ -1,0 +1,309 @@
+adapter:
+  name: tables
+  field: tables and figures
+  file_types: [".xlsx", ".csv", ".tsv", ".xlsm"]
+  title: Tables, Excel and figures (pandas, openpyxl, matplotlib)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Reads CSV and Excel lab sheets, summarizes and reshapes tables, writes xlsx files and makes journal-style plots.
+    Each step has a manual route in Excel terms, so a lab member can repeat it by hand.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: pandas, openpyxl, matplotlib
+  version: "pandas 2.3.3, openpyxl 3.1.5, matplotlib 3.11.2"
+  tested_versions: ["3.1.5"]
+  homepage: https://pandas.pydata.org
+  docs:
+    - https://pandas.pydata.org/docs/
+    - https://openpyxl.readthedocs.io
+    - https://matplotlib.org/stable/
+  install: >
+    The adapter uses the biostats Python environment. Add openpyxl to it:
+    uv pip install --python ~/.guided-analysis/envs/biostats/bin/python openpyxl
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 60
+  call_timeout_s: 300
+
+locate:
+  env: GA_TABLES_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/biostats/bin/python
+    - ~/.guided-analysis/envs/biostats/Scripts/python.exe
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import openpyxl; print(openpyxl.__version__)"]
+  version_pattern: '(\d+\.\d+\.\d+)'
+
+module: adapter.ts
+
+data_rules:
+  cloud_visibility: all
+  note: Lab tables are small. The model sees the table preview of each step.
+
+decisions:
+  - key: error_bars
+    label: Error bars on bar and line plots
+    kind: choice
+    choices: [SD, SEM]
+    default: SD
+    group: Figures
+    help: >
+      SD shows the spread of the values. SEM shows how precise the mean is, and it gets smaller as n grows.
+      Say in the legend which one you show.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_plot, arg: error_bars }
+
+  - key: show_points
+    label: Show individual points
+    kind: bool
+    default: true
+    group: Figures
+    help: Points show each sample on the bar or box, so the reader sees n and the spread.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: make_plot, arg: points }
+
+tools:
+  - name: read_table
+    title: Read a table
+    description: >
+      Read a CSV, TSV or xlsx file. Finds the tables in a messy sheet and reports their range, columns, types, row count,
+      summary rows and note cells. Group labels above repeated headers become a Group column. Saves the table as a CSV for the other tools.
+    read_only: true
+    function: "ga_tables:read_table"
+    params:
+      path: { type: string, description: Absolute path. }
+      sheet: { type: string, description: Sheet name. Default is the first sheet with data. }
+      table: { type: integer, minimum: 1, description: Number of the table to read. Default is the largest. }
+      range: { type: string, description: "Excel range whose first row is the header, for example C5:G20." }
+      groups_to_rows: { type: boolean, default: true, description: Turn group label blocks into rows with a Group column. }
+    required: [path]
+
+  - name: summarize_table
+    title: Summarize a table
+    description: n, mean, SD, SEM, median, quartiles, IQR, min and max for each value column, by group.
+    read_only: true
+    function: "ga_tables:summarize_table"
+    params:
+      path: { type: string, description: CSV or xlsx path. }
+      values: { type: array, items: { type: string }, description: Columns to summarize. Default is all numeric columns. }
+      group_by: { type: array, items: { type: string } }
+      ratios: { type: object, description: 'New column to formula, for example {"Red %": "Red dots / Total cells * 100"}. Computed per row, then summarized.' }
+
+  - name: reshape_table
+    title: Reshape a table
+    description: >
+      Change a table. The steps run in this order: join, compute, filter, pivot or melt, select, rename, sort.
+      Saves a new CSV.
+    read_only: true
+    function: "ga_tables:reshape_table"
+    params:
+      path: { type: string }
+      join: { type: object, description: '{path, on, how}. how is left (default), inner, right or outer.' }
+      compute: { type: object, description: 'New column to formula, for example {"Ratio": "Red dots / Total cells"}.' }
+      filter: { type: string, description: "Rows to keep, for example: Group == 'Control' and Age > 3" }
+      pivot: { type: object, description: "To wide: {index, columns, values}." }
+      melt: { type: object, description: "To long: {id_columns, value_columns, name, value}." }
+      select: { type: array, items: { type: string } }
+      rename: { type: object, description: Old name to new name. }
+      sort: { type: array, items: { type: string }, description: Columns. A leading - sorts from largest. }
+      name: { type: string, description: Name of the new file. }
+    required: [path]
+
+  - name: make_plot
+    title: Make a figure
+    description: >
+      Plot in journal style and save PNG (300 dpi) and SVG in the figures folder. bar: mean with error bars. box: median and quartiles.
+      scatter: optional linear fit and r. line: mean of y at each x. histogram: values of y. Labels need units.
+    function: "ga_tables:make_plot"
+    params:
+      path: { type: string }
+      kind: { type: string, enum: [bar, box, scatter, line, histogram] }
+      y: { type: string, description: Value column. }
+      y_label: { type: string, description: "Value axis label with unit, for example 'Red dots per cell (%)'." }
+      x: { type: string, description: Group column for bar and box. Numeric column for scatter and line. }
+      x_label: { type: string, description: Needed with unit for scatter and line. }
+      group: { type: string, description: Color by this column (scatter, line, histogram). }
+      error_bars: { type: string, enum: [SD, SEM] }
+      points: { type: boolean }
+      fit: { type: boolean }
+      bins: { type: integer }
+      title: { type: string }
+      file_name: { type: string }
+    required: [path, kind, y, y_label]
+
+map:
+  - tool: read_table
+    route: "In Excel: open the file, select the table range (header row first) and copy it to a new sheet with Home > Paste > Values."
+    fidelity: close
+    difference: The tool finds the range itself, leaves out summary rows such as Average, and turns note cells inside the data into blanks.
+    evidence: { source: docs, test: messy-sheet }
+
+  - tool: summarize_table
+    route: "In Excel: Insert > PivotTable; Rows: the group column; Values: Average, Count and StdDev. SEM = STDEV.S(range)/SQRT(COUNT(range)). Quartiles = QUARTILE.INC."
+    params:
+      - { arg: group_by, label: Rows }
+      - { arg: values, label: Values }
+    fidelity: exact
+    evidence: { source: docs, test: summary-by-hand, note: "SD is the sample SD (STDEV.S, n - 1). Quartiles use the inclusive method (QUARTILE.INC)." }
+
+  - tool: reshape_table
+    route: "In Excel: XLOOKUP for a join, a formula column for compute, Data > Filter, Insert > PivotTable for wide, Power Query Unpivot for long, Data > Sort."
+    fidelity: close
+    difference: The tool does each step in one call. In Excel each step is a separate action.
+    evidence: { source: docs, test: pivot-and-join }
+
+  - tool: write_xlsx
+    route: "In Excel: paste each table into its own sheet; View > Freeze Panes > Freeze Top Row; Home > Format > AutoFit Column Width; File > Save As > Excel Workbook."
+    fidelity: exact
+    evidence: { source: docs, test: xlsx-round-trip }
+
+  - tool: make_plot
+    route: "In Excel: Insert > Chart (Clustered Column, Box and Whisker, Scatter, Line or Histogram). For per-group error bars use Error Bars > More Options > Custom with the SD or SEM cells."
+    params:
+      - { arg: error_bars, label: Error Bars, ui_default: Standard Error, note: "Excel's built-in Standard Deviation error bar is one SD across all bars, not each group's SD. Use Custom values." }
+    fidelity: close
+    difference: Excel has no direct option for points over bars. Add them as a scatter series. Excel's box plot uses exclusive quartiles by default.
+    evidence: { source: docs, test: bar-plot-file }
+
+checks:
+  - id: error_bar_type_not_reported
+    severity: warning
+    description: A figure with error bars is reported without saying SD or SEM and n.
+    text: >
+      If the answer reports a bar or line plot with error bars, it must say whether the bars are SD or SEM and give n for each group.
+      Flag the answer if one is missing.
+
+tests:
+  - id: messy-sheet
+    description: >
+      Synthetic lab sheet (data/make_test_data.py). Group labels in row 3 (merged D3:E3 and F3:G3), headers in row 5, sample names in
+      column C, a text note in a data cell (D12 "lost"), an Average row, a note under the table, and a side table at I5:J8.
+    data: [data/messy_lab.xlsx]
+    calls:
+      - tool: read_table
+        args: { path: "{adapter_dir}/data/messy_lab.xlsx" }
+    expect:
+      - { path: metrics.n_tables, equals: 2 }
+      - { path: metrics.n_sheets, equals: 2 }
+      - { path: data.sheet, equals: Counts }
+      - { path: "data.tables[0].range", equals: "C5:G13" }
+      - { path: "data.tables[0].header_row", equals: 5 }
+      - { path: "data.tables[0].label_row", equals: 3 }
+      - { path: "data.tables[0].groups[1].label", equals: Knockdown }
+      - { path: "data.tables[0].groups[1].columns", equals: "F:G" }
+      - { path: "data.tables[0].excluded_rows[0].row", equals: 13 }
+      - { path: "data.tables[1].range", equals: "I5:J8" }
+      - { path: "data.tables[1].columns[0].type", equals: date }
+      - { path: metrics.n_notes, equals: 4 }
+      - { path: summary, contains: 'D12 "lost"' }
+      - { path: metrics.n_rows, equals: 12 }
+      - { path: table.columns, equals: [Sample, Group, Red dots, Total cells] }
+      - { path: "table.rows[6]", equals: [Slice 1, Knockdown, 5, 50] }
+
+  - id: summary-by-hand
+    description: >
+      Red % per slice, by group. Control 10, 12, 14, 16, 18, 20: mean 15, SD = sqrt(70 / 5) = 3.741657, SEM = SD / sqrt(6) = 1.527525,
+      median 15, Q1 = 12 + 0.25 x 2 = 12.5, Q3 = 16 + 0.75 x 2 = 17.5. Knockdown 10, 12, 8, 10, 14, 6: mean 10,
+      SD = sqrt(40 / 5) = 2.828427, SEM 1.154701, median 10.
+    data: [data/messy_lab.xlsx]
+    calls:
+      - { tool: read_table, args: { path: "{adapter_dir}/data/messy_lab.xlsx" }, save_as: long }
+      - tool: summarize_table
+        args: { path: "{saved.long.data.path}", values: ["Red %"], group_by: [Group], ratios: { "Red %": "Red dots / Total cells * 100" } }
+    expect:
+      - { path: "table.columns", equals: [Group, variable, n, mean, sd, sem, median, q1, q3, iqr, min, max] }
+      - { path: "table.rows[0][1]", equals: "Red %" }
+      - { path: "table.rows[0][2]", equals: 6 }
+      - { path: "table.rows[0][3]", approx: 15, abs: 1.0e-9 }
+      - { path: "table.rows[0][4]", approx: 3.741657, abs: 1.0e-6 }
+      - { path: "table.rows[0][5]", approx: 1.527525, abs: 1.0e-6 }
+      - { path: "table.rows[0][7]", approx: 12.5, abs: 1.0e-9 }
+      - { path: "table.rows[0][8]", approx: 17.5, abs: 1.0e-9 }
+      - { path: "table.rows[1][0]", equals: Knockdown }
+      - { path: "table.rows[1][3]", approx: 10, abs: 1.0e-9 }
+      - { path: "table.rows[1][4]", approx: 2.828427, abs: 1.0e-6 }
+      - { path: "table.rows[1][5]", approx: 1.154701, abs: 1.0e-6 }
+      - { path: "table.rows[1][6]", approx: 10, abs: 1.0e-9 }
+
+  - id: pivot-and-join
+    description: >
+      Pivot the long table to one row per slice and one column per group (Slice 1 is 10 and 5 red dots). Then join the slice depths
+      (data/slices.csv has slices 1 to 5), so the two Slice 6 rows have no match.
+    data: [data/messy_lab.xlsx, data/slices.csv]
+    calls:
+      - { tool: read_table, args: { path: "{adapter_dir}/data/messy_lab.xlsx" }, save_as: long }
+      - tool: reshape_table
+        args: { path: "{saved.long.data.path}", pivot: { index: Sample, columns: Group, values: Red dots }, name: wide }
+        save_as: wide
+      - tool: reshape_table
+        args: { path: "{saved.long.data.path}", join: { path: "{adapter_dir}/data/slices.csv", on: Sample }, filter: "Group == 'Knockdown'", sort: ["-Section depth (um)"], name: joined }
+    expect:
+      - { path: "saved.wide.table.columns", equals: [Sample, Control, Knockdown] }
+      - { path: "saved.wide.table.rows[0]", equals: [Slice 1, 10, 5] }
+      - { path: "saved.wide.metrics.n_rows", equals: 6 }
+      - { path: metrics.n_unmatched, equals: 2 }
+      - { path: metrics.n_rows, equals: 6 }
+      - { path: "table.rows[0]", equals: [Slice 5, Knockdown, 7, 50, 80] }
+
+  - id: xlsx-round-trip
+    description: >
+      Write the long table and its summary to xlsx with the harness writer, then read the file back with openpyxl.
+      Numbers stay numbers and the header row is frozen.
+    data: [data/messy_lab.xlsx]
+    calls:
+      - { tool: read_table, args: { path: "{adapter_dir}/data/messy_lab.xlsx" }, save_as: long }
+      - { tool: summarize_table, args: { path: "{saved.long.data.path}", group_by: [Group] }, save_as: stats }
+      - tool: write_xlsx
+        args: { tables: [{ path: "{saved.long.data.path}", sheet: counts }, { path: "{saved.stats.data.path}", sheet: summary }], file_name: roundtrip }
+        save_as: book
+      - { tool: read_table, args: { path: "{saved.book.data.path}", sheet: summary } }
+    expect:
+      - { path: "saved.book.metrics.n_sheets", equals: 2 }
+      - { path: "saved.book.data.sheets[0].number_cells", equals: 24 }
+      - { path: "saved.book.outputs[0].path", contains: roundtrip }
+      - { path: "data.sheets[0].name", equals: counts }
+      - { path: "data.sheets[0].freeze", equals: A2 }
+      - { path: "data.sheets[1].freeze", equals: A2 }
+      - { path: "data.columns[3].name", equals: mean }
+      - { path: "data.columns[3].type", equals: number }
+      - { path: "data.columns[2].type", equals: number }
+      - { path: "table.rows[0][3]", approx: 15, abs: 1.0e-9 }
+      - { path: "table.rows[0][4]", approx: 3.741657, abs: 1.0e-6 }
+
+  - id: bar-plot-file
+    description: >
+      Bar plot of Red % by group with SEM error bars and points. The figure is 2.8 x 3.0 inches at 300 dpi (840 x 900 pixels).
+      The summary gives the means (15 and 10), the SEM (1.528 and 1.155) and n.
+    data: [data/messy_lab.xlsx]
+    calls:
+      - { tool: read_table, args: { path: "{adapter_dir}/data/messy_lab.xlsx" }, save_as: long }
+      - { tool: reshape_table, args: { path: "{saved.long.data.path}", compute: { "Red %": "Red dots / Total cells * 100" } }, save_as: ratio }
+      - tool: make_plot
+        args: { path: "{saved.ratio.data.path}", kind: bar, x: Group, y: "Red %", y_label: "Red dots per cell (%)", error_bars: SEM, points: true, file_name: test-bar }
+    expect:
+      - { path: metrics.width_px, equals: 840 }
+      - { path: metrics.height_px, equals: 900 }
+      - { path: metrics.png_bytes, min: 20000 }
+      - { path: metrics.svg_bytes, min: 2000 }
+      - { path: metrics.mean_Control, approx: 15, abs: 1.0e-9 }
+      - { path: "outputs[0].path", contains: "figures/test-bar" }
+      - { path: summary, contains: "Control 15 ± 1.528 (n = 6), Knockdown 10 ± 1.155 (n = 6)" }
+      - { path: summary, contains: SEM error bars and individual points }
+
+  - id: plot-needs-units
+    description: A value axis label with no unit fails.
+    data: [data/messy_lab.xlsx]
+    calls:
+      - { tool: read_table, args: { path: "{adapter_dir}/data/messy_lab.xlsx" }, save_as: long }
+      - { tool: make_plot, args: { path: "{saved.long.data.path}", kind: box, x: Group, y: Red dots, y_label: Red dots } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: unit }

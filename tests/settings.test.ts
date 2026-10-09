@@ -189,3 +189,12 @@ test("show details is a session-only switch for the terminal view", async () => 
   await expect(changeSetting(ctx, "details", "off", "user")).rejects.toThrow(/only in: this session only/);
   expect(events.map((e) => e.data)).toEqual([{ name: "details", old: "off", new: "on", scope: "session" }]);
 });
+
+test("the adapters for every session are a list, and none clears the list", async () => {
+  expect(row(describe({ cwd, env: {} }), "defaultAdapters")).toMatchObject({ value: "tables", source: "default" });
+  await changeSetting({ cwd, env: {} }, "defaultAdapters", "tables, biostats", "project");
+  expect(JSON.parse(readFileSync(settingsPath("project", cwd), "utf8"))).toEqual({ defaultAdapters: ["tables", "biostats"] });
+  expect(row(describe({ cwd, env: {} }), "defaultAdapters")).toMatchObject({ value: "tables, biostats", source: "project" });
+  await changeSetting({ cwd, env: {} }, "defaultAdapters", "none", "user");
+  expect(JSON.parse(readFileSync(settingsPath("user", cwd), "utf8"))).toEqual({ defaultAdapters: [] });
+});

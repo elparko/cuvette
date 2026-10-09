@@ -37,6 +37,7 @@ export interface SettingDef {
   choices?: () => string[];
   free?: boolean;
   number?: boolean;
+  list?: boolean;
   def?: unknown;
   lockedInTurn?: boolean;
   secret?: boolean;
@@ -212,6 +213,15 @@ export const SETTINGS: SettingDef[] = [
     read: (ctx) => ({ value: ctx.session!.adapterInfo.map((a) => `${a.name} ${a.version}`).join(", ") || "none", source: "session" }),
   },
   {
+    name: "defaultAdapters",
+    group: "Adapters",
+    label: "Adapters in every session",
+    help: "Adapters that each new session loads at the start, separated by commas. Type none for no adapter. The benchmark does not use this setting.",
+    scopes: ["user", "project"],
+    free: true,
+    list: true,
+  },
+  {
     name: "adapter_folders",
     group: "Adapters",
     label: "Adapter folders",
@@ -334,6 +344,7 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 export function show(v: unknown): string {
   if (v === undefined || v === null || v === "") return "not set";
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "none";
   return typeof v === "string" ? v : JSON.stringify(v);
 }
 
@@ -370,6 +381,10 @@ export function parseValue(d: SettingDef, raw: unknown): unknown {
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) throw new Error(`${d.label} must be a number above 0, or off.`);
     return n;
+  }
+  if (d.list) {
+    const items = (Array.isArray(raw) ? raw.map(String) : String(raw ?? "").split(",")).map((x) => x.trim()).filter(Boolean);
+    return items.length === 1 && items[0] === "none" ? [] : items;
   }
   const v = String(raw ?? "").trim();
   if (!v) throw new Error(`${d.label} needs a value.`);

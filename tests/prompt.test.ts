@@ -14,7 +14,7 @@ test("with no adapter at the start, the prompt tells the agent to list and load 
   const model = { provider: "claude" as const, model: "m", contextWindow: 1, vision: true, small: false };
   const pick = systemPrompt({ ...base, model, pick: true });
   expect(pick).toContain("# Programs");
-  expect(pick).toMatch(/Call list_adapters\. Then call use_adapter/);
+  expect(pick).toMatch(/call list_adapters\. Then call use_adapter/);
   expect(pick).toMatch(/Do not guess tool names/);
   expect(systemPrompt({ ...base, model })).not.toContain("list_adapters");
   expect(systemPrompt({ ...base, model, guidance: false, pick: true })).toMatch(/list_adapters/);
