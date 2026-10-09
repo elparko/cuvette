@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entry, Question } from "../src/core/types.ts";
-import { cardFromEvent, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, type Card, type PlanCard } from "../src/ui/cards.ts";
+import { cardFromEvent, checkLines, sheetRows, clarifyOpen, clarifyProgress, closesCard, permissionView, planInit, planReduce, planResolve, planTitle, pushCard, settingLabel, settingQuestion, setupRequest, type Card, type PlanCard } from "../src/ui/cards.ts";
 import { routeMessage, nextQueued } from "../src/ui/messages.ts";
 import { settingEditor } from "../src/ui/config.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
@@ -227,5 +227,15 @@ describe("question sequence and /change in the shared layer", () => {
     const r3 = await respondQuestion(s, changeCard(dec) as never, "something new");
     expect(r3.line!.startsWith(`${dec.label} is now something new.`)).toBe(true);
     expect(s.record.entries(["decision"]).at(-1)!.data).toMatchObject({ key: dec.key, new: "something new", reason: "changed with /change" });
+  });
+});
+
+describe("the setup card question", () => {
+  test("starts the analysis only before the first request", () => {
+    const s = new FakeSession({ delayMs: 0 });
+    expect(setupRequest(s, { question: "  Is drug 2 better?  " })).toBe("Is drug 2 better?");
+    expect(setupRequest(s, { question: "" })).toBeUndefined();
+    s.record.append("user", { text: "Count the cells." });
+    expect(setupRequest(s, { question: "Is drug 2 better?" })).toBeUndefined();
   });
 });

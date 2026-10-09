@@ -16,7 +16,7 @@ import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
 import { changeSetting, type SettingSession } from "../core/settings.ts";
 import { canGoBack, isPlainQuestion, reopenQuestions, respondQuestion, SEQ_START, seqAnswered, seqBack, seqLeave, seqPending, seqProgress, seqView, type QuestionSeq } from "../ui/cards.ts";
-import { applyRewind, applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
+import { applyRewind, applySetup, setupRequest, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, respondPhi, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
 import { inputPlaceholder, nextQueued, routeMessage, stopTurn, usageFields } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
 import { INPUT_MAX_ROWS, InputBox, KeyStyle } from "./input-box.tsx";
@@ -422,7 +422,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
       )}
       {card ? (
         <CardRows.Provider value={fit.card}>
-          {(cardViews({ session, cards, seq, setSeq, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: running, program, programs: opts.programs, setInput })[card.t] as (c: Card) => React.ReactNode)(card)}
+          {(cardViews({ session, cards, seq, setSeq, env, popCard, setCards, line, say, submitKey, ask: submit, refresh, details, toggleDetails, busy: running, program, programs: opts.programs, setInput })[card.t] as (c: Card) => React.ReactNode)(card)}
         </CardRows.Provider>
       ) : null}
       {fit.inputBox ? <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
@@ -494,6 +494,7 @@ interface CardDeps {
   line(sym: string, text: string, color?: string, dim?: boolean): void;
   say: Say;
   submitKey(key: string): Promise<void>;
+  ask(text: string): void;
   refresh(): void;
   details: { current: boolean };
   toggleDetails(): void;
@@ -518,6 +519,8 @@ function cardViews(d: CardDeps): CardViews {
           const problem = applySetup(session, values, profile);
           if (problem) d.line("✗", problem, "red");
           popCard();
+          const request = problem ? undefined : setupRequest(session, values);
+          if (request) d.ask(request);
         }}
       />
     ),

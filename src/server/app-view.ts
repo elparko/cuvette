@@ -3,7 +3,7 @@ import type { BusEvent, Entry, Mode, PlanResponse } from "../core/types.ts";
 import type { SettingSession } from "../core/settings.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import {
-  applyRewind, applySetup, canGoBack, respondQuestion, SEQ_START, seqAnswered, seqBack, seqNext, seqPending, seqProgress, seqView, type QuestionSeq, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
+  applyRewind, applySetup, setupRequest, canGoBack, respondQuestion, SEQ_START, seqAnswered, seqBack, seqNext, seqPending, seqProgress, seqView, type QuestionSeq, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
   respondPermission, respondPhi, saveEln, saveKey, startCards, type Card, type PlanAction, type Say,
 } from "../ui/cards.ts";
 import { commands, openPanels, openSetup, type CommandCtx } from "../ui/commands.ts";
@@ -375,6 +375,8 @@ export class WebView {
         }
         const problem = applySetup(s, values, str("profile") || undefined);
         if (problem) this.line("✗", problem, "red");
+        const request = problem ? undefined : setupRequest(s, values);
+        if (request) void this.submit(request);
         break;
       }
       case "permission":

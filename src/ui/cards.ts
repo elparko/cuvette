@@ -427,6 +427,12 @@ export function applySetup(session: SessionLike, values: Record<string, unknown>
   return undefined;
 }
 
+// The question of a setup card starts the analysis if the scientist has not asked anything yet.
+export function setupRequest(session: SessionLike, values: Record<string, unknown>): string | undefined {
+  const q = typeof values.question === "string" ? values.question.trim() : "";
+  return q && !session.record.entries(["user"]).length ? q : undefined;
+}
+
 // ---------------------------------------------------------------- key and eLabFTW
 
 export interface Say {
