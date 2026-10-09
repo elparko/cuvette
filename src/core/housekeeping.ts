@@ -12,7 +12,7 @@ export function canMakeNode(d: Record<string, unknown>): boolean {
 
 export function retried(e: Entry, later: Entry[]): boolean {
   for (const x of later) {
-    if (x.kind === "user") return false;
+    if (x.kind === "user" && !x.data.during) return false;
     if (x.kind !== "tool_result" || x.data.ok === false) continue;
     if (x.data.tool === e.data.tool || !canMakeNode(e.data)) return true;
   }

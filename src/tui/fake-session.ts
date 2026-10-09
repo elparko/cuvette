@@ -142,6 +142,7 @@ export class FakeSession implements SessionLike {
 
   private async runTool(tool: string, args: Args, out: ToolOut) {
     const callId = `c${this.record.entries(["tool_call"]).length + 1}`;
+    this.deliver();
     this.status("running", tool, args);
     this.record.append("tool_call", { callId, tool, adapter: "smile-msi", args });
     await this.sleep();
@@ -196,6 +197,20 @@ export class FakeSession implements SessionLike {
     this.record.append("tool_call", { callId, tool, args });
     await this.sleep();
     this.record.append("tool_result", { callId, tool, ok: true, summary, effectiveArgs: args, fidelity: "none" });
+  }
+
+  steered: { text: string; now: boolean }[] = [];
+
+  steer(text: string, now = false): void {
+    this.steered.push({ text, now });
+  }
+
+  takeSteered(): string[] {
+    return this.steered.splice(0).map((m) => m.text);
+  }
+
+  private deliver() {
+    for (const m of this.steered.splice(0)) this.record.append("user", { text: m.text, during: true, afterStep: this.record.nodes().length, ...(m.now ? { now: true } : {}) });
   }
 
   private waitFor(id: string): Promise<Reply> {

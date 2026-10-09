@@ -134,6 +134,11 @@ const MODE_TEXT: Record<Mode, string> = {
   plan: "plan: the agent plans only",
 };
 
+export function busyHint(state: string, queue?: boolean): string {
+  const after = queue ? "Your message waits until the turn ends." : state === "running" ? "Your message goes in after the step." : "Your message goes in after the next step.";
+  return `${state === "running" ? "Esc stops this step. " : ""}${after} Start it with ! to send it now.`;
+}
+
 export function tokensText(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
@@ -149,6 +154,7 @@ export function StatusLine(props: {
   tokens: { input: number; output: number };
   hint?: string;
   details?: boolean;
+  queue?: boolean;
   bypass?: boolean;
 }) {
   const parts: React.ReactNode[] = [
@@ -201,7 +207,7 @@ export function StatusLine(props: {
       ) : (
         line
       )}
-      <Text dimColor>{props.hint || (props.details ? "Ctrl+O: short view" : "Ctrl+O: all steps")}</Text>
+      <Text dimColor>{props.hint || (props.busy ? busyHint(props.state, props.queue) : props.details ? "Ctrl+O: short view" : "Ctrl+O: all steps")}</Text>
     </Box>
   );
 }

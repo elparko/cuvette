@@ -44,6 +44,8 @@ export interface SessionLike {
   questions: { open(): Question[] };
   findings: { list(status?: Finding["status"]): Finding[]; resolve(fid: string, action: "accept" | "reject" | "fix", reason?: string): void };
   send(text: string, opts?: { internal?: boolean; plan?: boolean }): Promise<string>;
+  steer?(text: string, now?: boolean): void;
+  takeSteered?(): string[];
   planFirst?: boolean;
   respondPlan?(r: PlanResponse): void;
   setPlanFirst?(on: boolean): void;

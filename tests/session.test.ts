@@ -720,3 +720,58 @@ test("headless runs do not plan unless asked; with planFirst the headless runner
   expect(session.record.entries(["plan_approved"])).toHaveLength(1);
   expect(session.record.nodes().map((n) => n.tool)).toEqual(["blur"]);
 });
+
+test("a message typed during a turn goes in after the current step, with the step it came after", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "blur", args: { input: "/data/a.tif", sigma: 2 } }] },
+    { text: "Done." },
+    { text: "Done with the log scale." },
+  ]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: tmpdir() });
+  session.decisions.applySetup({ question: "q" });
+  let sent = false;
+  session.bus.on((e) => {
+    if (e.type === "status" && e.state === "running" && !sent) {
+      sent = true;
+      session!.steer("Use the log scale.");
+    }
+  });
+  await session.send("Blur a.tif");
+  const second = provider.requests[1]!.messages.at(-1)!;
+  expect(second.parts.map((p) => p.type)).toEqual(["tool_result", "text"]);
+  expect((second.parts[1] as { text: string }).text).toContain("Use the log scale.");
+  const u = session.record.entries(["user"]);
+  expect(u).toHaveLength(2);
+  expect(u[1]!.data).toMatchObject({ text: "Use the log scale.", during: true, afterStep: 0 });
+  expect(session.takeSteered()).toEqual([]);
+});
+
+test("a message that comes while the agent writes its answer starts one more step, not a new turn", async () => {
+  const provider = new FakeProvider([{ text: "First answer." }, { text: "Second answer, with your note." }]);
+  session = await Session.create({ adapters: [], provider, cwd: tmpdir(), settings: { guidance: false } });
+  session.bus.on((e) => {
+    if (e.type === "status" && e.state === "thinking" && provider.requests.length === 0) session!.steer("Also give the median.");
+  });
+  const answer = await session.send("Describe sleep.csv");
+  expect(answer).toBe("Second answer, with your note.");
+  expect(session.record.entries(["assistant"]).map((e) => e.data.final)).toEqual([false, true]);
+  expect(JSON.stringify(provider.requests[1]!.messages.at(-1))).toContain("Also give the median.");
+});
+
+test("a message with send now stops the running tool and the agent reads it next", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "run_command", args: { purpose: "wait", does: "Waits 20 seconds.", argv: ["sleep", "20"] } }, { name: "list_dir", args: { path: "." } }] },
+    { text: "Stopped as you asked." },
+  ]);
+  session = await Session.create({ adapters: [], provider, cwd: tmpdir(), settings: { guidance: false, permissionMode: "bypass" } });
+  session.bus.on((e) => {
+    if (e.type === "status" && e.state === "running" && e.tool === "run_command") setTimeout(() => session!.steer("Stop, wrong folder.", true), 300);
+  });
+  const t0 = Date.now();
+  await session.send("wait");
+  expect(Date.now() - t0).toBeLessThan(10000);
+  const parts = provider.requests[1]!.messages.at(-1)!.parts as { type: string; text?: string }[];
+  expect(parts[1]!.text).toMatch(/not run\. The scientist sent a message/);
+  expect(parts.at(-1)!.text).toContain("Stop, wrong folder.");
+  expect(session.record.entries(["user"]).at(-1)!.data).toMatchObject({ during: true, now: true });
+});

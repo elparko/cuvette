@@ -87,6 +87,7 @@ export class Mapper {
     ];
     switch (e.kind) {
       case "user":
+        if (d.during) return line("▸", "The agent read your message.", undefined, true);
         return [{ key, t: "user", text: String(d.text ?? "") }];
       case "assistant":
         if (String(d.text ?? "").trim()) this.said = true;

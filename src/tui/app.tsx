@@ -185,7 +185,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
             show(collapser.current.flush());
             setPending([]);
             setLive("");
-            const [next, ...rest] = queueRef.current;
+            const [next, ...rest] = [...(session.takeSteered?.() ?? []), ...queueRef.current];
             if (next !== undefined) {
               updateQueue(rest);
               session.send(next).catch((err: Error) => line("✗", `The agent stopped: ${err.message}`, "red"));
@@ -296,7 +296,15 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     setInput("");
     setSel(0);
     if (text.startsWith("/")) return void runCommand(text);
-    if (status.state !== "idle") return updateQueue([...queueRef.current, text]);
+    if (status.state !== "idle") {
+      const now = text.startsWith("!");
+      const body = now ? text.slice(1).trim() : text;
+      if (!body) return;
+      if (!session.steer || (!now && session.settings?.messages === "queue")) return updateQueue([...queueRef.current, body]);
+      session.steer(body, now);
+      push({ key: `u${++counter.current}`, t: "user", text: body });
+      return line("▸", now ? "Sent now. The current step stops, and the agent reads your message." : "Sent. The agent reads it after the current step.", undefined, true);
+    }
     setHint("");
     session.send(text).catch((e: Error) => line("✗", `The agent stopped: ${e.message}`, "red"));
   };
@@ -315,6 +323,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     if (key.escape) {
       if (status.state !== "idle") {
         updateQueue([]);
+        session.takeSteered?.();
         session.interrupt();
       }
       else if (input) setText("");
@@ -458,7 +467,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
               setSel(0);
             }}
             onSubmit={submit}
-            placeholder={status.state === "idle" ? "Ask for an analysis step, or type / for commands" : "The agent is working. Your message waits. Esc stops it."}
+            placeholder={status.state === "idle" ? "Ask for an analysis step, or type / for commands" : session.settings?.messages === "queue" ? "The agent is working. Your message waits until the turn ends." : "The agent is working. Your message goes in after the current step."}
           />
         )}
       </Box>
@@ -484,6 +493,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         tokens={tokens}
         hint={hint}
         details={showAll}
+        queue={session.settings?.messages === "queue" || !session.steer}
         bypass={bypass}
       />
     </Box>

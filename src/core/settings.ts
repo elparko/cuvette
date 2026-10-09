@@ -116,6 +116,14 @@ export const SETTINGS: SettingDef[] = [
     read: (ctx) => (ctx.ui!.details() ? { value: "on", source: "session" } : { value: "off", source: "default" }),
   },
   {
+    name: "messages",
+    group: "Session",
+    label: "Messages during a turn",
+    help: "after-step: a message that you type while the agent works goes to the agent after the current step. queue: the message waits until the turn ends. A message that starts with ! stops the current step and goes at once.",
+    scopes: ALL,
+    choices: () => ["after-step", "queue"],
+  },
+  {
     name: "output_folder",
     group: "Session",
     label: "Save results in",

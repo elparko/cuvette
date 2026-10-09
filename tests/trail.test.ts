@@ -225,3 +225,11 @@ test("the html and md exports put the approved plan at the top, with its changes
   expect(md).toContain("- Version 2: A <plot> helps.");
   expect(trail(r, 1).map((l) => l.line)).toEqual(["You approved the analysis plan, version 1", "Plan changed to version 2. Reason: A <plot> helps."]);
 });
+
+test("a message typed during a turn is a note in the same group, with the step it came after", () => {
+  const r = new AnalysisRecord(join(dir, "steer"), "20260101-000000-st00");
+  r.append("user", { text: "go" });
+  r.append("user", { text: "use TIC", during: true, afterStep: 2, afterTool: "blur" });
+  const t = trail(r, 1, [adapter]);
+  expect(t.map((x) => [x.line, x.group, !!x.request])).toEqual([["You asked: go", 1, true], ["You wrote while the agent worked (after step 2): use TIC", 1, false]]);
+});

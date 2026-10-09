@@ -20,7 +20,7 @@ import { compareNote, instruction, teachReview, type TeachSummary } from "./mode
 import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
-import { activity, PURPOSE } from "./housekeeping.ts";
+import { activity, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
 import { AnalysisRecord } from "./record.ts";
 import { Findings, referee, runChecks } from "./review.ts";
@@ -433,7 +433,7 @@ export class Session {
       return { load: [a.name], by: "human", text: `The approved plan names ${a.name}, so the plan approval covers this load.` };
     }
     const list = this.adapterList();
-    const request = String(this.record.entries(["user"]).at(-1)?.data.text ?? "");
+    const request = String(this.lastRequest()?.data.text ?? "");
     const me = list.find((x) => x.name === a.name);
     const files = me ? filesFor(request, me, this.cwd) : [];
     const why = [reason.trim().replace(/([^.])$/, "$1."), files.length ? `The request names ${files.join(", ")}, and ${a.name} reads that file type.` : ""].filter(Boolean).join(" ");
@@ -487,7 +487,7 @@ export class Session {
     }
     if (this.deferred()) {
       this.active.add("find_tools");
-      this.chooseActiveTools(String(this.record.entries(["user"]).at(-1)?.data.text ?? ""));
+      this.chooseActiveTools(String(this.lastRequest()?.data.text ?? ""));
     } else names.forEach((n) => this.active.add(n));
     this.system = this.buildSystem();
     const info = this.adapterInfo.at(-1)!;
@@ -611,6 +611,11 @@ export class Session {
         const said = res.message.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n").trim();
         const calls = res.message.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
         this.lastSaid = said;
+        if (!calls.length && this.steered.length) {
+          if (said) this.record.append("assistant", { text: said, final: false });
+          this.push({ role: "user", parts: [{ type: "text", text: this.takeSteer() }] });
+          continue;
+        }
         if (!calls.length && this.planning && !this.planUpdate && nudges < 2 && !forceAnswer) {
           nudges++;
           if (said) this.record.append("assistant", { text: said, final: false });
@@ -630,7 +635,7 @@ export class Session {
           const tail = said.slice(-400);
           const promise = endsWithPromise(said) || announcesStep(said);
           const asksLeave = this.settings.headless && /\b(would you like me to|shall I|should I|do you want me to)\b[^?]*\?\s*$/i.test(tail);
-          const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
+          const turnStart = this.lastRequest()?.id ?? 0;
           const ranStep = this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf && n.tool !== "calculate");
           const noWork = this.settings.headless && this.adapters.length > 0 && !ranStep;
           const plan = (this.record.entries(["note"]).filter((e) => e.id > turnStart && Array.isArray(e.data.plan)).at(-1)?.data.plan as { step: string; status: string }[] | undefined) ??
@@ -667,6 +672,10 @@ export class Session {
             results.push({ type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist stopped the turn.", isError: true });
             continue;
           }
+          if (this.steered.some((m) => m.now)) {
+            results.push({ type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist sent a message. Read it first.", isError: true });
+            continue;
+          }
           const sig = `${call.name}:${JSON.stringify(call.args)}`;
           repeats = sig === lastSig ? repeats + 1 : 0;
           lastSig = sig;
@@ -680,6 +689,7 @@ export class Session {
         }
         const pending = this.drainNotes();
         if (pending) results.push({ type: "text", text: pending } as Part);
+        if (this.steered.length) results.push({ type: "text", text: this.takeSteer() } as Part);
         this.push({ role: "user", parts: results });
         if (this.stopTurn) {
           this.stopTurn = false;
@@ -807,7 +817,7 @@ export class Session {
   }
 
   private resultsNotIn(answer: string): string {
-    const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
+    const turnStart = this.lastRequest()?.id ?? 0;
     const stale = this.record.stale();
     const said = extractNumbers(answer).map((f) => f.value);
     const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(1e-9, Math.abs(b) * 0.005);
@@ -840,7 +850,46 @@ export class Session {
     return { type: "tool_result", callId, name, text: `ERROR: ${message}`, isError: true };
   }
 
-  private async runCall(call: Extract<Part, { type: "tool_call" }>, signal: AbortSignal): Promise<Part> {
+  private steered: { text: string; typedAt: string; afterStep: number; afterTool: string; now: boolean }[] = [];
+  private callAbort?: AbortController;
+
+  steer(text: string, now = false): void {
+    const last = this.record.entries(["tool_result"]).at(-1);
+    this.steered.push({ text, typedAt: new Date().toISOString(), afterStep: stepNumbers(this.record.nodes()).size, afterTool: String(last?.data.tool ?? ""), now });
+    if (now) this.callAbort?.abort();
+  }
+
+  takeSteered(): string[] {
+    const list = this.steered.map((m) => m.text);
+    this.steered = [];
+    return list;
+  }
+
+  private takeSteer(): string {
+    const list = this.steered;
+    this.steered = [];
+    for (const m of list) this.record.append("user", { text: m.text, during: true, typedAt: m.typedAt, afterStep: m.afterStep, afterTool: m.afterTool, ...(m.now ? { now: true } : {}) });
+    return `[The scientist wrote this while you worked. Read it before your next step.]\n${list.map((m) => m.text).join("\n\n")}`;
+  }
+
+  private lastRequest(): Entry | undefined {
+    return this.record.entries(["user"]).filter((e) => !e.data.during).at(-1);
+  }
+
+  private async runCall(call: Extract<Part, { type: "tool_call" }>, outer: AbortSignal): Promise<Part> {
+    const ctl = new AbortController();
+    const stop = () => ctl.abort();
+    outer.addEventListener("abort", stop, { once: true });
+    this.callAbort = ctl;
+    try {
+      return await this.runOne(call, ctl.signal);
+    } finally {
+      outer.removeEventListener("abort", stop);
+      this.callAbort = undefined;
+    }
+  }
+
+  private async runOne(call: Extract<Part, { type: "tool_call" }>, signal: AbortSignal): Promise<Part> {
     const tool = this.findTool(call.name);
     this.record.append("tool_call", { callId: call.id, tool: call.name, adapter: tool?.adapter, args: call.args as Record<string, unknown> });
     this.bus.emit({ type: "status", state: "running", tool: call.name, purpose: activity(call.name, (call.args ?? {}) as Args, tool?.source === "adapter" ? tool.title : undefined), since: Date.now() });
@@ -1594,7 +1643,7 @@ export class Session {
 
   private noteSkippedSteps() {
     if (!this.plan || this.planning || !this.approvedEntry) return;
-    const turnStart = this.record.entries(["user"]).at(-1)?.id ?? 0;
+    const turnStart = this.lastRequest()?.id ?? 0;
     if (this.approvedEntry < turnStart) return;
     for (const x of this.plan.steps) {
       if (!x.tool || x.status === "done" || x.status === "skipped" || this.planWarned.has(`skip:${x.step}`)) continue;

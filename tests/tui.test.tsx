@@ -8,7 +8,7 @@ import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 import { renderGraph, suggestions } from "../src/tui/commands.ts";
 import React from "react";
 import { render } from "ink";
-import { ItemView, activityText, runningText } from "../src/tui/view.tsx";
+import { ItemView, activityText, busyHint, runningText } from "../src/tui/view.tsx";
 
 let live: { h: Harness; s: FakeSession; done: Promise<void> } | undefined;
 
@@ -109,8 +109,9 @@ describe("markdown", () => {
 });
 
 describe("queue", () => {
-  test("a message typed while busy waits and is sent when the turn ends", async () => {
+  test("with the queue setting, a message typed while busy waits and is sent when the turn ends", async () => {
     const { h, s } = start();
+    s.settings.messages = "queue";
     await sleep(100);
     s.bus.emit({ type: "status", state: "thinking" });
     await sleep(40);
@@ -133,6 +134,7 @@ describe("queue", () => {
 
   test("Esc stops the agent and clears the queue", async () => {
     const { h, s } = start();
+    s.settings.messages = "queue";
     await sleep(100);
     s.bus.emit({ type: "status", state: "thinking" });
     await sleep(40);
@@ -143,6 +145,53 @@ describe("queue", () => {
     s.bus.emit({ type: "status", state: "idle" });
     await sleep(100);
     expect(s.sent).toEqual([]);
+  });
+});
+
+describe("messages during a turn", () => {
+  test("a message typed while busy goes to the agent after the step and shows at once", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "status", state: "running", tool: "run_script", purpose: "Running a script", since: Date.now() });
+    await sleep(40);
+    expect(h.all()).toContain("Esc stops this step. Your message goes in after the step. Start it with ! to send it now.");
+    await submit(h, "use TIC");
+    await until(() => h.all().includes("Sent. The agent reads it after the current step."));
+    expect(h.all()).toContain("> use TIC");
+    expect(s.steered).toEqual([{ text: "use TIC", now: false }]);
+    expect(s.sent).toEqual([]);
+  });
+
+  test("! sends now; Esc drops messages that the agent did not read", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "status", state: "running", tool: "run_script", since: Date.now() });
+    await sleep(40);
+    await submit(h, "!stop, wrong folder");
+    await until(() => h.all().includes("Sent now. The current step stops"));
+    expect(s.steered).toEqual([{ text: "stop, wrong folder", now: true }]);
+    await type(h, "\x1b");
+    await until(() => s.interrupts === 1);
+    s.bus.emit({ type: "status", state: "idle" });
+    await sleep(100);
+    expect(s.sent).toEqual([]);
+  });
+
+  test("a message that the agent did not read before the turn ended goes as the next request", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.bus.emit({ type: "status", state: "thinking" });
+    await sleep(40);
+    await submit(h, "and the median");
+    await until(() => s.steered.length === 1);
+    s.bus.emit({ type: "status", state: "idle" });
+    await until(() => s.sent.includes("and the median"));
+  });
+
+  test("the mapper marks a delivered message as read", () => {
+    const s = new FakeSession({ delayMs: 0 });
+    const e = s.record.append("user", { text: "use TIC", during: true, afterStep: 2 });
+    expect(new Mapper(s).map(e)).toMatchObject([{ t: "line", text: "The agent read your message.", dim: true }]);
   });
 });
 
@@ -498,9 +547,10 @@ describe("quiet view", () => {
     await submit(h, "again");
     await until(() => h.all().includes("Permission needed: run_script"));
     expect(h.all()).toContain("read_file  Read 90 of 90 bytes.");
+    h.frames.length = 0;
     await type(h, "\x0f");
-    const after = (a: string, b: string) => h.all().lastIndexOf(a) > h.all().lastIndexOf(b);
-    await until(() => after("Ctrl+O: all steps", "Ctrl+O: short view"));
+    await until(() => h.all().includes("· Looked at 1 folder (msi)"));
+    expect(h.all()).not.toContain("read_file  Read");
   });
 });
 

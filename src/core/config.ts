@@ -22,6 +22,7 @@ export interface Settings {
   planFirst?: boolean | "on" | "off";
   permissions: Record<string, "allow" | "ask" | "deny">;
   permissionMode: "ask" | "bypass";
+  messages: "after-step" | "queue";
   hooks: Partial<Record<HookEvent, { matcher?: string; command: string[] }[]>>;
   notify: { ntfy?: string };
 }
@@ -44,6 +45,7 @@ export const DEFAULTS: Settings = {
   headless: false,
   permissions: {},
   permissionMode: "ask",
+  messages: "after-step",
   hooks: {},
   notify: {},
 };
