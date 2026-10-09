@@ -1,12 +1,10 @@
 import { spawn } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
 import type { Mode, Owner, Question } from "../core/types.ts";
-import { gaHome } from "../adapters/manifest.ts";
 import { planView } from "../core/plan.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
+import { listSessions, sessionLine } from "../core/sessions.ts";
 import type { Card } from "./cards.tsx";
 import { show } from "./cards.tsx";
 import type { OutputRef } from "./items.ts";
@@ -170,16 +168,6 @@ async function allOpen(): Promise<Question[] | undefined> {
     if (mod?.allOpenQuestions) return mod.allOpenQuestions();
   }
   return undefined;
-}
-
-function listSessions(): string[] {
-  const dir = join(gaHome(), "sessions");
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .filter((d) => existsSync(join(dir, d, "log.jsonl")))
-    .sort()
-    .reverse()
-    .slice(0, 10);
 }
 
 export const commands: Command[] = [
@@ -484,11 +472,11 @@ export const commands: Command[] = [
   },
   {
     name: "resume",
-    help: "List past sessions.",
+    help: "List the last 10 sessions, newest first.",
     run(_, ctx) {
-      const ids = listSessions();
-      const text = ids.length ? ids.join("\n") : "No past sessions.";
-      ctx.print(`${text}\n\nTo continue one, quit and run: ga --resume <id>`, "Sessions");
+      const list = listSessions().slice(0, 10);
+      const text = list.length ? list.map((s) => sessionLine(s)).join("\n") : "No past sessions.";
+      ctx.print(`${text}\n\nTo continue one, quit and run: ga resume`, "Sessions");
     },
   },
   {

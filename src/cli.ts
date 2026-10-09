@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { adapterDirs, gaHome, loadAdapter } from "./adapters/manifest.ts";
@@ -8,8 +8,9 @@ import type { Mode } from "./core/types.ts";
 const HELP = `ga - a guided analysis agent for science programs
 
 Usage
-  ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume <id>] [--bypass-permissions] [--no-plan]
-  ga -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json] [--plan]
+  ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume [<id>]]
+  ga resume [<id>]                     pick one of the last 10 sessions and continue it [--bypass-permissions]
+  ga -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json]
 
   With no --adapter, the agent calls list_adapters and asks to load the adapter that fits
   the request with use_adapter. The program is your decision: accept or change it on the
@@ -39,7 +40,7 @@ Usage
   ga eln status|remove                 show or remove the saved eLabFTW key
   ga eln push <session>                send a session to eLabFTW after you approve the list
   ga eln link <session> <id>           read an eLabFTW experiment and propose setup values
-  ga sessions                          list the sessions
+  ga sessions                          list the sessions, newest first: folder, age, first request
   ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln
   ga replay <flow.json> [--input name=path ...] [--session <id>]
   ga run-step <adapter> <tool> '<json args>'
@@ -55,7 +56,7 @@ Plan first: in an interactive session the agent writes an analysis plan, and you
 
 Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
 
-const argv = process.argv.slice(2);
+const argv = process.argv.slice(2).map((a, i, all) => ((a === "--resume" || a === "-r") && (all[i + 1] === undefined || all[i + 1]!.startsWith("-")) ? "--resume=" : a));
 const { values: o, positionals: pos } = parseArgs({
   args: argv,
   allowPositionals: true,
@@ -126,13 +127,35 @@ async function headless(prompt: string) {
   await s.close();
 }
 
-async function interactive() {
+const RECENT_MS = 7 * 24 * 3600 * 1000;
+
+async function chooseSession(always: boolean): Promise<string> {
+  const { listSessions, defaultSession, folderText } = await import("./core/sessions.ts");
+  const list = listSessions();
+  const pick = defaultSession(list, process.cwd());
+  if (!pick) fail("There is no session to resume.");
+  const note = pick.here ? "" : `No session was started in this folder. The newest session is ${pick.info.id} in ${folderText(pick.info.cwd)}.`;
+  const recent = list.filter((s) => Date.now() - s.used < RECENT_MS);
+  if (process.stdin.isTTY && process.stdout.isTTY && (always || recent.length > 1)) {
+    const shown = list.slice(0, 10);
+    if (!shown.includes(pick.info)) shown.unshift(pick.info);
+    const { pickSession } = await import("./tui/picker.tsx");
+    const s = await pickSession(shown, shown.indexOf(pick.info), note);
+    if (!s) process.exit(0);
+    return s.id;
+  }
+  if (note) console.error(`${note} It opens now.`);
+  return pick.info.id;
+}
+
+async function interactive(resumeId?: string) {
   const { Session } = await import("./core/session.ts");
   const { runTui } = await import("./tui/app.tsx");
   const adapters = (o.adapter as string[]) ?? [];
-  if (!adapters.length && !o.resume) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
-  const s = o.resume
-    ? await Session.resume(str(o.resume)!, { model: str(o.model), interactive: true, settings: { ...bypass(), ...planSetting() } })
+  if (o.resume !== undefined && !resumeId) resumeId = str(o.resume) || (await chooseSession(false));
+  if (!adapters.length && !resumeId) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
+  const s = resumeId
+    ? await Session.resume(resumeId, { model: str(o.model), interactive: true, settings: { ...bypass(), ...planSetting() } })
     : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, interactive: true, settings: { ...bypass(), ...planSetting() } });
   await runTui(s as never, {});
   await s.close();
@@ -145,6 +168,8 @@ async function main() {
   switch (cmd) {
     case undefined:
       return interactive();
+    case "resume":
+      return interactive(a1 || (await chooseSession(true)));
     case "help":
       return console.log(HELP);
     case "adapters": {
@@ -302,17 +327,10 @@ async function main() {
       return;
     }
     case "sessions": {
-      const dir = join(gaHome(), "sessions");
-      if (!existsSync(dir)) return;
-      for (const id of readdirSync(dir).sort()) {
-        const log = join(dir, id, "log.jsonl");
-        if (!existsSync(log)) continue;
-        const lines = readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-        const first = lines.find((e) => e.kind === "session");
-        const ask = lines.find((e) => e.kind === "user");
-        const used = [...(first?.data.adapters ?? []), ...lines.filter((e) => e.kind === "adapter").map((e) => e.data)];
-        console.log(`${id}  ${used.map((a: { name: string }) => a.name).join(",").padEnd(12)} ${String(first?.data.model ?? "").padEnd(18)} ${String(ask?.data.text ?? "").slice(0, 60)}`);
-      }
+      const { listSessions, sessionLine } = await import("./core/sessions.ts");
+      const list = listSessions();
+      if (!list.length) return console.log("No sessions yet.");
+      for (const s of list) console.log(sessionLine(s));
       return;
     }
     case "export": {
