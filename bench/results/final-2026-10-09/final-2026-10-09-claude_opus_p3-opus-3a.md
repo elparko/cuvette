@@ -127,3 +127,6 @@ Leak check: 2 paths read, 0 outside the allow list, 0 blocked, 0 unsourced claim
 | continuous_ibd_bytes | 335976 exact | pass 335976 (n1 metrics.ibd_bytes, entry 22) | not asked |
 | processed_ibd_bytes | 604744 exact | pass 604744 (n2 metrics.ibd_bytes, entry 25) | not asked |
 
+
+
+Note (9 October): run 2 of palmer2017-metaspace-fdr stopped with "Cannot reach the Claude API". The JSON file holds the rerun from final-2026-10-09-rerun-claude_opus_p4-palmer-run2.json in its place, with the field rerunOf. The table above shows the first run.

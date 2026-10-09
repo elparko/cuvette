@@ -3,11 +3,11 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
-## Unreleased
-
-- Tables adapter 0.2.0: the tool `read_plate` reads plate-reader grids (96 or 384 wells, several blocks in a sheet, an optional plate map) into one long table. Text cells such as OVRFLW stay missing.
-
 ## 9 October 2026
+
+### Benchmark
+
+- Final paper benchmark on commit 1d5f392, 53 papers, blind: Claude Opus, Sonnet and Haiku with three runs each, and qwen3:8b with one run. Computed items correct: 99.6% for each Claude model and 79.7% for qwen3:8b. The report is `docs/benchmark-2026-10-09.md`.
 
 ### Adapters from others
 - `cuvette adapter add <name | git address | folder | .zip>` installs an adapter in the user adapter folder. `update` shows the changed files, the new tools and the new permissions before it applies. `remove` deletes it. `list --installed` shows the source, the version, the commit and the SHA-256.
@@ -24,9 +24,11 @@ The project is in early development. Version numbers start at the first public r
 - The environment variables start with `CUVETTE_`. Cuvette still reads the old `GA_*` names and gives each adapter process both names.
 - The first start moves `~/.guided-analysis` to `~/.cuvette` and leaves a link at the old path. The `.ga/` folder of a project still works, and folder trust covers `.ga/` and `.cuvette/`.
 ### Desktop app
+- A new logo and app icon: a cuvette with a light beam that comes out weaker on the far side.
 - Cuvette for macOS: a Tauri app of 68 MB (a 17 MB .dmg), with the Cuvette core and its own Node inside. Open a folder from the File menu, drag a folder onto the Dock icon, or use the Finder action. Cuvette > Install Command Line Tool adds the `cuvette` command for Terminal. The app is not signed yet.
 
 ### Session flow
+- The question of the setup card starts the analysis. Before, the scientist had to type the request again after the card.
 - Before it asks anything, the agent looks at the data with a new read-only tool, `inspect_data`: the channels and their kind (brightfield or fluorescence), names, bit depth and groups. It then says what it found, and it never asks about a stain or channel that the data does not have.
 - Questions come one at a time ("Question 1 of 3"), with the recommendation selected. Enter accepts it, the next question opens by itself, and Back returns to the previous one.
 - `/change` reopens any answered question or decision. Results that used the old value become out of date, and a demonstration that used it can run again.
@@ -34,6 +36,7 @@ The project is in early development. Version numbers start at the first public r
 - Settings that you confirm in the proposed metrics count as answered when the steps run, so no card asks again.
 
 ### New analyses
+- Tables adapter 0.2.0: the tool `read_plate` reads plate-reader grids (96 or 384 wells, several blocks in a sheet, an optional plate map) into one long table. Text cells such as OVRFLW stay missing.
 - Metabolomics statistics (metabolomics-stats): PQN and total area normalization, PCA, PLS-DA and OPLS-DA with permutation tests and VIP scores, and feature tests with FDR. The Thevenot 2015 urine data are the benchmark case.
 - Epidemiology rates (epi-rates): exact rate intervals, rate ratios, attributable fractions, number needed to treat, and direct and indirect standardization. The benchmark case is the NCHS final death data for 2020.
 - Trial endpoints (trial-endpoints): risk difference with Wald, Newcombe or Miettinen-Nurminen intervals, Mantel-Haenszel strata, hazard ratio, restricted mean survival time and non-inferiority checks. The benchmark case is the SHOCK trial.

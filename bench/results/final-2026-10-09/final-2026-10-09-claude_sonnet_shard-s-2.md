@@ -1148,3 +1148,9 @@ Leak check: 2 paths read, 0 outside the allow list, 1 blocked, 0 unsourced claim
 | lloq | 0.121 ±0.0005 | pass 0.121 (n3 metrics.series_lloq_sample, entry 56) | pass 0.121 via tolerance (n5, claim check 96) |
 | uloq | 7.744 ±0.0005 | pass 7.744 (n3 metrics.series_uloq_sample, entry 56) | pass 7.744 via tolerance (n5, claim check 96) |
 
+
+
+Note (9 October): run 3 of nair2024-plasmid-growth stopped with "Cannot reach the Claude API". The JSON file holds the rerun from final-2026-10-09-rerun-claude_sonnet_p4-nair-run3.json in its place, with the field rerunOf. The table above shows the first run.
+
+
+Note (9 October): run 1 of yun2026-lasv-elisa stopped with "Cannot reach the Claude API". The JSON file holds the rerun from final-2026-10-09-rerun-claude_sonnet_p4-yun-run1.json in its place, with the field rerunOf. The table above shows the first run.
