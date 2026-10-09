@@ -10,6 +10,16 @@ These items are being built and are not on main yet:
 
 ## 9 October 2026
 
+### Adapters from others
+- `cuvette adapter add <name | git address | folder | .zip>` installs an adapter in the user adapter folder. `update` shows the changed files, the new tools and the new permissions before it applies. `remove` deletes it. `list --installed` shows the source, the version, the commit and the SHA-256.
+- A git source is pinned to a commit. A registry source is pinned to a version. Cuvette records the source and a SHA-256 of the files in `installed-adapters.json`.
+- Before each install or update, Cuvette runs `cuvette adapter check --static` (no code is imported) and shows a card: the program, shipped code, network use, decisions, license, citations and the check result. An adapter with an error is not installed. Bypass permissions does not skip the question.
+- Trust labels: Reviewed (built-in catalog), Checked (registry, passed its checks) and Unlisted (git address, folder or zip, with a warning). They show in `cuvette adapters`, on the Programs page, in `list_adapters`, in the program choice and in the record.
+- An Unlisted adapter that ships code asks once more the first time it runs. `cuvette adapter allow-code <name>` answers it without a window.
+- The registry client reads `index.json` from the setting `adapter_registry`. If the registry is not reachable, Cuvette says so in one line. `scripts/build-registry-index.mjs` builds the index. See [docs/adapter-registry.md](docs/adapter-registry.md).
+- `cuvette adapter audit <folder | name>` asks Claude to review the files. It asks first and shows the cost. `registry-template/` holds the pull request workflow for the future registry repository: lint, known-answer tests, a Claude review with a verdict, CODEOWNERS and the pull request template. A maintainer still approves the merge.
+- The Programs page has an "Add an adapter" button and the trust label on each row. In the terminal, press `a` in the `/programs` panel.
+
 ### Rename
 - The project is now Cuvette (was guided-analysis), and the command `ga` is now `cuvette`. Run `npm link` again so that `cuvette` is the global command.
 - The environment variables start with `CUVETTE_`. Cuvette still reads the old `GA_*` names and gives each adapter process both names.

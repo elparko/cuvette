@@ -401,3 +401,4 @@ agent's prompt.
 - [docs/proprietary-alternatives.md](docs/proprietary-alternatives.md): the programs that labs buy, the
   open-source alternative for each one, and the adapter that runs it.
 - [docs/adapter-spec.md](docs/adapter-spec.md) and [docs/onboarding-guide.md](docs/onboarding-guide.md).
+- [docs/adapter-registry.md](docs/adapter-registry.md): install an adapter from others, the trust labels and the registry.
