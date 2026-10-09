@@ -120,7 +120,7 @@ describe("resize", () => {
       const lines = await resize(h, c, r);
       once(lines, "> compare endo and epi");
       once(lines, "Step 1");
-      once(lines, "cuvette");
+      once(lines, "Cuvette");
       once(lines, "Your decision: Which AUC cutoff");
       expect(h.term.view()).toContain("Enter accepts");
     }

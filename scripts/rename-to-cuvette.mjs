@@ -54,6 +54,7 @@ const PROSE = [
   ['[ga, "mcp"', '[cuvette, "mcp"'],
   ['"ga.js"', '"cuvette.js"'],
   ["writeFileSync(ga,", "writeFileSync(cuvette,"],
+  ['once(lines, "guided-analysis")', 'once(lines, "Cuvette")'],
   [" (or `GA_KEYLOG`)", ""],
   ["env.CUVETTE_KEYLOG || env.GA_KEYLOG", "env.CUVETTE_KEYLOG"],
   [', GA_KEYLOG: ""', ""],
