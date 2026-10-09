@@ -58,6 +58,10 @@ answers:
     decision: Wells that you exclude as outliers
     value: R7-LPC-2, R9-LPC-1
     source: S1 Data. The two OD values have a trailing asterisk (masked in Gen5), and the printed mean OD of the LPC leaves them out.
+  "*":
+    decision: Free questions of the model
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers each free question with the values above.
 items:
   runs:
     source: published

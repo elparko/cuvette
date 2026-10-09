@@ -6,9 +6,9 @@ adapter:
   version: 0.1.0
   spec: "1"
   description: >
-    Fits ELISA and other immunoassay standard curves (4PL and 5PL) with the R package drc, back-calculates
-    sample concentrations with the dilution factor, and gives the LOD, LLOQ and ULOQ. The scientist chooses
-    the model, the weighting, the blank and the outlier wells.
+    Fits ELISA and other immunoassay standard curves (4PL and 5PL) with the R package drc. It back-calculates
+    the samples with the dilution factor and gives the LOD, LLOQ and ULOQ. The scientist chooses the model,
+    the weighting, the blank and the outlier wells.
   authors: [Parker Smith]
   status: draft
 
@@ -120,7 +120,7 @@ decisions:
     default: none
     group: Standard curve
     help: >
-      signal fits the curve to the mean signal of each standard and back-calculates the mean signal of each
+      signal fits the curve to the mean signal of each standard. It back-calculates the mean signal of each
       sample, as Gen5 does. none fits each well and averages the concentrations of the wells.
     owner: human
     stage: when_needed
@@ -388,9 +388,9 @@ tools:
     title: Fit an ELISA standard curve and back-calculate samples
     description: >
       Fit a 4PL or 5PL standard curve to the standards of an immunoassay plate and back-calculate the samples.
-      Returns the curve parameters, R-squared, the LOD from the blank wells, LLOQ and ULOQ from the recovery of the
-      standards, and for each sample the concentration times the dilution factor, the CV of the replicates and a
-      flag for values outside the range. Saves the curve plot as PNG and SVG. The input is one row for each well.
+      It returns the curve parameters, R-squared, the LOD from the blank wells, and LLOQ and ULOQ from the recovery
+      of the standards. For each sample it gives the concentration times the dilution factor, the CV of the
+      replicates and a range flag. It saves the plot as PNG and SVG. The input has one row for each well.
     params:
       data: { type: string, description: "Path of a CSV file with one row for each well and a header row." }
       model: { type: string, enum: [4PL, 5PL, 5PL-softmax], description: "Leave out. The harness sets it from the decision record. The curve model." }
@@ -422,13 +422,20 @@ tools:
       across: { kind: table, ext: .csv, description: "With two or more plates: one row for each sample with the mean over the plates, the CV and the recovery." }
     script: scripts/fit_standard_curve.R
     parse: json
+    citations:
+      - text: "Gottschalk PG, Dunn JR (2005). The five-parameter logistic: a characterization and comparison with the four-parameter logistic. Analytical Biochemistry 343(1): 54-65."
+        doi: 10.1016/j.ab.2005.04.035
+        when: { model: 5PL }
+      - text: "Gottschalk PG, Dunn JR (2005). The five-parameter logistic: a characterization and comparison with the four-parameter logistic. Analytical Biochemistry 343(1): 54-65."
+        doi: 10.1016/j.ab.2005.04.035
+        when: { model: 5PL-softmax }
 
   - name: compare_models
     title: Compare curve models
     description: >
-      Fit two or more curve models to the same points and compare them. Returns the residual sum of squares, AICc,
-      the lack-of-fit p for each model, and the extra sum-of-squares F test for each nested pair, such as 4PL
-      against 5PL. Use it on the standards of a plate or on one dose-response group. Saves a plot as PNG and SVG.
+      Fit two or more curve models to the same points and compare them. It returns the residual sum of squares,
+      AICc and the lack-of-fit p of each model. It gives the extra sum-of-squares F test for each nested pair, such
+      as 4PL against 5PL. Use it on the standards of a plate or on one dose-response group. It saves a plot as PNG and SVG.
     params:
       data: { type: string, description: "Path of a CSV file with a header row." }
       models: { type: array, minItems: 2, items: { type: string, enum: [4PL, 5PL, 5PL-softmax, 3PL, 4PL-normalized, Weibull1, Weibull2] }, description: "Two or more model names. 3PL has the bottom fixed at 0. 4PL-normalized has the bottom at 0 and the top at 100." }
