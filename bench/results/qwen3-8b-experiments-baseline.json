@@ -1,0 +1,1094 @@
+{
+ "date": "2026-10-08",
+ "models": [
+  "ollama:qwen3:8b"
+ ],
+ "runsPerCell": 2,
+ "runs": [
+  {
+   "paper": "gramfort2013-mne-sample",
+   "model": "ollama:qwen3:8b",
+   "run": 1,
+   "status": "answer",
+   "durationS": 141.826,
+   "session": "20261008-182753-654d",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/qwen3-experiments/baseline/ollama_qwen3_8b/gramfort2013-mne-sample/run1/home/sessions/20261008-182753-654d",
+   "answer": "The answer incorrectly referred to \"eeg\" for the channel type when the decision record specifies \"grad\". The correct channel type is \"grad\" (gradiometers). The peak latency and amplitude for the left-ear tone are based on the gradiometer data.\n\n### Final Answer:\n1. **Number of events of each kind**: There are 0 events on STI 014 with a minimum duration of 0.1 seconds. If we count every pulse (min_duration = 0), there are 319 events in total.\n\n2. **Number of epochs left and auditory left-ear trials**: After cutting the recording around each event and applying the rejection limits, 309 epochs were kept. Specifically, there are 68 auditory left-ear trials left.\n\n3. **Peak latency and amplitude for the left-ear tone**: The brain response to the left-ear tone peaks at 0.100 seconds (100 ms) after the tone in the gradiometers. The amplitude is -161.12 fT/cm. This peak is determined using the strongest single channel with the negative sign, which is typical for an EEG N100 response.\n\nSettings used, from the decision record: Epoch start (s): -0.2 · Epoch end (s): 0.5 · Baseline start (s): -0.2 · Baseline end (s): 0 · Reject gradiometer epochs above (fT/cm): 4000 · Reject magnetometer epochs above (fT): 4000 · Reject EEG epochs above (uV): 150 · Reject EOG epochs above (uV): 250 · Channel type for the peak: grad · Peak window start (s): 0.08 · Peak window end (s): 0.12.",
+   "items": [
+    {
+     "key": "events_total",
+     "description": "Events found on STI 014.",
+     "expected": 319,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 319,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_events_without_min_duration",
+      "entry": 14
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 100,
+      "text": null
+     }
+    },
+    {
+     "key": "events_id1",
+     "description": "Events with id 1 (auditory/left).",
+     "expected": 72,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": false,
+      "value": 73,
+      "diff": 1,
+      "node": "n6",
+      "path": "metrics.count_visual_left",
+      "entry": 57
+     },
+     "reported": {
+      "pass": false,
+      "value": 68,
+      "diff": 4,
+      "via": null,
+      "node": "n7",
+      "claimEntry": 100,
+      "text": "Specifically, there are 68 auditory left-ear trials left."
+     }
+    },
+    {
+     "key": "events_id2",
+     "description": "Events with id 2 (auditory/right).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.count_visual_left",
+      "entry": 57
+     },
+     "reported": {
+      "pass": false,
+      "value": 68,
+      "diff": 5,
+      "via": null,
+      "node": "n7",
+      "claimEntry": 100,
+      "text": "Specifically, there are 68 auditory left-ear trials left."
+     }
+    },
+    {
+     "key": "events_id3",
+     "description": "Events with id 3 (visual/left).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.count_visual_left",
+      "entry": 57
+     },
+     "reported": {
+      "pass": false,
+      "value": 68,
+      "diff": 5,
+      "via": null,
+      "node": "n7",
+      "claimEntry": 100,
+      "text": "Specifically, there are 68 auditory left-ear trials left."
+     }
+    },
+    {
+     "key": "events_id4",
+     "description": "Events with id 4 (visual/right).",
+     "expected": 70,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 70,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.count_auditory_right",
+      "entry": 57
+     },
+     "reported": {
+      "pass": false,
+      "value": 68,
+      "diff": 2,
+      "via": null,
+      "node": "n7",
+      "claimEntry": 100,
+      "text": "Specifically, there are 68 auditory left-ear trials left."
+     }
+    },
+    {
+     "key": "events_id5",
+     "description": "Events with id 5 (smiley).",
+     "expected": 15,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "comparison",
+      "value": 15,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.count_buttonpress",
+      "entry": 46
+     },
+     "reported": {
+      "pass": false,
+      "value": 14,
+      "diff": 1,
+      "via": null,
+      "node": "n6",
+      "claimEntry": 100,
+      "text": "**Number of events of each kind**: There are 0 events on STI 014 with a minimum duration of 0.1 seconds."
+     }
+    },
+    {
+     "key": "events_id32",
+     "description": "Events with id 32 (buttonpress).",
+     "expected": 16,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.count_buttonpress",
+      "entry": 57
+     },
+     "reported": {
+      "pass": false,
+      "value": 14,
+      "diff": 2,
+      "via": null,
+      "node": "n6",
+      "claimEntry": 100,
+      "text": "**Number of events of each kind**: There are 0 events on STI 014 with a minimum duration of 0.1 seconds."
+     }
+    },
+    {
+     "key": "epochs_dropped",
+     "description": "Epochs dropped by the limits, all six ids.",
+     "expected": 10,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_dropped",
+      "entry": 57
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 100,
+      "text": null
+     }
+    },
+    {
+     "key": "epochs_kept",
+     "description": "Epochs kept, all six ids.",
+     "expected": 309,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 309,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_epochs",
+      "entry": 57
+     },
+     "reported": {
+      "pass": true,
+      "value": 309,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 100,
+      "text": "**Number of epochs left and auditory left-ear trials**: After cutting the recording around each event and applying the rejection limits, 309 epochs were kept."
+     }
+    },
+    {
+     "key": "auditory_left_kept",
+     "description": "Auditory/left epochs kept.",
+     "expected": 68,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 68,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.count_auditory_left",
+      "entry": 57
+     },
+     "reported": {
+      "pass": true,
+      "value": 68,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 100,
+      "text": "Specifically, there are 68 auditory left-ear trials left."
+     }
+    },
+    {
+     "key": "n100_latency_gfp",
+     "description": "N100 latency (s), global field power of good gradiometers, auditory/left.",
+     "expected": 0.0932,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.093237766140581,
+      "diff": 0.00003776614058099981,
+      "node": "n11",
+      "path": "metrics.gfp_latency_s",
+      "entry": 87
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.1,
+      "diff": 0.0068000000000000005,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 100,
+      "text": "**Number of events of each kind**: There are 0 events on STI 014 with a minimum duration of 0.1 seconds."
+     }
+    },
+    {
+     "key": "n100_amplitude_gfp",
+     "description": "N100 global field power amplitude in gradiometers (fT/cm).",
+     "expected": 42.1,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42.10613215387011,
+      "diff": 0.006132153870105128,
+      "node": "n11",
+      "path": "metrics.gfp_amplitude",
+      "entry": 87
+     },
+     "reported": {
+      "pass": false,
+      "value": 68,
+      "diff": 25.9,
+      "via": null,
+      "node": "n7",
+      "claimEntry": 100,
+      "text": "Specifically, there are 68 auditory left-ear trials left."
+     }
+    },
+    {
+     "key": "strongest_grad_latency",
+     "description": "Latency (s) of the strongest gradiometer channel.",
+     "expected": 0.0866,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.08,
+      "diff": 0.006599999999999995,
+      "node": "n11",
+      "path": "metrics.window_start_s",
+      "entry": 87
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.1,
+      "diff": 0.013400000000000009,
+      "via": null,
+      "node": "n1",
+      "claimEntry": 100,
+      "text": "**Number of events of each kind**: There are 0 events on STI 014 with a minimum duration of 0.1 seconds."
+     }
+    },
+    {
+     "key": "strongest_grad_amplitude",
+     "description": "Amplitude (fT/cm) of the strongest gradiometer channel, absolute value.",
+     "expected": 199,
+     "tolerance": 8,
+     "abs": true,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 203,
+      "diff": 4,
+      "node": "n11",
+      "path": "metrics.n_channels",
+      "entry": 87
+     },
+     "reported": {
+      "pass": false,
+      "value": -161.12,
+      "diff": 37.879999999999995,
+      "via": null,
+      "node": "n11",
+      "claimEntry": 100,
+      "text": "The amplitude is -161.12 fT/cm."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 8,
+    "inputTokens": 71706,
+    "outputTokens": 852,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "nudges": 1,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 0,
+     "warning": 0,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   }
+  },
+  {
+   "paper": "gramfort2013-mne-sample",
+   "model": "ollama:qwen3:8b",
+   "run": 2,
+   "status": "answer",
+   "durationS": 150.998,
+   "session": "20261008-183015-ffb6",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/qwen3-experiments/baseline/ollama_qwen3_8b/gramfort2013-mne-sample/run2/home/sessions/20261008-183015-ffb6",
+   "answer": "### 3. Peak of the Brain Response to the Left-Ear Tone:\n- **Peak latency (gradiometers):** 0.100 s (within the window 0.080 to 0.120 s)\n- **Peak amplitude (gradiometers):** -161.12 fT/cm (mode: neg for EEG N100)\n- **Global field power peak latency:** 0.093 s\n- **Global field power peak amplitude:** 42.11 fT/cm\n\n### Final Answers:\n1. **Number of events of each kind:**\n   - **Auditory/left (id 1):** 72 events\n   - **Auditory/right (id 2):** 73 events\n   - **Visual/left (id 3):** 73 events\n   - **Visual/right (id 4):** 70 events\n   - **Smiley (id 5):** 15 events\n   - **Buttonpress (id 32):** 16 events\n\n2. **Number of epochs and auditory left-ear trials:**\n   - **Total epochs kept:** 309\n   - **Auditory left-ear trials (id 1):** 68 epochs\n\n3. **Brain response to the left-ear tone:**\n   - **Peak latency (gradiometers):** 0.100 s\n   - **Peak amplitude (gradiometers):** -161.12 fT/cm\n   - **Global field power peak latency:** 0.093 s\n   - **Global field power peak amplitude:** 42.11 fT/cm\n\n**What I did:** I loaded the raw data, counted the events, cut the epochs, computed the evoked response, and measured the peak response to the left-ear tone.\n\n**What I found:** The number of events, the number of epochs, and the peak latency and amplitude of the brain response to the left-ear tone were successfully determined.\n\n**What is uncertain:** There is no uncertainty in the reported values, as they were directly measured from the data.\n\nSettings used, from the decision record: Epoch start (s): -0.2 · Epoch end (s): 0.5 · Baseline start (s): -0.2 · Baseline end (s): 0 · Reject gradiometer epochs above (fT/cm): 4000 · Reject magnetometer epochs above (fT): 4000 · Reject EEG epochs above (uV): 150 · Reject EOG epochs above (uV): 250 · Channel type for the peak: grad · Peak window start (s): 0.08 · Peak window end (s): 0.12.",
+   "items": [
+    {
+     "key": "events_total",
+     "description": "Events found on STI 014.",
+     "expected": 319,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 319,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_events",
+      "entry": 14
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 103,
+      "text": null
+     }
+    },
+    {
+     "key": "events_id1",
+     "description": "Events with id 1 (auditory/left).",
+     "expected": 72,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 72,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_1",
+      "entry": 14
+     },
+     "reported": {
+      "pass": true,
+      "value": 72,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 103,
+      "text": "- **Auditory/left (id 1):** 72 events"
+     }
+    },
+    {
+     "key": "events_id2",
+     "description": "Events with id 2 (auditory/right).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_2",
+      "entry": 14
+     },
+     "reported": {
+      "pass": true,
+      "value": 73,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 103,
+      "text": "- **Auditory/right (id 2):** 73 events"
+     }
+    },
+    {
+     "key": "events_id3",
+     "description": "Events with id 3 (visual/left).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_2",
+      "entry": 14
+     },
+     "reported": {
+      "pass": true,
+      "value": 73,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 103,
+      "text": "- **Auditory/right (id 2):** 73 events"
+     }
+    },
+    {
+     "key": "events_id4",
+     "description": "Events with id 4 (visual/right).",
+     "expected": 70,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 70,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_4",
+      "entry": 14
+     },
+     "reported": {
+      "pass": true,
+      "value": 70,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 103,
+      "text": "- **Visual/right (id 4):** 70 events"
+     }
+    },
+    {
+     "key": "events_id5",
+     "description": "Events with id 5 (smiley).",
+     "expected": 15,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 15,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_5",
+      "entry": 14
+     },
+     "reported": {
+      "pass": true,
+      "value": 15,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 103,
+      "text": "- **Smiley (id 5):** 15 events"
+     }
+    },
+    {
+     "key": "events_id32",
+     "description": "Events with id 32 (buttonpress).",
+     "expected": 16,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_32",
+      "entry": 14
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 103,
+      "text": "- **Buttonpress (id 32):** 16 events"
+     }
+    },
+    {
+     "key": "epochs_dropped",
+     "description": "Epochs dropped by the limits, all six ids.",
+     "expected": 10,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_dropped",
+      "entry": 57
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 103,
+      "text": null
+     }
+    },
+    {
+     "key": "epochs_kept",
+     "description": "Epochs kept, all six ids.",
+     "expected": 309,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 309,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.n_epochs",
+      "entry": 57
+     },
+     "reported": {
+      "pass": true,
+      "value": 309,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 103,
+      "text": "- **Total epochs kept:** 309"
+     }
+    },
+    {
+     "key": "auditory_left_kept",
+     "description": "Auditory/left epochs kept.",
+     "expected": 68,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 68,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.count_auditory_left",
+      "entry": 57
+     },
+     "reported": {
+      "pass": true,
+      "value": 68,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 103,
+      "text": "- **Auditory left-ear trials (id 1):** 68 epochs"
+     }
+    },
+    {
+     "key": "n100_latency_gfp",
+     "description": "N100 latency (s), global field power of good gradiometers, auditory/left.",
+     "expected": 0.0932,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.093237766140581,
+      "diff": 0.00003776614058099981,
+      "node": "n11",
+      "path": "metrics.gfp_latency_s",
+      "entry": 91
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.093,
+      "diff": 0.00020000000000000573,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 103,
+      "text": "- **Global field power peak latency:** 0.093 s"
+     }
+    },
+    {
+     "key": "n100_amplitude_gfp",
+     "description": "N100 global field power amplitude in gradiometers (fT/cm).",
+     "expected": 42.1,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42.10613215387011,
+      "diff": 0.006132153870105128,
+      "node": "n11",
+      "path": "metrics.gfp_amplitude",
+      "entry": 91
+     },
+     "reported": {
+      "pass": true,
+      "value": 42.11,
+      "diff": 0.00999999999999801,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 103,
+      "text": "- **Global field power peak amplitude:** 42.11 fT/cm"
+     }
+    },
+    {
+     "key": "strongest_grad_latency",
+     "description": "Latency (s) of the strongest gradiometer channel.",
+     "expected": 0.0866,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.08,
+      "diff": 0.006599999999999995,
+      "node": "n11",
+      "path": "metrics.window_start_s",
+      "entry": 91
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.093,
+      "diff": 0.006400000000000003,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 103,
+      "text": "- **Global field power peak latency:** 0.093 s"
+     }
+    },
+    {
+     "key": "strongest_grad_amplitude",
+     "description": "Amplitude (fT/cm) of the strongest gradiometer channel, absolute value.",
+     "expected": 199,
+     "tolerance": 8,
+     "abs": true,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 203,
+      "diff": 4,
+      "node": "n11",
+      "path": "metrics.n_channels",
+      "entry": 91
+     },
+     "reported": {
+      "pass": false,
+      "value": -161.12,
+      "diff": 37.879999999999995,
+      "via": null,
+      "node": "n11",
+      "claimEntry": 103,
+      "text": "- **Peak amplitude (gradiometers):** -161.12 fT/cm (mode: neg for EEG N100)"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 8,
+    "inputTokens": 72046,
+    "outputTokens": 1027,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "nudges": 2,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings": {
+     "info": 6,
+     "warning": 0,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   }
+  },
+  {
+   "paper": "bradley-photutils-100gaussians",
+   "model": "ollama:qwen3:8b",
+   "run": 1,
+   "status": "answer",
+   "durationS": 340.829,
+   "session": "20261008-183246-e06d",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/qwen3-experiments/baseline/ollama_qwen3_8b/bradley-photutils-100gaussians/run1/home/sessions/20261008-183246-e06d",
+   "answer": "The answer has been corrected to reflect the actual value used for the \"Background estimator in each box,\" which is **sextractor**. Here is the revised answer:\n\n### Summary of Analysis\n\n#### Sky Level and Noise\n- **Sky Level (Background Median):** 5.152 ct (counts)\n- **Noise (RMS Median):** 2.094 ct\n- The background is measured as a global sigma-clipped median, and the noise is the median of the RMS values.\n\n#### Number of Stars\n- The image contains **82 detected sources** using a detection threshold of 3 sigma, with a minimum of 10 connected pixels.\n\n#### Brightness of Specified Stars\n- **Pixel positions:** (48.70, 200.33), (145.05, 168.52), and (355.56, 252.20)\n- **Net Flux (Aperture Flux):** \n  - (48.70, 200.33): 936.49 ct\n  - (145.05, 168.52): 760.20 ct\n  - (355.56, 252.20): 925.24 ct\n- The sky background was subtracted using an annulus from 15 to 20 pixels.\n\n### Uncertainties and Notes\n- The noise of the net flux increases with the square root of the aperture area.\n- The values provided are the median net flux and background for the specified positions.\n- The results are in the unit of counts (ct). \n\n### Conclusion\n- The sky level is 5.152 ct with a noise of 2.094 ct.\n- There are 82 stars detected in the image.\n- The brightness of the specified stars is:\n  - (48.70, 200.33): 936.49 ct\n  - (145.05, 168.52): 760.20 ct\n  - (355.56, 252.20): 925.24 ct\n\nThe analysis was completed successfully.\n\nStep results that the answer does not mention, from the record:\n- n1 inspect_fits: 1 HDUs. HDU 0 is 300x500. Unit: ct. WCS: pixel scale 1.000 arcsec.\n\nSettings used, from the decision record: Sigma-clip level: 3 · Background method: global · Background box size (pixels): 50 · Background estimator in each box: sextractor · Mask bright sources before the background: false · Detection threshold (sigma above background): 3 · Minimum connected pixels for a source: 10 · Smoothing kernel width (FWHM, pixels): 3 · Split touching sources: false · Aperture radius (pixels): 10 · Sky level for the aperture: annulus · Annulus inner radius (pixels): 15 · Annulus outer radius (pixels): 20.",
+   "items": [
+    {
+     "key": "sky_level",
+     "description": "Sky level (clipped median).",
+     "expected": 5.152,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5.152441501617432,
+      "diff": 0.0004415016174315056,
+      "node": "n9",
+      "path": "metrics.background_median",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 5.152,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 128,
+      "text": "- **Sky Level (Background Median):** 5.152 ct (counts)"
+     }
+    },
+    {
+     "key": "sky_noise",
+     "description": "Sky noise (clipped standard deviation).",
+     "expected": 2.094,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.094237386105181,
+      "diff": 0.00023738610518098113,
+      "node": "n9",
+      "path": "metrics.rms_median",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.094,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 128,
+      "text": "- **Noise (RMS Median):** 2.094 ct"
+     }
+    },
+    {
+     "key": "sources_detected",
+     "description": "Sources detected.",
+     "expected": 82,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 82,
+      "diff": 0,
+      "node": "n18",
+      "path": "metrics.n_sources",
+      "entry": 91
+     },
+     "reported": {
+      "pass": true,
+      "value": 82,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n18",
+      "claimEntry": 128,
+      "text": "- The image contains **82 detected sources** using a detection threshold of 3 sigma, with a minimum of 10 connected pixels."
+     }
+    },
+    {
+     "key": "net_flux_48_70_200_33",
+     "description": "Net flux at (48.70, 200.33).",
+     "expected": 895.4,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 925.2356566301798,
+      "diff": 29.83565663017987,
+      "node": "n19",
+      "path": "metrics.median_net_flux",
+      "entry": 110
+     },
+     "reported": {
+      "pass": true,
+      "value": 925.24,
+      "diff": 29.840000000000032,
+      "via": "tolerance",
+      "node": "n19",
+      "claimEntry": 128,
+      "text": "- (355.56, 252.20): 925.24 ct"
+     }
+    },
+    {
+     "key": "net_flux_145_05_168_52",
+     "description": "Net flux at (145.05, 168.52).",
+     "expected": 734.1,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 760.1982396747551,
+      "diff": 26.098239674755064,
+      "node": "n19",
+      "path": "table.rows[1][5]",
+      "entry": 110
+     },
+     "reported": {
+      "pass": true,
+      "value": 760.2,
+      "diff": 26.100000000000023,
+      "via": "tolerance",
+      "node": "n19",
+      "claimEntry": 128,
+      "text": "- (145.05, 168.52): 760.20 ct"
+     }
+    },
+    {
+     "key": "net_flux_355_56_252_20",
+     "description": "Net flux at (355.56, 252.20).",
+     "expected": 873.9,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 925.2356566301798,
+      "diff": 51.33565663017987,
+      "node": "n19",
+      "path": "metrics.median_net_flux",
+      "entry": 110
+     },
+     "reported": {
+      "pass": true,
+      "value": 925.24,
+      "diff": 51.34000000000003,
+      "via": "tolerance",
+      "node": "n19",
+      "claimEntry": 128,
+      "text": "- (355.56, 252.20): 925.24 ct"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 49970,
+    "outputTokens": 1394,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 0,
+     "warning": 0,
+     "error": 6
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 4
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-adda7fb18e0f9872f/bench/results/qwen3-8b-experiments-baseline.md",
+  "json": "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-adda7fb18e0f9872f/bench/results/qwen3-8b-experiments-baseline.json"
+ },
+ "summary": {
+  "cells": {
+   "gramfort2013-mne-sample": {
+    "ollama:qwen3:8b": {
+     "computed": 27,
+     "computedOf": 28,
+     "reported": 14,
+     "reportedOf": 24,
+     "runs": 2,
+     "statuses": {
+      "answer": 2
+     }
+    }
+   },
+   "bradley-photutils-100gaussians": {
+    "ollama:qwen3:8b": {
+     "computed": 6,
+     "computedOf": 6,
+     "reported": 6,
+     "reportedOf": 6,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "ollama:qwen3:8b": {
+    "computed": 33,
+    "computedOf": 34,
+    "reported": 20,
+    "reportedOf": 30,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "ollama:qwen3:8b": {
+    "runs": 3,
+    "durationS": 633.653,
+    "requests": 22,
+    "inputTokens": 193722,
+    "outputTokens": 3273,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "toolCalls": 14,
+    "failedToolCalls": 0,
+    "nudges": 3,
+    "planReminders": 0,
+    "revisions": 2,
+    "findings_info": 6,
+    "findings_warning": 0,
+    "findings_error": 8,
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 14
+   }
+  },
+  "skipped": []
+ }
+}
