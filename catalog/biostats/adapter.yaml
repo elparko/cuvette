@@ -1008,7 +1008,7 @@ tools:
       path: { type: string, minLength: 1, description: Absolute path of the CSV file. One row for each subject. }
       outcome: { type: string, description: "Column of the binary outcome. If its values are not 0 and 1, give event." }
       covariates: { type: string, description: "Covariate column names, separated by commas. The model adjusts each odds ratio for the other covariates." }
-      event: { type: string, description: "Value of the outcome column that counts as the event (1), such as yes or dead. Leave out if the column holds 0 and 1." }
+      event: { type: string, description: "Value of the outcome column that counts as the event (1), such as yes or dead. All other values count as 0. Leave out if the column holds 0 and 1." }
       categorical: { type: string, description: "Numeric covariate columns to treat as categories, separated by commas, such as a stage coded 1 to 4. Text columns are always categories." }
       reference: { type: string, description: "Leave out. The harness sets it from the decision record. Reference level of each categorical covariate as column=level pairs separated by commas, or first for the first sorted level." }
       subset: { type: string, description: "Optional row filter as a pandas query, such as \"smoke == 1\" or \"sex == 'F'\". Leave out to use all rows." }

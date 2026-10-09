@@ -1,0 +1,100 @@
+kind: research paper
+short: Lackey 2015
+field: Statistics
+program: statsmodels and SciPy (Python), through the biostats adapter
+citation:
+  authors: Lackey B, Seas C, Van der Stuyft P, Otero L
+  title: "Patient characteristics associated with tuberculosis treatment default: a cohort study in a high-incidence area of Lima, Peru"
+  venue: PLOS ONE 10(6):e0128541
+  year: 2015
+  doi: 10.1371/journal.pone.0128541
+related:
+  - text: "Data: Lackey B et al. Data from: Patient characteristics associated with tuberculosis treatment default. Dryad, CC0. The benchmark downloads the copy on Zenodo, record 4992464."
+    url: https://zenodo.org/records/4992464
+measured: >-
+  A prospective cohort of 1294 adults with smear-positive pulmonary tuberculosis in Lima, Peru, 2010 to 2011. The
+  analysis holds 1233 patients with an outcome and complete data; 127 defaulted. The paper tests each risk factor
+  with a chi-square test and reports the odds ratios of a multivariable logistic regression model.
+instruction: >-
+  Test the association of default with age group, sex, marital status and poverty. Fit a multivariable logistic
+  regression of default on drug use, BMI, MDR treatment, weekly alcohol, HIV status and secondary education, and give
+  each adjusted odds ratio with its 95% confidence interval.
+instruction_basis: >-
+  The Statistical analysis section and Table 2. Bivariate chi-square tests, then a multivariable logistic regression
+  in Stata 12.1. The final model holds the six covariates of the request.
+answers:
+  replicate:
+    decision: Unit of replication
+    value: the patient, one row for each patient
+    source: The cohort design. Each patient gives one outcome.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: The paper reports 95% confidence intervals and calls p below .05 significant.
+  chi_square_correction:
+    decision: Yates continuity correction for a 2x2 chi-square test
+    value: false
+    source: >-
+      The paper used Stata 12.1; tabulate, chi2 gives the Pearson test with no correction. The uncorrected test
+      reproduces the printed p for poverty (.034). The Yates test gives .046.
+  logistic_covariates:
+    decision: Covariates of the logistic model
+    value: drug_use, bmi, mdr_tb, alcohol_weekly, hiv_status, secondary_education
+    source: Table 2, the variables with a multivariable odds ratio.
+  logistic_event:
+    decision: Outcome value that counts as the event
+    value: "1"
+    source: Table 2 compares default with all other outcomes. The column default is 1 for default.
+  reference_levels:
+    decision: Reference level of each categorical covariate
+    value: drug_use=No, bmi=Normal, mdr_tb=No, alcohol_weekly=No, hiv_status=Negative, secondary_education=Yes
+    source: Table 2, the rows with an odds ratio of 1.00.
+  fisher_alternative:
+    decision: Sidedness of the Fisher exact test
+    value: two-sided
+    source: The request asks for no Fisher test. The default value.
+items:
+  patients: {source: published, where: "Results and Fig 1, 1233 subjects in the final analyses.", check: "fetch.sh keeps 1233 rows (check.out)."}
+  defaulted: {source: published, where: "Abstract, 127 (10%) defaulted.", check: "127 rows with default 1 (check.out)."}
+  p_age: {source: published, where: "Table 2, bivariate P for age, .006.", check: "R chisq.test gives 0.00604 (check.out)."}
+  p_sex: {source: published, where: "Table 2, bivariate P for sex, < .001.", check: "R chisq.test gives 0.0000395 (check.out)."}
+  p_marital: {source: published, where: "Table 2, bivariate P for marital status, .681.", check: "R chisq.test gives 0.68145 (check.out)."}
+  p_poverty: {source: published, where: "Table 2, bivariate P for socioeconomic status, .034.", check: "R chisq.test(correct = FALSE) gives 0.03436 (check.out)."}
+  or_drug: {source: published, where: "Abstract and Table 2, 4.78.", check: "R glm gives 4.7816 (check.out)."}
+  or_drug_lo: {source: published, where: "Abstract and Table 2, 3.05.", check: "R confint.default gives 3.0522."}
+  or_drug_hi: {source: published, where: "Abstract and Table 2, 7.49.", check: "R gives 7.4907."}
+  or_underweight: {source: published, where: "Abstract and Table 2, 2.08.", check: "R gives 2.0795."}
+  or_underweight_lo: {source: published, where: "Abstract and Table 2, 1.21.", check: "R gives 1.2137."}
+  or_underweight_hi: {source: published, where: "Abstract and Table 2, 3.56.", check: "R gives 3.5629."}
+  or_overweight: {source: published, where: "Table 2, 0.88.", check: "R gives 0.8777."}
+  or_overweight_lo: {source: published, where: "Table 2, 0.44.", check: "R gives 0.4445."}
+  or_overweight_hi: {source: published, where: "Table 2, 1.73.", check: "R gives 1.7333."}
+  or_mdr: {source: published, where: "Abstract and Table 2, 3.04.", check: "R gives 3.0385."}
+  or_mdr_lo: {source: published, where: "Abstract and Table 2, 1.58.", check: "R gives 1.5780."}
+  or_mdr_hi: {source: published, where: "Abstract and Table 2, 5.85.", check: "R gives 5.8507."}
+  or_alcohol: {source: published, where: "Abstract and Table 2, 2.22.", check: "R gives 2.2220."}
+  or_alcohol_lo: {source: published, where: "Abstract and Table 2, 1.40.", check: "R gives 1.4008."}
+  or_alcohol_hi: {source: published, where: "Abstract and Table 2, 3.52.", check: "R gives 3.5246."}
+  or_hiv_not_tested: {source: published, where: "Abstract and Table 2, 2.30.", check: "R gives 2.3031."}
+  or_hiv_not_tested_lo: {source: published, where: "Abstract and Table 2, 1.50.", check: "R gives 1.5000."}
+  or_hiv_not_tested_hi: {source: published, where: "Abstract and Table 2, 3.54.", check: "R gives 3.5363."}
+  or_hiv_positive: {source: published, where: "Table 2, 1.39.", check: "R gives 1.3925."}
+  or_hiv_positive_lo: {source: published, where: "Table 2, 0.42.", check: "R gives 0.4167."}
+  or_hiv_positive_hi: {source: published, where: "Table 2, 4.65.", check: "R gives 4.6534."}
+  or_no_secondary: {source: published, where: "Abstract and Table 2, 1.55.", check: "R gives 1.5499."}
+  or_no_secondary_lo: {source: published, where: "Abstract and Table 2, 1.03.", check: "R gives 1.0317."}
+  or_no_secondary_hi: {source: published, where: "Abstract and Table 2, 2.33.", check: "R gives 2.3286."}
+  p_poverty_yates_trap:
+    source: computed
+    tool: R chisq.test(correct = TRUE)
+    where: Not in the paper. The Yates correction is a different method from the paper's Stata test.
+    independence: independent
+    check: SciPy chi2_contingency(correction = True) gives 0.0465.
+data:
+  source: >-
+    Dryad dataset of the paper, copied on Zenodo record 4992464 (Lima TB Treatment Default Data.xls). fetch.sh drops
+    the patients with no outcome and with a missing value in the 12 variables of the original model (Fig 1), renames
+    the columns and adds default (1 for the outcome Default).
+  url: https://zenodo.org/records/4992464
+  license: CC0 1.0 public domain dedication, from the Zenodo record. Ages are in groups; the file has no names. The paper is CC BY 4.0.
+  size: 380 KB Excel file, 1293 rows and 18 columns. The CSV has 1233 rows and 19 columns.

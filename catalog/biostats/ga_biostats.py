@@ -495,8 +495,6 @@ def _binary_outcome(series, event, name):
         target = str(event).strip()
         if target not in set(text):
             return None, "The event value %r is not in the outcome column %s. Its values are: %s." % (target, name, ", ".join(sorted(set(text))[:10]))
-        if text.nunique() != 2:
-            return None, "The outcome column %s must have exactly 2 values. It has %d: %s." % (name, text.nunique(), ", ".join(sorted(set(text))[:10]))
         return series.map(lambda v: None if pd.isna(v) else float(str(v) == target)), ""
     levels = set(values.unique().tolist())
     if not levels <= {0, 1, True, False}:
@@ -566,8 +564,10 @@ def fit_logistic(path, outcome, covariates, event=None, categorical=None, refere
     level = 100 * (1 - alpha)
     rows = "; ".join("%s OR %.4g (%g%% CI %.4g to %.4g, p = %.3g)" % (r.term, r.odds_ratio, level, r.or_ci_lo, r.or_ci_hi, r.p) for r in table.itertuples() if r.term != "const")
     multi = [t for t in term_tests if t["df"] > 1]
-    summary = "Logistic regression of %s%s, n = %d, %d events. %s. Likelihood-ratio test of the model: chi-square %.4g on %d df, p = %.4g. Wald confidence intervals." % (
-        outcome, "" if event is None else " = %s" % event, res.nobs, events, rows, res.llr, res.df_model, res.llr_pvalue)
+    others = sorted(set(raw[outcome].map(str)) - {str(event)}) if event is not None else []
+    against = " against %s" % (", ".join(others) if len(others) <= 6 else "%d other values" % len(others)) if event is not None else ""
+    summary = "Logistic regression of %s%s%s, n = %d, %d events. %s. Likelihood-ratio test of the model: chi-square %.4g on %d df, p = %.4g. Wald confidence intervals." % (
+        outcome, "" if event is None else " = %s" % event, against, res.nobs, events, rows, res.llr, res.df_model, res.llr_pvalue)
     if multi:
         summary += " Likelihood-ratio test of each categorical covariate: %s." % "; ".join("%s chi-square %.4g on %d df, p = %.4g" % (t["covariate"], t["lr_chi2"], t["df"], t["p"]) for t in multi)
     if refs:

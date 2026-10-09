@@ -1,0 +1,48 @@
+tool: statsmodels Logit and SciPy chi2_contingency, through the biostats adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/lackey2015-tb-default/tb_default.csv
+decisions:
+  chi_square: "Pearson, no continuity correction"
+  logistic_covariates: "drug_use, bmi, mdr_tb, alcohol_weekly, hiv_status, secondary_education"
+  reference_levels: "No, Normal, No, No, Negative, Yes (secondary school completed)"
+  ci: Wald
+  alpha: 0.05
+expected:
+  - {description: "patients", value: 1233, tolerance: 0, source: "paper: 1233 in the final analyses"}
+  - {description: "defaulted", value: 127, tolerance: 0, source: "paper: 127 (10%) defaulted"}
+  - {description: "chi-square p age", value: 0.00604, tolerance: 0.0002, source: "paper Table 2: .006"}
+  - {description: "chi-square p sex", value: 0.0000395, tolerance: 0.000005, source: "paper Table 2: < .001"}
+  - {description: "chi-square p marital", value: 0.6815, tolerance: 0.001, source: "paper Table 2: .681"}
+  - {description: "chi-square p poverty", value: 0.03436, tolerance: 0.0005, source: "paper Table 2: .034"}
+  - {description: "OR drug use", value: 4.7816, tolerance: 0.005, source: "paper: 4.78 (3.05-7.49)"}
+  - {description: "OR drug use lower", value: 3.0522, tolerance: 0.005, source: "paper: 3.05"}
+  - {description: "OR drug use upper", value: 7.4907, tolerance: 0.005, source: "paper: 7.49"}
+  - {description: "OR underweight", value: 2.0795, tolerance: 0.005, source: "paper: 2.08 (1.21-3.56)"}
+  - {description: "OR underweight lower", value: 1.2137, tolerance: 0.005, source: "paper: 1.21"}
+  - {description: "OR underweight upper", value: 3.5629, tolerance: 0.005, source: "paper: 3.56"}
+  - {description: "OR overweight", value: 0.8777, tolerance: 0.005, source: "paper Table 2: 0.88 (0.44-1.73)"}
+  - {description: "OR overweight lower", value: 0.4445, tolerance: 0.005, source: "paper: 0.44"}
+  - {description: "OR overweight upper", value: 1.7333, tolerance: 0.005, source: "paper: 1.73"}
+  - {description: "OR MDR", value: 3.0385, tolerance: 0.005, source: "paper: 3.04 (1.58-5.85)"}
+  - {description: "OR MDR lower", value: 1.5780, tolerance: 0.005, source: "paper: 1.58"}
+  - {description: "OR MDR upper", value: 5.8507, tolerance: 0.005, source: "paper: 5.85"}
+  - {description: "OR alcohol", value: 2.2220, tolerance: 0.005, source: "paper: 2.22 (1.40-3.52)"}
+  - {description: "OR alcohol lower", value: 1.4008, tolerance: 0.005, source: "paper: 1.40"}
+  - {description: "OR alcohol upper", value: 3.5246, tolerance: 0.005, source: "paper: 3.52"}
+  - {description: "OR HIV test not done", value: 2.3031, tolerance: 0.005, source: "paper: 2.30 (1.50-3.54)"}
+  - {description: "OR HIV test not done lower", value: 1.5000, tolerance: 0.005, source: "paper: 1.50"}
+  - {description: "OR HIV test not done upper", value: 3.5363, tolerance: 0.005, source: "paper: 3.54"}
+  - {description: "OR HIV positive", value: 1.3925, tolerance: 0.005, source: "paper Table 2: 1.39 (0.42-4.65)"}
+  - {description: "OR HIV positive lower", value: 0.4167, tolerance: 0.005, source: "paper: 0.42"}
+  - {description: "OR HIV positive upper", value: 4.6534, tolerance: 0.005, source: "paper: 4.65"}
+  - {description: "OR secondary school not completed", value: 1.5499, tolerance: 0.005, source: "paper: 1.55 (1.03-2.33)"}
+  - {description: "OR secondary school lower", value: 1.0317, tolerance: 0.005, source: "paper: 1.03"}
+  - {description: "OR secondary school upper", value: 2.3286, tolerance: 0.005, source: "paper: 2.33"}
+  - {description: "chi-square p poverty with Yates (trap)", value: 0.04649, tolerance: 0.0005, source: "computed, R chisq.test with correct = TRUE"}
+notes: |
+  R 4.6.1 glm with Wald intervals (confint.default) and chisq.test(correct = FALSE) give every value (check.R, check.out). The biostats tools (statsmodels Logit, SciPy chi2_contingency) give the same values.
+  The paper used Stata 12.1. Its tabulate, chi2 has no continuity correction. The Yates correction gives p 0.0465 for poverty, not the printed .034, so the correction decision matters. It is a trap item.
+  The analysis set is the 1233 patients with an outcome and complete data for the 12 variables of the original multivariable model (Fig 1 and the Missing data section). fetch.sh makes it. A complete-case set for the 6 final covariates only holds more patients and gives other odds ratios.
+  The multivariable p-values of BMI (.020) and HIV status (< .001) in Table 2 are joint tests. The likelihood-ratio tests give .026 and .0009. They are not items.
+  The paper selected the final covariates by backward selection. The request gives the final covariates. The diabetes odds ratio (exact logistic regression) is not an item.

@@ -1,0 +1,37 @@
+adapters: [proc]
+prompt: |
+  I measured four serum markers in 401 patients: 208 with hepatocellular carcinoma (HCC) and 193 with liver cirrhosis and no HCC. The file is {data}/jang2016-hcc-biomarkers/hcc_biomarkers.csv, one row for each patient. HCC_studyGr is 1 for HCC and 0 for cirrhosis. AFP_ng_per_ml is alpha-fetoprotein (ng/mL), PIVKA_delete_range is PIVKA-II (ng/mL), OPN is osteopontin (ng/mL) and DKK is Dickkopf-1 (pg/mL). The other columns are clinical data and 0/1 copies of the markers at fixed cut-offs. How well does each marker tell HCC from cirrhosis? Give me the AUC of each of the four markers with a 95% confidence interval. Then give me the sensitivity and specificity at the cut-offs AFP 20 ng/mL, PIVKA-II 10 ng/mL, OPN 100 ng/mL and DKK-1 500 pg/mL. Write every number in your final answer text.
+answers:
+  positive_class: "1"
+  direction: higher
+  threshold_rule: closest.topleft
+  auc_ci_method: delong
+  prevalence: sample
+  alpha: 0.05
+allow: all
+timeout_s: 1500
+data: [jang2016-hcc-biomarkers/hcc_biomarkers.csv]
+items:
+  - {key: n_hcc, description: "Patients with HCC", value: 208, exact: true, in_answer: false}
+  - {key: n_cirrhosis, description: "Patients with cirrhosis", value: 193, exact: true, in_answer: false}
+  - {key: auc_afp, description: "AUC of AFP", value: 0.7856, tolerance: 0.001}
+  - {key: auc_afp_lo, description: "AUC of AFP, 95% CI lower bound", value: 0.7404, tolerance: 0.001}
+  - {key: auc_afp_hi, description: "AUC of AFP, 95% CI upper bound", value: 0.8309, tolerance: 0.001}
+  - {key: auc_pivka, description: "AUC of PIVKA-II", value: 0.7294, tolerance: 0.001}
+  - {key: auc_pivka_lo, description: "AUC of PIVKA-II, 95% CI lower bound", value: 0.6799, tolerance: 0.001}
+  - {key: auc_pivka_hi, description: "AUC of PIVKA-II, 95% CI upper bound", value: 0.7789, tolerance: 0.001}
+  - {key: auc_opn, description: "AUC of OPN", value: 0.6596, tolerance: 0.001}
+  - {key: auc_opn_lo, description: "AUC of OPN, 95% CI lower bound", value: 0.6061, tolerance: 0.001}
+  - {key: auc_opn_hi, description: "AUC of OPN, 95% CI upper bound", value: 0.7131, tolerance: 0.001}
+  - {key: auc_dkk, description: "AUC of DKK-1", value: 0.6650, tolerance: 0.001}
+  - {key: auc_dkk_lo, description: "AUC of DKK-1, 95% CI lower bound", value: 0.6120, tolerance: 0.001}
+  - {key: auc_dkk_hi, description: "AUC of DKK-1, 95% CI upper bound", value: 0.7180, tolerance: 0.001}
+  - {key: sens_afp, description: "Sensitivity of AFP at 20 ng/mL", value: 0.6202, tolerance: 0.001}
+  - {key: spec_afp, description: "Specificity of AFP at 20 ng/mL", value: 0.9016, tolerance: 0.001}
+  - {key: sens_pivka, description: "Sensitivity of PIVKA-II at 10 ng/mL", value: 0.5096, tolerance: 0.001}
+  - {key: spec_pivka, description: "Specificity of PIVKA-II at 10 ng/mL", value: 0.9119, tolerance: 0.001}
+  - {key: sens_opn, description: "Sensitivity of OPN at 100 ng/mL", value: 0.4615, tolerance: 0.001}
+  - {key: spec_opn, description: "Specificity of OPN at 100 ng/mL", value: 0.8031, tolerance: 0.001}
+  - {key: sens_dkk, description: "Sensitivity of DKK-1 at 500 pg/mL", value: 0.5000, tolerance: 0.001}
+  - {key: spec_dkk, description: "Specificity of DKK-1 at 500 pg/mL", value: 0.8083, tolerance: 0.001}
+  - {key: auc_afp_binary_trap, description: "AUC of the 0/1 column AFP_20_ng (trap result)", value: 0.7609, tolerance: 0.0005, in_answer: false, trap: true}

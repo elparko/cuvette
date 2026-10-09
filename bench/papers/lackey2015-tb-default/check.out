@@ -1,0 +1,39 @@
+patients 1233 defaulted 127 
+
+Bivariate Pearson chi-square (no continuity correction, as Stata tabulate, chi2):
+age_group        chi2 12.4326 df 3 p 0.00604 | with Yates p 0.00604
+sex              chi2 16.8976 df 1 p 0.00004 | with Yates p 0.00006
+marital_status   chi2 1.5035 df 3 p 0.68145 | with Yates p 0.68145
+poverty          chi2 4.4765 df 1 p 0.03436 | with Yates p 0.04649
+chronic_disease  chi2 0.8199 df 1 p 0.36520 | with Yates p 0.53301
+
+Multivariable logistic regression, Wald 95% CI (as Stata logistic):
+                            OR     lo     hi      p
+(Intercept)             0.0303 0.0200 0.0459 0.0000
+drug_useYes             4.7816 3.0522 7.4907 0.0000
+bmiOverweight/Obese     0.8777 0.4445 1.7333 0.7071
+bmiUnderweight          2.0795 1.2137 3.5629 0.0077
+mdr_tbYes               3.0385 1.5780 5.8507 0.0009
+alcohol_weeklyYes       2.2220 1.4008 3.5246 0.0007
+hiv_statusPositive      1.3925 0.4167 4.6534 0.5907
+hiv_statusTest not done 2.3031 1.5000 3.5363 0.0001
+secondary_educationNo   1.5499 1.0317 2.3286 0.0348
+
+Likelihood-ratio test of each covariate:
+Single term deletions
+
+Model:
+default ~ drug_use + bmi + mdr_tb + alcohol_weekly + hiv_status + 
+    secondary_education
+                    Df Deviance    AIC    LRT  Pr(>Chi)    
+<none>                   678.33 696.33                     
+drug_use             1   723.44 739.44 45.106 1.866e-11 ***
+bmi                  2   685.61 699.61  7.273 0.0263451 *  
+mdr_tb               1   688.07 704.07  9.741 0.0018022 ** 
+alcohol_weekly       1   689.40 705.40 11.062 0.0008811 ***
+hiv_status           2   692.40 706.40 14.061 0.0008845 ***
+secondary_education  1   682.79 698.79  4.459 0.0347184 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Bivariate OR male: 2.4153 (1.5693 to 3.7174)

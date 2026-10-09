@@ -1,0 +1,92 @@
+kind: research paper
+short: Jang 2016
+field: Statistics
+program: pROC (R), through the proc adapter
+citation:
+  authors: Jang ES, Jeong S-H, Kim J-W, Choi YS, Leissner P, Brechot C
+  title: >-
+    Diagnostic performance of alpha-fetoprotein, protein induced by vitamin K absence, osteopontin, Dickkopf-1 and its
+    combinations for hepatocellular carcinoma
+  venue: PLOS ONE 11(3):e0151069
+  year: 2016
+  doi: 10.1371/journal.pone.0151069
+related:
+  - text: "Data: Jang ES et al. Data from: Diagnostic performance of alpha-fetoprotein, PIVKA-II, osteopontin, Dickkopf-1 and its combinations for hepatocellular carcinoma. Dryad, CC0. The benchmark downloads the copy on Zenodo, record 4952129."
+    url: https://zenodo.org/records/4952129
+measured: >-
+  A case-control study of 208 patients with hepatocellular carcinoma and 193 patients with liver cirrhosis. The study
+  measured serum AFP, PIVKA-II, osteopontin and Dickkopf-1, and reports the AUC of each marker with a 95% confidence
+  interval (DeLong, pROC in R), and the sensitivity and specificity at fixed cut-offs.
+instruction: >-
+  Give the AUC of each of the four markers with a 95% confidence interval, and the sensitivity and specificity at the
+  cut-offs AFP 20 ng/mL, PIVKA-II 10 ng/mL, OPN 100 ng/mL and DKK-1 500 pg/mL.
+instruction_basis: >-
+  The abstract and the Results section, "Diagnostic performance of each biomarker". The paper gives the AUC with its
+  95% CI for each marker, HCC against cirrhosis, and the sensitivity and specificity at these cut-offs.
+answers:
+  positive_class:
+    decision: Outcome value of the patients with the disease
+    value: "1"
+    source: The readme of the data and the group sizes. HCC_studyGr has 208 rows with 1 (HCC) and 193 with 0 (cirrhosis).
+  direction:
+    decision: Direction
+    value: higher
+    source: All four markers are higher in HCC (Results, median levels, p < 0.001).
+  threshold_rule:
+    decision: Rule for the best threshold
+    value: closest.topleft
+    source: Methods, "the level showing the minimum distance to the top-left corner of each ROC curve". The request uses the published cut-offs.
+  auc_ci_method:
+    decision: Confidence interval of the AUC
+    value: delong
+    source: Methods, the DeLong method in the pROC package.
+  prevalence:
+    decision: Prevalence for PPV and NPV
+    value: sample
+    source: The request asks for no PPV or NPV.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: The paper gives 95% confidence intervals.
+items:
+  n_hcc:
+    source: published
+    where: Abstract, 208 HCC patients.
+    check: 208 rows with HCC_studyGr 1 (check.out).
+  n_cirrhosis:
+    source: published
+    where: Abstract, 193 liver cirrhosis patients.
+    check: 193 rows with HCC_studyGr 0 (check.out).
+  auc_afp: {source: published, where: "Abstract and Results, AFP 0.786.", check: "pROC 0.78563; NumPy DeLong 0.7856 (check.out)."}
+  auc_afp_lo: {source: published, where: "Abstract and Results, 0.740.", check: "pROC 0.74040; NumPy 0.7404."}
+  auc_afp_hi: {source: published, where: "Abstract and Results, 0.831.", check: "pROC 0.83087; NumPy 0.8309."}
+  auc_pivka: {source: published, where: "Abstract and Results, PIVKA-II 0.729.", check: "pROC 0.72939; NumPy 0.7294."}
+  auc_pivka_lo: {source: published, where: "Abstract and Results, 0.680.", check: "pROC 0.67986; NumPy 0.6799."}
+  auc_pivka_hi: {source: published, where: "Abstract and Results, 0.779.", check: "pROC 0.77891; NumPy 0.7789."}
+  auc_opn: {source: published, where: "Abstract and Results, OPN 0.660.", check: "pROC 0.65960; NumPy 0.6596."}
+  auc_opn_lo: {source: published, where: "Abstract and Results, 0.606.", check: "pROC 0.60610; NumPy 0.6061."}
+  auc_opn_hi: {source: published, where: "Abstract and Results, 0.713.", check: "pROC 0.71310; NumPy 0.7131."}
+  auc_dkk: {source: published, where: "Abstract and Results, DKK-1 0.665.", check: "pROC 0.66498; NumPy 0.6650."}
+  auc_dkk_lo: {source: published, where: "Abstract and Results, 0.612.", check: "pROC 0.61201; NumPy 0.6120."}
+  auc_dkk_hi: {source: published, where: "Abstract and Results, 0.718.", check: "pROC 0.71796; NumPy 0.7180."}
+  sens_afp: {source: published, where: "Results, AFP > 20 ng/mL, sensitivity 62%.", check: "0.6202 (check.out)."}
+  spec_afp: {source: published, where: "Results, specificity 90.2%.", check: "0.9016 (check.out)."}
+  sens_pivka: {source: published, where: "Results, PIVKA-II > 10 ng/mL, sensitivity 51.0%.", check: "0.5096 (check.out)."}
+  spec_pivka: {source: published, where: "Results, specificity 91.2%.", check: "0.9119 (check.out)."}
+  sens_opn: {source: published, where: "Results, OPN > 100 ng/mL, sensitivity 46.2%.", check: "0.4615 (check.out)."}
+  spec_opn: {source: published, where: "Results, specificity 80.3%.", check: "0.8031 (check.out)."}
+  sens_dkk: {source: published, where: "Results, DKK-1 > 500 pg/mL, sensitivity 50.0%.", check: "0.5000 (check.out)."}
+  spec_dkk: {source: published, where: "Results, specificity 80.8%.", check: "0.8083 (check.out)."}
+  auc_afp_binary_trap:
+    source: computed
+    tool: NumPy, AUC of the 0/1 column AFP_20_ng
+    where: Not in the paper. The AUC of a dichotomized marker is the mean of its sensitivity and specificity, not the AUC of the marker.
+    independence: independent
+    check: pROC on AFP_20_ng gives 0.7609.
+data:
+  source: >-
+    Dryad dataset of the paper, copied on Zenodo record 4952129 (HCC_biomarker_160206_data.xlsx). fetch.sh writes the
+    first sheet to one CSV file with no change of columns.
+  url: https://zenodo.org/records/4952129
+  license: CC0 1.0 public domain dedication, from the Zenodo record. The file has no names. The paper is CC BY 4.0.
+  size: 100 KB Excel file, 401 rows and 57 columns.

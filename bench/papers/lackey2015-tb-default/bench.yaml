@@ -1,0 +1,46 @@
+adapters: [biostats]
+prompt: |
+  In a cohort of adults with smear-positive pulmonary tuberculosis in Lima, Peru, I want to find the risk factors for default from treatment. The file {data}/lackey2015-tb-default/tb_default.csv has one row for each of the patients in the analysis. default is 1 if the patient defaulted and 0 for every other outcome (the column outcome gives the outcome). The other columns are age_group, sex, marital_status, poverty, prison, secondary_education (completed secondary school, Yes or No), smoking, alcohol_weekly (alcohol at least once a week), drug_use, rehab, mdr_tb (MDR treatment), bmi (Normal, Underweight, Overweight/Obese), chronic_disease, hiv_status (Negative, Positive, Test not done) and diabetes. First, test the association of default with age group, sex, marital status and poverty, one at a time, and give me each p-value. Then fit a multivariable logistic regression of default on drug_use, bmi, mdr_tb, alcohol_weekly, hiv_status and secondary_education, and give me each adjusted odds ratio with its 95% confidence interval. Write every number in your final answer text.
+answers:
+  replicate: "subjects, patients or animals (one value per subject)"
+  alpha: 0.05
+  chi_square_correction: false
+  logistic_covariates: "drug_use, bmi, mdr_tb, alcohol_weekly, hiv_status, secondary_education"
+  logistic_event: "1"
+  reference_levels: "drug_use=No, bmi=Normal, mdr_tb=No, alcohol_weekly=No, hiv_status=Negative, secondary_education=Yes"
+  fisher_alternative: two-sided
+allow: all
+timeout_s: 1800
+data: [lackey2015-tb-default/tb_default.csv]
+items:
+  - {key: patients, description: "Patients in the analysis", value: 1233, exact: true, in_answer: false}
+  - {key: defaulted, description: "Patients who defaulted", value: 127, exact: true, in_answer: false}
+  - {key: p_age, description: "Chi-square p, age group by default", value: 0.00604, tolerance: 0.0002}
+  - {key: p_sex, description: "Chi-square p, sex by default", value: 0.0000395, tolerance: 0.000005}
+  - {key: p_marital, description: "Chi-square p, marital status by default", value: 0.6815, tolerance: 0.001}
+  - {key: p_poverty, description: "Chi-square p, poverty by default", value: 0.03436, tolerance: 0.0005}
+  - {key: or_drug, description: "Adjusted OR, drug use", value: 4.7816, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_drug_lo, description: "Adjusted OR, drug use, CI lower", value: 3.0522, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_drug_hi, description: "Adjusted OR, drug use, CI upper", value: 7.4907, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_underweight, description: "Adjusted OR, underweight", value: 2.0795, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_underweight_lo, description: "Adjusted OR, underweight, CI lower", value: 1.2137, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_underweight_hi, description: "Adjusted OR, underweight, CI upper", value: 3.5629, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_overweight, description: "Adjusted OR, overweight or obese", value: 0.8777, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_overweight_lo, description: "Adjusted OR, overweight or obese, CI lower", value: 0.4445, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_overweight_hi, description: "Adjusted OR, overweight or obese, CI upper", value: 1.7333, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_mdr, description: "Adjusted OR, MDR treatment", value: 3.0385, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_mdr_lo, description: "Adjusted OR, MDR treatment, CI lower", value: 1.5780, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_mdr_hi, description: "Adjusted OR, MDR treatment, CI upper", value: 5.8507, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_alcohol, description: "Adjusted OR, weekly alcohol", value: 2.2220, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_alcohol_lo, description: "Adjusted OR, weekly alcohol, CI lower", value: 1.4008, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_alcohol_hi, description: "Adjusted OR, weekly alcohol, CI upper", value: 3.5246, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_hiv_not_tested, description: "Adjusted OR, HIV test not done", value: 2.3031, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_hiv_not_tested_lo, description: "Adjusted OR, HIV test not done, CI lower", value: 1.5000, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_hiv_not_tested_hi, description: "Adjusted OR, HIV test not done, CI upper", value: 3.5363, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_hiv_positive, description: "Adjusted OR, HIV positive", value: 1.3925, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_hiv_positive_lo, description: "Adjusted OR, HIV positive, CI lower", value: 0.4167, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_hiv_positive_hi, description: "Adjusted OR, HIV positive, CI upper", value: 4.6534, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_no_secondary, description: "Adjusted OR, secondary school not completed", value: 1.5499, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_no_secondary_lo, description: "Adjusted OR, secondary school not completed, CI lower", value: 1.0317, tolerance: 0.005, tool: fit_logistic}
+  - {key: or_no_secondary_hi, description: "Adjusted OR, secondary school not completed, CI upper", value: 2.3286, tolerance: 0.005, tool: fit_logistic}
+  - {key: p_poverty_yates_trap, description: "Chi-square p with the Yates correction, poverty (trap result)", value: 0.04649, tolerance: 0.0005, in_answer: false, trap: true}

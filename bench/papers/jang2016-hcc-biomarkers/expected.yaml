@@ -1,0 +1,38 @@
+tool: pROC (R), roc and ci.auc with the DeLong method
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/jang2016-hcc-biomarkers/hcc_biomarkers.csv
+decisions:
+  positive_class: "1 (HCC)"
+  direction: higher
+  auc_ci_method: delong
+  alpha: 0.05
+expected:
+  - {description: "HCC patients", value: 208, tolerance: 0, source: "paper: 208 HCC"}
+  - {description: "cirrhosis patients", value: 193, tolerance: 0, source: "paper: 193 LC"}
+  - {description: "AUC AFP", value: 0.7856, tolerance: 0.001, source: "paper: 0.786"}
+  - {description: "AUC AFP CI lower", value: 0.7404, tolerance: 0.001, source: "paper: 0.740"}
+  - {description: "AUC AFP CI upper", value: 0.8309, tolerance: 0.001, source: "paper: 0.831"}
+  - {description: "AUC PIVKA-II", value: 0.7294, tolerance: 0.001, source: "paper: 0.729"}
+  - {description: "AUC PIVKA-II CI lower", value: 0.6799, tolerance: 0.001, source: "paper: 0.680"}
+  - {description: "AUC PIVKA-II CI upper", value: 0.7789, tolerance: 0.001, source: "paper: 0.779"}
+  - {description: "AUC OPN", value: 0.6596, tolerance: 0.001, source: "paper: 0.660"}
+  - {description: "AUC OPN CI lower", value: 0.6061, tolerance: 0.001, source: "paper: 0.606"}
+  - {description: "AUC OPN CI upper", value: 0.7131, tolerance: 0.001, source: "paper: 0.713"}
+  - {description: "AUC DKK-1", value: 0.6650, tolerance: 0.001, source: "paper: 0.665"}
+  - {description: "AUC DKK-1 CI lower", value: 0.6120, tolerance: 0.001, source: "paper: 0.612"}
+  - {description: "AUC DKK-1 CI upper", value: 0.7180, tolerance: 0.001, source: "paper: 0.718"}
+  - {description: "sensitivity AFP > 20", value: 0.6202, tolerance: 0.001, source: "paper: 62%"}
+  - {description: "specificity AFP > 20", value: 0.9016, tolerance: 0.001, source: "paper: 90.2%"}
+  - {description: "sensitivity PIVKA-II > 10", value: 0.5096, tolerance: 0.001, source: "paper: 51.0%"}
+  - {description: "specificity PIVKA-II > 10", value: 0.9119, tolerance: 0.001, source: "paper: 91.2%"}
+  - {description: "sensitivity OPN > 100", value: 0.4615, tolerance: 0.001, source: "paper: 46.2%"}
+  - {description: "specificity OPN > 100", value: 0.8031, tolerance: 0.001, source: "paper: 80.3%"}
+  - {description: "sensitivity DKK-1 > 500", value: 0.5000, tolerance: 0.001, source: "paper: 50.0%"}
+  - {description: "specificity DKK-1 > 500", value: 0.8083, tolerance: 0.001, source: "paper: 80.8%"}
+  - {description: "AUC of the 0/1 AFP column (trap)", value: 0.7609, tolerance: 0.0005, source: "computed, AUC of AFP_20_ng"}
+notes: |
+  pROC 1.19.1 roc() and ci.auc() (DeLong) on the continuous markers give every AUC and interval in the abstract and the Results to three decimals. The paper used pROC in R. A NumPy implementation of DeLong in Python (check.py, check.out) gives the same values.
+  No marker value equals a cut-off, so at or above (the tool) and above (the paper) classify the same patients.
+  Trap: the AUC of the 0/1 column AFP_20_ng is 0.7609, (sensitivity + specificity) / 2 at the cut-off. It is not the AUC of the marker.
+  The paper chose its own cut-offs by the distance to the top-left corner in other analyses. The request gives the published cut-offs.

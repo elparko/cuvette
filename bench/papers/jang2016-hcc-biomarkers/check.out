@@ -1,0 +1,6 @@
+patients 401 HCC 208 cirrhosis 193
+AFP_ng_per_ml      AUC 0.7856 DeLong 95% CI 0.7404 to 0.8309; at >= 20: sensitivity 0.6202 specificity 0.9016
+PIVKA_delete_range AUC 0.7294 DeLong 95% CI 0.6799 to 0.7789; at >= 10: sensitivity 0.5096 specificity 0.9119
+OPN                AUC 0.6596 DeLong 95% CI 0.6061 to 0.7131; at >= 100: sensitivity 0.4615 specificity 0.8031
+DKK                AUC 0.6650 DeLong 95% CI 0.6120 to 0.7180; at >= 500: sensitivity 0.5000 specificity 0.8083
+AUC of the 0/1 column AFP_20_ng (wrong method): 0.7609
