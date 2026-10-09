@@ -1,0 +1,973 @@
+adapter:
+  name: calcium-imaging
+  title: Calcium imaging
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Analyzes calcium imaging with NumPy and SciPy. It replaces steps that labs do in Inscopix Data Processing, NIS-Elements,
+    ZEN, MetaFluor or by hand in ImageJ. It reads cell fluorescence traces, or a small TIFF stack with ROIs. It gives dF/F,
+    events, event rates, responsive cells, pairwise correlation and group tests. Suite2p is an optional tool for motion correction.
+  field: calcium imaging
+  file_types: [".csv", ".tif", ".tiff", ".zip", ".roi", ".npy"]
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: NumPy and SciPy (calcium imaging tools), with optional Suite2p
+  version: "1.18.1"
+  tested_versions: []
+  homepage: https://scipy.org
+  docs:
+    - https://suite2p.readthedocs.io
+    - https://github.com/j-friedrich/OASIS
+    - https://caiman.readthedocs.io
+    - https://imagej.net/ij/docs/guide/146-30.html
+  install: >
+    The light tools use their own Python environment at ~/.cuvette/envs/calcium-imaging, or the Python in CUVETTE_CALCIUM_PYTHON.
+    Make it with: uv venv ~/.cuvette/envs/calcium-imaging && uv pip install --python ~/.cuvette/envs/calcium-imaging/bin/python -r catalog/calcium-imaging/requirements.txt.
+    Suite2p is optional and large (it brings PyTorch). The run_suite2p tool looks for it in ~/.cuvette/envs/suite2p or in CUVETTE_SUITE2P_PYTHON. It never installs it.
+  citation:
+    - text: "Virtanen, P., Gommers, R., Oliphant, T. E., et al. (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods, 17(3), 261-272."
+      doi: 10.1038/s41592-019-0686-2
+    - text: "Harris, C. R., Millman, K. J., van der Walt, S. J., et al. (2020). Array programming with NumPy. Nature, 585(7825), 357-362."
+      doi: 10.1038/s41586-020-2649-2
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: CUVETTE_CALCIUM_PYTHON
+  paths:
+    - ~/.cuvette/envs/calcium-imaging/bin/python
+    - ~/.cuvette/envs/calcium-imaging/Scripts/python.exe
+    - ~/.guided-analysis/envs/calcium-imaging/bin/python
+    - /Volumes/ga-envs/calcium-imaging/bin/python
+  which: []
+  version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import scipy, tifffile, roifile; print('calcium-imaging scipy', scipy.__version__)"]
+  version_pattern: 'scipy (\S+)'
+  identity: 'calcium-imaging scipy \d'
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees metrics, tables and small plot previews. It never sees the image stacks.
+
+standards: ""
+
+decisions:
+  - key: question
+    label: What question do you ask with these recordings?
+    kind: text
+    group: Question
+    help: Example - Does the drug raise the fraction of cells that respond to the odor? Does the firing rate of the cells change after the lesion?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: unit_of_replication
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - cells in one field (exploratory)
+      - fields or recordings
+      - animals, slices or independent cultures
+    default: animals, slices or independent cultures
+    group: Design
+    help: >
+      Cells in one animal are not independent samples. A test across groups must use the animal, or a mixed model with the
+      animal as a random effect.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: frame_rate_hz
+    label: Frame rate of the recording (Hz)
+    kind: float
+    lo: 0.01
+    group: Design
+    help: Frames per second of the acquisition, not of the display. A CSV file with a time column gives it. A table without one does not. A wrong rate changes every time and rate.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: inspect_recording, arg: frame_rate }
+      - { tool: extract_traces, arg: frame_rate }
+      - { tool: run_suite2p, arg: frame_rate }
+      - { tool: compute_dff, arg: frame_rate }
+      - { tool: detect_events, arg: frame_rate }
+      - { tool: find_responsive_cells, arg: frame_rate }
+      - { tool: correlate_cells, arg: frame_rate }
+
+  - key: indicator
+    label: Calcium indicator
+    kind: choice
+    choices: [GCaMP6f, GCaMP6m, GCaMP6s, jGCaMP7f, jGCaMP8f, jGCaMP8m, jGCaMP8s, other]
+    default: GCaMP6s
+    group: Design
+    help: >
+      The indicator sets how fast a transient rises and falls. In the first GCaMP6 paper, the rise time was longest for 6s, then 6m,
+      then 6f. jGCaMP8 rises faster than jGCaMP7f. The 8f and 8m forms decay faster than 7f. A fast indicator needs a high frame
+      rate and a short decay time constant. The report must name it.
+    changes_conclusion: false
+    owner: human
+    stage: setup
+
+  - key: baseline_method
+    label: Baseline F0 for dF/F
+    kind: choice
+    choices: [percentile, first_frames, fixed]
+    default: percentile
+    group: Baseline
+    help: >
+      Percentile takes a low percentile of F in a sliding window. It follows slow drift and bleaching. First frames takes the mean
+      of the first seconds. It needs a quiet start. Fixed uses one number that you give. The choice changes every dF/F value.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: compute_dff, arg: baseline_method }
+    sensitivity:
+      options: [percentile, first_frames]
+      tool: compute_dff
+      compare: [metrics.median_dff, metrics.max_dff]
+      max_runs: 2
+
+  - key: baseline_window_s
+    label: Baseline window (s)
+    kind: float
+    default: 60
+    lo: 1
+    group: Baseline
+    help: >
+      For the percentile baseline. The window must be several times longer than a transient and shorter than the drift. A cell
+      that is active for most of the window gets a baseline that is too high. The Suite2p default is 60 s.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compute_dff, arg: baseline_window_s }
+    sensitivity:
+      options: [20, 60, 120]
+      tool: compute_dff
+      compare: [metrics.median_dff, metrics.max_dff]
+      max_runs: 3
+
+  - key: baseline_percentile
+    label: Baseline percentile
+    kind: float
+    default: 8
+    lo: 0
+    hi: 100
+    group: Baseline
+    help: For the percentile baseline. A low percentile follows the quiet level of F. A higher percentile follows the activity of busy cells. The Suite2p default is 8.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compute_dff, arg: baseline_percentile }
+
+  - key: baseline_first_s
+    label: Length of the quiet start (s)
+    kind: float
+    default: 10
+    lo: 0.1
+    group: Baseline
+    help: For the first-frames baseline. Use seconds before the stimulus with no events. If a cell has an event in them, F0 is too high for that cell.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compute_dff, arg: baseline_first_s }
+
+  - key: fixed_f0
+    label: Fixed F0 (raw fluorescence units)
+    kind: float
+    lo: 0
+    group: Baseline
+    help: For the fixed baseline. One value in the units of the traces, the same for every cell. Use it only if all cells have a similar resting F.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compute_dff, arg: fixed_f0 }
+
+  - key: neuropil_coefficient
+    label: Neuropil coefficient (0 = no correction)
+    kind: float
+    default: 0.7
+    lo: 0
+    hi: 1
+    group: Baseline
+    help: >
+      The tool subtracts this fraction of the neuropil trace from each cell trace. The first GCaMP6 paper used 0.7, and it is the
+      Suite2p default. A high value can give a negative trace in a dim cell. Use 0 for a dye in culture with no neuropil.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: compute_dff, arg: neuropil_coefficient }
+    sensitivity:
+      options: [0, 0.4, 0.7, 1]
+      tool: compute_dff
+      compare: [metrics.median_dff, metrics.max_dff]
+      max_runs: 4
+
+  - key: neuropil_inner_px
+    label: Gap between cell and neuropil ring (pixels)
+    kind: float
+    default: 3
+    lo: 0
+    group: Baseline
+    help: For ROIs from a TIFF stack. The ring starts this far from the cell edge, so that cell light does not enter the ring.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: extract_traces, arg: neuropil_inner_px }
+
+  - key: neuropil_outer_px
+    label: Outer edge of the neuropil ring (pixels, 0 = no ring)
+    kind: float
+    default: 0
+    lo: 0
+    group: Baseline
+    help: For ROIs from a TIFF stack. The ring ends this far from the cell edge. Chen 2013 used a region 20 micrometers from the cell center. Convert this to pixels with your pixel size.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: extract_traces, arg: neuropil_outer_px }
+
+  - key: event_method
+    label: Event detection method
+    kind: choice
+    choices: [threshold, oasis]
+    default: threshold
+    group: Events
+    help: >
+      Threshold calls an event when dF/F rises above a multiple of the noise. It gives amplitude, area, rise time and decay time.
+      OASIS (Friedrich 2017) infers the spikes that fit an exponential decay. It gives spike times and sizes, and it needs the decay time constant.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: detect_events, arg: method }
+    sensitivity:
+      options: [threshold, oasis]
+      tool: detect_events
+      compare: [metrics.n_events, metrics.mean_event_rate_hz]
+      max_runs: 2
+
+  - key: event_threshold_sd
+    label: Event threshold (standard deviations of the noise)
+    kind: float
+    default: 3
+    lo: 0.5
+    group: Events
+    help: >
+      For threshold, an event starts when dF/F is this many noise SDs above the median. For OASIS, a spike must be this many noise
+      SDs in size. A low value finds small events and false events. A high value misses small events.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: detect_events, arg: threshold_sd }
+    sensitivity:
+      options: [2, 3, 4]
+      tool: detect_events
+      compare: [metrics.n_events, metrics.mean_event_rate_hz]
+      max_runs: 3
+
+  - key: min_event_duration_s
+    label: Shortest event (s)
+    kind: float
+    default: 0
+    lo: 0
+    group: Events
+    help: For threshold. An event must stay above the threshold for this long. 0 keeps a single frame. Use a value of a few frames to remove noise spikes.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_events, arg: min_duration_s }
+
+  - key: decay_tau_s
+    label: Indicator decay time constant (s)
+    kind: float
+    default: 1
+    lo: 0.01
+    group: Events
+    help: >
+      The time for a transient to fall to 37 percent. It is the half-decay time divided by 0.69. OASIS needs it. The Suite2p default
+      is 1 s. Read the value for your indicator and your cell type, and check it on a clear single transient.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_events, arg: decay_tau_s }
+      - { tool: run_suite2p, arg: tau_s }
+
+  - key: stimulus_onsets_s
+    label: Stimulus onset times (s)
+    kind: text
+    group: Response
+    help: The times when the stimulus starts, in seconds from the first frame. Write them as text like 10, 40, 70, or give a CSV file with a column onset_s.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_responsive_cells, arg: stimulus_onsets_s }
+
+  - key: response_window_s
+    label: Response window (s)
+    kind: float
+    default: 2
+    lo: 0.05
+    group: Response
+    help: The tool averages dF/F over this window after each onset. Make it as long as the response you expect. A slow indicator needs a longer window.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_responsive_cells, arg: response_window_s }
+
+  - key: pre_window_s
+    label: Pre-stimulus window (s)
+    kind: float
+    default: 2
+    lo: 0.05
+    group: Response
+    help: The tool takes the baseline mean and the noise SD from this window before each onset. It must be free of the end of the last response.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_responsive_cells, arg: pre_window_s }
+
+  - key: response_delay_s
+    label: Delay of the response window (s)
+    kind: float
+    default: 0
+    lo: 0
+    group: Response
+    help: The response window starts this long after the onset. Use it for a slow indicator or a late response.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_responsive_cells, arg: response_delay_s }
+
+  - key: z_criterion
+    label: Responsive cell criterion (z score)
+    kind: float
+    default: 2
+    lo: 0
+    group: Response
+    help: >
+      A cell responds if the z score of its mean response is above this value. The z score is the mean change in the response window
+      divided by the SD of dF/F in the pre-stimulus window. A higher value is stricter. The fraction of responsive cells depends on it, so report it.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_responsive_cells, arg: z_criterion }
+    sensitivity:
+      options: [2, 3, 4]
+      tool: find_responsive_cells
+      compare: [metrics.fraction_responsive, metrics.n_responsive]
+      max_runs: 3
+
+  - key: response_direction
+    label: Direction of the response
+    kind: choice
+    choices: [increase, decrease, either]
+    default: increase
+    group: Response
+    help: Increase counts cells that go up. Decrease counts cells that go down. Either counts both.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_responsive_cells, arg: direction }
+
+  - key: min_trial_fraction
+    label: Smallest fraction of trials over the criterion (0 = not used)
+    kind: float
+    default: 0
+    lo: 0
+    hi: 1
+    group: Response
+    help: If above 0, a cell must also pass the criterion in this fraction of the trials. It removes cells that respond because of one large trial.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: find_responsive_cells, arg: min_trial_fraction }
+
+  - key: correlation_bin_s
+    label: Bin width for correlation (s, 0 = none)
+    kind: float
+    default: 0
+    lo: 0
+    group: Correlation
+    help: The tool averages dF/F in bins of this width before it correlates the cells. A wide bin removes the effect of frame jitter and noise. It also changes the correlation.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: correlate_cells, arg: bin_s }
+
+  - key: group_test
+    label: Test for the comparison of groups
+    kind: choice
+    choices: [welch, rank]
+    default: welch
+    group: Statistics
+    help: Welch compares means and does not assume equal variances. Rank compares the ranks (Mann-Whitney for 2 groups, Kruskal-Wallis for more). Both use the animal means.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_groups, arg: test }
+
+  - key: suite2p_diameter_px
+    label: Cell diameter for Suite2p (pixels)
+    kind: float
+    lo: 1
+    group: Suite2p
+    help: The typical diameter of a cell body in the image. Suite2p uses it to find cells. Measure a few cells in the mean image.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_suite2p, arg: diameter_px }
+
+  - key: suite2p_registration
+    label: Motion correction in Suite2p
+    kind: choice
+    choices: [none, rigid, nonrigid]
+    default: rigid
+    group: Suite2p
+    help: Rigid moves the whole frame. Nonrigid moves blocks of the frame and needs a large image, at least a few blocks of 128 pixels. None skips the step for a movie that you corrected before.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_suite2p, arg: registration }
+
+  - key: suite2p_iscell_threshold
+    label: Cell probability to keep an ROI
+    kind: float
+    default: 0.5
+    lo: 0
+    hi: 1
+    group: Suite2p
+    help: Suite2p gives each ROI a probability of being a cell. The tool keeps the ROIs at or above this value. Check the kept ROIs on the mean image.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_suite2p, arg: iscell_threshold }
+
+tools:
+  - name: inspect_recording
+    title: Inspect traces or a stack
+    description: Read a traces CSV file, a Suite2p folder or a TIFF stack. Report the number of cells, the frames and the frame rate. It warns if the traces look like dF/F already, or have values at or below zero. Run it before the other tools.
+    read_only: true
+    batch: false
+    function: "calcium_tools:inspect_recording"
+    params:
+      path: { type: string, minLength: 1, description: "Path of a traces CSV file, a Suite2p plane folder, or a TIFF stack." }
+      frame_rate: { type: number, minimum: 0, default: 0, description: "Frame rate in Hz. 0 means read it from the time column." }
+      time_column: { type: string, default: "", description: "Name of the time column, in seconds. Empty means find a column named time or time_s." }
+      rois: { type: string, default: all, description: "Comma list of trace names to keep, or all." }
+    required: [path]
+
+  - name: extract_traces
+    title: Extract ROI traces from a TIFF stack
+    description: >-
+      Average the pixels of each ROI in every frame of a TIFF stack. ROIs come from an ImageJ ROI file (.zip or .roi), a label image, or a CSV table of circles. It can also average a neuropil ring around each cell. It writes the traces as CSV files for compute_dff. For a stack that needs motion correction or cell detection, use run_suite2p.
+    batch: false
+    function: "calcium_tools:extract_traces"
+    params:
+      stack: { type: string, minLength: 1, description: "Path of a TIFF stack with frames, height and width." }
+      roi_file: { type: string, minLength: 1, description: "Path of an ImageJ .zip or .roi file, a label .tif image, or a .csv file with the columns name, x, y and radius_px." }
+      frame_rate: { type: number, minimum: 0, default: 0, description: "Frame rate in Hz. 0 means read the frame interval from the TIFF file." }
+      neuropil_inner_px: { type: number, minimum: 0, default: 0, description: "Gap between the cell edge and the neuropil ring, in pixels." }
+      neuropil_outer_px: { type: number, minimum: 0, default: 0, description: "Distance of the ring outer edge from the cell edge, in pixels. 0 means no ring." }
+    required: [stack, roi_file]
+
+  - name: run_suite2p
+    title: Suite2p motion correction and cell detection
+    description: >-
+      Run Suite2p on a TIFF stack of a two-photon recording. It corrects motion, finds cells and extracts the cell and neuropil traces. The tool then reads the traces back as CSV files for compute_dff. It needs Suite2p in its own environment, and it stops with a message if that is missing. It never installs Suite2p. To read a finished Suite2p run, give existing_folder. CaImAn is a heavier alternative that this adapter does not run.
+    batch: false
+    function: "calcium_tools:run_suite2p"
+    params:
+      stack: { type: string, default: "", description: "Path of a TIFF stack to process. Leave it empty if you give existing_folder." }
+      existing_folder: { type: string, default: "", description: "Path of a finished Suite2p run, the folder suite2p or its plane0 folder. The tool only reads it." }
+      frame_rate: { type: number, minimum: 0, default: 0, description: "Frame rate in Hz. Required for a new run." }
+      tau_s: { type: number, minimum: 0, default: 0, description: "Decay time constant of the indicator, in seconds. Required for a new run." }
+      diameter_px: { type: number, minimum: 0, default: 0, description: "Typical cell diameter in pixels. Required for a new run." }
+      registration: { type: string, enum: [none, rigid, nonrigid], default: rigid, description: "Motion correction: none, rigid or nonrigid." }
+      iscell_threshold: { type: number, minimum: 0, maximum: 1, default: 0.5, description: "Smallest cell probability to keep an ROI (unitless fraction)." }
+      suite2p_python: { type: string, default: "", description: "Path of the Python program that has Suite2p. Empty means look in the usual places." }
+    citations:
+      - text: "Pachitariu, M., Stringer, C., Dipoppa, M., Schroder, S., Rossi, L. F., Dalgleish, H., Carandini, M., & Harris, K. D. (2017). Suite2p: beyond 10,000 neurons with standard two-photon microscopy. bioRxiv, 061507."
+        doi: 10.1101/061507
+        kind: program
+
+  - name: compute_dff
+    title: Compute dF/F
+    description: >-
+      Compute dF/F for each trace as (F - F0) / F0, with the baseline F0 that you choose. It can first subtract a fraction of a neuropil trace. It writes a dF/F table, a heatmap of dF/F and a plot of traces. dF/F is a fraction, so 0.5 means 50 percent. Do not run it on traces that are dF/F already.
+    batch: false
+    function: "calcium_tools:compute_dff"
+    params:
+      traces: { type: string, minLength: 1, description: "Path of a traces CSV file (one column for each cell, with a time column or a frame_rate) or a Suite2p plane folder." }
+      baseline_method: { type: string, enum: [percentile, first_frames, fixed], description: "The method that sets F0: percentile in a sliding window, mean of the first frames, or a fixed value." }
+      frame_rate: { type: number, minimum: 0, default: 0, description: "Frame rate in Hz. 0 means read it from the time column." }
+      time_column: { type: string, default: "", description: "Name of the time column, in seconds." }
+      rois: { type: string, default: all, description: "Comma list of trace names to keep, or all." }
+      neuropil: { type: string, default: "", description: "Path of the neuropil traces CSV file with the same cells and frames. Empty with a Suite2p folder means use its Fneu file." }
+      neuropil_coefficient: { type: number, minimum: 0, maximum: 1, default: 0, description: "Fraction of the neuropil trace to subtract (unitless). 0 means no correction." }
+      baseline_window_s: { type: number, minimum: 0, default: 0, description: "For percentile. Window length in seconds. The window has the frame at its center." }
+      baseline_percentile: { type: number, minimum: 0, maximum: 100, default: 8, description: "For percentile. The percentile of F in the window, from 0 to 100." }
+      baseline_first_s: { type: number, minimum: 0, default: 0, description: "For first_frames. Length of the baseline period in seconds from the start." }
+      fixed_f0: { type: number, minimum: 0, default: 0, description: "For fixed. The F0 in the units of the traces." }
+      sort_rois: { type: boolean, default: false, description: "True to sort the heatmap rows by the time of the peak." }
+    required: [traces, baseline_method]
+    citations:
+      - text: "Chen, T.-W., Wardill, T. J., Sun, Y., et al. (2013). Ultrasensitive fluorescent proteins for imaging neuronal activity. Nature, 499(7458), 295-300."
+        doi: 10.1038/nature12354
+        when: { neuropil_coefficient: set }
+
+  - name: detect_events
+    title: Detect calcium events
+    description: >-
+      Find events in dF/F traces by a threshold in noise standard deviations, or by OASIS deconvolution. It gives the event times, the event rate of each cell, and the amplitude. The threshold method also gives the area, the 10 to 90 percent rise time and the half-decay time. It writes an event raster. Give reference spike times for one trace to get the sensitivity and precision.
+    batch: false
+    function: "calcium_tools:detect_events"
+    params:
+      traces: { type: string, minLength: 1, description: "Path of a dF/F CSV file from compute_dff." }
+      method: { type: string, enum: [threshold, oasis], description: "Event detection method." }
+      threshold_sd: { type: number, minimum: 0, description: "Threshold in noise standard deviations (unitless)." }
+      frame_rate: { type: number, minimum: 0, default: 0, description: "Frame rate in Hz. 0 means read it from the time column." }
+      time_column: { type: string, default: "", description: "Name of the time column, in seconds." }
+      rois: { type: string, default: all, description: "Comma list of trace names to keep, or all." }
+      min_duration_s: { type: number, minimum: 0, default: 0, description: "For threshold. Shortest time above the threshold, in seconds." }
+      decay_tau_s: { type: number, minimum: 0, default: 0, description: "For OASIS. Decay time constant of the indicator, in seconds." }
+      truth_times: { type: [string, array], items: { type: number }, default: "", description: "Optional reference spike times in seconds, as a list or a CSV file path, for one trace." }
+      truth_tolerance_s: { type: number, minimum: 0, default: 0.5, description: "A detected event matches a reference spike within this many seconds." }
+    required: [traces, method, threshold_sd]
+    citations:
+      - text: "Friedrich, J., Zhou, P., & Paninski, L. (2017). Fast online deconvolution of calcium imaging data. PLOS Computational Biology, 13(3), e1005423."
+        doi: 10.1371/journal.pcbi.1005423
+        when: { method: oasis }
+
+  - name: find_responsive_cells
+    title: Find cells that respond to a stimulus
+    description: >-
+      Find the cells that respond to a stimulus. For each cell it takes the mean dF/F in a window after each onset and subtracts the mean before the onset. It divides by the noise SD of the pre-stimulus window. It reports the z score of each cell and the fraction of cells above your criterion. It writes a heatmap of the response.
+    batch: false
+    function: "calcium_tools:find_responsive_cells"
+    params:
+      traces: { type: string, minLength: 1, description: "Path of a dF/F CSV file from compute_dff." }
+      stimulus_onsets_s: { type: [string, array], items: { type: number }, description: "Stimulus onset times in seconds, as a list, as text like 10, 40, 70, or as a CSV file path with a column onset_s." }
+      response_window_s: { type: number, minimum: 0, description: "Length of the response window after the onset, in seconds." }
+      pre_window_s: { type: number, minimum: 0, description: "Length of the window before the onset, in seconds." }
+      z_criterion: { type: number, minimum: 0, description: "A cell responds if its z score is above this value (unitless)." }
+      frame_rate: { type: number, minimum: 0, default: 0, description: "Frame rate in Hz. 0 means read it from the time column." }
+      time_column: { type: string, default: "", description: "Name of the time column, in seconds." }
+      rois: { type: string, default: all, description: "Comma list of trace names to keep, or all." }
+      response_delay_s: { type: number, minimum: 0, default: 0, description: "Delay between the onset and the start of the response window, in seconds." }
+      direction: { type: string, enum: [increase, decrease, either], default: increase, description: "Count cells that go up, go down, or both." }
+      min_trial_fraction: { type: number, minimum: 0, maximum: 1, default: 0, description: "Smallest fraction of trials over the criterion (unitless). 0 means not used." }
+    required: [traces, stimulus_onsets_s, response_window_s, pre_window_s, z_criterion]
+
+  - name: correlate_cells
+    title: Pairwise correlation of cells
+    description: >-
+      Compute the Pearson correlation of every pair of cells from their dF/F traces. It reports the mean and median pairwise correlation, the mean correlation of each cell with the others, and a heatmap of the matrix. Cells that share a stimulus or a drift correlate even without a connection, so the number describes shared activity and not a circuit.
+    read_only: true
+    batch: false
+    function: "calcium_tools:correlate_cells"
+    params:
+      traces: { type: string, minLength: 1, description: "Path of a dF/F CSV file from compute_dff." }
+      frame_rate: { type: number, minimum: 0, default: 0, description: "Frame rate in Hz. 0 means read it from the time column." }
+      time_column: { type: string, default: "", description: "Name of the time column, in seconds." }
+      rois: { type: string, default: all, description: "Comma list of trace names to keep, or all." }
+      bin_s: { type: number, minimum: 0, default: 0, description: "Bin width in seconds before the correlation. 0 means no binning." }
+    required: [traces]
+
+  - name: compare_groups
+    title: Compare groups of cells that sit in animals
+    description: >-
+      Compare a cell-level value, such as the event rate, between groups when the cells come from animals or fields. The test uses the mean of each animal, because cells in one animal are not independent. It also shows the invalid cell-level p value, the intraclass correlation and the design effect. For a mixed model that keeps every cell, use the lme4 adapter.
+    read_only: true
+    batch: false
+    function: "calcium_tools:compare_groups"
+    params:
+      table: { type: string, minLength: 1, description: "Path of a CSV file with one row for each cell." }
+      group_column: { type: string, minLength: 1, description: "Column with the group, such as control or treated." }
+      animal_column: { type: string, minLength: 1, description: "Column with the animal, slice or culture of each cell." }
+      value_column: { type: string, minLength: 1, description: "Column with the number to compare, such as the event rate in Hz." }
+      field_column: { type: string, default: "", description: "Optional column with the field of view. The tool averages the cells of a field first, then the fields of an animal." }
+      test: { type: string, enum: [welch, rank], default: welch, description: "Welch t test or rank test (Mann-Whitney, or Kruskal-Wallis for more than 2 groups)." }
+    required: [table, group_column, animal_column, value_column]
+    citations:
+      - text: "Welch, B. L. (1947). The generalization of 'Student's' problem when several different population variances are involved. Biometrika, 34(1-2), 28-35."
+        doi: 10.1093/biomet/34.1-2.28
+        when: { test: welch }
+      - text: "Mann, H. B., & Whitney, D. R. (1947). On a test of whether one of two random variables is stochastically larger than the other. The Annals of Mathematical Statistics, 18(1), 50-60."
+        doi: 10.1214/aoms/1177730491
+        when: { test: rank }
+      - text: "Lazic, S. E. (2010). The problem of pseudoreplication in neuroscientific studies: is it affecting your analysis? BMC Neuroscience, 11, 5."
+        doi: 10.1186/1471-2202-11-5
+
+map:
+  - tool: inspect_recording
+    route: "ImageJ or Fiji: Image > Properties... for the frame interval; ROI Manager > More > Multi Measure to list the mean of each ROI in each frame; check the table for zero or negative values"
+    steps:
+      - "Inscopix Data Processing, NIS-Elements, ZEN, MetaFluor: export the mean intensity of each ROI over time to a CSV or Excel table"
+    params:
+      - { arg: path, label: Exported table or image stack }
+    fidelity: close
+    difference: "The tool reads the table and adds checks. The routes in the other programs were not run."
+    evidence: { source: docs, test: inspect_synthetic }
+    summary: "{n_rois} trace(s), {n_frames} frames, {frame_rate_hz} Hz"
+
+  - tool: extract_traces
+    route: "ImageJ or Fiji: draw each cell with the oval or polygon tool and add it to the ROI Manager (Analyze > Tools > ROI Manager); in the ROI Manager choose More > Multi Measure with Measure all slices and One row per slice; Analyze > Set Measurements > Mean gray value"
+    steps:
+      - "For the neuropil, draw a ring around each cell (Edit > Selection > Enlarge, then Make Band) and measure it the same way"
+      - "NIS-Elements: draw ROIs, then the Time Measurement view; ZEN: draw regions, then the mean ROI intensity over time; MetaFluor: define regions and log the data; export each table"
+    params:
+      - { arg: roi_file, label: ROI Manager list }
+      - { arg: neuropil_inner_px, label: Band, note: "Edit > Selection > Make Band gives a band at one distance. The tool uses a gap and an outer edge." }
+    fidelity: close
+    difference: "ImageJ Multi Measure averages the pixels of the ROI mask in each frame, as the tool does. The ring is a distance band in the tool and a band of fixed width in ImageJ. The route was not run in the other programs."
+    evidence: { source: docs, test: demo_light_pipeline }
+    summary: "{n_rois} ROI(s), {n_frames} frames, {frame_rate_hz} Hz"
+
+  - tool: run_suite2p
+    route: "Suite2p GUI or script: File > Run suite2p, set the sampling rate (fs), the cell timescale (tau), the diameter and the motion correction, then Run; or run_s2p in Python"
+    steps:
+      - "Inscopix Data Processing: the Motion Correction and the cell identification steps (PCA-ICA or CNMF-E) are the matching steps"
+      - "CaImAn: the CNMF pipeline is a heavier alternative that this adapter does not run"
+    params:
+      - { arg: frame_rate, label: Sampling rate (fs) }
+      - { arg: tau_s, label: Ca timescale (tau), ui_default: 1 }
+      - { arg: diameter_px, label: Cell diameter }
+      - { arg: registration, label: Motion correction }
+      - { arg: iscell_threshold, label: Probability threshold of the cell classifier, ui_default: 0.5 }
+    fidelity: exact
+    evidence: { source: code, test: suite2p_demo, note: "The tool calls run_s2p with the settings above. The test counts the ROIs of a direct Suite2p run in checks/check_suite2p.out." }
+    summary: "{n_rois_kept} of {n_rois_detected} ROIs kept, {n_frames} frames"
+
+  - tool: compute_dff
+    route: "ImageJ or Fiji: export the ROI means with Multi Measure; in a spreadsheet, subtract the neuropil column times the coefficient, find F0 (a percentile of a sliding window, the mean of the first rows, or one number), and compute (F - F0) / F0"
+    steps:
+      - "Inscopix Data Processing: the dF/F step; NIS-Elements and ZEN: a formula column on the exported table; MetaFluor: the F/F0 normalization of the log"
+    params:
+      - { arg: baseline_method, label: F0 definition }
+      - { arg: baseline_window_s, label: Window, ui_default: 60 }
+      - { arg: baseline_percentile, label: Percentile, ui_default: 8 }
+      - { arg: neuropil_coefficient, label: Neuropil coefficient, ui_default: 0.7 }
+    fidelity: close
+    difference: "The percentile uses the nearest-rank rule of SciPy percentile_filter and a centered window, with the first and last values repeated at the ends. The programs differ in the baseline definition. The spreadsheet route gives the same numbers if it uses the same F0."
+    evidence: { source: docs, test: demo_light_pipeline }
+    summary: "{n_rois} trace(s), median dF/F {median_dff}"
+
+  - tool: detect_events
+    route: "In a spreadsheet or ImageJ: compute the noise SD of each dF/F trace, mark each rise above the median plus k times the SD, and list the time, the peak height, the area and the times at 10 and 90 percent of the peak and at half-decay"
+    steps:
+      - "OASIS: run deconvolveCa (MATLAB) or oasis.functions.deconvolve (Python) on each trace with the decay time constant"
+      - "Inscopix Data Processing: the Event Detection tool"
+    params:
+      - { arg: threshold_sd, label: Threshold in noise SDs }
+      - { arg: decay_tau_s, label: Decay time constant }
+      - { arg: min_duration_s, label: Shortest event }
+    fidelity: close
+    difference: "The noise SD is the median absolute deviation times 1.4826. An event ends when dF/F falls below half of the threshold. Events that overlap in time merge. The OASIS penalty is set so that the residual matches the noise SD of the frame differences. Programs differ in these rules. The routes in the programs were not run."
+    evidence: { source: code, test: allen_oasis, note: "The OASIS result agrees with the reference oasis package at the same penalty to 1e-15 (checks/check_calcium.out)." }
+    summary: "{n_events} event(s), mean rate {mean_event_rate_hz} Hz"
+
+  - tool: find_responsive_cells
+    route: "In a spreadsheet: for each cell and each onset, average dF/F in the response window and in the pre-stimulus window; subtract; divide the mean over trials by the SD of the pre-stimulus values; mark the cells above the criterion"
+    steps:
+      - "Inscopix Data Processing and NIS-Elements: the population-activity and stimulus-aligned views; read the window means from the exported table"
+    params:
+      - { arg: z_criterion, label: z score criterion }
+      - { arg: response_window_s, label: Response window }
+      - { arg: pre_window_s, label: Baseline window }
+    fidelity: close
+    difference: "The noise SD is the SD of dF/F around the mean of each pre-stimulus window, pooled over trials. Other programs use other noise estimates. The route was not run in a program."
+    evidence: { source: code, test: responsive_synthetic }
+    summary: "{n_responsive} of {n_rois} cells respond"
+
+  - tool: correlate_cells
+    route: "In a spreadsheet or GraphPad Prism: Correlation matrix of the dF/F columns (Pearson r); take the mean of the values above the diagonal"
+    params:
+      - { arg: bin_s, label: Bin width }
+    fidelity: exact
+    evidence: { source: code, test: demo_light_pipeline, note: "numpy.corrcoef in checks/check_calcium.py gives the same mean and median." }
+    summary: "{n_pairs} pairs, mean r {mean_pairwise_r}"
+
+  - tool: compare_groups
+    route: "GraphPad Prism or SPSS: average the cells of each animal in a sheet, then run an unpaired t test with Welch correction (or Mann-Whitney) on the animal means"
+    steps:
+      - "R: t.test(value ~ group, data = animal_means)"
+      - "Mixed model with every cell: lmer(value ~ group + (1 | animal)) in the lme4 adapter"
+    params:
+      - { arg: test, label: Test }
+    fidelity: exact
+    evidence: { source: code, test: groups_synthetic, note: "R t.test on the animal means gives the same t and p (checks/check_groups.out)." }
+    summary: "{test}: p {p_animal_level}"
+
+checks:
+  - id: pseudoreplication
+    description: A p value uses cells as independent samples.
+    severity: error
+    text: The report must not give a p value or a confidence interval that treats cells in one animal, slice or field as independent samples. A test must use the animal means, or a mixed model with the animal as a random effect.
+  - id: parameters_reported
+    description: The report does not give the settings that change the result.
+    severity: warning
+    text: The report must give the frame rate, the baseline method with its window and percentile, the neuropil coefficient, the event method and threshold, the indicator and its decay time constant, and for responsive cells the windows and the z criterion.
+  - id: responsive_without_criterion
+    description: A fraction of responsive cells is given without its criterion.
+    severity: warning
+    text: The report must state the z criterion and the two windows next to each fraction of responsive cells. The fraction changes with the criterion.
+  - id: events_not_spikes
+    description: Calcium events are called spikes.
+    severity: warning
+    text: The report must not call a threshold event an action potential. A calcium transient can hold several spikes. An OASIS spike is an inferred value, and its size is not a spike count unless a recording with known spikes shows it.
+  - id: dff_twice
+    description: dF/F is computed on traces that are dF/F already.
+    severity: error
+    text: The report must not use dF/F that was computed on traces that already were dF/F. The inspect_recording warning about negative values and a median near zero shows this.
+
+tests:
+  - id: inspect_synthetic
+    description: >
+      Designed traces: 2 cells, 1000 frames at 10 Hz, 100 s. The values come from the design in data/make_synthetic.py.
+    data: [data/synthetic_transients.csv]
+    calls:
+      - { tool: inspect_recording, args: { path: "{adapter_dir}/data/synthetic_transients.csv" } }
+    expect:
+      - { path: metrics.n_rois, equals: 2 }
+      - { path: metrics.n_frames, equals: 1000 }
+      - { path: metrics.frame_rate_hz, approx: 10, abs: 0.000001 }
+      - { path: metrics.duration_s, approx: 100, abs: 0.0001 }
+
+  - id: dff_fixed_f0
+    description: >
+      Fixed F0 of 100 on the designed traces. F is 100 with noise and five transients of relative height 0.5 each. The mean F0
+      is the fixed value, and the largest dF/F is near the designed height.
+    data: [data/synthetic_transients.csv]
+    calls:
+      - { tool: compute_dff, args: { traces: "{adapter_dir}/data/synthetic_transients.csv", baseline_method: fixed, fixed_f0: 100 } }
+    expect:
+      - { path: metrics.mean_f0, approx: 100, abs: 0.000001 }
+      - { path: metrics.max_dff, min: 0.45, max: 0.6 }
+
+  - id: dff_first_frames
+    description: >
+      Baseline from the first 5 s of the designed traces. They hold no transient and F is 100 with noise, so the mean F0 is 100
+      within the noise of 50 samples (SD 1 each, standard error 0.14).
+    data: [data/synthetic_transients.csv]
+    calls:
+      - { tool: compute_dff, args: { traces: "{adapter_dir}/data/synthetic_transients.csv", baseline_method: first_frames, baseline_first_s: 5 } }
+    expect:
+      - { path: metrics.mean_f0, approx: 100, abs: 0.6 }
+
+  - id: neuropil_design
+    description: >
+      Designed cell trace: cell F is 120 and the neuropil trace is 40 at rest, plus five transients of height 46 on the corrected
+      trace. With a coefficient of 0.7 the corrected resting F is 120 - 0.7 * 40 = 92. The 8th percentile of the noisy trace is
+      about 0.7 lower. Without the correction F0 is near 120.
+    data: [data/synthetic_neuropil_F.csv, data/synthetic_neuropil_Fneu.csv]
+    calls:
+      - { tool: compute_dff, args: { traces: "{adapter_dir}/data/synthetic_neuropil_F.csv", neuropil: "{adapter_dir}/data/synthetic_neuropil_Fneu.csv", neuropil_coefficient: 0.7, baseline_method: percentile, baseline_window_s: 60, baseline_percentile: 8 }, save_as: corrected }
+      - { tool: compute_dff, args: { traces: "{adapter_dir}/data/synthetic_neuropil_F.csv", baseline_method: percentile, baseline_window_s: 60, baseline_percentile: 8 } }
+    expect:
+      - { path: saved.corrected.metrics.mean_f0, approx: 92, abs: 1.0 }
+      - { path: metrics.mean_f0, approx: 120, abs: 1.0 }
+
+  - id: events_synthetic_threshold
+    description: >
+      Designed traces, fixed F0. Five transients in each of 2 cells, at 10, 30, 50, 70 and 90 s, with relative height 0.5, a rise
+      in one sample (10 to 90 percent rise time 0.8 samples = 0.08 s) and an exponential decay with a time constant of 1 s
+      (half-decay 0.693 s). Known answer from the design: 10 events, rate 5 per 100 s = 0.05 Hz.
+    data: [data/synthetic_transients.csv]
+    calls:
+      - { tool: compute_dff, args: { traces: "{adapter_dir}/data/synthetic_transients.csv", baseline_method: fixed, fixed_f0: 100 }, save_as: d }
+      - { tool: detect_events, args: { traces: "{saved.d.outputs[0].path}", method: threshold, threshold_sd: 5 } }
+    expect:
+      - { path: metrics.n_events, equals: 10 }
+      - { path: metrics.mean_event_rate_hz, approx: 0.05, abs: 0.000001 }
+      - { path: metrics.mean_amplitude, approx: 0.5, abs: 0.05 }
+      - { path: metrics.mean_area, approx: 0.5, abs: 0.05 }
+      - { path: metrics.mean_rise_10_90_s, approx: 0.08, abs: 0.01 }
+      - { path: metrics.mean_decay_half_s, approx: 0.69, abs: 0.1 }
+
+  - id: events_synthetic_oasis
+    description: Same designed traces with OASIS and a decay time constant of 1 s. The design has 10 spikes in all, 5 in each cell.
+    data: [data/synthetic_transients.csv]
+    calls:
+      - { tool: compute_dff, args: { traces: "{adapter_dir}/data/synthetic_transients.csv", baseline_method: fixed, fixed_f0: 100 }, save_as: d }
+      - { tool: detect_events, args: { traces: "{saved.d.outputs[0].path}", method: oasis, threshold_sd: 5, decay_tau_s: 1 } }
+    expect:
+      - { path: metrics.n_events, equals: 10 }
+      - { path: metrics.mean_event_rate_hz, approx: 0.05, abs: 0.000001 }
+
+  - id: responsive_synthetic
+    description: >
+      Designed traces: 6 cells with noise SD 0.02 (relative units). Cells 1 to 3 rise by 0.3 in the 2 s after each of 5 onsets.
+      Known answer from the design: 3 of 6 cells respond. The z score of a responding cell is near 0.3 / 0.02 = 15.
+    data: [data/synthetic_stimulus.csv]
+    calls:
+      - tool: find_responsive_cells
+        args: { traces: "{adapter_dir}/data/synthetic_stimulus.csv", stimulus_onsets_s: "10, 30, 50, 70, 90", response_window_s: 2, pre_window_s: 3, z_criterion: 3 }
+    expect:
+      - { path: metrics.n_responsive, equals: 3 }
+      - { path: metrics.fraction_responsive, approx: 0.5, abs: 0.000001 }
+      - { path: metrics.n_trials_used, equals: 5 }
+      - { path: "table.rows[0][1]", approx: 15, abs: 2.5 }
+
+  - id: correlation_design
+    description: >
+      Designed traces: B = 2 A + 5 and C = -A. The pairs (A,B), (A,C) and (B,C) have r = 1, -1 and -1, so the mean is -1/3 and
+      the median is -1.
+    data: [data/synthetic_correlation.csv]
+    calls:
+      - { tool: correlate_cells, args: { traces: "{adapter_dir}/data/synthetic_correlation.csv" } }
+    expect:
+      - { path: metrics.n_pairs, equals: 3 }
+      - { path: metrics.mean_pairwise_r, approx: -0.3333333, abs: 0.000001 }
+      - { path: metrics.median_pairwise_r, approx: -1, abs: 0.000001 }
+      - { path: metrics.max_pairwise_r, approx: 1, abs: 0.000001 }
+
+  - id: groups_synthetic
+    description: >
+      Designed table: 2 groups of 3 animals with 10 cells each. The animal means are 1, 2, 3 and 4, 5, 6. R t.test (Welch) on the
+      animal means gives t = -3.674235, df = 4, p = 0.02131164 (checks/check_groups.R, output checks/check_groups.out).
+    data: [data/synthetic_groups.csv]
+    calls:
+      - { tool: compare_groups, args: { table: "{adapter_dir}/data/synthetic_groups.csv", group_column: group, animal_column: animal, value_column: event_rate_hz } }
+    expect:
+      - { path: metrics.statistic, approx: -3.674235, abs: 0.000001 }
+      - { path: metrics.p_animal_level, approx: 0.02131164, abs: 0.00000001 }
+      - { path: metrics.n_animals, equals: 6 }
+      - { path: metrics.n_cells, equals: 60 }
+      - { path: metrics.p_cell_level_not_valid, max: 0.000001 }
+
+  - id: allen_threshold
+    description: >
+      Allen Institute neuron 101084 (GCaMP6s, mouse V1, dF/F with neuropil subtracted) with cell-attached spikes from the Cascade
+      ground truth database. The file holds 266 spikes in 20000 frames of 169.3197 s. The threshold method (3 noise SDs) gives
+      69 events, 68 of them within 0.5 s of a reference spike. The independent count in checks/check_calcium.py (plain
+      loops, output checks/check_calcium.out) agrees.
+    data: [data/cascade/allen_101084_dff.csv, data/cascade/allen_101084_spikes.csv]
+    fetch: data/fetch.sh
+    calls:
+      - tool: detect_events
+        args: { traces: "{adapter_dir}/data/cascade/allen_101084_dff.csv", method: threshold, threshold_sd: 3, truth_times: "{adapter_dir}/data/cascade/allen_101084_spikes.csv", truth_tolerance_s: 0.5 }
+    expect:
+      - { path: metrics.n_truth, equals: 266 }
+      - { path: metrics.duration_s, approx: 169.3197, abs: 0.001 }
+      - { path: metrics.n_events, equals: 69 }
+      - { path: metrics.n_matched, equals: 68 }
+      - { path: metrics.sensitivity, approx: 0.255639, abs: 0.00001 }
+      - { path: metrics.precision, approx: 0.985507, abs: 0.00001 }
+
+  - id: allen_oasis
+    description: >
+      The same neuron with OASIS, a decay time constant of 0.5 s and a spike size of 3 noise SDs. The reference oasis package
+      (j-friedrich/OASIS, oasisAR1) with the same penalty search gives 14 spikes, all within 0.5 s of a reference spike. The
+      tool deconvolution equals the package result to 1e-15 at the same penalty (checks/check_calcium.out).
+    data: [data/cascade/allen_101084_dff.csv, data/cascade/allen_101084_spikes.csv]
+    fetch: data/fetch.sh
+    calls:
+      - tool: detect_events
+        args: { traces: "{adapter_dir}/data/cascade/allen_101084_dff.csv", method: oasis, threshold_sd: 3, decay_tau_s: 0.5, truth_times: "{adapter_dir}/data/cascade/allen_101084_spikes.csv", truth_tolerance_s: 0.5 }
+    expect:
+      - { path: metrics.n_events, equals: 14 }
+      - { path: metrics.n_matched, equals: 14 }
+
+  - id: demo_light_pipeline
+    description: >
+      CaImAn demo movie (2000 frames of 60 by 80 pixels, 10 Hz) with 12 circular ROIs of radius 4 pixels (data/demo_rois.csv) and
+      a neuropil ring from 5 to 12 pixels. The tools extract the traces, compute dF/F with a coefficient of 0.7 and a 30 s window at the
+      8th percentile, detect events at 3 SDs with a shortest event of 0.3 s, and correlate the cells. The independent
+      values come from plain loops in checks/check_calcium.py (output checks/check_calcium.out).
+    data: [data/demo/demoMovie.tif, data/demo_rois.csv]
+    fetch: data/fetch.sh
+    calls:
+      - { tool: extract_traces, args: { stack: "{adapter_dir}/data/demo/demoMovie.tif", roi_file: "{adapter_dir}/data/demo_rois.csv", frame_rate: 10, neuropil_inner_px: 5, neuropil_outer_px: 12 }, save_as: ex }
+      - { tool: compute_dff, args: { traces: "{saved.ex.outputs[0].path}", neuropil: "{saved.ex.outputs[1].path}", neuropil_coefficient: 0.7, baseline_method: percentile, baseline_window_s: 30, baseline_percentile: 8 }, save_as: d }
+      - { tool: detect_events, args: { traces: "{saved.d.outputs[0].path}", method: threshold, threshold_sd: 3, min_duration_s: 0.3 }, save_as: ev }
+      - { tool: correlate_cells, args: { traces: "{saved.d.outputs[0].path}" } }
+    expect:
+      - { path: saved.ex.metrics.n_rois, equals: 12 }
+      - { path: saved.d.metrics.mean_f0, approx: 409.3107, rel: 0.00001 }
+      - { path: saved.d.metrics.median_dff, approx: 0.302473, abs: 0.000001 }
+      - { path: saved.d.metrics.max_dff, approx: 7.631559, abs: 0.0001 }
+      - { path: saved.ev.metrics.n_events, equals: 62 }
+      - { path: saved.ev.metrics.mean_event_rate_hz, approx: 0.025833, abs: 0.000001 }
+      - { path: metrics.n_pairs, equals: 66 }
+      - { path: metrics.mean_pairwise_r, approx: 0.099372, abs: 0.000001 }
+      - { path: metrics.median_pairwise_r, approx: 0.077072, abs: 0.000001 }
+
+  - id: demo_stack_info
+    description: The CaImAn demo movie file holds 2000 frames of 60 by 80 pixels (the TIFF header).
+    data: [data/demo/demoMovie.tif]
+    fetch: data/fetch.sh
+    calls:
+      - { tool: inspect_recording, args: { path: "{adapter_dir}/data/demo/demoMovie.tif" } }
+    expect:
+      - { path: metrics.frames, equals: 2000 }
+      - { path: metrics.height, equals: 60 }
+      - { path: metrics.width, equals: 80 }
+
+  - id: suite2p_demo
+    description: >
+      Suite2p 1.1.0 on the CaImAn demo movie (10 Hz, tau 1 s, diameter 8 pixels, rigid motion correction) finds 132 ROIs, and 30
+      have a cell probability of 0.5 or more. A direct run_s2p call gives the same shapes (checks/check_suite2p.py, output
+      checks/check_suite2p.out). The test is skipped if Suite2p is not installed.
+    data: [data/demo/suite2p_ok]
+    fetch: data/fetch_suite2p.sh
+    calls:
+      - { tool: run_suite2p, args: { stack: "{adapter_dir}/data/demo/demoMovie.tif", frame_rate: 10, tau_s: 1, diameter_px: 8, registration: rigid } }
+    expect:
+      - { path: metrics.n_rois_detected, equals: 132 }
+      - { path: metrics.n_rois_kept, equals: 30 }
+      - { path: metrics.n_frames, equals: 2000 }
+
+  - id: missing_traces
+    description: A traces file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: inspect_recording, args: { path: "{adapter_dir}/data/no_such_traces.csv" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "not found" }
+      - { path: error, contains: "no_such_traces.csv" }
+
+  - id: fixed_without_f0
+    description: The fixed baseline without a value fails and names the argument.
+    data: [data/synthetic_transients.csv]
+    calls:
+      - { tool: compute_dff, args: { traces: "{adapter_dir}/data/synthetic_transients.csv", baseline_method: fixed } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "fixed_f0" }
+
+  - id: oasis_without_tau
+    description: OASIS without a decay time constant fails and names the argument.
+    data: [data/synthetic_correlation.csv]
+    calls:
+      - { tool: detect_events, args: { traces: "{adapter_dir}/data/synthetic_correlation.csv", method: oasis, threshold_sd: 3 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "decay_tau_s" }
+
+  - id: animal_in_two_groups
+    description: An animal that appears in two groups fails, and the error names the animal.
+    data: [data/synthetic_groups.csv]
+    calls:
+      - { tool: compare_groups, args: { table: "{adapter_dir}/data/synthetic_groups.csv", group_column: group, animal_column: field, value_column: event_rate_hz } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "more than one group" }
+
+  - id: suite2p_missing
+    description: A Suite2p interpreter that does not exist fails with a message that says Suite2p is not installed, and it installs nothing.
+    data: [data/synthetic_transients.csv]
+    calls:
+      - { tool: run_suite2p, args: { stack: "{adapter_dir}/data/synthetic_transients.csv", frame_rate: 10, tau_s: 1, diameter_px: 8, suite2p_python: "/nonexistent/python" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Suite2p is not installed" }

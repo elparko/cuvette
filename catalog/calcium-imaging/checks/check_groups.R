@@ -1,0 +1,8 @@
+args <- commandArgs(trailingOnly = TRUE)
+d <- read.csv(file.path(args[1], "data", "synthetic_groups.csv"))
+m <- aggregate(event_rate_hz ~ group + animal, d, mean)
+print(m)
+t <- t.test(event_rate_hz ~ group, data = m)
+cat("Welch t on animal means: t =", t$statistic, " df =", t$parameter, " p =", t$p.value, "\n")
+cells <- t.test(event_rate_hz ~ group, data = d)
+cat("Welch t on cells (not valid): p =", cells$p.value, "\n")

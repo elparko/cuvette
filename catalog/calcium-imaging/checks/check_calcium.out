@@ -1,0 +1,10 @@
+== Allen Institute cell-attached ground truth, neuron 101084 (Cascade database)
+frames 20000 frame_rate_hz 118.119732 duration_s 169.3197 n_truth 266
+threshold k=3: n_events 69 n_matched 68 sensitivity 0.255639 precision 0.985507
+oasis tau=0.5 s, reference package oasisAR1: noise_sd 0.082983 lambda 1.553503 n_events 14 n_matched 14
+max |c_tool - c_reference| at the same lambda: 4.440892098500626e-16  max |s diff|: 6.661338147750939e-16
+== CaImAn demo movie, 12 circular ROIs of data/demo_rois.csv
+F mean over frames and ROIs 1567.005 Fneu mean 1447.4282
+percentile baseline 30 s, 8th percentile (nearest rank), coefficient 0.7: mean_f0 409.3107 median_dff 0.302473 max_dff 7.631559
+threshold k=3 min 0.3 s: n_events 62 mean rate hz 0.025833
+pairwise r: n_pairs 66 mean 0.099372 median 0.077072

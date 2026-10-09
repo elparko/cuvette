@@ -65,15 +65,16 @@ of each package. The sources are at the end.
 | --- | --- | --- | --- | --- | --- |
 | Imaris | Oxford Instruments (Bitplane), commercial | 3D and 4D rendering, surfaces, spot tracking. | napari (BSD-3); Fiji (GPL-3); Icy (GPL-3) | `imagej`, `scikit-image`, `cellpose` | Partial. 2D segmentation and counts are covered. 3D surfaces and tracking are open. |
 | Volocity | Quorum Technologies, commercial, no developer updates | 3D views, colocalization. | Fiji Coloc 2 (GPL-3); napari (BSD-3) | `image-assays`, `imagej` | Partial. Colocalization (Pearson, Manders, Costes thresholds and test, 2D or z-stack, with a mask) is covered by `image-assays`, which repeats the Coloc 2 calculations. 3D views are open. |
-| MetaMorph | Molecular Devices, commercial | Acquisition, ratio and calcium imaging. | Fiji (GPL-3); CellProfiler (BSD-3) | `imagej`, `cellprofiler` | Partial. Acquisition is not in scope. |
-| NIS-Elements | Nikon, commercial (the viewer is free, closed) | Acquisition and analysis, `.nd2` files. | Bio-Formats (GPL-2); nd2 (BSD-3); napari (BSD-3) | `bftools`, `imagej` | Covered for file reading and 2D analysis. |
-| ZEN | Carl Zeiss, commercial (ZEN lite is free, closed) | Acquisition and analysis, `.czi` files. | Bio-Formats (GPL-2); czifile (BSD-3) | `bftools`, `imagej` | Covered for file reading and 2D analysis. |
+| MetaMorph | Molecular Devices, commercial | Acquisition, ratio and calcium imaging. | Fiji (GPL-3); CellProfiler (BSD-3) | `imagej`, `cellprofiler`, `calcium-imaging` | Partial. Calcium traces from exported ROI tables are covered by `calcium-imaging`. Acquisition is not in scope. |
+| NIS-Elements | Nikon, commercial (the viewer is free, closed) | Acquisition and analysis, `.nd2` files. | Bio-Formats (GPL-2); nd2 (BSD-3); napari (BSD-3) | `bftools`, `imagej`, `calcium-imaging` | Covered for file reading and 2D analysis. Calcium traces from the Time Measurement export are covered by `calcium-imaging`. |
+| ZEN | Carl Zeiss, commercial (ZEN lite is free, closed) | Acquisition and analysis, `.czi` files. | Bio-Formats (GPL-2); czifile (BSD-3) | `bftools`, `imagej`, `calcium-imaging` | Covered for file reading and 2D analysis. Calcium traces from the exported ROI table are covered by `calcium-imaging`. |
 | LAS X | Leica, commercial | Confocal acquisition and analysis, `.lif` files. | Bio-Formats (GPL-2); readlif (GPL-3) | `bftools`, `imagej` | Covered for file reading and 2D analysis. |
 | Harmony and Columbus | Revvity, commercial. Columbus reached end of life on 2024-03-25. | High-content screening on Operetta and Opera Phenix. | CellProfiler (BSD-3); Cellpose (BSD-3); Fiji (GPL-3) | `cellprofiler`, `cellpose`, `image-assays` | Partial. Nuclei counts, positive-cell fractions, cargo per cell and phagocytic indices are covered by `image-assays` (count_cell_uptake) with `cellpose` labels as an option. Plate-level quality (Z' factor): in progress by another agent. |
 | HALO | Indica Labs, commercial | Digital pathology scoring: positive cells, H-score, Ki-67 index on whole slides. | QuPath (GPL-3); scikit-image (BSD-3); pandas (BSD-3) | `qupath`, `ihc-scoring` | Partial. `ihc-scoring` gives the H-score, the Allred score, the Ki-67 index with a hot spot, and the agreement with a pathologist, from a QuPath cell table or from an image. `qupath` finds the cells. Tissue classifiers and multiplex modules are open. |
 | Visiopharm | Visiopharm, commercial | Image analysis apps for IHC scoring, Ki-67 hot spots and tissue classes. | QuPath (GPL-3); scikit-image (BSD-3) | `qupath`, `ihc-scoring` | Partial. Same as HALO. The Visiopharm hot spot rules are its own. The `ihc-scoring` hot spot is a square window that moves in half steps. |
 | Aperio ImageScope | Leica Biosystems, the viewer is free, closed. The analysis algorithms are licensed. | Nuclear, membrane and positive pixel count algorithms. | QuPath (GPL-3); scikit-image (BSD-3) | `qupath`, `ihc-scoring` | Partial. Same as HALO. The positive pixel count algorithm is open. |
 | inForm | Akoya Biosciences, commercial | Tissue and cell segmentation and scoring for multiplex and brightfield slides. | QuPath (GPL-3); scikit-image (BSD-3) | `qupath`, `ihc-scoring` | Partial. Brightfield DAB scoring is covered as for HALO. Multiplex unmixing and tissue learning are open. |
+| Inscopix Data Processing, MetaFluor | Inscopix (Bruker), closed, comes with the miniscope. MetaFluor: Molecular Devices, commercial. | Calcium imaging: dF/F, cell identification, event detection and population activity (Inscopix); ratio and single-wavelength calcium traces from ROIs (MetaFluor). | Suite2p (GPL-3); CaImAn (GPL-2); OASIS (GPL-3); Fiji (GPL-3) | `calcium-imaging` | Partial. `calcium-imaging` reads the exported traces or a small TIFF stack with ROIs. It gives dF/F, events, responsive cells, correlation and group tests. Suite2p runs on a two-photon stack if it is installed. Miniscope cell identification (CNMF-E) and CaImAn are open. Ratio imaging (340/380) is open. |
 
 ## Flow cytometry
 
@@ -283,6 +284,22 @@ One adapter from the work of 9 October 2026. It passes `cuvette adapter check ih
 
 `qupath` already counts positive cells and gives an H-score. `ihc-scoring` does not repeat that step. It reads the cell table of QuPath, or a pathologist table of percents. It adds the Allred score, the Ki-67 hot spot and the agreement statistics.
 
+## Calcium imaging
+
+Added on 9 October 2026. `cuvette adapter check calcium-imaging --run-tests` passes with no error. The `--drive` test did not run, because it needs a local model.
+
+| Part | Adapter | Tools | Known-answer tests | Benchmark paper |
+| --- | --- | --- | --- | --- |
+| Calcium traces and stacks | `calcium-imaging` (NumPy, SciPy, tifffile, roifile; Suite2p 1.1.0 is optional) | 8 | 19 | see the Results note below |
+
+Where each test value comes from:
+
+- `compute_dff`, `detect_events`, `find_responsive_cells`, `correlate_cells`: designed traces. The answer comes from the design (`data/make_synthetic.py`): the number of events, the event rate, the rise time, the half-decay time and the z score.
+- `compare_groups`: R `t.test` on the animal means of a designed table (`checks/check_groups.R`).
+- `detect_events` on the Allen Institute neuron 101084 (Cascade ground truth database): 266 reference spikes from the file. The event counts and the matches come from plain loops (`checks/check_calcium.py`). The OASIS result equals the reference `oasis` package at the same penalty to 1e-15.
+- `extract_traces`, `compute_dff`, `detect_events`, `correlate_cells` on the CaImAn demo movie: plain NumPy loops (`checks/check_calcium.py`).
+- `run_suite2p` on the same movie: a direct `run_s2p` call (`checks/check_suite2p.py`). The test skips if the computer has no Suite2p.
+
 ## Sources
 
 - [Q] Statistics program counts in PubMed Central, 2016 to 2021: https://quantifyinghealth.com/?p=7735
@@ -341,7 +358,7 @@ One adapter from the work of 9 October 2026. It passes `cuvette adapter check ih
 
 The vendor names of these programs come from general knowledge, not from a web check:
 
-- microscopy and gels: Imaris, MetaMorph, NIS-Elements, ZEN, LAS X, ImageQuant TL.
+- microscopy and gels: Imaris, MetaMorph, NIS-Elements, ZEN, LAS X, ImageQuant TL, Inscopix Data Processing, MetaFluor.
 - plate readers and pathways: SoftMax Pro, Gen5, MetaCore.
 - chromatography and mass spectrometry: Chromeleon, Empower, OpenLab, MassHunter, Xcalibur, Spectronaut,
   Proteome Discoverer, PEAKS.

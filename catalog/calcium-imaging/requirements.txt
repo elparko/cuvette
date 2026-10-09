@@ -1,0 +1,8 @@
+# Light level. Install: uv pip install --python ~/.cuvette/envs/calcium-imaging/bin/python -r requirements.txt
+numpy==2.5.3
+scipy==1.18.1
+matplotlib==3.11.2
+tifffile==2026.9.20
+roifile==2026.9.22
+# Full level (optional, large, own environment ~/.cuvette/envs/suite2p). The run_suite2p tool never installs it.
+# suite2p==1.1.0

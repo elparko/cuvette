@@ -1,0 +1,9 @@
+    group     animal event_rate_hz
+1 control control_m1             1
+2 control control_m2             2
+3 control control_m3             3
+4 treated treated_m1             4
+5 treated treated_m2             5
+6 treated treated_m3             6
+Welch t on animal means: t = -3.674235  df = 4  p = 0.02131164 
+Welch t on cells (not valid): p = 5.240998e-20 
