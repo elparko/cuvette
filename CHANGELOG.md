@@ -10,12 +10,27 @@ These items are being built and are not on main yet:
 - Citations for every program and method that a session uses: `/cite`, BibTeX, RIS, APA and Vancouver.
 - New analyses: ELISA standard curves, dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
 - A map of proprietary lab software and the open-source alternatives that Cuvette supports.
-- ASD-STE100 Simplified Technical English for all text that the agent writes, with a checker.
-- A package lock for each session, more reasons for "out of date", `/status`, and a before-and-after table.
 - A warning before likely patient identifiers go to a cloud model, and the session cost in the status line.
 - Rewind, branches and method templates.
 
 ## 9 October 2026
+
+### Security
+- Folder trust: settings, hooks and adapters in a data folder take effect only after you trust the folder. A card shows every setting, every command in full and every adapter that would replace a built-in one. Choose Trust, Trust once or Do not trust. If a trusted file changes, Cuvette asks again. `ga trust` and `/trust` manage the list.
+
+### Writing
+- The agent writes to you in ASD-STE100 Simplified Technical English: short sentences, active voice and plain words. A checker reports long or passive sentences in answers, adapter text and docs (`npm run lint:text`). The setting `text_style` turns the rules off.
+
+### Reproducibility
+- Each session records the exact package versions of each environment it uses, and saves `environment.lock.json`, `requirements.txt` and `renv.lock`.
+- A step is out of date when its decision, an input file, the adapter, the program or the packages change. `/status` lists each step and the reason, and `/rerun` runs the out-of-date steps again.
+- When a step runs again, a before-and-after table shows each number that changed.
+
+### Terminal
+- The screen no longer jumps to the top after each message. The input box stays on the bottom rows.
+- Footer hints: full, short or off, with Ctrl+T.
+- Option+Backspace and the other word keys work in every text field, also when the key bytes arrive in pieces. `CUVETTE_KEYLOG=<file>` records raw key bytes for a bug report.
+
 
 ### Security
 - Folder trust: the settings, hooks and adapters in `.ga/` or `.cuvette/` of a project folder take effect only after you trust the folder. A card shows what the folder contains. A changed file asks again. `ga trust`, `/trust`, `--trust-folder`, and a Folder trust row in `/config` and the app Settings page.
