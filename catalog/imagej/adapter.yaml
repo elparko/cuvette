@@ -35,9 +35,13 @@ locate:
   env: IMAGEJ_JAR
   paths:
     - /Applications/ImageJ.app/Contents/Java/ij.jar
+    - ~/Applications/ImageJ.app/Contents/Java/ij.jar
     - /Applications/Fiji.app/jars/ij-*.jar
     - ~/Applications/Fiji.app/jars/ij-*.jar
     - ~/Fiji.app/jars/ij-*.jar
+    - /Applications/Fiji/jars/ij-*.jar
+    - ~/Applications/Fiji/jars/ij-*.jar
+    - ~/Fiji/jars/ij-*.jar
     - ~/ImageJ/ij.jar
     - /opt/imagej/ij.jar
     - /opt/Fiji.app/jars/ij-*.jar

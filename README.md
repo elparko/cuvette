@@ -18,6 +18,43 @@ node bin/ga.js --help
 node bin/ga.js adapters
 ```
 
+### First start and check
+
+The first time that you start `ga` with no Claude API key and no local model, `ga` asks one
+question: "Use Claude (needs an API key)" or "Use a local model (Ollama, free, runs on this
+Mac)". It saves the choice, checks this Mac, and offers a 2-minute sample analysis. The sample
+is the Student (1908) sleep data in `samples/sleep/` (public domain).
+
+```bash
+node bin/ga.js doctor          # ok, missing or old for Node, the model, Python, R, Java and each program
+node bin/ga.js doctor --fix    # asks once, then installs the missing Python environments and R packages
+```
+
+For each item that is missing or old, `ga doctor` shows the install command or a download link.
+`--fix` runs only the uv and R commands. It does not run Homebrew or download programs.
+
+### Start without the terminal (macOS)
+
+Do these steps one time, in Terminal:
+
+1. Install Cuvette and link the command: `npm install`, then `npm link`.
+2. Add the Finder action: `ga install-finder-action`.
+3. Add the launcher app: `ga install-launcher`.
+
+Then you do not need the terminal:
+
+- In Finder, Control-click a folder (or a file), then choose Quick Actions > Analyze with Cuvette.
+  Cuvette starts in that folder. For a file, it uses the folder of the file.
+- Or double-click Cuvette in the Applications folder of your home folder. Choose the folder with
+  your data.
+
+Cuvette saves the results in that folder, in `cuvette/`. The two commands save the full path of
+Node and of `ga`. If you move the repository or change the Node version, run the two commands
+again. If the Quick Action is not in the menu, open System Settings > Keyboard > Keyboard
+Shortcuts > Services > Files and Folders, and turn on "Analyze with Cuvette".
+
+To remove them: `ga uninstall-finder-action` and `ga uninstall-launcher`.
+
 ### With no adapter
 
 ```bash

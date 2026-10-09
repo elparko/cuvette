@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { adapterDirs, gaHome, loadAdapter } from "./adapters/manifest.ts";
@@ -39,6 +40,16 @@ Usage
   project folder, an absolute path (a lab share, a results drive) is used as given. A project
   setting wins over a user setting. If the folder is read-only, the session folder goes to
   ~/.guided-analysis/projects/.
+
+  ga doctor [--fix]                    check Node, the model, the Python environments, R, Java and each adapter's program;
+                                       --fix installs the missing Python environments and R packages after it asks
+  ga install-finder-action             add "Analyze with Cuvette" to the Quick Actions of folders and files in Finder (macOS)
+  ga uninstall-finder-action           remove it
+  ga install-launcher                  add Cuvette.app to ~/Applications: double-click it, choose a folder (macOS)
+  ga uninstall-launcher                remove it
+
+  On the first start with no Claude API key and no local model, ga asks which model to use,
+  checks this Mac, and offers a 2-minute sample analysis.
 
   ga models                            list the models
   ga config                            show each setting, its value and where it comes from
@@ -109,6 +120,7 @@ const { values: o, positionals: pos } = parseArgs({
     "bypass-permissions": { type: "boolean" },
     plan: { type: "boolean" },
     "no-plan": { type: "boolean" },
+    fix: { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -168,16 +180,58 @@ async function chooseSession(always: boolean): Promise<string> {
   return pick.info.id;
 }
 
+async function firstStart(): Promise<{ cwd: string; message: string } | undefined> {
+  const fs = await import("./core/firststart.ts");
+  console.log("Welcome to Cuvette. First, choose the model that does the analysis.\n");
+  fs.CHOICES.forEach((c, i) => console.log(`  ${i + 1}  ${c.label}\n     ${c.help}\n`));
+  let pick = "";
+  while (pick !== "1" && pick !== "2") pick = (await ask("Type 1 or 2: ")).trim();
+  if (pick === "1") {
+    for (let i = 1; ; i++) {
+      const r = await fs.chooseClaude(await readSecret("Paste your Claude API key (it starts with sk-ant-): "));
+      console.log(r.text);
+      if (r.ok) break;
+      if (i === 3) fail("No key was saved. Run ga key when you have a key, or run ga again and choose the local model.");
+    }
+  } else {
+    const st = await fs.ollamaState();
+    let model = st.recommended ?? fs.RECOMMENDED_LOCAL;
+    if (st.models.length > 1) {
+      console.log("\nModels in Ollama on this Mac:");
+      st.models.forEach((m, i) => console.log(`  ${i + 1}  ${m}${m === model ? " (recommended)" : ""}`));
+      const a = (await ask(`Type a number, or press Enter for ${model}: `)).trim();
+      model = st.models[Number(a) - 1] ?? (a || model);
+    }
+    const r = await fs.chooseLocal(model);
+    console.log(r.text);
+    if (!r.ok) {
+      console.log("Then start Cuvette again.");
+      process.exit(0);
+    }
+  }
+  console.log("\nChecking this Mac for the programs that Cuvette uses (about 15 seconds)...");
+  const dr = await import("./core/doctor.ts");
+  const checks = await dr.runDoctor();
+  console.log(dr.doctorText(checks, { only: ["missing", "old"] }) + "\nThe full list: ga doctor\n");
+  const yes = (await ask("Try a 2-minute sample analysis? It uses a small public data set: extra sleep of 10 patients with two drugs (Student, 1908). [Y/n] ")).trim();
+  if (/^n/i.test(yes)) return undefined;
+  const s = fs.copySample();
+  console.log(`Copied the data to ${s.file}. The results go in that folder.\n`);
+  return { cwd: s.folder, message: s.request };
+}
+
 async function interactive(resumeId?: string) {
   const { Session } = await import("./core/session.ts");
   const { runTui } = await import("./tui/app.tsx");
   const adapters = (o.adapter as string[]) ?? [];
   if (o.resume !== undefined && !resumeId) resumeId = str(o.resume) || (await chooseSession(false));
-  if (!adapters.length && !resumeId) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
+  let sample: { cwd: string; message: string } | undefined;
+  if (!resumeId && !str(o.model) && process.stdin.isTTY && (await import("./core/firststart.ts")).needsFirstStart()) sample = await firstStart();
+  if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
   const s = resumeId
     ? await Session.resume(resumeId, { model: str(o.model), interactive: true, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See ga sessions.`))
-    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, settings: { ...bypass(), ...planSetting() } });
-  await runTui(s as never, {});
+    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, cwd: sample?.cwd, settings: { ...bypass(), ...planSetting() } });
+  await runTui(s as never, { firstMessage: sample?.message });
   await s.close();
 }
 
@@ -340,6 +394,53 @@ async function main() {
         return;
       }
       return fail("usage: ga config [get <name> | set <name> <value> [--user|--project]]");
+    }
+    case "doctor": {
+      const dr = await import("./core/doctor.ts");
+      const tty = process.stderr.isTTY;
+      const progress = (t: string) => tty && process.stderr.write(`\rChecking ${t}...`.padEnd(40));
+      let checks = await dr.runDoctor({ onProgress: progress });
+      if (tty) process.stderr.write("\r".padEnd(41) + "\r");
+      console.log(dr.doctorText(checks));
+      if (o.fix) {
+        const cmds = dr.safeFixes(checks);
+        if (!cmds.length) console.log("\nNothing to install: no Python environment or R package set is missing that --fix can install.");
+        else {
+          console.log(`\nThese commands install the missing parts:\n${cmds.map((c) => `  ${c}`).join("\n")}`);
+          if (!/^y(es)?$/i.test((await ask("Run them now? [y/N] ")).trim())) return console.log("Nothing was installed.");
+          const { spawnSync } = await import("node:child_process");
+          const PATH = [process.env.PATH, "/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".local/bin")].join(":");
+          for (const c of cmds) {
+            console.log(`\n$ ${c}`);
+            const r = spawnSync("/bin/sh", ["-c", c], { stdio: "inherit", env: { ...process.env, PATH } });
+            if (r.status !== 0) console.log(`This command stopped with exit code ${r.status}.`);
+          }
+          checks = await dr.runDoctor({ onProgress: progress });
+          if (tty) process.stderr.write("\r".padEnd(41) + "\r");
+          console.log(`\nAfter the install:\n${dr.doctorText(checks, { only: ["missing", "old"] })}`);
+        }
+      }
+      process.exitCode = dr.canStart(checks) ? 0 : 1;
+      return;
+    }
+    case "install-finder-action":
+    case "uninstall-finder-action":
+    case "install-launcher":
+    case "uninstall-launcher": {
+      if (process.platform !== "darwin") return fail("This command works only on macOS.");
+      const mac = await import("./core/macos.ts");
+      if (cmd === "install-finder-action") {
+        const p = mac.gaPaths();
+        const dir = mac.installFinderAction({ paths: p });
+        return console.log(`Installed the Quick Action "${mac.ACTION_NAME}" in ${dir}.\nIt runs ${p.node} ${p.ga}.\nIn Finder, Control-click a folder or a file, then choose Quick Actions > ${mac.ACTION_NAME}.\nIf it is not in the menu, open System Settings > Keyboard > Keyboard Shortcuts > Services > Files and Folders and turn it on.\nTo remove it: ga uninstall-finder-action`);
+      }
+      if (cmd === "uninstall-finder-action") return console.log(mac.uninstallFinderAction() ? `Removed ${mac.actionPath()}.` : "The Quick Action is not installed.");
+      if (cmd === "install-launcher") {
+        const p = mac.gaPaths();
+        const dir = mac.installLauncher({ paths: p });
+        return console.log(`Installed ${dir}.\nIt runs ${p.node} ${p.ga}.\nDouble-click Cuvette in Applications in your home folder (or find it with Spotlight). It asks for a folder, then starts Cuvette in that folder.\nTo remove it: ga uninstall-launcher`);
+      }
+      return console.log(mac.uninstallLauncher() ? `Removed ${mac.launcherPath()}.` : "The launcher is not installed.");
     }
     case "models": {
       const { listModels } = await import("./providers/index.ts");
