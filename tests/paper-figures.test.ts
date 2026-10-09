@@ -15,6 +15,7 @@ describe.skipIf(!existsSync(PY))("paper figures", () => {
     const r = spawnSync(
       PY,
       [
+        join(ROOT, "src/adapters/kinds/ga_figures.py"),
         join(ROOT, "bench/papers", id, "figure.py"),
         "--session", join(FIXTURES, id, "session"),
         "--run", join(FIXTURES, id, "run.json"),

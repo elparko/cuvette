@@ -1,0 +1,52 @@
+figure.facecolor: white
+figure.dpi: 100
+axes.facecolor: white
+savefig.facecolor: white
+savefig.edgecolor: white
+savefig.dpi: 300
+savefig.bbox: standard
+svg.fonttype: none
+svg.hashsalt: cuvette
+pdf.fonttype: 42
+
+font.family: sans-serif
+font.sans-serif: Helvetica, Arial, DejaVu Sans
+font.size: 8
+text.color: 14161c
+axes.labelsize: 8
+axes.labelcolor: 454b5a
+axes.titlesize: 9
+axes.titleweight: bold
+axes.titlecolor: 14161c
+axes.titlelocation: left
+axes.titlepad: 8
+axes.edgecolor: 2b2f3a
+axes.linewidth: 0.6
+axes.spines.top: False
+axes.spines.right: False
+axes.axisbelow: True
+axes.prop_cycle: cycler('color', ['1b6aa8', 'c2381f', '7a3b9c', '2b8a6e', 'd08a1e', '7a8091', '14161c', '5aa0cf'])
+
+axes.grid: True
+grid.color: e8eaf0
+grid.linewidth: 0.5
+
+xtick.color: 2b2f3a
+ytick.color: 2b2f3a
+xtick.labelcolor: 454b5a
+ytick.labelcolor: 454b5a
+xtick.labelsize: 7.5
+ytick.labelsize: 7.5
+xtick.major.size: 2.5
+ytick.major.size: 2.5
+xtick.major.width: 0.6
+ytick.major.width: 0.6
+
+lines.linewidth: 1.2
+lines.solid_capstyle: round
+patch.linewidth: 0.6
+patch.edgecolor: 2b2f3a
+
+legend.frameon: False
+legend.fontsize: 7.5
+legend.title_fontsize: 8

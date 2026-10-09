@@ -6,6 +6,28 @@ VECTOR = ("svg", "pdf", "eps")
 DPI = 300
 
 
+STYLE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cuvette.mplstyle")
+
+
+def style_path():
+    raw = os.environ.get("CUVETTE_FIGURE_STYLE", "").strip()
+    if raw.lower() in ("none", "off", "0"):
+        return None
+    return raw or STYLE_FILE
+
+
+def apply_style():
+    path = style_path()
+    if not path or not os.path.isfile(path):
+        return
+    try:
+        import matplotlib.style
+
+        matplotlib.style.use(path)
+    except Exception as e:
+        print("cuvette: figure style not applied: %s" % e, file=sys.stderr)
+
+
 def formats():
     raw = os.environ.get("CUVETTE_FIGURE_FORMATS", "png,svg")
     return [f for f in (x.strip().lower().lstrip(".") for x in raw.split(",")) if f in VECTOR]
@@ -15,6 +37,7 @@ def _patch(figure_module):
     Figure = figure_module.Figure
     if getattr(Figure.savefig, "_cuvette", False):
         return
+    apply_style()
     original = Figure.savefig
 
     def savefig(self, fname, *args, **kwargs):
@@ -67,3 +90,13 @@ def install():
         _patch(sys.modules["matplotlib.figure"])
     elif not any(isinstance(f, _Finder) for f in sys.meta_path):
         sys.meta_path.insert(0, _Finder())
+
+
+if __name__ == "__main__":
+    import runpy
+
+    apply_style()
+    script = sys.argv[1]
+    sys.argv = sys.argv[1:]
+    sys.path.insert(0, os.path.dirname(os.path.abspath(script)))
+    runpy.run_path(script, run_name="__main__")

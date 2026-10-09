@@ -12,17 +12,17 @@ import matplotlib.ticker
 import matplotlib.pyplot as plt
 import numpy as np
 
-BLUE = "#0072B2"
-ORANGE = "#E69F00"
-SKY = "#56B4E9"
-VERMILION = "#D55E00"
-GREEN = "#009E73"
-PURPLE = "#CC79A7"
-YELLOW = "#F0E442"
-GREY = "#6b6b6b"
-GREEN_BG = "#c8e6c9"
-RED_BG = "#f4c7c3"
-GREY_BG = "#e0e0e0"
+BLUE = "#1b6aa8"
+ORANGE = "#d08a1e"
+SKY = "#5aa0cf"
+VERMILION = "#c2381f"
+GREEN = "#2b8a6e"
+PURPLE = "#7a3b9c"
+YELLOW = "#e0b83a"
+GREY = "#7a8091"
+GREEN_BG = "#d6ebe3"
+RED_BG = "#f6d5d0"
+GREY_BG = "#e8eaf0"
 
 
 class NoOutput(Exception):
@@ -187,7 +187,7 @@ def draw_table(ax, rows):
     t.auto_set_font_size(False)
     t.set_fontsize(9)
     t.scale(1, 2.6 if len(rows) < 8 else (2.0 if len(rows) < 12 else 1.55))
-    ax.set_title("green = pass, red = fail, grey = not produced", fontsize=10, color="#444444")
+    ax.set_title("green = pass, red = fail, grey = not produced", fontsize=10, color="#454b5a")
 
 
 def no_output(ax, reason):
@@ -310,7 +310,7 @@ def draw(ax, session, run, log):
                 c = BLUE if row["term"] == "fin" else GREY
                 fa.plot([row["hr_ci_lo"], row["hr_ci_hi"]], [yy, yy], color=c, lw=2)
                 fa.plot(row["hazard_ratio"], yy, "s", color=c, ms=6)
-            fa.axvline(1, color="#444444", ls="--", lw=1)
+            fa.axvline(1, color="#454b5a", ls="--", lw=1)
             fa.set_xscale("log")
             fa.set_yticks(ys)
             fa.set_yticklabels(list(ct["term"]), fontsize=9)

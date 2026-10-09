@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-BLUE, ORANGE, VERM, GREEN, SKY, GREY, PURPLE, YELLOW = "#0072B2", "#E69F00", "#D55E00", "#009E73", "#56B4E9", "#8C8C8C", "#CC79A7", "#F0E442"
+BLUE, ORANGE, VERM, GREEN, SKY, GREY, PURPLE, YELLOW = "#1b6aa8", "#d08a1e", "#c2381f", "#2b8a6e", "#5aa0cf", "#7a8091", "#7a3b9c", "#e0b83a"
 PASS_BG, FAIL_BG, NONE_BG = GREEN, VERM, "#C8C8C8"
 
 
@@ -148,9 +148,9 @@ def draw_table(ax, ctx):
     fs = 9.5 if n <= 8 else 8.5 if n <= 12 else 7.5
     cols = [0.0, 0.46, 0.64, 0.82, 1.0]
     head_h = 0.06
-    ax.add_patch(plt.Rectangle((0, 1 - head_h), 1, head_h, color="#222222", lw=0))
+    ax.add_patch(plt.Rectangle((0, 1 - head_h), 1, head_h, color="#e8eaf0", lw=0))
     for i, t in enumerate(["Item", "Expected", "Computed", "Reported"]):
-        ax.text(cols[i] + 0.012, 1 - head_h / 2, t, va="center", ha="left", color="white", fontsize=fs + 0.5, fontweight="bold")
+        ax.text(cols[i] + 0.012, 1 - head_h / 2, t, va="center", ha="left", color="#14161c", fontsize=fs + 0.5, fontweight="bold")
     h = (1 - head_h - 0.07) / n
     wrap = 34 if fs >= 8.5 else 40
     for k, it in enumerate(rows):
@@ -163,7 +163,7 @@ def draw_table(ax, ctx):
         ax.text(cols[1] + 0.012, (y0 + y1) / 2, fmt(it["expected"]), va="center", ha="left", fontsize=fs)
         for j, key in ((2, "computed"), (3, "reported")):
             state, text = cell_state(it[key])
-            bg, fg, mark = (PASS_BG, "white", "pass") if state is True else (FAIL_BG, "white", "fail") if state is False else (NONE_BG, "#222222", "")
+            bg, fg, mark = (PASS_BG, "white", "pass") if state is True else (FAIL_BG, "white", "fail") if state is False else (NONE_BG, "#14161c", "")
             if state is None:
                 text = "not produced" if key == "computed" else "not stated"
             elif len(text) > 9:
@@ -172,7 +172,7 @@ def draw_table(ax, ctx):
             ax.text(cols[j] + 0.012, (y0 + y1) / 2, text, va="center", ha="left", color=fg, fontsize=fs - (1 if state is None else 0), fontweight="bold" if state is not None else "normal")
             if mark and len(text) <= 7:
                 ax.text(cols[j + 1] - 0.012, (y0 + y1) / 2, mark, va="center", ha="right", color=fg, fontsize=fs - 1.5)
-    ax.text(0, 0.0, "Green: matches expected. Red: does not match. Grey: no value.", fontsize=8, va="bottom", ha="left", color="#444444")
+    ax.text(0, 0.0, "Green: matches expected. Red: does not match. Grey: no value.", fontsize=8, va="bottom", ha="left", color="#454b5a")
 
 
 def verdict_color(item):
@@ -186,8 +186,8 @@ def no_output_box(ax, reason):
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.add_patch(plt.Rectangle((0.03, 0.2), 0.94, 0.6, fill=False, ec=GREY, lw=2, ls="--"))
-    ax.text(0.5, 0.62, "No output to draw", ha="center", va="center", fontsize=17, fontweight="bold", color="#333333")
-    ax.text(0.5, 0.42, "\n".join(textwrap.wrap(reason, 62)[:5]), ha="center", va="center", fontsize=11, color="#333333")
+    ax.text(0.5, 0.62, "No output to draw", ha="center", va="center", fontsize=17, fontweight="bold", color="#2b2f3a")
+    ax.text(0.5, 0.42, "\n".join(textwrap.wrap(reason, 62)[:5]), ha="center", va="center", fontsize=11, color="#2b2f3a")
 
 
 def read_numbers(p):
@@ -196,7 +196,7 @@ def read_numbers(p):
     return pd.read_csv(p)
 
 
-def expected_line(ax, value, label, axis="y", color="#222222"):
+def expected_line(ax, value, label, axis="y", color="#14161c"):
     if value is None:
         return
     if axis == "y":

@@ -130,6 +130,8 @@ _install()
 
 const FIGURES_PY = readFileSync(fileURLToPath(new URL("../adapters/kinds/ga_figures.py", import.meta.url)), "utf8");
 
+const STYLE_FILE = readFileSync(fileURLToPath(new URL("../adapters/kinds/cuvette.mplstyle", import.meta.url)), "utf8");
+
 const BOOT = "import sys,runpy;d,s=sys.argv[1:3];sys.path.insert(0,d);import ga_api;sys.argv=[s];runpy.run_path(s,init_globals={k:getattr(ga_api,k) for k in ('call','save_table','save_figure','ToolError')},run_name='__main__')";
 
 type SandboxState = "unknown" | "on" | "off";
@@ -245,6 +247,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       writeFileSync(script, String(v.args.code));
       writeFileSync(join(scriptDir, "ga_api.py"), CUVETTE_API);
       writeFileSync(join(scriptDir, "ga_figures.py"), FIGURES_PY);
+      writeFileSync(join(scriptDir, "cuvette.mplstyle"), STYLE_FILE);
       const before = snapshot(dirs.workDir, scriptDir);
       const python = scriptPython();
       const argv = wrap([python, "-I", "-c", BOOT, scriptDir, script], dirs.workDir, opts.network, dirs.projectDir);

@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 
 
@@ -19,15 +20,19 @@ def draw(run, out):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "adapters", "kinds"))
+    import ga_figures
+
+    ga_figures.apply_style()
     items = run["items"]
     n = max(len(items), 1)
     fig, axes = plt.subplots(n, 1, figsize=(9, 0.9 * n + 1.2), squeeze=False)
-    green, red, grey = "#1a7f4b", "#c62828", "#8a8f98"
+    green, red, grey = "#2b8a6e", "#c2381f", "#7a8091"
     for ax, it in zip(axes[:, 0], items):
         exp = it["expected"]
         tol = 0 if it["tolerance"] == "exact" else it["tolerance"]
         half = max(tol * 3, abs(exp) * 0.1, 1e-9) if tol == 0 else max(tol * 3, 1e-12)
-        ax.axvspan(-tol, tol, color="#cfe8d9", zorder=0)
+        ax.axvspan(-tol, tol, color="#dcefe8", zorder=0)
         ax.axvline(0, color=grey, lw=1, zorder=1)
         for row, (name, side, mark) in enumerate([("computed", it["computed"], "o"), ("reported", it["reported"], "D")]):
             v = side.get("value")
@@ -46,6 +51,7 @@ def draw(run, out):
                 ax.annotate(f"{v:.4g}", (x, y), xytext=(-6 if x > 0 else 6, 0), textcoords="offset points", ha="right" if x > 0 else "left", va="center", fontsize=7, color=color)
         ax.set_xlim(-half * 1.05, half * 1.05)
         ax.set_ylim(-0.6, 0.6)
+        ax.grid(False)
         ax.set_yticks([])
         ax.tick_params(labelsize=7)
         ax.set_title(f"{it['key']}   expected {exp:.6g}", loc="left", fontsize=8)
@@ -54,7 +60,7 @@ def draw(run, out):
     fig.suptitle(f"{run['paper']}  {run['model']}   circle: computed, diamond: reported", fontsize=9, x=0.01, ha="left")
     fig.text(0.01, 0.005, "Axis: value minus expected. Green band: tolerance. Green dot: pass. Red dot: fail. Grey dot: not asked.", fontsize=7, color=grey)
     fig.tight_layout(rect=(0, 0.02, 1, 0.97))
-    fig.savefig(out, dpi=110, facecolor="white")
+    fig.savefig(out, dpi=200, facecolor="white")
 
 
 def main():

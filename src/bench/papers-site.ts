@@ -13,6 +13,7 @@ import { summarize, type Cell } from "./papers-report.ts";
 import type { PapersResult, PaperRun } from "./papers.ts";
 
 const FALLBACK = resolve(dirname(fileURLToPath(import.meta.url)), "fallback_figure.py");
+const STYLED = resolve(dirname(fileURLToPath(import.meta.url)), "../adapters/kinds/ga_figures.py");
 const SCIENCE_PYTHON = join(homedir(), ".cuvette/envs/science/bin/python");
 const MAX_WIDTH = 1600;
 
@@ -86,7 +87,7 @@ export function figureFor(run: PaperRun, paperDir: string, imgDir: string, pytho
   const expected = join(paperDir, "expected.yaml");
   let ok = false;
   if (existsSync(script)) {
-    const r = spawnSync(python, [script, "--session", run.dir ?? "", "--run", runFile, "--expected", expected, "--out", out], { encoding: "utf8", timeout: 180_000 });
+    const r = spawnSync(python, [STYLED, script, "--session", run.dir ?? "", "--run", runFile, "--expected", expected, "--out", out], { encoding: "utf8", timeout: 180_000 });
     ok = r.status === 0 && existsSync(out);
     if (!ok) log(`${run.paper} ${run.model}: figure.py failed, using the fallback figure. ${short((r.stderr || "").trim().split("\n").at(-1) ?? "", 160)}`);
   }

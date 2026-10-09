@@ -11,13 +11,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-BLUE = "#0072B2"
-ORANGE = "#E69F00"
-SKY = "#56B4E9"
-VERMILION = "#D55E00"
-GREEN_BG = "#c8e6c9"
-RED_BG = "#f4c7c3"
-GREY_BG = "#e0e0e0"
+BLUE = "#1b6aa8"
+ORANGE = "#d08a1e"
+SKY = "#5aa0cf"
+VERMILION = "#c2381f"
+GREEN_BG = "#d6ebe3"
+RED_BG = "#f6d5d0"
+GREY_BG = "#e8eaf0"
 
 
 def parse_args():
@@ -120,7 +120,7 @@ def draw_table(ax, rows):
     t.auto_set_font_size(False)
     t.set_fontsize(9)
     t.scale(1, 2.0 if len(rows) < 8 else 1.6)
-    ax.set_title("green = pass, red = fail, grey = not produced", fontsize=9, color="#444444")
+    ax.set_title("green = pass, red = fail, grey = not produced", fontsize=9, color="#454b5a")
 
 
 def no_output(ax, reason):
