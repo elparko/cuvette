@@ -1640,6 +1640,8 @@ export class Session {
 
   async answer(qid: string, value: unknown, note = ""): Promise<void> {
     const waited = this.waitedQids.has(qid);
+    const open = this.questions.get(qid);
+    if (open?.decisionKey && open.status === "open") this.decisions.validate(open.decisionKey, this.questions.match(open, value));
     const q = this.questions.answer(qid, value, note);
     if (q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by: "human", reason: `answer to ${qid}` });
     if (waited) return;

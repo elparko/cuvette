@@ -280,6 +280,10 @@ export class DecisionRecord {
     return { name, version, values: data.values ?? {}, owners: data.owners ?? {} };
   }
 
+  validate(key: string, raw: unknown): unknown {
+    return coerce(this.state(key).def, raw);
+  }
+
   applySetup(values: Record<string, unknown>, opts: { profile?: string; how?: string } = {}): void {
     let profile: ReturnType<DecisionRecord["loadProfile"]> | undefined;
     if (opts.profile) profile = this.loadProfile(opts.profile);

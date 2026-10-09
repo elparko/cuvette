@@ -523,7 +523,10 @@ function cardViews(d: CardDeps): CardViews {
         card={card}
         onAnswer={(value, note) => {
           popCard();
-          session.answer(card.q.qid, value, note).catch((e: Error) => d.line("✗", e.message, "red"));
+          session.answer(card.q.qid, value, note).catch((e: Error) => {
+            d.line("✗", `${e.message} Try again.`, "red");
+            d.setCards((x) => (x.some((c) => c.t === "question" && c.q.qid === card.q.qid) ? x : [card, ...x]));
+          });
         }}
         onDismiss={popCard}
       />

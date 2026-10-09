@@ -40,7 +40,9 @@ test("ask, answer by label, closed throws, restore", async () => {
   expect(allOpenQuestions().map((x) => x.qid)).toEqual(["q1", "q2"]);
   expect(q.answer("q1", "rms").answer).toBe("rms");
   expect(() => q.answer("q1", "tic")).toThrow(/closed/);
-  expect(() => q.answer("q2", "nope")).toThrow();
+  expect(q.match(q.get("q2")!, "TIC")).toBe("tic");
+  expect(q.match(q.get("q2")!, " 200 ")).toBe(200);
+  expect(q.match(q.get("q2")!, "use the median")).toBe("use the median");
   q.answer("q2", "TIC");
   expect(allOpenQuestions()).toEqual([]);
   const again = new QuestionQueue(rec as any);

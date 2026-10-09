@@ -81,16 +81,7 @@ export class QuestionQueue {
     const q = this.questions.get(qid);
     if (!q) throw new Error(`No question ${qid}.`);
     if (q.status !== "open") throw new Error(`Question ${qid} is already closed (${q.status}).`);
-    let chosen = value;
-    if (q.options.length) {
-      const text = String(value).trim().toLowerCase();
-      const hit =
-        q.options.find((o) => o.value === value) ??
-        q.options.find((o) => String(o.value).toLowerCase() === text) ??
-        q.options.find((o) => o.label.trim().toLowerCase() === text);
-      if (!hit && q.decisionKey) throw new Error(`Answer must be one of: ${q.options.map((o) => o.label).join(", ")}.`);
-      chosen = hit ? hit.value : value;
-    }
+    const chosen = this.match(q, value);
     q.status = "answered";
     q.answer = chosen;
     q.answered = new Date().toISOString();
@@ -98,6 +89,18 @@ export class QuestionQueue {
     upsert(q);
     this.release(q);
     return q;
+  }
+
+  match(q: Question, value: unknown): unknown {
+    if (!q.options.length) return value;
+    const text = String(value).trim().toLowerCase();
+    const hit =
+      q.options.find((o) => o.value === value) ??
+      q.options.find((o) => String(o.value).toLowerCase() === text) ??
+      q.options.find((o) => o.label.trim().toLowerCase() === text);
+    if (hit) return hit.value;
+    const typed = String(value).trim();
+    return typed !== "" && !Number.isNaN(Number(typed)) ? Number(typed) : value;
   }
 
   get(qid: string): Question | undefined {
