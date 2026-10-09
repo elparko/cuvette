@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Mode, Owner, Question } from "../core/types.ts";
 import { gaHome } from "../adapters/manifest.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
+import { stepNumbers } from "../core/housekeeping.ts";
 import type { Card } from "./cards.tsx";
 import { show } from "./cards.tsx";
 import type { OutputRef } from "./items.ts";
@@ -20,6 +21,7 @@ export interface CommandCtx {
   clear(): void;
   quit(): void;
   outputs(): OutputRef[];
+  toggleDetails(): boolean;
   startWindow(): Promise<string>;
   startPanel(): Promise<{ url: string; opened: string[]; failed: string[] }>;
 }
@@ -106,6 +108,8 @@ export function renderGraph(session: SessionLike): string {
   const nodes = session.record.nodes();
   if (!nodes.length) return "No steps yet.";
   const stale = session.record.stale();
+  const steps = stepNumbers(nodes);
+  const name = (id: string) => (steps.has(id) ? `Step ${steps.get(id)}` : `Comparison ${id}`);
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const kids = new Map<string, string[]>();
   const placed = new Set<string>();
@@ -118,8 +122,8 @@ export function renderGraph(session: SessionLike): string {
   const out: string[] = [];
   const label = (id: string) => {
     const n = byId.get(id)!;
-    const extra = n.parents.length > 1 ? ` (also from ${n.parents.slice(1).join(", ")})` : "";
-    return `${id} ${clip(n.summary || n.tool, 60)}${extra}${stale.has(id) ? "  [out of date]" : ""}`;
+    const extra = n.parents.length > 1 ? ` (also from ${n.parents.slice(1).map(name).join(", ")})` : "";
+    return `${name(id)} ${clip(n.summary || n.tool, 60)}${extra}${stale.has(id) ? "  [out of date]" : ""}`;
   };
   const walk = (id: string, prefix: string, last: boolean, top: boolean) => {
     if (placed.has(id)) return;
@@ -451,6 +455,13 @@ export const commands: Command[] = [
       } catch (e) {
         ctx.error(`The panel did not start: ${(e as Error).message}`);
       }
+    },
+  },
+  {
+    name: "details",
+    help: "Show or hide the housekeeping steps, such as file reads. Ctrl+O does the same.",
+    run(_, ctx) {
+      ctx.notice(ctx.toggleDetails() ? "All steps are shown, with the housekeeping steps." : "Only the analysis steps are shown. Housekeeping steps are in one dim line.");
     },
   },
   { name: "clear", help: "Clear the screen. The record stays.", run: (_, ctx) => ctx.clear() },

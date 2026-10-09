@@ -197,3 +197,15 @@ test("shortReason, parseRoute and renderMarkdown", () => {
   expect(html).toContain("<th>x</th>");
   expect(html).toContain("<pre>raw &lt;1&gt;</pre>");
 });
+
+test("the trail leaves out housekeeping calls and numbers only the analysis steps", () => {
+  const r = new AnalysisRecord(join(dir, "hk"), "20260101-000000-hk00");
+  r.append("user", { text: "go" });
+  r.append("tool_result", { tool: "run_command", ok: true, summary: "Ran ls" });
+  r.append("tool_result", { tool: "open", adapter: "fake", ok: false, error: "no file" });
+  const a = r.addNode(nodeIn({ tool: "open", summary: "Opened a.tif" }));
+  r.append("tool_result", { tool: "open", adapter: "fake", ok: true, summary: "Opened a.tif" }, { node: a.id });
+  r.append("tool_result", { tool: "read_file", ok: false, error: "missing" });
+  const t = trail(r, 1, [adapter]);
+  expect(t.map((x) => [x.line, x.step])).toEqual([["You asked: go", undefined], ["Opened a.tif", 1], ["Failed: missing", undefined]]);
+});

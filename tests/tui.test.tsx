@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { runTui } from "../src/tui/app.tsx";
 import { FakeSession } from "../src/tui/fake-session.ts";
 import { imageProtocol, inlineImage } from "../src/tui/image.ts";
-import { Mapper, settingsLine } from "../src/tui/items.ts";
+import { Collapser, Mapper, mainView, settingsLine, type Item, type Logged } from "../src/tui/items.ts";
 import { tableLines } from "../src/tui/markdown.tsx";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 import { renderGraph, suggestions } from "../src/tui/commands.ts";
@@ -54,7 +54,7 @@ describe("transcript", () => {
     await until(() => h.all().includes("Which AUC cutoff do you want?"));
     await type(h, "1");
     try {
-      await until(() => h.all().includes("14 features differ between endo and epi at AUC 0.7.") && h.all().includes("✗ Step 4") && /open\s+with\s+\/open 1/.test(h.all()));
+      await until(() => h.all().includes("14 features differ between endo and epi at AUC 0.7.") && h.all().includes("✗ export_table") && /open\s+with\s+\/open 1/.test(h.all()));
     } catch (e) {
       throw new Error(`${(e as Error).message}\n--- last screen text ---\n${h.all().slice(-2500)}`);
     }
@@ -66,7 +66,10 @@ describe("transcript", () => {
     expect(text).toContain("● Step 3  Found 14 features different between endo and epi");
     expect(text).toContain("▸ Analyze > Discriminating features · group a endo");
     expect(text).toMatch(/image:\s*[\s\S]*\.png[\s\S]*\(open\s+with\s+\/open 1\)/);
-    expect(text).toContain("✗ Step 4  Folder is read-only");
+    expect(text).toContain("✗ export_table  Folder is read-only");
+    expect(text).not.toContain("Step 4");
+    expect(text).toContain("· Looked at 1 folder (msi); Read 2 files (endo_epi.imzML, samples.csv)");
+    expect(text).not.toContain("read_file");
     expect(text).toContain("◇ code only: no manual route");
     expect(text).toMatch(/\d+(\.\d)?k? in \/ \d+ out/);
   });
@@ -316,11 +319,11 @@ describe("keys and commands", () => {
     await type(h, "y");
     await until(() => h.all().includes("Which AUC cutoff"));
     await type(h, "1");
-    await until(() => h.all().includes("Step 4"));
+    await until(() => h.all().includes("export_table"));
     s.setDecision("normalization", "RMS", "test");
     const graph = renderGraph(s);
-    expect(graph).toContain("n1 Loaded 2 samples");
-    expect(graph).toMatch(/└─ n2 Normalized spectra with TIC {2}\[out of date\]/);
+    expect(graph).toContain("Step 1 Loaded 2 samples");
+    expect(graph).toMatch(/└─ Step 2 Normalized spectra with TIC {2}\[out of date\]/);
     await submit(h, "/review");
     await until(() => h.all().includes("Review finding 1 of 1"));
     await type(h, "a");
@@ -372,6 +375,105 @@ describe("API key", () => {
   });
 });
 
+describe("quiet view", () => {
+  const texts = (items: Item[]) => items.map((i) => (i.t === "line" ? `${i.sym} ${i.text}` : i.t === "step" ? `${i.n ? `Step ${i.n}` : i.tool} ${i.ok ? i.summary : i.error}` : i.t));
+
+  function feed(build: (s: FakeSession) => void) {
+    const s = new FakeSession({ delayMs: 0 });
+    const start = s.record.entries().length;
+    build(s);
+    const m = new Mapper(s);
+    const log: Logged[] = s.record.entries().slice(start).map((e) => ({ e, items: m.map(e) }));
+    return { s, log };
+  }
+
+  test("consecutive housekeeping calls become one dim line, and only analysis steps get numbers", () => {
+    const { log } = feed((s) => {
+      s.record.append("user", { text: "compare sleep" });
+      s.record.append("tool_call", { callId: "a", tool: "list_dir", args: { path: "/data/sleep" } });
+      s.record.append("tool_result", { callId: "a", tool: "list_dir", ok: true, summary: "2 entries" });
+      s.record.append("tool_result", { callId: "b", tool: "read_file", ok: true, summary: "Read", effectiveArgs: { path: "/data/sleep/sleep.csv" } });
+      s.record.append("permission", { tool: "run_command", decision: "allowed" });
+      s.record.append("tool_result", { callId: "c", tool: "run_command", ok: true, summary: "Ran ls", effectiveArgs: { argv: ["/bin/ls", "-l"] } });
+      s.record.append("tool_result", { callId: "d", tool: "compare_two_groups", adapter: "biostats", ok: true, summary: "Welch t test" }, { node: "n1" });
+      s.record.append("tool_result", { callId: "e", tool: "list_adapters", ok: true, summary: "2 adapters" });
+      s.record.append("tool_result", { callId: "f", tool: "describe", adapter: "biostats", ok: true, summary: "Means" }, { node: "n2" });
+      s.record.append("assistant", { text: "Done.", final: true });
+    });
+    const { settled, pending } = mainView(log, true);
+    expect(pending).toEqual([]);
+    expect(texts(settled)).toEqual([
+      "user",
+      "· Looked at 1 folder (sleep); Read 1 file (sleep.csv); Ran 1 command (ls)",
+      "Step 1 Welch t test",
+      "· Checked the adapter list",
+      "Step 2 Means",
+      "assistant",
+    ]);
+  });
+
+  test("a failed call that the agent retries joins the dim line; one that blocks shows as a warning", () => {
+    const { log } = feed((s) => {
+      s.record.append("tool_result", { callId: "a", tool: "run_script", ok: false, error: "NameError: x" });
+      s.record.append("assistant", { text: "I fix the column name.", final: false });
+      s.record.append("tool_result", { callId: "b", tool: "run_script", ok: true, summary: "Mean 7.1 h" }, { node: "n1" });
+      s.record.append("tool_result", { callId: "c", tool: "read_file", ok: false, error: "no such file" });
+      s.record.append("assistant", { text: "I cannot read the file.", final: true });
+    });
+    const out = texts(mainView(log, true).settled);
+    expect(out).toEqual(["· Tried run_script again after 1 error", "assistant", "Step 1 Mean 7.1 h", "read_file no such file", "assistant"]);
+  });
+
+  test("setup questions read as a short form: one line for each answer", () => {
+    const { log } = feed((s) => {
+      s.record.append("blocked", { tool: "compare_two_groups", reason: "waiting for the scientist: test", qid: "q1" });
+      s.record.append("question", { qid: "q1", title: "Which test?" });
+      s.record.append("tool_result", { callId: "a", tool: "read_file", ok: true, summary: "Read", effectiveArgs: { path: "/d/sleep.csv" } });
+      s.record.append("answer", { qid: "q1", value: "Welch", by: "human" });
+      s.record.append("question", { qid: "q2", title: "Alpha" });
+      s.record.append("answer", { qid: "q2", value: 0.05, by: "human" });
+    });
+    expect(texts(mainView(log, true).settled)).toEqual(["· Read 1 file (sleep.csv)", "✓ Which test? Welch", "✓ Alpha: 0.05"]);
+  });
+
+  test("held lines show in the live area until the next main line", () => {
+    const c = new Collapser();
+    const { log } = feed((s) => {
+      s.record.append("tool_result", { callId: "a", tool: "list_dir", ok: true, summary: "x", effectiveArgs: { path: "/a" } });
+      s.record.append("tool_result", { callId: "b", tool: "list_dir", ok: true, summary: "x", effectiveArgs: { path: "/b" } });
+    });
+    expect(c.add(log[0]!)).toEqual([]);
+    expect(c.add(log[1]!)).toEqual([]);
+    expect(texts(c.preview())).toEqual(["· Looked at 2 folders (a, b)"]);
+    expect(texts(c.add({ items: [{ key: "x", t: "line", sym: "▸", text: "hi" }] }))).toEqual(["· Looked at 2 folders (a, b)", "▸ hi"]);
+  });
+
+  test("/details and Ctrl+O show every housekeeping call, and the setting stays", async () => {
+    const { h } = start();
+    await sleep(100);
+    await submit(h, "compare endo and epi");
+    await until(() => h.all().includes("Permission needed: run_script"));
+    await type(h, "y");
+    await until(() => h.all().includes("Which AUC cutoff do you want?"));
+    await type(h, "1");
+    await until(() => h.all().includes("14 features differ") && h.all().includes("export_table"));
+    await sleep(100);
+    expect(h.all()).toContain("Ctrl+O: all steps");
+    expect(h.all()).not.toContain("read_file  Read 400 of 400 bytes.");
+    await submit(h, "/details");
+    await until(() => h.all().includes("read_file  Read 400 of 400 bytes."));
+    expect(h.all()).toContain("list_dir  3 entries in /data/msi.");
+    expect(h.all()).toContain("Ctrl+O: short view");
+    h.frames.length = 0;
+    await submit(h, "again");
+    await until(() => h.all().includes("Permission needed: run_script"));
+    expect(h.all()).toContain("read_file  Read 90 of 90 bytes.");
+    await type(h, "\x0f");
+    const after = (a: string, b: string) => h.all().lastIndexOf(a) > h.all().lastIndexOf(b);
+    await until(() => after("Ctrl+O: all steps", "Ctrl+O: short view"));
+  });
+});
+
 describe("pieces", () => {
   test("settingsLine keeps scalars only", () => {
     expect(settingsLine({ tolerance_ppm: 5, min_auc: 0.7, nested: { a: 1 }, none: null })).toBe("tolerance ppm 5 · min auc 0.7");
@@ -392,10 +494,12 @@ describe("pieces", () => {
     expect(new Mapper(s).map(e)).toEqual([{ key: `e${e.id}`, t: "line", sym: "+", color: "cyan", text: "Loaded the adapter biostats 0.1.1 (program 0.30.0): a paired test on a CSV file", dim: undefined }]);
   });
 
-  test("mapper numbers adapter steps and tracks outputs", () => {
+  test("mapper numbers analysis steps and tracks outputs", () => {
     const s = new FakeSession({ delayMs: 0 });
     const m = new Mapper(s);
-    const e = s.record.append("tool_result", { tool: "t", adapter: "a", ok: true, summary: "Did it", images: ["abc"], files: [], effectiveArgs: {}, manualRoute: "Menu > Item" });
+    const look = s.record.append("tool_result", { tool: "read_file", ok: true, summary: "Read a.csv" });
+    expect(m.map(look)[0]).toMatchObject({ t: "step", n: undefined });
+    const e = s.record.append("tool_result", { tool: "t", adapter: "a", ok: true, summary: "Did it", images: ["abc"], files: [], effectiveArgs: {}, manualRoute: "Menu > Item" }, { node: "n1" });
     const [item] = m.map(e);
     expect(item).toMatchObject({ t: "step", n: 1, summary: "Did it", route: "Menu > Item" });
     expect(m.outputs).toHaveLength(1);

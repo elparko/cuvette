@@ -7,7 +7,7 @@ import { claudeKey, credentialsPath, elabftwProblem, keyProblem, maskKey, saveCl
 import { checkClaudeKey } from "../providers/claude.ts";
 import { commands, openSetup, openWithOs, suggestions, type CommandCtx } from "./commands.ts";
 import { imageProtocol, inlineImage } from "./image.ts";
-import { Mapper, type Item } from "./items.ts";
+import { Collapser, Mapper, mainView, type Item, type Logged } from "./items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
 import { Header, ItemView, StatusLine, type StaticItem } from "./view.tsx";
 import { Markdown } from "./markdown.tsx";
@@ -23,6 +23,10 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
   const counter = useRef(0);
   const windowHandle = useRef<{ url: string; close(): void } | undefined>(undefined);
   const lastCtrlC = useRef(0);
+  const log = useRef<Logged[]>([]);
+  const collapser = useRef(new Collapser());
+  const details = useRef(false);
+  const idle = useRef(true);
 
   const [items, setItems] = useState<StaticItem[]>([{ key: "header", t: "header" }]);
   const [epoch, setEpoch] = useState(0);
@@ -39,6 +43,8 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
   const [openQ, setOpenQ] = useState(() => session.questions.open().length);
   const [tokens, setTokens] = useState({ input: 0, output: 0 });
   const [hint, setHint] = useState("");
+  const [pending, setPending] = useState<Item[]>([]);
+  const [showAll, setShowAll] = useState(false);
   const [queue, setQueue] = useState<string[]>([]);
   const queueRef = useRef<string[]>([]);
   const updateQueue = useCallback((next: string[]) => {
@@ -46,7 +52,36 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
     setQueue(next);
   }, []);
 
-  const push = useCallback((...more: Item[]) => setItems((x) => [...x, ...more]), []);
+  const show = useCallback((more: Item[]) => {
+    if (more.length) setItems((x) => [...x, ...more]);
+  }, []);
+  const record = useCallback(
+    (l: Logged) => {
+      log.current.push(l);
+      if (details.current) return show(l.items);
+      show(collapser.current.add(l));
+      setPending(collapser.current.preview());
+    },
+    [show],
+  );
+  const push = useCallback((...more: Item[]) => record({ items: more }), [record]);
+  const toggleDetails = useCallback(() => {
+    details.current = !details.current;
+    setShowAll(details.current);
+    (opts.stdout ?? process.stdout).write("\x1b[2J\x1b[3J\x1b[H");
+    let rows: Item[];
+    if (details.current) {
+      rows = log.current.flatMap((l) => l.items);
+      setPending([]);
+    } else {
+      const v = mainView(log.current, idle.current);
+      collapser.current = v.collapser;
+      rows = v.settled;
+      setPending(v.pending);
+    }
+    setItems([{ key: "header", t: "header" }, ...rows]);
+    setEpoch((x) => x + 1);
+  }, [opts]);
   const line = useCallback(
     (sym: string, text: string, color?: string, dim?: boolean) =>
       push({ key: `l${++counter.current}`, t: "line", sym, color, text, dim }),
@@ -122,7 +157,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
               if (seq) write(seq + "\n");
             }
           }
-          if (out.length) push(...out);
+          record({ e: en, items: out });
           if (en.kind === "assistant") setLive("");
           if (en.kind === "usage") setTokens({ ...mapper.current.tokens });
           if (en.kind === "answer") dropCard((c) => c.t === "question" && c.q.qid === en.data.qid);
@@ -136,7 +171,10 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           break;
         case "status":
           setStatus({ state: e.state, tool: e.tool });
+          idle.current = e.state === "idle";
           if (e.state === "idle") {
+            show(collapser.current.flush());
+            setPending([]);
             setLive("");
             const [next, ...rest] = queueRef.current;
             if (next !== undefined) {
@@ -170,11 +208,16 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
       refresh,
       clear: () => {
         (opts.stdout ?? process.stdout).write("\x1b[2J\x1b[3J\x1b[H");
+        log.current = [];
         setItems([]);
         setEpoch((x) => x + 1);
       },
       quit: () => void quit(),
       outputs: () => mapper.current.outputs,
+      toggleDetails: () => {
+        toggleDetails();
+        return details.current;
+      },
       startWindow: async () => {
         if (!windowHandle.current) {
           const { startWindow } = await import("../server/window.ts");
@@ -206,7 +249,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         return { url, opened, failed };
       },
     }),
-    [session, cards, addCard, refresh, quit, opts],
+    [session, cards, addCard, refresh, quit, opts, toggleDetails],
   );
 
   const runCommand = async (text: string) => {
@@ -255,6 +298,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
       setTimeout(() => setHint((h) => (h.startsWith("Press Ctrl+C") ? "" : h)), 2000);
       return;
     }
+    if (key.ctrl && ch === "o") return toggleDetails();
     if (cards.length) return;
     if (key.escape) {
       if (status.state !== "idle") {
@@ -298,6 +342,9 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           </Box>
         )}
       </Static>
+      {pending.map((it) => (
+        <ItemView key={it.key} item={it} />
+      ))}
       {live ? (
         <Box marginTop={1}>
           <Markdown text={live} width={((stdout as unknown as { columns?: number })?.columns ?? 80) - 1} />
@@ -403,6 +450,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         openQuestions={openQ}
         tokens={tokens}
         hint={hint}
+        details={showAll}
       />
     </Box>
   );

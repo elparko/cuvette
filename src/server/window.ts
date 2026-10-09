@@ -6,6 +6,7 @@ import { extname } from "node:path";
 import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import type { BusEvent, Mode, Question } from "../core/types.ts";
+import { roleInRecord, stepNumbers } from "../core/housekeeping.ts";
 import { parseRoute, shortReason, trail } from "../core/trail.ts";
 import { panelHtml } from "./panel-page.ts";
 import { setWindowUrl } from "./notify.ts";
@@ -88,7 +89,6 @@ async function trailLines(session: WindowSession): Promise<unknown[]> {
   }
 }
 
-const HARNESS = new Set(["ask_scientist", "load_skill", "find_tools", "note", "plan", "task", "propose_lab_rule", "propose_change", "compare_options", "read_file", "list_dir", "calculate"]);
 const CODE_CAP = 20000;
 const asObj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
@@ -147,16 +147,18 @@ export async function stateOf(session: WindowSession) {
   const waitingKeys = new Set(questions.map((q) => q.decisionKey).filter(Boolean));
   const resultByNode = new Map<string, Record<string, unknown>>();
   const nodeByCall = new Map<string, string>();
-  const failed: { id: string; entry: number; tool: string; reason: string; error: string }[] = [];
+  const failed: { id: string; entry: number; tool: string; reason: string; error: string; housekeeping: boolean }[] = [];
+  const all = record.entries();
   for (const e of record.entries(["tool_result"])) {
     if (e.node) {
       resultByNode.set(e.node, e.data);
       if (e.data.callId) nodeByCall.set(String(e.data.callId), e.node);
-    } else if (e.data.ok === false && !HARNESS.has(String(e.data.tool))) {
+    } else if (e.data.ok === false) {
       const error = String(e.data.error ?? e.data.text ?? "");
-      failed.push({ id: `x${e.id}`, entry: e.id, tool: String(e.data.tool ?? ""), reason: shortReason(error), error });
+      failed.push({ id: `x${e.id}`, entry: e.id, tool: String(e.data.tool ?? ""), reason: shortReason(error), error, housekeeping: roleInRecord(all, e) !== "failed" });
     }
   }
+  const steps = stepNumbers(record.nodes());
   const deviations = new Map<string, unknown[]>();
   for (const e of record.entries(["deviation"])) {
     const id = nodeByCall.get(String(e.data.callId));
@@ -175,6 +177,7 @@ export async function stateOf(session: WindowSession) {
       compare: compare.get(n.id) ?? null,
       waiting: Object.keys(n.decisions ?? {}).some((k) => waitingKeys.has(k)),
       deviations: deviations.get(n.id) ?? [],
+      step: steps.get(n.id) ?? null,
     };
   });
   const setup = record.entries(["setup"]).at(-1);

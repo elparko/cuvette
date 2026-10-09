@@ -121,6 +121,7 @@ export function StatusLine(props: {
   openQuestions: number;
   tokens: { input: number; output: number };
   hint?: string;
+  details?: boolean;
 }) {
   const parts: React.ReactNode[] = [
     <Text key="m" color="cyan">
@@ -159,7 +160,7 @@ export function StatusLine(props: {
           </React.Fragment>
         ))}
       </Text>
-      {props.hint ? <Text dimColor>{props.hint}</Text> : null}
+      <Text dimColor>{props.hint || (props.details ? "Ctrl+O: short view" : "Ctrl+O: all steps")}</Text>
     </Box>
   );
 }

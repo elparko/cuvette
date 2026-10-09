@@ -155,9 +155,10 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
     sentences.push(methodsSentence(adapters, g.first));
     if (g.rest.length && g.key) {
       const here = num;
-      num++;
+      num += g.rest.length;
       const paths = g.rest.map((n) => `\`${show(n.args[g.key!])}\``).join(", ");
-      lines.push(`${num}. Repeat step ${here} for ${paths}.`);
+      const range = g.rest.length > 1 ? ` (steps ${here + 1} to ${num})` : "";
+      lines.push(`${here + 1}. Repeat step ${here} for ${paths}${range}.`);
       sentences.push(`The same step was repeated for ${g.rest.length} more input${g.rest.length === 1 ? "" : "s"}.`);
     }
   }

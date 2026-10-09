@@ -185,6 +185,14 @@ export class FakeSession implements SessionLike {
     return node;
   }
 
+  private async look(tool: string, args: Args, summary: string) {
+    const callId = `c${this.record.entries(["tool_call"]).length + 1}`;
+    this.status("running", tool);
+    this.record.append("tool_call", { callId, tool, args });
+    await this.sleep();
+    this.record.append("tool_result", { callId, tool, ok: true, summary, effectiveArgs: args, fidelity: "none" });
+  }
+
   private waitFor(id: string): Promise<Reply> {
     return new Promise((resolve) => this.waiters.set(id, resolve));
   }
@@ -198,6 +206,10 @@ export class FakeSession implements SessionLike {
     await this.stream("I will load the data, normalize it, and compare endo with epi. ");
     if (this.aborted) return this.stopped();
 
+    await this.look("list_dir", { path: "/data/msi" }, "3 entries in /data/msi.");
+    await this.look("read_file", { path: "/data/msi/endo_epi.imzML" }, "Read 400 of 400 bytes.");
+    await this.look("read_file", { path: "/data/msi/samples.csv" }, "Read 90 of 90 bytes.");
+    if (this.aborted) return this.stopped();
     const n1 = await this.runTool("load_dataset", { path: "endo_epi.imzML" }, {
       summary: "Loaded 2 samples with 4812 spectra",
       route: "File > Open > endo_epi.imzML",

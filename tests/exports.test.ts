@@ -155,3 +155,13 @@ test("the protocol lists the programs that the agent loaded, with the reason, an
   expect(md).toContain("## Programs");
   expect(md).toContain("- biostats adapter 0.1.1, program 0.30.0: The request is a paired test on a CSV file.");
 });
+
+test("protocol step numbers match the step numbers of the nodes when a step repeats for more inputs", () => {
+  const r = new AnalysisRecord(join(dir, "s3"), "20260101-000000-abce");
+  r.append("session", { adapters: [{ name: "fake", version: "0.1.0", programVersion: "1.0" }], model: "m" });
+  for (const p of ["/w/1.tif", "/w/2.tif", "/w/3.tif"]) r.addNode(nodeIn({ tool: "open", args: { path: p } }));
+  r.addNode(nodeIn({ tool: "fit", args: { src: "/w/x" } }));
+  const md = readFileSync(exportProtocol(r, [adapter], join(dir, "p3.md")), "utf8");
+  expect(md).toContain("2. Repeat step 1 for `/w/2.tif`, `/w/3.tif` (steps 2 to 3).");
+  expect(md).toContain("4. fit");
+});

@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import type { LoadedAdapter, MapEntry } from "../adapters/manifest.ts";
+import { roleInRecord, stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Entry, Node } from "./types.ts";
 
@@ -10,6 +11,7 @@ export type TrailIcon = "setup" | "step" | "decision" | "question" | "deviation"
 
 export interface TrailLine {
   n: number;
+  step?: number;
   entry: number;
   icon: TrailIcon;
   line: string;
@@ -238,8 +240,6 @@ function stepBuilt(record: AnalysisRecord, e: Entry, node: Node | undefined, ada
   return { icon: "step", line, stale: isStale, badges, failed, tool, details, technical };
 }
 
-const HARNESS_TOOLS = new Set(["ask_scientist", "load_skill", "find_tools", "note", "plan", "task", "propose_lab_rule", "read_file", "list_dir"]);
-
 function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | undefined, stale: Set<string>, joined: Set<string>, compare: Map<string, string>): Built | undefined {
   const d = e.data;
   const tech = (extra: Record<string, unknown> = {}) => ({ entry: e.id, kind: e.kind, ts: e.ts, ...extra });
@@ -260,7 +260,6 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       };
     }
     case "tool_result": {
-      if (!d.adapter && HARNESS_TOOLS.has(String(d.tool))) return undefined;
       if (d.sensitivityOf) {
         const node = nodeFor(record, e);
         if (node) joined.add(node.id);
@@ -268,6 +267,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       }
       const node = nodeFor(record, e);
       if (node) joined.add(node.id);
+      if (roleInRecord(record.entries(), e) === "housekeeping") return undefined;
       return stepBuilt(record, e, node, adapters, stale, compare);
     }
     case "node": {
@@ -310,6 +310,7 @@ export function trail(record: AnalysisRecord, level: 1 | 2 | 3 = 1, adapters?: L
   const stale = record.stale();
   const joined = new Set<string>();
   const compare = record.comparisons();
+  const steps = stepNumbers(record.nodes());
   const out: TrailLine[] = [];
   let group = 0;
   for (const e of record.entries()) {
@@ -317,6 +318,8 @@ export function trail(record: AnalysisRecord, level: 1 | 2 | 3 = 1, adapters?: L
     if (!b) continue;
     if (b.request) group++;
     const t: TrailLine = { n: out.length + 1, entry: e.id, icon: b.icon, line: b.line, stale: !!b.stale, group, badges: b.badges ?? [] };
+    const node = b.icon === "step" && !b.failed ? (b.technical?.node as string | undefined) ?? (e.kind === "node" ? String(e.data.id) : undefined) : undefined;
+    if (node && steps.has(node)) t.step = steps.get(node);
     if (b.tool) t.tool = b.tool;
     if (b.failed) t.failed = true;
     if (b.request) t.request = true;
@@ -606,7 +609,7 @@ function stepHtml(record: AnalysisRecord, t: TrailLine): string {
   const body = htmlDetails(d);
   const tech = t.technical ? `<details><summary>Technical record</summary><div class="body">${htmlDl(t.technical)}</div></details>` : "";
   const more = body ? `<details><summary>${t.failed ? "Full error and details" : "Route, settings and details"}</summary><div class="body">${body}</div></details>` : "";
-  return `<article class="${classes}" id="s${t.n}"><div class="head">${iconSvg(t.icon)}<span class="n">${t.n}.</span><span class="t">${esc(t.line)}</span>${badges}</div>${imageFigures(record, (d.images as string[] | undefined) ?? [])}${more}${tech}</article>`;
+  return `<article class="${classes}" id="s${t.n}"><div class="head">${iconSvg(t.icon)}<span class="n">${t.step ? `Step ${t.step}` : ""}</span><span class="t">${esc(t.line)}</span>${badges}</div>${imageFigures(record, (d.images as string[] | undefined) ?? [])}${more}${tech}</article>`;
 }
 
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string): string {

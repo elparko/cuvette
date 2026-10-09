@@ -198,6 +198,7 @@ aside .tabs .n.alert { background: var(--warn-bg); border-color: var(--warn); co
       <label><input type="checkbox" id="f-compare"> Hide comparison runs</label>
       <label><input type="checkbox" id="f-harness"> Hide harness steps</label>
       <label><input type="checkbox" id="f-stale"> Show only out of date</label>
+      <label><input type="checkbox" id="f-housekeeping"> Show housekeeping</label>
       <span class="count" id="count"></span>
     </div>
     <div class="legend" aria-label="Legend">
@@ -247,7 +248,7 @@ let selected = null;
 let tab = "trail";
 const openLines = new Set();
 const params = new URLSearchParams(location.search);
-let prefs = { compare: false, harness: false, stale: false, theme: "auto" };
+let prefs = { compare: false, harness: false, stale: false, housekeeping: false, theme: "auto" };
 try { Object.assign(prefs, JSON.parse(localStorage.getItem("ga.window") || "{}")); } catch (e) {}
 if (params.get("theme")) prefs.theme = params.get("theme");
 if (params.get("tab")) tab = params.get("tab");
@@ -360,7 +361,7 @@ function items() {
     if (prefs.stale && !stale.has(n.id)) hidden.add(n.id);
   }
   const extra = prefs.stale ? [] : [
-    ...state.failed.map((f) => ({ id: f.id, failed: f })),
+    ...state.failed.filter((f) => prefs.housekeeping || !f.housekeeping).map((f) => ({ id: f.id, failed: f })),
     ...state.questions.map((q) => ({ id: "q:" + q.qid, question: q })),
   ];
   const shown = [...all.filter((it) => !hidden.has(it.id)), ...extra];
@@ -374,9 +375,9 @@ function card(it, pos) {
   const tool = it.failed ? it.failed.tool : it.question ? "Decision" : it.node.tool;
   const num = it.failed || it.question ? null : keyNumber(text);
   const cls = ["card", ...st.map((x) => (x === "ok" ? "ok" : x)), num ? "" : "nonum", selected === it.id ? "sel" : ""].filter(Boolean).join(" ");
-  const label = it.failed ? "failed step " + tool : it.question ? "open question" : "step " + it.id + " " + tool;
+  const label = it.failed ? "failed step " + tool : it.question ? "open question" : (it.node.step ? "step " + it.node.step : "comparison run " + it.id) + " " + tool;
   const el = h("button", { class: cls, type: "button", style: "left:" + pos.x + "px;top:" + pos.y + "px", "aria-label": label + ", " + st.map((x) => STATUS_LABEL[x]).join(", ") + ". " + text, "aria-pressed": selected === it.id ? "true" : "false" });
-  const top = h("span", { class: "top" }, h("span", { class: "tool" }, tool), it.node ? h("span", { class: "nid" }, it.id) : null);
+  const top = h("span", { class: "top" }, h("span", { class: "tool" }, tool), it.node ? h("span", { class: "nid" }, it.node.step ? "Step " + it.node.step : it.id) : null);
   const tags = main === "ok" ? [["ok", ""]] : st.filter((x) => x !== "ok").map((x) => [x, STATUS_LABEL[x]]);
   tags.slice(0, 3).forEach(([k, t], i) => {
     top.append(h("span", { class: "st" + (k === "compare" ? " cmp" : "") + (k === "ok" ? " okst" : ""), style: i === 0 ? "margin-left:auto" : "", title: t || "ok" }, icon(STATUS_PATHS[k], "", "", true)));
@@ -462,7 +463,7 @@ function drawDetail() {
   if (!n) {
     const stale = state.stale.length, cmp = state.nodes.filter((x) => x.compare).length;
     box.append(h("h2", {}, "Step details"), h("p", { class: "empty" }, "Select a step in the graph to see its result, settings, manual route and code."),
-      h("p", {}, state.nodes.length + " steps. ", stale + " out of date. ", cmp + " comparison runs. ", state.failed.length + " failed. ", state.questions.length + " waiting for a decision."));
+      h("p", {}, state.nodes.filter((n) => n.step).length + " steps. ", stale + " out of date. ", cmp + " comparison runs. ", state.failed.length + " failed. ", state.questions.length + " waiting for a decision."));
     return;
   }
   const st = statusOf({ node: n });
@@ -570,7 +571,7 @@ function drawTrail(box) {
       const nid = nodeByEntry.get(l.entry);
       const kind = l.failed ? "failed" : l.icon;
       const main = h(nid ? "button" : "div", { class: "tl-main" + (nid ? " link" : ""), type: nid ? "button" : false, onclick: nid ? () => { selected = nid; render(); } : false },
-        icon(ICON_PATHS[kind] || ICON_PATHS.step, "ic", ICON_LABEL[kind] || "Step"), h("span", { class: "n" }, l.n + "."),
+        icon(ICON_PATHS[kind] || ICON_PATHS.step, "ic", ICON_LABEL[kind] || "Step"), h("span", { class: "n" }, l.step ? "Step " + l.step : ""),
         h("span", { class: "t" }, l.tool ? h("code", { class: "tname" }, l.tool) : null, l.line, h("span", { class: "badges" }, lineBadges(l))));
       const row = h("div", { class: "tl " + kind + (l.stale ? " stale" : "") }, main);
       const err = l.details && l.details.error;
@@ -682,6 +683,7 @@ function render() {
   document.getElementById("f-compare").checked = prefs.compare;
   document.getElementById("f-harness").checked = prefs.harness;
   document.getElementById("f-stale").checked = prefs.stale;
+  document.getElementById("f-housekeeping").checked = prefs.housekeeping;
   applyTheme();
   drawGraph();
   drawDetail();
@@ -702,7 +704,7 @@ async function load() {
   render();
 }
 
-for (const [id, key] of [["f-compare", "compare"], ["f-harness", "harness"], ["f-stale", "stale"]]) {
+for (const [id, key] of [["f-compare", "compare"], ["f-harness", "harness"], ["f-stale", "stale"], ["f-housekeeping", "housekeeping"]]) {
   document.getElementById(id).addEventListener("change", (e) => { prefs[key] = e.target.checked; savePrefs(); render(); });
 }
 document.getElementById("theme").addEventListener("click", () => {
