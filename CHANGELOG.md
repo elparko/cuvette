@@ -86,6 +86,9 @@ These items are being built and are not on main yet:
 - A sample sheet (`samples.csv`) lists each sample with its group, unit of replication and batch. You edit it in the app or with `/samples`. The proposed metrics take n from it.
 - Design checks on the sample sheet: pseudoreplication, groups confounded with a batch, unbalanced groups, and too few n for the planned test.
 
+### Fixes
+- A headless run no longer hangs when the answers file gives a value that a decision refuses (for example a text catch-all for a number). The harness uses the recommendation, the default or the first option, and logs a notice. The terminal and panel views show the reason and keep the question open. The drc papers now give explicit numeric answers.
+
 ## 8 October 2026
 
 ### Session flow

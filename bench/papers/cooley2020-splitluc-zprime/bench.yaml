@@ -5,6 +5,10 @@ answers:
   normalization: percent_activity
   zprime_stat: mean_sd
   exclude_wells: none
+  response_level: 50
+  lod_sd: 3
+  recovery_limit_pct: 20
+  cv_limit_pct: 20
   "*": "Use the values in the decision record."
 allow: all
 timeout_s: 1200

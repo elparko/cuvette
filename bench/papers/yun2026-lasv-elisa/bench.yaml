@@ -10,6 +10,7 @@ answers:
   recovery_limit_pct: 25
   cv_limit_pct: 25
   exclude_wells: "R7-LPC-2, R9-LPC-1"
+  response_level: 50
   "*": "Use the values in the decision record."
 allow: all
 timeout_s: 1800

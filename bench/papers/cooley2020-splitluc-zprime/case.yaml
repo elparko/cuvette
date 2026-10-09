@@ -32,6 +32,22 @@ answers:
     decision: Wells that you exclude as outliers
     value: none
     source: The summary table uses all five wells of each control for the 10 µl plates.
+  response_level:
+    decision: Response level of an absolute IC50
+    value: 50
+    source: Not in the paper. The analysis reports no absolute IC50, so the tool ignores this value.
+  lod_sd:
+    decision: LOD as the blank mean plus k standard deviations
+    value: 3
+    source: Not in the paper. The adapter default; no item uses an LOD.
+  recovery_limit_pct:
+    decision: Accepted bias of a back-calculated standard (percent)
+    value: 20
+    source: Not in the paper. The adapter default; no item uses a recovery limit.
+  cv_limit_pct:
+    decision: Highest accepted CV of replicate wells (percent)
+    value: 20
+    source: Not in the paper. The adapter default; no item uses a CV limit.
   "*":
     decision: Free questions of the model
     value: Use the values in the decision record.

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts";
 import { applyHeadlessSetup, attachHeadless } from "../src/core/headless.ts";
 import { Session, announcesStep, endsWithPromise } from "../src/core/session.ts";
@@ -520,6 +520,18 @@ test("the answers file can change the program choice", async () => {
   expect(session.record.entries(["decision"]).find((e) => e.data.key === "adapter")!.data).toMatchObject({ new: "lab2", by: "human", reason: "from the answers file" });
   expect(session.record.entries(["question"])).toHaveLength(0);
   expect(session.decisions.value("adapter")).toBe("lab2");
+});
+
+test("headless run: a refused answer from the catch-all falls back to the default and logs a notice", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: pickCwd(), settings: { headless: true } });
+  attachHeadless(session, { answers: { "*": "Use the values in the decision record." }, allow: new Set() });
+  const q = await session.questions.ask({ decisionKey: "min_size", title: "Smallest particle", text: "?", options: [], default: 5, evidence: "" });
+  session.bus.emit({ type: "question", question: q });
+  await vi.waitFor(() => expect(session!.questions.get(q.qid)!.status).toBe("answered"));
+  expect(session.questions.get(q.qid)!.answer).toBe(5);
+  expect(session.decisions.value("min_size")).toBe(5);
+  const text = session.record.entries(["notice"]).map((e) => String(e.data.text)).join("\n");
+  expect(text).toMatch(/The answers file gave 'Use the values in the decision record\.' for min_size, which it refused: .* Used '5' instead\./);
 });
 
 test("blind mode adds a mid-session adapter folder to the allow list and hides it from the file tools", async () => {

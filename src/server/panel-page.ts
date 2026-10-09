@@ -74,7 +74,7 @@ function drawCards(f) {
     if (q.evidence) c.append(el("pre", "", q.evidence));
     for (const o of q.options) {
       const rec = q.recommendation && JSON.stringify(q.recommendation.value) === JSON.stringify(o.value);
-      c.append(btn(o.label + (rec ? " (recommended)" : ""), () => api("api/answer", { qid: q.qid, value: o.value }), rec));
+      c.append(btn(o.label + (rec ? " (recommended)" : ""), async () => { const r = await api("api/answer", { qid: q.qid, value: o.value }); if (!r.ok) line("error", "The answer was refused: " + (await r.json()).error + " The question stays open."); }, rec));
     }
     if (q.recommendation) c.append(el("div", "rec", "Recommended: " + q.recommendation.reason));
     box.append(c);

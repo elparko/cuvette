@@ -1,4 +1,5 @@
 import { fitAnswer } from "../core/answers.ts";
+import { answerHeadless } from "../core/headless.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BENCH_DIR, ensureData } from "./datasets.ts";
@@ -45,7 +46,7 @@ export async function runScenario(id: string, opts: RunOptions): Promise<RunResu
       if (e.type === "instruction") return void session.followDone(e.step, "", true);
       if (e.type !== "question") return;
       const v = e.question.decisionKey ? fitAnswer(e.question, answerFor(sc, e.question)) : answerFor(sc, e.question) ?? "Use your best judgment and state it as an assumption.";
-      setTimeout(() => void session.answer(e.question.qid, v ?? "", "simulated scientist").catch(() => {}), 0);
+      setTimeout(() => void answerHeadless(session, e.question, v ?? "", "simulated scientist"), 0);
     });
     const setupKeys = new Set(session.decisions.fields().filter((f) => f.stage === "setup").map((f) => f.key));
     const fromAnswers = Object.fromEntries(Object.entries(sc.answers.decisions).filter(([k]) => setupKeys.has(k)));

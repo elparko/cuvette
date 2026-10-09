@@ -518,15 +518,20 @@ export function ClarifyCard(props: { card: Extract<Card, { t: "clarify" }>; sess
   const { card } = props;
   const [seq, setSeq] = useState<QuestionSeq>(SEQ_START);
   const [, setTick] = useState(0);
+  const [refused, setRefused] = useState("");
   const open = clarifyOpen(card, props.session.questions.open());
   const v = seqView(seq, open);
   const answer = (value: unknown, note?: string) => {
     if (!v) return;
     setSeq(seqAnswered(seq, v.q, value));
     const done = v.changing ? props.session.changeAnswer?.(v.q.qid, value, note) : props.session.answer(v.q.qid, value, note);
+    setRefused("");
     void Promise.resolve(done).then(
       () => setTick((x) => x + 1),
-      () => setSeq((s) => ({ ...s, done: s.done.filter((x) => x.q.qid !== v.q.qid) })),
+      (e: Error) => {
+        setRefused(`${e.message} Try again.`);
+        setSeq((s) => ({ ...s, done: s.done.filter((x) => x.q.qid !== v.q.qid) }));
+      },
     );
   };
   return (
@@ -549,6 +554,7 @@ export function ClarifyCard(props: { card: Extract<Card, { t: "clarify" }>; sess
         </Box>
       ) : null}
       {card.skipped.length ? <Text dimColor>Not asked, because your request answers it: {card.skipped.map((x) => x.split(" The request says:")[0]).join(" ")}</Text> : null}
+      {refused ? <Text color="red">✗ {refused}</Text> : null}
       {v ? (
         <Box flexDirection="column" marginTop={1}>
           <QuestionCard
@@ -574,6 +580,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
   const { card } = props;
   const [raw, setSt] = useState<PlanState>(() => planInit(card));
   const [, setTick] = useState(0);
+  const [refused, setRefused] = useState("");
   const all = props.session.questions.open();
   const st = planResolve(card, raw, all);
   const step = st.step;
@@ -651,10 +658,11 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
             <Text dimColor>
               Open setting {card.qids.length - open.length + 1} of {card.qids.length - st.later.length}. Answer it here, or press Esc to answer later.
             </Text>
+            {refused ? <Text color="red">✗ {refused}</Text> : null}
             <QuestionCard
               key={q.qid}
               card={{ t: "question", q }}
-              onAnswer={(value, note) => void props.session.answer(q.qid, value, note).then(() => setTick((x) => x + 1))}
+              onAnswer={(value, note) => void props.session.answer(q.qid, value, note).then(() => (setRefused(""), setTick((x) => x + 1)), (e: Error) => setRefused(`${e.message} Try again.`))}
               onDismiss={() => act({ a: "later", qid: q.qid })}
             />
           </Box>

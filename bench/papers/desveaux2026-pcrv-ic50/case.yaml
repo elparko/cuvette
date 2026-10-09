@@ -43,6 +43,18 @@ answers:
     decision: Weighting of the fit
     value: none
     source: Not in the paper. The drc default.
+  lod_sd:
+    decision: LOD as the blank mean plus k standard deviations
+    value: 3
+    source: Not in the paper. The adapter default; no item uses an LOD.
+  recovery_limit_pct:
+    decision: Accepted bias of a back-calculated standard (percent)
+    value: 20
+    source: Not in the paper. The adapter default; no item uses a recovery limit.
+  cv_limit_pct:
+    decision: Highest accepted CV of replicate wells (percent)
+    value: 20
+    source: Not in the paper. The adapter default; no item uses a CV limit.
   "*":
     decision: Free questions of the model
     value: Use the values in the decision record.
