@@ -1,0 +1,13 @@
+gene sets in the file: 4026
+distinct genes in the library: 19512
+
+106 of the 4026 gene sets share a gene with the list. Benjamini-Hochberg runs over those, background 20000.
+term                                        x     set                      p             p adjusted         odds ratio
+latamoxef HL60 DOWN                         3    1578  0.0018453839711629735    0.11186724021582134      35.0876190476
+ethotoin HL60 DOWN                          1      24  0.0047917256572958273    0.11186724021582134      289.463768116
+betulinic acid PC3 DOWN                     1      30  0.0059869615251826038    0.11186724021582134      229.505747126
+staurosporine MCF7 DOWN                     2     649  0.0060397542320333973    0.11186724021582134      29.9057187017
+cloperastine PC3 DOWN                       1      37  0.0073800423045372338    0.11186724021582134      184.814814815
+
+The same top term with the genes of the library as the background (the gseapy default):
+latamoxef HL60 DOWN: p = 0.001984222886

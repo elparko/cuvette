@@ -41,7 +41,7 @@ locate:
     - ~/.guided-analysis/envs/enrichment/bin/python
     - ~/.guided-analysis/envs/enrichment/Scripts/python.exe
   which: []
-  version_command: ["{program_path}", "-W", "ignore", "-c", "import gseapy; print('gseapy', gseapy.__version__)"]
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import importlib.metadata as m; print('gseapy', m.version('gseapy'))"]
   version_pattern: 'gseapy (\S+)'
   identity: 'gseapy \d'
 

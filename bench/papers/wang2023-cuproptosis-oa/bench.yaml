@@ -1,0 +1,38 @@
+adapters: [enrichment]
+prompt: |
+  A study of osteoarthritis synovium ended with four hub genes: DBT, DLST, FDX1 and LIPT1. They are in {data}/wang2023-cuproptosis-oa/hub_genes.csv, one per row under the header "gene".
+
+  I want the small molecules whose signatures overlap these four genes. The gene set file is {data}/wang2023-cuproptosis-oa/DSigDB.gmt, the drug signatures database. Use the same settings as the Enrichr web site: the background is 20000 genes, and no limit on the gene set size.
+
+  Give me the top 5 terms by p-value. For each one, give the number of the four genes in the set, the size of the set, the raw p-value and the adjusted p-value. Give the odds ratio of the first term as well.
+
+  Write every number in your final answer text.
+answers:
+  gene_sets: ""
+  background: "20000 genes (the Enrichr default)"
+  min_size: 1
+  max_size: 100000
+  de_padj_max: 1
+  de_lfc_min: 0
+  direction: both
+allow: all
+timeout_s: 1800
+data:
+  - wang2023-cuproptosis-oa/hub_genes.csv
+  - wang2023-cuproptosis-oa/DSigDB.gmt
+items:
+  - {key: overlap_1, description: "Genes of the list in the top term", value: 3, exact: true}
+  - {key: set_size_1, description: "Size of the top term", value: 1578, exact: true}
+  - {key: p_value_1, description: "Raw p of the top term", value: 0.0018453476993364856, tolerance: 0.000001}
+  - {key: p_adjusted_1, description: "Adjusted p of the top term", value: 0.11186607610867805, tolerance: 0.00001}
+  - {key: odds_ratio_1, description: "Odds ratio of the top term", value: 35.08761904761905, tolerance: 0.001}
+  - {key: set_size_2, description: "Size of the second term", value: 24, exact: true}
+  - {key: p_value_2, description: "Raw p of the second term", value: 0.004791660011821214, tolerance: 0.000001}
+  - {key: set_size_3, description: "Size of the third term", value: 30, exact: true}
+  - {key: p_value_3, description: "Raw p of the third term", value: 0.0059868860535258585, tolerance: 0.000001}
+  - {key: set_size_4, description: "Size of the fourth term", value: 649, exact: true}
+  - {key: p_value_4, description: "Raw p of the fourth term", value: 0.0060396749482483575, tolerance: 0.000001}
+  - {key: set_size_5, description: "Size of the fifth term", value: 37, exact: true}
+  - {key: p_value_5, description: "Raw p of the fifth term", value: 0.007379956522320185, tolerance: 0.000001}
+  - {key: n_sets_tested, description: "Number of gene sets tested", value: 4026, exact: true, in_answer: false}
+  - {key: p_value_1_library_background_trap, description: "Raw p of the top term with the genes of the library as the background (trap result)", value: 0.0019842229, tolerance: 0.0000001, in_answer: false, trap: true}

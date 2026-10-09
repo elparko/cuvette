@@ -1,0 +1,162 @@
+R version 4.6.1 (2026-06-24) 
+
+## Abdominal protein: aov(fb_mg ~ factor(age)*factor(treatment)*factor(replicate))
+                                                Df Sum Sq Mean Sq F value
+factor(age)                                      1 1.3577  1.3577  35.693
+factor(treatment)                                1 0.0012  0.0012   0.032
+factor(replicate)                                2 2.7387  1.3694  36.000
+factor(age):factor(treatment)                    1 0.0402  0.0402   1.057
+factor(age):factor(replicate)                    2 0.2137  0.1068   2.809
+factor(treatment):factor(replicate)              2 0.0545  0.0273   0.717
+factor(age):factor(treatment):factor(replicate)  2 0.0943  0.0471   1.240
+Residuals                                       60 2.2823  0.0380        
+                                                  Pr(>F)    
+factor(age)                                     1.36e-07 ***
+factor(treatment)                                 0.8596    
+factor(replicate)                               5.34e-11 ***
+factor(age):factor(treatment)                     0.3081    
+factor(age):factor(replicate)                     0.0682 .  
+factor(treatment):factor(replicate)               0.4925    
+factor(age):factor(treatment):factor(replicate)   0.2968    
+Residuals                                                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+p for age 1.356049e-07
+
+## Abdominal FAS activity: the same model on fb_nadph
+                                                Df Sum Sq Mean Sq F value
+factor(age)                                      1   1.53   1.532   2.010
+factor(treatment)                                1   0.53   0.532   0.698
+factor(replicate)                                2  44.68  22.338  29.323
+factor(age):factor(treatment)                    1   0.37   0.369   0.484
+factor(age):factor(replicate)                    2   7.85   3.924   5.152
+factor(treatment):factor(replicate)              2   1.92   0.962   1.262
+factor(age):factor(treatment):factor(replicate)  2   1.11   0.553   0.726
+Residuals                                       60  45.71   0.762        
+                                                  Pr(>F)    
+factor(age)                                      0.16140    
+factor(treatment)                                0.40668    
+factor(replicate)                               1.31e-09 ***
+factor(age):factor(treatment)                    0.48931    
+factor(age):factor(replicate)                    0.00862 ** 
+factor(treatment):factor(replicate)              0.29039    
+factor(age):factor(treatment):factor(replicate)  0.48796    
+Residuals                                                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+The paper prints F2,60 = 0.962 for treatment by replicate. 0.9616 is the mean square; the F is 1.2624.
+
+## Acini area: aov(Average ~ factor(Age)*factor(Treatment)*factor(Replicate))
+                                                Df    Sum Sq   Mean Sq F value
+factor(Age)                                      1 0.0006911 0.0006911  27.780
+factor(Treatment)                                1 0.0007254 0.0007254  29.156
+factor(Replicate)                                2 0.0003410 0.0001705   6.853
+factor(Age):factor(Treatment)                    1 0.0000141 0.0000141   0.568
+factor(Age):factor(Replicate)                    2 0.0000666 0.0000333   1.338
+factor(Treatment):factor(Replicate)              2 0.0001179 0.0000589   2.369
+factor(Age):factor(Treatment):factor(Replicate)  2 0.0002218 0.0001109   4.457
+Residuals                                       60 0.0014927 0.0000249        
+                                                  Pr(>F)    
+factor(Age)                                     1.95e-06 ***
+factor(Treatment)                               1.20e-06 ***
+factor(Replicate)                                0.00209 ** 
+factor(Age):factor(Treatment)                    0.45392    
+factor(Age):factor(Replicate)                    0.27004    
+factor(Treatment):factor(Replicate)              0.10226    
+factor(Age):factor(Treatment):factor(Replicate)  0.01568 *  
+Residuals                                                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+## Acini area with type III sums of squares (the trap)
+Anova Table (Type III tests)
+
+Response: Average
+                                                   Sum Sq Df   F value
+(Intercept)                                     0.0303274  1 1219.0048
+factor(Age)                                     0.0006600  1   26.5282
+factor(Treatment)                               0.0007510  1   30.1882
+factor(Replicate)                               0.0003543  2    7.1207
+factor(Age):factor(Treatment)                   0.0000172  1    0.6931
+factor(Age):factor(Replicate)                   0.0000689  2    1.3843
+factor(Treatment):factor(Replicate)             0.0001249  2    2.5100
+factor(Age):factor(Treatment):factor(Replicate) 0.0002218  2    4.4572
+Residuals                                       0.0014927 60          
+                                                   Pr(>F)    
+(Intercept)                                     < 2.2e-16 ***
+factor(Age)                                     3.040e-06 ***
+factor(Treatment)                               8.429e-07 ***
+factor(Replicate)                                0.001679 ** 
+factor(Age):factor(Treatment)                    0.408420    
+factor(Age):factor(Replicate)                    0.258373    
+factor(Treatment):factor(Replicate)              0.089770 .  
+factor(Age):factor(Treatment):factor(Replicate)  0.015676 *  
+Residuals                                                    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+The acini design is unbalanced:
+, ,  = A
+
+   
+    QMP - QMP +
+  3     6     5
+  8     6     6
+
+, ,  = B
+
+   
+    QMP - QMP +
+  3     6     6
+  8     6     6
+
+, ,  = C
+
+   
+    QMP - QMP +
+  3     6     7
+  8     6     6
+
+
+## Normalized FAS: Kruskal-Wallis and Dunn
+
+	Kruskal-Wallis rank sum test
+
+data:  fas by order
+Kruskal-Wallis chi-squared = 9.3498, df = 3, p-value = 0.02498
+
+
+	Kruskal-Wallis rank sum test
+
+data:  fas by replicate
+Kruskal-Wallis chi-squared = 23.87, df = 2, p-value = 6.557e-06
+
+  Kruskal-Wallis rank sum test
+
+data: x and g
+Kruskal-Wallis chi-squared = 9.3498, df = 3, p-value = 0.02
+
+
+                      Dunn's Pairwise Comparison of x by g                      
+                                  (Bonferroni)                                  
+
+Col Mean-│
+Row Mean │          A          B          C
+─────────┼─────────────────────────────────
+       B │  -0.278727
+         │     1.0000 
+         │
+       C │   2.436874   2.715601
+         │     0.0889     0.0397*
+         │
+       D │   1.250291   1.529019  -1.186582
+         │     1.0000     0.7576     1.0000 
+
+FWER = 0.05
+Reject Ho if adjusted p ≤ FWER, where (unadjusted) p = Pr(|Z| ≥ |z|)
+  Comparison          Z     P.unadj      P.adj
+1      A - B -0.2787274 0.780453996 1.00000000
+2      A - C  2.4368743 0.014814830 0.08888898
+3      B - C  2.7156017 0.006615545 0.03969327
+4      A - D  1.2502917 0.211193011 1.00000000
+5      B - D  1.5290191 0.126259698 0.75755819
+6      C - D -1.1865826 0.235392316 1.00000000

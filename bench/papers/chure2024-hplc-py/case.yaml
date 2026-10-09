@@ -1,0 +1,130 @@
+kind: research paper
+short: Chure 2024
+field: Chromatography
+program: hplc-py (Python), through the chromatography adapter
+citation:
+  authors: Chure G, Cremer J
+  title: "hplc-py: A Python Utility For Rapid Quantification of Complex Chemical Chromatograms"
+  venue: Journal of Open Source Software 9(94):6270
+  year: 2024
+  doi: 10.21105/joss.06270
+related:
+  - text: "The software and its data, archived for the paper: hplc-py 0.2.5, Zenodo (2024), GPL-3.0."
+    doi: 10.5281/zenodo.10642439
+measured: >-
+  The paper describes the peak quantification algorithm of hplc-py on a real chromatogram. Figure 2D prints a
+  peak table from the fit_peaks method of the example trace: retention time, amplitude, scale, skew and
+  integrated area. Figure 2E and 2F show a lactose calibration from four standards. The traces are in the
+  archive that the paper cites.
+instruction: >-
+  Integrate the peaks of the example chromatogram between 10 and 20 minutes with a corrected baseline, and
+  give the retention time and the area of each peak, with the amplitude, the scale and the skew of the first
+  one. Then fit a calibration curve from the four lactose standards and give the concentration of the unknown.
+instruction_basis: >-
+  Figure 2C and 2D for the peak table, and Figure 2E and 2F for the calibration. The quickstart page of the
+  documentation uses the same trace with a crop from 10 to 20 minutes.
+answers:
+  baseline:
+    decision: Baseline correction
+    value: snip
+    source: Figure 2C, step i, "background subtraction, chrom.correct_baseline()". The detector signal drifts.
+  peak_width:
+    decision: Approximate peak width
+    value: 5
+    source: The hplc-py default for correct_baseline. The quickstart uses it.
+  prominence:
+    decision: Smallest peak height that counts
+    value: 0.01
+    source: The hplc-py default, 1% of the largest peak.
+  through_origin:
+    decision: Force the calibration through zero
+    value: false
+    source: >-
+      Not stated in the paper. Figure 2F draws a line that does not pass through the origin. A line with an
+      intercept is the usual choice in a chromatography data system.
+  weighting:
+    decision: Weighting of the calibration fit
+    value: none
+    source: Not stated. The standards cover one order of magnitude, so no weighting is needed.
+items:
+  n_peaks:
+    source: computed
+    tool: hplc-py 0.2.10
+    where: >-
+      Figure 2D prints three rows of a table whose first column is cut off by the figure. The window from 10
+      to 20 minutes holds six peaks.
+    independence: not independent. The value comes from the same program.
+    check: The same count comes from hplc-py 0.2.5, the archived version.
+  peak1_retention_time:
+    source: published
+    where: Figure 2D, row 1, column ret_time. 10.90.
+    check: The adapter gives 10.90.
+  peak1_area:
+    source: published
+    where: Figure 2D, row 1, column area. 2.8e+6.
+    check: The adapter gives 2805655.43, which rounds to 2.8e+6.
+  peak1_amplitude:
+    source: published
+    where: Figure 2D, row 1, column amp. 2.3e+4.
+    check: The adapter gives 23380.46, which rounds to 2.3e+4.
+  peak1_scale:
+    source: published
+    where: Figure 2D, row 1, column scale. 0.16.
+    check: The adapter gives 0.1588.
+  peak1_skew:
+    source: published
+    where: Figure 2D, row 1, column skew. 0.70.
+    check: The adapter gives 0.6918.
+  peak3_retention_time:
+    source: published
+    where: Figure 2D, row 3, column ret_time. 14.45.
+    check: The adapter gives 14.45 for the third peak.
+  peak1_area_exact:
+    source: computed
+    tool: hplc-py 0.2.10
+    where: Not in the paper. The figure prints two significant figures.
+    independence: not independent. The value comes from the same program.
+    check: >-
+      The area of a window by the trapezoid rule, divided by the sampling step, gives the same kind of number.
+      catalog/chromatography/checks/area_units.py shows the two on a synthetic peak with a known area.
+  calibration_slope:
+    source: computed
+    tool: numpy least squares, in the adapter
+    where: Figure 2F draws the line but prints no slope.
+    independence: independent
+    check: R 4.6.1 lm(area ~ conc) gives 156586.7415 (catalog/chromatography/checks/calibration_r.out).
+  calibration_intercept:
+    source: computed
+    tool: numpy least squares, in the adapter
+    where: Not printed.
+    independence: independent
+    check: R 4.6.1 lm gives 14624.93792.
+  calibration_r_squared:
+    source: computed
+    tool: numpy least squares, in the adapter
+    where: Not printed.
+    independence: independent
+    check: R 4.6.1 lm gives 0.9988678581.
+  unknown_concentration:
+    source: computed
+    tool: the chromatography adapter
+    where: >-
+      Not printed. The file name of the unknown says 2 mM. The calibration gives 1.8994 mM, 5% below the
+      nominal value.
+    independence: independent
+    check: R 4.6.1 back-calculation gives 1.89941477 (checks/calibration_r.out).
+  n_peaks_no_baseline_trap:
+    source: computed
+    tool: hplc-py 0.2.10
+    where: >-
+      Not in the paper. Without the baseline correction the same window gives 7 peaks instead of 6, and the
+      first peak moves from 10.90 to 10.28 minutes. A run that skips the baseline reaches this value.
+    independence: not independent.
+    check: The adapter run with baseline none.
+notes: >-
+  Rows 2 and 3 of Figure 2D do not reproduce in full. Row 2 prints a retention time of 15.19, and the trace in
+  the archive gives 15.53. Row 3 prints an amplitude of 3.7e+4 and a skew of -5.55, and the trace gives
+  3.5e+4 and -3.0. Only the retention time of row 3, 14.45, reproduces. The figure panel was probably made
+  from a chromatogram that the archive does not hold, so those values are not items.
+  The paper is CC BY 4.0. The code and the data are GPL-3.0, so the benchmark downloads them and does not
+  copy them into the repository.

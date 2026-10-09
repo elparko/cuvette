@@ -1,5 +1,7 @@
 import os
 import re
+import urllib.parse
+import urllib.request
 import warnings
 from datetime import date
 
@@ -13,7 +15,7 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 
-BACKGROUNDS = ("measured genes", "measured genes in the gene sets", "all genes in the gene sets")
+BACKGROUNDS = ("measured genes", "measured genes in the gene sets", "all genes in the gene sets", "20000 genes (the Enrichr default)")
 
 
 def _fail(message):
@@ -93,6 +95,10 @@ def _gene_sets(gene_sets):
     return sets, None
 
 
+def _bg_size(bg):
+    return bg if isinstance(bg, int) else len(bg)
+
+
 def _ids(series):
     return series.dropna().astype(str).str.strip().str.replace(r"\.\d+$", "", regex=True)
 
@@ -141,23 +147,45 @@ def fetch_gene_sets(library, organism="Human"):
     name = str(library or "").strip()
     if not name:
         return _fail("library is empty. Name an Enrichr library, such as MSigDB_Hallmark_2020 or GO_Biological_Process_2023.")
+    base = {"Human": "", "Mouse": "Mouse", "Yeast": "Yeast", "Fly": "Fly", "Fish": "Fish", "Worm": "Worm"}.get(organism)
+    if base is None:
+        return _fail("organism %r is not known. Use Human, Mouse, Yeast, Fly, Fish or Worm." % organism)
+    host = "https://maayanlab.cloud/%sEnrichr" % base
+    url = "%s/geneSetLibrary?mode=text&libraryName=%s" % (host, urllib.parse.quote(name))
     try:
-        sets = gp.get_library(name=name, organism=organism)
+        with urllib.request.urlopen(url, timeout=300) as fh:
+            text = fh.read().decode("utf-8", errors="replace")
     except Exception as e:
         try:
             known = gp.get_library_name(organism=organism)
             close = [k for k in known if name.lower().split("_")[0] in k.lower()][:10]
         except Exception:
             close = []
-        return _fail("Could not download the Enrichr library %s for %s: %s.%s" % (name, organism, e, (" Similar names: " + ", ".join(close)) if close else ""))
+        return _fail("Could not download the Enrichr library %s for %s from %s: %s.%s" % (
+            name, organism, host, e, (" Similar names: " + ", ".join(close)) if close else ""))
+    sets = {}
+    dropped = 0
+    for line in text.splitlines():
+        parts = [x.strip() for x in line.rstrip("\n").split("\t")]
+        if len(parts) < 3 or not parts[0]:
+            dropped += int(bool(line.strip()))
+            continue
+        genes = [g.split(",")[0] for g in parts[2:] if g and g.split(",")[0]]
+        if genes:
+            sets[parts[0]] = genes
+        else:
+            dropped += 1
+    if not sets:
+        return _fail("The Enrichr library %s for %s came back with no gene set. The server returned %d characters." % (name, organism, len(text)))
     stamp = date.today().isoformat()
     path = os.path.join(os.getcwd(), "%s_%s_%s.gmt" % (re.sub(r"\W+", "_", name), organism, stamp))
     with open(path, "w") as fh:
         for k, v in sets.items():
             fh.write("\t".join([k, "Enrichr %s %s downloaded %s" % (name, organism, stamp)] + list(v)) + "\n")
     sizes = [len(v) for v in sets.values()]
-    return {"ok": True, "summary": "Downloaded the Enrichr library %s (%s) on %s: %d gene sets, median size %d genes. Saved %s." % (
-        name, organism, stamp, len(sets), int(np.median(sizes)), path),
+    note = " %d line(s) had no name or no gene; the tool left them out." % dropped if dropped else ""
+    return {"ok": True, "summary": "Downloaded the Enrichr library %s (%s) on %s: %d gene sets, median size %d genes. Saved %s.%s" % (
+        name, organism, stamp, len(sets), int(np.median(sizes)), path, note),
         "metrics": {"n_gene_sets": len(sets), "median_set_size": float(np.median(sizes))},
         "data": {"gmt": path, "library": name, "organism": organism, "date": stamp},
         "outputs": [{"path": path, "kind": "file", "name": os.path.basename(path)}]}
@@ -229,39 +257,54 @@ def run_ora(path, gene_sets, id_column, background, padj_column=None, padj_max=N
         bg = measured
     elif background == "measured genes in the gene sets":
         bg = measured & annotated
-    else:
+    elif background == "all genes in the gene sets":
         bg = annotated
-    q_in = query & bg
+    else:
+        bg = 20000
+    q_in = query if isinstance(bg, int) else query & bg
     if not q_in or not (query & annotated):
         return _fail("No gene of the list (%d genes, rule %s) is in the background (%s, %d genes) or in any gene set. Check the ID type: the table has %s IDs, the gene sets %s IDs." % (
-            len(query), rule, background, len(bg), _id_kind(measured), _id_kind(annotated)))
-    kept = {k: v for k, v in sets.items() if min_size <= len(set(v) & bg) <= max_size}
+            len(query), rule, background, _bg_size(bg), _id_kind(measured), _id_kind(annotated)))
+    kept = {k: v for k, v in sets.items() if min_size <= len(set(v) if isinstance(bg, int) else set(v) & bg) <= max_size}
     if not kept:
-        return _fail("No gene set has between %d and %d genes in the background (%d genes)." % (min_size, max_size, len(bg)))
+        return _fail("No gene set has between %d and %d genes in the background (%s genes)." % (min_size, max_size, _bg_size(bg)))
     try:
         tag = lambda xs: ["id:" + x for x in xs]
-        enr = gp.enrich(gene_list=tag(sorted(query)), gene_sets={k: tag(v) for k, v in kept.items()}, background=set(tag(bg)), outdir=None, cutoff=1.0, no_plot=True)
+        back = bg if isinstance(bg, int) else set(tag(bg))
+        enr = gp.enrich(gene_list=tag(sorted(query)), gene_sets={k: tag(v) for k, v in kept.items()}, background=back, outdir=None, cutoff=1.0, no_plot=True)
     except Exception as e:
-        return _fail("gseapy enrich stopped (list of %d genes, %d gene sets, background %d genes): %s" % (len(query), len(kept), len(bg), e))
+        return _fail("gseapy enrich stopped (list of %d genes, %d gene sets, background %s genes): %s" % (len(query), len(kept), _bg_size(bg), e))
     res = enr.results.copy() if isinstance(enr.results, pd.DataFrame) else pd.DataFrame()
     if res.empty:
         return _fail("No gene set shares a gene with the list (%d genes in the background). Tested %d gene sets." % (len(q_in), len(kept)))
     res["overlap_n"] = res["Overlap"].str.split("/").str[0].astype(int)
     res["set_size_in_background"] = res["Overlap"].str.split("/").str[1].astype(int)
+    x = res["overlap_n"].astype(float)
+    m = res["set_size_in_background"].astype(float)
+    n_list = float(len(q_in))
+    total = float(_bg_size(bg))
     out = pd.DataFrame({"term": res["Term"], "overlap": res["overlap_n"], "set_size": res["set_size_in_background"],
-                        "list_size": len(q_in), "background_size": len(bg), "p_value": res["P-value"], "p_adjusted_bh": res["Adjusted P-value"],
-                        "odds_ratio": res["Odds Ratio"], "genes": res["Genes"].str.replace("id:", "", regex=False)}).sort_values(["p_value", "term"]).reset_index(drop=True)
+                        "list_size": len(q_in), "background_size": _bg_size(bg), "p_value": res["P-value"], "p_adjusted_bh": res["Adjusted P-value"],
+                        "odds_ratio": (x * (total - m - n_list + x) / np.maximum((m - x) * (n_list - x), 1.0)),
+                        "odds_ratio_haldane": res["Odds Ratio"],
+                        "genes": res["Genes"].str.replace("id:", "", regex=False)}).sort_values(["p_value", "term"]).reset_index(drop=True)
     sig = out[out["p_adjusted_bh"] < 0.05]
-    metrics = {"list_size": len(query), "list_size_in_background": len(q_in), "background_size": len(bg), "n_sets_tested": len(kept),
+    metrics = {"list_size": len(query), "list_size_in_background": len(q_in), "background_size": _bg_size(bg), "n_sets_tested": len(kept),
                "n_sets_with_overlap": len(out), "n_sets_significant": len(sig), "top_overlap": int(out.loc[0, "overlap"]),
-               "top_p_value": float(out.loc[0, "p_value"]), "top_p_adjusted": float(out.loc[0, "p_adjusted_bh"])}
+               "top_set_size": int(out.loc[0, "set_size"]), "top_p_value": float(out.loc[0, "p_value"]),
+               "top_p_adjusted": float(out.loc[0, "p_adjusted_bh"]), "top_odds_ratio": float(out.loc[0, "odds_ratio"])}
+    for i in range(min(5, len(out))):
+        metrics["overlap_%d" % (i + 1)] = int(out.loc[i, "overlap"])
+        metrics["set_size_%d" % (i + 1)] = int(out.loc[i, "set_size"])
+        metrics["p_value_%d" % (i + 1)] = float(out.loc[i, "p_value"])
+        metrics["p_adjusted_%d" % (i + 1)] = float(out.loc[i, "p_adjusted_bh"])
     plot = out.copy()
     plot["gene_ratio"] = plot["overlap"] / plot["list_size"]
     plot["-log10 adjusted p"] = -np.log10(plot["p_adjusted_bh"].clip(lower=1e-300))
-    outputs = _dotplot(plot, "gene_ratio", "overlap", "-log10 adjusted p", "Over-representation, %s, background %s (%d genes)" % (rule, background, len(bg)), "ora_dotplot", "Gene ratio (overlap / list size)")
+    outputs = _dotplot(plot, "gene_ratio", "overlap", "-log10 adjusted p", "Over-representation, %s, background %s (%d genes)" % (rule, background, _bg_size(bg)), "ora_dotplot", "Gene ratio (overlap / list size)")
     top = out.head(5)
     summary = "ORA (hypergeometric, BH): %d genes pass %s, %d of them in the background (%s, %d genes). %d gene sets tested (size %d to %d), %d with adjusted p < 0.05. Top: %s." % (
-        len(query), rule, len(q_in), background, len(bg), len(kept), min_size, max_size, len(sig),
+        len(query), rule, len(q_in), background, _bg_size(bg), len(kept), min_size, max_size, len(sig),
         "; ".join("%s %d/%d, p = %.3g, adjusted p = %.3g" % (r.term, r.overlap, r.set_size, r.p_value, r.p_adjusted_bh) for r in top.itertuples()))
     return {"ok": True, "summary": summary, "metrics": metrics, "data": {"rule": rule, "background": background},
             "table": _table(out, "ora_results"), "outputs": outputs}

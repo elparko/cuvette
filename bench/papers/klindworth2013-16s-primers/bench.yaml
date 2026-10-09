@@ -1,0 +1,38 @@
+adapters: [cloning]
+prompt: |
+  I want to check two 16S rRNA primer pairs before I order them. The template is the Escherichia coli rrnB operon, {data}/klindworth2013-16s-primers/ecoli_rrnb.fasta (GenBank J01695.2, linear). The 16S gene of this record starts at position 1268.
+
+  Pair 1: forward CCTACGGGNGGCWGCAG, reverse GACTACHVGGGTATCTAATCC. Both hold IUPAC ambiguity codes.
+  Pair 2: forward AGAGTTTGATCMTGGC, reverse CCGTCAATTCMTTTGAGTTT.
+
+  1. For each pair, how many products does the template give, and where does each product start and end on J01695.2? Give me the product length.
+  2. Primer names in this field carry the start position of the forward primer in the 16S gene of E. coli, counted from the first base of the gene. What is that position for each forward primer?
+  3. My polymerase buffer has 50 mM monovalent salt, 1.5 mM magnesium and 0.6 mM dNTP, and I use each primer at 200 nM. What is the melting temperature of CCTACGGGAGGCAGCAG, the version of the first forward primer with no ambiguity?
+
+  Write every number in your final answer text.
+answers:
+  min_anneal_bp: 13
+  topology: linear
+  na_mM: 50
+  mg_mM: 1.5
+  dntp_mM: 0.6
+  primer_nM: 200
+  tm_method: primer3
+  salt_correction: santalucia
+allow: all
+timeout_s: 1800
+data:
+  - klindworth2013-16s-primers/ecoli_rrnb.fasta
+items:
+  - {key: pair1_products, description: "Number of products from pair 1", value: 1, exact: true}
+  - {key: pair1_start, description: "Start of the pair 1 product on J01695.2", value: 1608, exact: true}
+  - {key: pair1_end, description: "End of the pair 1 product on J01695.2", value: 2072, exact: true}
+  - {key: pair1_length, description: "Length of the pair 1 product, first to last base", value: 465, exact: true}
+  - {key: pair1_ecoli_position, description: "Start of the pair 1 forward primer in the E. coli 16S numbering", value: 341, exact: true}
+  - {key: pair2_products, description: "Number of products from pair 2", value: 1, exact: true}
+  - {key: pair2_start, description: "Start of the pair 2 product on J01695.2", value: 1275, exact: true}
+  - {key: pair2_end, description: "End of the pair 2 product on J01695.2", value: 2193, exact: true}
+  - {key: pair2_length, description: "Length of the pair 2 product, first to last base", value: 919, exact: true}
+  - {key: pair2_ecoli_position, description: "Start of the pair 2 forward primer in the E. coli 16S numbering", value: 8, exact: true}
+  - {key: tm_primer3, description: "Melting temperature of CCTACGGGAGGCAGCAG, in degrees C", value: 61.39, tolerance: 0.01}
+  - {key: pair1_coordinate_difference, description: "Difference of the two primer start positions in the E. coli numbering (the published amplicon size)", value: 464, exact: true, in_answer: false}

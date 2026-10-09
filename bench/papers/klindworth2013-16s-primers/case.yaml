@@ -1,0 +1,140 @@
+kind: research paper
+short: Klindworth 2013
+field: Molecular cloning
+program: Biopython and primer3-py, through the cloning adapter
+citation:
+  authors: Klindworth A, Pruesse E, Schweer T, Peplies J, Quast C, Horn M, Glöckner FO
+  title: "Evaluation of general 16S ribosomal RNA gene PCR primers for classical and next-generation sequencing-based diversity studies"
+  venue: Nucleic Acids Research 41(1):e1
+  year: 2013
+  doi: 10.1093/nar/gks808
+related:
+  - text: "Brosius J, Palmer ML, Kennedy PJ, Noller HF. Complete nucleotide sequence of a 16S ribosomal RNA gene from Escherichia coli. PNAS 75(10):4801-4805 (1978). The source of the E. coli position numbering, and of GenBank J01695."
+    doi: 10.1073/pnas.75.10.4801
+measured: >-
+  The study checked general 16S rRNA gene primers against the SILVA database and recommended primer pairs for
+  three amplicon size classes. The primer names carry the start position of the primer in the E. coli 16S
+  numbering of Brosius 1978. The paper gives the sequence of two bacterial pairs in the Materials and Methods
+  and prints the amplicon size of the recommended pair.
+instruction: >-
+  Find the products of the two primer pairs on the E. coli rrnB operon, give the positions and the length of
+  each one, convert the forward primer start to the E. coli 16S numbering, and give the melting temperature of
+  one primer under stated buffer conditions.
+instruction_basis: >-
+  The Materials and Methods, which print both primer pairs, and the Results, which print the 464 bp amplicon
+  size of the first pair. The naming rule is in the Materials and Methods: "'0338' stands for start position
+  338 in the Escherichia coli system of nomenclature".
+answers:
+  min_anneal_bp:
+    decision: "Shortest 3' match for a binding site"
+    value: 13
+    source: >-
+      Not in the paper. 13 is the usual default. The two sites here match over the full primer, so the value
+      does not change the result.
+  topology:
+    decision: Linear or circular template
+    value: linear
+    source: The GenBank record J01695.2 is a linear sequence of one operon.
+  na_mM:
+    decision: Monovalent cations
+    value: 50 mM
+    source: Given in the request, not in the paper. The paper does not print a melting temperature.
+  mg_mM:
+    decision: Magnesium
+    value: 1.5 mM
+    source: Given in the request.
+  dntp_mM:
+    decision: Total dNTP
+    value: 0.6 mM
+    source: Given in the request.
+  primer_nM:
+    decision: Primer concentration
+    value: 200 nM
+    source: Given in the request.
+  tm_method:
+    decision: Melting temperature method
+    value: primer3
+    source: Given in the request. The Primer3 method is the SantaLucia 1998 nearest-neighbor model.
+  salt_correction:
+    decision: Salt correction
+    value: santalucia
+    source: The Primer3 default.
+items:
+  pair1_products:
+    source: computed
+    tool: the cloning adapter, simulate_pcr
+    where: Not in the paper. The paper states one amplicon for this pair.
+    independence: independent
+    check: A plain regular expression search finds one forward site and one reverse site (catalog/cloning/checks/pcr_16s_string_search.py).
+  pair1_start:
+    source: computed
+    tool: the cloning adapter, simulate_pcr
+    where: Not in the paper in J01695.2 coordinates.
+    independence: independent
+    check: The string search gives 1608 (checks/pcr_16s_string_search.out).
+  pair1_end:
+    source: computed
+    tool: the cloning adapter, simulate_pcr
+    where: Not in the paper in J01695.2 coordinates.
+    independence: independent
+    check: The string search gives 2072.
+  pair1_length:
+    source: computed
+    tool: the cloning adapter, simulate_pcr
+    where: >-
+      The paper prints 464 bp. 465 is the count of bases from the first to the last base. 464 is the
+      difference of the two primer start positions in the E. coli numbering (785 minus 341), which is how the
+      paper counts. Both numbers describe the same product.
+    independence: independent
+    check: The string search gives an inclusive length of 465.
+  pair1_ecoli_position:
+    source: published
+    where: >-
+      The primer name S-D-Bact-0341-b-S-17 carries the position. The Materials and Methods state the rule:
+      "'0338' stands for start position 338 in the Escherichia coli system of nomenclature".
+    check: 1608 minus 1268 plus 1 gives 341, where 1268 is the first base of the 16S gene in J01695.2.
+  pair2_products:
+    source: computed
+    tool: the cloning adapter, simulate_pcr
+    where: Not in the paper.
+    independence: independent
+    check: The string search finds one site for each primer.
+  pair2_start:
+    source: computed
+    tool: the cloning adapter, simulate_pcr
+    where: Not in the paper.
+    independence: independent
+    check: 1275 on J01695.2, which is E. coli position 8, the number in the primer name S-D-Bact-0008-a-S-16.
+  pair2_end:
+    source: computed
+    tool: the cloning adapter, simulate_pcr
+    where: Not in the paper.
+    independence: independent
+    check: 2193 on J01695.2, which is E. coli position 926, the end of the reverse primer S-D-Bact-0907-a-A-20.
+  pair2_length:
+    source: computed
+    tool: the cloning adapter, simulate_pcr
+    where: Not in the paper.
+    independence: independent
+    check: 2193 minus 1275 plus 1 gives 919.
+  pair2_ecoli_position:
+    source: published
+    where: The primer name S-D-Bact-0008-a-S-16 carries the position 8.
+    check: 1275 minus 1268 plus 1 gives 8.
+  tm_primer3:
+    source: computed
+    tool: primer3-py 2.3.1 calc_tm
+    where: Not in the paper. The paper prints no melting temperature.
+    independence: independent
+    check: >-
+      The primer3 test file oligotm.txt pins the same function on 33 other oligonucleotides
+      (catalog/cloning/checks/oligotm_suite.out). The value here comes from the adapter.
+  pair1_coordinate_difference:
+    source: published
+    where: 'Results. "the pair S-D-Bact-0341-b-S-17/S-D-Bact-0785-a-A-21 shows the best combination of domain and phylum coverage and can thus be recommended for 464 bp amplicons".'
+    check: 785 minus 341 gives 464.
+notes: >-
+  The license of the paper is CC BY-NC. The data are a GenBank record, which has no use restriction.
+  The two printed primer sequences are in the Materials and Methods: "S-D-Bact-0341-b-S-17,
+  5'-CCTACGGGNGGCWGCAG-3' and S-D-Bact-0785-a-A-21, 5'-GACTACHVGGGTATCTAATCC-3'", and
+  "S-D-Bact-0008-a-S-16, 5'-AGAGTTTGATCMTGGC-3' and S-D-Bact-0907-a-A-20, 5'-CCGTCAATTCMTTTGAGTTT-3'".

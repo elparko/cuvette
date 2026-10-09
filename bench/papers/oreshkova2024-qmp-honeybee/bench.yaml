@@ -1,0 +1,45 @@
+adapters: [biostats]
+prompt: |
+  I have two files from a honey bee experiment. Each cage held nurse-aged bees of one age group (3 or 8 days) with queen mandibular pheromone (QMP +) or without it (QMP -), and the whole experiment ran three times (replicates A, B and C).
+
+  File 1: {data}/oreshkova2024-qmp-honeybee/qmp_pooled_data.csv. One row for each pooled sample of two abdomens. Columns: age (3 or 8), treatment (QMP + or QMP -), replicate (A, B or C), order (the four treatment groups), fb_mg (abdominal protein in mg), fb_nadph (abdominal fatty acid synthase activity in nmol NADPH per minute per abdomen) and fas (fatty acid synthase activity normalized to protein).
+
+  File 2: {data}/oreshkova2024-qmp-honeybee/hpg_data.csv. One row for each hypopharyngeal gland. Columns: Age, Treatment, Replicate and Average (the acini area in mm squared).
+
+  1. Does age, QMP treatment or the replicate change the abdominal protein (fb_mg)? Test all three factors together with every interaction. Give me the F statistic with both degrees of freedom and the p-value for each term.
+  2. Do the same for the acini area (Average in file 2) with Age, Treatment and Replicate.
+  3. The normalized FAS (fas) is not normally distributed. Compare the four treatment groups (order) with a rank test, and compare the three replicates the same way. Give me the test statistic, the degrees of freedom and the p-value, and the pairwise comparisons with a Bonferroni correction.
+
+  Write every number in your final answer text.
+answers:
+  replicate: "subjects, patients or animals (one value per subject)"
+  alpha: 0.05
+  ss_type: 1
+  factorial_posthoc: none
+  rank_p_adjust: bonferroni
+allow: all
+timeout_s: 1800
+data:
+  - oreshkova2024-qmp-honeybee/qmp_pooled_data.csv
+  - oreshkova2024-qmp-honeybee/hpg_data.csv
+items:
+  - {key: protein_f_age, description: "Abdominal protein, F for age", value: 35.693, tolerance: 0.001}
+  - {key: protein_f_treatment, description: "Abdominal protein, F for QMP treatment", value: 0.032, tolerance: 0.0005}
+  - {key: protein_f_replicate, description: "Abdominal protein, F for replicate", value: 36.000, tolerance: 0.001}
+  - {key: protein_p_age, description: "Abdominal protein, p for age", value: 0.0000001356, tolerance: 0.0000001, in_answer: false}
+  - {key: protein_p_treatment, description: "Abdominal protein, p for QMP treatment", value: 0.8596, tolerance: 0.0001}
+  - {key: protein_f_age_x_treatment, description: "Abdominal protein, F for age by treatment", value: 1.057, tolerance: 0.001}
+  - {key: protein_f_age_x_replicate, description: "Abdominal protein, F for age by replicate", value: 2.809, tolerance: 0.001}
+  - {key: protein_df_residual, description: "Residual degrees of freedom of the three-way ANOVA", value: 60, exact: true, in_answer: false}
+  - {key: acini_f_age, description: "Acini area, F for age", value: 27.780, tolerance: 0.001}
+  - {key: acini_f_treatment, description: "Acini area, F for QMP treatment", value: 29.156, tolerance: 0.001}
+  - {key: acini_f_replicate, description: "Acini area, F for replicate", value: 6.853, tolerance: 0.001}
+  - {key: acini_p_replicate, description: "Acini area, p for replicate", value: 0.00209, tolerance: 0.00001}
+  - {key: acini_f_three_way, description: "Acini area, F for age by treatment by replicate", value: 4.457, tolerance: 0.001}
+  - {key: acini_p_three_way, description: "Acini area, p for age by treatment by replicate", value: 0.01568, tolerance: 0.00001}
+  - {key: fas_kruskal_chi2, description: "Kruskal-Wallis chi-squared for the four treatment groups", value: 9.3498, tolerance: 0.0001}
+  - {key: fas_kruskal_df, description: "Kruskal-Wallis degrees of freedom", value: 3, exact: true, in_answer: false}
+  - {key: fas_kruskal_p, description: "Kruskal-Wallis p for the four treatment groups", value: 0.02498, tolerance: 0.00001}
+  - {key: fas_dunn_padj, description: "Dunn adjusted p, the only significant pair", value: 0.0397, tolerance: 0.0001}
+  - {key: fas_replicate_chi2, description: "Kruskal-Wallis chi-squared for the three replicates", value: 23.87, tolerance: 0.005}
+  - {key: acini_f_age_type3_trap, description: "Acini area, F for age with type III sums of squares (trap result)", value: 26.528, tolerance: 0.001, in_answer: false, trap: true}

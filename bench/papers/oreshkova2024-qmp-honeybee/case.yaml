@@ -1,0 +1,151 @@
+kind: research paper
+short: Oreshkova 2024
+field: Statistics
+program: statsmodels and SciPy (Python), through the biostats adapter
+citation:
+  authors: Oreshkova A, Scofield S, Amdam GV
+  title: "The effects of queen mandibular pheromone on nurse-aged honey bee (Apis mellifera) hypopharyngeal gland size and lipid metabolism"
+  venue: PLOS ONE 19(9):e0292500
+  year: 2024
+  doi: 10.1371/journal.pone.0292500
+related:
+  - text: "Data: abdominal metrics, figshare (2023), CC BY 4.0."
+    doi: 10.6084/m9.figshare.24164316
+  - text: "Data: average hypopharyngeal acini area, figshare (2023), CC BY 4.0."
+    doi: 10.6084/m9.figshare.24164265
+  - text: "The authors' own R script, figshare (2023), CC BY 4.0. It names aov, kruskal.test and FSA::dunnTest."
+    doi: 10.6084/m9.figshare.24164343
+measured: >-
+  Nurse-aged honey bees were held in cages with or without queen mandibular pheromone (QMP), at two ages
+  (3 and 8 days). The whole experiment ran three times (replicates A, B and C). The study measured the
+  abdominal protein, the abdominal fatty acid synthase activity and the area of the hypopharyngeal gland
+  acini. The analysis is a three-way factorial ANOVA for each measurement, and a Kruskal-Wallis test with
+  Dunn comparisons for the normalized enzyme activity.
+instruction: >-
+  Test the abdominal protein and the acini area against age, QMP treatment and replicate, with every
+  interaction. Give the F statistic with both degrees of freedom and the p-value for each term. Compare the
+  normalized fatty acid synthase activity across the four treatment groups and the three replicates with a
+  rank test, and give the pairwise comparisons with a Bonferroni correction.
+instruction_basis: >-
+  Results sections 3.2, 3.3 and 3.4, and the authors' R script. The script runs
+  aov(fb_mg ~ factor(age)*factor(treatment)*factor(replicate)), the same for fb_nadph, the same for the acini
+  area, then kruskal.test(fas ~ order), kruskal.test(fas ~ replicate) and dunnTest with the Bonferroni method.
+answers:
+  replicate:
+    decision: Unit of replication
+    value: one row for each pooled sample or each gland
+    source: >-
+      Methods. Each row of the abdominal file is one pooled sample of two abdomens. Each row of the acini file
+      is one gland. The authors fit the replicate as a fixed factor, so the ANOVA counts the rows as independent.
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: The paper reports significance at 0.05 throughout.
+  ss_type:
+    decision: Type of sums of squares
+    value: 1
+    source: >-
+      The authors' R script uses aov, which gives type I sums of squares. The acini data are unbalanced
+      (one cage gives 5 glands and another 7), so type III gives different F values for the main effects.
+  factorial_posthoc:
+    decision: Comparisons of the cell means after the ANOVA
+    value: none
+    source: The paper reports no post-hoc test after the three-way ANOVA.
+  rank_p_adjust:
+    decision: Correction after the rank test
+    value: bonferroni
+    source: "The R script calls dunnTest(..., method = \"bonferroni\"). The paper prints the adjusted p as Padj."
+items:
+  protein_f_age:
+    source: published
+    where: 'Section 3.2. "Abdominal protein was significantly higher in 8-day-old than 3-day-old bees (F1,60 = 35.693, P < 0.001; Fig 6)".'
+    check: R 4.6.1 aov gives 35.6928 (check_anova.R).
+  protein_f_treatment:
+    source: published
+    where: 'Section 3.2. "it was not significantly affected by QMP treatment (F1,60 = 0.032, P = 0.8596)".'
+    check: R 4.6.1 aov gives 0.0316 (check_anova.R).
+  protein_f_replicate:
+    source: published
+    where: 'Section 3.2. "significantly different between replicates (F2,60 = 36.000 P < 0.001; S2B Fig)".'
+    check: R 4.6.1 aov gives 35.9995 (check_anova.R).
+  protein_p_age:
+    source: computed
+    tool: statsmodels 0.15.0 anova_lm
+    where: The paper prints P < 0.001 only.
+    independence: independent
+    check: R 4.6.1 aov gives 1.356e-07 (check_anova.R).
+  protein_p_treatment:
+    source: published
+    where: Section 3.2, the same sentence as protein_f_treatment.
+    check: R 4.6.1 aov gives 0.8596 (check_anova.R).
+  protein_f_age_x_treatment:
+    source: published
+    where: 'Section 3.2. "age x QMP treatment (F1,60 = 1.057, P = 0.3081)".'
+    check: R 4.6.1 aov gives 1.0567 (check_anova.R).
+  protein_f_age_x_replicate:
+    source: published
+    where: 'Section 3.2. "age x replicate (F2,60 = 2.809, P = 0.0682)".'
+    check: R 4.6.1 aov gives 2.8085 (check_anova.R).
+  protein_df_residual:
+    source: published
+    where: Section 3.2. Every F statistic is printed as F1,60 or F2,60.
+    check: R 4.6.1 aov gives 60 residual degrees of freedom (check_anova.R).
+  acini_f_age:
+    source: published
+    where: 'Section 3.4. "Mean HPG acini area was significantly higher in 8-day-old than 3-day-old bees (F1,60 = 27.780, P < 0.001; Fig 8)".'
+    check: R 4.6.1 aov gives 27.7799 (check_anova.R).
+  acini_f_treatment:
+    source: published
+    where: 'Section 3.4. "and in bees treated with QMP (F1,60 = 29.156, P < 0.001)".'
+    check: R 4.6.1 aov gives 29.1555 (check_anova.R).
+  acini_f_replicate:
+    source: published
+    where: 'Section 3.4. "was significantly different between replicates (F2,60 = 6.853, P = 0.00209; S2D Fig)".'
+    check: R 4.6.1 aov gives 6.8530 (check_anova.R).
+  acini_p_replicate:
+    source: published
+    where: Section 3.4, the same sentence as acini_f_replicate.
+    check: R 4.6.1 aov gives 0.002087 (check_anova.R).
+  acini_f_three_way:
+    source: published
+    where: 'Section 3.4. "The interaction effect age x treatment x replicate was significant (F2,60 = 4.457, P = 0.01568)".'
+    check: R 4.6.1 aov gives 4.4572 (check_anova.R).
+  acini_p_three_way:
+    source: published
+    where: Section 3.4, the same sentence as acini_f_three_way.
+    check: R 4.6.1 aov gives 0.015684 (check_anova.R).
+  fas_kruskal_chi2:
+    source: published
+    where: 'Section 3.3. "the four treatment groups (Kruskal-Wallis, chi-squared = 9.3498, df = 3, P = 0.02498; Fig 7)".'
+    check: R 4.6.1 kruskal.test gives 9.3498 (check_anova.R).
+  fas_kruskal_df:
+    source: published
+    where: Section 3.3, the same sentence.
+    check: R 4.6.1 kruskal.test gives 3 (check_anova.R).
+  fas_kruskal_p:
+    source: published
+    where: Section 3.3, the same sentence.
+    check: R 4.6.1 kruskal.test gives 0.02498 (check_anova.R).
+  fas_dunn_padj:
+    source: published
+    where: >-
+      Section 3.3. "only the 3-day-old QMP + and 8-day-old QMP- groups differed significantly from each other
+      (Dunn's post-hoc test, Padj = 0.0397)".
+    check: R 4.6.1 FSA::dunnTest with the Bonferroni method gives 0.03969 for the pair B against C (check_anova.R).
+  fas_replicate_chi2:
+    source: published
+    where: 'Section 3.3. "Normalized FAS activity significantly differed between the three replicates (chi-squared = 23.87, df = 2, P < 0.001; S2C Fig)".'
+    check: R 4.6.1 kruskal.test gives 23.8701 (check_anova.R).
+  acini_f_age_type3_trap:
+    source: computed
+    tool: statsmodels 0.15.0 anova_lm with type III sums of squares
+    where: >-
+      Not in the paper. The acini data are unbalanced, so type III sums of squares give 26.528 for age instead
+      of the published 27.780. A run that uses the SPSS or Prism default reaches this value.
+    independence: independent
+    check: R 4.6.1 car::Anova(type = 3) gives 26.5282 (check_anova.R).
+notes: >-
+  Section 3.2 has one printed value that does not reproduce. For the QMP treatment by replicate term of the
+  abdominal fatty acid synthase activity the paper prints "F2,60 = 0.962, P = 0.29039". 0.9616 is the mean
+  square of that term, not the F statistic; the F is 1.2624, and the printed p value matches 1.2624. It is a
+  copy error in the paper, so this term is not a benchmark item.

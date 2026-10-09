@@ -1,0 +1,138 @@
+kind: research paper
+short: Wang 2023
+field: Gene set enrichment
+program: gseapy (Python), through the enrichment adapter
+citation:
+  authors: Wang Y, Zhang Y, Jiang M, Zhang J, Li J, Wang Y, Wang M
+  title: "Bioinformatics Prediction and Experimental Validation Identify a Novel Cuproptosis-Related Gene Signature in Human Synovial Inflammation during Osteoarthritis Progression"
+  venue: Biomolecules 13(1):127
+  year: 2023
+  doi: 10.3390/biom13010127
+related:
+  - text: "Yoo M et al. DSigDB: drug signatures database for gene set analysis. Bioinformatics 31(18):3069-3071 (2015). The gene set library."
+    doi: 10.1093/bioinformatics/btv313
+  - text: "Kuleshov MV et al. Enrichr: a comprehensive gene set enrichment analysis web server 2016 update. Nucleic Acids Research 44(W1):W90-W97 (2016). The web service that served the library and ran the test."
+    doi: 10.1093/nar/gkw377
+measured: >-
+  The study looked for cuproptosis-related genes in the synovium of osteoarthritis patients. It ended with
+  four hub genes: DBT, DLST, FDX1 and LIPT1. Section 2.7 of the Methods ran these four genes against the drug
+  signatures database (DSigDB) on the Enrichr web site, to find small molecules whose signature overlaps them.
+  Table 1 prints the top ten terms with the overlap, the raw p value, the adjusted p value, the odds ratio,
+  the combined score and the overlapping genes, at full precision.
+instruction: >-
+  Test the four hub genes against the DSigDB gene sets. Use the Enrichr settings: a background of 20000 genes
+  and no limit on the gene set size. Give the top five terms with the overlap, the set size, the raw p value
+  and the adjusted p value, and the odds ratio of the first term.
+instruction_basis: >-
+  Methods section 2.7 and Table 1. The four hub genes are in the abstract and in the Results.
+answers:
+  gene_sets:
+    decision: Gene set collection
+    value: the DSigDB file that fetch.sh downloads
+    source: "Methods 2.7: the drug signatures database (DSigDB) on the Enrichr platform."
+  background:
+    decision: Background (universe)
+    value: 20000 genes
+    source: >-
+      Not in the paper. It is the default of the Enrichr web site, which the authors used. The printed p
+      values match this background and no other. The genes of the library as the background give 0.00198 for
+      the top term instead of the printed 0.00185.
+  min_size:
+    decision: Smallest gene set size
+    value: 1
+    source: Enrichr applies no size limit. The second term has 24 genes, so a limit of 15 to 500 would drop terms.
+  max_size:
+    decision: Largest gene set size
+    value: 100000
+    source: Enrichr applies no size limit. The top term has 1578 genes.
+  de_padj_max:
+    decision: Adjusted p cutoff for the gene list
+    value: not used
+    source: The gene list is given, so no cutoff applies.
+  de_lfc_min:
+    decision: Fold change cutoff for the gene list
+    value: not used
+    source: The gene list is given.
+  direction:
+    decision: Up, down or both
+    value: not used
+    source: The gene list is given.
+items:
+  overlap_1:
+    source: published
+    where: 'Table 1, row 1. "LATAMOXEF HL60 DOWN, 3/1578".'
+    check: scipy hypergeom on the downloaded library gives the same overlap (bench/papers/wang2023-cuproptosis-oa/check_hypergeom.py).
+  set_size_1:
+    source: published
+    where: Table 1, row 1, the second number of the overlap.
+    check: The downloaded DSigDB line for that term has 1578 genes (check_hypergeom.py).
+  p_value_1:
+    source: published
+    where: 'Table 1, row 1. p 0.0018453476993364856.'
+    check: >-
+      scipy.stats.hypergeom.sf(2, 20000, 1578, 4) gives 0.0018453839711629735 (check_hypergeom.py). The
+      difference from the printed value is 2e-5 relative. Enrichr computes the same quantity with its own code.
+  p_adjusted_1:
+    source: published
+    where: Table 1, row 1. Adjusted p 0.11186607610867805.
+    check: >-
+      Benjamini-Hochberg over the 4026 terms gives 0.11186724021582133 (check_hypergeom.py). The difference
+      follows from the raw p values.
+  odds_ratio_1:
+    source: published
+    where: Table 1, row 1. Odds ratio 35.08761904761905.
+    check: >-
+      The Enrichr formula x(N - K - n + x) / ((K - x)(n - x)) gives 35.08761904761905 exactly
+      (check_hypergeom.py). gseapy applies a Haldane-Anscombe correction by default and gives 27.28, so the
+      adapter reports both.
+  set_size_2:
+    source: published
+    where: 'Table 1, row 2. "ETHOTOIN HL60 DOWN, 1/24".'
+    check: check_hypergeom.py.
+  p_value_2:
+    source: published
+    where: Table 1, row 2. p 0.004791660011821214.
+    check: scipy gives 0.004791725657295827 (check_hypergeom.py).
+  set_size_3:
+    source: published
+    where: 'Table 1, row 3. "BETULINIC ACID PC3 DOWN, 1/30".'
+    check: check_hypergeom.py.
+  p_value_3:
+    source: published
+    where: Table 1, row 3. p 0.0059868860535258585.
+    check: scipy gives 0.005986961524956 (check_hypergeom.py).
+  set_size_4:
+    source: published
+    where: 'Table 1, row 4. "STAUROSPORINE MCF7 DOWN, 2/649".'
+    check: check_hypergeom.py.
+  p_value_4:
+    source: published
+    where: Table 1, row 4. p 0.0060396749482483575.
+    check: scipy gives 0.006039754232 (check_hypergeom.py).
+  set_size_5:
+    source: published
+    where: 'Table 1, row 5. "CLOPERASTINE PC3 DOWN, 1/37".'
+    check: check_hypergeom.py.
+  p_value_5:
+    source: published
+    where: Table 1, row 5. p 0.007379956522320185.
+    check: scipy gives 0.007380042305 (check_hypergeom.py).
+  n_sets_tested:
+    source: computed
+    tool: gseapy 1.3.1
+    where: Not in the paper. It is the number of gene sets in the DSigDB file that Enrichr serves.
+    independence: independent
+    check: "wc -l on the downloaded file gives 4026 lines (fetch.sh)."
+  p_value_1_library_background_trap:
+    source: computed
+    tool: gseapy 1.3.1
+    where: >-
+      Not in the paper. With the genes of the library as the background (19512 genes), the top term gives
+      0.0019842229 instead of the printed 0.0018453. A run that keeps the gseapy default reaches this value.
+    independence: independent
+    check: check_hypergeom.py computes the same value with scipy.
+notes: >-
+  The printed p values and the computed ones agree to about 5 significant figures, not to the last digit.
+  Enrichr uses its own hypergeometric code. The tolerances allow this difference.
+  Enrichr can change a library without changing its name. fetch.sh checks the SHA-256 of the file, so a
+  changed library stops the run instead of giving different numbers.
