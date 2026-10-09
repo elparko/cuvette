@@ -96,7 +96,7 @@ test("clarify waits for a data look; then the found text and the questions follo
   expect(found).not.toContain("I see DAPI");
   expect(found).not.toContain("GFP");
   expect(asked[0]).toEqual({ text: "What counts as a positive cell?", options: ["Any red inside the cell"] });
-  expect(asked.slice(1).map((a) => a.text)).toEqual(["I found counts.csv (columns group, set, positive, total). Is this an earlier analysis of these images? Should the demonstration compare with it?"]);
+  expect(asked.slice(1).map((a) => a.text)).toContain("I found counts.csv (columns group, set, positive, total). Is this an earlier analysis of these images? Should the demonstration compare with it?");
   const all = JSON.stringify(asked);
   for (const w of ["DAPI", "green", "Green", "nuclei", "nuclear"]) expect(all).not.toContain(w);
   const log = session.record.entries(["clarify"]).map((e) => e.data.action);

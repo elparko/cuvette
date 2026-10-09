@@ -175,7 +175,11 @@ def inspect_folder(root, out_dir):
     sample = []
     if by_field:
         first = sorted(by_field)[0]
-        sample = [describe_image(f, out_dir) for _, f in sorted(by_field[first], key=lambda x: x[0].lower())][:4]
+        for _, f in sorted(by_field[first], key=lambda x: x[0].lower())[:4]:
+            try:
+                sample.append(describe_image(f, out_dir))
+            except Exception:
+                pass
     return {"kind": "folder", "groups": groups, "n_files": len(files), "n_images": len(images), "n_fields": len(by_field), "tokens": tokens, "sample": sample, "tables": [os.path.relpath(t, root) for t in tables[:10]], "n_tables": len(tables)}
 
 
@@ -258,8 +262,12 @@ def main():
         d = inspect_folder(path, out_dir)
         imgs = d["sample"]
     elif ext in IMAGE:
-        d = {"kind": "image", **describe_image(path, out_dir)}
-        imgs = [d]
+        try:
+            d = {"kind": "image", **describe_image(path, out_dir)}
+            imgs = [d]
+        except Exception as e:
+            print(json.dumps({"ok": False, "error": "The image %s could not be read: %s" % (os.path.basename(path), e)}))
+            return
     elif ext in TABLE:
         d = inspect_table(path, out_dir)
         imgs = []

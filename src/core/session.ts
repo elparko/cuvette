@@ -262,6 +262,7 @@ export class Session {
   private checked = new Set<string>();
   private sheet?: SampleSheet;
   private toolsHinted = false;
+  private planStart = 0;
   private scientistAsked?: string;
   inspection?: Inspection;
   reference?: Reference;
@@ -2100,6 +2101,7 @@ export class Session {
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
     this.inspection = undefined;
+    this.planStart = this.record.entries().at(-1)?.id ?? 0;
     this.toolsHinted = false;
     this.clarified = !this.tools.has("clarify");
     this.modeBefore = this.mode === "plan" ? "watch" : this.mode;
@@ -2673,16 +2675,17 @@ export class Session {
       source: "harness",
       readOnly: true,
       permission: "allow",
-      execute: async (a, ctx) => {
-        const path = resolve(this.cwd, String(a.path ?? ".").replace(/^~(?=[\\/]|$)/, homedir()));
-        const insp = await inspectData(path, join(this.workDir, "inspect"), ctx.signal);
-        if (!insp.ok) return { ok: false, error: insp.error ?? "The inspection failed." };
-        this.inspection = insp;
-        this.record.append("inspection", { path, kind: insp.kind, summary: insp.summary, colors: insp.colors, kinds: insp.kinds, groups: (insp.groups ?? []).map((g) => g.name), columns: (insp.columns ?? []).map((c) => c.name) });
-        const { previews, ...rest } = insp;
-        return { ok: true, summary: insp.summary, text: JSON.stringify(rest).slice(0, 8000), outputs: previews.map((p) => outputFile(p)) };
-      },
+      execute: async (a, ctx) => this.inspectPath(resolve(this.cwd, String(a.path ?? ".").replace(/^~(?=[\\/]|$)/, homedir())), ctx.signal),
     };
+  }
+
+  private async inspectPath(path: string, signal?: AbortSignal): Promise<ToolOutput> {
+    const insp = await inspectData(path, join(this.workDir, "inspect"), signal);
+    if (!insp.ok) return { ok: false, error: insp.error ?? "The inspection failed." };
+    this.inspection = insp;
+    this.record.append("inspection", { path, kind: insp.kind, summary: insp.summary, colors: insp.colors, kinds: insp.kinds, groups: (insp.groups ?? []).map((g) => g.name), columns: (insp.columns ?? []).map((c) => c.name) });
+    const { previews, ...rest } = insp;
+    return { ok: true, summary: insp.summary, text: JSON.stringify(rest).slice(0, 8000), outputs: previews.map((p) => outputFile(p)) };
   }
 
   private clarifyTool(): Tool {
@@ -2720,10 +2723,15 @@ export class Session {
 
   private async clarify(a: Args): Promise<ToolOutput> {
     if (!this.planning || this.planUpdate) return { ok: false, error: "clarify is for the start of a new request, before the proposed metrics." };
-    if (!this.inspection) return { ok: false, error: "Look at the data first: call inspect_data on the data folder or file of the request (or . for the project folder). Then call clarify, with questions that fit what you found." };
+    if (!this.inspection) {
+      const looked = this.record.entries(["data_check"]).filter((e) => e.id > this.planStart).at(-1)?.data.source;
+      if (looked && existsSync(String(looked))) await this.inspectPath(String(looked), this.abort?.signal);
+    }
+    const looked = this.record.entries(["data_check", "inspection"]).some((e) => e.id > this.planStart);
+    if (!this.inspection && !looked) return { ok: false, error: "Look at the data first: call inspect_data on the data folder or file of the request (or . for the project folder). Then call clarify, with questions that fit what you found." };
     let found = String(a.found ?? "").trim();
-    const wrong = absentStains(found, this.inspection);
-    if (!found || wrong.length) {
+    const wrong = this.inspection ? absentStains(found, this.inspection) : [];
+    if (this.inspection && (!found || wrong.length)) {
       if (found) this.record.append("clarify", { action: "found_replaced", phase: "Questions", found, reason: `The data has no ${wrong.join(" or ")} channel or stain.` });
       found = this.inspection.summary;
     }
