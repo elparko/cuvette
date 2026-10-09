@@ -66,6 +66,10 @@ answers:
     decision: Unit of replication
     value: wells, plates or dishes
     source: Each plate is one count. No statistics across plates are asked.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers a free question with this text.
 items:
   images:
     source: published

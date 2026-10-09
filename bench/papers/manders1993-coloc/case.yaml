@@ -41,6 +41,10 @@ answers:
     decision: Unit of replication
     value: cells or objects in one image (exploratory)
     source: Each pair is one designed image. No statistics are asked.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers a free question with this text.
 items:
   pearson_a_b:
     source: published

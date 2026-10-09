@@ -95,6 +95,10 @@ answers:
     decision: Unit of replication
     value: images or fields
     source: No test across groups is asked.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the paper. The benchmark answers a free question with this text.
 items:
   fields:
     source: published
