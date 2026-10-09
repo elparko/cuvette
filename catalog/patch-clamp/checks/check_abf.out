@@ -1,0 +1,40 @@
+current clamp file 171116sh_0018.abf: 17 sweeps, 20000 Hz, step window 0.14685 to 0.64685 s
+step  -100.0 pA  spikes  0  rate   0.0 Hz  steady  -73.171 mV
+step   -75.0 pA  spikes  0  rate   0.0 Hz  steady  -70.542 mV
+step   -50.0 pA  spikes  0  rate   0.0 Hz  steady  -66.524 mV
+step   -25.0 pA  spikes  0  rate   0.0 Hz  steady  -64.733 mV
+step     0.0 pA  spikes  0  rate   0.0 Hz  steady  -61.447 mV
+step    25.0 pA  spikes  0  rate   0.0 Hz  steady  -58.397 mV
+step    50.0 pA  spikes  1  rate   2.0 Hz  steady  -56.800 mV
+step    75.0 pA  spikes  1  rate   2.0 Hz  steady  -47.652 mV
+step   100.0 pA  spikes  3  rate   6.0 Hz  steady  -44.146 mV
+step   125.0 pA  spikes  4  rate   8.0 Hz  steady  -42.857 mV
+step   150.0 pA  spikes  5  rate  10.0 Hz  steady  -42.007 mV
+step   175.0 pA  spikes  6  rate  12.0 Hz  steady  -40.079 mV
+step   200.0 pA  spikes  6  rate  12.0 Hz  steady  -40.906 mV
+step   225.0 pA  spikes  7  rate  14.0 Hz  steady  -39.685 mV
+step   250.0 pA  spikes  8  rate  16.0 Hz  steady  -38.765 mV
+step   275.0 pA  spikes  8  rate  16.0 Hz  steady  -37.254 mV
+step   300.0 pA  spikes  9  rate  18.0 Hz  steady  -37.449 mV
+rheobase 50.0 pA, F-I slope 0.065455 Hz per pA over 11 sweeps
+first spike at rheobase: raw dV/dt crossing, threshold -39.307 mV
+input resistance from steady state of 3 hyperpolarizing sweeps: 116.1800 MOhm
+resting potential, mean baseline of these sweeps: -61.5496 mV
+
+voltage clamp file 17o05024_vc_steps.abf: 7 sweeps, 20000 Hz, step window 0.55465 to 1.05465 s
+V -110.00 mV  largest deviation    -51.688 pA  mean    -25.637 pA  (window 0.6 to 1.05 s, baseline 0.1 to 0.5 s)
+V -100.00 mV  largest deviation    -45.011 pA  mean    -18.809 pA  (window 0.6 to 1.05 s, baseline 0.1 to 0.5 s)
+V  -90.00 mV  largest deviation    -41.632 pA  mean    -12.279 pA  (window 0.6 to 1.05 s, baseline 0.1 to 0.5 s)
+V  -80.00 mV  largest deviation    -24.193 pA  mean     -5.009 pA  (window 0.6 to 1.05 s, baseline 0.1 to 0.5 s)
+V  -70.00 mV  largest deviation    -26.952 pA  mean      0.366 pA  (window 0.6 to 1.05 s, baseline 0.1 to 0.5 s)
+V  -60.00 mV  largest deviation    -16.341 pA  mean      5.337 pA  (window 0.6 to 1.05 s, baseline 0.1 to 0.5 s)
+V  -50.00 mV  largest deviation     15.315 pA  mean     10.317 pA  (window 0.6 to 1.05 s, baseline 0.1 to 0.5 s)
+leak line from the mean current of 3 sweeps between -80 and -60 mV: 0.517253 nS, intercept 36.4390 pA
+V -110.00 mV  leak-subtracted largest deviation    -31.229 pA
+V -100.00 mV  leak-subtracted largest deviation    -29.725 pA
+V  -90.00 mV  leak-subtracted largest deviation    -31.518 pA
+V  -80.00 mV  leak-subtracted largest deviation    -19.252 pA
+V  -70.00 mV  leak-subtracted largest deviation    -27.183 pA
+V  -60.00 mV  leak-subtracted largest deviation    -21.744 pA
+V  -50.00 mV  leak-subtracted largest deviation      4.739 pA
+largest after the leak subtraction -31.518 pA at -90.00 mV

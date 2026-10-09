@@ -1,0 +1,16 @@
+activation, conductance in nS, Erev 60 
+     Estimate Std. Error    t value Pr(>|t|)
+a   10.018054   0.032961  303.93558        0
+vh -20.002506   0.154795 -129.21923        0
+k    7.589344   0.132832   57.13473        0
+R squared 0.9998306 
+Wald 95% interval of vh: -20.3059 -19.69911 
+Wald 95% interval of k: 7.329 7.84969 
+t 95% interval of vh: -20.35946 -19.64555 
+
+inactivation, no floor
+     Estimate Std. Error    t value Pr(>|t|)
+a  804.305014   4.061907  198.01169        0
+vh -60.037402   0.196725 -305.18382        0
+k    6.088358   0.171188   35.56544        0
+R squared 0.9996886 

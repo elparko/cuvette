@@ -360,6 +360,7 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `epi-rates` | R epitools | R scripts | rates with exact intervals, rate ratios, standardized rates, number needed to treat |
 | `trial-endpoints` | R survRM2, survival | R scripts | trial endpoints: risk difference, Mantel-Haenszel, hazard ratio, restricted mean survival time, non-inferiority |
 | `chromatography` | hplc-py | Python library | chromatogram peaks |
+| `patch-clamp` | pyABF, Neo, eFEL | Python library | patch-clamp recordings: spikes, passive properties, currents, synaptic events, groups of cells |
 | `flowcore` | flowCore | R scripts | flow cytometry: spillover from single-stain controls, percent positive and MFI, group tests |
 | `amr` | AMR | R scripts | MIC tables: EUCAST and CLSI S, I, R, MIC50 and MIC90 |
 | `openbabel` | Open Babel | command line | chemistry |

@@ -1,0 +1,24 @@
+Unit: cells. Welch t-test, cKO minus Ctrl
+event_frequency_hz: diff -1.206140, t -2.678230, df 29.9075, p 0.01190575, CI -2.125997 to -0.286284, Cohen d -0.946897
+event_amplitude_pa: diff -13.558480, t -2.324401, df 27.5334, p 0.02771289, CI -25.516187 to -1.600773, Cohen d -0.821800
+event_rise_10_90_ms: diff 0.069095, t 0.690553, df 29.2876, p 0.49528357, CI -0.135459 to 0.273650, Cohen d 0.244147
+event_decay_tau_ms: diff -0.970031, t -1.464664, df 27.6157, p 0.15430527, CI -2.327521 to 0.387458, Cohen d -0.517837
+Benjamini-Hochberg over the 4 features: 0.04762300 0.05542578 0.49528357 0.20574037 
+
+Mann-Whitney U, cells
+event_frequency_hz: W 59.5, p 0.01036074
+event_amplitude_pa: W 55.0, p 0.00628659
+event_rise_10_90_ms: W 166.0, p 0.15755742
+event_decay_tau_ms: W 86.0, p 0.11779641
+
+Unit: animals (mean of the cells of each animal), Welch t-test
+event_frequency_hz: diff -1.282261, t -2.622353, df 9.9999, p 0.02549474, CI -2.371763 to -0.192759
+event_amplitude_pa: diff -11.119196, t -2.064455, df 9.7097, p 0.06672291, CI -23.168800 to 0.930408
+event_rise_10_90_ms: diff 0.110210, t 1.738764, df 7.6207, p 0.12214260, CI -0.037230 to 0.257649
+event_decay_tau_ms: diff -1.865587, t -2.334635, df 6.3407, p 0.05599723, CI -3.795707 to 0.064534
+
+ICC over animals (one-way ANOVA estimator), all cells
+event_frequency_hz: ICC 0.260063
+event_amplitude_pa: ICC 0.032812
+event_rise_10_90_ms: ICC -0.284775
+event_decay_tau_ms: ICC 0.201639

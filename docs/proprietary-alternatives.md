@@ -129,6 +129,15 @@ of each package. The sources are at the end.
 | Proteome Discoverer | Thermo Fisher, commercial | Database search for DDA and TMT. | Sage (MIT); OpenMS (BSD-3); mokapot (Apache-2.0); limma (GPL-2 or later). MSFragger is free for academia but closed. | `sage`, `openms`, `limma-proteomics` | Covered for search. TMT reporter quantification is partial. `limma-proteomics` replaces the statistics of a Proteins table export (ratio test and volcano plot). |
 | PEAKS Studio | Bioinformatics Solutions, commercial | De novo sequencing and database search. | Sage (MIT); OpenMS (BSD-3) | `sage` | Partial. De novo sequencing is open. |
 
+## Cellular electrophysiology
+
+| Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
+| --- | --- | --- | --- | --- | --- |
+| pCLAMP with Clampfit | Molecular Devices, commercial | Reads Axon `.abf` files. Spike and event detection, statistics of levels and peaks, curve fits. | pyABF (MIT); Neo (BSD-3); eFEL (LGPL-3); Stimfit (GPL-2) | `patch-clamp` | Partial. Reading, spike features, passive properties, I-V and Boltzmann fits, and spontaneous events are covered. Acquisition, paired-pulse and evoked-event analysis, and noise analysis are open. |
+| Easy Electrophysiology | Easy Electrophysiology Ltd, commercial. An academic license is paid each year. | Spike, rheobase, input resistance, sag, I-V, and spontaneous and evoked event analysis. | pyABF (MIT); Neo (BSD-3); eFEL (LGPL-3); Stimfit (GPL-2) | `patch-clamp` | Partial. As for Clampfit. Evoked events and the other file formats of the program are open. |
+| Igor Pro with NeuroMatic | WaveMetrics, commercial. NeuroMatic is free for Igor users. | Wave-based analysis, stats tabs, curve fits, event detection. | Neo with igor2 (LGPL-3 or later) reads `.pxp` files; SciPy (BSD-3) | `patch-clamp` | Partial. The tools read Igor packed experiment files through Neo. NeuroMatic macros and the Igor wave notes are not read. |
+| Mini Analysis | Synaptosoft, commercial | Detection of spontaneous synaptic events and their amplitude, rise and decay. | pyABF (MIT); SciPy (BSD-3). Stimfit (GPL-2) detects events with a template. | `patch-clamp` | Partial. Template and threshold detection, and group tables with the animal as the unit, are covered. The manual event-by-event review is not. |
+
 ## What this work builds
 
 The order of value follows the table. The choice leaves out what the other agents build.
@@ -330,6 +339,11 @@ Where each test value comes from:
 - fgsea: https://github.com/alserglab/fgsea
 - gseapy: https://github.com/zqfang/GSEApy
 - GSEA desktop: https://github.com/GSEA-MSigDB/gsea-desktop/blob/master/LICENSE.txt
+- pyABF: https://github.com/swharden/pyABF/blob/main/LICENSE
+- Neo: https://github.com/NeuralEnsemble/python-neo/blob/master/LICENSE.txt
+- eFEL, igor2: the PyPI page of each package
+- Stimfit: https://github.com/neurodroid/stimfit
+- Easy Electrophysiology license page: https://easyelectrophysiology.com
 - UGENE: https://github.com/ugeneunipro/ugene
 - Biopython: https://github.com/biopython/biopython/blob/master/LICENSE.rst
 - pydna: https://github.com/pydna-group/pydna/blob/master/LICENSE.txt
@@ -362,6 +376,7 @@ The vendor names of these programs come from general knowledge, not from a web c
 - plate readers and pathways: SoftMax Pro, Gen5, MetaCore.
 - chromatography and mass spectrometry: Chromeleon, Empower, OpenLab, MassHunter, Xcalibur, Spectronaut,
   Proteome Discoverer, PEAKS.
+- electrophysiology: pCLAMP and Clampfit, Igor Pro and NeuroMatic, Mini Analysis.
 - qualitative work: NVivo.
 No web source confirmed whether these downloads are free or paid: CFX Maestro, QuantStudio,
 Seahorse Wave, 2100 Expert and TapeStation.

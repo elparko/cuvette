@@ -1,0 +1,7 @@
+events put into synthetic_events.csv by make_synthetic.py (seed 20261009)
+number of events 26
+duration 8.0 s, frequency 3.2500 Hz
+amplitude mean 55.6769 pA, median 53.4200 pA
+10 to 90 percent rise time of the noise-free shape: 0.9140 ms
+decay time constant of the shape: 8.0 ms
+peak of the shape is at 1.7640 ms after the onset

@@ -12,3 +12,9 @@ tifffile==2026.9.20
 scikit-image==0.26.0
 # python-pptx (MIT license) writes the image deck: /export images pptx.
 python-pptx==1.0.2
+# pyabf, neo, igor2, efel and h5py read Axon, Igor, NWB and other patch-clamp files (the patch-clamp adapter).
+pyabf==2.3.8
+neo==0.14.5
+igor2==0.5.13
+efel==5.7.34
+h5py==3.16.0

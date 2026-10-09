@@ -1,0 +1,17 @@
+d <- read.csv(file.path("..", "data", "synthetic_activation.csv"))
+erev <- 60
+d$g <- d$current_pa / (d$voltage_mv - erev)
+fit <- nls(g ~ a / (1 + exp((vh - voltage_mv) / k)), data = d, start = list(a = 10, vh = -20, k = 8), algorithm = "port", lower = c(a = 0, vh = -200, k = 0.1), control = nls.control(tol = 1e-10, maxiter = 500))
+cat("activation, conductance in nS, Erev", erev, "\n")
+print(round(summary(fit)$coefficients, 6))
+cat("R squared", round(1 - sum(resid(fit)^2) / sum((d$g - mean(d$g))^2), 8), "\n")
+ci <- confint.default(fit, level = 0.95)
+cat("Wald 95% interval of vh:", round(ci["vh", ], 5), "\n")
+cat("Wald 95% interval of k:", round(ci["k", ], 5), "\n")
+cat("t 95% interval of vh:", round(coef(fit)["vh"] + c(-1, 1) * qt(0.975, df.residual(fit)) * summary(fit)$coefficients["vh", 2], 5), "\n\n")
+
+e <- read.csv(file.path("..", "data", "synthetic_inactivation.csv"))
+fit2 <- nls(current_pa ~ a / (1 + exp((voltage_mv - vh) / k)), data = e, start = list(a = 800, vh = -60, k = 8), algorithm = "port", lower = c(a = 0, vh = -200, k = 0.1), control = nls.control(tol = 1e-10, maxiter = 500))
+cat("inactivation, no floor\n")
+print(round(summary(fit2)$coefficients, 6))
+cat("R squared", round(1 - sum(resid(fit2)^2) / sum((e$current_pa - mean(e$current_pa))^2), 8), "\n")

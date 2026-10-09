@@ -1,0 +1,1212 @@
+adapter:
+  name: patch-clamp
+  field: cellular electrophysiology
+  file_types: [".abf", ".nwb", ".pxp", ".wcp", ".csv", ".txt"]
+  title: Patch clamp (pyABF, Neo and eFEL)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Measures action potentials, passive properties, currents and spontaneous synaptic events from patch-clamp recordings.
+    It does the analysis that Clampfit, Easy Electrophysiology, Igor Pro with NeuroMatic and Mini Analysis do.
+    It also compares cell-level values between groups, with the animal as the unit.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: pyABF with Neo and eFEL
+  version: "pyabf 2.3.8, neo 0.14.5, efel 5.7.34"
+  tested_versions: []
+  homepage: https://swharden.com/pyabf/
+  docs:
+    - https://swharden.com/pyabf/tutorial/
+    - https://neo.readthedocs.io/
+    - https://github.com/openbraininstitute/eFEL
+  install: >
+    The adapter uses a Python environment in ~/.guided-analysis/envs/patch-clamp. Make it and install the pinned packages:
+    uv venv ~/.guided-analysis/envs/patch-clamp --python 3.12 && uv pip install --python ~/.guided-analysis/envs/patch-clamp/bin/python
+    -r catalog/patch-clamp/requirements.txt. The adapter looks for the Python program in GA_PATCH_CLAMP_PYTHON first.
+  citation:
+    - text: "Harden, S. W. (2017 to 2026). pyABF: a Python library for reading electrophysiology data from Axon Binary Format (ABF) files [Computer software]."
+      url: https://swharden.com/pyabf/
+    - text: "Garcia, S., Guarino, D., Jaillet, F., Jennings, T., Propper, R., Rautenberg, P. L., Rodgers, C. C., Sobolev, A., Wachtler, T., Yger, P., & Davison, A. P. (2014). Neo: an object model for handling electrophysiology data in multiple formats. Frontiers in Neuroinformatics, 8, 10."
+      doi: 10.3389/fninf.2014.00010
+    - text: "Ranjan, R., Van Geit, W., Moor, R., Roessert, C., Riquelme, L., Damart, T., Jaquier, A., Tuncel, A., Mandge, D., Kilic, I., et al. (2020). eFEL: Electrophys Feature Extraction Library [Computer software]. Zenodo."
+      doi: 10.5281/zenodo.593869
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1200
+
+locate:
+  env: GA_PATCH_CLAMP_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/patch-clamp/bin/python
+    - ~/.guided-analysis/envs/patch-clamp/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('pyabf', m.version('pyabf'))"]
+  version_pattern: 'pyabf (\S+)'
+  identity: 'pyabf \d'
+
+standards: >
+  The tools read an Axon ABF file with pyABF, an Allen Cell Types NWB 1.0 file with h5py, and other files with Neo. A text
+  file needs a time column in seconds and signal_unit. Voltages are in mV, currents in pA, times in s, unless a name says ms.
+  The tools subtract ljp_mv from every voltage. The unit of a Neo file can be missing, so set signal_unit then.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools return sweep numbers, step currents, spike and event values, and cell-level tables. They never return the sampled trace.
+
+decisions:
+  - key: spike_threshold_method
+    label: Definition of the spike threshold
+    kind: choice
+    choices: [dvdt_cutoff, dvdt_fraction_of_upstroke]
+    default: dvdt_cutoff
+    group: Action potential
+    help: >
+      dvdt_cutoff takes the first point where dV/dt reaches the cutoff. dvdt_fraction_of_upstroke moves back to 5 percent of the
+      mean upstroke. The Allen Institute does this. The two differ by several mV (Sekerli 2004).
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_spikes, arg: spike_threshold_method }
+    sensitivity:
+      options: [dvdt_cutoff, dvdt_fraction_of_upstroke]
+      tool: measure_spikes
+      compare: [metrics.threshold_mv, metrics.amplitude_mv, metrics.half_width_ms]
+      max_runs: 2
+
+  - key: dvdt_cutoff_mv_per_ms
+    label: Spike threshold cutoff for dV/dt (mV per ms)
+    kind: float
+    default: 20
+    lo: 1
+    hi: 500
+    group: Action potential
+    help: >
+      The rate of rise that marks the start of a spike. Papers use values from 10 to 50 mV per ms. A higher cutoff gives a
+      later and more depolarized threshold. Name the value in the report.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_spikes, arg: dvdt_cutoff_mv_per_ms }
+    sensitivity:
+      options: [10, 20, 40]
+      tool: measure_spikes
+      compare: [metrics.threshold_mv, metrics.amplitude_mv, metrics.n_sweeps_with_spikes]
+      max_runs: 3
+
+  - key: min_peak_mv
+    label: Lowest spike peak (mV)
+    kind: float
+    default: -30
+    lo: -100
+    hi: 100
+    group: Action potential
+    help: >
+      A deflection counts as a spike only if its peak is at or above this voltage. A low value counts small spikelets and
+      noise. A high value misses spikes that fail to overshoot.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_spikes, arg: min_peak_mv }
+
+  - key: baseline_window
+    label: Baseline window before the step (s)
+    kind: text
+    group: Windows
+    help: >
+      Two times in seconds, such as 0.02,0.14, in the quiet part of the sweep before the step. The mean of this window is the
+      resting potential or the baseline current. Do not include the test pulse or a drift.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_passive, arg: baseline_window }
+      - { tool: measure_current_steps, arg: baseline_window }
+
+  - key: sweeps
+    label: Sweeps to include
+    kind: text
+    default: all
+    group: Windows
+    help: >
+      Write all, or a list of sweep numbers such as 1-8,10 (1 is the first sweep). Leave out a sweep with a lost seal, a change in
+      access resistance or a run-down. Decide before you see the result.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_spikes, arg: sweeps }
+      - { tool: measure_passive, arg: sweeps }
+      - { tool: measure_current_steps, arg: sweeps }
+      - { tool: detect_events, arg: sweeps }
+      - { tool: detect_events_for_cells, arg: sweeps }
+
+  - key: ljp_mv
+    label: Liquid junction potential correction (mV)
+    kind: float
+    group: Voltage
+    lo: -60
+    hi: 60
+    help: >
+      The tool subtracts this value from every recorded voltage. Calculate it for your two solutions (Neher 1992; Barry 1994, JPCalc),
+      such as 10 to 15 mV for a potassium gluconate pipette solution. Write 0 if you do not correct. Say which you did.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_spikes, arg: ljp_mv }
+      - { tool: measure_passive, arg: ljp_mv }
+      - { tool: measure_current_steps, arg: ljp_mv }
+    sensitivity:
+      options: [0, 10]
+      tool: measure_spikes
+      compare: [metrics.threshold_mv, metrics.peak_mv]
+      max_runs: 2
+
+  - key: input_resistance_measure
+    label: Deflection that gives the input resistance
+    kind: choice
+    choices: [steady_state, peak]
+    default: steady_state
+    group: Passive properties
+    help: >
+      steady_state uses the mean of the last 100 ms of the step. peak uses the largest deflection, as the Allen Institute does.
+      The two differ in a cell with sag. Say which one you report.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_passive, arg: input_resistance_measure }
+    sensitivity:
+      options: [steady_state, peak]
+      tool: measure_passive
+      compare: [metrics.input_resistance_mohm]
+      max_runs: 2
+
+  - key: peak_direction
+    label: Direction of the peak current
+    kind: choice
+    choices: [inward, outward, largest]
+    default: largest
+    group: Voltage clamp
+    help: >
+      inward takes the most negative current in the window. outward takes the most positive one. largest takes the larger of
+      the two. Pick inward or outward if a step can give both.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_current_steps, arg: peak_direction }
+
+  - key: leak_subtraction
+    label: Leak subtraction
+    kind: choice
+    choices: [none, linear_extrapolation]
+    default: none
+    group: Voltage clamp
+    help: >
+      linear_extrapolation fits a line to the mean current in the leak range and subtracts it at every voltage. none keeps the
+      raw current. The line fails if a voltage-gated current is active in the leak range. A P/N protocol (Bezanilla and
+      Armstrong 1977) is a better test.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_current_steps, arg: leak_subtraction }
+    sensitivity:
+      options: [none, linear_extrapolation]
+      tool: measure_current_steps
+      compare: [metrics.peak_current_pa, metrics.voltage_at_peak_mv]
+      max_runs: 2
+
+  - key: leak_fit_range_mv
+    label: Voltage range of the leak fit (mV)
+    kind: text
+    group: Voltage clamp
+    help: >
+      Two voltages in mV, such as -80,-60, where only the leak current flows. Choose a range below the activation of every
+      voltage-gated current in the cell. At least 2 sweeps must lie in the range.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: measure_current_steps, arg: leak_fit_range_mv }
+
+  - key: reversal_potential_mv
+    label: Reversal potential for the conductance (mV)
+    kind: float
+    group: Voltage clamp
+    lo: -150
+    hi: 150
+    help: >
+      The tool divides each current by the voltage minus this value to get a conductance. Use the Nernst potential of the ion for
+      the two solutions, after the LJP correction. A wrong value changes the V1/2 and the slope.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: fit_boltzmann, arg: reversal_potential_mv }
+
+  - key: event_method
+    label: Event detection method
+    kind: choice
+    choices: [template, threshold]
+    default: template
+    group: Synaptic events
+    help: >
+      template slides a scaled template over the trace (Clements and Bekkers 1997). It finds small events in noise. threshold finds
+      deflections above a multiple of the noise. It is faster and misses small events. Report the method.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_events, arg: event_method }
+      - { tool: detect_events_for_cells, arg: event_method }
+    sensitivity:
+      options: [template, threshold]
+      tool: detect_events
+      compare: [metrics.n_events, metrics.mean_amplitude_pa, metrics.frequency_hz]
+      max_runs: 2
+
+  - key: event_threshold
+    label: Event detection threshold (times the noise SD)
+    kind: float
+    default: 4
+    lo: 2
+    hi: 20
+    group: Synaptic events
+    help: >
+      For the template method, the detection trace must exceed this multiple of its own noise SD. For the threshold method, a
+      deflection must exceed this multiple of the noise SD of the trace. A lower value finds more events and more false events.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_events, arg: event_threshold }
+      - { tool: detect_events_for_cells, arg: event_threshold }
+    sensitivity:
+      options: [3.5, 4, 5]
+      tool: detect_events
+      compare: [metrics.n_events, metrics.mean_amplitude_pa, metrics.frequency_hz]
+      max_runs: 3
+
+  - key: event_direction
+    label: Direction of the events
+    kind: choice
+    choices: [inward, outward]
+    default: inward
+    group: Synaptic events
+    help: >
+      inward events are negative currents, such as a mEPSC at -70 mV. outward events are positive currents. Check the holding
+      voltage and the chloride reversal potential.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_events, arg: event_direction }
+      - { tool: detect_events_for_cells, arg: event_direction }
+
+  - key: event_rise_ms
+    label: Expected event rise time constant (ms)
+    kind: float
+    default: 0.5
+    lo: 0.05
+    hi: 20
+    group: Synaptic events
+    help: >
+      The rise time constant of the template. Use about 0.5 ms for a mEPSC and about 1 ms for a mIPSC. A template that is too slow
+      misses fast events. A template that is too fast adds noise.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_events, arg: event_rise_ms }
+      - { tool: detect_events_for_cells, arg: event_rise_ms }
+
+  - key: event_decay_ms
+    label: Expected event decay time constant (ms)
+    kind: float
+    default: 3
+    lo: 0.5
+    hi: 200
+    group: Synaptic events
+    help: >
+      The decay time constant of the template. Use about 3 ms for a mEPSC and about 10 ms for a mIPSC. Events closer than 5 decay
+      constants count as one event.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: detect_events, arg: event_decay_ms }
+      - { tool: detect_events_for_cells, arg: event_decay_ms }
+
+  - key: replicate_unit
+    label: Unit of replication for the group comparison
+    kind: choice
+    choices: [animals, cells]
+    default: animals
+    group: Group comparison
+    help: >
+      animals averages the cells of each animal first, so n is the number of animals. cells uses each cell as one observation.
+      Cells from one animal are not independent (Lazic 2010; Aarts 2014). For a model that uses every cell, use lmer in the lme4 adapter.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_cell_groups, arg: replicate_unit }
+
+  - key: group_test
+    label: Test for the difference between two groups
+    kind: choice
+    choices: [t, mannwhitney]
+    default: t
+    group: Group comparison
+    help: >
+      t is the Welch t-test. mannwhitney is the rank test. Many values, such as the event frequency, have a skewed spread.
+      Choose the test before you see the data.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_cell_groups, arg: test }
+
+  - key: alpha
+    label: Significance level (alpha)
+    kind: float
+    default: 0.05
+    lo: 0.0001
+    hi: 0.5
+    group: Group comparison
+    help: A p-value below alpha is significant. The confidence level is 1 minus alpha. Choose alpha before you see the p-value.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_cell_groups, arg: alpha }
+      - { tool: fit_boltzmann, arg: alpha }
+
+tools:
+  - name: inspect_recording
+    title: Inspect a recording
+    description: >
+      List the sweeps, sampling rate, signal unit and step command of a recording file. Use it before every other tool.
+      It tells whether the file is current clamp or voltage clamp and which tool fits.
+    read_only: true
+    function: "ga_patch_clamp:inspect_recording"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the file (.abf, Allen .nwb, .pxp, .wcp, or a text table)." }
+      channel: { type: integer, minimum: 0, default: 0, description: "Index of the recorded channel (count, 0 is the first)." }
+      signal_unit: { type: string, description: "Unit of the recorded signal: mV, V, pA or nA. Needed for a text file and for a Neo file that has no unit." }
+    required: [path]
+    outputs:
+      sweeps: { kind: table, ext: csv, description: One row for each sweep. }
+      plot: { kind: image, ext: png, description: All sweeps and the command. }
+
+  - name: measure_spikes
+    title: Action potential features and the F-I curve
+    description: >
+      Measure spike threshold, amplitude, half-width, afterhyperpolarization, rheobase and the frequency-current curve from
+      current-clamp steps. Uses eFEL for spike trains. It refuses a voltage-clamp file. It does not measure resistance or tau: measure_passive does.
+    function: "ga_patch_clamp:measure_spikes"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the current-clamp recording. }
+      spike_threshold_method: { type: string, enum: [dvdt_cutoff, dvdt_fraction_of_upstroke], description: "The threshold definition. The harness sets it from the decision record." }
+      dvdt_cutoff_mv_per_ms: { type: number, minimum: 1, description: "Cutoff of dV/dt in mV per ms. The harness sets it from the decision record." }
+      min_peak_mv: { type: number, description: "Lowest spike peak in mV. The harness sets it from the decision record." }
+      sweeps: { type: [string, array], items: { type: integer }, description: "Sweep numbers to include (count, 1 is the first), or all. The harness sets it from the decision record." }
+      ljp_mv: { type: number, description: "Liquid junction potential in mV, subtracted from every voltage. The harness sets it from the decision record." }
+      channel: { type: integer, minimum: 0, default: 0, description: "Index of the recorded channel (count, 0 is the first)." }
+      sweep_label: { type: string, description: "Keep only sweeps whose label holds this text, such as Long Square in an Allen file." }
+      stim_window: { type: [string, array], items: { type: number }, description: "Start and end of the step in s. The default comes from the command waveform." }
+      cell_id: { type: string, description: "Name of the cell in the cell table. The default is the file name." }
+      signal_unit: { type: string, description: "Unit of the signal: mV or V. Needed for a text file." }
+    required: [path]
+    outputs:
+      sweeps: { kind: table, ext: csv, description: "One row for each sweep: step current, spike count, rate, eFEL values." }
+      spikes: { kind: table, ext: csv, description: One row for each spike. }
+      cell_features: { kind: table, ext: csv, description: One row with the cell values for collect_cell_features. }
+      plot: { kind: image, ext: png, description: "Rheobase sweep, a high sweep and the F-I curve." }
+    citations:
+      - text: "Ranjan, R., Van Geit, W., Moor, R., Roessert, C., Riquelme, L., Damart, T., Jaquier, A., Tuncel, A., Mandge, D., Kilic, I., et al. (2020). eFEL: Electrophys Feature Extraction Library [Computer software]. Zenodo."
+        doi: 10.5281/zenodo.593869
+        kind: program
+      - text: "Sekerli, M., Del Negro, C. A., Lee, R. H., & Butera, R. J. (2004). Estimating action potential thresholds from neuronal time-series: new metrics and evaluation of methodologies. IEEE Transactions on Biomedical Engineering, 51(9), 1665-1672."
+        doi: 10.1109/TBME.2004.827531
+      - text: "Gouwens, N. W., Sorensen, S. A., Berg, J., Lee, C., Jarsky, T., Ting, J., et al. (2019). Classification of electrophysiological and morphological neuron types in the mouse visual cortex. Nature Neuroscience, 22(7), 1182-1195."
+        doi: 10.1038/s41593-019-0417-0
+        when:
+          spike_threshold_method: dvdt_fraction_of_upstroke
+
+  - name: measure_passive
+    title: Resting potential, input resistance, tau and sag
+    description: >
+      Measure the resting potential, input resistance, membrane time constant and sag from hyperpolarizing current steps.
+      It refuses a sweep with a step of zero or more. It does not measure spikes: measure_spikes does.
+    function: "ga_patch_clamp:measure_passive"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the current-clamp recording. }
+      baseline_window: { type: [string, array], items: { type: number }, description: "Start and end of the baseline in s. The harness sets it from the decision record." }
+      input_resistance_measure: { type: string, enum: [steady_state, peak], description: "Deflection for the input resistance. The harness sets it from the decision record." }
+      sweeps: { type: [string, array], items: { type: integer }, description: "Sweep numbers to include (count, 1 is the first), or all. The harness sets it from the decision record." }
+      ljp_mv: { type: number, description: "Liquid junction potential in mV, subtracted from every voltage. The harness sets it from the decision record." }
+      current_range_pa: { type: [string, array], items: { type: number }, description: "Keep only steps above the first and below the second value, in pA, such as -100,0." }
+      channel: { type: integer, minimum: 0, default: 0, description: "Index of the recorded channel (count, 0 is the first)." }
+      sweep_label: { type: string, description: "Keep only sweeps whose label holds this text, such as Long Square in an Allen file." }
+      stim_window: { type: [string, array], items: { type: number }, description: "Start and end of the step in s. The default comes from the command waveform." }
+      cell_id: { type: string, description: "Name of the cell in the cell table. The default is the file name." }
+      signal_unit: { type: string, description: "Unit of the signal: mV or V. Needed for a text file." }
+    required: [path]
+    outputs:
+      passive_sweeps: { kind: table, ext: csv, description: "One row for each sweep: deflection, sag fraction and tau." }
+      cell_features: { kind: table, ext: csv, description: One row with the cell values for collect_cell_features. }
+      plot: { kind: image, ext: png, description: "The steps and the voltage-current plot." }
+    citations:
+      - text: "Gouwens, N. W., Sorensen, S. A., Berg, J., Lee, C., Jarsky, T., Ting, J., et al. (2019). Classification of electrophysiological and morphological neuron types in the mouse visual cortex. Nature Neuroscience, 22(7), 1182-1195."
+        doi: 10.1038/s41593-019-0417-0
+      - text: "Neher, E. (1992). Correction for liquid junction potentials in patch clamp experiments. Methods in Enzymology, 207, 123-131."
+        doi: 10.1016/0076-6879(92)07008-C
+        when:
+          ljp_mv: set
+
+  - name: measure_current_steps
+    title: Peak current and the I-V curve
+    description: >
+      Measure the peak current of each voltage step in a voltage-clamp recording and write the I-V table. It can subtract a leak
+      line. It does not fit activation curves: fit_boltzmann does. It refuses a current-clamp file.
+    function: "ga_patch_clamp:measure_current_steps"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the voltage-clamp recording (.abf or Allen .nwb)." }
+      current_window: { type: [string, array], items: { type: number }, description: "Start and end in s of the window in which the tool finds the peak. Start after the capacitive transient." }
+      baseline_window: { type: [string, array], items: { type: number }, description: "Start and end of the baseline in s. The harness sets it from the decision record." }
+      peak_direction: { type: string, enum: [inward, outward, largest], description: "Which peak to take. The harness sets it from the decision record." }
+      leak_subtraction: { type: string, enum: [none, linear_extrapolation], description: "Leak subtraction. The harness sets it from the decision record." }
+      leak_fit_range_mv: { type: [string, array], items: { type: number }, description: "Start and end in mV of the voltage range for the leak fit. Needed for linear_extrapolation." }
+      ljp_mv: { type: number, description: "Liquid junction potential in mV, subtracted from every voltage. The harness sets it from the decision record." }
+      sweeps: { type: [string, array], items: { type: integer }, description: "Sweep numbers to include (count, 1 is the first), or all. The harness sets it from the decision record." }
+      voltage_window: { type: [string, array], items: { type: number }, description: "Start and end in s of the window that gives the voltage of each sweep. The default is the step. Use the prepulse for an inactivation curve." }
+      channel: { type: integer, minimum: 0, default: 0, description: "Index of the recorded channel (count, 0 is the first)." }
+      sweep_label: { type: string, description: "Keep only sweeps whose label holds this text." }
+      cell_id: { type: string, description: "Name of the cell in the cell table. The default is the file name." }
+    required: [path]
+    outputs:
+      iv: { kind: table, ext: csv, description: "One row for each sweep: voltage and current." }
+      cell_features: { kind: table, ext: csv, description: One row with the cell values for collect_cell_features. }
+      plot: { kind: image, ext: png, description: The sweeps and the I-V curve. }
+    citations:
+      - text: "Bezanilla, F., & Armstrong, C. M. (1977). Inactivation of the sodium channel. I. Sodium current experiments. Journal of General Physiology, 70(5), 549-566."
+        doi: 10.1085/jgp.70.5.549
+        when:
+          leak_subtraction: linear_extrapolation
+      - text: "Neher, E. (1992). Correction for liquid junction potentials in patch clamp experiments. Methods in Enzymology, 207, 123-131."
+        doi: 10.1016/0076-6879(92)07008-C
+        when:
+          ljp_mv: set
+      - text: "Barry, P. H. (1994). JPCalc, a software package for calculating liquid junction potential corrections in patch-clamp, intracellular, epithelial and bilayer measurements and for correcting junction potential measurements. Journal of Neuroscience Methods, 51(1), 107-116."
+        doi: 10.1016/0165-0270(94)90031-0
+        when:
+          ljp_mv: set
+
+  - name: fit_boltzmann
+    title: Activation or inactivation curve (Boltzmann fit)
+    description: >
+      Fit a Boltzmann curve to an I-V table and give V1/2 and the slope factor with standard errors and confidence intervals.
+      An activation curve turns current into conductance with a reversal potential. Fit each cell alone, then compare cells.
+    read_only: true
+    function: "ga_patch_clamp:fit_boltzmann"
+    params:
+      table: { type: string, minLength: 1, description: "Absolute path of a CSV file with a voltage column and a current column, such as the iv.csv of measure_current_steps." }
+      curve: { type: string, enum: [activation, inactivation], description: "activation rises with voltage and uses a conductance. inactivation falls with voltage and uses the current." }
+      reversal_potential_mv: { type: number, description: "Reversal potential in mV (millivolts). Needed for activation. The harness sets it from the decision record." }
+      voltage_col: { type: string, description: "Name of the voltage column (mV). The default is voltage_mv." }
+      current_col: { type: string, description: "Name of the current column (pA). The default is current_pa." }
+      exclude_within_mv: { type: number, minimum: 0, description: "Leave out points within this distance of the reversal potential, in mV. 0 keeps all points." }
+      fit_floor: { type: boolean, description: "True fits a non-inactivating current for an inactivation curve. False sets the floor to 0." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, description: "Significance level of the confidence interval (fraction). The harness sets it from the decision record." }
+    required: [table, curve]
+    outputs:
+      boltzmann: { kind: table, ext: csv, description: "The normalized points and the fitted curve." }
+      cell_features: { kind: table, ext: csv, description: One row with V1/2 and the slope for collect_cell_features. }
+      plot: { kind: image, ext: png, description: The points and the fit. }
+    citations:
+      - text: "Hodgkin, A. L., & Huxley, A. F. (1952). A quantitative description of membrane current and its application to conduction and excitation in nerve. The Journal of Physiology, 117(4), 500-544."
+        doi: 10.1113/jphysiol.1952.sp004764
+
+  - name: detect_events
+    title: Spontaneous synaptic events
+    description: >
+      Detect spontaneous synaptic events (mEPSC or mIPSC) in a voltage-clamp trace and measure amplitude, frequency, rise time
+      and decay time. It uses a scaled template (Clements and Bekkers 1997) or a threshold. It reads one cell.
+    function: "ga_patch_clamp:detect_events"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the voltage-clamp recording (.abf, .pxp, .wcp, or a text table)." }
+      event_method: { type: string, enum: [template, threshold], description: "Detection method. The harness sets it from the decision record." }
+      event_threshold: { type: number, minimum: 1, description: "Threshold as a multiple of the noise SD (unitless). The harness sets it from the decision record." }
+      event_direction: { type: string, enum: [inward, outward], description: "Sign of the events. The harness sets it from the decision record." }
+      event_rise_ms: { type: number, minimum: 0.01, description: "Rise time constant of the template in ms. The harness sets it from the decision record." }
+      event_decay_ms: { type: number, minimum: 0.1, description: "Decay time constant of the template in ms. The harness sets it from the decision record." }
+      sweeps: { type: [string, array], items: { type: integer }, description: "Sweep numbers to include (count, 1 is the first), or all. The harness sets it from the decision record." }
+      channel: { type: integer, minimum: 0, default: 0, description: "Index of the recorded channel (count, 0 is the first)." }
+      sweep_label: { type: string, description: "Keep only sweeps whose label holds this text." }
+      filter_hz: { type: number, minimum: 0, description: "Cutoff in Hz of a 4-pole Bessel low-pass filter before detection. 0 means no filter." }
+      analysis_window: { type: [string, array], items: { type: number }, description: "Start and end in s of the part of each sweep to analyze. Use it to skip a test pulse." }
+      cell_id: { type: string, description: "Name of the cell in the cell table. The default is the file name." }
+      signal_unit: { type: string, description: "Unit of the current: pA or nA. Needed for a text file and for a Neo file that has no unit, such as an Igor pxp file." }
+    required: [path]
+    outputs:
+      events: { kind: table, ext: csv, description: "One row for each event: time, amplitude, rise and decay." }
+      cell_features: { kind: table, ext: csv, description: One row with the cell values for collect_cell_features. }
+      plot: { kind: image, ext: png, description: "A trace with events, the average event and the amplitude distribution." }
+    citations:
+      - text: "Clements, J. D., & Bekkers, J. M. (1997). Detection of spontaneous synaptic events with an optimally scaled template. Biophysical Journal, 73(1), 220-229."
+        doi: 10.1016/S0006-3495(97)78062-7
+        when:
+          event_method: template
+
+  - name: detect_events_for_cells
+    title: Spontaneous synaptic events in many cells
+    description: >
+      Detect spontaneous synaptic events in every file of a folder that matches a pattern, with one cell for each file. Writes a
+      cell table with frequency, amplitude, rise and decay, and joins animal and group from a metadata file.
+    batch: true
+    function: "ga_patch_clamp:detect_events_for_cells"
+    params:
+      folder: { type: string, minLength: 1, description: Absolute path of the folder with one recording file for each cell. }
+      pattern: { type: string, minLength: 1, description: "File pattern in the folder, such as *.pxp." }
+      metadata: { type: string, description: "Absolute path of a CSV file with the columns cell, animal and group. The column cell holds the file name without the extension." }
+      event_method: { type: string, enum: [template, threshold], description: "Detection method. The harness sets it from the decision record." }
+      event_threshold: { type: number, minimum: 1, description: "Threshold as a multiple of the noise SD (unitless). The harness sets it from the decision record." }
+      event_direction: { type: string, enum: [inward, outward], description: "Sign of the events. The harness sets it from the decision record." }
+      event_rise_ms: { type: number, minimum: 0.01, description: "Rise time constant of the template in ms. The harness sets it from the decision record." }
+      event_decay_ms: { type: number, minimum: 0.1, description: "Decay time constant of the template in ms. The harness sets it from the decision record." }
+      sweeps: { type: [string, array], items: { type: integer }, description: "Sweep numbers to include in each file (count, 1 is the first), or all. The harness sets it from the decision record." }
+      filter_hz: { type: number, minimum: 0, description: "Cutoff in Hz of a 4-pole Bessel low-pass filter before detection. 0 means no filter." }
+      analysis_window: { type: [string, array], items: { type: number }, description: "Start and end in s of the part of each sweep to analyze. Use it to skip a test pulse." }
+      signal_unit: { type: string, description: "Unit of the current: pA or nA. Needed for a text file and for a file that has no unit, such as an Igor pxp file." }
+    required: [folder, pattern]
+    outputs:
+      cells: { kind: table, ext: csv, description: "One row for each cell." }
+      plot: { kind: image, ext: png, description: "A trace with events of the last cell." }
+    citations:
+      - text: "Clements, J. D., & Bekkers, J. M. (1997). Detection of spontaneous synaptic events with an optimally scaled template. Biophysical Journal, 73(1), 220-229."
+        doi: 10.1016/S0006-3495(97)78062-7
+        when:
+          event_method: template
+
+  - name: collect_cell_features
+    title: Join cell tables
+    description: >
+      Join the per-cell result tables of the measure tools, and the animal and group of each cell, into one table. The table has
+      one row for each cell. Use it in the group comparison.
+    read_only: true
+    batch: false
+    function: "ga_patch_clamp:collect_cell_features"
+    params:
+      paths: { type: [array, string], items: { type: string }, minItems: 1, description: "Absolute paths of cell_features.csv files, as a list or comma text. Each has a cell column." }
+      metadata: { type: string, description: "Absolute path of a CSV file with the columns cell, animal and group." }
+      id_column: { type: string, description: "Name of the column that names the cell. The default is cell." }
+    required: [paths]
+    outputs:
+      cells: { kind: table, ext: csv, description: "One row for each cell." }
+
+  - name: compare_cell_groups
+    title: Compare two groups of cells
+    description: >
+      Compare cell-level values between two groups with the Welch t-test or the Mann-Whitney test. The unit is the animal or the
+      cell. It adjusts over features with Benjamini-Hochberg. Cells nest in animals: for a mixed model use lme4.
+    function: "ga_patch_clamp:compare_cell_groups"
+    read_only: true
+    params:
+      table: { type: string, minLength: 1, description: "Absolute path of a CSV file with one row for each cell, a group column, an animal column and numeric feature columns." }
+      group_col: { type: string, description: Column with exactly 2 group labels. }
+      features: { type: [array, string], items: { type: string }, description: "Feature columns to test, as a list or comma text. The default is all numeric columns." }
+      replicate_unit: { type: string, enum: [animals, cells], description: "Unit of replication. The harness sets it from the decision record." }
+      test: { type: string, enum: [t, mannwhitney], description: "t is Welch. mannwhitney is the rank test. The harness sets it from the decision record." }
+      animal_col: { type: string, description: "Column that names the animal. The default is animal." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, description: "Significance level (fraction). The harness sets it from the decision record." }
+    required: [table, group_col]
+    outputs:
+      group_comparison: { kind: table, ext: csv, description: "One row for each feature." }
+      plot: { kind: image, ext: png, description: One dot for each animal or cell. }
+    citations:
+      - text: "Welch, B. L. (1947). The generalization of 'Student's' problem when several different population variances are involved. Biometrika, 34(1-2), 28-35."
+        doi: 10.1093/biomet/34.1-2.28
+        when:
+          test: t
+      - text: "Mann, H. B., & Whitney, D. R. (1947). On a test of whether one of two random variables is stochastically larger than the other. The Annals of Mathematical Statistics, 18(1), 50-60."
+        doi: 10.1214/aoms/1177730491
+        when:
+          test: mannwhitney
+      - text: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society: Series B, 57(1), 289-300."
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+      - text: "Lazic, S. E. (2010). The problem of pseudoreplication in neuroscientific studies: is it affecting your analysis? BMC Neuroscience, 11, 5."
+        doi: 10.1186/1471-2202-11-5
+      - text: "Aarts, E., Verhage, M., Veenvliet, J. V., Dolan, C. V., & van der Sluis, S. (2014). A solution to dependency: using multilevel analysis to accommodate nested data. Nature Neuroscience, 17(4), 491-496."
+        doi: 10.1038/nn.3648
+
+map:
+  - tool: inspect_recording
+    route: 'pyabf.ABF(path); abf.sweepCount, abf.dataRate, abf.sweepEpochs'
+    steps:
+      - "Clampfit: File > Open Data. The status bar and the Lab Book show the number of sweeps and the sampling rate."
+      - "Easy Electrophysiology and Mini Analysis: open the file and read the sweep list."
+      - "Igor Pro with NeuroMatic: load the file with the NeuroMatic file tab, then read the wave list."
+    params:
+      - { arg: path, label: file }
+      - { arg: channel, label: signal or channel }
+    fidelity: exact
+    evidence: { source: docs, test: inspect-ic-file }
+
+  - tool: measure_spikes
+    route: 'efel.get_feature_values(traces, ["Spikecount", "ISI_CV", "adaptation_index"]) and a threshold at the first point where dV/dt reaches the cutoff'
+    steps:
+      - "Clampfit: Analyze > Event Detection with a threshold search, or the Statistics window for peak and half-width. The threshold is by hand."
+      - "Easy Electrophysiology: the action potential analysis. It sets the threshold from a rate of rise or from the maximum of the second derivative."
+      - "Igor Pro with NeuroMatic: the Stats tab for peak and width, and a macro for the threshold."
+    params:
+      - { arg: dvdt_cutoff_mv_per_ms, label: threshold rate of rise }
+      - { arg: min_peak_mv, label: spike peak limit }
+      - { arg: stim_window, label: step start and end }
+    fidelity: close
+    difference: >
+      The program applies its own threshold rule, filter and window. The tool filters V with a 4-pole Bessel filter at 10 kHz before it
+      takes dV/dt. The program names were not run side by side with the tool.
+    evidence: { source: docs, test: allen-cell-1 }
+
+  - tool: measure_passive
+    route: 'a straight line fit of the steady-state voltage on the step current, and a single exponential fit of the onset'
+    steps:
+      - "Clampfit: Analyze > Statistics for the steady-state level, then Analyze > Fit with a single exponential for tau."
+      - "Easy Electrophysiology: the input resistance, the membrane time constant and the sag modules."
+      - "Igor Pro with NeuroMatic: the Stats tab for the level, and the Fit tab for tau."
+    params:
+      - { arg: baseline_window, label: baseline range }
+      - { arg: current_range_pa, label: steps to include }
+    fidelity: close
+    difference: >
+      The program may fit tau on a window that you place by hand. The tool fits from 10 percent of the peak deflection to the peak.
+      The capacitance from tau over resistance is a rough value, not a compensation reading.
+    evidence: { source: docs, test: passive-ic-file }
+
+  - tool: measure_current_steps
+    route: 'the mean of the baseline subtracted from the trace, then the largest deflection in the window of each sweep'
+    steps:
+      - "Clampfit: Analyze > Statistics, with a baseline region and a peak search region, then an I-V plot of the table."
+      - "Easy Electrophysiology: the I-V analysis."
+      - "Igor Pro with NeuroMatic: the Stats tab with a baseline window and a peak window."
+    params:
+      - { arg: current_window, label: peak search region }
+      - { arg: baseline_window, label: baseline region }
+    fidelity: close
+    difference: "The tool takes the largest deflection after a baseline subtraction. Clampfit can also use the mean of a region."
+    evidence: { source: docs, test: iv-vc-file }
+
+  - tool: fit_boltzmann
+    route: 'scipy.optimize.curve_fit of a Boltzmann function on the conductance or the current'
+    steps:
+      - "Clampfit: Analyze > Fit, with the Boltzmann function, charge-voltage or sigmoid."
+      - "Igor Pro: CurveFit with a sigmoid, or a user function A / (1 + exp((V1/2 - V) / k))."
+      - "Prism: Nonlinear regression, Boltzmann sigmoidal."
+    params:
+      - { arg: reversal_potential_mv, label: reversal potential }
+    fidelity: exact
+    evidence: { source: docs, test: boltzmann-activation, note: "R nls gives the same V1/2, slope factor and standard errors (checks/check_boltzmann.R)." }
+
+  - tool: detect_events
+    route: 'a scaled template fit at each point of the trace (Clements and Bekkers), then a peak search of the detection trace'
+    steps:
+      - "Clampfit: Event Detection > Template Search, with a template that you build from events."
+      - "Easy Electrophysiology: the spontaneous event analysis with a template or a threshold."
+      - "Mini Analysis: Analysis > Detect events with an amplitude threshold."
+    params:
+      - { arg: event_threshold, label: detection threshold }
+      - { arg: event_rise_ms, label: template rise }
+      - { arg: event_decay_ms, label: template decay }
+    fidelity: close
+    difference: >
+      The programs build the template from the average of events that you choose. The tool uses a difference of two exponentials.
+      The tool sets the threshold as a multiple of the noise SD of the detection trace.
+    evidence: { source: docs, test: events-synthetic }
+
+  - tool: detect_events_for_cells
+    route: 'detect_events for each file of the folder'
+    steps:
+      - "Run the same event detection for each cell, with the same settings, and write the values in one table."
+    fidelity: code_only
+    difference: "The programs have batch modes with their own settings, but no step gives one cell table with the animal and the group."
+    evidence: { source: code, test: events-batch }
+
+  - tool: collect_cell_features
+    route: 'pandas merge of the cell tables on the cell name'
+    steps:
+      - "Copy the result of each cell from the program into one spreadsheet, with a column for the animal and a column for the group."
+    fidelity: code_only
+    difference: "The programs write one result file for each cell. The join is a spreadsheet step."
+    evidence: { source: code, test: collect-cells }
+
+  - tool: compare_cell_groups
+    route: 'scipy.stats.ttest_ind(equal_var=False) on the cell values, or on the mean of each animal'
+    steps:
+      - "Prism: a t-test with Welch correction, or a nested t-test. A nested t-test treats the animal as a level."
+      - "R: t.test(feature ~ group), after aggregate() by animal, or lme4::lmer(feature ~ group + (1 | animal))."
+    params:
+      - { arg: replicate_unit, label: unit of the test, ui_default: "cells" }
+    fidelity: exact
+    evidence: { source: docs, test: groups-animals, note: "R t.test gives the same t, df, p and interval (checks/check_groups.R)." }
+
+checks:
+  - id: cells_counted_as_n
+    severity: warning
+    description: Cells from few animals are counted as independent samples.
+    text: >
+      If the answer compares two groups and gives n as a number of cells, it must also give the number of animals in each group
+      and say that cells in one animal are not independent. Flag the answer if it uses cells as n and does not say so, or if it
+      does not point to a mixed model with the animal as a random effect.
+  - id: ljp_not_reported
+    severity: warning
+    description: Voltages are reported with no word about the liquid junction potential.
+    text: >
+      If the answer gives a membrane potential, a threshold or a voltage of an I-V curve, it must say whether the liquid junction
+      potential was corrected and by how many mV. Flag the answer if it does not say so.
+  - id: threshold_definition_not_reported
+    severity: warning
+    description: A spike threshold is reported without the definition.
+    text: >
+      If the answer gives a spike threshold, it must name the definition and the dV/dt cutoff, and the minimum peak. Two definitions
+      give thresholds that differ by several mV. Flag the answer if one of them is missing.
+  - id: event_settings_not_reported
+    severity: warning
+    description: An event frequency or amplitude is reported without the detection settings.
+    text: >
+      If the answer gives an event frequency or amplitude, it must name the method, the threshold, the template kinetics and the
+      filter. The values depend on them. Flag the answer if one of them is missing.
+  - id: rheobase_resolution
+    severity: info
+    description: The rheobase is given as an exact current.
+    text: >
+      A rheobase from current steps is only as fine as the step size. If the answer gives a rheobase, it must name the step size,
+      or say that the true value lies between two steps.
+
+tests:
+  - id: inspect-ic-file
+    description: >
+      The pyABF sample file 171116sh_0018.abf has 17 sweeps at 20 kHz. Its epoch table gives a step from sample 2937 to 12937, which is
+      0.14685 s to 0.64685 s, and steps from -100 to 300 pA. The values come from pyABF itself (checks/check_abf.py, output
+      checks/check_abf.out).
+    data: [data/pyabf/171116sh_0018.abf]
+    calls:
+      - tool: inspect_recording
+        args: { path: "{adapter_dir}/data/pyabf/171116sh_0018.abf" }
+    expect:
+      - { path: metrics.n_sweeps, equals: 17 }
+      - { path: metrics.sampling_rate_hz, approx: 20000, abs: 0.001 }
+      - { path: metrics.step_start_s, approx: 0.14685, abs: 0.00001 }
+      - { path: metrics.step_end_s, approx: 0.64685, abs: 0.00001 }
+      - { path: metrics.step_min, approx: -100, abs: 0.01 }
+      - { path: metrics.step_max, approx: 300, abs: 0.01 }
+      - { path: data.data.mode, equals: current_clamp }
+
+  - id: spikes-ic-file
+    description: >
+      The same file. checks/check_abf.py counts spikes with a raw dV/dt of 20 mV per ms and a peak of -10 mV or more. It gives a
+      rheobase of 50 pA, a frequency-current slope of 0.065455 Hz per pA over 11 sweeps, and a first threshold of -39.307 mV. The
+      tool filters V before dV/dt, so its threshold differs by 0.1 mV or less.
+    data: [data/pyabf/171116sh_0018.abf]
+    calls:
+      - tool: measure_spikes
+        args:
+          path: "{adapter_dir}/data/pyabf/171116sh_0018.abf"
+          spike_threshold_method: dvdt_cutoff
+          dvdt_cutoff_mv_per_ms: 20
+          min_peak_mv: -10
+          sweeps: all
+          ljp_mv: 0
+    expect:
+      - { path: metrics.rheobase_pa, approx: 50, abs: 0.01 }
+      - { path: metrics.fi_slope_hz_per_pa, approx: 0.065455, abs: 0.00001 }
+      - { path: metrics.n_sweeps_with_spikes, equals: 11 }
+      - { path: metrics.threshold_mv, approx: -39.307, abs: 0.1 }
+
+  - id: spikes-ljp
+    description: >
+      With ljp_mv set to 12, every voltage is 12 mV lower by the definition of the correction (recorded voltage minus the junction
+      potential). The first threshold of the previous test, -39.307 mV, becomes -51.307 mV.
+    data: [data/pyabf/171116sh_0018.abf]
+    calls:
+      - tool: measure_spikes
+        args:
+          path: "{adapter_dir}/data/pyabf/171116sh_0018.abf"
+          spike_threshold_method: dvdt_cutoff
+          dvdt_cutoff_mv_per_ms: 20
+          min_peak_mv: -10
+          sweeps: all
+          ljp_mv: 12
+    expect:
+      - { path: metrics.threshold_mv, approx: -51.307, abs: 0.1 }
+      - { path: metrics.rheobase_pa, approx: 50, abs: 0.01 }
+
+  - id: passive-ic-file
+    description: >
+      The same file, the three steps from -100 to 0 pA exclusive. checks/check_abf.py fits a line to the mean voltage of the last
+      100 ms of each step and gives 116.18 MOhm, with a mean baseline of -61.5496 mV between 0.02 s and 0.13 s.
+    data: [data/pyabf/171116sh_0018.abf]
+    calls:
+      - tool: measure_passive
+        args:
+          path: "{adapter_dir}/data/pyabf/171116sh_0018.abf"
+          baseline_window: [0.02, 0.13]
+          input_resistance_measure: steady_state
+          sweeps: all
+          ljp_mv: 0
+          current_range_pa: [-100, 0]
+    expect:
+      - { path: metrics.input_resistance_mohm, approx: 116.18, abs: 0.05 }
+      - { path: metrics.resting_potential_mv, approx: -61.5496, abs: 0.01 }
+      - { path: metrics.n_sweeps, equals: 3 }
+
+  - id: iv-vc-file
+    description: >
+      The pyABF sample file 17o05024_vc_steps.abf has 7 voltage steps from -110 to -50 mV. checks/check_abf.py takes the largest
+      deflection from 0.6 s to 1.05 s after a baseline of 0.1 s to 0.5 s. A line through the mean currents between -80 and -60 mV
+      has a slope of 0.517253 nS and an intercept of 36.4390 pA. The largest leak-subtracted current is -31.518 pA at -90 mV.
+    data: [data/pyabf/17o05024_vc_steps.abf]
+    calls:
+      - tool: measure_current_steps
+        args:
+          path: "{adapter_dir}/data/pyabf/17o05024_vc_steps.abf"
+          current_window: [0.6, 1.05]
+          baseline_window: [0.1, 0.5]
+          peak_direction: largest
+          leak_subtraction: linear_extrapolation
+          leak_fit_range_mv: [-80, -60]
+          ljp_mv: 0
+          sweeps: all
+    expect:
+      - { path: metrics.leak_conductance_ns, approx: 0.517253, abs: 0.000001 }
+      - { path: metrics.leak_intercept_pa, approx: 36.4390, abs: 0.0001 }
+      - { path: metrics.peak_current_pa, approx: -31.518, abs: 0.001 }
+      - { path: metrics.voltage_at_peak_mv, approx: -90, abs: 0.01 }
+
+  - id: iv-ljp
+    description: >
+      With ljp_mv set to 10 and no leak subtraction, every command voltage is 10 mV lower. The largest raw deflection of
+      checks/check_abf.out is -51.688 pA at -110 mV. It is now at -120 mV, and the current is the same.
+    data: [data/pyabf/17o05024_vc_steps.abf]
+    calls:
+      - tool: measure_current_steps
+        args:
+          path: "{adapter_dir}/data/pyabf/17o05024_vc_steps.abf"
+          current_window: [0.6, 1.05]
+          baseline_window: [0.1, 0.5]
+          peak_direction: largest
+          leak_subtraction: none
+          ljp_mv: 10
+          sweeps: all
+    expect:
+      - { path: metrics.voltage_at_peak_mv, approx: -120, abs: 0.01 }
+      - { path: metrics.peak_current_pa, approx: -51.688, abs: 0.001 }
+
+  - id: allen-cell-1
+    description: >
+      Allen Cell Types Database cell 567987585 (mouse VISl layer 4, Pvalb-IRES-Cre). The database gives rheobase 230 pA, F-I slope
+      1.07166364 Hz per pA, input resistance 129.843786 MOhm, tau 8.25874 ms and an upstroke to downstroke ratio of 1.14581527
+      (ApiCellTypesSpecimenDetail, fields ef__threshold_i_long_square, ef__f_i_curve_slope, ef__ri, ef__tau and
+      ef__upstroke_downstroke_ratio_long_square). The tool follows the Allen definitions: threshold at 5 percent of the mean upstroke
+      after dV/dt of 20 mV per ms, the peak deflection for the input resistance, steps between -100 and 0 pA. The database tau is 0.4 percent
+      higher than the tool value. The cause is not known.
+    fetch: data/fetch.sh
+    data: [data/allen/567987585.nwb]
+    calls:
+      - tool: measure_spikes
+        args:
+          path: "{adapter_dir}/data/allen/567987585.nwb"
+          sweep_label: Long Square
+          spike_threshold_method: dvdt_fraction_of_upstroke
+          dvdt_cutoff_mv_per_ms: 20
+          min_peak_mv: -30
+          sweeps: all
+          ljp_mv: 0
+        save_as: spikes
+      - tool: measure_passive
+        args:
+          path: "{adapter_dir}/data/allen/567987585.nwb"
+          sweep_label: Long Square
+          baseline_window: [0.92, 1.02]
+          input_resistance_measure: peak
+          sweeps: all
+          ljp_mv: 0
+          current_range_pa: [-100, 0]
+    expect:
+      - { path: saved.spikes.metrics.rheobase_pa, approx: 230, abs: 0.01 }
+      - { path: saved.spikes.metrics.fi_slope_hz_per_pa, approx: 1.07166364, rel: 0.000001 }
+      - { path: saved.spikes.metrics.upstroke_downstroke_ratio, approx: 1.14581527, rel: 0.000001 }
+      - { path: metrics.input_resistance_mohm, approx: 129.843786, rel: 0.00001 }
+      - { path: metrics.tau_ms, approx: 8.25874, rel: 0.01 }
+
+  - id: allen-cell-2
+    description: >
+      Allen Cell Types Database cell 595511209 (mouse VISp layer 4, Tlx3-Cre_PL56). The database gives rheobase 70 pA, F-I slope
+      0.115153631 Hz per pA, input resistance 187.187567 MOhm, tau 32.5551 ms and an upstroke to downstroke ratio of 3.87456911.
+      The settings are those of the first Allen test. The database tau differs by 0.9 percent from the tool.
+    fetch: data/fetch.sh
+    data: [data/allen/595511209.nwb]
+    calls:
+      - tool: measure_spikes
+        args:
+          path: "{adapter_dir}/data/allen/595511209.nwb"
+          sweep_label: Long Square
+          spike_threshold_method: dvdt_fraction_of_upstroke
+          dvdt_cutoff_mv_per_ms: 20
+          min_peak_mv: -30
+          sweeps: all
+          ljp_mv: 0
+        save_as: spikes
+      - tool: measure_passive
+        args:
+          path: "{adapter_dir}/data/allen/595511209.nwb"
+          sweep_label: Long Square
+          baseline_window: [0.92, 1.02]
+          input_resistance_measure: peak
+          sweeps: all
+          ljp_mv: 0
+          current_range_pa: [-100, 0]
+    expect:
+      - { path: saved.spikes.metrics.rheobase_pa, approx: 70, abs: 0.01 }
+      - { path: saved.spikes.metrics.fi_slope_hz_per_pa, approx: 0.115153631, rel: 0.000001 }
+      - { path: saved.spikes.metrics.upstroke_downstroke_ratio, approx: 3.87456911, rel: 0.000001 }
+      - { path: metrics.input_resistance_mohm, approx: 187.187567, rel: 0.00001 }
+      - { path: metrics.tau_ms, approx: 32.5551, rel: 0.02 }
+
+  - id: allen-cell-3
+    description: >
+      Allen Cell Types Database cell 563220277 (mouse VISp layer 5, Sim1-Cre_KJ18). The database gives rheobase 90 pA, F-I slope
+      0.207532397 Hz per pA, input resistance 128.515631 MOhm and an upstroke to downstroke ratio of 3.22588602. The test leaves out
+      tau for this cell: the tool gives no fit for one of the three sweeps, so its mean differs from the database.
+    fetch: data/fetch.sh
+    data: [data/allen/563220277.nwb]
+    calls:
+      - tool: measure_spikes
+        args:
+          path: "{adapter_dir}/data/allen/563220277.nwb"
+          sweep_label: Long Square
+          spike_threshold_method: dvdt_fraction_of_upstroke
+          dvdt_cutoff_mv_per_ms: 20
+          min_peak_mv: -30
+          sweeps: all
+          ljp_mv: 0
+        save_as: spikes
+      - tool: measure_passive
+        args:
+          path: "{adapter_dir}/data/allen/563220277.nwb"
+          sweep_label: Long Square
+          baseline_window: [0.92, 1.02]
+          input_resistance_measure: peak
+          sweeps: all
+          ljp_mv: 0
+          current_range_pa: [-100, 0]
+    expect:
+      - { path: saved.spikes.metrics.rheobase_pa, approx: 90, abs: 0.01 }
+      - { path: saved.spikes.metrics.fi_slope_hz_per_pa, approx: 0.207532397, rel: 0.000001 }
+      - { path: saved.spikes.metrics.upstroke_downstroke_ratio, approx: 3.22588602, rel: 0.000001 }
+      - { path: metrics.input_resistance_mohm, approx: 128.515631, rel: 0.00001 }
+
+  - id: boltzmann-activation
+    description: >
+      The synthetic table data/synthetic_activation.csv has 11 points of a noisy activation curve (generated with V1/2 of -20 mV,
+      slope factor 7.5 mV, reversal potential 60 mV and 3 pA of noise). R 4.6.1 nls (port algorithm) on the conductance gives V1/2 =
+      -20.002506 mV (SE 0.154795), k = 7.589344 mV (SE 0.132832), R squared 0.9998306, and a t interval of -20.35946 to -19.64555 for
+      V1/2 (checks/check_boltzmann.R, output checks/check_boltzmann.out).
+    data: [data/synthetic_activation.csv]
+    calls:
+      - tool: fit_boltzmann
+        args:
+          table: "{adapter_dir}/data/synthetic_activation.csv"
+          curve: activation
+          reversal_potential_mv: 60
+          alpha: 0.05
+    expect:
+      - { path: metrics.v_half_mv, approx: -20.002506, abs: 0.00001 }
+      - { path: metrics.slope_k_mv, approx: 7.589344, abs: 0.00001 }
+      - { path: metrics.v_half_se_mv, approx: 0.154795, abs: 0.000001 }
+      - { path: metrics.v_half_ci_lo, approx: -20.35946, abs: 0.0001 }
+      - { path: metrics.v_half_ci_hi, approx: -19.64555, abs: 0.0001 }
+      - { path: metrics.r_squared, approx: 0.9998306, abs: 0.0000001 }
+
+  - id: boltzmann-inactivation
+    description: >
+      The synthetic table data/synthetic_inactivation.csv has 11 points of a noisy inactivation curve (generated with V1/2 of
+      -60 mV and slope factor 6 mV). R 4.6.1 nls gives V1/2 = -60.037402 mV, k = 6.088358 mV and R squared 0.9996886.
+    data: [data/synthetic_inactivation.csv]
+    calls:
+      - tool: fit_boltzmann
+        args:
+          table: "{adapter_dir}/data/synthetic_inactivation.csv"
+          curve: inactivation
+    expect:
+      - { path: metrics.v_half_mv, approx: -60.037402, abs: 0.00001 }
+      - { path: metrics.slope_k_mv, approx: 6.088358, abs: 0.00001 }
+      - { path: metrics.r_squared, approx: 0.9996886, abs: 0.0000001 }
+
+  - id: events-synthetic
+    description: >
+      The synthetic trace data/synthetic_events.csv (8 s at 10 kHz, noise SD 4 pA, a slow drift) holds 26 inward events with a rise
+      constant of 0.7 ms and a decay constant of 8 ms. Their mean amplitude is 55.6769 pA, and the noise-free 10 to 90 percent rise
+      time is 0.9140 ms (checks/check_events.py, output checks/check_events.out). Noise biases the measured peak up by about 4 percent.
+    data: [data/synthetic_events.csv, data/synthetic_events_truth.csv]
+    calls:
+      - tool: detect_events
+        args:
+          path: "{adapter_dir}/data/synthetic_events.csv"
+          signal_unit: pA
+          event_method: template
+          event_threshold: 4
+          event_direction: inward
+          event_rise_ms: 0.7
+          event_decay_ms: 8
+          sweeps: all
+    expect:
+      - { path: metrics.n_events, equals: 26 }
+      - { path: metrics.frequency_hz, approx: 3.25, abs: 0.0001 }
+      - { path: metrics.mean_amplitude_pa, approx: 55.6769, rel: 0.06 }
+      - { path: metrics.mean_decay_tau_ms, approx: 8.0, rel: 0.1 }
+      - { path: metrics.mean_rise_10_90_ms, approx: 0.914, rel: 0.2 }
+
+  - id: events-batch
+    description: >
+      The batch tool on a folder with the synthetic trace as one cell. It gives the same event count as the single-cell test, 26
+      events in 8 s.
+    data: [data/synthetic_events.csv]
+    calls:
+      - tool: detect_events_for_cells
+        args:
+          folder: "{adapter_dir}/data"
+          pattern: synthetic_events.csv
+          signal_unit: pA
+          event_method: template
+          event_threshold: 4
+          event_direction: inward
+          event_rise_ms: 0.7
+          event_decay_ms: 8
+          sweeps: all
+    expect:
+      - { path: metrics.n_cells, equals: 1 }
+      - { path: "table.rows[0][1]", equals: 26 }
+
+  - id: collect-cells
+    description: >
+      The cell_features tables of measure_spikes (8 values) and measure_passive (5 values) on one file, joined under one cell name.
+      The result has 1 cell and 14 columns (the name and 13 values).
+    data: [data/pyabf/171116sh_0018.abf]
+    calls:
+      - tool: measure_spikes
+        args:
+          path: "{adapter_dir}/data/pyabf/171116sh_0018.abf"
+          spike_threshold_method: dvdt_cutoff
+          dvdt_cutoff_mv_per_ms: 20
+          min_peak_mv: -10
+          sweeps: all
+          ljp_mv: 0
+          cell_id: cellA
+        save_as: spikes
+      - tool: measure_passive
+        args:
+          path: "{adapter_dir}/data/pyabf/171116sh_0018.abf"
+          baseline_window: [0.02, 0.13]
+          input_resistance_measure: steady_state
+          sweeps: all
+          ljp_mv: 0
+          current_range_pa: [-100, 0]
+          cell_id: cellA
+        save_as: passive
+      - tool: collect_cell_features
+        args:
+          paths: ["{saved.spikes.data.tables.cell_features.path}", "{saved.passive.data.tables.cell_features.path}"]
+    expect:
+      - { path: metrics.n_cells, equals: 1 }
+      - { path: metrics.n_columns, equals: 14 }
+
+  - id: groups-cells
+    description: >
+      data/jahncke_cells_events.csv holds 32 Purkinje cells from 12 mice (16 Ctrl and 16 cKO cells, 6 animals in each group). R 4.6.1
+      t.test with unequal variances on the cells, cKO minus Ctrl, gives for the event frequency: difference -1.206140 Hz, t -2.678230,
+      df 29.9075, p 0.01190575, interval -2.125997 to -0.286284, Cohen d -0.946897. The ICC over animals is 0.260063
+      (checks/check_groups.R, output checks/check_groups.out).
+    data: [data/jahncke_cells_events.csv]
+    calls:
+      - tool: compare_cell_groups
+        args:
+          table: "{adapter_dir}/data/jahncke_cells_events.csv"
+          group_col: group
+          features: [event_frequency_hz, event_amplitude_pa]
+          replicate_unit: cells
+          test: t
+          alpha: 0.05
+    expect:
+      - { path: "table.rows[0][8]", approx: 2.969298, abs: 0.0001 }
+      - { path: "table.rows[0][12]", approx: -1.206140, abs: 0.00001 }
+      - { path: "table.rows[0][13]", approx: -2.125997, abs: 0.00001 }
+      - { path: "table.rows[0][14]", approx: -0.286284, abs: 0.00001 }
+      - { path: "table.rows[0][16]", approx: 0.01190575, abs: 0.0000001 }
+      - { path: "table.rows[0][17]", approx: -0.946897, abs: 0.00001 }
+      - { path: "table.rows[0][18]", approx: 0.260063, abs: 0.00001 }
+      - { path: summary, contains: lme4 }
+
+  - id: groups-animals
+    description: >
+      The same table with the animal as the unit (6 means in each group). R 4.6.1 t.test on the animal means gives for the event
+      frequency: difference -1.282261 Hz, t -2.622353, df 9.9999, p 0.02549474, interval -2.371763 to -0.192759.
+    data: [data/jahncke_cells_events.csv]
+    calls:
+      - tool: compare_cell_groups
+        args:
+          table: "{adapter_dir}/data/jahncke_cells_events.csv"
+          group_col: group
+          features: [event_frequency_hz, event_amplitude_pa]
+          replicate_unit: animals
+          test: t
+          alpha: 0.05
+    expect:
+      - { path: "table.rows[0][4]", equals: 6 }
+      - { path: "table.rows[0][12]", approx: -1.282261, abs: 0.00001 }
+      - { path: "table.rows[0][13]", approx: -2.371763, abs: 0.00001 }
+      - { path: "table.rows[0][14]", approx: -0.192759, abs: 0.00001 }
+      - { path: "table.rows[0][16]", approx: 0.02549474, abs: 0.0000001 }
+
+  - id: wrong-clamp-mode
+    description: A current-clamp tool refuses a voltage-clamp file and names the right tools.
+    data: [data/pyabf/17o05024_vc_steps.abf]
+    calls:
+      - tool: measure_spikes
+        args:
+          path: "{adapter_dir}/data/pyabf/17o05024_vc_steps.abf"
+          spike_threshold_method: dvdt_cutoff
+          dvdt_cutoff_mv_per_ms: 20
+          min_peak_mv: -10
+          sweeps: all
+          ljp_mv: 0
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: measure_current_steps }
+
+  - id: missing-ljp
+    description: A voltage tool without ljp_mv fails and names the decision.
+    data: [data/pyabf/171116sh_0018.abf]
+    calls:
+      - tool: measure_spikes
+        args:
+          path: "{adapter_dir}/data/pyabf/171116sh_0018.abf"
+          spike_threshold_method: dvdt_cutoff
+          dvdt_cutoff_mv_per_ms: 20
+          min_peak_mv: -10
+          sweeps: all
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "ljp_mv is missing" }
+
+  - id: missing-reversal-potential
+    description: An activation fit without the reversal potential fails and says why the tool needs it.
+    data: [data/synthetic_activation.csv]
+    calls:
+      - tool: fit_boltzmann
+        args:
+          table: "{adapter_dir}/data/synthetic_activation.csv"
+          curve: activation
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "reversal_potential_mv is missing" }
