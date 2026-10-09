@@ -1,0 +1,16 @@
+R version 4.6.1 (2026-06-24) 
+list: genes with score > 15: 333 
+
+background: measured genes in the gene sets size 3690 list in background 168 sets tested 586 with overlap 362 
+BH over the sets with an overlap of 1 or more (the gseapy rule)
+5991851_Mitotic_Prometaphase overlap 22/82 p 3.7511e-12 padj 1.3579e-09
+5990980_Cell_Cycle overlap 45/369 p 1.64201e-10 padj 2.97203e-08
+5992217_Resolution_of_Sister_Chromatid_Cohesion overlap 19/74 p 2.857e-10 padj 3.44744e-08
+Fisher exact one-sided check, top set: p 3.7511e-12
+
+background: measured genes size 12000 list in background 333 sets tested 586 with overlap 362 
+BH over the sets with an overlap of 1 or more (the gseapy rule)
+5990980_Cell_Cycle overlap 45/369 p 2.87805e-17 padj 1.04185e-14
+5991851_Mitotic_Prometaphase overlap 22/82 p 3.17954e-16 padj 5.75496e-14
+5990979_Cell_Cycle,_Mitotic overlap 40/317 p 5.97774e-16 padj 7.21314e-14
+Fisher exact one-sided check, top set: p 2.87805e-17

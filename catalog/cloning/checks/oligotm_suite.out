@@ -1,0 +1,36 @@
+primer3-py 2.3.1
+AAAGAAAGACCCAGTGATATGCTGTCT      breslauer schildkraut Na 50   Mg 0    dNTP 0    expected 63.684650 got 63.684650 ok
+ACAACCCAGGCCCTGTGGAC             breslauer schildkraut Na 50   Mg 0    dNTP 0.8  expected 66.783376 got 66.783376 ok
+ACTGGGATGACAGCAAGGCCC            breslauer schildkraut Na 50   Mg 0    dNTP 1    expected 67.947254 got 67.947254 ok
+ACTTTCCTGTTGGACAAGCCCTTT         breslauer schildkraut Na 50   Mg 0    dNTP 10   expected 65.349952 got 65.349952 ok
+AGCCTGGCCAACATGGTGAA             breslauer schildkraut Na 50   Mg 1    dNTP 0    expected 74.932401 got 74.932401 ok
+AGGCTGAGGCGGGAGAATCA             breslauer schildkraut Na 50   Mg 1    dNTP 0.8  expected 71.934895 got 71.934895 ok
+ATCTTGCCCGCCTCCACTTC             breslauer schildkraut Na 50   Mg 1    dNTP 1    expected 65.948961 got 65.948961 ok
+CAACAAACCGTGGCCCTCTC             breslauer schildkraut Na 50   Mg 1.5  dNTP 0    expected 74.997943 got 74.997943 ok
+CAAGGCCAGAGAATGGTTTCCAA          breslauer schildkraut Na 50   Mg 1.5  dNTP 0.8  expected 74.456879 got 74.456879 ok
+CACTTTGGGAGGCCGAGGAG             breslauer schildkraut Na 50   Mg 2.5  dNTP 0    expected 77.815533 got 77.815533 ok
+CAGTGGAAGTGACGCCGTGTG            breslauer schildkraut Na 50   Mg 2.5  dNTP 0.8  expected 77.633141 got 77.633141 ok
+CCAAGCCCTTGGGCAGCTC              breslauer santalucia  Na 50   Mg 0    dNTP 0    expected 73.707812 got 73.707812 ok
+CCACCTCAGCCTCCCGAGAA             breslauer santalucia  Na 50   Mg 0    dNTP 1    expected 72.289173 got 72.289173 ok
+CCCAAAGCAATCTACAGATTCAAAGAA      breslauer santalucia  Na 50   Mg 0    dNTP 0.8  expected 68.920648 got 68.920648 ok
+CCCGCGTGTGGTTTCTCTATTTG          breslauer santalucia  Na 50   Mg 0    dNTP 0    expected 71.826149 got 71.826149 ok
+CCTCCCGGGTTCACACCATT             breslauer santalucia  Na 50   Mg 1.5  dNTP 0    expected 79.028727 got 79.028727 ok
+CCTTCTGACAAGGGATTAATAACCAGA      breslauer santalucia  Na 50   Mg 2.5  dNTP 0.8  expected 75.999617 got 75.999617 ok
+GAAACCTCACCCGGAGCCAGTA           santalucia schildkraut Na 50   Mg 0    dNTP 2    expected 51.910898 got 51.910898 ok
+GACAACACCTGGACACCGGTTA           santalucia schildkraut Na 50   Mg 0    dNTP 10   expected 50.261568 got 50.261568 ok
+GAGGCAGAGAGAGAGGAAGAGACAGA       santalucia schildkraut Na 50   Mg 0    dNTP 0    expected 52.569759 got 52.569759 ok
+GATCCTCGGGCAGGCAGTTG             santalucia schildkraut Na 50   Mg 1    dNTP 0    expected 59.683669 got 59.683669 ok
+GCAAGACAAAGGCATGCTTACAAGA        santalucia schildkraut Na 50   Mg 1.5  dNTP 1    expected 57.513748 got 57.513748 ok
+GCACAGTGGCCCTTGTGACTG            santalucia schildkraut Na 50   Mg 2.5  dNTP 1.0  expected 61.599017 got 61.599017 ok
+GCAGCCTGGACATAGCCCTGTA           santalucia santalucia  Na 50   Mg 0    dNTP 0    expected 58.108426 got 58.108426 ok
+GCAGGCCAGAAGGCAGGATT             santalucia santalucia  Na 50   Mg 0    dNTP 5    expected 56.916950 got 56.916950 ok
+GCCATGGACGTGGTCTACGC             santalucia santalucia  Na 50   Mg 0    dNTP 0    expected 57.801174 got 57.801174 ok
+GCGACCCAAGCGAGTTACCA             santalucia santalucia  Na 50   Mg 1    dNTP 0    expected 62.957534 got 62.957534 ok
+GCTTCATGTCAGATTTGTTATACCACTGGG   santalucia santalucia  Na 50   Mg 1    dNTP 1    expected 58.091721 got 58.091721 ok
+GGCAGGCAGTTGGTCGGTGT             santalucia santalucia  Na 50   Mg 1.5  dNTP 1.5  expected 59.552734 got 59.552734 ok
+GGGCCATGGGATTAGTCTGC             santalucia santalucia  Na 50   Mg 2.5  dNTP 0    expected 62.463700 got 62.463700 ok
+GGTATGGTGTTTTAATACCTGTGGCAGA     santalucia santalucia  Na 50   Mg 2.5  dNTP 1    expected 64.204218 got 64.204218 ok
+GTGAAACTCACGGTCACGCAAA           santalucia santalucia  Na 50   Mg 2.5  dNTP 0    expected 64.004323 got 64.004323 ok
+GGTATGGTGTTTTAATACCTGTGGCAGA     santalucia santalucia  Na 50   Mg 2.5  dNTP 1    expected 64.204218 got 64.204218 ok
+rows used 33 of 76, differences 0
+Rows with the owczarzy salt correction (code 2) or Tm model 2 are left out: primer3-py 2.3.1 gives different values for them.

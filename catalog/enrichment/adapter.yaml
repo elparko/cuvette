@@ -1,0 +1,469 @@
+adapter:
+  name: enrichment
+  field: gene set enrichment
+  file_types: [".rnk", ".gmt", ".csv", ".tsv"]
+  title: Gene set enrichment (gseapy)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Tests whether pathways are over-represented in a gene list, or enriched at the top or bottom of a ranked gene list
+    (preranked GSEA). It reads a differential expression table and a GMT gene set file. It does the pathway step of
+    Ingenuity Pathway Analysis or MetaCore with open gene sets.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: gseapy
+  version: "gseapy 1.3.1"
+  tested_versions: []
+  homepage: https://gseapy.readthedocs.io
+  docs:
+    - https://gseapy.readthedocs.io/en/latest/introduction.html
+    - https://gseapy.readthedocs.io/en/latest/gseapy_example.html
+    - https://www.gsea-msigdb.org/gsea/doc/GSEAUserGuideFrame.html
+  install: >
+    The adapter uses a Python environment in ~/.guided-analysis/envs/enrichment. Make it and install the packages:
+    uv venv ~/.guided-analysis/envs/enrichment && uv pip install --python ~/.guided-analysis/envs/enrichment/bin/python
+    gseapy pandas matplotlib scipy
+  citation:
+    - text: "Fang, Z., Liu, X., & Peltz, G. (2023). GSEApy: a comprehensive package for performing gene set enrichment analysis in Python. Bioinformatics, 39(1), btac757."
+      doi: 10.1093/bioinformatics/btac757
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1200
+
+locate:
+  env: GA_ENRICHMENT_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/enrichment/bin/python
+    - ~/.guided-analysis/envs/enrichment/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import gseapy; print('gseapy', gseapy.__version__)"]
+  version_pattern: 'gseapy (\S+)'
+  identity: 'gseapy \d'
+
+data_rules:
+  cloud_visibility: all
+  note: Gene-level results have no patient data. Check the data use agreement of a clinical cohort before you send gene lists to a cloud model.
+
+decisions:
+  - key: gene_sets
+    label: Gene set collection (GMT file)
+    kind: text
+    group: Gene sets
+    help: >
+      The pathways to test, as a GMT file: MSigDB Hallmark, Reactome or GO, for example. Record the collection and its version.
+      The gene IDs and the species must match the table. fetch_gene_sets downloads an Enrichr library as a GMT file.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_ora, arg: gene_sets }
+      - { tool: run_gsea_prerank, arg: gene_sets }
+
+  - key: background
+    label: Background (universe) for over-representation
+    kind: choice
+    choices: [measured genes, measured genes in the gene sets, all genes in the gene sets]
+    group: Over-representation
+    help: >
+      The genes that could be on the list. The first choice is every gene in the table, as in gseapy and Enrichr with a background.
+      The second choice also removes the genes in no gene set, as in clusterProfiler and DAVID.
+      The third choice ignores the measurement and gives p values that are too small.
+      The choice can change p values by several orders of magnitude.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_ora, arg: background }
+    sensitivity:
+      options: [measured genes, measured genes in the gene sets, all genes in the gene sets]
+      tool: run_ora
+      compare: [metrics.background_size, metrics.top_p_adjusted, metrics.n_sets_significant]
+      max_runs: 3
+
+  - key: de_padj_max
+    label: Adjusted p cutoff for a differentially expressed gene
+    kind: float
+    default: 0.05
+    lo: 0.000001
+    hi: 1
+    group: Over-representation
+    help: A gene goes on the list if its adjusted p is below this value. Use the cutoff of the differential expression report.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_ora, arg: padj_max }
+
+  - key: de_lfc_min
+    label: Smallest absolute log2 fold change for the gene list
+    kind: float
+    default: 0
+    lo: 0
+    hi: 20
+    group: Over-representation
+    help: 0 uses no fold change cutoff. 1 keeps genes that change 2-fold or more. A cutoff after the test gives a shorter list and can change which pathways pass.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_ora, arg: lfc_min }
+
+  - key: direction
+    label: Up, down or both
+    kind: choice
+    choices: [both, up, down]
+    default: both
+    group: Over-representation
+    help: both tests all changed genes in one list. up and down test each direction alone. Pathways often show only in one direction.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_ora, arg: direction }
+
+  - key: min_size
+    label: Smallest gene set size
+    kind: int
+    default: 15
+    lo: 1
+    hi: 1000
+    group: Gene sets
+    help: The tools do not test a gene set with fewer genes in the background or the ranked list. 15 is the GSEA default. clusterProfiler uses 10.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_ora, arg: min_size }
+      - { tool: run_gsea_prerank, arg: min_size }
+
+  - key: max_size
+    label: Largest gene set size
+    kind: int
+    default: 500
+    lo: 2
+    hi: 100000
+    group: Gene sets
+    help: The tools do not test a gene set with more genes. Very large sets are general terms. 500 is the GSEA and clusterProfiler default.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_ora, arg: max_size }
+      - { tool: run_gsea_prerank, arg: max_size }
+
+  - key: rank_metric
+    label: Ranking metric for GSEA
+    kind: choice
+    choices: [column, signed_log10_p, log2_fold_change]
+    group: GSEA
+    help: >
+      The choice column uses a column as it is, such as the DESeq2 stat or the limma t.
+      The choice signed_log10_p is the sign of the fold change times -log10 p.
+      The choice log2_fold_change ranks by effect size only, so noisy genes with few counts can rank high.
+      The metric changes the gene order and the result.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_gsea_prerank, arg: rank_metric }
+
+  - key: permutations
+    label: Number of gene set permutations
+    kind: int
+    default: 1000
+    lo: 10
+    hi: 100000
+    group: GSEA
+    help: More permutations give a more precise p value. The smallest possible p is about 1 divided by the number of permutations. 1000 is the GSEA default.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_gsea_prerank, arg: permutations }
+
+  - key: seed
+    label: Random seed for the permutations
+    kind: int
+    default: 42
+    lo: 0
+    hi: 2147483647
+    group: GSEA
+    help: The seed fixes the permutations, so a second run gives the same p values. A different seed changes NES and p a little, not ES.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: run_gsea_prerank, arg: seed }
+    sensitivity:
+      options: [1, 2, 3]
+      tool: run_gsea_prerank
+      compare: [metrics.n_sets_fdr_q_below_025, metrics.nes_1, metrics.p_value_1]
+      max_runs: 3
+
+tools:
+  - name: inspect_gene_table
+    title: Inspect a gene table
+    description: >
+      List the columns of a differential expression table or a .rnk file. Count the gene IDs and the duplicates, and guess the ID type.
+      With gene_sets, it also counts how many IDs are in the gene sets.
+    read_only: true
+    function: "ga_enrichment:inspect_gene_table"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the table: CSV, TSV, Excel or .rnk (two columns, no header)." }
+      gene_sets: { type: string, description: Absolute path of a GMT file. }
+      id_column: { type: string, description: "Column with the gene IDs. The default is the first column; in a .rnk file it is gene." }
+    required: [path]
+    outputs:
+      columns: { kind: table, ext: csv, description: One row for each column. }
+
+  - name: fetch_gene_sets
+    title: Download a gene set library
+    description: >
+      Download one Enrichr gene set library (such as MSigDB_Hallmark_2020 or Reactome_2022) and save it as a GMT file with the date.
+      Needs the network. Use the saved file as gene_sets in run_ora or run_gsea_prerank.
+    function: "ga_enrichment:fetch_gene_sets"
+    params:
+      library: { type: string, minLength: 1, description: "Enrichr library name, such as MSigDB_Hallmark_2020." }
+      organism: { type: string, enum: [Human, Mouse, Yeast, Fly, Fish, Worm], default: Human, description: Species of the library. }
+    required: [library]
+    outputs:
+      gmt: { kind: file, ext: gmt, description: The gene sets. }
+
+  - name: run_ora
+    title: Over-representation analysis
+    description: >
+      Test each gene set for more genes from a list than chance (hypergeometric test, Benjamini-Hochberg adjustment). The list comes from
+      the cutoffs on the table columns, or from gene_list. Reports the overlap, the p value, the adjusted p value and a dot plot.
+    read_only: true
+    function: "ga_enrichment:run_ora"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the full table of measured genes (all genes, not only the significant ones)." }
+      gene_sets: { type: string, description: Absolute path of a GMT file. }
+      id_column: { type: string, description: Column with the gene IDs. They must be the same ID type as in the GMT file. }
+      background: { type: string, enum: [measured genes, measured genes in the gene sets, all genes in the gene sets], description: The universe of the test. }
+      padj_column: { type: string, description: Column of adjusted p values. }
+      padj_max: { type: number, minimum: 0, maximum: 1, description: "A gene is on the list if its adjusted p is below this value (probability)." }
+      lfc_column: { type: string, description: Column of log2 fold changes. }
+      lfc_min: { type: number, minimum: 0, description: "Smallest absolute log2 fold change (log2 units)." }
+      direction: { type: string, enum: [both, up, down], description: Which changes go on the list. Needs lfc_column for up or down. }
+      min_size: { type: integer, minimum: 1, description: Smallest gene set size in the background (count of genes). }
+      max_size: { type: integer, minimum: 2, description: Largest gene set size in the background (count of genes). }
+      gene_list: { type: array, items: { type: string }, description: A list of gene IDs to use instead of the cutoffs. }
+    required: [path, id_column]
+    outputs:
+      results: { kind: table, ext: csv, description: One row for each gene set with an overlap. }
+      plot: { kind: image, ext: png, description: Dot plot of the top gene sets (PNG and SVG). }
+
+  - name: run_gsea_prerank
+    title: Preranked GSEA
+    description: >
+      Rank all genes by a metric and test whether each gene set is at the top or the bottom of the ranking (preranked GSEA).
+      The p values come from gene set permutations. Reports ES, NES, nominal p, FDR q and the leading edge, a bar plot of NES and the running score plot.
+    read_only: true
+    function: "ga_enrichment:run_gsea_prerank"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the full table of measured genes, or a .rnk file." }
+      gene_sets: { type: string, description: Absolute path of a GMT file. }
+      id_column: { type: string, description: "Column with the gene IDs. In a .rnk file it is gene." }
+      rank_metric: { type: string, enum: [column, signed_log10_p, log2_fold_change], description: The metric that ranks the genes. }
+      rank_column: { type: string, description: "Column for rank_metric column, such as stat. In a .rnk file it is score." }
+      lfc_column: { type: string, description: Column of log2 fold changes. }
+      p_column: { type: string, description: Column of raw p values (for signed_log10_p). }
+      permutations: { type: integer, minimum: 10, description: Number of gene set permutations (count). }
+      seed: { type: integer, minimum: 0, description: Random seed (integer). }
+      min_size: { type: integer, minimum: 1, description: Smallest gene set size in the ranked list (count of genes). }
+      max_size: { type: integer, minimum: 2, description: Largest gene set size in the ranked list (count of genes). }
+      weight: { type: number, minimum: 0, default: 1, description: "Weight of the ranking metric in the score (unitless). 1 is the GSEA default, 0 is the Kolmogorov-Smirnov statistic." }
+      focus_terms: { type: array, items: { type: string }, description: "Gene set names to report as metrics es_1, nes_1 and so on, in this order." }
+    required: [path, id_column]
+    outputs:
+      results: { kind: table, ext: csv, description: One row for each gene set. }
+      nes: { kind: image, ext: png, description: Bar plot of the top NES (PNG and SVG). }
+      running: { kind: image, ext: png, description: Running enrichment score of the first focus term or the top term (PNG and SVG). }
+
+citations:
+  - tool: run_gsea_prerank
+    text: "Subramanian, A., Tamayo, P., Mootha, V. K., Mukherjee, S., Ebert, B. L., Gillette, M. A., Paulovich, A., Pomeroy, S. L., Golub, T. R., Lander, E. S., & Mesirov, J. P. (2005). Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles. Proceedings of the National Academy of Sciences, 102(43), 15545-15550."
+    doi: 10.1073/pnas.0506580102
+  - tool: run_ora
+    text: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society: Series B, 57(1), 289-300."
+    doi: 10.1111/j.2517-6161.1995.tb02031.x
+  - tool: fetch_gene_sets
+    text: "Kuleshov, M. V., Jones, M. R., Rouillard, A. D., Fernandez, N. F., Duan, Q., Wang, Z., Koplev, S., Jenkins, S. L., Jagodnik, K. M., Lachmann, A., McDermott, M. G., Monteiro, C. D., Gundersen, G. W., & Ma'ayan, A. (2016). Enrichr: a comprehensive gene set enrichment analysis web server 2016 update. Nucleic Acids Research, 44(W1), W90-W97."
+    doi: 10.1093/nar/gkw377
+
+map:
+  - tool: inspect_gene_table
+    route: 'pandas.read_csv(path).describe(include="all")'
+    steps:
+      - "In IPA: the dataset upload screen shows the ID type and the number of mapped IDs."
+    params:
+      - { arg: path, label: path }
+    fidelity: close
+    difference: The tool also counts duplicate IDs and the IDs that are in the gene sets.
+    evidence: { source: docs, test: inspect-ranks }
+
+  - tool: fetch_gene_sets
+    route: 'gseapy.get_library(name="MSigDB_Hallmark_2020", organism="Human")'
+    steps:
+      - "Or download the GMT file from https://maayanlab.cloud/Enrichr/#libraries or https://www.gsea-msigdb.org."
+    params:
+      - { arg: library, label: name }
+      - { arg: organism, label: organism, ui_default: Human }
+    fidelity: exact
+    evidence: { source: docs, note: "Needs the network, so no known-answer test. The file name keeps the download date." }
+
+  - tool: run_ora
+    route: 'gseapy.enrich(gene_list=genes, gene_sets="sets.gmt", background=universe, outdir=None).results'
+    steps:
+      - "Make the list: rows with padj below the cutoff (and the fold change rule). Make the universe from the background choice."
+      - "R: clusterProfiler::enricher(genes, universe = universe, TERM2GENE = t2g, minGSSize = 15, maxGSSize = 500, pAdjustMethod = 'BH')"
+      - "In IPA: Core Analysis, then Canonical Pathways. IPA uses its own pathways and a right-tailed Fisher exact test."
+    params:
+      - { arg: background, label: background, ui_default: "all genes in the gene sets (gseapy without background)" }
+      - { arg: min_size, label: minGSSize, ui_default: 10 }
+      - { arg: max_size, label: maxGSSize, ui_default: 500 }
+    fidelity: exact
+    evidence: { source: docs, test: ora-measured-in-sets, note: "R phyper and fisher.test give the same p values (checks/ora_phyper.R)." }
+
+  - tool: run_gsea_prerank
+    route: 'gseapy.prerank(rnk=ranks, gene_sets="sets.gmt", min_size=15, max_size=500, permutation_num=1000, weight=1, seed=42).res2d'
+    steps:
+      - "R: fgsea::fgsea(pathways, stats = ranks, minSize = 15, maxSize = 500)"
+      - "GSEA desktop: Tools > GseaPreranked, with the .rnk file and the GMT file."
+    params:
+      - { arg: permutations, label: permutation_num, ui_default: 1000 }
+      - { arg: seed, label: seed, ui_default: 123 }
+      - { arg: weight, label: weight, ui_default: 1 }
+      - { arg: min_size, label: min_size, ui_default: 15 }
+      - { arg: max_size, label: max_size, ui_default: 500 }
+    fidelity: close
+    difference: "ES, the set size and the leading edge are exact. NES and p depend on the permutations, so they differ a little from fgsea and GSEA desktop, and from run to run with another seed."
+    evidence: { source: docs, test: gsea-fgsea-vignette }
+
+checks:
+  - id: background_not_reported
+    severity: warning
+    description: An over-representation result is reported without the background and the list rule.
+    text: >
+      If the answer reports over-represented pathways, it must give the background (universe) and its size, the rule that made the
+      gene list (cutoffs and direction), the gene set collection with its version, and the multiple testing correction. Flag the answer
+      if one is missing.
+  - id: gsea_p_floor
+    severity: warning
+    description: A GSEA p value of 0 is reported as 0.
+    text: >
+      A permutation p value cannot be 0. If the answer reports p = 0 or FDR q = 0 from run_gsea_prerank, flag it. It must say p is below
+      1 divided by the number of permutations.
+  - id: enrichment_as_mechanism
+    severity: warning
+    description: The answer says that a pathway is activated or causes the effect because it is enriched.
+    text: >
+      Enrichment shows that genes of a set changed together. It does not show that the pathway is active, or the direction of its activity,
+      or a cause. Flag an answer that claims activation, inhibition or causation from run_ora or run_gsea_prerank alone.
+
+tests:
+  - id: inspect-ranks
+    description: >
+      The fgsea example ranks (exampleRanks, GSE14308) have 12000 Entrez gene IDs. R length(exampleRanks) gives 12000 and
+      length(examplePathways) gives 1457 (fgsea 1.38.0).
+    data: [data/fgsea_exampleRanks.rnk, data/fgsea_examplePathways.gmt]
+    calls:
+      - tool: inspect_gene_table
+        args: { path: "{adapter_dir}/data/fgsea_exampleRanks.rnk", gene_sets: "{adapter_dir}/data/fgsea_examplePathways.gmt" }
+    expect:
+      - { path: metrics.n_unique_ids, equals: 12000 }
+      - { path: metrics.n_gene_sets, equals: 1457 }
+
+  - id: gsea-fgsea-vignette
+    description: >
+      The fgsea vignette (Bioconductor, fgsea-tutorial) runs fgsea on exampleRanks and examplePathways with minSize 15 and maxSize 500. It
+      prints ES 0.7253270 (size 82, leading edge 44) for 5991851_Mitotic_Prometaphase and ES 0.5388497 (size 369, leading edge 155) for
+      5990980_Cell_Cycle. ES and the leading edge do not depend on the permutations.
+    data: [data/fgsea_exampleRanks.rnk, data/fgsea_examplePathways.gmt]
+    calls:
+      - tool: run_gsea_prerank
+        args:
+          path: "{adapter_dir}/data/fgsea_exampleRanks.rnk"
+          gene_sets: "{adapter_dir}/data/fgsea_examplePathways.gmt"
+          id_column: gene
+          rank_metric: column
+          rank_column: score
+          permutations: 100
+          seed: 42
+          min_size: 15
+          max_size: 500
+          focus_terms: [5991851_Mitotic_Prometaphase, 5990980_Cell_Cycle]
+    expect:
+      - { path: metrics.es_1, approx: 0.7253270, abs: 0.0000005 }
+      - { path: metrics.size_1, equals: 82 }
+      - { path: metrics.leading_edge_n_1, equals: 44 }
+      - { path: metrics.es_2, approx: 0.5388497, abs: 0.0000005 }
+      - { path: metrics.size_2, equals: 369 }
+      - { path: metrics.leading_edge_n_2, equals: 155 }
+      - { path: metrics.n_sets_tested, equals: 586 }
+
+  - id: ora-measured-in-sets
+    description: >
+      Genes with score above 15 in exampleRanks (333 genes) against examplePathways, background "measured genes in the gene sets" (3690 genes),
+      sets of 15 to 500 genes. R phyper (checks/ora_phyper.R, output checks/ora_phyper.out) gives the top set 5991851_Mitotic_Prometaphase,
+      overlap 22 of 82, p 3.7511e-12, BH adjusted 1.3579e-09. fisher.test gives the same p.
+    data: [data/fgsea_exampleRanks.rnk, data/fgsea_examplePathways.gmt]
+    calls:
+      - tool: run_ora
+        args:
+          path: "{adapter_dir}/data/fgsea_exampleRanks.rnk"
+          gene_sets: "{adapter_dir}/data/fgsea_examplePathways.gmt"
+          id_column: gene
+          background: measured genes in the gene sets
+          lfc_column: score
+          lfc_min: 15
+          direction: up
+          min_size: 15
+          max_size: 500
+    expect:
+      - { path: metrics.background_size, equals: 3690 }
+      - { path: metrics.list_size_in_background, equals: 168 }
+      - { path: metrics.top_overlap, equals: 22 }
+      - { path: metrics.top_p_value, approx: 3.7511e-12, rel: 0.0001 }
+      - { path: metrics.top_p_adjusted, approx: 1.3579e-09, rel: 0.0001 }
+      - { path: "table.rows[0][0]", equals: 5991851_Mitotic_Prometaphase }
+
+  - id: ora-measured-genes
+    description: >
+      The same list with background "measured genes" (12000 genes). R phyper gives the top set 5990980_Cell_Cycle, overlap 45 of 369,
+      p 2.87805e-17, BH adjusted 1.04185e-14 (checks/ora_phyper.out). The background changes p by about 7 orders of magnitude.
+    data: [data/fgsea_exampleRanks.rnk, data/fgsea_examplePathways.gmt]
+    calls:
+      - tool: run_ora
+        args:
+          path: "{adapter_dir}/data/fgsea_exampleRanks.rnk"
+          gene_sets: "{adapter_dir}/data/fgsea_examplePathways.gmt"
+          id_column: gene
+          background: measured genes
+          lfc_column: score
+          lfc_min: 15
+          direction: up
+          min_size: 15
+          max_size: 500
+    expect:
+      - { path: metrics.background_size, equals: 12000 }
+      - { path: metrics.top_overlap, equals: 45 }
+      - { path: metrics.top_p_value, approx: 2.87805e-17, rel: 0.0001 }
+      - { path: metrics.top_p_adjusted, approx: 1.04185e-14, rel: 0.0001 }
+
+  - id: wrong-id-type
+    description: Gene symbols against a GMT file of Entrez IDs give no overlap. The error names both ID types.
+    data: [data/fgsea_examplePathways.gmt, data/symbols.csv]
+    calls:
+      - tool: run_ora
+        args:
+          path: "{adapter_dir}/data/symbols.csv"
+          gene_sets: "{adapter_dir}/data/fgsea_examplePathways.gmt"
+          id_column: gene
+          background: measured genes
+          padj_column: padj
+          padj_max: 0.05
+          min_size: 15
+          max_size: 500
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Check the ID type" }

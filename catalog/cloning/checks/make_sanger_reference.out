@@ -1,0 +1,6 @@
+raw length 1165
+Mott trimmed (limit 0.05) start 14 end 1090 length 1076
+reference length 1156
+substitutions in read coordinates (1-based) [101, 302, 503] count 3
+expected aligned reference span 41 to 1116
+expected identity percent 99.721

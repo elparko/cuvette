@@ -1,0 +1,606 @@
+adapter:
+  name: cloning
+  field: molecular cloning
+  file_types: [".dna", ".gb", ".gbk", ".fasta", ".fa", ".ab1", ".fastq"]
+  title: Sequences, primers and cloning (Biopython, primer3-py, pydna)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Reads SnapGene, GenBank, FASTA and ABI files, designs primers, gives melting temperatures, simulates PCR and
+    restriction digests, and aligns Sanger reads to a reference. It does the basic work of SnapGene and Geneious.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: Biopython, primer3-py, pydna
+  version: "biopython 1.88, primer3-py 2.3.1, pydna 5.5.16"
+  tested_versions: []
+  homepage: https://biopython.org
+  docs:
+    - https://biopython.org/docs/latest/Tutorial/index.html
+    - https://libnano.github.io/primer3-py/
+    - https://primer3.org/manual.html
+    - https://pydna-group.github.io/pydna/
+  install: >
+    The adapter uses a Python environment in ~/.guided-analysis/envs/cloning. Make it and install the packages:
+    uv venv ~/.guided-analysis/envs/cloning && uv pip install --python ~/.guided-analysis/envs/cloning/bin/python
+    biopython primer3-py pydna matplotlib pandas numpy
+  citation:
+    - text: "Cock, P. J. A., Antao, T., Chang, J. T., Chapman, B. A., Cox, C. J., Dalke, A., Friedberg, I., Hamelryck, T., Kauff, F., Wilczynski, B., & de Hoon, M. J. L. (2009). Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics, 25(11), 1422-1423."
+      doi: 10.1093/bioinformatics/btp163
+    - text: "Untergasser, A., Cutcutache, I., Koressaar, T., Ye, J., Faircloth, B. C., Remm, M., & Rozen, S. G. (2012). Primer3: new capabilities and interfaces. Nucleic Acids Research, 40(15), e115."
+      doi: 10.1093/nar/gks596
+    - text: "Koressaar, T., & Remm, M. (2007). Enhancements and modifications of primer design program Primer3. Bioinformatics, 23(10), 1289-1291."
+      doi: 10.1093/bioinformatics/btm091
+    - text: "Pereira, F., Azevedo, F., Carvalho, A., Ribeiro, G. F., Budde, M. W., & Johansson, B. (2015). Pydna: a simulation and documentation tool for DNA assembly strategies using python. BMC Bioinformatics, 16, 142."
+      doi: 10.1186/s12859-015-0544-x
+
+connection:
+  kind: python
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 600
+
+locate:
+  env: GA_CLONING_PYTHON
+  paths:
+    - ~/.guided-analysis/envs/cloning/bin/python
+    - ~/.guided-analysis/envs/cloning/Scripts/python.exe
+  which: []
+  version_command: ["{program_path}", "-W", "ignore", "-c", "import Bio, primer3, pydna; print('biopython', Bio.__version__, 'primer3', primer3.__version__)"]
+  version_pattern: 'biopython (\S+)'
+  identity: 'biopython \d.*primer3 \d'
+
+decisions:
+  - key: na_mM
+    label: Monovalent cations (Na+ and K+) in the PCR buffer, mM
+    kind: float
+    default: 50
+    lo: 0
+    hi: 1000
+    group: PCR buffer
+    help: >
+      The salt in your polymerase buffer. Salt raises the melting temperature. Read the value from the buffer sheet of the polymerase.
+      50 mM is the Primer3 default.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: primer_properties, arg: na_mM }
+      - { tool: design_primers, arg: na_mM }
+
+  - key: mg_mM
+    label: Mg2+ in the PCR buffer, mM
+    kind: float
+    default: 1.5
+    lo: 0
+    hi: 50
+    group: PCR buffer
+    help: >
+      Free magnesium raises the melting temperature more than sodium does. Many polymerase buffers have 1.5 to 2.5 mM.
+      Use 0 to compare with a calculator that ignores magnesium.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: primer_properties, arg: mg_mM }
+      - { tool: design_primers, arg: mg_mM }
+
+  - key: dntp_mM
+    label: Total dNTP in the PCR, mM
+    kind: float
+    default: 0.6
+    lo: 0
+    hi: 20
+    group: PCR buffer
+    help: dNTPs bind magnesium, so they lower the free Mg2+. 0.6 mM is the Primer3 default (0.15 mM of each dNTP).
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: primer_properties, arg: dntp_mM }
+      - { tool: design_primers, arg: dntp_mM }
+
+  - key: primer_nM
+    label: Primer concentration, nM
+    kind: float
+    default: 50
+    lo: 1
+    hi: 10000
+    group: PCR buffer
+    help: >
+      The concentration of each primer. A higher concentration gives a higher melting temperature. Primer3 uses 50 nM.
+      Many PCR protocols use 200 to 500 nM, which gives a Tm about 1 to 3 C higher.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: primer_properties, arg: primer_nM }
+      - { tool: design_primers, arg: primer_nM }
+
+  - key: tm_method
+    label: Melting temperature method
+    kind: choice
+    choices: [primer3, biopython]
+    default: primer3
+    group: Melting temperature
+    help: >
+      primer3 is the SantaLucia 1998 nearest-neighbor method of Primer3 and Primer-BLAST. biopython is Biopython Tm_NN with the Allawi and
+      SantaLucia table. Different calculators give values that differ by 1 to 5 C for the same primer. Use one method for all primers.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: primer_properties, arg: tm_method }
+
+  - key: salt_correction
+    label: Salt correction of the Tm
+    kind: choice
+    choices: [santalucia, schildkraut]
+    default: santalucia
+    group: Melting temperature
+    help: santalucia is the Primer3 default. schildkraut is the older formula of Primer3 version 1. The choice applies to the primer3 method only.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: primer_properties, arg: salt_correction }
+
+  - key: product_size_range
+    label: PCR product size range, bp
+    kind: text
+    default: "150-250,100-300,301-400,401-500,501-600,601-700,701-850,851-1000"
+    group: Primer design
+    help: >
+      The product sizes that Primer3 can return, in order of preference. The default is the Primer3web list.
+      For qPCR, a range such as 70-150 is usual. For Sanger sequencing of a region, make the range cover the region with a margin.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: design_primers, arg: product_size_range }
+
+  - key: opt_tm_c
+    label: Optimum primer Tm, C
+    kind: float
+    default: 59
+    lo: 40
+    hi: 80
+    group: Primer design
+    help: The Tm that Primer3 aims for. 59 C is the Primer3web default. A polymerase with a high-salt buffer can need a higher value.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: design_primers, arg: opt_tm_c }
+
+  - key: min_tm_c
+    label: Lowest primer Tm, C
+    kind: float
+    default: 57
+    lo: 30
+    hi: 80
+    group: Primer design
+    help: Primer3 rejects a primer with a Tm below this value. 57 C is the Primer3web default.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: design_primers, arg: min_tm_c }
+
+  - key: max_tm_c
+    label: Highest primer Tm, C
+    kind: float
+    default: 62
+    lo: 40
+    hi: 90
+    group: Primer design
+    help: Primer3 rejects a primer with a Tm above this value. 62 C is the Primer3web default.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: design_primers, arg: max_tm_c }
+
+  - key: min_anneal_bp
+    label: Shortest 3' match for a primer binding site, bp
+    kind: int
+    default: 13
+    lo: 6
+    hi: 60
+    group: In-silico PCR
+    help: >
+      A primer binds where its 3' end matches the template for at least this many bases. A short value finds more off-target products.
+      13 is the pydna default. A real PCR can amplify from shorter matches at a low annealing temperature.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: simulate_pcr, arg: min_anneal_bp }
+    sensitivity:
+      options: [10, 13, 18]
+      tool: simulate_pcr
+      compare: [metrics.n_products, metrics.n_binding_sites]
+      max_runs: 3
+
+  - key: topology
+    label: Linear or circular template
+    kind: choice
+    choices: [file, linear, circular]
+    default: file
+    group: Template
+    help: >
+      file uses the topology in the GenBank or SnapGene file. A plasmid is circular. A PCR product or a genome is linear.
+      A FASTA file has no topology, so choose one. A circular template gives one fragment fewer than a linear one with the same cuts.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: digest_sequence, arg: topology }
+      - { tool: simulate_pcr, arg: topology }
+
+  - key: quality_trim
+    label: Trim the low-quality ends of a Sanger read
+    kind: bool
+    default: true
+    group: Sanger reads
+    help: >
+      true removes the noisy start and end of the read. It uses Mott's method with an error limit of 0.05, as Biopython abi-trim does.
+      false keeps every base, so the ends show many false mismatches.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: align_sanger_read, arg: trim }
+
+tools:
+  - name: read_sequence
+    title: Read a sequence file
+    description: >
+      Read a SnapGene .dna, GenBank, FASTA, FASTQ or ABI .ab1 file and report its length, GC content, topology and features.
+      For an .ab1 trace it also reports the quality and the length after quality trimming.
+    read_only: true
+    function: "ga_cloning:read_sequence"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the sequence file. The file ending sets the format." }
+    required: [path]
+    outputs:
+      features: { kind: table, ext: csv, description: The feature table. }
+
+  - name: primer_properties
+    title: Primer Tm, GC and dimers
+    description: >
+      Calculate the melting temperature, the GC content, the hairpin and the self-dimer of one or more primers. For two primers
+      it also gives the Tm difference and the dimer of the pair.
+    read_only: true
+    function: "ga_cloning:primer_properties"
+    params:
+      primers: { type: array, items: { type: string }, minItems: 1, description: "Primer sequences, 5' to 3', A C G T only. A text with commas also works." }
+      na_mM: { type: number, minimum: 0, description: Monovalent cations in mM. }
+      mg_mM: { type: number, minimum: 0, description: Mg2+ in mM. }
+      dntp_mM: { type: number, minimum: 0, description: Total dNTP in mM. }
+      primer_nM: { type: number, minimum: 1, description: Concentration of each primer in nM. }
+      tm_method: { type: string, enum: [primer3, biopython], description: "primer3 (SantaLucia 1998, as in Primer3) or biopython (Biopython Tm_NN)." }
+      salt_correction: { type: string, enum: [santalucia, schildkraut], description: Salt correction for the primer3 method. }
+    required: [primers]
+    outputs:
+      properties: { kind: table, ext: csv, description: One row for each primer. }
+
+  - name: design_primers
+    title: Design PCR primers with Primer3
+    description: >
+      Design PCR primer pairs on a template with Primer3 and the Primer3web settings. Optionally the product must cover a target region.
+      Returns up to 5 pairs with positions, Tm, GC and product size, and a map of the pairs.
+    read_only: true
+    function: "ga_cloning:design_primers"
+    params:
+      template: { type: string, minLength: 1, description: "Absolute path of a sequence file, or the sequence itself (A C G T)." }
+      product_size_range: { type: string, description: "Product sizes in bp, such as 100-300, or several ranges separated by commas in order of preference." }
+      opt_tm_c: { type: number, description: Optimum primer Tm in degrees C. }
+      min_tm_c: { type: number, description: Lowest primer Tm in degrees C. }
+      max_tm_c: { type: number, description: Highest primer Tm in degrees C. }
+      target_start: { type: integer, minimum: 1, description: "First base (1-based index) of a region that the product must cover." }
+      target_length: { type: integer, minimum: 1, description: Length of that region in bp. }
+      na_mM: { type: number, minimum: 0, description: Monovalent cations in mM. }
+      mg_mM: { type: number, minimum: 0, description: Mg2+ in mM. }
+      dntp_mM: { type: number, minimum: 0, description: Total dNTP in mM. }
+      primer_nM: { type: number, minimum: 1, description: Concentration of each primer in nM. }
+      num_return: { type: integer, minimum: 1, maximum: 20, default: 5, description: Number of pairs to return (count). }
+    required: [template]
+    outputs:
+      pairs: { kind: table, ext: csv, description: The primer pairs. }
+      map: { kind: image, ext: png, description: The pairs on the template (PNG and SVG). }
+
+  - name: simulate_pcr
+    title: Simulate a PCR (in-silico PCR)
+    description: >
+      Find where two primers bind a template and give each PCR product with its size and positions. Reports every product, so it
+      also shows off-target products. Use design_primers to make new primers.
+    read_only: true
+    function: "ga_cloning:simulate_pcr"
+    params:
+      template: { type: string, minLength: 1, description: "Absolute path of the template file, or the sequence itself." }
+      forward: { type: string, minLength: 6, description: "Forward primer, 5' to 3'." }
+      reverse: { type: string, minLength: 6, description: "Reverse primer, 5' to 3', as ordered (not the reverse complement)." }
+      min_anneal_bp: { type: integer, minimum: 6, description: "Shortest 3' match that counts as a binding site, in bp." }
+      topology: { type: string, enum: [file, linear, circular], description: "file uses the topology in the file. A FASTA template is linear unless you say circular." }
+    required: [template, forward, reverse]
+    outputs:
+      products: { kind: table, ext: csv, description: The products. }
+      sequences: { kind: file, ext: fasta, description: The product sequences. }
+      map: { kind: image, ext: png, description: The products on the template (PNG and SVG). }
+
+  - name: digest_sequence
+    title: Simulate a restriction digest
+    description: >
+      Cut a sequence with one or more restriction enzymes and give the fragment sizes, the cut positions and a virtual gel.
+      The enzyme names are REBASE names, such as EcoRI.
+    read_only: true
+    function: "ga_cloning:digest_sequence"
+    params:
+      template: { type: string, minLength: 1, description: "Absolute path of the sequence file, or the sequence itself." }
+      enzymes: { type: array, items: { type: string }, minItems: 1, description: "Enzyme names with their case, such as EcoRI or HindIII." }
+      topology: { type: string, enum: [file, linear, circular], description: "file uses the topology in the file. A FASTA template needs linear or circular." }
+    required: [template, enzymes]
+    outputs:
+      fragments: { kind: table, ext: csv, description: The fragments. }
+      gel: { kind: image, ext: png, description: The virtual gel (PNG and SVG). }
+
+  - name: align_sanger_read
+    title: Align a Sanger read to a reference
+    description: >
+      Align one Sanger read (.ab1, FASTQ or FASTA) to a reference sequence on both strands and list each mismatch and indel with the base quality.
+      Use it to confirm a clone or a mutation.
+    read_only: true
+    function: "ga_cloning:align_sanger_read"
+    params:
+      read: { type: string, minLength: 1, description: Absolute path of the read file. }
+      reference: { type: string, minLength: 1, description: "Absolute path of the reference file (GenBank, SnapGene or FASTA), or the sequence itself." }
+      trim: { type: boolean, description: "true removes the low-quality ends first (Mott's method). It needs base qualities." }
+    required: [read, reference]
+    outputs:
+      differences: { kind: table, ext: csv, description: The mismatches and indels. }
+      plot: { kind: image, ext: png, description: Quality along the read with the differences (PNG and SVG). }
+
+map:
+  - tool: read_sequence
+    route: 'Bio.SeqIO.read(path, "snapgene")   # or "genbank", "fasta", "abi"; SeqIO.read(path, "abi-trim") gives the trimmed read'
+    steps:
+      - "In SnapGene: File > Open, then the Features tab."
+    params:
+      - { arg: path, label: file }
+    fidelity: exact
+    evidence: { source: docs, test: snapgene-file, note: "The Biopython test suite lists 3941 bp, circular and 9 features for pFA-KanMX4.dna." }
+
+  - tool: primer_properties
+    route: 'primer3.calc_tm(seq, mv_conc=50, dv_conc=1.5, dntp_conc=0.6, dna_conc=50, tm_method="santalucia", salt_corrections_method="santalucia")'
+    steps:
+      - "Biopython method: Bio.SeqUtils.MeltingTemp.Tm_NN(seq, Na=50, Mg=0, dnac1=25, dnac2=25)."
+      - "Hairpin and dimers: primer3.calc_hairpin(seq), primer3.calc_homodimer(seq), primer3.calc_heterodimer(a, b)."
+      - "In SnapGene: select the primer, then read the Tm in the primer window. SnapGene uses its own salt settings."
+    params:
+      - { arg: na_mM, label: mv_conc, ui_default: 50 }
+      - { arg: mg_mM, label: dv_conc, ui_default: 1.5 }
+      - { arg: dntp_mM, label: dntp_conc, ui_default: 0.6 }
+      - { arg: primer_nM, label: dna_conc, ui_default: 50 }
+      - { arg: tm_method, label: tm_method, ui_default: primer3 }
+      - { arg: salt_correction, label: salt_corrections_method, ui_default: santalucia }
+    fidelity: exact
+    evidence: { source: docs, test: tm-primer3-suite, note: "Values from the primer3 test file oligotm.txt and the Biopython MeltingTemp docs. SnapGene was not run." }
+
+  - tool: design_primers
+    route: 'primer3.bindings.design_primers({"SEQUENCE_TEMPLATE": seq}, settings)   # settings = data/primer3web_v4_0_0_default_settings.txt'
+    steps:
+      - "Or paste the template into https://primer3.ut.ee with the default settings."
+      - "In SnapGene: the Primers menu. SnapGene does not use Primer3, so its primers differ."
+    params:
+      - { arg: product_size_range, label: PRIMER_PRODUCT_SIZE_RANGE, ui_default: "150-250 100-300 301-400 401-500 501-600 601-700 701-850 851-1000" }
+      - { arg: opt_tm_c, label: PRIMER_OPT_TM, ui_default: 59 }
+      - { arg: min_tm_c, label: PRIMER_MIN_TM, ui_default: 57 }
+      - { arg: max_tm_c, label: PRIMER_MAX_TM, ui_default: 62 }
+      - { arg: target_start, label: SEQUENCE_TARGET start }
+      - { arg: target_length, label: SEQUENCE_TARGET length }
+    fidelity: exact
+    evidence: { source: docs, test: primer3-suite-design, note: "Matches the primer3 test suite file primer3web_v4_0_0_default_settings_output." }
+
+  - tool: simulate_pcr
+    route: 'pydna.amplify.Anneal([Primer(fwd), Primer(rev)], Dseqrecord(template, circular=False), limit=13).products'
+    steps:
+      - "In SnapGene: Actions > PCR, choose the two primers, then read the product size."
+      - "Or Tools > Simulate Agarose Gel with a lane 'amplified by PCR'."
+    params:
+      - { arg: min_anneal_bp, label: limit, ui_default: 13 }
+      - { arg: topology, label: circular, ui_default: linear }
+    fidelity: close
+    difference: "SnapGene menu names are from the SnapGene support pages, not tested in SnapGene. SnapGene finds binding sites with its own rule, so off-target products can differ."
+    evidence: { source: docs, test: pcr-cdc-n2 }
+
+  - tool: digest_sequence
+    route: 'Bio.Restriction.RestrictionBatch(["EcoRI"]).search(seq, linear=True); then the fragment sizes between the cuts'
+    steps:
+      - "In SnapGene: Tools > Simulate Agarose Gel, choose the enzymes for the lane (up to 4), then read the band sizes."
+    params:
+      - { arg: enzymes, label: enzymes }
+      - { arg: topology, label: linear, ui_default: "from the file" }
+    fidelity: close
+    difference: "The fragment sizes are exact. SnapGene menu names are from the SnapGene support pages, not tested in SnapGene. The virtual gel is a log-scale drawing, not a model of migration."
+    evidence: { source: docs, test: lambda-ecori }
+
+  - tool: align_sanger_read
+    route: 'read = SeqIO.read(ab1, "abi-trim"); PairwiseAligner(mode="local", match_score=5, mismatch_score=-4, open_gap_score=-10, extend_gap_score=-0.5).align(ref, read)'
+    steps:
+      - "Align the read and its reverse complement. Keep the strand with the higher score."
+      - "In SnapGene: open the reference, then Tools > Align to Reference DNA Sequence, and add the .ab1 file."
+    params:
+      - { arg: trim, label: "abi-trim", ui_default: true }
+    fidelity: close
+    difference: "The scores are the EMBOSS water defaults (EDNAFULL). SnapGene and Geneious use their own aligners and trimming, so the ends of the alignment can differ. Not tested in SnapGene."
+    evidence: { source: code, test: sanger-synthetic }
+
+checks:
+  - id: tm_conditions_not_reported
+    severity: warning
+    description: A Tm is reported without the method and the salt, Mg2+, dNTP and primer concentrations.
+    text: >
+      If the answer gives a primer melting temperature, it must name the method (Primer3 SantaLucia or Biopython) and the Na+, Mg2+,
+      dNTP and primer concentrations. A Tm without these conditions cannot be compared with another calculator. Flag the answer if one is missing.
+  - id: topology_not_stated
+    severity: warning
+    description: A digest or PCR result does not say whether the template is circular or linear.
+    text: >
+      If the answer gives restriction fragment sizes or PCR products, it must say whether the template was circular or linear.
+      Flag the answer if it does not. A plasmid read as linear gives one fragment more.
+  - id: low_quality_mismatch
+    severity: warning
+    description: A Sanger mismatch is called a mutation without its base quality.
+    text: >
+      If the answer calls a difference between a Sanger read and the reference a mutation, it must give the base quality (Phred) at that position.
+      A mismatch with quality below 20, or in the first or last 30 bases of the read, needs a second read or the reverse strand. Flag the answer if it does not say this.
+
+tests:
+  - id: snapgene-file
+    description: >
+      pFA-KanMX4.dna from the Biopython test suite (Tests/SnapGene). test_SeqIO_SnapGene.py gives 3941 bp, circular, and 9 features.
+    data: [data/pFA-KanMX4.dna]
+    calls:
+      - tool: read_sequence
+        args: { path: "{adapter_dir}/data/pFA-KanMX4.dna" }
+    expect:
+      - { path: metrics.length_bp, equals: 3941 }
+      - { path: data.data.topology, equals: circular }
+      - { path: metrics.n_features, equals: 9 }
+
+  - id: abi-read
+    description: >
+      3730.ab1 from the Biopython test suite (Tests/Abi). The base calls (PBAS2) have 1165 bases. checks/make_sanger_reference.py reads the
+      raw ABIF tags without Biopython and gives the same count (checks/make_sanger_reference.out).
+    data: [data/3730.ab1]
+    calls:
+      - tool: read_sequence
+        args: { path: "{adapter_dir}/data/3730.ab1" }
+    expect:
+      - { path: metrics.length_bp, equals: 1165 }
+      - { path: data.data.format, equals: abi }
+
+  - id: tm-primer3-suite
+    description: >
+      The primer3 test suite file oligotm.txt (data/primer3_oligotm.txt): GCGACCCAAGCGAGTTACCA with SantaLucia 1998 and the SantaLucia salt
+      correction, 50 mM monovalent, 1 mM Mg2+, 0 dNTP, gives 62.957534 C. The oligotm default primer concentration is 50 nM.
+      checks/oligotm_suite.py runs all 33 rows of the file that use the santalucia or schildkraut salt correction; all match (checks/oligotm_suite.out).
+    data: [data/primer3_oligotm.txt]
+    calls:
+      - tool: primer_properties
+        args: { primers: [GCGACCCAAGCGAGTTACCA], na_mM: 50, mg_mM: 1, dntp_mM: 0, primer_nM: 50, tm_method: primer3, salt_correction: santalucia }
+    expect:
+      - { path: metrics.tm_c_1, approx: 62.957534, abs: 0.001 }
+      - { path: metrics.gc_percent_1, approx: 60, abs: 0.01 }
+
+  - id: tm-biopython-docs
+    description: >
+      The Biopython MeltingTemp docs: Tm_NN of CGTTCCAAAGATGTGGGCATGAGCTTAC with the defaults (Na 50 mM, no Mg2+, dnac1 = dnac2 = 25 nM) is 60.32 C.
+    calls:
+      - tool: primer_properties
+        args: { primers: [CGTTCCAAAGATGTGGGCATGAGCTTAC], na_mM: 50, mg_mM: 0, dntp_mM: 0, primer_nM: 50, tm_method: biopython }
+    expect:
+      - { path: metrics.tm_c_1, approx: 60.32, abs: 0.005 }
+
+  - id: primer3-suite-design
+    description: >
+      The primer3 test suite input primer3web_v4_0_0_default_settings_input with the Primer3web v4 settings. The expected output file gives
+      the best pair gacacacttgctgctttcca at 610 and atgtggaccgttgttgttgg at 804, product 195 bp, Tm 58.976 and 58.971, and 5 pairs.
+    data: [data/primer3_test_template.fasta, data/primer3web_v4_0_0_default_settings.txt]
+    calls:
+      - tool: design_primers
+        args:
+          template: "{adapter_dir}/data/primer3_test_template.fasta"
+          product_size_range: "150-250,100-300,301-400,401-500,501-600,601-700,701-850,851-1000"
+          opt_tm_c: 59
+          min_tm_c: 57
+          max_tm_c: 62
+          na_mM: 50
+          mg_mM: 1.5
+          dntp_mM: 0.6
+          primer_nM: 50
+    expect:
+      - { path: metrics.n_pairs, equals: 5 }
+      - { path: metrics.product_bp, equals: 195 }
+      - { path: metrics.left_start_1based, equals: 610 }
+      - { path: metrics.right_end_1based, equals: 804 }
+      - { path: metrics.left_tm_c, approx: 58.976, abs: 0.001 }
+      - { path: metrics.right_tm_c, approx: 58.971, abs: 0.001 }
+      - { path: "table.rows[0][1]", equals: GACACACTTGCTGCTTTCCA }
+
+  - id: lambda-ecori
+    description: >
+      Lambda DNA (NCBI NC_001416.1, 48502 bp, linear) cut with EcoRI. NEB lists the Lambda DNA-EcoRI digest fragments as 21226, 7421,
+      5804, 5643, 4878 and 3530 bp.
+    data: [data/lambda.gb]
+    calls:
+      - tool: digest_sequence
+        args: { template: "{adapter_dir}/data/lambda.gb", enzymes: [EcoRI] }
+    expect:
+      - { path: metrics.n_fragments, equals: 6 }
+      - { path: metrics.largest_bp, equals: 21226 }
+      - { path: metrics.smallest_bp, equals: 3530 }
+      - { path: "table.rows[1][2]", equals: 7421 }
+      - { path: "table.rows[2][2]", equals: 5804 }
+      - { path: "table.rows[3][2]", equals: 5643 }
+      - { path: "table.rows[4][2]", equals: 4878 }
+
+  - id: puc19-circular
+    description: >
+      pUC19 (GenBank L09137.2, 2686 bp, circular) cut with EcoRI and HindIII. The NEB pUC19 map puts the EcoRI site at 396 and the HindIII site
+      at 447 (first base of the site), so the cuts (first base after the cut) are at 397 and 448. A circular template gives 2 fragments: 51 and 2635 bp.
+    data: [data/puc19.gb]
+    calls:
+      - tool: digest_sequence
+        args: { template: "{adapter_dir}/data/puc19.gb", enzymes: [EcoRI, HindIII] }
+    expect:
+      - { path: metrics.n_fragments, equals: 2 }
+      - { path: metrics.smallest_bp, equals: 51 }
+      - { path: metrics.largest_bp, equals: 2635 }
+      - { path: data.data.topology, equals: circular }
+
+  - id: pcr-cdc-n2
+    description: >
+      The CDC 2019-nCoV N2 primers (TTACAAACATTGGCCGCAAA, GCGCGACATTCCGAAGAA) on SARS-CoV-2 Wuhan-Hu-1 (GenBank MN908947.3). The CDC panel
+      gives positions 29164 to 29230, a 67 bp amplicon. checks/pcr_string_search.py finds the same positions with a plain string search.
+    data: [data/sars_cov_2_MN908947.3.fasta]
+    calls:
+      - tool: simulate_pcr
+        args: { template: "{adapter_dir}/data/sars_cov_2_MN908947.3.fasta", forward: TTACAAACATTGGCCGCAAA, reverse: GCGCGACATTCCGAAGAA, min_anneal_bp: 13 }
+    expect:
+      - { path: metrics.n_products, equals: 1 }
+      - { path: metrics.product_bp, equals: 67 }
+      - { path: metrics.start_1based, equals: 29164 }
+      - { path: metrics.end_1based, equals: 29230 }
+
+  - id: sanger-synthetic
+    description: >
+      3730.ab1 aligned to data/sanger_reference.fasta. checks/make_sanger_reference.py made the reference: lambda bases 1 to 40, the reverse
+      complement of the Mott-trimmed read with 3 substitutions (read bases 101, 302, 503), then lambda bases 41 to 80. Expected: reverse strand,
+      3 mismatches, no indels. Biopython abi-trim keeps 1075 bases, one base fewer at the 3' end than the classic Mott rule in the check script
+      (1076), so the alignment starts at reference base 42, not 41.
+    data: [data/3730.ab1, data/sanger_reference.fasta]
+    calls:
+      - tool: align_sanger_read
+        args: { read: "{adapter_dir}/data/3730.ab1", reference: "{adapter_dir}/data/sanger_reference.fasta", trim: true }
+    expect:
+      - { path: metrics.mismatches, equals: 3 }
+      - { path: metrics.inserted_bases, equals: 0 }
+      - { path: metrics.deleted_bases, equals: 0 }
+      - { path: data.data.strand, equals: reverse complement }
+      - { path: metrics.aligned_ref_start_1based, equals: 42 }
+      - { path: metrics.aligned_ref_end_1based, equals: 1116 }
+      - { path: metrics.read_length_used, equals: 1075 }
+
+  - id: unknown-enzyme
+    description: An enzyme name that is not in REBASE fails, and the error names it.
+    data: [data/puc19.gb]
+    calls:
+      - tool: digest_sequence
+        args: { template: "{adapter_dir}/data/puc19.gb", enzymes: [EcoXYZ] }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Unknown enzyme name: EcoXYZ" }
+
+  - id: fasta-needs-topology
+    description: A FASTA template has no topology, so a digest without a topology fails and asks for one.
+    data: [data/sars_cov_2_MN908947.3.fasta]
+    calls:
+      - tool: digest_sequence
+        args: { template: "{adapter_dir}/data/sars_cov_2_MN908947.3.fasta", enzymes: [EcoRI] }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Set topology to linear or circular" }

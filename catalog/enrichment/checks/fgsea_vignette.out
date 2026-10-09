@@ -1,0 +1,4 @@
+R version 4.6.1 (2026-06-24) fgsea 1.38.0 
+pathways tested 586 
+5991851_Mitotic_Prometaphase ES 0.7253270 size 82 leading edge 44 NES 2.9727 pval 1.84e-18
+5990980_Cell_Cycle ES 0.5388497 size 369 leading edge 155 NES 2.7059 pval 7.96e-27
