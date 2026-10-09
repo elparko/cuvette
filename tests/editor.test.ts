@@ -271,10 +271,10 @@ describe("help and footer", () => {
 });
 
 describe("splitKeys and one-line fields", () => {
-  test("a chunk with several control keys splits into single keys; text and escape sequences stay whole", () => {
+  test("a chunk with control keys splits into single keys, Enter too, because a paste comes as a bracketed paste; text and escape sequences stay whole", () => {
     expect(splitKeys("\x05\x15")).toEqual(["\x05", "\x15"]);
     expect(splitKeys("ab\x17cd")).toEqual(["ab", "\x17", "cd"]);
-    expect(splitKeys("line one\rline two")).toEqual(["line one\rline two"]);
+    expect(splitKeys("fast typing\r")).toEqual(["fast typing", "\r"]);
     expect(splitKeys("\x1b[127;3u")).toEqual(["\x1b[127;3u"]);
   });
 

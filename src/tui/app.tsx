@@ -9,12 +9,12 @@ import { imageProtocol, inlineImage } from "./image.ts";
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import type { SessionLike, TuiOptions } from "./types.ts";
 import type { ProgramHooks } from "../ui/programs.ts";
-import { Header, ItemView, RunningLine, StatusLine, activityText, animationsOn, liveLayout, type StaticItem } from "./view.tsx";
+import { FOOTER_HINTS, Header, ItemView, RunningLine, StatusLine, activityText, animationsOn, footerHints, liveLayout, statusRows, type StaticItem } from "./view.tsx";
 import { Markdown } from "./markdown.tsx";
 import { ConfigPanel } from "./config-panel.tsx";
 import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
-import type { SettingSession } from "../core/settings.ts";
+import { changeSetting, type SettingSession } from "../core/settings.ts";
 import { applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
 import { inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
@@ -69,6 +69,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   const [queue, setQueue] = useState<string[]>([]);
   const [vimMode, setVimMode] = useState<VimMode>("insert");
   const keyStyle = inputKeys(session.settings?.input_keys);
+  const hints = footerHints(session.settings?.footer_hints);
   const queueRef = useRef<string[]>([]);
   const updateQueue = useCallback((next: string[]) => {
     queueRef.current = next;
@@ -345,6 +346,13 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
       return;
     }
     if (key.ctrl && ch === "o") return toggleDetails();
+    if (key.ctrl && ch === "t") {
+      const next = FOOTER_HINTS[(FOOTER_HINTS.indexOf(hints) + 1) % FOOTER_HINTS.length]!;
+      void changeSetting({ cwd: session.cwd ?? process.cwd(), env, session: session as unknown as SettingSession }, "footer_hints", next, "session").then(refresh);
+      setHint(`Footer hints: ${next}. Ctrl+T changes them.`);
+      setTimeout(() => setHint((h) => (h.startsWith("Footer hints:") ? "" : h)), 2000);
+      return;
+    }
     if (cards.length) return;
     if (key.escape || key.upArrow || key.downArrow) return;
     if (key.tab && key.shift) {
@@ -360,9 +368,9 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   const program = session.adapterInfo[0]?.title ?? "the program";
   const { columns, rows } = useWindowSize();
   const running = status.state !== "idle";
-  const footKeys = card ? "" : footerKeys(keyStyle, vimMode, running);
+  const footKeys = card || hints !== "full" ? "" : footerKeys(keyStyle, vimMode, running);
   const inputRows = Math.min(INPUT_MAX_ROWS + 1, layout(input, Math.max(10, columns - 6)).length);
-  const fit = liveLayout({ rows, columns, card: !!card, running, input: input.length, inputRows, keys: !!footKeys, queue: queue.length, suggestions: sugg.length, text: !!live, pending: pending.length > 0 });
+  const fit = liveLayout({ rows, columns, card: !!card, running, input: input.length, inputRows, keys: !!footKeys, status: statusRows({ hints, bypass, state: status.state, hint }), queue: queue.length, suggestions: sugg.length, text: !!live, pending: pending.length > 0 });
   const animate = animationsOn(opts.stdout ?? process.stdout, env, session.settings?.animations);
 
   return (
@@ -457,6 +465,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
         queue={session.settings?.messages === "queue" || !session.steer}
         bypass={bypass}
         keys={footKeys}
+        hints={hints}
         esc={keyStyle === "vim" && vimMode === "insert" ? "Esc twice stops this step. " : undefined}
       />
         </Box>

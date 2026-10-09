@@ -76,7 +76,7 @@ function single(s: string): Stroke {
 
 export function splitKeys(data: string): string[] {
   if (data.startsWith("\x1b") || data.length < 2) return [data];
-  return data.match(/[\x00-\x08\x0b\x0c\x0e-\x1f]|[^\x00-\x08\x0b\x0c\x0e-\x1f]+/g) ?? [];
+  return data.match(/[\x00-\x1f\x7f]|[^\x00-\x1f\x7f]+/g) ?? [];
 }
 
 export function decodeKey(seq: string): Stroke {
@@ -539,6 +539,7 @@ export function keyRows(style: InputKeys): KeyRow[] {
     { keys: "Tab", does: "Complete a / command." },
     { keys: "Shift+Tab", does: "Change the mode." },
     { keys: "Ctrl+O", does: "Show or hide the housekeeping steps." },
+    { keys: "Ctrl+T", does: "Change the footer hints: full, short, off." },
     { keys: "Ctrl+C twice", does: "Quit." },
     { keys: "! at the start", does: "Send the message now, while the agent works." },
   ];

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { EventEmitter } from "node:events";
-import { Box, Text, usePaste, useStdin, useWindowSize } from "ink";
+import { Box, Text, useInput, usePaste, useStdin, useWindowSize } from "ink";
 import { decodeKey, emptyEd, splitKeys, layout, press, rowOf, step, type Ed, type InputKeys, type VimMode } from "./editor.ts";
 
 export const INPUT_MAX_ROWS = 12;
@@ -24,7 +24,7 @@ export interface InputBoxProps {
 }
 
 export function InputBox(props: InputBoxProps) {
-  const stdin = useStdin() as unknown as { internal_eventEmitter: EventEmitter; setRawMode(on: boolean): void };
+  const stdin = useStdin() as unknown as { internal_eventEmitter: EventEmitter };
   const shared = useContext(KeyStyle);
   const { columns } = useWindowSize();
   const style = props.style ?? shared;
@@ -50,28 +50,27 @@ export function InputBox(props: InputBoxProps) {
     latest.current.onVimMode?.(ed.current.vim);
   }, [style]);
 
+  const queue = useRef<string[]>([]);
   useEffect(() => {
-    stdin.setRawMode(true);
-    const onInput = (data: string) => {
-      if (latest.current.active === false) return;
-      for (const seq of splitKeys(data)) onKey(seq);
-    };
-    const onKey = (seq: string) => {
-      const p = latest.current;
-      const k = decodeKey(seq);
-      if (p.arrowsOut && (k.key === "up" || k.key === "down") && !k.alt && !k.cmd && !k.ctrl) return p.onEdge?.(k.key);
-      const r = press(ed.current, k, p.style, p.width, p.single);
-      if (r.st !== ed.current) commit(r.st);
-      if (r.out === "submit") p.onSubmit(r.st.text);
-      else if (r.out === "escape") p.onEscape?.();
-      else if (r.out) p.onEdge?.(r.out);
-    };
-    stdin.internal_eventEmitter.on("input", onInput);
-    return () => {
-      stdin.internal_eventEmitter.removeListener("input", onInput);
-      stdin.setRawMode(false);
-    };
+    const grab = (data: string) => void (latest.current.active !== false && queue.current.push(data));
+    stdin.internal_eventEmitter.on("input", grab);
+    return () => void stdin.internal_eventEmitter.removeListener("input", grab);
   }, []);
+
+  const onKey = (seq: string) => {
+    const p = latest.current;
+    const k = decodeKey(seq);
+    if (p.arrowsOut && (k.key === "up" || k.key === "down") && !k.alt && !k.cmd && !k.ctrl) return p.onEdge?.(k.key);
+    const r = press(ed.current, k, p.style, p.width, p.single);
+    if (r.st !== ed.current) commit(r.st);
+    if (r.out === "submit") p.onSubmit(r.st.text);
+    else if (r.out === "escape") p.onEscape?.();
+    else if (r.out) p.onEdge?.(r.out);
+  };
+
+  useInput(() => {
+    for (const data of queue.current.splice(0)) for (const seq of splitKeys(data)) onKey(seq);
+  });
 
   usePaste((text) => commit(step(ed.current, { insert: latest.current.single ? text.replace(/\r\n?|\n/g, " ") : text }, latest.current.width).st), { isActive: props.active !== false });
 

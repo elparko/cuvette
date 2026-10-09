@@ -15,9 +15,9 @@ export function animationsOn(stdout: { isTTY?: boolean } | undefined, env: Recor
   return Boolean(stdout?.isTTY) && env.TERM !== "dumb" && setting !== "off" && setting !== false;
 }
 
-export function liveLayout(o: { rows: number; columns: number; card: boolean; running: boolean; input: number; inputRows?: number; keys?: boolean; queue: number; suggestions: number; text: boolean; pending: boolean }) {
+export function liveLayout(o: { rows: number; columns: number; card: boolean; running: boolean; input: number; inputRows?: number; keys?: boolean; status?: number; queue: number; suggestions: number; text: boolean; pending: boolean }) {
   const budget = o.rows - 2;
-  const footer = 3 + (o.keys ? 1 : 0) + o.queue + o.suggestions;
+  const footer = 1 + (o.status ?? 2) + (o.keys ? 1 : 0) + o.queue + o.suggestions;
   const box = 2 + (o.inputRows ?? Math.max(1, Math.ceil((o.input + 4) / Math.max(1, o.columns - 4))));
   const inputBox = !o.card || budget - footer - box >= 16;
   const avail = Math.max(0, budget - footer - (inputBox ? box : 0));
@@ -160,6 +160,19 @@ const MODE_TEXT: Record<Mode, string> = {
   plan: "plan: the agent plans only",
 };
 
+export type FooterHints = "full" | "short" | "off";
+export const FOOTER_HINTS: FooterHints[] = ["full", "short", "off"];
+
+export function footerHints(v: unknown): FooterHints {
+  return FOOTER_HINTS.includes(v as FooterHints) ? (v as FooterHints) : "full";
+}
+
+export function statusRows(o: { hints: FooterHints; bypass?: boolean; state: string; hint?: string }): number {
+  if (o.hints === "full") return 2;
+  if (o.hints === "short") return 1 + (o.hint ? 1 : 0);
+  return (o.bypass ? 1 : 0) + (o.hint || o.state === "running" ? 1 : 0);
+}
+
 export function busyHint(state: string, queue?: boolean, esc = "Esc stops this step. "): string {
   const after = queue ? "Your message waits until the turn ends." : state === "running" ? "Your message goes in after the step." : "Your message goes in after the next step.";
   return `${state === "running" ? esc : ""}${after} Start it with ! to send it now.`;
@@ -184,7 +197,43 @@ export function StatusLine(props: {
   bypass?: boolean;
   keys?: string;
   esc?: string;
+  hints?: FooterHints;
 }) {
+  const hints = props.hints ?? "full";
+  const marker = (
+    <Text color="yellow" bold>
+      bypass permissions
+    </Text>
+  );
+  if (hints !== "full") {
+    const head =
+      hints === "short" ? (
+        <Text wrap="truncate-end">
+          {props.bypass ? (
+            <>
+              {marker}
+              <Text dimColor> · </Text>
+            </>
+          ) : null}
+          <Text dimColor>
+            <Text color="cyan">{props.mode}</Text> · {props.model}
+          </Text>
+        </Text>
+      ) : props.bypass ? (
+        marker
+      ) : null;
+    const tail = props.hint || (hints === "off" && props.busy && props.state === "running" ? (props.esc ?? "Esc stops this step. ").trim() : "");
+    return (
+      <Box flexDirection="column">
+        {head}
+        {tail ? (
+          <Text dimColor wrap="truncate-end">
+            {tail}
+          </Text>
+        ) : null}
+      </Box>
+    );
+  }
   const parts: React.ReactNode[] = [
     <Text key="m" color="cyan">
       {MODE_TEXT[props.mode]}

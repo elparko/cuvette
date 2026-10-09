@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "vitest";
 import { runTui } from "../src/tui/app.tsx";
 import { FakeSession } from "../src/ui/fake-session.ts";
-import { animationsOn, liveLayout } from "../src/tui/view.tsx";
+import { animationsOn, footerHints, liveLayout, statusRows } from "../src/tui/view.tsx";
 import { makeHarness, plain, sleep, until, type Harness } from "../src/tui/testing.ts";
 
 let live: { h: Harness; done: Promise<void> } | undefined;
@@ -74,4 +74,82 @@ test("the live region leaves two rows of the terminal free", () => {
     const box = l.inputBox ? 3 : 0;
     expect(2 + 1 + box + l.live + l.pending + l.card).toBeLessThanOrEqual(Math.max(rows - 2, 2 + 1 + 4));
   }
+});
+
+const bottom = (h: Harness) => h.term.view().trimEnd().split("\n").slice(-4).join("\n");
+
+test("footer hints: full, short and off; Ctrl+T cycles them; bypass and Waiting for your answer stay", async () => {
+  const { h, s } = start();
+  await until(() => h.term.view().includes("watch: the agent runs the steps"));
+  expect(h.term.view()).toContain("Shift+Enter: new line");
+  h.type("\x14");
+  await until(() => s.settings.footer_hints === "short" && !h.term.view().includes("watch: the agent runs the steps"));
+  await until(() => !h.term.view().includes("Footer hints: short"), 3000);
+  expect(bottom(h)).toMatch(/watch · fake-model\s*$/);
+  expect(h.term.view()).not.toContain("Ctrl+O: all steps");
+  expect(h.term.view()).not.toContain("Shift+Enter: new line");
+  h.type("\x14");
+  await until(() => s.settings.footer_hints === "off");
+  await until(() => !h.term.view().includes("Footer hints: off"), 3000);
+  expect(bottom(h)).toMatch(/╰─+╯\s*$/);
+
+  s.bus.emit({ type: "status", state: "running", tool: "run_script", since: Date.now() });
+  await until(() => bottom(h).includes("Esc stops this step."));
+  expect(bottom(h)).not.toContain("Your message goes in after the step.");
+  s.bus.emit({ type: "status", state: "idle" });
+  await until(() => !bottom(h).includes("Esc stops this step."));
+
+  h.type("/permissions bypass");
+  await sleep(40);
+  h.type("\r");
+  await until(() => s.permissionMode === "bypass" && /bypass permissions\s*$/.test(bottom(h)));
+  s.bus.emit({ type: "status", state: "thinking", since: Date.now() });
+  s.proposePlan("Question: Q1");
+  await until(() => h.term.view().includes("● Waiting for your answer"));
+  expect(bottom(h)).toMatch(/bypass permissions\s*$/);
+  h.type("\x14");
+  await until(() => s.settings.footer_hints === "full");
+  await until(() => h.term.view().includes("bypass permissions · watch: the agent runs the steps"));
+  expect(h.term.view()).toContain("● Waiting for your answer");
+});
+
+test("/config changes the footer hints at once; /help shows Ctrl+T", async () => {
+  const { h, s } = start();
+  await until(() => h.term.view().includes("watch: the agent runs the steps"));
+  h.type("/help");
+  await sleep(40);
+  h.type("\r");
+  await until(() => h.all().includes("Change the footer hints: full, short, off."));
+  h.type("/config");
+  await sleep(40);
+  h.type("\r");
+  await until(() => h.term.view().includes("Settings"));
+  for (let i = 0; i < 40 && !h.term.view().includes("▸ Footer hints"); i++) {
+    const before = h.term.view();
+    h.type("\x1b[B");
+    await until(() => h.term.view() !== before);
+  }
+  h.type("\r");
+  await until(() => /▸ short/.test(h.term.view()) || /▸ full/.test(h.term.view()));
+  for (let i = 0; i < 4 && !/▸ off/.test(h.term.view()); i++) {
+    const before = h.term.view();
+    h.type("\x1b[B");
+    await until(() => h.term.view() !== before);
+  }
+  h.type("\r");
+  await until(() => h.term.view().includes("Save off where?"));
+  h.type("\r");
+  await until(() => s.settings.footer_hints === "off");
+  h.type("\x1b");
+  await until(() => !h.term.view().includes("Settings") && !h.term.view().includes("watch: the agent runs the steps"));
+  expect(bottom(h)).toMatch(/╰─+╯\s*$/);
+});
+
+test("footer rows for the layout", () => {
+  expect(footerHints("nonsense")).toBe("full");
+  expect(statusRows({ hints: "full", state: "idle" })).toBe(2);
+  expect(statusRows({ hints: "short", state: "idle" })).toBe(1);
+  expect(statusRows({ hints: "off", state: "idle" })).toBe(0);
+  expect(statusRows({ hints: "off", state: "running", bypass: true })).toBe(2);
+  expect(statusRows({ hints: "off", state: "idle", hint: "Press Ctrl+C again to quit." })).toBe(1);
 });

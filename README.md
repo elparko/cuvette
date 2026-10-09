@@ -170,7 +170,8 @@ change applies at once. `/help` shows the keys of the current style.
 | Stop the agent | Esc | Esc | Esc in normal mode (Esc twice from insert mode) |
 
 `classic` is a one-line box with the plain keys. A paste with line breaks stays one message in each style.
-Shift+Tab, Ctrl+O, Ctrl+C twice, Tab and the `!` prefix work in each style.
+Shift+Tab, Ctrl+O, Ctrl+T, Ctrl+C twice, Tab and the `!` prefix work in each style.
+Ctrl+T cycles the setting `footer_hints` (group Display): `full`, `short` (mode and model only) or `off`.
 The text fields on the cards and in `/config` use the same keys as the input box, in one line.
 
 To record the raw key bytes for a bug report, start with `CUVETTE_KEYLOG=/tmp/keys.log ga` (or `GA_KEYLOG`).

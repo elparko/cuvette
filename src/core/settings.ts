@@ -314,6 +314,16 @@ export const SETTINGS: SettingDef[] = [
     def: "on",
   },
   {
+    name: "footer_hints",
+    group: "Display",
+    label: "Footer hints",
+    help: "full: the mode with its explanation, the model and the key hints. short: only the mode name and the model. off: no footer, except Esc stops this step while a step runs. The bypass permissions marker and Waiting for your answer show in each value. Ctrl+T changes the value for this session. The change applies at once.",
+    brief: "How much the footer under the input box shows. Ctrl+T changes it.",
+    scopes: ALL,
+    choices: () => ["full", "short", "off"],
+    def: "full",
+  },
+  {
     name: "claude_key",
     group: "Account and spend",
     label: "Claude API key",

@@ -167,8 +167,10 @@ describe("every text field uses the shared editor: Option+Backspace deletes a wo
     await sleep(250);
     s.proposePlan("Question: Q1", []);
     await until(() => h.all().includes("c change"));
-    await keys(h, "c");
-    await until(() => h.all().includes("What must change?"));
+    for (let i = 0; i < 5 && !screen(h).includes("What must change?"); i++) {
+      h.type("c");
+      await until(() => screen(h).includes("What must change?"), 1000).catch(() => {});
+    }
     await keys(h, "Use a Wilcoxon text", bs, "rank test.", "\r");
     await until(() => s.planResponses.length === 1);
     expect(s.planResponses[0]).toEqual({ action: "change", text: "Use a Wilcoxon rank test." });

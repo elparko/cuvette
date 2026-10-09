@@ -30,6 +30,7 @@ export interface Settings {
   notify: { ntfy?: string };
   export_xlsx: "on" | "off" | boolean;
   animations?: "on" | "off";
+  footer_hints?: "full" | "short" | "off";
   figure_formats: string;
   output_folder: string;
   defaultAdapters: string[];

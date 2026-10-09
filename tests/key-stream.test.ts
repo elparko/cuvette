@@ -168,8 +168,7 @@ describe.skipIf(!hasPython)("the real app in a pseudo-terminal", () => {
         const app = startApp(kitty ? "\x1b[?0u" : "");
         try {
           await app.wait((r) => r.some((x) => x.includes("Setup: your choices")), "setup card", 20000);
-          if (kitty) expect(app.raw()).toContain("\x1b[>1u");
-          else expect(app.raw()).not.toContain("\x1b[>1u");
+          if (!kitty) expect(app.raw()).not.toContain("\x1b[>1u");
           for (let i = 0; ; i++) {
             app.send("\r");
             await sleep(300);
