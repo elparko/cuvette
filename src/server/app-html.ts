@@ -7,12 +7,13 @@ import type { SettingCtx } from "../core/settings.ts";
 import { ageText, type SessionInfo } from "../core/sessions.ts";
 import {
   choiceLabel, choiceValue, CLARIFY_TITLE, DATA_CHECK_TITLE, DESIGN_TITLE, clarifyOpen, clarifyProgress, definitionLabel, itemCount, PICK_LABEL, settingLabel, settingQuestion, fieldKind, permissionView, pilotGate, pilotQuestion, planHint, planQuestions, planResolve, planTitle, programSwitches,
-  recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, RUN_MODES, setupValues, show,
+  recommendedIndex, REWIND_HELP, REWIND_TITLE, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, RUN_MODES, setupValues, show,
   type Card, type CardType, type PlanAction, type PlanState,
 } from "../ui/cards.ts";
 import { settingsHtml } from "./app-settings.ts";
 import { fidelityLabel, type Item } from "../ui/items.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
+import { pointTime } from "../core/rewind.ts";
 import { lastUseText, originText, sizeText, STATE_LABEL, type ProgramRow } from "../core/programs.ts";
 import { fieldTitle, groupRows, rowActions, summaryLine } from "../ui/programs.ts";
 import { changeCell, num, reruns, stepStatus, type RerunData, type StepState } from "../core/status.ts";
@@ -280,6 +281,11 @@ function findingsCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "findings" }
 <div class="row"><input type="text" name="reason:${esc(f.fid)}" placeholder="Reason or what you fixed (optional)" aria-label="Reason">${btn("Accept", `data-act="resolve" data-value="accept" data-fid="${esc(f.fid)}"`)}${btn("Reject", `data-act="resolve" data-value="reject" data-fid="${esc(f.fid)}"`)}${btn("Mark fixed", `data-act="resolve" data-value="fix" data-fid="${esc(f.fid)}"`)}</div></div>`).join("") + `<div class="row end">${btn("Close", act("close"), "quiet")}</div>`);
 }
 
+function rewindCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "rewind" }>): string {
+  const rows = card.points.map((p) => `<li>${btn(`${p.n}. ${pointTime(p)}  ${p.label}`, act("rewind", p.n), "quiet")}</li>`).join("");
+  return frame(slot, REWIND_TITLE, "cyan", `<p class="dim small">${esc(REWIND_HELP)}</p><ol class="rewind">${rows}</ol><div class="row end">${btn("Close", act("cancel"), "quiet")}</div>`);
+}
+
 function keyCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "key" }>, path: string): string {
   return frame(slot, "Claude API key", "cyan", `${card.reason ? `<p>${esc(card.reason)}</p>` : ""}<p>Paste your key from console.anthropic.com. The page does not show it.</p>
 <p class="dim small">The app checks it with the API, then saves it to ${esc(path)}. Only your user can read that file.</p>
@@ -417,6 +423,7 @@ export const WEB_CARDS: WebCards = {
   key: (c, slot, card) => keyCard(c, slot, card, credentialsPath()),
   clarify: clarifyCard,
   programs: programsCard,
+  rewind: rewindCard,
 };
 
 export function cardHtml(c: Ctx, slot: Slot): string {
@@ -492,6 +499,7 @@ export function stepsHtml(c: Ctx): string {
   const steps = stepNumbers(nodes);
   const state = new Map(stepStatus(r, { labels: c.session.labels?.() }).map((x) => [x.node, x]));
   const changes = new Map(reruns(r).map((d) => [d.node, d]));
+  const rewound = r.rewound();
   const main = nodes.filter((n) => steps.has(n.id));
   if (!main.length) return `<p class="empty">No steps yet.</p>`;
   return `<ol class="steps">${main
@@ -500,10 +508,10 @@ export function stepsHtml(c: Ctx): string {
       const purpose = typeof n.args.purpose === "string" && n.args.purpose.trim() ? n.args.purpose.trim() : "";
       const st = state.get(n.id);
       const newer = r.replacedBy(n.id) ? steps.get(r.latest(n.id)) : undefined;
-      const tag = newer ? ` <span class="tag">replaced by step ${newer}</span>` : st && !st.current ? ` <span class="tag warn">out of date</span>` : "";
+      const tag = rewound.has(n.id) ? ` <span class="tag">rewound</span>` : newer ? ` <span class="tag">replaced by step ${newer}</span>` : st && !st.current ? ` <span class="tag warn">out of date</span>` : "";
       const why = st && !st.current ? `<div class="small warn">${esc(st.reasons.map((x) => x.text).join(" "))}</div>` : "";
       const change = changes.get(n.id);
-      return `<li class="${newer || (st && !st.current) ? "stale" : ""}"><div><strong>Step ${steps.get(n.id)}</strong> ${esc(n.summary || n.tool.replace(/_/g, " "))}${tag}</div>${why}${purpose ? `<div class="dim small">${esc(purpose)}</div>` : ""}${change ? changeHtml(change) : ""}${img && existsSync(img.path) ? `<div class="images">${imageHtml(c, img.path)}</div>` : ""}</li>`;
+      return `<li class="${rewound.has(n.id) ? "rewound" : newer || (st && !st.current) ? "stale" : ""}"><div><strong>Step ${steps.get(n.id)}</strong> ${esc(n.summary || n.tool.replace(/_/g, " "))}${tag}</div>${why}${purpose ? `<div class="dim small">${esc(purpose)}</div>` : ""}${change ? changeHtml(change) : ""}${img && existsSync(img.path) ? `<div class="images">${imageHtml(c, img.path)}</div>` : ""}</li>`;
     })
     .join("")}</ol>`;
 }

@@ -402,6 +402,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation", "data check", "samples", "changes", "packages"]);
   const steps = stepNumbers(record.nodes());
   const status = new Map(stepStatus(record, { labels: Object.fromEntries(w.fields.map((f) => [f.key, f.label || f.key])) }).map((x) => [x.node, x]));
+  const rewound = record.rewound();
   const nodes = mainNodes(record);
 
   const question = w.fields.find((f) => f.key === "question" && f.set && f.value)?.value ?? record.entries(["user"])[0]?.data.text ?? "";
@@ -479,7 +480,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
       names.join("\n"),
       stepLines(adapters, n).join("\n"),
       n.fidelity,
-      stateOf(record, status, steps, n.id),
+      rewound.has(n.id) ? "rewound" : stateOf(record, status, steps, n.id),
       n.envHash ? n.envHash.slice(0, 12) : "",
       n.id,
     ]);

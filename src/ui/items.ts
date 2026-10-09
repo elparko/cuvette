@@ -197,6 +197,14 @@ export class Mapper {
         const n = ((d.packages as unknown[]) ?? []).length;
         return d.kind === "program" ? [] : line("▸", `Recorded the package versions of the ${d.name} environment: ${d.language}, ${n} ${n === 1 ? "package" : "packages"}.`, undefined, true);
       }
+      case "rewind":
+        return line("↶", `Returned to: ${String(d.point ?? "")}. ${((d.nodes as string[]) ?? []).length} results marked rewound.`, "cyan");
+      case "fork":
+        return line("⑂", `This session is the branch "${String(d.name ?? "")}" of ${String((d.parent as { title?: string })?.title || (d.parent as { id?: string })?.id || "another session")}.`, "cyan");
+      case "branch":
+        return line("⑂", `New branch "${String((d.child as { name?: string })?.name ?? "")}": ${String((d.child as { folder?: string })?.folder ?? "")}`, "cyan");
+      case "method":
+        return line("▸", d.action === "saved" ? `Saved the method ${String(d.name)}: ${String(d.path ?? "")}` : `Started from the method ${String(d.name)}. The questions come with the saved answers.`, "cyan");
       case "stale":
         return line("⚠", `Out of date: ${((d.nodes as string[]) ?? []).join(", ")} (${d.reason ?? d.key})`, "yellow");
       case "note":

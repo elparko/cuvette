@@ -117,6 +117,9 @@ th { color: var(--dim); font-weight: 600; }
 ol.steps { padding-left: 0; list-style: none; margin: 0; }
 ol.steps li { border-left: 4px solid var(--ok); padding: 4px 10px; margin: 0 0 8px; background: var(--panel2); border-radius: 0 8px 8px 0; overflow-wrap: anywhere; }
 ol.steps li.stale { border-left-color: var(--warn); }
+ol.steps li.rewound { border-left-color: var(--stale); opacity: .7; }
+ol.rewind { list-style: none; padding: 0; margin: 0 0 8px; }
+ol.rewind .btn { width: 100%; text-align: left; margin: 2px 0; white-space: normal; }
 * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
 *:hover, *:focus-within { scrollbar-color: var(--line) transparent; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }

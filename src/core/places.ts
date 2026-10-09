@@ -132,11 +132,26 @@ export function provisional(p: Place): boolean {
   return !p.legacy && basename(p.outDir).startsWith(".new-");
 }
 
+const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export function branchPlace(parent: Place, name: string, id: string): Place {
+  if (parent.legacy) throw new Error("This session uses the old folder layout. A branch needs a session folder.");
+  const d = new Date();
+  const base = `${dayOf(d)}-${slug(name) || id}`;
+  let dir = base;
+  for (let i = 2; existsSync(join(dirname(parent.outDir), dir)); i++) dir = `${base}-${i}`;
+  const outDir = join(dirname(parent.outDir), dir);
+  const p: Place = { id, recordDir: join(outDir, ".record"), outDir, project: parent.project, title: name, created: d.toISOString(), legacy: false, fallback: parent.fallback };
+  mkdirSync(p.recordDir, { recursive: true });
+  writeMeta(p);
+  writeFileSync(join(outDir, "README.txt"), README);
+  saveIndexRow(p, { title: name, description: `Branch of ${parent.title || parent.id}` });
+  return p;
+}
+
 export function titlePlace(p: Place, request: string, keepOldName: boolean): Place {
   const title = request.trim().split("\n")[0]!.slice(0, 120);
-  const d = p.created ? new Date(p.created) : new Date();
-  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const base = `${day}-${slug(title) || p.id}`;
+  const base = `${dayOf(p.created ? new Date(p.created) : new Date())}-${slug(title) || p.id}`;
   let name = base;
   for (let i = 2; existsSync(join(dirname(p.outDir), name)); i++) name = `${base}-${i}`;
   const outDir = join(dirname(p.outDir), name);

@@ -158,6 +158,9 @@ shortens tool results and summarizes old turns near the context limit.
 | `/questions` | Open questions in this session and all sessions. |
 | `/trail 1`, `/trail 2`, `/trail 3` | The audit trail: one line per step, then details, then the technical record. |
 | `/graph`, `/window` | The analysis graph in the terminal, or in a browser window. |
+| `/rewind` | Return the conversation to an earlier message or confirmed stage. Later results stay in the folder and the record, marked rewound. Decisions return to their values at that point. |
+| `/branch <name>`, `/branches`, `/compare <a> <b>` | Copy the session into a linked folder next to it to try another method; list the branches with a one-line result; show the key numbers of two branches side by side. |
+| `/save-method <name>`, `/method <name>` | Save the confirmed analysis as a method in `~/.guided-analysis/methods/` (or, with `project`, in `.cuvette/methods/` of the project folder, which loads only in a trusted folder); start a new session from it. The questions come with the saved answers, and the demonstration still runs. Also `ga --method <name> <folder>` and `ga method list\|show\|delete\|export\|import`. |
 | `/review`, `/findings` | Run the rule checks and the referee; accept, reject or fix each finding. |
 | `/export html` | The trail as one HTML file. Also `md`, `jsonl`, `pdf`, `protocol`, `script`, `notebook`, `flow`. |
 | `/databook` | A data book (PDF and HTML): question, data, methods, results, figures, checks and the manual route. `/databook project` covers all sessions of the project folder. `/databook docx` needs pandoc. On the command line: `ga databook [<session folder>\|<project folder>]`. |

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -95,6 +95,13 @@ Usage
   ga databook [<session folder>|<project folder>] [--format pdf|docx|html] [--sessions all|<id,...>]
                                        write a data book: the data, methods, results and figures of a session,
                                        or of all sessions of a project folder (default: the current folder)
+  ga method list|show <name>|delete <name>
+  ga method export <name> [<file or folder>]   write the method as one file to share with the lab
+  ga method import <file> [<name>]     save a method file from a colleague
+  ga --method <name> [<folder>]        start a session on new data with a saved method: the questions come with the
+                                       saved answers for you to confirm, the metrics come filled in, and the
+                                       demonstration on one sample still runs before the batch
+                                       (in a session: /save-method <name>, /method <name>)
   ga replay <flow.json> [--input name=path ...] [--session <id>]
   ga run-step <adapter> <tool> '<json args>'
   ga questions                         open questions in every session
@@ -138,6 +145,7 @@ const { values: o, positionals: pos } = parseArgs({
     size: { type: "string" },
     input: { type: "string", multiple: true },
     session: { type: "string" },
+    method: { type: "string" },
     sessions: { type: "string" },
     by: { type: "string" },
     docs: { type: "string", multiple: true },
@@ -189,7 +197,7 @@ async function headless(prompt: string) {
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = FORMATS.has(str(o.output) ?? "") ? str(o.output)! : "text";
-  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, trustFolder, settings: { headless: true, ...bypass(), ...planSetting() } });
+  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, trustFolder, method: str(o.method), settings: { headless: true, ...bypass(), ...planSetting() } });
   if (s.trustNotice) process.stderr.write(`Note: ${s.trustNotice}\n`);
   attachHeadless(s, { answers, allow });
   s.bus.on((e) => {
@@ -265,7 +273,7 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   return { cwd: s.folder, message: s.request };
 }
 
-async function interactive(resumeId?: string) {
+async function interactive(resumeId?: string, folder?: string) {
   const { Session } = await import("./core/session.ts");
   const { runTui } = await import("./tui/app.tsx");
   const adapters = (o.adapter as string[]) ?? [];
@@ -279,7 +287,7 @@ async function interactive(resumeId?: string) {
   if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
   const s = resumeId
     ? await Session.resume(resumeId, { model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See ga sessions.`))
-    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, trustFolder, cwd: sample?.cwd, settings: { ...bypass(), ...planSetting() } });
+    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, trustFolder, cwd: sample?.cwd ?? folder, method: str(o.method), settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(e.message));
   await runTui(s as never, { firstMessage: sample?.message });
   await s.close();
 }
@@ -340,6 +348,10 @@ async function main() {
   if (o.help) return console.log(HELP);
   if (typeof o.print === "string") return headless(o.print);
   const [cmd, a1, a2, a3] = pos;
+  if (typeof o.method === "string" && (cmd === undefined || existsSync(cmd))) {
+    if (cmd && !statSync(cmd).isDirectory()) fail(`${cmd} is not a folder.`);
+    return interactive(undefined, cmd ? resolve(cmd) : undefined);
+  }
   switch (cmd) {
     case undefined:
       return interactive();
@@ -659,6 +671,24 @@ async function main() {
       const w = await db.writeDatabook({ target: a1, cwd, sessions: str(o.sessions)?.split(","), formats, author });
       console.log(db.writtenLines(w).join("\n"));
       return;
+    }
+    case "method": {
+      const m = await import("./core/methods.ts");
+      if (!a1 || a1 === "list") {
+        const list = m.listMethods(process.cwd());
+        if (!list.length) return console.log(`No saved methods in ${m.methodsDir()}. In a session, confirm the analysis, then type /save-method <name>.`);
+        for (const x of list) console.log(`${x.name.padEnd(24)} ${x.saved.slice(0, 10)}  ${(x.where === "home" ? "home" : x.trusted ? "project" : "project, not trusted").padEnd(20)} ${x.question.slice(0, 80)}`);
+        return;
+      }
+      try {
+        if (a1 === "show" && a2) return console.log(m.methodText(m.loadMethod(a2, process.cwd())));
+        if (a1 === "delete" && a2) return console.log(`Deleted ${m.deleteMethod(a2)}`);
+        if (a1 === "export" && a2) return console.log(`Wrote ${m.exportMethod(a2, a3 ?? process.cwd())}`);
+        if (a1 === "import" && a2) return console.log(`Saved ${m.importMethod(a2, a3)}`);
+      } catch (e) {
+        fail((e as Error).message);
+      }
+      return fail("Use: ga method list | show <name> | delete <name> | export <name> [<file or folder>] | import <file> [<name>]");
     }
     case "replay": {
       const { replayFlow } = await import("./core/replay.ts");

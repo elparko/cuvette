@@ -10,7 +10,7 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
-import { findPlace, inProject, legacyPlace, local, newPlace, outputRoot, outside, provisional, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { findPlace, inProject, placeAt, legacyPlace, local, newPlace, outputRoot, outside, provisional, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
@@ -36,6 +36,9 @@ import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listData
 import { applyEdit, designChecks, groupSummary, readSheet, SAMPLE_COLUMNS, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet } from "./samples.ts";
 import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
+import { rewindPoints, type RewindResult } from "./rewind.ts";
+import { fillFromMethod, loadMethod, methodFrom, methodNote, saveMethod, type Method } from "./methods.ts";
+import { branchesOf, branchSession, compareRows, findBranch, openRecord, type BranchInfo } from "./branch.ts";
 import { Findings, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
@@ -80,6 +83,7 @@ export interface SessionOptions {
   place?: Place;
   defaults?: boolean;
   trustFolder?: boolean;
+  method?: string;
 }
 
 interface Pending<T> {
@@ -253,6 +257,7 @@ export class Session {
   private lastSaid = "";
   private waiting = new Map<string, BusEvent>();
   lastStatus: Extract<BusEvent, { type: "status" }> = { type: "status", state: "idle" };
+  method?: Method;
 
   private constructor(id: string, cwd: string, settings: Settings, place: Place) {
     this.id = id;
@@ -307,10 +312,12 @@ export class Session {
     const settings = loadSettings(cwd, overrides);
     const id = opts.place?.id ?? opts.id ?? newId();
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
+    if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
     const s = new Session(id, cwd, settings, place);
     s.overrides = overrides;
     s.onceTrusted = !!opts.trustFolder;
     await s.init(opts);
+    if (opts.method) s.startMethod(opts.method);
     if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
     return s;
   }
@@ -409,6 +416,11 @@ export class Session {
 
     this.system = this.buildSystem();
     if (resumed) {
+      const used = this.record.live(["method"]).filter((e) => e.data.action === "started").at(-1);
+      if (used)
+        try {
+          this.method = loadMethod(String(used.data.path));
+        } catch {}
       this.history = this.record.messages();
       this.notes.push("The session was resumed after a restart. Program state may have reset; outputs from earlier steps are still on disk.");
     } else {
@@ -773,7 +785,7 @@ export class Session {
         const hint = fileTypeHint(text, this.adapterList(), this.cwd, this.adapters.map((a) => a.name));
         if (hint) this.notes.push(hint);
       }
-      this.record.append("user", { text });
+      this.record.append("user", { text, ...(opts.internal ? { internal: true } : {}) });
       const notes = this.drainNotes();
       this.push({ role: "user", parts: [{ type: "text", text: notes ? `${notes}\n\n${text}` : text }] });
       for (let step = 0; step < this.settings.maxSteps; step++) {
@@ -1013,11 +1025,11 @@ export class Session {
     const pre = await this.hooks.preAnswer({ event: "PreAnswer", session: this.id, answer: text });
     const answer = pre.answer ?? text;
     this.noteSkippedSteps();
-    const claims = checkAnswer(answer, this.record);
+    const claims = checkAnswer(answer, this.record.liveView());
     let kept: string | undefined;
     let keptClaims: typeof claims | undefined;
     let keptFound: { f: FindingIn; source: Finding["source"] }[] | undefined;
-    const ctx = { record: this.record, decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
+    const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const found: { f: FindingIn; source: Finding["source"] }[] = [...(pre.findings ?? []).map((f) => ({ f, source: "hook" as const }))];
     for (const f of await runChecks(ctx)) found.push({ f, source: "rule" });
     if (this.refereeProvider && !signal.aborted) {
@@ -1032,7 +1044,7 @@ export class Session {
     if (revised && this.draft && errors.length >= this.draft.errors && measured(claims) < this.draft.measured) {
       this.record.append("notice", { text: "The revision lost results and fixed no problem, so the harness kept the first answer." });
       ({ answer: kept, found: keptFound } = this.draft);
-      keptClaims = checkAnswer(kept, this.record);
+      keptClaims = checkAnswer(kept, this.record.liveView());
       errors = keptFound.filter((x) => x.f.severity === "error");
     }
     this.draft = undefined;
@@ -1904,6 +1916,7 @@ export class Session {
       this.mode = "plan";
     }
     this.notes.push(this.planUpdate ? PLAN_UPDATE_NOTE : `${PLAN_NOTE} ${DATA_CHECK_NOTE}`);
+    if (!this.planUpdate && this.method) this.notes.push(methodNote(this.method));
     if (!this.planUpdate && this.pick && !this.adapters.length) this.notes.push("No adapter is loaded yet. Call list_adapters, then name the adapter for each part in programs, with its exact name. When the scientist confirms the plan, call use_adapter for it. The confirmation covers that load, so no second card shows.");
     if (!this.planUpdate && this.refCandidates.length)
       this.notes.push(`Files in the project folder that may be earlier results on the same data: ${this.refCandidates.map(describeCandidate).join("; ")}. If one fits, name it in the reference section, state each measure in the reference's own terms, and ask in reference.question whether your measure is the same as the reference's measure.`);
@@ -2221,6 +2234,8 @@ export class Session {
   private whoSet(key: string): string {
     const last = this.record.entries(["setup", "decision"]).filter((e) => (e.kind === "decision" ? e.data.key === key : key in ((e.data.values as object) ?? {}))).at(-1);
     if (!last) return "default";
+    const how = String(last.kind === "decision" ? last.data.reason ?? "" : last.data.how ?? "");
+    if (how.startsWith("from the method ") && !((last.data.defaultsAccepted as string[] | undefined) ?? []).includes(key)) return how.slice(9);
     if (last.kind === "decision") return last.data.by === "agent" ? "agent" : String(last.data.reason ?? "").startsWith("set in the confirmed analysis") ? String(last.data.reason).replace(/^.*\((.*)\)$/, "$1") : "you";
     return ((last.data.defaultsAccepted as string[] | undefined) ?? []).includes(key) || String(last.data.how ?? "").startsWith("defaults") ? "default" : "you";
   }
@@ -2314,6 +2329,7 @@ export class Session {
     }
     if (!this.planUpdate && !this.clarified) return { ok: false, error: "Phase 1 first: call clarify with what you found in the data and your clarifying questions about meaning (or none). Then call plan with the proposed analysis." };
     const plan = this.planUpdate && this.plan ? mergePlan(this.plan, given) : ({ steps: [], ...readPlan(a) } as AnalysisPlan);
+    if (this.method && !this.planUpdate) fillFromMethod(plan, this.method);
     if (plan.restatement) {
       const g = goalOnly(plan.restatement);
       plan.restatement = g.text;
@@ -2375,7 +2391,9 @@ export class Session {
     const answers = [...this.planQids.values(), ...settingsOf(plan).map((x) => x.setting)].filter((d, i, all) => d.by === "you" && all.indexOf(d) === i).map((d) => `${d.label} = ${String(d.value)}`);
     this.setReference(r.reference);
     const refNote = this.reference ? (this.reference.mode === "blind" ? ` The reference ${basename(this.reference.path)} is held back for a blind test. Do not try to read it.` : ` The pilot compares with the reference ${basename(this.reference.path)}.`) : "";
-    if (r.action === "pilot" && plan.pilot) {
+    const methodPilot = !!this.method && !this.planUpdate && r.action === "approve" && !!plan.pilot;
+    if (methodPilot) this.record.append("notice", { text: `The method ${this.method!.name} requires the demonstration on a sample before the batch. Demonstration sample: ${plan.pilot!.sample.replace(/[.\s]+$/, "")}.` });
+    if ((r.action === "pilot" || methodPilot) && plan.pilot) {
       this.pilotPlan = { plan: structuredClone(plan), version, target, answers };
       this.pilotStage = true;
       this.record.append("plan", { action: "pilot_requested", phase: "Pilot", version, sample: plan.pilot.sample });
@@ -2451,10 +2469,19 @@ export class Session {
       else if (TECHNICAL.test(text)) technical.push(text);
       else kept.push({ question: text, options: Array.isArray(q.options) ? q.options.map(String) : [], recommendation: q.recommendation ? String(q.recommendation) : undefined, key: q.key ? String(q.key) : undefined });
     }
-    const asked = kept.slice(0, 5);
+    const fromMethod = new Set<string>();
+    if (this.method?.questions.length) {
+      const saved = this.method.questions.map((q) => {
+        const same = kept.find((k) => norm(k.question) === norm(q.question));
+        fromMethod.add(q.question);
+        return { question: q.question, options: [q.answer, ...(same?.options ?? []).filter((o) => o !== q.answer)], recommendation: q.answer, key: same?.key };
+      });
+      kept.splice(0, kept.length, ...saved);
+    }
+    const asked = kept.slice(0, 5 + fromMethod.size);
     const c = this.refCandidates[0];
     const refAsked = c && !asked.some((q) => /hand count|earlier (analysis|result)|reference|previous (analysis|result)/i.test(q.question));
-    this.record.append("clarify", { action: "asked", phase: "Questions", found, questions: asked.map((q) => q.question), skipped, technical, reference: refAsked ? c.path : undefined });
+    this.record.append("clarify", { action: "asked", phase: "Questions", found, questions: asked.map((q) => q.question), skipped, technical, reference: refAsked ? c.path : undefined, ...(fromMethod.size ? { method: this.method!.name, fromMethod: [...fromMethod] } : {}) });
     const fields = this.decisions.fields();
     type Asked = { qid: string; question: string; ref?: boolean; key?: string; item?: CheckItem | DesignIssue; design?: boolean };
     const qs: Asked[] = [];
@@ -2469,7 +2496,8 @@ export class Session {
     for (const q of asked) {
       const f = q.key ? fields.find((x) => x.key === q.key && x.owner === "human") : undefined;
       const options = (q.options.length ? q.options : (f?.choices ?? []).map(String)).map((o) => ({ value: o, label: o }));
-      const asked1 = await this.questions.ask({ decisionKey: f?.key ?? "", title: q.question.length > 80 ? q.question.slice(0, 77) + "..." : q.question, text: q.question, options, recommendation: q.recommendation ? { value: q.recommendation, reason: "" } : undefined, evidence: "" });
+      const text = fromMethod.has(q.question) ? `${q.question} The method ${this.method!.name} answers: ${String(q.recommendation).replace(/[.\s]+$/, "")}. Confirm it, or choose another answer for the new data.` : q.question;
+      const asked1 = await this.questions.ask({ decisionKey: f?.key ?? "", title: q.question.length > 80 ? q.question.slice(0, 77) + "..." : q.question, text, options, recommendation: q.recommendation ? { value: q.recommendation, reason: "" } : undefined, evidence: "" });
       qs.push({ qid: asked1.qid, question: q.question, key: q.key });
     }
     if (refAsked) {
@@ -2526,6 +2554,7 @@ export class Session {
       ok: true,
       summary: [
         answers.length ? `The scientist answered: ${answers.join("; ")}.` : "No question was needed.",
+        fromMethod.size ? `These are the questions of the saved method ${this.method!.name}, with the scientist's answers for the new data. Your own questions were not asked. If the new data needs one, ask it with ask_scientist.` : "",
         checkAnswers.length ? `Data check answers: ${checkAnswers.join(" ")} Put each row or file that is left out in exclusions of the plan, with its effect.` : "",
         this.sheet ? `The scientist checked the sample sheet ${join(this.outputDir, "samples.csv")}: ${groupSummary(this.sheet.rows)}. The steps must use it for the groups and for n: match files on the path column, and use the unit column as n.` : "",
         notes.length ? `Design notes from the sample sheet: ${notes.join(" ")}` : "",
@@ -2724,6 +2753,84 @@ export class Session {
     }
   }
 
+  startMethod(ref: string): Method {
+    if (this.record.live(["user"]).some((e) => !e.data.internal)) throw new Error(`This session has a request already. Start a new session with the method: cuvette --method ${ref} <folder>`);
+    const m = loadMethod(ref, this.cwd);
+    this.method = m;
+    this.record.append("method", { action: "started", name: m.name, path: m.path, hash: m.hash, saved: m.saved, from: m.from ?? null, questions: m.questions.length });
+    this.setupPreset = { ...this.setupPreset, ...m.decisions };
+    const known = Object.fromEntries(Object.entries(m.decisions).filter(([k]) => this.decisions.has(k)));
+    if (this.setupNeeded()) this.decisions.applySetup(known, { how: `from the method ${m.name}` });
+    else for (const [k, v] of Object.entries(known)) this.decisions.change(k, v, { by: "human", reason: `from the method ${m.name}` });
+    this.planFirst = true;
+    this.settings = { ...this.settings, pilot: "on" };
+    this.addPilotTools();
+    if (!this.tools.has("clarify")) this.tools.set("clarify", this.clarifyTool());
+    this.active.add("clarify");
+    return m;
+  }
+
+  saveMethod(name: string, where: "home" | "project" = "home"): { method: Method; path: string } {
+    const method = methodFrom(this.record, name, this.decisions.values(), { session: this.id, folder: this.place.outDir, title: this.place.title });
+    const path = saveMethod(method, where === "project" ? this.cwd : undefined);
+    this.record.append("method", { action: "saved", name: method.name, path });
+    return { method, path };
+  }
+
+  branch(name: string, point?: number): { id: string; folder: string; upTo: number } {
+    if (this.busy) throw new Error("The agent is busy. Press Esc to stop it, then make the branch.");
+    if (!this.record.live(["user"]).length) throw new Error("Nothing to copy yet. Send a request first.");
+    const upTo = point === undefined ? undefined : rewindPoints(this.record).find((p) => p.n === point)?.upTo;
+    if (point !== undefined && upTo === undefined) throw new Error(`No point ${point}. Type /rewind to see the points.`);
+    const r = branchSession({ id: this.id, place: this.place, record: this.record }, name, upTo);
+    return { id: r.place.id, folder: r.place.outDir, upTo: r.upTo };
+  }
+
+  branches(): BranchInfo[] {
+    return branchesOf({ id: this.id, place: this.place, record: this.record });
+  }
+
+  compareBranches(a: string, b: string): { a: BranchInfo; b: BranchInfo; rows: string[][]; differ: number } {
+    const src = { id: this.id, place: this.place, record: this.record };
+    const [x, y] = [findBranch(src, a), findBranch(src, b)];
+    if (!x || !y) throw new Error(`No branch named ${!x ? a : b}. Type /branches to see the list.`);
+    const rec = (i: BranchInfo) => {
+      if (i.role === "this") return this.record;
+      const p = placeAt(join(i.folder, ".record"));
+      if (!p) throw new Error(`The folder of ${i.name} is missing: ${i.folder}`);
+      return openRecord(p);
+    };
+    return { a: x, b: y, ...compareRows(rec(x), rec(y)) };
+  }
+
+  rewind(n: number): RewindResult {
+    if (this.busy) throw new Error("The agent is busy. Press Esc to stop it, then rewind.");
+    const point = rewindPoints(this.record).find((p) => p.n === n);
+    if (!point) throw new Error(`No point ${n}. Type /rewind to see the list.`);
+    const nodes = this.record.entries(["node"]).filter((e) => e.id > point.upTo && !this.record.setAside(e.id)).map((e) => String(e.node ?? e.data.id));
+    this.record.append("rewind", { upTo: point.upTo, entry: point.entry, kind: point.kind, point: point.label, nodes });
+    const decisions = this.decisions.restoreTo(point.upTo, `rewind to ${point.label}`);
+    const modeThen = this.record.entries(["mode"]).filter((e) => e.id <= point.upTo).at(-1)?.data.new ?? this.record.entries(["session"])[0]?.data.mode ?? this.mode;
+    if (modeThen !== this.mode && modeThen !== "plan") {
+      this.record.append("mode", { old: this.mode, new: modeThen, reason: "rewind" });
+      this.mode = modeThen as Mode;
+    }
+    this.history = this.record.messages();
+    this.closeOpenCalls();
+    const a = approvedPlan(this.record);
+    this.approvedEntry = a?.entry ?? 0;
+    this.plan = a ? structuredClone(currentPlan(this.record)) : undefined;
+    this.planning = false;
+    this.pilotStage = false;
+    this.pilotPlan = undefined;
+    this.planWarned.clear();
+    this.waiting.delete("plan");
+    const ref = this.record.live(["reference"]).at(-1)?.data;
+    this.reference = ref && ref.mode !== "none" && ref.path ? ({ ...ref } as unknown as Reference) : undefined;
+    this.notes.push(`The scientist rewound the conversation to ${point.kind === "message" ? `the point before the message "${point.text}"` : `this point: ${point.label}`}.${nodes.length ? ` These results are set aside and must not be used: ${nodes.join(", ")}.` : ""}${decisions.length ? ` Decisions returned to earlier values: ${decisions.map((d) => `${d.key} = ${JSON.stringify(d.to)}`).join("; ")}.` : ""}`);
+    return { point, nodes, decisions, text: point.kind === "message" ? point.text : undefined };
+  }
+
   respondPlan(r: PlanResponse): void {
     this.planWait?.resolve(r);
   }
@@ -2751,8 +2858,8 @@ export class Session {
 
   async review(): Promise<Finding[]> {
     const answer = this.lastAnswer || (this.record.entries(["assistant"]).filter((e) => e.data.final).at(-1)?.data.text as string) || "";
-    const claims = checkAnswer(answer, this.record);
-    const ctx = { record: this.record, decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
+    const claims = checkAnswer(answer, this.record.liveView());
+    const ctx = { record: this.record.liveView(), decisions: this.decisions, adapters: this.adapters, answer, claims, textStyle: this.settings.text_style ?? "ste" };
     const out: Finding[] = [];
     for (const f of await runChecks(ctx)) out.push(this.findings.add(f, "rule"));
     if (this.refereeProvider) for (const f of await referee(this.refereeProvider, ctx)) out.push(this.findings.add(f, "referee"));

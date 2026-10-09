@@ -3,7 +3,7 @@ import type { BusEvent, Entry, Mode, PlanResponse } from "../core/types.ts";
 import type { SettingSession } from "../core/settings.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import {
-  applySetup, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
+  applyRewind, applySetup, cardFromEvent, CLARIFY_SKIP_ANSWER, sheetRows, choiceValue, closesCard, fieldKind, keyProblem, needsSetup, numberProblem, planInit, planIntro, planReduce, planResolve, pushCard, refreshesStatus,
   respondPermission, saveEln, saveKey, startCards, type Card, type PlanAction, type Say,
 } from "../ui/cards.ts";
 import { commands, openPanels, openSetup, type CommandCtx } from "../ui/commands.ts";
@@ -418,6 +418,13 @@ export class WebView {
       case "config":
         this.sendStatus();
         break;
+      case "rewind": {
+        if (a !== "rewind") break;
+        const r = applyRewind(s, Number(body.value));
+        this.line(r.ok ? "↶" : "✗", r.text, r.ok ? "cyan" : "red");
+        this.sendStatus();
+        break;
+      }
       case "clarify": {
         const q = s.questions.open().find((x) => x.qid === body.qid);
         if (!q) return this.keep(slot);

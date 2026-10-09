@@ -2,6 +2,8 @@ import type { BusEvent, Entry, Finding, Mode, PlanEvent, PlanResponse, Question,
 import { claudeKey, elabftwProblem, keyProblem, maskKey, saveClaudeKey, saveElabftw } from "../core/credentials.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { codeOf, plainOf } from "./items.ts";
+import { rewindText, type RewindPoint } from "../core/rewind.ts";
+import { stepNumbers } from "../core/housekeeping.ts";
 import type { DecisionFieldLike, SessionLike } from "./types.ts";
 
 export type Card =
@@ -15,7 +17,8 @@ export type Card =
   | { t: "config" }
   | { t: "programs"; name?: string }
   | ({ t: "plan" } & Omit<PlanEvent, "type">)
-  | { t: "clarify"; found: string; qids: string[]; skipped: string[]; check?: string; notes?: string[] };
+  | { t: "clarify"; found: string; qids: string[]; skipped: string[]; check?: string; notes?: string[] }
+  | { t: "rewind"; points: RewindPoint[] };
 
 export type CardType = Card["t"];
 
@@ -81,6 +84,21 @@ export const NO_KEY = "No Claude API key is set. Add one now, or press Esc if yo
 
 export function planIntro(session: SessionLike): string {
   return session.planFirst ? "The agent asks a few questions, proposes the metrics, and shows them on one sample. You confirm before the batch runs." : "Type /plan to get questions, proposed metrics and a demonstration before any step runs.";
+}
+
+// ---------------------------------------------------------------- rewind
+
+export const REWIND_TITLE = "Return to an earlier point";
+export const REWIND_HELP = "The results after the point stay in the folder and in the record, marked rewound. Decisions return to their values at that point.";
+
+export function applyRewind(session: SessionLike, n: number): { ok: boolean; text: string; input?: string } {
+  if (!session.rewind) return { ok: false, text: "Not available yet." };
+  try {
+    const r = session.rewind(n);
+    return { ok: true, text: rewindText(r, stepNumbers(session.record.nodes())), input: r.text };
+  } catch (e) {
+    return { ok: false, text: (e as Error).message };
+  }
 }
 
 // ---------------------------------------------------------------- permission

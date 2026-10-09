@@ -1,5 +1,6 @@
 import React, { useContext, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
+import { pointTime } from "../core/rewind.ts";
 import { Box, Text, useInput } from "ink";
 import { Field } from "./input-box.tsx";
 import type { Question } from "../core/types.ts";
@@ -7,7 +8,7 @@ import {
   CLARIFY_SKIP_ANSWER, CLARIFY_TITLE, checkLines, DATA_CHECK_TITLE, DESIGN_TITLE, questionCursor, questionEnter, questionNeed, questionStartText, programQuestion, clarifyOpen, clarifyProgress, itemCount, PICK_LABEL, settingLabel, settingQuestion,
   choiceLabel, choiceValue, definitionLabel, fieldKind, findingReasonLabel, findingTitle, fixedProblem, numberProblem, permissionView, pilotGate, pilotQuestion, planHint, planInit,
   planQuestions, planReduce, planResolve, planTitle, programSwitches, recommendedIndex, referenceLine, referenceQuestion, refModeQuestion, REFERENCE_PATH_LABEL, setupValues, show,
-  type Card, type PlanAction, type PlanState,
+  REWIND_HELP, REWIND_TITLE, type Card, type PlanAction, type PlanState,
 } from "../ui/cards.ts";
 import type { DecisionFieldLike, SessionLike } from "../ui/types.ts";
 import type { PlanResponse } from "../core/types.ts";
@@ -218,6 +219,29 @@ export function InstructionCard(props: {
           Do this step in {props.program}, then press <Text bold>Enter</Text>. Press <Text bold>s</Text> to let the agent do it. Esc stops the agent.
         </Text>
       </Box>
+    </Frame>
+  );
+}
+
+export function RewindCard(props: { card: Extract<Card, { t: "rewind" }>; onChoose: (n: number) => void; onClose: () => void }) {
+  const list = props.card.points;
+  const [sel, setSel] = useState(Math.max(0, list.length - 1));
+  useInput((_, key) => {
+    if (key.escape) props.onClose();
+    else if (key.upArrow) setSel((x) => Math.max(0, x - 1));
+    else if (key.downArrow) setSel((x) => Math.min(list.length - 1, x + 1));
+    else if (key.return && list[sel]) props.onChoose(list[sel]!.n);
+  });
+  return (
+    <Frame title={REWIND_TITLE} color="cyan" arrows>
+      <Text dimColor>{REWIND_HELP}</Text>
+      {list.map((p, i) => (
+        <Text key={p.n} color={i === sel ? "cyan" : undefined} bold={i === sel} wrap="truncate-end">
+          {i === sel ? "▸ " : "  "}
+          {String(p.n).padStart(2)}. {pointTime(p)} {p.label}
+        </Text>
+      ))}
+      <Text dimColor>↑ ↓ select · Enter returns to this point · Esc closes</Text>
     </Frame>
   );
 }

@@ -321,6 +321,14 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       return { icon: "decision", line: `Validation against the reference: ${clip(((d.summary as string[]) ?? [])[1] ?? "")}`, details: { summary: d.summary, plot: d.plot }, technical: tech() };
     case "notice":
       return d.plan ? { icon: "deviation", line: clip(show(d.text)), technical: tech() } : undefined;
+    case "rewind":
+      return { icon: "note", line: `Returned to an earlier point: ${show(d.point)}. ${((d.nodes as string[]) ?? []).length} results marked rewound.`, details: { point: d.point, upTo: d.upTo, nodes: d.nodes }, technical: tech() };
+    case "fork":
+      return { icon: "note", line: `Branch "${show(d.name)}" of the session ${show((d.parent as { title?: string; id?: string })?.title || (d.parent as { id?: string })?.id)}`, details: { parent: d.parent, upTo: d.upTo }, technical: tech() };
+    case "branch":
+      return { icon: "note", line: `New branch "${show((d.child as { name?: string })?.name)}" in ${show((d.child as { folder?: string })?.folder)}`, details: { child: d.child, upTo: d.upTo }, technical: tech() };
+    case "method":
+      return { icon: "setup", line: d.action === "saved" ? `Saved as the method ${show(d.name)}` : `Started from the method ${show(d.name)}`, details: { path: d.path }, technical: tech() };
     case "user":
       if (d.during) return { icon: "note", line: `You wrote while the agent worked (after step ${show(d.afterStep ?? 0)}): ${clip(show(d.text))}`, technical: tech({ typedAt: d.typedAt, afterTool: d.afterTool, now: d.now }) };
       return { icon: "note", line: `You asked: ${clip(show(d.text))}`, request: true, details: { text: d.text }, technical: tech() };
@@ -342,7 +350,7 @@ export function trail(record: AnalysisRecord, level: 1 | 2 | 3 = 1, adapters?: L
     const b = build(record, e, adapters, stale, joined, compare);
     if (!b) continue;
     if (b.request) group++;
-    const t: TrailLine = { n: out.length + 1, entry: e.id, icon: b.icon, line: b.line, stale: !!b.stale, group, badges: b.badges ?? [] };
+    const t: TrailLine = { n: out.length + 1, entry: e.id, icon: b.icon, line: b.line, stale: !!b.stale, group, badges: [...(b.badges ?? []), ...(record.setAside(e.id) ? ["rewound"] : [])] };
     const node = b.icon === "step" && !b.failed ? (b.technical?.node as string | undefined) ?? (e.kind === "node" ? String(e.data.id) : undefined) : undefined;
     if (node && steps.has(node)) t.step = steps.get(node);
     if (b.tool) t.tool = b.tool;

@@ -6,6 +6,9 @@ function makeRecord(seed: { kind: EntryKind; data: Record<string, unknown>; node
   const entries: Entry[] = seed.map((s, i) => ({ id: i + 1, ts: "", session: "s", kind: s.kind, node: s.node, data: s.data }));
   const record: any = {
     entries: (kinds?: EntryKind[]) => entries.filter((e) => !kinds || kinds.includes(e.kind)),
+    live: (kinds?: EntryKind[]) => entries.filter((e) => !kinds || kinds.includes(e.kind)),
+    rewound: () => new Set(),
+    setAside: () => false,
     append(kind: EntryKind, data: Record<string, unknown>) {
       const e = { id: entries.length + 1, ts: "", session: "s", kind, data } as Entry;
       entries.push(e);
@@ -201,14 +204,14 @@ describe("referee", () => {
 test("an answer that names the wrong choice of a decision is an error", async () => {
   const { runChecks: run } = await import("../src/core/review.ts");
   const adapter = { name: "x", manifest: { decisions: [{ key: "m", label: "Threshold method", kind: "choice", choices: ["Default", "Otsu"] }], checks: [] }, module: async () => ({}) };
-  const ctx = { record: { entries: () => [], nodes: () => [], stale: () => new Set() }, decisions: { values: () => ({ m: "Default" }) }, adapters: [adapter], answer: "We used the Otsu method.", claims: [] };
+  const ctx = { record: { entries: () => [], live: () => [], nodes: () => [], stale: () => new Set() }, decisions: { values: () => ({ m: "Default" }) }, adapters: [adapter], answer: "We used the Otsu method.", claims: [] };
   const found = await run(ctx as never);
   expect(found.find((f) => f.check === "decision_misreported")?.severity).toBe("error");
 });
 
 test("significant with no test in the record is an error", async () => {
   const { runChecks: run } = await import("../src/core/review.ts");
-  const record = { entries: () => [], nodes: () => [{ id: "n1", result: { metrics: { mean_area: 3 } } }], numbers: () => [{ node: "n1", path: "metrics.mean_area", value: 3 }], stale: () => new Set() };
+  const record = { entries: () => [], live: () => [], nodes: () => [{ id: "n1", result: { metrics: { mean_area: 3 } } }], numbers: () => [{ node: "n1", path: "metrics.mean_area", value: 3 }], stale: () => new Set() };
   const ctx = { record, decisions: { values: () => ({}) }, adapters: [], answer: "The treated cells are significantly larger.", claims: [] };
   expect((await run(ctx as never)).some((f) => f.check === "significance_without_test" && f.severity === "error")).toBe(true);
   const ok = { ...ctx, answer: "The treated cells are larger. No statistical test was run." };
@@ -218,7 +221,7 @@ test("significant with no test in the record is an error", async () => {
 test("a choice word in a sentence about something else is not a misreport", async () => {
   const { runChecks: run } = await import("../src/core/review.ts");
   const adapter = { name: "x", manifest: { decisions: [{ key: "norm", label: "Normalization", kind: "choice", choices: ["tic", "rms", "none"] }], checks: [] }, module: async () => ({}) };
-  const record = { entries: () => [], nodes: () => [], numbers: () => [], stale: () => new Set() };
+  const record = { entries: () => [], live: () => [], nodes: () => [], numbers: () => [], stale: () => new Set() };
   const base = { record, decisions: { values: () => ({ norm: "none" }) }, adapters: [adapter], claims: [] };
   const fine = await run({ ...base, answer: "The total ion current (TIC) image is bright at the rim. Normalization: none." } as never);
   expect(fine.some((f) => f.check === "decision_misreported")).toBe(false);

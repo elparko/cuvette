@@ -11,6 +11,9 @@ function fake(numbers: { node: string; path: string; value: number }[], user: st
   const record = {
     numbers: () => numbers,
     entries: (kinds?: EntryKind[]) => entries.filter((e) => !kinds || kinds.includes(e.kind)),
+    live: (kinds?: EntryKind[]) => entries.filter((e) => !kinds || kinds.includes(e.kind)),
+    rewound: () => new Set(),
+    setAside: () => false,
     append: (kind: string, data: Record<string, unknown>) => {
       appended.push({ kind, data });
       return { id: 99, ts: "", session: "s", kind, data } as Entry;

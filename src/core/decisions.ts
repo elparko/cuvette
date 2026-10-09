@@ -200,8 +200,10 @@ export class DecisionRecord {
         this.setupDone = true;
         for (const [k, v] of Object.entries(d.values ?? {})) this.put(k, v);
         for (const [k, o] of Object.entries(d.owners ?? {})) this.putOwner(k, o as Owner);
-      } else if (e.kind === "decision") this.put(d.key, d.new);
-      else this.putOwner(d.key, d.new);
+      } else if (e.kind === "decision") {
+        if (d.unset) this.unput(d.key);
+        else this.put(d.key, d.new);
+      } else this.putOwner(d.key, d.new);
     }
   }
 
@@ -211,6 +213,41 @@ export class DecisionRecord {
       s.value = value;
       s.set = true;
     }
+  }
+
+  private unput(key: string): void {
+    const s = this.states.get(key);
+    if (s) {
+      s.value = undefined;
+      s.set = false;
+    }
+  }
+
+  valuesAt(upTo: number): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const e of this.record.entries(["setup", "decision"])) {
+      if (e.id > upTo) break;
+      const d = e.data as any;
+      if (e.kind === "setup") Object.assign(out, d.values ?? {});
+      else if (d.unset) delete out[d.key];
+      else out[d.key] = d.new;
+    }
+    return out;
+  }
+
+  restoreTo(upTo: number, reason: string): { key: string; from: unknown; to: unknown }[] {
+    const then = this.valuesAt(upTo);
+    const out: { key: string; from: unknown; to: unknown }[] = [];
+    for (const s of this.states.values()) {
+      const k = s.def.key;
+      const had = Object.hasOwn(then, k);
+      if (had === s.set && (!had || same(then[k], s.value))) continue;
+      out.push({ key: k, from: s.set ? s.value : null, to: had ? then[k] : null });
+      this.record.append("decision", { key: k, old: s.set ? s.value : null, new: had ? then[k] : null, by: "human", reason, rewind: true, ...(had ? {} : { unset: true }) });
+      if (had) this.put(k, then[k]);
+      else this.unput(k);
+    }
+    return out;
   }
 
   private putOwner(key: string, owner: Owner): void {

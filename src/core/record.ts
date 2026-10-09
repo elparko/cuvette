@@ -41,6 +41,8 @@ export class AnalysisRecord {
   private staleIds = new Set<string>();
   private envs = new Map<string, EnvLock & { name: string }>();
   private replaced = new Map<string, string>();
+  private nodeEntry = new Map<string, number>();
+  private asideRanges: [number, number][] = [];
   private nextNode = 1;
 
   constructor(sessionDir: string, readonly sessionId: string, places: RecordPlaces = {}) {
@@ -81,6 +83,7 @@ export class AnalysisRecord {
       const n = e.data as unknown as Node;
       this.nodeList.push(n);
       this.nodeById.set(n.id, n);
+      this.nodeEntry.set(n.id, e.id);
       const num = Number(/^n(\d+)$/.exec(n.id)?.[1] ?? 0);
       if (num >= this.nextNode) this.nextNode = num + 1;
     } else if (e.kind === "stale") {
@@ -90,7 +93,33 @@ export class AnalysisRecord {
       if (!this.envs.has(l.hash)) this.envs.set(l.hash, l);
     } else if (e.kind === "rerun") {
       this.replaced.set(String(e.data.old), String(e.data.node));
+    } else if (e.kind === "rewind") {
+      this.asideRanges.push([Number(e.data.upTo), e.id]);
     }
+  }
+
+  setAside(id: number): boolean {
+    return this.asideRanges.some(([from, to]) => id > from && id < to);
+  }
+
+  live(kinds?: EntryKind[]): Entry[] {
+    return this.entries(kinds).filter((e) => !this.setAside(e.id));
+  }
+
+  liveView(): AnalysisRecord {
+    if (!this.asideRanges.length) return this;
+    const rewound = this.rewound();
+    return new Proxy(this, {
+      get: (t, k, r) => {
+        if (k === "entries") return (kinds?: EntryKind[]) => t.live(kinds);
+        if (k === "nodes") return () => t.nodes().filter((n) => !rewound.has(n.id));
+        return Reflect.get(t, k, r);
+      },
+    });
+  }
+
+  rewound(): Set<string> {
+    return new Set([...this.nodeEntry].filter(([, id]) => this.setAside(id)).map(([n]) => n));
   }
 
   append(kind: EntryKind, data: Record<string, unknown>, opts: { refs?: number[]; node?: string } = {}): Entry {
@@ -241,7 +270,9 @@ export class AnalysisRecord {
 
   numbers(): { node: string; path: string; value: number }[] {
     const out: { node: string; path: string; value: number }[] = [];
+    const rewound = this.rewound();
     for (const n of this.nodeList) {
+      if (rewound.has(n.id)) continue;
       let count = 0;
       const walk = (v: unknown, path: string) => {
         if (count >= MAX_NUMBERS_PER_NODE) return;
@@ -285,21 +316,14 @@ export class AnalysisRecord {
     return out;
   }
 
-  messages(): Message[] {
-    const all = this.log;
-    let start = 0;
-    let head: Message[] = [];
-    for (let i = all.length - 1; i >= 0; i--) {
-      if (all[i].kind === "compaction") {
-        head = [{ role: "user", parts: [{ type: "text", text: String(all[i].data.summary ?? "") }] }];
-        start = i + 1;
-        break;
-      }
+  messages(upTo = Infinity): Message[] {
+    let out: Message[] = [];
+    for (const e of this.log) {
+      if (e.id > upTo) break;
+      if (e.kind === "compaction") out = [{ role: "user", parts: [{ type: "text", text: String(e.data.summary ?? "") }] }];
+      else if (e.kind === "rewind") out = this.messages(Number(e.data.upTo));
+      else if (e.kind === "message") out.push(e.data.message as Message);
     }
-    const rest = all
-      .slice(start)
-      .filter((e) => e.kind === "message")
-      .map((e) => e.data.message as Message);
-    return [...head, ...rest];
+    return out;
   }
 }

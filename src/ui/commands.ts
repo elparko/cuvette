@@ -8,7 +8,10 @@ import { statusText, stepStatus, type StepState } from "../core/status.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
 import { listSessions, sessionLine } from "../core/sessions.ts";
 import { groupSummary, sheetTable } from "../core/samples.ts";
-import { choiceLabel, choiceValue, show, type Card } from "./cards.ts";
+import { applyRewind, choiceLabel, choiceValue, show, type Card } from "./cards.ts";
+import { rewindPoints } from "../core/rewind.ts";
+import { branchesText } from "../core/branch.ts";
+import { listMethods, methodText } from "../core/methods.ts";
 import type { OutputRef } from "./items.ts";
 import type { SessionLike } from "./types.ts";
 
@@ -133,7 +136,7 @@ const TRAIL_ICON: Record<string, string> = {
 export function renderTrail(lines: any[], level: number): string {
   const out: string[] = [];
   for (const l of lines) {
-    out.push(`${String(l.n).padStart(2)}. ${TRAIL_ICON[l.icon] ?? "▸"} ${l.line}${l.stale ? "  [out of date]" : ""}`);
+    out.push(`${String(l.n).padStart(2)}. ${TRAIL_ICON[l.icon] ?? "▸"} ${l.line}${l.stale ? "  [out of date]" : ""}${l.badges?.includes("rewound") ? "  [rewound]" : ""}`);
     if (level >= 2 && l.details) for (const [k, v] of Object.entries(l.details)) out.push(`      ${k}: ${clip(show(v), 100)}`);
     if (level >= 3 && l.technical) for (const [k, v] of Object.entries(l.technical)) out.push(`      · ${k}: ${clip(show(v), 100)}`);
   }
@@ -144,6 +147,7 @@ export function renderGraph(session: SessionLike): string {
   const nodes = session.record.nodes();
   if (!nodes.length) return "No steps yet.";
   const stale = session.record.stale();
+  const rewound = session.record.rewound();
   const steps = stepNumbers(nodes);
   const name = (id: string) => (steps.has(id) ? `Step ${steps.get(id)}` : `Comparison ${id}`);
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -159,7 +163,7 @@ export function renderGraph(session: SessionLike): string {
   const label = (id: string) => {
     const n = byId.get(id)!;
     const extra = n.parents.length > 1 ? ` (also from ${n.parents.slice(1).map(name).join(", ")})` : "";
-    return `${name(id)} ${clip(n.summary || n.tool, 60)}${extra}${stale.has(id) ? "  [out of date]" : ""}`;
+    return `${name(id)} ${clip(n.summary || n.tool, 60)}${extra}${stale.has(id) ? "  [out of date]" : ""}${rewound.has(id) ? "  [rewound]" : ""}`;
   };
   const walk = (id: string, prefix: string, last: boolean, top: boolean) => {
     if (placed.has(id)) return;
@@ -508,6 +512,111 @@ export const commands: Command[] = [
       const list = ctx.session.findings.list("open");
       if (!list.length) return ctx.notice("No open findings.");
       ctx.openCard({ t: "findings", list });
+    },
+  },
+  {
+    name: "rewind",
+    args: "[n]",
+    help: "Return the conversation to an earlier message or confirmed stage. Later results stay in the folder, marked rewound.",
+    run([n], ctx) {
+      const s = ctx.session;
+      if (!s.rewind) return unavailable(ctx);
+      if (n !== undefined) {
+        if (!/^\d+$/.test(n)) return ctx.error("Use: /rewind or /rewind <n>");
+        const r = applyRewind(s, Number(n));
+        if (!r.ok) return ctx.error(r.text);
+        ctx.notice(r.text);
+        return ctx.refresh();
+      }
+      const points = rewindPoints(s.record);
+      if (!points.length) return ctx.notice("No point to return to yet.");
+      ctx.openCard({ t: "rewind", points });
+    },
+  },
+  {
+    name: "branch",
+    args: "<name> [at <n>]",
+    help: "Copy this session into a new folder next to it, to try another method. at <n> copies up to point n of /rewind.",
+    run(args, ctx) {
+      const s = ctx.session;
+      if (!s.branch) return unavailable(ctx);
+      const at = args.length >= 3 && args.at(-2) === "at" && /^\d+$/.test(args.at(-1)!) ? Number(args.at(-1)) : undefined;
+      const name = (at === undefined ? args : args.slice(0, -2)).join(" ").trim();
+      if (!name) return ctx.error("Use: /branch <name> or /branch <name> at <n>");
+      try {
+        const r = s.branch(name, at);
+        ctx.print(`The branch ${name} is in ${r.folder}.\nThis session does not change. Both records link to each other.\nTo work in the branch, open it: ga open "${r.folder}"`, "Branch");
+      } catch (e) {
+        ctx.error((e as Error).message);
+      }
+    },
+  },
+  {
+    name: "branches",
+    help: "List this session, its parent and its branches, each with a one-line result.",
+    run(_, ctx) {
+      const s = ctx.session;
+      if (!s.branches) return unavailable(ctx);
+      const list = s.branches();
+      const tail = list.length > 1 ? "\n\nCompare two: /compare <n> <n>" : "\n\nNo branches yet. Make one: /branch <name>";
+      ctx.print(branchesText(list) + tail, "Branches");
+    },
+  },
+  {
+    name: "compare",
+    args: "[a] <b>",
+    help: "Show the key numbers and decisions of two branches side by side. Use the numbers or names from /branches.",
+    run(args, ctx) {
+      const s = ctx.session;
+      if (!s.compareBranches) return unavailable(ctx);
+      if (!args.length || args.length > 2) return ctx.error("Use: /compare <b> or /compare <a> <b>");
+      const [a, b] = args.length === 1 ? ["this", args[0]!] : [args[0]!, args[1]!];
+      try {
+        const r = s.compareBranches(a, b);
+        const body = r.rows.length ? table(["Number", r.a.name, r.b.name, "Change"], r.rows) : "No numbers to compare yet.";
+        ctx.print(`${body}\n\n${r.differ} of ${r.rows.length} ${r.rows.length === 1 ? "row differs" : "rows differ"}.`, `Compare: ${r.a.name} and ${r.b.name}`);
+      } catch (e) {
+        ctx.error((e as Error).message);
+      }
+    },
+  },
+  {
+    name: "save-method",
+    args: "<name> [project]",
+    help: "Save the confirmed analysis as a method: the questions and answers, the metrics and settings, the programs and the demonstration rule. project saves it in .cuvette/methods of the project folder.",
+    run(args, ctx) {
+      const s = ctx.session;
+      if (!s.saveMethod) return unavailable(ctx);
+      const project = args.length === 2 && args[1] === "project";
+      const name = (project ? args.slice(0, 1) : args).join(" ").trim();
+      if (!name) return ctx.error("Use: /save-method <name> or /save-method <name> project");
+      try {
+        const r = s.saveMethod(name, project ? "project" : "home");
+        ctx.print(`${methodText(r.method)}\n\nSaved in ${r.path}.\nUse it on new data: cuvette --method ${r.method.name} <folder>, or /method ${r.method.name} in a new session.`, `Method ${r.method.name}`);
+      } catch (e) {
+        ctx.error((e as Error).message);
+      }
+    },
+  },
+  {
+    name: "method",
+    args: "[name]",
+    help: "List the saved methods, or start this new session from one. The questions come pre-answered and the demonstration still runs.",
+    run(args, ctx) {
+      const s = ctx.session;
+      const name = args.join(" ").trim();
+      if (!name) {
+        const list = listMethods(s.cwd);
+        return ctx.print(list.length ? `${table(["Method", "Saved", "Where", "Question"], list.map((m) => [m.name, m.saved.slice(0, 10), m.where === "home" ? "home" : m.trusted ? "project" : "project, not trusted", clip(m.question, 60)]))}\n\nStart from one: /method <name>` : "No saved methods. Save one with /save-method <name> after you confirm an analysis.", "Methods");
+      }
+      if (!s.startMethod) return unavailable(ctx);
+      try {
+        const m = s.startMethod(name);
+        ctx.print(`${methodText(m)}\n\nType your request for the new data. The questions come with the saved answers for you to confirm. The demonstration on one sample runs before the batch.`, `Method ${m.name}`);
+        ctx.refresh();
+      } catch (e) {
+        ctx.error((e as Error).message);
+      }
     },
   },
   {

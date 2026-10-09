@@ -107,7 +107,7 @@ test("the leak check flags paths outside the allow list and counts unsourced and
     { id: 6, kind: "claim_check", data: { claims: [{ label: "measured", value: 1 }, { label: "unsourced", value: 0.75 }, { label: "literature", value: 1.1 }] } },
     { id: 7, kind: "assistant", data: { final: true, text: "R2 0.75" } },
   ] as unknown as Entry[];
-  const record = { entries: (kinds?: string[]) => entries.filter((e) => !kinds || kinds.includes(e.kind)), nodes: () => [] };
+  const record = { entries: (kinds?: string[]) => entries.filter((e) => !kinds || kinds.includes(e.kind)), live: (kinds?: string[]) => entries.filter((e) => !kinds || kinds.includes(e.kind)), nodes: () => [] };
   const k = leakCheck(record, { allow: ["/run", "/data/p"], deny: ["/repo"] });
   expect(k.read).toEqual(["/data/p/in.csv", "/repo/bench/p/expected.yaml", "/run/work/notes.txt"]);
   expect(k.outside).toEqual(["/repo/bench/p/expected.yaml"]);

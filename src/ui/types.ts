@@ -2,6 +2,9 @@ import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
 import type { DeckOptions, DeckWritten } from "../core/imagedeck.ts";
 import type { StepState } from "../core/status.ts";
+import type { BranchInfo } from "../core/branch.ts";
+import type { Method } from "../core/methods.ts";
+import type { RewindResult } from "../core/rewind.ts";
 import type { BusEvent, Entry, Finding, Mode, ModelInfo, Owner, PlanResponse, Question } from "../core/types.ts";
 import type { SampleRow } from "../core/samples.ts";
 
@@ -71,6 +74,12 @@ export interface SessionLike {
   exportImages?(options: DeckOptions): Promise<DeckWritten>;
   elnPush?(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }>;
   elnLink?(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }>;
+  rewind?(n: number): RewindResult;
+  branch?(name: string, point?: number): { id: string; folder: string; upTo: number };
+  branches?(): BranchInfo[];
+  compareBranches?(a: string, b: string): { a: BranchInfo; b: BranchInfo; rows: string[][]; differ: number };
+  saveMethod?(name: string, where?: "home" | "project"): { method: Method; path: string };
+  startMethod?(ref: string): Method;
   openEvents?(): BusEvent[];
   sampleSheet?(): { rows: SampleRow[]; path: string; from: string } | undefined;
   editSamples?(text: string): Promise<string>;

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { CATALOG_DIR, gaHome } from "../adapters/manifest.ts";
 
 export const PROJECT_DIRS = [".ga", ".cuvette"];
@@ -27,6 +27,7 @@ export interface FolderScan {
   values: Record<string, unknown>;
   hooks: string[];
   adapters: { name: string; replaces?: string }[];
+  methods: string[];
   bypass: boolean;
 }
 
@@ -120,13 +121,20 @@ function shadows(name: string): string | undefined {
 
 export function scanFolder(folder: string): FolderScan {
   const key = folderKey(folder);
-  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d)))) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], bypass: false };
+  if (!PROJECT_DIRS.some((d) => existsSync(join(key, d)))) return { folder: key, files: {}, hash: "", layers: [], keys: [], values: {}, hooks: [], adapters: [], methods: [], bypass: false };
   const files: Record<string, string> = {};
   const paths: string[] = [];
+  const methods: string[] = [];
   for (const d of PROJECT_DIRS) {
     for (const f of SETTINGS_FILES) if (existsSync(join(key, d, f))) paths.push(join(key, d, f));
     const a = join(key, d, "adapters");
     if (existsSync(a) && lstatSync(a).isDirectory()) walk(a, paths);
+    const m = join(key, d, "methods");
+    if (!existsSync(m) || !lstatSync(m).isDirectory()) continue;
+    const found: string[] = [];
+    walk(m, found);
+    paths.push(...found);
+    methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
   }
   for (const p of paths) files[relative(key, p)] = sha(readFileSync(p));
   const layers = projectSettings(key);
@@ -139,10 +147,10 @@ export function scanFolder(folder: string): FolderScan {
       for (const n of readdirSync(dir).sort())
         if (existsSync(join(dir, n, "adapter.yaml")) && !adapters.some((a) => a.name === n)) adapters.push({ name: n, replaces: shadows(n) });
   const hash = sha(Object.entries(files).map(([p, h]) => `${p}\0${h}\n`).join(""));
-  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, bypass: values.permissionMode === "bypass" };
+  return { folder: key, files, hash, layers, keys, values, hooks: hookLines(layers), adapters, methods, bypass: values.permissionMode === "bypass" };
 }
 
-export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0;
+export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0;
 
 function userFile(): string {
   return join(gaHome(), "settings.json");
@@ -247,6 +255,7 @@ export function folderLines(s: FolderScan): string[] {
   out.push(s.bypass ? "Bypass permissions: ON. Tool calls would run with no permission card." : "Bypass permissions: not set.");
   if (s.hooks.length) out.push("Hooks (each command runs on this computer):", ...s.hooks.map((h) => `  ${h}`));
   if (s.adapters.length) out.push("Adapters (their code runs on this computer):", ...s.adapters.map((a) => `  ${a.name}${a.replaces ? `: replaces ${a.replaces}` : ""}`));
+  if (s.methods.length) out.push("Methods (they fill in the questions and settings of a new session):", ...s.methods.map((m) => `  ${m}`));
   return out;
 }
 

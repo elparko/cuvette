@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Static, Text, render, useApp, useInput, useStdout, useWindowSize } from "ink";
 import type { BusEvent, Mode } from "../core/types.ts";
-import { ElnCard, FindingsCard, InstructionCard, KeyCard, PermissionCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
+import { ElnCard, FindingsCard, InstructionCard, RewindCard, KeyCard, PermissionCard, ClarifyCard, PlanCard, QuestionCard, SetupCard, type Card } from "./cards.tsx";
 import { credentialsPath } from "../core/credentials.ts";
 import { checkClaudeKey } from "../providers/claude.ts";
 import { commands, openPanels, openSetup, openWithOs, suggestions, table, type CommandCtx } from "../ui/commands.ts";
@@ -15,7 +15,7 @@ import { ConfigPanel } from "./config-panel.tsx";
 import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
 import { changeSetting, type SettingSession } from "../core/settings.ts";
-import { applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
+import { applyRewind, applySetup, cardFromEvent, closesCard, keyProblem, needsSetup, planIntro, pushCard, refreshesStatus, respondPermission, saveEln, saveKey, startCards, type CardType, type Say } from "../ui/cards.ts";
 import { inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
 import { footerKeys, inputKeys, keyRows, layout, type VimMode } from "./editor.ts";
 import { INPUT_MAX_ROWS, InputBox, KeyStyle } from "./input-box.tsx";
@@ -416,7 +416,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
       )}
       {card ? (
         <CardRows.Provider value={fit.card}>
-          {(cardViews({ session, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: running, program, programs: opts.programs })[card.t] as (c: Card) => React.ReactNode)(card)}
+          {(cardViews({ session, env, popCard, setCards, line, say, submitKey, refresh, details, toggleDetails, busy: running, program, programs: opts.programs, setInput })[card.t] as (c: Card) => React.ReactNode)(card)}
         </CardRows.Provider>
       ) : null}
       {fit.inputBox ? <Box borderStyle="round" borderColor={card ? "gray" : "cyan"} paddingX={1}>
@@ -491,6 +491,7 @@ interface CardDeps {
   busy: boolean;
   program: string;
   programs?: ProgramHooks;
+  setInput(text: string): void;
 }
 
 type CardViews = { [K in CardType]: (c: Extract<Card, { t: K }>) => React.ReactNode };
@@ -548,6 +549,20 @@ function cardViews(d: CardDeps): CardViews {
     clarify: (card) => <ClarifyCard key={`clarify${card.qids.join(",")}`} card={card} session={session} />,
     plan: (card) => <PlanCard key={`plan${card.stage}${card.version}${card.text.length}`} card={card} session={session} onRespond={(r) => (popCard(), session.respondPlan?.(r))} />,
     findings: (card) => <FindingsCard key="findings" card={card} session={session} onClose={popCard} />,
+    rewind: (card) => (
+      <RewindCard
+        key="rewind"
+        card={card}
+        onClose={popCard}
+        onChoose={(n) => {
+          popCard();
+          const r = applyRewind(session, n);
+          d.line(r.ok ? "↶" : "✗", r.text, r.ok ? "cyan" : "red");
+          if (r.input) d.setInput(r.input);
+          d.refresh();
+        }}
+      />
+    ),
     eln: () => <ElnCard key="eln" path={credentialsPath()} onCancel={popCard} onSubmit={(url, key) => void (saveEln(session, url, key, { ...d.say, ok: (t) => (popCard(), d.say.ok(t)) }))} />,
     config: () => (
       <ConfigPanel
