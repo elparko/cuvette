@@ -823,7 +823,7 @@ test("a turn with results writes results.xlsx in the output folder and one saved
   const on = await run({});
   expect(on.dir).toMatch(/\/ga-proj-[^/]+\/cuvette\/\d{4}-\d\d-\d\d-count-particles-tif$/);
   expect(readFileSync(on.xlsx).subarray(0, 2).toString()).toBe("PK");
-  expect(on.saved.map((e) => e.data.text)).toEqual([expect.stringMatching(/^Saved: results\.xlsx \(4 sheets\)\. Folder: /)]);
+  expect(on.saved.map((e) => e.data.text)).toEqual([expect.stringMatching(/^Saved: results\.xlsx \(5 sheets\)\. Folder: /)]);
   const off = await run({ export_xlsx: "off" });
   expect(off.saved).toEqual([]);
   expect(existsSync(off.xlsx)).toBe(false);
