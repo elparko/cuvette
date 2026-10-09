@@ -8,7 +8,7 @@ export type Args = Record<string, unknown>;
 export type EntryKind =
   | "session" | "setup" | "user" | "message" | "assistant" | "thinking"
   | "tool_call" | "tool_result" | "node" | "stale"
-  | "decision" | "owner_change" | "deviation" | "blocked" | "permission"
+  | "decision" | "owner_change" | "deviation" | "blocked" | "permission" | "permission_mode"
   | "question" | "answer" | "sensitivity"
   | "finding" | "finding_resolution" | "claim_check"
   | "mode" | "follow_step" | "lab_memory"

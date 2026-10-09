@@ -56,6 +56,7 @@ export class FakeSession implements SessionLike {
   dir: string;
   workDir: string;
   mode: Mode;
+  permissionMode: "ask" | "bypass" = "ask";
   busy = false;
   model: ModelInfo = { provider: "fake", model: "fake-model", contextWindow: 200000, vision: true, small: false };
   adapterInfo = [
@@ -329,6 +330,12 @@ export class FakeSession implements SessionLike {
     const old = this.decisions.owner(key);
     this.owners.set(key, owner);
     this.record.append("owner_change", { key, old, new: owner, by: "human" });
+  }
+
+  setPermissionMode(m: "ask" | "bypass"): void {
+    if (m === this.permissionMode) return;
+    this.record.append("permission_mode", { old: this.permissionMode, new: m, how: `/permissions ${m}` });
+    this.permissionMode = m;
   }
 
   setMode(mode: Mode): void {

@@ -8,13 +8,22 @@ import type { Mode } from "./core/types.ts";
 const HELP = `ga - a guided analysis agent for science programs
 
 Usage
-  ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume <id>]
+  ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume <id>] [--bypass-permissions]
   ga -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json]
 
   With no --adapter, the agent calls list_adapters and asks to load the adapter that fits
   the request with use_adapter. The program is your decision: accept or change it on the
   card, or set "adapter": "<name>" in the answers file. The record keeps each load and its
   reason. With --adapter, the session has only the adapters that you name.
+
+  --bypass-permissions
+  WARNING: In bypass, the agent can run commands and write files without asking.
+  The harness allows each tool call that has a permission card and logs it with the reason
+  "bypass permissions". The status line shows "bypass permissions". Also /permissions bypass,
+  or "permissions": "bypass" in ~/.guided-analysis/settings.json or .ga/settings.json.
+  Bypass does not change these: method decisions stay with you (/decisions agent gives them
+  to the agent); plan and teach mode still block steps; blind benchmark rules and the macOS
+  sandbox still apply; a push to eLabFTW still asks; "deny" rules in settings still deny.
 
   ga adapters                        list the adapters (name, kind, status, field, program)
   ga adapter check <name|dir> [--run-tests]
@@ -73,6 +82,7 @@ const { values: o, positionals: pos } = parseArgs({
     "dry-run": { type: "boolean" },
     "run-tests": { type: "boolean" },
     generic: { type: "boolean" },
+    "bypass-permissions": { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -84,13 +94,14 @@ function fail(msg: string): never {
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 const readJson = (p?: string) => (p ? JSON.parse(readFileSync(p, "utf8")) : undefined);
+const bypass = () => (o["bypass-permissions"] ? { permissionMode: "bypass" as const } : {});
 
 async function headless(prompt: string) {
   const { Session } = await import("./core/session.ts");
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = str(o.output) ?? "text";
-  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: { headless: true } });
+  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: { headless: true, ...bypass() } });
   attachHeadless(s, { answers, allow });
   s.bus.on((e) => {
     if (out === "stream-json") process.stdout.write(JSON.stringify(e) + "\n");
@@ -110,8 +121,8 @@ async function interactive() {
   const adapters = (o.adapter as string[]) ?? [];
   if (!adapters.length && !o.resume) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
   const s = o.resume
-    ? await Session.resume(str(o.resume)!, { model: str(o.model) })
-    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic });
+    ? await Session.resume(str(o.resume)!, { model: str(o.model), settings: bypass() })
+    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, settings: bypass() });
   await runTui(s as never, {});
   await s.close();
 }

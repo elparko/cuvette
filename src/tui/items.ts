@@ -134,7 +134,11 @@ export class Mapper {
         return [];
       }
       case "permission":
-        return line("▸", `Permission for ${d.tool}: ${d.decision}`, undefined, true);
+        return line("▸", `Permission for ${d.tool}: ${d.decision}${d.reason ? ` (${d.reason})` : ""}`, undefined, true);
+      case "permission_mode":
+        return d.new === "bypass"
+          ? line("⚠", "Bypass permissions is on. The agent runs commands and writes files without asking.", "yellow")
+          : line("▸", "Bypass permissions is off. Tool calls that need permission show a card again.", "cyan");
       case "compaction":
         return line("▸", "Older messages were summarized to save space.", undefined, true);
       case "stale":

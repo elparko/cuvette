@@ -552,3 +552,32 @@ describe("pieces", () => {
     expect(h.all()).not.toContain("running run_script");
   });
 });
+
+describe("bypass permissions", () => {
+  test("/permissions bypass shows the marker and logs the change; /permissions ask removes it", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    expect(h.last()).not.toContain("bypass permissions ·");
+    await submit(h, "/permissions bypass");
+    await until(() => s.permissionMode === "bypass" && h.last().includes("bypass permissions ·"));
+    expect(h.all()).toContain("Bypass permissions is on.");
+    expect(h.all()).toContain("method decisions stay with you");
+    await submit(h, "/permissions ask");
+    await until(() => s.permissionMode === "ask" && !h.last().includes("bypass permissions ·"));
+    expect(s.record.entries(["permission_mode"]).map((e) => e.data.new)).toEqual(["bypass", "ask"]);
+  });
+
+  test("/decisions agent gives the scientist's decisions to the agent; /decisions me takes them back", async () => {
+    const { h, s } = start();
+    await sleep(100);
+    s.setOwner("seed", "fixed");
+    const human = s.decisions.fields().filter((f) => s.decisions.owner(f.key) === "human").map((f) => f.key);
+    expect(human.length).toBeGreaterThan(0);
+    await submit(h, "/decisions agent");
+    await until(() => human.every((k) => s.decisions.owner(k) === "agent"));
+    expect(s.decisions.owner("seed")).toBe("fixed");
+    await submit(h, "/decisions me");
+    await until(() => s.decisions.fields().every((f) => s.decisions.owner(f.key) !== "agent"));
+    expect(s.decisions.owner("seed")).toBe("fixed");
+  });
+});

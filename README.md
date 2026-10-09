@@ -79,12 +79,45 @@ results, and summarizes old turns near the context limit.
 | Shift+Tab | Change the mode: watch, follow, teach, plan. |
 | `/setup` | Fill in the decision record before the first result. |
 | `/decisions`, `/owner` | See the decisions; give a decision type to the agent or keep it. |
+| `/decisions agent`, `/decisions me` | Give all your decisions to the agent, or take them back. Fixed decisions do not change. |
+| `/permissions bypass`, `/permissions ask` | Allow tool calls without a permission card, or show the cards again (the default). |
 | `/questions` | Open questions in this session and all sessions. |
 | `/trail 1`, `/trail 2`, `/trail 3` | The audit trail: one line per step, then details, then the technical record. |
 | `/graph`, `/window` | The analysis graph in the terminal, or in a browser window. |
 | `/review`, `/findings` | Run the rule checks and the referee; accept, reject or fix each finding. |
 | `/export html` | The trail as one HTML file. Also `md`, `jsonl`, `pdf`, `protocol`, `script`, `notebook`, `flow`. |
 | `/lab` | Approve or reject lab rules that the agent proposed. |
+
+### Bypass permissions
+
+By default, a tool call that needs permission shows a card, and you allow or deny it. These
+calls are `run_command`, `write_file`, `run_script`, adapter tools that ask, and a script that
+searches the home folder or `/Volumes`.
+
+WARNING: In bypass, the agent can run commands and write files without asking.
+
+```
+node bin/ga.js --adapter imagej --bypass-permissions
+```
+
+To start bypass in a session, type `/permissions bypass`. To stop it, type `/permissions ask`.
+To start each session in bypass, put `"permissions": "bypass"` in
+`~/.guided-analysis/settings.json` or in `.ga/settings.json` of the project. To keep rules in
+the same file, use `"permissionMode": "bypass"` and keep the rules in `"permissions"`.
+
+In bypass, the harness allows each call that has a permission card. The record logs each of
+these calls as a `permission` entry with the reason `bypass permissions`. The record also logs
+a `permission_mode` entry when bypass starts or stops. The status line shows
+`bypass permissions` in yellow for as long as bypass is on.
+
+Bypass does not change these:
+
+- Method decisions, such as the test, the threshold or the program, stay with you. To give all
+  of them to the agent, type `/decisions agent`. To take them back, type `/decisions me`.
+- Plan mode and teach mode still block the steps.
+- The blind rules of the benchmark and the macOS sandbox of `run_script` still apply.
+- A push to eLabFTW sends data out of the computer, so it still asks.
+- A `deny` rule in a settings file still denies the call.
 
 ## What the harness enforces
 

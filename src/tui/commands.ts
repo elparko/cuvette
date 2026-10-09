@@ -193,8 +193,15 @@ export const commands: Command[] = [
   { name: "setup", help: "Open the setup card for your choices.", run: (_, ctx) => openSetup(ctx) },
   {
     name: "decisions",
-    help: "Show every decision, its owner and who set it.",
-    run(_, ctx) {
+    args: "[agent|me]",
+    help: "Show every decision, its owner and who set it. agent gives all your decisions to the agent; me takes them back.",
+    run([who], ctx) {
+      if (who === "agent" || who === "me") {
+        const [from, to]: Owner[] = who === "agent" ? ["human", "agent"] : ["agent", "human"];
+        const keys = ctx.session.decisions.fields().filter((f) => ctx.session.decisions.owner(f.key) === from).map((f) => f.key);
+        for (const k of keys) ctx.session.setOwner(k, to);
+        ctx.notice(keys.length ? `${who === "agent" ? "The agent now owns" : "You now own"} ${keys.length} ${keys.length === 1 ? "decision" : "decisions"}: ${keys.join(", ")}. Fixed decisions do not change.` : "No decision changed owner.");
+      } else if (who) return ctx.error("Use: /decisions, /decisions agent or /decisions me");
       ctx.print(table(["Key", "Value", "Owner", "Set by"], decisionRows(ctx.session)), "Decisions");
     },
   },
@@ -207,6 +214,26 @@ export const commands: Command[] = [
       if (!ctx.session.decisions.fields().some((f) => f.key === key)) return ctx.error(`No decision named ${key}. See /decisions.`);
       ctx.session.setOwner(key, owner as Owner);
       ctx.notice(`Owner of ${key} is now ${owner}.`);
+    },
+  },
+  {
+    name: "permissions",
+    args: "[bypass|ask]",
+    help: "Show or change the permission mode. bypass allows tool calls without a card.",
+    run([m], ctx) {
+      if (m === "bypass" || m === "ask") {
+        ctx.session.setPermissionMode(m);
+        ctx.refresh();
+      } else if (m) return ctx.error("Use: /permissions bypass or /permissions ask");
+      const now = ctx.session.permissionMode;
+      ctx.print(
+        now === "bypass"
+          ? "Bypass permissions is on. The harness allows each tool call that has a permission card, without a card, and logs it with the reason \"bypass permissions\".\n" +
+              "These do not change: method decisions stay with you (/decisions agent gives them to the agent); plan and teach mode still block steps; blind benchmark rules and the macOS sandbox still apply; a push to eLabFTW still asks; deny rules in settings still deny.\n" +
+              "Type /permissions ask to show the permission cards again."
+          : "Ask (the default). A tool call that needs permission shows a card, and you allow or deny it. Type /permissions bypass to allow them without a card.",
+        "Permissions",
+      );
     },
   },
   {

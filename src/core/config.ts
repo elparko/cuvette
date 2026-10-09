@@ -20,6 +20,7 @@ export interface Settings {
   askWaits: boolean;
   headless: boolean;
   permissions: Record<string, "allow" | "ask" | "deny">;
+  permissionMode: "ask" | "bypass";
   hooks: Partial<Record<HookEvent, { matcher?: string; command: string[] }[]>>;
   notify: { ntfy?: string };
 }
@@ -41,17 +42,25 @@ export const DEFAULTS: Settings = {
   askWaits: true,
   headless: false,
   permissions: {},
+  permissionMode: "ask",
   hooks: {},
   notify: {},
 };
 
 function readJson(path: string): Partial<Settings> {
   if (!existsSync(path)) return {};
+  let s: Partial<Settings> & { permissions?: unknown };
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    s = JSON.parse(readFileSync(path, "utf8"));
   } catch (e) {
     throw new Error(`settings file ${path} is not valid JSON: ${(e as Error).message}`);
   }
+  if (typeof s.permissions === "string") {
+    if (s.permissions !== "bypass" && s.permissions !== "ask") throw new Error(`settings file ${path}: "permissions" must be "bypass", "ask" or an object of rules`);
+    const { permissions, ...rest } = s;
+    return { ...rest, permissionMode: permissions };
+  }
+  return s as Partial<Settings>;
 }
 
 function merge(a: Settings, b: Partial<Settings>): Settings {

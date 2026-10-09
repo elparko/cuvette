@@ -142,6 +142,7 @@ export function StatusLine(props: {
   tokens: { input: number; output: number };
   hint?: string;
   details?: boolean;
+  bypass?: boolean;
 }) {
   const parts: React.ReactNode[] = [
     <Text key="m" color="cyan">
@@ -170,16 +171,29 @@ export function StatusLine(props: {
       </Text>,
     );
   }
+  const line = (
+    <Text dimColor>
+      {parts.map((p, i) => (
+        <React.Fragment key={i}>
+          {i > 0 ? " · " : ""}
+          {p}
+        </React.Fragment>
+      ))}
+    </Text>
+  );
   return (
     <Box flexDirection="column">
-      <Text dimColor>
-        {parts.map((p, i) => (
-          <React.Fragment key={i}>
-            {i > 0 ? " · " : ""}
-            {p}
-          </React.Fragment>
-        ))}
-      </Text>
+      {props.bypass ? (
+        <Text>
+          <Text color="yellow" bold>
+            bypass permissions
+          </Text>
+          <Text dimColor> · </Text>
+          {line}
+        </Text>
+      ) : (
+        line
+      )}
       <Text dimColor>{props.hint || (props.details ? "Ctrl+O: short view" : "Ctrl+O: all steps")}</Text>
     </Box>
   );

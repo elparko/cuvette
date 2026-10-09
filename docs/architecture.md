@@ -150,7 +150,8 @@ it.
 | owner_change | decisions | key, old, new, by |
 | deviation | session | callId, tool, deviations |
 | blocked | session | callId, tool, reason, qid |
-| permission | session | rid, tool, decision (allowed, denied), by, note, sha256 |
+| permission | session | rid, tool, decision (allowed, denied), by, note, sha256; reason "bypass permissions" if the harness allowed it in bypass |
+| permission_mode | session | old, new (ask, bypass), how |
 | question / answer | questions | the `Question` / qid, value, note, by |
 | sensitivity | sensitivity | the `SensitivityResult` |
 | finding / finding_resolution | review | the `Finding` / fid, action, reason |
@@ -361,6 +362,11 @@ ga mcp
 
 - **Permission order.** Rules are checked deny, then ask, then allow; the first match decides
   (Claude Code's order). A hook decision `defer` means `block`.
+- **Bypass permissions.** `--bypass-permissions`, `/permissions bypass` or
+  `"permissions": "bypass"` in a settings file. In bypass, `requestPermission` allows the call
+  and logs it with the reason `bypass permissions`. The blind check, the plan and teach mode
+  check, the decision hook and `deny` rules run before it, so they do not change. The eLabFTW
+  push gives an outward text to `requestPermission`, so it still asks.
 - **Hook order.** The decision hook runs before the mode hook, so Follow mode shows filled
   values. Plan and teach mode deny a non-read-only tool before any hook runs.
 - **After an answer.** A call that was blocked runs again with the linked arguments set from the

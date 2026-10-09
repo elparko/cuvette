@@ -25,6 +25,7 @@ export interface SessionLike {
   dir: string;
   workDir: string;
   mode: Mode;
+  permissionMode: "ask" | "bypass";
   busy: boolean;
   model: ModelInfo;
   adapterInfo: { name: string; title: string; version: string; programVersion: string }[];
@@ -46,6 +47,7 @@ export interface SessionLike {
   setDecision(key: string, value: unknown, reason?: string): string[];
   setOwner(key: string, owner: Owner): void;
   setMode(mode: Mode): void;
+  setPermissionMode(m: "ask" | "bypass"): void;
   followDone(step: number, note?: string, agentDoes?: boolean): Promise<void>;
   review(): Promise<Finding[]>;
   compact(): Promise<void>;

@@ -146,6 +146,7 @@ export class Session {
   workDir: string;
   cwd: string;
   mode: Mode;
+  permissionMode: Settings["permissionMode"];
   busy = false;
   settings: Settings;
   bus = new Bus();
@@ -186,6 +187,7 @@ export class Session {
     this.cwd = cwd;
     this.settings = settings;
     this.mode = settings.mode;
+    this.permissionMode = settings.permissionMode;
     this.dir = join(gaHome(), "sessions", id);
     mkdirSync(this.dir, { recursive: true });
     this.record = new AnalysisRecord(this.dir, id);
@@ -296,6 +298,7 @@ export class Session {
         ...(this.pick ? { pick: true } : {}),
       });
     }
+    if (this.permissionMode === "bypass") this.record.append("permission_mode", { old: "ask", new: "bypass", how: opts.settings?.permissionMode === "bypass" ? "the --bypass-permissions flag" : "a settings file" });
     await this.hooks.event("SessionStart", { session: this.id });
     this.timer = setInterval(() => this.expireQuestions(), 30_000);
     this.timer.unref?.();
@@ -1183,6 +1186,10 @@ export class Session {
   private async requestPermission(tool: Tool, args: Args, signal: AbortSignal, outward?: string, search?: { root: string; purpose: string }): Promise<{ ok: boolean; note: string; always: boolean }> {
     const rid = `r${++this.permCount}`;
     const code = typeof args.code === "string" ? args.code : undefined;
+    if (this.permissionMode === "bypass" && !outward) {
+      this.record.append("permission", { rid, tool: tool.name, decision: "allowed", by: "harness", reason: "bypass permissions", always: false, sha256: code ? createHash("sha256").update(code).digest("hex") : undefined });
+      return { ok: true, note: "bypass permissions", always: false };
+    }
     let touches = outward ?? ( tool.adapter ? `Runs ${tool.remoteName ?? tool.name} in ${this.adapterInfo.find((a) => a.name === tool.adapter)?.title}. It writes only to the session folder.` : "Runs on this computer with your user permissions.");
     if (!outward && tool.name === "run_script") {
       try {
@@ -1326,6 +1333,12 @@ export class Session {
   setOwner(key: string, owner: Owner): void {
     this.decisions.setOwner(key, owner, "human");
     this.notes.push(`The scientist set the owner of "${key}" to ${owner}.`);
+  }
+
+  setPermissionMode(m: Settings["permissionMode"]): void {
+    if (m === this.permissionMode) return;
+    this.record.append("permission_mode", { old: this.permissionMode, new: m, how: `/permissions ${m}` });
+    this.permissionMode = m;
   }
 
   setMode(mode: Mode): void {

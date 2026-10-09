@@ -40,6 +40,14 @@ test("the key is saved with mode 600 and the push sends nothing before approval"
   expect(s.record.entries(["permission"]).at(-1)!.data).toMatchObject({ tool: "eln_push", decision: "denied" });
 });
 
+test("bypass permissions does not skip the eLabFTW confirmation", async () => {
+  s.setPermissionMode("bypass");
+  const seen = approve(false);
+  await expect(s.elnPush()).rejects.toThrow(/did not approve/);
+  expect(seen).toHaveLength(1);
+  expect(mock.requests).toEqual([]);
+});
+
 test("the permission card lists the server, the action and the files", async () => {
   const seen = approve(true);
   await s.elnPush();

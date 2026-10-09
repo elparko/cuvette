@@ -40,6 +40,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
   const [draft, setDraft] = useState("");
   const [sel, setSel] = useState(0);
   const [mode, setMode] = useState<Mode>(session.mode);
+  const [bypass, setBypass] = useState(session.permissionMode === "bypass");
   const [openQ, setOpenQ] = useState(() => session.questions.open().length);
   const [tokens, setTokens] = useState({ input: 0, output: 0 });
   const [hint, setHint] = useState("");
@@ -101,6 +102,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
   const popCard = useCallback(() => setCards((x) => x.slice(1)), []);
   const refresh = useCallback(() => {
     setMode(session.mode);
+    setBypass(session.permissionMode === "bypass");
     setOpenQ(session.questions.open().length);
   }, [session]);
 
@@ -163,7 +165,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
           if (en.kind === "answer") dropCard((c) => c.t === "question" && c.q.qid === en.data.qid);
           if (en.kind === "permission") dropCard((c) => c.t === "permission" && c.rid === en.data.rid);
           if (en.kind === "follow_step") dropCard((c) => c.t === "instruction" && c.step === en.data.step);
-          if (en.kind === "mode" || en.kind === "question" || en.kind === "answer") refresh();
+          if (en.kind === "mode" || en.kind === "permission_mode" || en.kind === "question" || en.kind === "answer") refresh();
           break;
         }
         case "delta":
@@ -452,6 +454,7 @@ export function App({ session, opts }: { session: SessionLike; opts: TuiOptions 
         tokens={tokens}
         hint={hint}
         details={showAll}
+        bypass={bypass}
       />
     </Box>
   );
