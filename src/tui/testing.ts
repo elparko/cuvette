@@ -154,7 +154,7 @@ export function makeHarness(columns = 100, rows = 40): Harness {
   return {
     stdin: input,
     stdout: out,
-    type: (t) => void input.write(t),
+    type: (t) => void setTimeout(() => input.write(t), 25),
     resize: (c, r) => {
       Object.assign(out, { columns: c, rows: r });
       term.resize(c, r);

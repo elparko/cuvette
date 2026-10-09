@@ -14,7 +14,7 @@ export function Fit(props: { max: number; head: React.ReactNode; tail?: React.Re
   const tailMax = Math.max(1, max - 2);
   const tailH = props.tail ? Math.min(tail.hasMeasured ? tail.height : 1, tailMax) : 0;
   const room = Math.max(1, max - tailH);
-  const fits = !bounded || (body.hasMeasured && body.height <= room);
+  const fits = !bounded || !body.hasMeasured || body.height <= room;
   const view = Math.max(1, room - 1);
   const maxTop = Math.max(0, body.height - view);
   const at = Math.min(top, maxTop);
@@ -39,7 +39,7 @@ export function Fit(props: { max: number; head: React.ReactNode; tail?: React.Re
   const tailClipped = bounded && tail.hasMeasured && tail.height > tailMax;
   const keys = arrows ? "↑↓ PgUp PgDn scroll" : "PgUp PgDn scroll";
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" overflowY="hidden" maxHeight={bounded ? Math.max(1, max) : undefined}>
       <Box flexDirection="column" overflowY="hidden" height={fits ? undefined : view} contentOffsetY={fits ? 0 : at}>
         <Box ref={bodyRef} flexDirection="column" flexShrink={0}>
           {props.head}
@@ -62,12 +62,9 @@ export function Fit(props: { max: number; head: React.ReactNode; tail?: React.Re
 }
 
 export function Last(props: { max: number; children: React.ReactNode }) {
-  const ref = useRef<DOMElement>(null);
-  const m = useBoxMetrics(ref);
-  const clip = !m.hasMeasured || m.height > props.max;
   return (
-    <Box flexDirection="column" overflowY="hidden" height={clip ? Math.max(0, props.max) : undefined} justifyContent="flex-end">
-      <Box ref={ref} flexDirection="column" flexShrink={0}>
+    <Box flexDirection="column" overflowY="hidden" maxHeight={Math.max(0, props.max)} justifyContent="flex-end">
+      <Box flexDirection="column" flexShrink={0}>
         {props.children}
       </Box>
     </Box>

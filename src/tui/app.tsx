@@ -375,6 +375,8 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
           </Box>
         )}
       </Static>
+      <Box flexDirection="column" maxHeight={Math.max(1, rows - 2)} overflowY="hidden" justifyContent="flex-end">
+        <Box flexDirection="column" flexShrink={0}>
       {pending.length && fit.pending > 0 ? (
         <Last max={fit.pending}>
           {pending.map((it) => (
@@ -457,6 +459,8 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
         keys={footKeys}
         esc={keyStyle === "vim" && vimMode === "insert" ? "Esc twice stops this step. " : undefined}
       />
+        </Box>
+      </Box>
     </Box>
     </KeyStyle.Provider>
   );

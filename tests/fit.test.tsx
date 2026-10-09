@@ -8,6 +8,9 @@ import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import type { SessionLike } from "../src/tui/types.ts";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
+import { Last } from "../src/tui/fit.tsx";
+import { Text, render } from "ink";
+import React from "react";
 
 let live: { h: Harness; done: Promise<void> } | undefined;
 
@@ -72,9 +75,8 @@ describe("a card taller than the terminal", () => {
     const { h, s } = start(100, 30);
     await until(() => h.all().includes("Type /plan"));
     s.proposePlan(planText);
-    await until(() => h.all().includes("approve and start"));
+    await until(() => h.term.view().includes("of 201"));
     h.type("\x1b[6~");
-
     await until(() => h.term.view().includes("Plan line 030 "));
     h.type("\x1b[B");
     await sleep(50);
@@ -83,6 +85,24 @@ describe("a card taller than the terminal", () => {
     h.type("a");
     await until(() => s.planResponses.length === 1);
     expect(s.planResponses[0]).toEqual({ action: "approve", mode: "watch" });
+  });
+});
+
+describe("Last", () => {
+  test("shows only the last rows of tall content", async () => {
+    const h = makeHarness(60, 20);
+    const app = render(
+      <Last max={3}>
+        {Array.from({ length: 10 }, (_, i) => (
+          <Text key={i}>{`row ${i + 1}`}</Text>
+        ))}
+      </Last>,
+      { stdout: h.stdout, stdin: h.stdin, patchConsole: false },
+    );
+    await sleep(100);
+    const view = h.term.lines();
+    app.unmount();
+    expect(view).toEqual(["row 8", "row 9", "row 10"]);
   });
 });
 
@@ -177,6 +197,33 @@ describe("bottom of the terminal", () => {
       atBottom(h, rows - 10);
     });
   }
+
+  test("five turns with cards append in place: no clear, no jump to the top, the scrollback keeps its order", async () => {
+    const { h, s } = start(100, 40);
+    await until(() => h.term.view().includes("Type /plan"));
+    await sleep(100);
+    const from = h.frames.length;
+    for (let i = 1; i <= 5; i++) {
+      h.type(`message ${i}`);
+      await sleep(40);
+      h.type("\r");
+      await until(() => h.term.view().includes("Permission needed: run_script"));
+      h.type("y");
+      await until(() => h.term.view().includes("a number answers at once"));
+      h.type("1");
+      await until(() => s.record.entries(["answer"]).length === i && !s.busy);
+      await sleep(100);
+    }
+    const out = h.frames.slice(from).join("");
+    expect(out).not.toMatch(/\x1b\[[23]J/);
+    expect(out).not.toMatch(/\x1b\[(\d*;\d*)?H/);
+    const lines = h.term.lines();
+    const at = [1, 2, 3, 4, 5].map((i) => lines.findIndex((l) => l === `> message ${i}`));
+    expect(at.every((x) => x >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    for (let i = 1; i <= 5; i++) once(lines, `> message ${i}`);
+    expect(lines.filter((l) => l.includes("14 features differ between endo and epi at AUC 0.7."))).toHaveLength(5);
+  });
 
   test("the input box keeps its row when the status line comes and goes", async () => {
     const { h, s } = start(100, 40);
