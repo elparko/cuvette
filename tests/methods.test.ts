@@ -29,7 +29,7 @@ const METRICS = {
 
 async function finished(): Promise<Session> {
   const p = new FakeProvider([
-    { calls: [{ name: "clarify", args: { found: "I see one image with about 60 dark particles.", questions: [{ question: QUESTION, options: ["One dark spot", "One cluster"] }] } }] },
+    { calls: [{ name: "inspect_data", args: { path: join(__dirname, "fixtures/lab") } }, { name: "clarify", args: { found: "I see one image with about 60 dark particles.", questions: [{ question: QUESTION, options: ["One dark spot", "One cluster"] }] } }] },
     { calls: [{ name: "plan", args: METRICS }] },
     { calls: [{ name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 8 } }] },
     { text: "The count is done." },
@@ -86,7 +86,7 @@ test("a new session from a method shows the questions pre-answered and still dem
   first.saveMethod("particles");
   const data = mkdtempSync(join(tmpdir(), "ga-new-data-"));
   const p = new FakeProvider([
-    { calls: [{ name: "clarify", args: { found: "I see 12 images." } }] },
+    { calls: [{ name: "inspect_data", args: { path: join(__dirname, "fixtures/lab") } }, { name: "clarify", args: { found: "I see 12 images." } }] },
     { calls: [{ name: "plan", args: { restatement: "You want: the number of particles in each image.", steps: [{ step: "Count the particles", tool: "count", settings: [{ key: "min_size", label: "Smallest particle" }] }] } }] },
     { calls: [{ name: "count", args: { input: data, method: "Otsu", min_size: 8 } }] },
     { text: "I wait for the demonstration." },
