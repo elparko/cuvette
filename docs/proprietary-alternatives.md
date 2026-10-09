@@ -74,8 +74,15 @@ of each package. The sources are at the end.
 
 | Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
 | --- | --- | --- | --- | --- | --- |
-| FlowJo | FlowJo LLC (BD, then Waters), commercial | Gating and population statistics. The usual flow program in most labs. | FlowKit (BSD-3, reads FlowJo `.wsp`); flowCore (Artistic-2.0); CytoML (AGPL-3) | `flowkit` | Covered. |
+| FlowJo | FlowJo LLC (BD, then Waters), commercial | Gating and population statistics. The usual flow program in most labs. | FlowKit (BSD-3, reads FlowJo `.wsp`); flowCore (Artistic-2.0); CytoML (AGPL-3) | `flowkit`, `flowcore` | Covered for gates from a workspace (`flowkit`). `flowcore`: spillover matrix from single-stain controls, percent positive and MFI from cutoffs, group tests. Automated gates (openCyto, flowDensity) are open. |
 | FCS Express | De Novo Software (Dotmatics), commercial | Flow and image cytometry. | FlowKit (BSD-3); flowCore (Artistic-2.0); FlowSOM (GPL-2 or later) | `flowkit` | Partial. Clustering of high-dimensional data is open. |
+
+## Microbiology susceptibility testing
+
+| Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
+| --- | --- | --- | --- | --- | --- |
+| Vitek 2 and Sensititre software, BioMerieux and Thermo Fisher | commercial, tied to the instrument | MIC reading, S, I, R by the breakpoint table in the instrument. | R AMR (GPL-2 or later); WHONET (free, closed) | `amr` | Partial. S, I, R from a MIC table by EUCAST or CLSI tables of 2011 to 2025, MIC50, MIC90 and percent susceptible with a 95% interval. Reading the plate or the disk zone is open. Disk diffusion and time-kill curves are open. |
+| Excel for MIC50 and MIC90 | Microsoft, commercial | Sorted MIC lists and percent susceptible. | R AMR (GPL-2 or later) | `amr` | Covered. |
 
 ## Omics and pathway analysis
 

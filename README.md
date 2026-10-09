@@ -354,6 +354,8 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `mofa` | MOFA+ (mofapy2) | Python library | multi-omics factor analysis |
 | `metabolomics-stats` | R ropls | R scripts | metabolite feature tables: normalization, PCA, PLS-DA, OPLS-DA, univariate tests |
 | `chromatography` | hplc-py | Python library | chromatogram peaks |
+| `flowcore` | flowCore | R scripts | flow cytometry: spillover from single-stain controls, percent positive and MFI, group tests |
+| `amr` | AMR | R scripts | MIC tables: EUCAST and CLSI S, I, R, MIC50 and MIC90 |
 | `openbabel` | Open Babel | command line | chemistry |
 | `onboarding` | the onboarding tools | MCP; used by `cuvette onboard` | any |
 
