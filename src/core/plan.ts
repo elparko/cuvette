@@ -78,7 +78,7 @@ export function readPlan(a: Record<string, unknown>, statusDefault = true): Part
   if (a.question) p.question = str(a.question);
   if (a.definitions) p.definitions = objs(a.definitions).map((o) => ({ measure: str(o.measure), definition: str(o.definition) })).filter((d) => d.measure && d.definition);
   if (a.exclusions) p.exclusions = objs(a.exclusions).map((o) => ({ what: str(o.what ?? o.step), effect: str(o.effect) || undefined })).filter((x) => x.what);
-  if (a.pilot && typeof a.pilot === "object" && str((a.pilot as Record<string, unknown>).sample)) {
+  if (a.pilot && typeof a.pilot === "object" && str((a.pilot as Record<string, unknown>).sample) && !/^(no|none|not needed|n\/a)\b/i.test(str((a.pilot as Record<string, unknown>).sample)) && str((a.pilot as Record<string, unknown>).sample).length <= 120) {
     const o = a.pilot as Record<string, unknown>;
     p.pilot = { sample: str(o.sample), shows: list(o.shows) };
   }
@@ -135,6 +135,79 @@ export function programLine(g: PlanProgram): string {
   return `${g.part ? `${g.part}: ` : ""}${g.program && g.program !== g.adapter ? `${g.program} through ${g.adapter}` : g.adapter} (agent)${g.why ? `. ${g.why.replace(/[.\s]+$/, "")}.` : ""}`;
 }
 
+export interface KnownDecision {
+  key: string;
+  label: string;
+  kind: string;
+  choices?: unknown[];
+  default?: unknown;
+  tools: string[];
+  asks?: boolean;
+}
+
+const GENERIC = new Set(["the", "a", "an", "of", "to", "in", "on", "for", "and", "or", "with", "per", "each", "is", "are", "that", "this", "what", "which", "do", "you", "use", "value", "setting", "method", "image", "images", "channel", "cell", "cells", "object", "objects", "group", "groups", "test", "count", "number"]);
+const termsOf = (s: string) => s.toLowerCase().replace(/_/g, " ").split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !GENERIC.has(w)).map((w) => w.replace(/s$/, ""));
+
+export function coerceSetting(d: KnownDecision, value: unknown): { ok: true; value: unknown } | { ok: false } {
+  if (value === undefined || value === null) return { ok: false };
+  const text = String(value).toLowerCase();
+  if (d.choices?.length) {
+    const hit = d.choices.find((c) => text === String(c).toLowerCase()) ?? d.choices.find((c) => new RegExp(`(^|[^a-z0-9])${String(c).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^a-z0-9])`).test(text));
+    return hit === undefined ? { ok: false } : { ok: true, value: hit };
+  }
+  if (/bool/.test(d.kind)) {
+    if (typeof value === "boolean") return { ok: true, value };
+    if (/\b(yes|true|on|paired|exclude|remove|split|assume)\b/.test(text) && !/\b(no|not|false|off|unpaired)\b/.test(text)) return { ok: true, value: true };
+    if (/\b(no|not|false|off|unpaired|keep|none|welch)\b/.test(text)) return { ok: true, value: false };
+    return { ok: false };
+  }
+  if (/int|float|num|real/.test(d.kind)) {
+    if (typeof value === "number") return { ok: true, value };
+    const m = /-?\d+(\.\d+)?/.exec(text);
+    return m ? { ok: true, value: Number(m[0]) } : { ok: false };
+  }
+  return { ok: true, value: typeof value === "string" ? value : JSON.stringify(value) };
+}
+
+export function matchSettings(plan: AnalysisPlan, known: KnownDecision[]): { matched: string[]; added: string[] } {
+  const matched: string[] = [];
+  const added: string[] = [];
+  const all = plan.steps.flatMap((s) => s.decisions ?? []);
+  const taken = new Set(all.map((d) => d.key).filter(Boolean) as string[]);
+  const scores: { d: PlanDecision; k: KnownDecision; score: number }[] = [];
+  for (const d of all) {
+    if (d.key) continue;
+    const words = new Set(termsOf(d.label));
+    for (const k of known) {
+      if (taken.has(k.key)) continue;
+      const score = new Set([...termsOf(k.label), ...termsOf(k.key)].filter((w) => words.has(w))).size;
+      if (score) scores.push({ d, k, score });
+    }
+  }
+  scores.sort((a, b) => b.score - a.score);
+  const used = new Set<PlanDecision>();
+  for (const { d, k, score } of scores) {
+    if (used.has(d) || taken.has(k.key)) continue;
+    if (scores.some((x) => x.d === d && x.k !== k && x.score === score && !taken.has(x.k.key))) continue;
+    const v = coerceSetting(k, d.value);
+    if (d.value !== undefined && !v.ok) continue;
+    d.key = k.key;
+    if (v.ok) d.value = v.value;
+    used.add(d);
+    taken.add(k.key);
+    matched.push(`${d.label} = ${k.key}`);
+  }
+  for (const k of known) {
+    if (taken.has(k.key) || k.default === undefined || k.default === null || k.default === "") continue;
+    const step = plan.steps.find((s) => s.tool && toolWords(s.tool).some((w) => k.tools.includes(w)));
+    if (!step) continue;
+    (step.decisions ??= []).push({ key: k.key, label: k.label, value: k.default, by: "default", ...(k.choices?.length ? { options: k.choices.map(String) } : {}) });
+    taken.add(k.key);
+    added.push(k.key);
+  }
+  return { matched, added };
+}
+
 export function settingsOf(p: Partial<AnalysisPlan>): { step: number; setting: PlanDecision }[] {
   return (p.steps ?? []).flatMap((s, i) => (s.decisions ?? []).map((setting) => ({ step: i + 1, setting })));
 }
@@ -163,7 +236,7 @@ export function planText(p: Partial<AnalysisPlan>, o: PlanTextOptions = {}): str
         const mark = s.status === "done" ? " [done]" : s.status === "skipped" ? " [skipped]" : "";
         const set = (s.decisions ?? []).map((x) => `${n(++item)}${settingLine(x)}`);
         if (view === "compact") {
-          out.push(`${i + 1}. ${s.step}${mark}${set.length ? `: ${set.join(" · ")}` : ""}`);
+          out.push(`${i + 1}. ${set.length ? s.step.replace(/[.:;\s]+$/, "") : s.step}${mark}${set.length ? `: ${set.join(" · ")}` : ""}`);
           if (s.reason) out.push(`   Reason: ${s.reason}`);
           return;
         }

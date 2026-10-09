@@ -29,7 +29,7 @@ import { compareNote, instruction, teachReview, type TeachSummary } from "./mode
 import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
 import { definitionsOf } from "./plan.ts";
-import { goalOnly, settingsOf } from "./plan.ts";
+import { goalOnly, matchSettings, settingsOf, type KnownDecision } from "./plan.ts";
 import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
 import { citationStyle, type CitationStyle } from "./citations.ts";
 import { absentStains, groundQuestions, inspectData, type Inspection } from "./inspect.ts";
@@ -120,6 +120,11 @@ const CLARIFY_SKIP = "No answer. Use your judgment and say what you chose.";
 const SHEET_TITLE = "Sample sheet";
 const PROGRAM_REASON = "chosen by the scientist with /program";
 const CONTINUE = /^(continue|go on|go ahead|proceed|yes|ok|okay|next|carry on)\b[\s\S]{0,40}$/i;
+
+function shortTitle(text: string): string {
+  const first = text.split(/(?<=[?.!])\s/)[0]!.trim();
+  return first.length > 60 ? `${first.slice(0, 57).replace(/\s+\S*$/, "")}...` : first;
+}
 
 function lastSentence(text: string): string {
   const s = text.trim().split(/(?<=[.!?])\s+/).filter(Boolean).at(-1) ?? "";
@@ -256,6 +261,8 @@ export class Session {
   private clarified = false;
   private checked = new Set<string>();
   private sheet?: SampleSheet;
+  private toolsHinted = false;
+  private scientistAsked?: string;
   inspection?: Inspection;
   reference?: Reference;
   private hidden: string[] = [];
@@ -690,6 +697,8 @@ export class Session {
     }
     this.adapters.push(a);
     const added = this.decisions.addAdapter(a, this.setupPreset);
+    const planned = this.activePlan();
+    if (planned && added.length) this.commitSettings(planned);
     this.hooks.add((await a.module()).hooks ?? []);
     if (m.connection.history_tool && !this.tools.has("review_my_steps")) {
       this.tools.set("review_my_steps", this.reviewTool());
@@ -1679,7 +1688,7 @@ export class Session {
         decisionKey: key,
         title: d?.label ?? key,
         text: `${d?.help || `The agent needs a value for "${d?.label ?? key}".`} The agent wants to run ${tool.remoteName ?? tool.name}.`,
-        options: (d?.choices ?? []).map((c) => ({ value: c, label: String(c) })),
+        options: d?.kind === "bool" && !d.choices.length ? [{ value: true, label: "yes" }, { value: false, label: "no" }] : (d?.choices ?? []).map((c) => ({ value: c, label: String(c) })),
         recommendation: hint ? { value: hint.value, reason: `The harness detected it from the files. ${hint.reason}` } : proposed !== undefined ? { value: proposed, reason: "The agent proposed this value in its tool call." } : d?.default !== undefined ? { value: d.default, reason: "This is the adapter default." } : undefined,
         evidence,
         default: d?.default,
@@ -1734,6 +1743,13 @@ export class Session {
     }
     const current = f.set ? f.value : f.default;
     if (current !== undefined && String(current) === String(value)) return { ok: true, summary: `The record already says ${JSON.stringify(current)} for ${f.label}.` };
+    if (this.scientistAsked !== undefined || (this.pilotStage && this.pilotPlan)) {
+      const asked = this.scientistAsked;
+      this.decisions.change(f.key, value, { by: asked !== undefined ? "human" : "agent", reason: asked !== undefined ? `the scientist asked: "${asked}"` : `changed during the demonstration: ${spec.reason}` });
+      const t = this.pilotPlan ? settingsOf(this.pilotPlan.plan).find((x) => x.setting.key === f.key)?.setting : undefined;
+      if (t) Object.assign(t, { value: this.decisions.value(f.key), by: asked !== undefined ? "you" : "agent" });
+      return { ok: true, summary: `${f.label} is now ${JSON.stringify(this.decisions.value(f.key))}. ${asked !== undefined ? "The scientist asked for this change, so no card asks again." : "The scientist sees it on the demonstration card and confirms it there."}` };
+    }
     const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
     let q = this.questions.open().find((x) => x.decisionKey === f.key);
     if (!q) {
@@ -2084,6 +2100,7 @@ export class Session {
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
     this.inspection = undefined;
+    this.toolsHinted = false;
     this.clarified = !this.tools.has("clarify");
     this.modeBefore = this.mode === "plan" ? "watch" : this.mode;
     this.refCandidates = this.findReferenceFiles(request);
@@ -2259,6 +2276,7 @@ export class Session {
   }
 
   private async pilotResult(a: Args): Promise<ToolOutput> {
+    this.scientistAsked = undefined;
     const sample = String(a.sample ?? "").trim();
     if (!sample) return { ok: false, error: "Give the pilot sample." };
     const values: Record<string, number> = {};
@@ -2346,7 +2364,8 @@ export class Session {
     if (r.action === "change") {
       if (r.definition) this.changeDefinition(r.definition);
       this.record.append("pilot_rejected", { run: entry, sample, reason: r.text });
-      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If a definition changes, call plan with the new definition and the reason.` };
+      this.scientistAsked = r.text;
+      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If the change is a setting with a key, call propose_change: the harness applies it at once, with no second card, because the scientist asked for it. If a definition changes, call plan with the new definition and the reason.` };
     }
     return { ok: false, error: "unknown answer" };
   }
@@ -2444,13 +2463,37 @@ export class Session {
       }
   }
 
+  private knownDecisions(plan: AnalysisPlan): KnownDecision[] {
+    const out: KnownDecision[] = [];
+    for (const name of new Set([...this.adapters.map((a) => a.name), ...plannedAdapters(plan)])) {
+      let a: LoadedAdapter | undefined = this.adapters.find((x) => x.name === name);
+      try {
+        a ??= applyOverlay(findAdapter(name, this.cwd));
+      } catch {
+        continue;
+      }
+      for (const d of a.manifest.decisions) {
+        const owner = this.decisions.has(d.key) ? this.decisions.owner(d.key) : d.owner;
+        if (owner !== "human" || !d.links.length || out.some((x) => x.key === d.key)) continue;
+        out.push({ key: d.key, label: d.label, kind: d.kind, choices: d.choices, default: d.default, tools: d.links.map((l) => l.tool.toLowerCase()), asks: d.stage === "when_needed" && !(this.decisions.has(d.key) && this.decisions.isSet(d.key)) });
+      }
+    }
+    return out;
+  }
+
   private commitSettings(plan: AnalysisPlan) {
     const fields = this.decisions.fields();
+    const done = new Set<string>();
     for (const { setting: d } of settingsOf(plan)) {
       const f = d.key ? fields.find((x) => x.key === d.key) : undefined;
-      if (!f || f.owner === "fixed" || d.value === undefined) continue;
+      if (!f || f.owner === "fixed" || d.value === undefined || done.has(f.key)) continue;
+      done.add(f.key);
       if (f.set && JSON.stringify(this.decisions.value(f.key)) === JSON.stringify(d.value)) continue;
-      this.decisions.change(f.key, d.value, { by: f.owner === "agent" ? "agent" : "human", reason: `set in the confirmed analysis (${d.by ?? "agent"})` });
+      try {
+        this.decisions.change(f.key, d.value, { by: f.owner === "agent" ? "agent" : "human", reason: `set in the confirmed analysis (${d.by ?? "agent"})` });
+      } catch (e) {
+        this.notes.push(`The setting ${d.label} = ${JSON.stringify(d.value)} does not fit the decision ${f.key}: ${(e as Error).message}`);
+      }
     }
   }
 
@@ -2519,6 +2562,18 @@ export class Session {
       plan.restatement = g.text;
       if (g.dropped.length) this.notes.push(`The restatement holds only the scientific goal. The harness took out: ${g.dropped.join(" ")} Answer such setup points briefly in your message.`);
     }
+    const known = this.knownDecisions(plan);
+    const m = matchSettings(plan, known);
+    const stepTools = new Set(plan.steps.flatMap((x) => (x.tool ?? "").toLowerCase().split(/[\s,;/()]+/)).filter(Boolean));
+    const keyed = new Set(settingsOf(plan).map((x) => x.setting.key).filter(Boolean));
+    const loose = known.filter((k) => k.asks && !keyed.has(k.key) && !k.tools.some((t) => stepTools.has(t)));
+    if (!this.planUpdate && !this.toolsHinted && loose.length && plannedAdapters(plan).length) {
+      this.toolsHinted = true;
+      const byTool = new Map<string, string[]>();
+      for (const k of loose) for (const t of k.tools) byTool.set(t, [...(byTool.get(t) ?? []), `${k.key} (${k.label}${k.choices?.length ? `: ${k.choices.map(String).join(", ")}` : ""}${k.default !== undefined ? `; default ${JSON.stringify(k.default)}` : ""})`]);
+      return { ok: false, error: `Name the tool of each step (the tool field) and give the settings of that tool with their keys, so that the run asks nothing again. The harness fills the ones you leave out with their defaults. Tools of the planned programs and their settings: ${[...byTool].map(([t, ks]) => `${t}: ${ks.join("; ")}`).join(". ")}. Then call plan again.` };
+    }
+    if (m.added.length) this.notes.push(`The harness added the settings ${m.added.join(", ")} of the planned programs with their default values. The scientist sees them in the card.`);
     this.fillDecisions(plan);
     if (this.sheet && !this.planUpdate) this.planFromSheet(plan);
     for (const g of plan.programs ?? []) g.program ??= this.adapterList().find((x) => x.name === g.adapter)?.program;
@@ -2645,7 +2700,8 @@ export class Session {
               properties: {
                 question: { type: "string" },
                 options: { type: "array", items: { type: "string" }, description: "Options from the data: the real channel names, groups, folders or columns that inspect_data found." },
-                recommendation: { type: "string" },
+                label: { type: "string", description: "A short name of 1 to 4 words for the answer line, for example One n or Positive cell." },
+                recommendation: { type: "string", description: "One of the options, word for word." },
                 key: { type: "string", description: "The decision key, if the decision record has one for this meaning, for example replicate." },
                 answered_by_request: { type: "string", description: "If the request already answers this question, quote it here. The harness then skips the question." },
               },
@@ -2666,7 +2722,7 @@ export class Session {
     if (!this.planning || this.planUpdate) return { ok: false, error: "clarify is for the start of a new request, before the proposed metrics." };
     if (!this.inspection) return { ok: false, error: "Look at the data first: call inspect_data on the data folder or file of the request (or . for the project folder). Then call clarify, with questions that fit what you found." };
     let found = String(a.found ?? "").trim();
-    const wrong = absentStains(found, this.inspection);
+    const wrong = absentStains(found, this.inspection, true);
     if (!found || wrong.length) {
       if (found) this.record.append("clarify", { action: "found_replaced", phase: "Questions", found, reason: `The data has no ${wrong.join(" or ")} channel or stain.` });
       found = this.inspection.summary;
@@ -2674,12 +2730,12 @@ export class Session {
     const raw = (Array.isArray(a.questions) ? a.questions : []).filter((q: any) => q && typeof q.question === "string" && q.question.trim());
     const skipped: string[] = [];
     const technical: string[] = [];
-    const kept: { question: string; options: string[]; recommendation?: string; key?: string }[] = [];
+    const kept: { question: string; label?: string; options: string[]; recommendation?: string; key?: string }[] = [];
     for (const q of raw as any[]) {
       const text = String(q.question).trim();
       if (typeof q.answered_by_request === "string" && q.answered_by_request.trim()) skipped.push(`${text} The request says: ${q.answered_by_request.trim()}`);
       else if (TECHNICAL.test(text)) technical.push(text);
-      else kept.push({ question: text, options: Array.isArray(q.options) ? q.options.map(String) : [], recommendation: q.recommendation ? String(q.recommendation) : undefined, key: q.key ? String(q.key) : undefined });
+      else kept.push({ question: text, label: q.label ? String(q.label).trim() : undefined, options: Array.isArray(q.options) ? q.options.map(String) : [], recommendation: q.recommendation ? String(q.recommendation) : undefined, key: q.key ? String(q.key) : undefined });
     }
     const fromMethod = new Set<string>();
     if (this.method?.questions.length) {
@@ -2711,7 +2767,8 @@ export class Session {
       const f = q.key ? fields.find((x) => x.key === q.key && x.owner === "human") : undefined;
       const options = (q.options.length ? q.options : (f?.choices ?? []).map(String)).map((o) => ({ value: o, label: o }));
       const text = fromMethod.has(q.question) ? `${q.question} The method ${this.method!.name} answers: ${String(q.recommendation).replace(/[.\s]+$/, "")}. Confirm it, or choose another answer for the new data.` : q.question;
-      const asked1 = await this.questions.ask({ decisionKey: f?.key ?? "", title: q.question.length > 80 ? q.question.slice(0, 77) + "..." : q.question, text, options, recommendation: q.recommendation ? { value: q.recommendation, reason: "" } : undefined, evidence: "" });
+      const rec = q.recommendation ? (options.find((o) => o.label.toLowerCase() === q.recommendation!.toLowerCase())?.value ?? (options.length ? undefined : q.recommendation)) : undefined;
+      const asked1 = await this.questions.ask({ decisionKey: f?.key ?? "", title: shortTitle(q.label || q.question), text, options, recommendation: rec !== undefined ? { value: rec, reason: "" } : undefined, evidence: "" });
       qs.push({ qid: asked1.qid, question: q.question, key: q.key });
     }
     if (refAsked) {

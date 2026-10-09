@@ -39,8 +39,11 @@ export const STAINS: { color: string; rx: RegExp }[] = [
   { color: "red", rx: /\b(?<!far[- ])(red|rfp|mcherry|tritc|texas red|alexa ?(568|594))\b/i },
 ];
 
-export function absentStains(text: string, insp: Inspection): string[] {
+const NEGATED = /\b(no|not|without|lacks?|missing|absent)\b[^.?!;:()]{0,60}/gi;
+
+export function absentStains(text: string, insp: Inspection, negationOk = false): string[] {
   if (!insp.images_seen) return [];
+  if (negationOk) text = text.replace(NEGATED, " ");
   const present = new Set(insp.colors);
   if (insp.kinds.includes("fluorescence") && !insp.colors.length) return [];
   return [...new Set(STAINS.filter((s) => !present.has(s.color) && s.rx.test(text)).map((s) => s.color))];

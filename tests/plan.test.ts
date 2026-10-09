@@ -136,3 +136,30 @@ test("the review flags a reported measure that has no definition in the answer",
   expect(definitionFindings(r, "Set 1 has 296 positive cells (a positive cell has at least 1 red pixel inside its outline).")).toEqual([]);
   expect(definitionFindings(r, "The mean is 3.")).toEqual([]);
 });
+
+test("settings with free labels get the decision key of the planned program, with the value in the decision's terms; a named tool's other settings come in with their defaults", async () => {
+  const { matchSettings, coerceSetting } = await import("../src/core/plan.ts");
+  const known = [
+    { key: "threshold_method", label: "Threshold method", kind: "choice", choices: ["otsu", "li", "triangle"], default: "otsu", tools: ["threshold_image", "count_objects"] },
+    { key: "min_object_size", label: "Smallest object to count (pixels)", kind: "int", default: 0, tools: ["label_objects"] },
+    { key: "split_touching", label: "Split touching objects with a watershed", kind: "bool", default: false, tools: ["label_objects"] },
+    { key: "exclude_border_objects", label: "Remove objects that touch the image border", kind: "bool", default: false, tools: ["label_objects"] },
+  ];
+  const plan = readPlan({
+    steps: [
+      { step: "Outline the cells", tool: "threshold_image", settings: [{ label: "cell threshold on CH1", value: "Otsu on a smoothed image", by: "agent" }] },
+      { step: "Label the cells", tool: "label_objects", settings: [{ label: "cell size limits", value: "30 to 400 px", by: "agent" }, { label: "watershed split", value: "yes", by: "agent" }] },
+    ],
+  }) as AnalysisPlan;
+  const r = matchSettings(plan, known);
+  expect(r.matched.sort()).toEqual(["cell size limits = min_object_size", "cell threshold on CH1 = threshold_method", "watershed split = split_touching"]);
+  expect(r.added).toEqual(["exclude_border_objects"]);
+  expect(plan.steps.flatMap((s) => (s.decisions ?? []).map((d) => [d.key, d.value, d.by]))).toEqual([
+    ["threshold_method", "otsu", "agent"],
+    ["min_object_size", 30, "agent"],
+    ["split_touching", true, "agent"],
+    ["exclude_border_objects", false, "default"],
+  ]);
+  expect(coerceSetting(known[0]!, "Yen")).toEqual({ ok: false });
+  expect(coerceSetting({ key: "paired", label: "Paired test", kind: "bool", tools: [] }, "paired t test")).toEqual({ ok: true, value: true });
+});

@@ -1321,3 +1321,36 @@ test("the four stages in order: Questions (meaning only), Proposed metrics (pre-
   const runQuestions = session.record.entries(["question"]).filter((e) => e.data.decisionKey === "method" || e.data.decisionKey === "min_size");
   expect(runQuestions).toHaveLength(0);
 });
+
+test("settings of a program that loads after the confirmation count at run time: the harness asks for the tools once, keys the settings, and no card asks again", async () => {
+  const cwd = pickCwd();
+  const loose = { programs: [{ part: "Counting", adapter: "lab", why: "It counts particles." }], steps: [{ step: "Count the particles" }] };
+  const named = { ...loose, steps: [{ step: "Count the particles", tool: "count", settings: [{ label: "Threshold method", value: "Triangle", by: "agent" }] }] };
+  const provider = new FakeProvider([
+    CLARIFY,
+    { calls: [{ name: "plan", args: loose }] },
+    { calls: [{ name: "plan", args: named }] },
+    { calls: [{ name: "use_adapter", args: { name: "lab", reason: "The plan names it." } }] },
+    { calls: [{ name: "count", args: { input: "/data/a.lab" } }] },
+    { text: "There are 66 particles (step 1)." },
+    { text: "There are 66 particles (step 1)." },
+  ]);
+  session = await Session.create({ adapters: [], provider, cwd, interactive: true });
+  session.decisions.applySetup({ question: "How many particles?" });
+  const cards: { settings?: { label: string; key?: string; value?: unknown; by?: string }[] }[] = [];
+  session.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, e.question.options[0]?.value ?? "x"), 0);
+    if (e.type === "plan") {
+      cards.push({ settings: e.settings });
+      setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+    }
+  });
+  await session.send("Count the particles in /data/a.lab");
+  const plans = session.record.entries(["tool_result"]).filter((e) => e.data.tool === "plan");
+  expect(String(plans[0]!.data.error)).toMatch(/^Name the tool of each step .*Tools of the planned programs and their settings: count: method \(Threshold method: Default, Otsu, Triangle\)\. Then call plan again\.$/);
+  expect(cards[0]!.settings!.map((x) => [x.label, x.key, x.value, x.by])).toEqual([["Threshold method", "method", "Triangle", "agent"], ["Smallest particle", "min_size", 5, "default"]]);
+  expect(session.record.entries(["question"]).filter((e) => e.data.decisionKey && e.data.decisionKey !== "")).toHaveLength(0);
+  expect(session.decisions.value("method")).toBe("Triangle");
+  expect(session.decisions.value("min_size")).toBe(5);
+  expect(session.record.nodes().find((n) => n.tool === "count")!.decisions).toMatchObject({ method: "Triangle", min_size: 5 });
+});
