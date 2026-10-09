@@ -113,6 +113,28 @@ The script prints the size of each part.
 
 The build is for Apple silicon (arm64) only. macOS 13.5 or later.
 
+Sizes of build 0.1.0 (MiB):
+
+| Part | Size |
+| --- | --- |
+| Cuvette.app | 68.4 |
+| Node binary (`Contents/MacOS/node`) | 58.7 |
+| Shell (`Contents/MacOS/cuvette`) | 4.4 |
+| Core (`Contents/Resources/core`: bundle 2.8, catalog, sample) | 5.1 |
+| Disk image (.dmg, LZMA) | 17.2 |
+
+With the official Node binary, Cuvette.app is 102.7 MiB and the disk image is 26.7 MiB.
+
+Memory after the start, idle on the start page (RSS, measured with `ps`):
+
+| Process | RSS (MB) |
+| --- | --- |
+| Shell (`cuvette`) | 72 to 78 |
+| Sidecar (`node`) | 170 to 186 (footprint 120 to 138) |
+| WebKit helpers (GPU, Networking, 2 or 3 WebContent) | 16 to 37 each, about 150 in total |
+
+The sidecar alone, before the page loads, uses 77 MB RSS (44 MB footprint).
+
 `npm run desktop:dev` starts the shell in debug mode. The debug shell runs the sidecar from the
 source with `node --import tsx desktop/sidecar/main.ts`, so a change in `src/` shows after a
 reload (Command-R) or a restart.
