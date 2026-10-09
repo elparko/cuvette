@@ -203,7 +203,7 @@ test("a project setting for the output folder wins over a user setting", async (
   session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.folderLine).toBe(`Results go to ${user}/<date>-<title>/`);
   await session.close();
-  mkdirSync(join(cwd, ".ga"));
+  mkdirSync(join(cwd, ".cuvette"));
   writeFileSync(join(cwd, ".cuvette", "settings.json"), JSON.stringify({ output_folder: "project-results" }));
   trustFolder(cwd);
   session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd, settings: { guidance: false, referee: "none" } });

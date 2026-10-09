@@ -127,7 +127,7 @@ export function uvCommand(home: string, name: string): string {
 }
 
 export function rLibrary(env: Record<string, string | undefined>, home = homedir()): string {
-  const cand = [env.CUVETTE_R_LIBS, env.R_LIBS_USER, "/Volumes/T7/guided-analysis/tools/R-library", join(home, ".cuvette", "R-library"), join(home, ".cuvette", "R-library")].filter((x): x is string => !!x);
+  const cand = [env.CUVETTE_R_LIBS, env.R_LIBS_USER, "/Volumes/T7/guided-analysis/tools/R-library", join(home, ".cuvette", "R-library"), join(home, ".guided-analysis", "R-library")].filter((x): x is string => !!x);
   return cand.find((c) => existsSync(c)) ?? join(home, ".cuvette", "R-library");
 }
 
@@ -181,7 +181,7 @@ function envOf(path: string | undefined, home: string): string | undefined {
 
 export function envNameIn(m: Manifest): string | undefined {
   for (const p of m.locate.paths) {
-    const hit = /\.cuvette\/envs\/([^/]+)\/bin\/python$/.exec(p);
+    const hit = /\.(?:cuvette|guided-analysis)\/envs\/([^/]+)\/bin\/python$/.exec(p);
     if (hit) return hit[1];
   }
   return undefined;

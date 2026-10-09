@@ -2,11 +2,12 @@ import { execFile } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { homeFolder } from "../../src/core/old-names.ts";
 import { startApp } from "../../src/server/app.ts";
 
 const MARK = "__CUVETTE_PATH__";
 const home = homedir();
-const CACHE = join(home, ".guided-analysis", "desktop-path.txt");
+const CACHE = join(homeFolder(home), "desktop-path.txt");
 
 function loginPath(): Promise<string> {
   return new Promise((done) => {

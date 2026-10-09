@@ -40,7 +40,7 @@ test("the sanitizer removes local paths, keys, addresses and host names", () => 
   const text = [
     "/Volumes/T7/guided-analysis/data/p/a.csv",
     "/Volumes/T7/guided-analysis/tools/bench-runs/d/claude/p/run1/home/sessions/s1/work/x.csv",
-    "/Volumes/T5/cuvette/data/p/a.csv",
+    "/Volumes/T5/guided-analysis/data/p/a.csv",
     "/Users/someone/Code/guided-analysis/catalog/biostats",
     "/Users/someone/notes.txt",
     "key sk-ant-api03-abcdefghijklmnop",

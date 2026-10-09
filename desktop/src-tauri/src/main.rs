@@ -90,7 +90,9 @@ async fn save_file(window: WebviewWindow, request: Request<'_>) -> Result<Option
 
 fn log_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    Path::new(&home).join(".guided-analysis/logs/desktop.log")
+    let home = Path::new(&home);
+    let dir = if !home.join(".cuvette").exists() && home.join(".guided-analysis").exists() { ".guided-analysis" } else { ".cuvette" };
+    home.join(dir).join("logs/desktop.log")
 }
 
 fn start_core(app: &AppHandle, folder: Option<&str>) -> std::io::Result<Child> {

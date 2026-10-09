@@ -138,7 +138,7 @@ test("/permissions turns bypass on and off and the record shows each change", as
 
 test('the settings file can say "permissions": "bypass"', () => {
   const cwd = mkdtempSync(join(tmpdir(), "cuvette-perm-cwd-"));
-  mkdirSync(join(cwd, ".ga"));
+  mkdirSync(join(cwd, ".cuvette"));
   writeFileSync(join(cwd, ".cuvette", "settings.json"), JSON.stringify({ permissions: "bypass" }));
   writeFileSync(join(cwd, ".cuvette", "settings.local.json"), JSON.stringify({ permissions: { "run_command:rm *": "deny" } }));
   expect(loadSettings(cwd).permissionMode).toBe("ask");

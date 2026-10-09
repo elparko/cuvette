@@ -4,7 +4,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const SKIP = new Set(["scripts/rename-to-cuvette.mjs", "src/core/old-names.ts", "tests/old-names.test.ts"]);
+const SKIP = new Set(["scripts/rename-to-cuvette.mjs", "src/core/old-names.ts", "tests/old-names.test.ts", "tests/config.test.ts", "tests/trust.test.ts"]);
 const TEXT = /\.(ts|tsx|mjs|js|py|R|sh|ya?ml|md|groovy|html)$/;
 const CODE = /\.(ts|tsx|mjs|js|py)$/;
 
@@ -63,7 +63,7 @@ const PROSE = [
 ];
 
 // Real folders that keep their names: the source folder and the T7 data drive.
-const KEEP = ["Code/guided-analysis", "Code-guided-analysis", "T7/guided-analysis", 'T7, "guided-analysis'];
+const KEEP = ["Code/guided-analysis", "Code-guided-analysis", "T7/guided-analysis", 'T7, "guided-analysis', "T5/guided-analysis", "\\/guided-analysis", "(guided-analysis|cuvette)", 'join(homedir(), ".guided-analysis")', "(?:cuvette|guided-analysis)", '"R-library"), join(home, ".guided-analysis", "R-library")'];
 
 const COMMANDS = "\\[|-|\\(|<|adapters?\\b|onboard\\b|models\\b|spend\\b|key\\b|eln\\b|sessions\\b|export\\b|replay\\b|run-step\\b|questions\\b|bench\\b|mcp\\b|app\\b|terminal\\b|tools\\b|doctor\\b|programs\\b|open\\b|resume\\b|install-|uninstall-|trust\\b|config\\b|method\\b|databook\\b|status\\b|compare\\b|learn\\b|run\\b|again\\b|asks\\b";
 const GA_CMD = new RegExp(`(?<![\\w./@$-])ga(?= (?:${COMMANDS}))`, "g");
@@ -115,6 +115,7 @@ function renameText(text, file) {
     .map((line) => renameLine(line, file))
     .join("\n");
   t = t.replace(/\bgaHome\b/g, "cuvetteHome");
+  if (file.startsWith("tests/")) t = t.replace(/"\.ga"/g, '".cuvette"').replace(/\.ga\//g, ".cuvette/").replace(/\\\.ga\\\//g, "\\.cuvette\\/");
   t = t.replace(/\bGaPaths\b/g, "CuvettePaths").replace(/\bgaPaths\b/g, "cuvettePaths");
   t = t.replace(/(?<=\w)\.ga\b(?![\w/])/g, ".cuvette").replace(/(?<!\w)\$GA\b/g, "$CUVETTE_JS").replace(/\bGA=(?=\$\{sq|')/g, "CUVETTE_JS=");
   t = t.replace(/join\(cwd, "\.ga", /g, 'join(cwd, ".cuvette", ');

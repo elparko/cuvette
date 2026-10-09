@@ -131,10 +131,10 @@ test("typing filters the rows by label and help, and Esc clears the search first
 
 test("a project file badge names the file, and a model choice shows its price", async () => {
   const { h, s } = await open();
-  mkdirSync(join(s.cwd, ".ga"), { recursive: true });
-  writeFileSync(join(s.cwd, ".ga", "settings.local.json"), JSON.stringify({ openImages: "off" }));
+  mkdirSync(join(s.cwd, ".cuvette"), { recursive: true });
+  writeFileSync(join(s.cwd, ".cuvette", "settings.local.json"), JSON.stringify({ openImages: "off" }));
   await key(h, DOWN);
-  await until(() => /Open QC images\s+off\s+Project · \.ga\/settings\.local\.json/.test(h.last()));
+  await until(() => /Open QC images\s+off\s+Project · \.cuvette\/settings\.local\.json/.test(h.last()));
   await key(h, "\x1b[A");
   await key(h, "\r");
   await until(() => h.last().includes("$4 in, $20 out per million tokens"));
