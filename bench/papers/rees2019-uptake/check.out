@@ -1,0 +1,7 @@
+CellProfiler 2016-03-02T21:08:37 1b13225
+field 1 (Image01.lsm): {'nuclei': 229, 'cells': 222, 'nlv': 189, 'nlv_in_cells': 158, 'positive': 102}, NLV per cell 0.7117, fraction with NLV 0.4595
+field 2 (Image02.lsm): {'nuclei': 216, 'cells': 215, 'nlv': 141, 'nlv_in_cells': 119, 'positive': 83}, NLV per cell 0.5535, fraction with NLV 0.3860
+field 3 (Image03.lsm): {'nuclei': 137, 'cells': 135, 'nlv': 131, 'nlv_in_cells': 110, 'positive': 65}, NLV per cell 0.8148, fraction with NLV 0.4815
+three fields: {'nuclei': 582, 'cells': 572, 'nlv': 461, 'nlv_in_cells': 387, 'positive': 250}
+NLV per cell 0.6766; fraction of cells with at least one NLV 0.4371
+thresholds: nuclei [0.1, 0.1, 0.1] cells [0.05, 0.05, 0.05] ThreshNLV Otsu [0.0128, 0.014, 0.0134] NLV [0.075, 0.075, 0.075]

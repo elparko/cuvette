@@ -1,7 +1,7 @@
 adapter:
   name: image-assays
   title: Bench image assays
-  version: 0.1.0
+  version: 0.1.2
   spec: "1"
   description: >
     Measures bench image assays with scikit-image and SciPy. It counts colonies on plates and
@@ -310,6 +310,30 @@ decisions:
     links:
       - { tool: count_cell_uptake, arg: nucleus_max_diameter }
 
+  - key: nucleus_smoothing
+    label: Blur before splitting touching nuclei (pixels, 0 = automatic)
+    kind: float
+    default: 0
+    lo: 0
+    group: Uptake
+    help: A larger blur merges the bright spots inside one nucleus, so the tool does not cut it in two. 0 uses a quarter of the smallest nucleus.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: nucleus_smoothing }
+
+  - key: nucleus_min_distance
+    label: Smallest distance between two nucleus centers (pixels, 0 = automatic)
+    kind: float
+    default: 0
+    lo: 0
+    group: Uptake
+    help: Two intensity peaks closer than this stay in one nucleus. 0 uses half the smallest nucleus.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: nucleus_min_distance }
+
   - key: cell_threshold
     label: Cell threshold (method name or a number)
     kind: text
@@ -322,16 +346,28 @@ decisions:
       - { tool: count_cell_uptake, arg: cell_threshold }
 
   - key: cell_expand
-    label: Cell growth from the nucleus (pixels)
+    label: Cell growth from the nucleus in expand mode (pixels)
     kind: float
-    default: 0
+    default: 10
     lo: 0
     group: Uptake
-    help: In expand mode, the distance each nucleus grows to make the cell. In membrane mode, the largest growth allowed. 0 in membrane mode sets no limit.
+    help: In expand mode, the distance that each nucleus grows to make the cell. Use about the cytoplasm width around a nucleus.
     owner: human
     stage: when_needed
     links:
       - { tool: count_cell_uptake, arg: cell_expand }
+
+  - key: cell_max_growth
+    label: Largest cell growth in membrane mode (pixels, 0 = no limit)
+    kind: float
+    default: 0
+    lo: 0
+    group: Uptake
+    help: In membrane mode, cells stop at this distance from the nucleus. 0 lets cells grow to the edge of the membrane stain.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: cell_max_growth }
 
   - key: cargo_threshold
     label: Cargo threshold (method name or a number)
@@ -353,6 +389,18 @@ decisions:
       tool: count_cell_uptake
       compare: [metrics.fraction_positive, metrics.mean_cargo_per_cell]
       max_runs: 3
+
+  - key: cargo_smoothing
+    label: Blur of the cargo channel before the threshold (pixels)
+    kind: float
+    default: 0
+    lo: 0
+    group: Uptake
+    help: A small blur removes single noisy pixels above the threshold. It can also join two close cargo objects. 0 turns it off.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: count_cell_uptake, arg: cargo_smoothing }
 
   - key: cargo_min_area
     label: Smallest cargo object (pixels)
@@ -522,7 +570,8 @@ tools:
       split_nuclei: { type: boolean, default: true, description: True to split touching nuclei at intensity peaks. }
       nucleus_smoothing: { type: number, minimum: 0, default: 0, description: "Blur before the tool splits touching nuclei, in pixels. 0 means a quarter of the smallest nucleus." }
       nucleus_min_distance: { type: number, minimum: 0, default: 0, description: "Smallest distance between two nucleus centers, in pixels. 0 means half the smallest nucleus." }
-      cell_expand: { type: number, minimum: 0, default: 0, description: "Growth of each nucleus, in pixels. In membrane mode it is the largest growth; 0 sets no limit." }
+      cell_expand: { type: number, minimum: 0, default: 10, description: "For expand mode. Growth of each nucleus into a cell, in pixels." }
+      cell_max_growth: { type: number, minimum: 0, default: 0, description: "For membrane mode. Largest distance of a cell edge from its nucleus, in pixels. 0 means no limit." }
       cell_threshold: { type: [string, number], default: otsu, description: "Method name or a number in raw intensity units of the cell channel." }
       cell_polarity: { type: string, enum: [bright, dark], default: bright, description: "For threshold and texture modes. Bright keeps pixels above the threshold." }
       cell_min_diameter: { type: number, minimum: 0, default: 0, description: "Smallest cell, in pixels across." }
@@ -616,6 +665,7 @@ map:
       - { arg: nucleus_threshold, label: Nucleus threshold method or value, ui_default: Default }
       - { arg: cell_mode, label: How cells are drawn }
       - { arg: cell_expand, label: Enlarge (pixels) }
+      - { arg: cell_max_growth, label: Largest growth in membrane mode (pixels) }
       - { arg: cargo_threshold, label: Cargo threshold method or value, ui_default: Default }
       - { arg: positivity_rule, label: Positive cell rule }
       - { arg: positivity_min, label: Smallest value for a positive cell }

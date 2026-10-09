@@ -1,0 +1,20 @@
+tool: scikit-image count_colonies, through the image-assays adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/makrai2023-colonies/plates
+decisions:
+  colony_channel: green
+  colony_polarity: bright
+  colony_threshold: triangle
+  colony_min_diameter: 20
+  colony_max_diameter: 250
+  colony_min_roundness: 0.6
+  rim_margin: 0.06
+  colony_background_radius: 50
+  split_touching_colonies: true
+expected:
+  - {description: "photos", value: 6, tolerance: 0, source: "data set"}
+  - {description: "colonies, six photos", value: 88, tolerance: 9, source: "images.xls, number of CFUs (hand annotation)"}
+notes: |
+  The settings came from a pilot on sp14_img07 to sp14_img12 (tool 130, printed 139) before the test photos ran.
+  The first run of the test photos with these settings gave 15, 14, 12, 17, 16, 14 (total 88).

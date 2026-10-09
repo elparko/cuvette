@@ -8,6 +8,16 @@ authors deposited with the images.
 The search used Europe PMC full text, the BioImage Archive, Zenodo, figshare, Dryad, the Broad
 Bioimage Benchmark Collection (BBBC) and the Image Data Resource (IDR).
 
+## Outcome
+
+| Flow | Built | Benchmark paper | Blind Claude Haiku run |
+| --- | --- | --- | --- |
+| Colony counting and clonogenic survival | `image-assays`: count_colonies, clonogenic_survival | `makrai2023-colonies` | Pass: 88 colonies against 88 printed (computed 2/2, reported 1/1) |
+| Colocalization | `image-assays`: measure_colocalization | `manders1993-coloc` | Pass: Pearson 0.721, 0.443, 0.164 against 0.72, 0.44, 0.16 (computed 6/6, reported 5/5) |
+| Uptake, phagocytosis and efferocytosis index, nuclei counts | `image-assays`: count_cell_uptake | `rees2019-uptake` | Pass: nuclei 566 against 582, vesicles 448 against 461, 0.769 vesicles per cell against 0.677, 50.1 percent positive against 43.7 (computed 6/6, reported 5/5). The cell count is a reference item that differs (459 against 572). |
+| Western blot densitometry | Not built | None reproduces (see below) | - |
+| Scratch assay | Not built | None found (see below) | - |
+
 ## Shortlist
 
 ### 1. Western blot and gel densitometry
@@ -22,6 +32,7 @@ Bioimage Benchmark Collection (BBBC) and the Image Data Resource (IDR).
 | Proprietary equivalent | Bio-Rad Image Lab (Lanes and Bands, Volume Tools), Cytiva ImageQuant TL (1D gel analysis) |
 | Open-source tool | Fiji Gel Analyzer (GPL-3). Fiji: Schindelin J et al. 2012, DOI 10.1038/nmeth.2019. Rolling-ball background: Sternberg SR 1983, DOI 10.1109/MC.1983.1654163 |
 | Plan | New tool `measure_blot_bands` in a new adapter (see "Build plan"). Lane profiles from the lane boxes, rolling-ball or baseline background, band volume per lane, ratio to the loading control, fold change against a reference lane. |
+| Result | Rejected after a test. The deposited TIFF files are 8-bit RGBA copies, not the raw imager files. Lane profiles with a straight baseline on replicate 1 (NQO1) give the control lanes within 10 percent of the printed ratios (DMSO 1.50 against 1.445, OMAV 100 nM 4.56 against 4.26, OMAV 200 nM 6.42 against 5.95), but the SMA lanes differ by up to 3.5 times (OMAV 200 nM 5.45 against 1.29 relative to the control untreated lane). Replicate 2 shows the same: the SMA OMAV bands look as dark as the control bands, but the sheet prints a fifth of the control value. The SMN control bands are saturated (pixel value 0). The printed values must come from other exposures than the deposited images. The blot tool is not built until a paper with matching raw images is found. |
 
 Other blot candidates:
 
@@ -32,6 +43,8 @@ Other blot candidates:
 | Macrophage-hepatocyte glucocorticoid receptor paper, western blot record Zenodo 5810203 (2021) | Rejected. The authors changed the contrast in Preview before the Fiji measurement. The step cannot be repeated. |
 | Butler TAJ et al. Biomed Res Int 2019, DOI 10.1155/2019/5214821 | Rejected. Compares ImageJ, ImageQuant TL and Image Studio, but the blots are only in a PDF. |
 | Alonso Villela SM et al. A protocol for recombinant protein quantification by densitometry. MicrobiologyOpen 2020, DOI 10.1002/mbo3.1027 | Rejected. No raw gel images. |
+| Cc2d1a dose study, Zenodo 23087973 (CC BY-SA 4.0, 2026) | Rejected. No peer-reviewed paper was found for the record. |
+| SH-SY5Y tauopathy model, Zenodo 15235224 (CC BY 4.0) | Rejected. Uncropped blots only; the source data hold no band values. |
 
 ### 2. Colony counting
 

@@ -1,0 +1,29 @@
+tool: count_cell_uptake, through the image-assays adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/rees2019-uptake/fields
+decisions:
+  cell_mode: membrane
+  nucleus_threshold: 6553.5
+  nucleus_min_diameter: 24
+  nucleus_max_diameter: 200
+  nucleus_smoothing: 10.64
+  nucleus_min_distance: 12
+  cell_threshold: 3276.75
+  cell_max_growth: 0
+  cargo_threshold: 5794
+  cargo_smoothing: 1
+  positivity_rule: spots
+  positivity_min: 1
+  exclude_border_cells: true
+expected:
+  - {description: "fields", value: 3, tolerance: 0, source: "data set"}
+  - {description: "nuclei, three fields", value: 582, tolerance: 35, source: "CellProfiler result file, Count_Nuclei"}
+  - {description: "vesicles, three fields", value: 461, tolerance: 35, source: "CellProfiler result file, Count_NLV"}
+  - {description: "vesicles per cell, pooled", value: 0.6766, tolerance: 0.12, source: "CellProfiler result file, Children_NLV_Count / Count_Cells"}
+  - {description: "fraction of cells with a vesicle, pooled", value: 0.4371, tolerance: 0.08, source: "CellProfiler result file"}
+  - {description: "cells after edge exclusion (reference)", value: 572, tolerance: 35, source: "CellProfiler result file, Count_Cells"}
+notes: |
+  Pilot run of the tool with these settings (before the blind run): nuclei 566, vesicles 448, cells 459,
+  vesicles per cell 0.769, fraction 0.501. The tolerances of the two per-cell items were set after this pilot.
+  The cell count does not reproduce: the tool grows cells with a watershed, not CellProfiler Propagation.

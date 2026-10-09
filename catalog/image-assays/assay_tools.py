@@ -675,8 +675,8 @@ def _uptake_one(path, s):
         ms = filters.gaussian(cellc, 1, preserve_range=True)
         ct = _threshold(ms, s["cell_threshold"], "cell_threshold")
         cm = (ms > ct) | (nl > 0)
-        if s["cell_expand"] and s["cell_expand"] > 0:
-            cm &= ndi.distance_transform_edt(nl == 0) <= float(s["cell_expand"])
+        if s["cell_max_growth"] > 0:
+            cm &= ndi.distance_transform_edt(nl == 0) <= s["cell_max_growth"]
         cl = segmentation.watershed(-ms, nl, mask=cm)
     elif mode in ("threshold", "texture"):
         src = _local_sd(cellc, 3) if mode == "texture" else filters.gaussian(cellc, 1, preserve_range=True)
@@ -798,7 +798,7 @@ def _uptake_one(path, s):
 
 def count_cell_uptake(path, cargo_channel, nucleus_channel=None, cell_channel=None, cell_mode="expand", cell_labels=None, pattern="*", hand_counts=None,
                       nucleus_threshold="otsu", nucleus_min_diameter=0, nucleus_max_diameter=0, split_nuclei=True, nucleus_smoothing=0.0, nucleus_min_distance=0,
-                      cell_expand=0, cell_threshold="otsu", cell_polarity="bright", cell_min_diameter=0, split_cells=True,
+                      cell_expand=10, cell_max_growth=0, cell_threshold="otsu", cell_polarity="bright", cell_min_diameter=0, split_cells=True,
                       cargo_threshold="otsu", cargo_smoothing=0.0, cargo_min_area=0,
                       positivity_rule="spots", positivity_min=1, exclude_border_cells=True, pixel_size=0.0):
     if positivity_rule not in RULES:
@@ -809,7 +809,7 @@ def count_cell_uptake(path, cargo_channel, nucleus_channel=None, cell_channel=No
         _fail("cell_polarity is %s. Use bright or dark" % cell_polarity)
     s = dict(cargo_channel=cargo_channel, nucleus_channel=nucleus_channel, cell_channel=cell_channel, cell_mode=cell_mode, cell_labels=cell_labels,
              nucleus_threshold=nucleus_threshold, nucleus_min_diameter=float(nucleus_min_diameter or 0), nucleus_max_diameter=float(nucleus_max_diameter or 0),
-             split_nuclei=bool(split_nuclei), nucleus_smoothing=float(nucleus_smoothing or 0), nucleus_min_distance=float(nucleus_min_distance or 0), cell_expand=float(cell_expand or 0),
+             split_nuclei=bool(split_nuclei), nucleus_smoothing=float(nucleus_smoothing or 0), nucleus_min_distance=float(nucleus_min_distance or 0), cell_expand=float(cell_expand or 0), cell_max_growth=float(cell_max_growth or 0),
              cell_threshold=cell_threshold, cell_polarity=cell_polarity, cell_min_diameter=float(cell_min_diameter or 0), split_cells=bool(split_cells),
              cargo_threshold=cargo_threshold, cargo_smoothing=float(cargo_smoothing or 0), cargo_min_area=float(cargo_min_area or 0),
              positivity_rule=positivity_rule, positivity_min=float(positivity_min), exclude_border_cells=bool(exclude_border_cells), pixel_size=float(pixel_size or 0))
@@ -831,13 +831,15 @@ def count_cell_uptake(path, cargo_channel, nucleus_channel=None, cell_channel=No
             header = [c.strip().lower() for c in next(csv.reader(f), [])]
         hand = _read_hand_counts(hand_counts, [c for c in ("total", "positive") if c in header] or ["total"])
     rows, outputs, comp = [], [], {"total": ([], []), "positive": ([], [])}
-    tot_cells = tot_pos = tot_cargo = 0
+    tot_cells = tot_pos = tot_cargo = tot_obj = tot_nuc = 0
     for f in files:
         m, outs, _ = _uptake_one(str(f), s)
         outputs.append(outs[0])
         tot_cells += m["n_cells"]
         tot_pos += m["n_positive"]
         tot_cargo += m["n_cargo_in_cells"]
+        tot_obj += m["n_cargo_objects"]
+        tot_nuc += m.get("n_nuclei", 0)
         row = [f.name, m["n_cells"], m["n_positive"], round(m["fraction_positive"], 5), m["n_cargo_in_cells"], round(m["mean_cargo_per_cell"], 5), m.get("n_nuclei", "")]
         if hand is not None:
             hv = hand.get(f.stem.lower())
@@ -854,8 +856,14 @@ def count_cell_uptake(path, cargo_channel, nucleus_channel=None, cell_channel=No
     fr = [r_[3] for r_ in rows]
     metrics = {"n_images": len(rows), "total_cells": tot_cells, "total_positive": tot_pos, "pooled_fraction_positive": tot_pos / tot_cells if tot_cells else 0.0,
                "mean_fraction_positive": float(np.mean(fr)), "sd_fraction_positive": float(np.std(fr, ddof=1)) if len(fr) > 1 else 0.0, "total_cargo_in_cells": tot_cargo,
-               "mean_cargo_per_cell": tot_cargo / tot_cells if tot_cells else 0.0}
-    summary = "%d images: %d of %d cells positive (pooled %.1f percent; mean of images %.1f percent); %.3f cargo objects for each cell" % (len(rows), tot_pos, tot_cells, 100 * metrics["pooled_fraction_positive"], 100 * metrics["mean_fraction_positive"], metrics["mean_cargo_per_cell"])
+               "mean_cargo_per_cell": tot_cargo / tot_cells if tot_cells else 0.0, "total_cargo_objects": tot_obj}
+    if nucleus_channel not in (None, ""):
+        metrics["total_nuclei"] = tot_nuc
+    summary = "%d images (cargo threshold %s, rule %s %g): %d of %d cells positive (pooled %.1f percent; mean of images %.1f percent); %d cargo objects in cells, %.3f for each cell; %d cargo objects in all" % (len(rows), cargo_threshold, positivity_rule, float(positivity_min), tot_pos, tot_cells, 100 * metrics["pooled_fraction_positive"], 100 * metrics["mean_fraction_positive"], tot_cargo, metrics["mean_cargo_per_cell"], tot_obj)
+    if "total_nuclei" in metrics:
+        summary += "; %d nuclei" % tot_nuc
+    if len(rows) <= 24:
+        summary += "; positive of all cells in each image: " + ", ".join("%s %d of %d" % (r_[0], r_[2], r_[1]) for r_ in rows)
     if hand is not None:
         if not any(comp[k][0] for k in comp):
             _fail("no image name in the hand count file %s matches an image in the folder %s" % (hand_counts, path))
@@ -1022,7 +1030,9 @@ def count_colonies(path, pattern="*", hand_counts=None, channel="gray", colony_p
     _write_csv(cpath, cols, rows)
     counts = [r_[1] for r_ in rows]
     metrics = {"n_images": len(rows), "total_colonies": int(sum(counts)), "mean_colonies_per_image": float(np.mean(counts))}
-    summary = "%d images, %d colonies in total, mean %.1f for each image" % (len(rows), metrics["total_colonies"], metrics["mean_colonies_per_image"])
+    summary = "%d images, %d colonies in total, mean %.1f for each image (threshold %s)" % (len(rows), metrics["total_colonies"], metrics["mean_colonies_per_image"], threshold)
+    if len(rows) <= 24:
+        summary += "; counts: " + ", ".join("%s %d" % (r_[0], r_[1]) for r_ in rows)
     if hand is not None:
         if not auto_v:
             _fail("no image name in the hand count file %s matches an image in the folder %s" % (hand_counts, path))

@@ -1,0 +1,79 @@
+kind: research paper
+short: Manders 1993
+field: Fluorescence microscopy
+program: scikit-image and NumPy (Python), through the image-assays adapter, which repeats the Fiji Coloc 2 calculations.
+citation:
+  authors: Manders EMM, Verbeek FJ, Aten JA
+  title: Measurement of co-localization of objects in dual-colour confocal images
+  venue: Journal of Microscopy 169(3):375-382
+  year: 1993
+  doi: 10.1111/j.1365-2818.1993.tb03313.x
+related:
+  - text: "Fiji Coloc 2 test images that copy the object pairs of the paper, and the unit tests that assert the paper's Pearson values (GPL-3)."
+    url: https://github.com/fiji/Colocalisation_Analysis/tree/82af2de4ad477e723d77a815279ee1c23b285da9/src/test
+  - text: "Costes SV et al. Automatic and quantitative measurement of protein-protein colocalization in live cells. Biophysical Journal 86:3993-4003, 2004."
+    doi: 10.1529/biophysj.103.038422
+measured: >-
+  The paper introduced the overlap coefficients M1 and M2. It tested them and the Pearson coefficient on designed image
+  pairs in which one channel overlaps the other by less and less. Fiji Coloc 2 copied the image pairs and asserts the
+  paper's Pearson values in its unit tests.
+instruction: >-
+  Measure the Pearson coefficient and Manders M1 and M2 for the pairs A-B, A-C and A-D over the whole image, with no
+  threshold.
+instruction_basis: >-
+  Coloc 2 PearsonsCorrelationTest.mandersPaperImagesTest ("The 1993 paper of Manders et. al ... presents ... testing data
+  ... there are Pearson colocalization numbers, too, and these get tested in this test") and
+  MandersColocalizationTest.mandersPaperImagesTest.
+answers:
+  coloc_threshold_method:
+    decision: Colocalization threshold method
+    value: none
+    source: The paper's overlap coefficients use all pixels above zero. The test images have no background.
+  costes_randomizations:
+    decision: Costes randomizations
+    value: 0
+    source: The paper has no significance test. The request does not ask for one.
+  psf_size:
+    decision: Blur spot size
+    value: 3 (the Coloc 2 default)
+    source: Not used, because the Costes test is off.
+  replication_unit:
+    decision: Unit of replication
+    value: cells or objects in one image (exploratory)
+    source: Each pair is one designed image. No statistics are asked.
+items:
+  pearson_a_b:
+    source: published
+    where: Manders 1993, as asserted in Coloc 2 PearsonsCorrelationTest (0.72, tolerance 0.01). check.py, check.out.
+    independence: independent
+    check: NumPy corrcoef on the same files gives 0.7213.
+  pearson_a_c:
+    source: published
+    where: As above (0.44).
+    independence: independent
+    check: NumPy gives 0.4426.
+  pearson_a_d:
+    source: published
+    where: As above (0.16).
+    independence: independent
+    check: NumPy gives 0.1639.
+  m1_a_b:
+    source: tutorial
+    where: Coloc 2 MandersColocalizationTest (0.75, tolerance 0.0001).
+    independence: independent
+    check: NumPy gives 0.7500.
+  m1_a_c:
+    source: tutorial
+    where: Coloc 2 MandersColocalizationTest (0.5).
+    independence: independent
+    check: NumPy gives 0.5000.
+  m2_a_d:
+    source: tutorial
+    where: Coloc 2 MandersColocalizationTest (0.25).
+    independence: independent
+    check: NumPy gives 0.2500.
+data:
+  source: Fiji Coloc 2 test resources mandersA.tiff to mandersD.tiff
+  url: https://github.com/fiji/Colocalisation_Analysis
+  license: GPL-3.0 (Coloc 2 repository)
+  size: 4 TIFF files of 300 by 300 pixels, 40 KB

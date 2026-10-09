@@ -1,0 +1,23 @@
+adapters: [image-assays]
+prompt: |
+  Count the bacterial colonies on each of the six blood agar plate photos in the folder {data}/makrai2023-colonies/plates. Give the count for each photo and the total over the six photos. Write every number in your final answer text.
+answers:
+  colony_channel: green
+  colony_polarity: bright
+  colony_threshold: triangle
+  colony_min_diameter: 20
+  colony_max_diameter: 250
+  colony_min_roundness: 0.6
+  rim_margin: 0.06
+  colony_background_radius: 50
+  split_touching_colonies: true
+  pixel_size: 0
+  replication_unit: wells, plates or dishes
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data:
+  - makrai2023-colonies/plates
+items:
+  - {key: images, description: "Photos counted", value: 6, exact: true, in_answer: false, tool: count_colonies}
+  - {key: total_colonies, description: "Colonies on the six photos, printed counts 14, 14, 14, 14, 16, 16", value: 88, tolerance: 9}

@@ -47,13 +47,14 @@ of each package. The sources are at the end.
 | CFX Maestro | Bio-Rad, comes with CFX instruments | qPCR Cq, delta-delta Cq, melt curves. | qpcR (GPL-2 or later); pcr (GPL-3); HTqPCR (Artistic-2.0); NormqPCR (LGPL-3) | none | In progress by another agent. |
 | QuantStudio Design and Analysis | Thermo Fisher, closed | qPCR analysis. | qpcR, pcr, HTqPCR (as above) | none | In progress by another agent. |
 | Seahorse Wave and Seahorse Analytics | Agilent, closed | Oxygen consumption rate (OCR), extracellular acidification rate (ECAR), Mito Stress Test. | ceas (MIT, R); seahtrue (Artistic-2.0, R) | none | Open. |
+| Synbiosis ProtoCOL, Interscience Scan | Synbiosis, Interscience, commercial, with the counter hardware | Colony counts on agar plates and clonogenic dishes. | OpenCFU (GPL-3); Fiji Analyze Particles (GPL-3); scikit-image (BSD-3) | `image-assays` | Covered for plate photos: colony counts with a QC overlay, hand-count comparison, plating efficiency and surviving fraction. |
 
 ## Gels, blots and electrophoresis
 
 | Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
 | --- | --- | --- | --- | --- | --- |
-| Image Lab | Bio-Rad. Standard edition free, closed. Security edition commercial. | Western blot and gel densitometry on ChemiDoc images. | Fiji Gel Analyzer (GPL-3) | `imagej` | In progress by another agent (densitometry tools). |
-| ImageQuant TL | Cytiva, commercial | Gel and blot densitometry from Typhoon and Amersham imagers. | Fiji (GPL-3) | `imagej` | In progress by another agent. |
+| Image Lab | Bio-Rad. Standard edition free, closed. Security edition commercial. | Western blot and gel densitometry on ChemiDoc images. | Fiji Gel Analyzer (GPL-3) | `imagej` | Open. No blot tool yet: no paper with raw blot images that match its printed band values was found (bench/papers/CANDIDATES-wetlab-imaging.md). |
+| ImageQuant TL | Cytiva, commercial | Gel and blot densitometry from Typhoon and Amersham imagers. | Fiji (GPL-3) | `imagej` | Open. As for Image Lab. |
 | 2100 Expert and TapeStation Analysis | Agilent, closed, comes with the instrument | RNA integrity number (RIN), library size. | bioanalyzeR (MIT, R, reads the exports) | none | Open. The RIN algorithm is closed, so no open program gives the same RIN. |
 | Experion software | Bio-Rad, closed (the system is discontinued) | Automated protein and RNA electrophoresis. | Fiji Gel Analyzer (GPL-3) | `imagej` | Open. |
 
@@ -62,12 +63,12 @@ of each package. The sources are at the end.
 | Proprietary program | Vendor, license | Use in the lab | Open-source alternatives (license) | Cuvette adapter | Gap |
 | --- | --- | --- | --- | --- | --- |
 | Imaris | Oxford Instruments (Bitplane), commercial | 3D and 4D rendering, surfaces, spot tracking. | napari (BSD-3); Fiji (GPL-3); Icy (GPL-3) | `imagej`, `scikit-image`, `cellpose` | Partial. 2D segmentation and counts are covered. 3D surfaces and tracking are open. |
-| Volocity | Quorum Technologies, commercial, no developer updates | 3D views, colocalization. | Fiji (GPL-3); napari (BSD-3) | `imagej` | Colocalization: in progress by another agent. |
+| Volocity | Quorum Technologies, commercial, no developer updates | 3D views, colocalization. | Fiji Coloc 2 (GPL-3); napari (BSD-3) | `image-assays`, `imagej` | Partial. Colocalization (Pearson, Manders, Costes thresholds and test, 2D or z-stack, with a mask) is covered by `image-assays`, which repeats the Coloc 2 calculations. 3D views are open. |
 | MetaMorph | Molecular Devices, commercial | Acquisition, ratio and calcium imaging. | Fiji (GPL-3); CellProfiler (BSD-3) | `imagej`, `cellprofiler` | Partial. Acquisition is not in scope. |
 | NIS-Elements | Nikon, commercial (the viewer is free, closed) | Acquisition and analysis, `.nd2` files. | Bio-Formats (GPL-2); nd2 (BSD-3); napari (BSD-3) | `bftools`, `imagej` | Covered for file reading and 2D analysis. |
 | ZEN | Carl Zeiss, commercial (ZEN lite is free, closed) | Acquisition and analysis, `.czi` files. | Bio-Formats (GPL-2); czifile (BSD-3) | `bftools`, `imagej` | Covered for file reading and 2D analysis. |
 | LAS X | Leica, commercial | Confocal acquisition and analysis, `.lif` files. | Bio-Formats (GPL-2); readlif (GPL-3) | `bftools`, `imagej` | Covered for file reading and 2D analysis. |
-| Harmony and Columbus | Revvity, commercial. Columbus reached end of life on 2024-03-25. | High-content screening on Operetta and Opera Phenix. | CellProfiler (BSD-3); Cellpose (BSD-3); Fiji (GPL-3) | `cellprofiler`, `cellpose` | Partial. Nuclei counts and uptake indices: in progress by another agent. Plate-level quality (Z' factor): in progress by another agent. |
+| Harmony and Columbus | Revvity, commercial. Columbus reached end of life on 2024-03-25. | High-content screening on Operetta and Opera Phenix. | CellProfiler (BSD-3); Cellpose (BSD-3); Fiji (GPL-3) | `cellprofiler`, `cellpose`, `image-assays` | Partial. Nuclei counts, positive-cell fractions, cargo per cell and phagocytic indices are covered by `image-assays` (count_cell_uptake) with `cellpose` labels as an option. Plate-level quality (Z' factor): in progress by another agent. |
 
 ## Flow cytometry
 

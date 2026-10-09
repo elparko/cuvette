@@ -1,0 +1,17 @@
+tool: measure_colocalization (Pearson, Manders, Costes), through the image-assays adapter
+adapter_kind: python
+data:
+  - /Volumes/T7/guided-analysis/data/manders1993-coloc
+decisions:
+  coloc_threshold_method: none
+  costes_randomizations: 0
+expected:
+  - {description: "Pearson A-B", value: 0.72, tolerance: 0.01, source: "Manders 1993 via Coloc 2 PearsonsCorrelationTest"}
+  - {description: "Pearson A-C", value: 0.44, tolerance: 0.01, source: "Manders 1993 via Coloc 2 PearsonsCorrelationTest"}
+  - {description: "Pearson A-D", value: 0.16, tolerance: 0.01, source: "Manders 1993 via Coloc 2 PearsonsCorrelationTest"}
+  - {description: "M1 A-B", value: 0.75, tolerance: 0.0001, source: "Coloc 2 MandersColocalizationTest"}
+  - {description: "M1 A-C", value: 0.5, tolerance: 0.0001, source: "Coloc 2 MandersColocalizationTest"}
+  - {description: "M2 A-D", value: 0.25, tolerance: 0.0001, source: "Coloc 2 MandersColocalizationTest"}
+notes: |
+  The paper is from 1993, outside the 2018 to 2026 search window. No 2018 to 2026 paper with raw two-channel
+  images and a printed coefficient for each image was found (bench/papers/CANDIDATES-wetlab-imaging.md).

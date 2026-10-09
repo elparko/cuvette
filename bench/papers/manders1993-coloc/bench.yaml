@@ -1,0 +1,20 @@
+adapters: [image-assays]
+prompt: |
+  These are test images of two-colour colocalization: {data}/manders1993-coloc/mandersA.tiff is channel 1, and mandersB.tiff, mandersC.tiff and mandersD.tiff in the same folder are three versions of channel 2 with less and less overlap. For each of the three pairs (A with B, A with C, A with D), measure the Pearson correlation coefficient and the Manders overlap coefficients M1 and M2 over the whole image. Write every number in your final answer text.
+answers:
+  coloc_threshold_method: none
+  costes_randomizations: 0
+  psf_size: 3
+  replication_unit: cells or objects in one image (exploratory)
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1200
+data:
+  - manders1993-coloc
+items:
+  - {key: pearson_a_b, description: "Pearson r, A with B", value: 0.72, tolerance: 0.01}
+  - {key: pearson_a_c, description: "Pearson r, A with C", value: 0.44, tolerance: 0.01}
+  - {key: pearson_a_d, description: "Pearson r, A with D", value: 0.16, tolerance: 0.01}
+  - {key: m1_a_b, description: "Manders M1, A with B", value: 0.75, tolerance: 0.0001, in_answer: false}
+  - {key: m1_a_c, description: "Manders M1, A with C", value: 0.5, tolerance: 0.0001}
+  - {key: m2_a_d, description: "Manders M2, A with D", value: 0.25, tolerance: 0.0001}

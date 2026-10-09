@@ -1,0 +1,33 @@
+adapters: [image-assays]
+prompt: |
+  The folder {data}/rees2019-uptake/fields has three confocal fields of BEAS-2B cells after 1 h with 0.5 nM Qtracker 705 nanoparticles (Zeiss LSM files). Channel 0 is Hoechst 33342 (nuclei), channel 1 is WGA-555 (cell membranes) and channel 2 is Qtracker 705 (nanoparticle-loaded vesicles). Find the nuclei, the cells and the vesicles. Over the three fields, give the number of nuclei, the number of vesicles, the mean number of vesicles per cell and the fraction of cells with at least one vesicle. Write every number in your final answer text.
+answers:
+  cell_mode: membrane
+  nucleus_threshold: "6553.5"
+  nucleus_min_diameter: 24
+  nucleus_max_diameter: 200
+  nucleus_smoothing: 10.64
+  nucleus_min_distance: 12
+  cell_threshold: "3276.75"
+  cell_max_growth: 0
+  cell_expand: 10
+  cargo_threshold: "5794"
+  cargo_smoothing: 1
+  cargo_min_area: 0
+  positivity_rule: spots
+  positivity_min: 1
+  exclude_border_cells: true
+  pixel_size: 0.346
+  replication_unit: images or fields
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 1800
+data:
+  - rees2019-uptake/fields
+items:
+  - {key: fields, description: "Fields measured", value: 3, exact: true, in_answer: false, tool: count_cell_uptake}
+  - {key: nuclei, description: "Nuclei in the three fields (CellProfiler 229, 216, 137)", value: 582, tolerance: 35}
+  - {key: vesicles, description: "Nanoparticle-loaded vesicles in the three fields (CellProfiler 189, 141, 131)", value: 461, tolerance: 35}
+  - {key: vesicles_per_cell, description: "Mean vesicles per cell, three fields pooled (387 / 572)", value: 0.6766, tolerance: 0.12}
+  - {key: fraction_cells_with_vesicles, description: "Fraction of cells with at least one vesicle, pooled (250 / 572)", value: 0.4371, tolerance: 0.08}
+  - {key: cells, description: "Cells after edge exclusion (CellProfiler Propagation 222, 215, 135); the watershed cells differ", value: 572, tolerance: 35, reference: true}

@@ -1,0 +1,134 @@
+kind: research paper
+short: Rees 2019
+field: Cell biology imaging
+program: scikit-image (Python), through the image-assays adapter. The paper used CellProfiler 2.2.
+citation:
+  authors: Rees P, Wills JW, Brown MR, Barnes CM, Summers HD
+  title: The origin of heterogeneous nanoparticle uptake by cells
+  venue: Nature Communications 10:2341
+  year: 2019
+  doi: 10.1038/s41467-019-10112-4
+related:
+  - text: "BioImage Archive S-BSST249: raw confocal fields, the CellProfiler pipeline and the CellProfiler result files."
+    url: https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BSST249
+  - text: "Stirling DR et al. CellProfiler 4: improvements in speed, utility and usability. BMC Bioinformatics 22:433, 2021."
+    doi: 10.1186/s12859-021-04344-9
+measured: >-
+  A549 and BEAS-2B cells took up Qtracker 705 quantum dots at several doses and times. CellProfiler segmented nuclei
+  (Hoechst), cells (propagation into the WGA-555 membrane stain) and nanoparticle-loaded vesicles (NLV) in each field and
+  counted the vesicles in each cell. The paper reports the mean number of vesicles per cell and their distributions; the
+  deposited result files give the counts of each field.
+instruction: >-
+  Count the nuclei and the vesicles in the first three fields of BEAS-2B, 0.5 nM, 1 h, and give the pooled vesicles per
+  cell and the fraction of cells with at least one vesicle.
+instruction_basis: >-
+  The deposited CellProfiler result file 1_BEAS_0.5nM_1h.mat (Count_Nuclei, Count_Cells, Count_NLV and
+  Children_NLV_Count of the cells) and the pipeline stored in it. Script check.py, output check.out.
+answers:
+  cell_mode:
+    decision: How the tool finds each cell
+    value: membrane
+    source: Pipeline, IdentifySecondaryObjects with Propagation from the nuclei into the WGA channel (OrigGreen).
+  nucleus_threshold:
+    decision: Nucleus threshold
+    value: 6553.5 raw units
+    source: Pipeline, IdentifyPrimaryObjects on OrigRed, lower bound 0.1 of the 16-bit scale. The result file shows a final threshold of 0.1 in each field. 0.1 x 65535 = 6553.5.
+  nucleus_min_diameter:
+    decision: Smallest nucleus
+    value: 24 pixels
+    source: Pipeline, typical diameter 24 to 200, objects outside the range discarded.
+  nucleus_max_diameter:
+    decision: Largest nucleus
+    value: 200 pixels
+    source: Pipeline, as above.
+  nucleus_smoothing:
+    decision: Blur before splitting nuclei
+    value: 10.64 pixels
+    source: Pipeline, declumping by intensity with a smoothing filter size of 25. CellProfiler uses a Gaussian with sigma = size / 2.35.
+  nucleus_min_distance:
+    decision: Smallest distance between nucleus centers
+    value: 12 pixels
+    source: Pipeline, "Suppress local maxima that are closer than this minimum allowed distance" = 12.
+  cell_threshold:
+    decision: Cell threshold
+    value: 3276.75 raw units
+    source: Pipeline, secondary objects with Otsu bounded below by 0.05. The result file shows 0.05 in each field. 0.05 x 65535.
+  cell_max_growth:
+    decision: Largest cell growth in membrane mode
+    value: 0 (no limit)
+    source: Propagation has no distance limit in the pipeline.
+  cell_expand:
+    decision: Cell growth from the nucleus in expand mode
+    value: 10 pixels (the default)
+    source: Not used. The membrane mode ignores this value.
+  cargo_threshold:
+    decision: Cargo threshold
+    value: 5794 raw units
+    source: >-
+      Pipeline: ApplyThreshold subtracts the Otsu threshold of the Qtracker channel (0.0128, 0.0140, 0.0134 in the
+      three fields), then IdentifyPrimaryObjects uses a threshold of 0.075 on the result. (0.0134 + 0.075) x 65535 = 5794.
+  cargo_smoothing:
+    decision: Blur of the cargo channel
+    value: 1 pixel
+    source: Pipeline, NLV threshold smoothing Automatic (a Gaussian with sigma 1).
+  cargo_min_area:
+    decision: Smallest cargo object
+    value: 0
+    source: Pipeline, NLV objects outside the diameter range are not discarded.
+  positivity_rule:
+    decision: Positive cell rule
+    value: spots, 1 or more
+    source: The request asks for cells with at least one vesicle.
+  positivity_min:
+    decision: Smallest value of the rule for a positive cell
+    value: 1 vesicle
+    source: The request asks for cells with at least one vesicle.
+  exclude_border_cells:
+    decision: Leave out edge cells
+    value: true
+    source: Pipeline, nuclei and cells that touch the border are discarded.
+  pixel_size:
+    decision: Pixel size
+    value: 0.346 micrometers
+    source: LSM metadata, VoxelSizeX 3.459e-7 m.
+  replication_unit:
+    decision: Unit of replication
+    value: images or fields
+    source: No test across groups is asked.
+items:
+  fields:
+    source: published
+    where: Data set, three fields.
+  nuclei:
+    source: published
+    where: Result file, Count_Nuclei 229, 216, 137.
+    independence: independent
+    check: CellProfiler 2.2 is a different program. The tolerance of 35 (6 percent) covers the different declumping.
+  vesicles:
+    source: published
+    where: Result file, Count_NLV 189, 141, 131.
+    independence: independent
+    check: CellProfiler declumps vesicles by intensity; the tool labels connected pixels. Tolerance 35 (8 percent).
+  vesicles_per_cell:
+    source: published
+    where: Result file, sum of Children_NLV_Count over cells (158, 119, 110) divided by Count_Cells (222, 215, 135).
+    independence: independent
+    check: >-
+      The watershed cells are larger than the Propagation cells, so more cells touch the edge and are left out. The
+      tolerance of 0.12 was set after a pilot run on the same fields gave 0.769; the difference comes from the cell
+      outlines, not the vesicle counts.
+  fraction_cells_with_vesicles:
+    source: published
+    where: Result file, cells with Children_NLV_Count above 0 (102, 83, 65) divided by Count_Cells.
+    independence: independent
+    check: As above. The pilot gave 0.501. Tolerance 0.08, set after the pilot.
+  cells:
+    source: published
+    where: Result file, Count_Cells. Reference item; the pilot gave 459 because the watershed cells differ from Propagation.
+data:
+  source: BioImage Archive S-BSST249, fields 1 to 3 of BEAS-2B 0.5 nM 1 h
+  url: https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BSST249
+  license: >-
+    The BioStudies record states no license; EMBL-EBI terms of use apply. The paper is CC BY 4.0 and its data
+    statement points to S-BSST249. The files are fetched, not redistributed.
+  size: 3 LSM files of 25 MB (2048 x 2048 pixels, 3 channels, 16 bit)

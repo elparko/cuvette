@@ -327,6 +327,7 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `scikit-image` | scikit-image | Python library | image segmentation |
 | `cellpose` | Cellpose | Python library | cell segmentation |
 | `cellprofiler` | CellProfiler | pipeline file, headless | image cytometry |
+| `image-assays` | scikit-image and SciPy | Python library | bench image assays: colony counts, colocalization, cell uptake |
 | `qupath` | QuPath | Groovy scripts, one batch run for each step | histology |
 | `bftools` | Bio-Formats tools | command line | image formats |
 | `scanpy` | scanpy | Python library | single-cell RNA |

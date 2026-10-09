@@ -1,0 +1,328 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "rees2019-uptake",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 136.268,
+   "session": "20261009-000829-08b0",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/rees2019-uptake/run1/home/sessions/20261009-000829-08b0",
+   "answer": "## Corrections\n\n1. **Thresholds were set by hand, not by Otsu.** The scientist's recorded values were used for the nucleus threshold (6553.5), the cell threshold (3276.75) and the cargo threshold (5794). My earlier statement that these came from Otsu was wrong. I cannot trace the cargo value to a logged Otsu result. The harness record says the scientist supplied it. The reviewer says it came from the answer to q15. I did not see q15 in my notes.\n2. **The cargo threshold was not Otsu on field 1.** I asked for Otsu. The harness overrode the request with the recorded value 5794. The folder run used 5794 as recorded.\n3. **The folder run came before any overlay check.** This breaks the standards, which require checking the QC overlay of the first image before a folder run. I did not check the overlay of field 1 before the folder run. The overlay is saved as a binary image that I cannot view. The outlines and the vesicle calls are therefore unverified. The counts below are provisional until someone checks the overlays by eye.\n\n## Result: three BEAS-2B fields, 0.5 nM Qtracker 705, 1 h (provisional)\n\n- Total nuclei: **566**\n- Total vesicles inside cells: **353** (of 448 vesicle objects detected in all three fields)\n- Mean vesicles per cell: **0.769** (353 / 459 cells)\n- Fraction of cells with at least one vesicle: **50.1%** (230 / 459 cells)\n\n| Field | Nuclei | Cells | Cells with ≥1 vesicle | Vesicles in cells | Vesicles per cell |\n|---|---|---|---|---|---|\n| 1 | 220 | 176 | 88 (50.0%) | 140 | 0.795 |\n| 2 | 211 | 172 | 80 (46.5%) | 110 | 0.640 |\n| 3 | 135 | 111 | 62 (55.9%) | 103 | 0.928 |\n\nThe mean of the three field values is 0.788 vesicles per cell and 50.8% of cells positive. The pooled values above are the main result.\n\n## Method\n\n- **Program:** scikit-image and SciPy, through the image-assays adapter.\n- **Pixel size:** 0.346 µm.\n- **Nuclei:** Hoechst, channel 0. Threshold 6553.5, set by hand as a recorded decision. Size 24 to 200 pixels. Touching nuclei split with 10.64 pixel blur and 12 pixel minimum center distance.\n- **Cells:** WGA membrane stain, channel 1, membrane mode. Threshold 3276.75, set by hand as a recorded decision. No growth limit. Cells that touch the image edge are excluded.\n- **Vesicles:** Qtracker 705, channel 2. Threshold 5794, set by hand as a recorded decision. Blur 1 pixel. No minimum area.\n- **Positive cell:** a cell with at least 1 vesicle inside its outline.\n\n## Uncertain\n\n- The QC overlays were not checked. The outlines and the vesicle calls are unverified.\n- The vesicle count is 2D. Vesicles inside a cell cannot be told apart from vesicles bound to its surface.\n- Field 1 excluded 59 nuclei for size. The excluded counts for fields 2 and 3 are not reported.\n- The nuclei count may include nuclei at the edge. I did not confirm this.\n- Three fields of one condition are not three biological replicates.\n\n## Waits for you\n\n- Check the three QC overlays by eye. Until then, the counts are provisional.\n- Confirm the source of the cargo threshold 5794, including the answer to q15.\n- Confirm the replication unit (images or fields).\n- Choose the vesicle count: 353 (inside cells, used here) or 448 (all detected).\n\nSettings used, from the decision record: Pixel size in micrometers (0 = uncalibrated): 0.346 · How the tool finds each cell: membrane · Nucleus threshold (method name or a number): 6553.5 · Smallest nucleus (pixels across): 24 · Largest nucleus (pixels across, 0 = no limit): 200 · Blur before splitting touching nuclei (pixels, 0 = automatic): 10.64 · Smallest distance between two nucleus centers (pixels, 0 = automatic): 12 · Cell threshold (method name or a number): 3276.75 · Cell growth from the nucleus in expand mode (pixels): 10 · Largest cell growth in membrane mode (pixels, 0 = no limit): 0 · Cargo threshold (method name or a number): 5794 · Blur of the cargo channel before the threshold (pixels): 1 · Smallest cargo object (pixels): 0 · Rule that calls a cell positive: spots · Smallest value of the rule for a positive cell: 1 · Leave out cells that touch the image edge: true.",
+   "items": [
+    {
+     "key": "fields",
+     "description": "Fields measured",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n5",
+      "path": "table.rows[2][0]",
+      "entry": 97
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 168,
+      "text": null
+     }
+    },
+    {
+     "key": "nuclei",
+     "description": "Nuclei in the three fields (CellProfiler 229, 216, 137)",
+     "expected": 582,
+     "tolerance": 35,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 566,
+      "diff": 16,
+      "node": "n6",
+      "path": "metrics.total_nuclei",
+      "entry": 120
+     },
+     "reported": {
+      "pass": true,
+      "value": 566,
+      "diff": 16,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 168,
+      "text": "- Total nuclei: **566**"
+     }
+    },
+    {
+     "key": "vesicles",
+     "description": "Nanoparticle-loaded vesicles in the three fields (CellProfiler 189, 141, 131)",
+     "expected": 461,
+     "tolerance": 35,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 459,
+      "diff": 2,
+      "node": "n6",
+      "path": "metrics.total_cells",
+      "entry": 120
+     },
+     "reported": {
+      "pass": true,
+      "value": 459,
+      "diff": 2,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 168,
+      "text": "- Mean vesicles per cell: **0.769** (353 / 459 cells)"
+     }
+    },
+    {
+     "key": "vesicles_per_cell",
+     "description": "Mean vesicles per cell, three fields pooled (387 / 572)",
+     "expected": 0.6766,
+     "tolerance": 0.12,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.63953,
+      "diff": 0.037069999999999936,
+      "node": "n6",
+      "path": "table.rows[1][5]",
+      "entry": 120
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.64,
+      "diff": 0.036599999999999966,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 168,
+      "text": "| 2 | 211 | 172 | 80 (46.5%) | 110 | 0.640 |"
+     }
+    },
+    {
+     "key": "fraction_cells_with_vesicles",
+     "description": "Fraction of cells with at least one vesicle, pooled (250 / 572)",
+     "expected": 0.4371,
+     "tolerance": 0.08,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.46512,
+      "diff": 0.02801999999999999,
+      "node": "n6",
+      "path": "table.rows[1][3]",
+      "entry": 120
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.465,
+      "diff": 0.027900000000000036,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 168,
+      "text": "| 2 | 211 | 172 | 80 (46.5%) | 110 | 0.640 |"
+     }
+    },
+    {
+     "key": "cells",
+     "description": "Cells after edge exclusion (CellProfiler Propagation 222, 215, 135); the watershed cells differ",
+     "expected": 572,
+     "tolerance": 35,
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 566,
+      "diff": 6,
+      "node": "n6",
+      "path": "metrics.total_nuclei",
+      "entry": 120
+     },
+     "reported": {
+      "pass": true,
+      "value": 566,
+      "diff": 6,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 168,
+      "text": "- Total nuclei: **566**"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 14,
+    "inputTokens": 36,
+    "outputTokens": 12189,
+    "cacheRead": 257692,
+    "cacheWrite": 30326,
+    "toolCalls": 12,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 4,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 4
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/rees2019-uptake/run1/home/sessions/20261009-000829-08b0/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/rees2019-uptake",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/rees2019-uptake/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a76134d20ea542636/catalog/image-assays",
+     "/Users/parker/.guided-analysis/envs/image-assays",
+     "/Volumes/T7/guided-analysis/tools/wetlab-env",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a76134d20ea542636/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a76134d20ea542636/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a76134d20ea542636/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a76134d20ea542636/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a76134d20ea542636",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a76134d20ea542636/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a76134d20ea542636/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a76134d20ea542636/catalog/image-assays"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/rees2019-uptake/fields",
+     "/Volumes/T7/guided-analysis/data/rees2019-uptake/fields/1_BEAS_0.5nM_1h_1.lsm",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/rees2019-uptake/run1/home/sessions/20261009-000829-08b0/work/count_cell_uptake-4/1_BEAS_0.5nM_1h_1_uptake_overlay.png",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/rees2019-uptake/run1/home/sessions/20261009-000829-08b0/work/count_cell_uptake-5/uptake_counts.csv"
+    ],
+    "outside": [],
+    "blocked": 1,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-2026-10-09-image-assays-haiku-rees-v011.md",
+  "json": "bench/results/papers-2026-10-09-image-assays-haiku-rees-v011.json"
+ },
+ "summary": {
+  "cells": {
+   "rees2019-uptake": {
+    "claude:claude-haiku-5-5": {
+     "computed": 5,
+     "computedOf": 5,
+     "reported": 4,
+     "reportedOf": 4,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 5,
+    "computedOf": 5,
+    "reported": 4,
+    "reportedOf": 4,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 136.268,
+    "requests": 14,
+    "inputTokens": 36,
+    "outputTokens": 12189,
+    "cacheRead": 257692,
+    "cacheWrite": 30326,
+    "toolCalls": 12,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings_info": 3,
+    "findings_warning": 4,
+    "findings_error": 1,
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 4
+   }
+  },
+  "skipped": []
+ }
+}

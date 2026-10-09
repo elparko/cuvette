@@ -1,0 +1,86 @@
+kind: research paper
+short: Makrai 2023
+field: Microbiology imaging
+program: scikit-image (Python), through the image-assays adapter. The paper counted by hand annotation (COCO Annotator and Make Sense).
+citation:
+  authors: Makrai L, Fodróczy B, Nagy SÁ, Czeiszing P, Csabai I, Szita G, Solymosi N
+  title: Annotated dataset for deep-learning-based bacterial colony detection
+  venue: Scientific Data 10:497
+  year: 2023
+  doi: 10.1038/s41597-023-02404-8
+related:
+  - text: "Data set: 369 plate photos, bounding boxes and the colony count of each photo, figshare, CC BY 4.0."
+    doi: 10.6084/m9.figshare.22022540.v3
+measured: >-
+  Microbiologists photographed blood agar plates of 24 veterinary bacterial species with three phones, on a black and on a
+  white background, and marked each colony with a bounding box. The metadata sheet gives the colony count of each photo.
+instruction: >-
+  Count the colonies on the six photos of species 14 (three plates, each photographed on a black and on a white
+  background) and give the count of each photo and the total.
+instruction_basis: >-
+  The metadata sheet images.xls (column number of CFUs) and the bounding box table annot_tab.csv of the data set.
+answers:
+  colony_channel:
+    decision: Plate image channel that shows the colonies
+    value: green
+    source: Not in the paper. Pale colonies on red blood agar have the most contrast in the green channel.
+  colony_polarity:
+    decision: Bright or dark colonies
+    value: bright
+    source: Not in the paper. The colonies are pale on red agar.
+  colony_threshold:
+    decision: Colony threshold
+    value: triangle
+    source: >-
+      Not in the paper. Chosen on a pilot of six other photos of the same species (sp14_img07 to sp14_img12, printed
+      counts 19, 19, 24, 25, 26, 26) before the test photos were run. Otsu cut into the agar noise on the pilot photos.
+  colony_min_diameter:
+    decision: Smallest colony
+    value: 20 pixels
+    source: Pilot photos, as above. Specks of the agar and small bubbles are narrower.
+  colony_max_diameter:
+    decision: Largest colony
+    value: 250 pixels
+    source: Pilot photos, as above.
+  colony_min_roundness:
+    decision: Smallest roundness
+    value: 0.6
+    source: Pilot photos, as above. Reflections and scratches are long and thin.
+  rim_margin:
+    decision: Dish rim to leave out
+    value: 0.06 of the dish radius
+    source: Pilot photos, as above. Bubbles sit at the dish wall.
+  colony_background_radius:
+    decision: Background smoothing
+    value: 50 pixels
+    source: Pilot photos, as above. The phones gave uneven light and shadows.
+  split_touching_colonies:
+    decision: Split touching colonies
+    value: true
+    source: Pilot photos, as above. Some colonies touch in pairs and triples.
+  pixel_size:
+    decision: Pixel size
+    value: 0 (uncalibrated)
+    source: The phone photos have no scale.
+  replication_unit:
+    decision: Unit of replication
+    value: wells, plates or dishes
+    source: Each plate is one count. No statistics across plates are asked.
+items:
+  images:
+    source: published
+    where: Data set, six photos of species 14.
+  total_colonies:
+    source: published
+    where: >-
+      images.xls, column number of CFUs, rows sp14_img01 to sp14_img06 (14, 14, 14, 14, 16, 16). The bounding box table
+      has the same numbers. Script check.py, output check.out.
+    independence: independent
+    check: >-
+      Hand annotation by microbiologists, a different method from the threshold count. The tolerance of 9 colonies
+      (about 10 percent) allows for touching colonies and bubbles that a threshold count can merge or add.
+data:
+  source: Makrai et al. 2023 data set, figshare
+  url: https://doi.org/10.6084/m9.figshare.22022540.v3
+  license: CC BY 4.0
+  size: 6 JPEG photos, 9.4 MB
