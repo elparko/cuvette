@@ -13,6 +13,12 @@ These items are being built and are not on main yet:
 
 ## 9 October 2026
 
+### Citations
+- Every adapter carries the citation that its program authors ask for, and each tool cites the published methods it uses: 174 citations, each with a DOI or a URL that was checked.
+- `/cite` lists what a session must cite, in APA or Vancouver style, and exports BibTeX and RIS. Only what ran is cited. Methods used only in a comparison are listed apart.
+- The data book methods paragraph cites each program and method inline. The HTML report, the protocol, the .eln export, `results.xlsx` (a References sheet) and `references.bib` carry the list.
+- The Programs page shows "How to cite" for each program.
+
 ### Session control
 - `/rewind` returns the session to an earlier message or stage. Later results stay in the folder, marked "rewound", and later decisions return to their earlier values.
 - `/branch <name>` copies the session to try another method. `/branches` lists them, and `/compare` shows their numbers side by side.
