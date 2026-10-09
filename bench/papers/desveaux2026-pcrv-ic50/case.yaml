@@ -35,6 +35,10 @@ answers:
     decision: Confidence interval of the IC50
     value: delta
     source: Not in the paper. The drc default for ED().
+  response_level:
+    decision: Response level of an absolute IC50
+    value: 50
+    source: Not in the paper. The IC50 of the paper is relative, so the tool ignores this value.
   weighting:
     decision: Weighting of the fit
     value: none
