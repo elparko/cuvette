@@ -1,0 +1,12 @@
+samples with missing values are removed first, as the cuvette tool does
+linear model, TSS, log base 2 with half of the smallest non-zero value as pseudo-count, age as z-score
+feature Faecalibacterium prausnitzii, n 1576
+diagnosis[T.CD] coef -1.553871 stderr 0.230653 p 2.264e-11
+diagnosis[T.UC] coef -0.004879 stderr 0.251856 p 0.9845
+antibiotics[T.Yes] coef -1.530598 stderr 0.320476 p 1.955e-06
+age coef -0.887835 stderr 0.093804 p 1.035e-20
+mixed model with a random intercept for the subject (REML)
+diagnosis[T.CD] coef -1.932142 stderr 0.713489
+diagnosis[T.UC] coef 0.238756 stderr 0.779902
+antibiotics[T.Yes] coef -1.111733 stderr 0.257856
+age coef -1.005417 stderr 0.289835

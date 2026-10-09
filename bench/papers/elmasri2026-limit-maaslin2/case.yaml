@@ -1,0 +1,189 @@
+kind: research paper
+short: El Masri 2026
+field: Genomics and transcriptomics
+program: MaAsLin 2 (R), through the microbiome adapter
+citation:
+  authors: El Masri D et al.
+  title: "Early-life microbiota in the LIMIT cohort: unveiling meconium microbiota types beyond maternal lifestyle"
+  venue: Gut Microbes 18(1)
+  year: 2026
+  doi: 10.1080/19490976.2026.2712811
+related:
+  - text: "Mallick H et al. Multivariable association discovery in population-scale meta-omics studies. PLOS Comput Biol 17:e1009442 (2021). Source of the MaAsLin 2 method."
+    doi: 10.1371/journal.pcbi.1009442
+measured: >-
+  The study sequenced the 16S rRNA gene (V1 to V8, long reads) in 168 meconium samples of newborns from the LIMIT
+  cohort in Pavia. The authors tested the association of each OTU with gestational age, gestational weight gain
+  (reference adequate), maternal age and pre-pregnancy BMI in the babies born by vaginal delivery, with MaAsLin 2.
+  The model uses total sum scaling, removes features that occur in fewer than 5 percent of the samples, and applies
+  the default log transform. One OTU (Klebsiella quasivariicola) is associated with gestational age.
+instruction: >-
+  I have a 16S study of 168 newborn meconium samples. Which OTUs are associated with gestational age in the babies
+  born by vaginal delivery, when I adjust for gestational weight gain, maternal age and pre-pregnancy BMI?
+instruction_basis: >-
+  The Methods and the Results section on MaAsLin 2. The paper does not name the column that holds the delivery type.
+  The benchmark uses the column birth_type with the value natural, which gives the 132 participants of the paper.
+answers:
+  question:
+    decision: Research question
+    value: Which OTUs are associated with gestational age in babies born by vaginal delivery?
+    source: Results, MaAsLin 2 on the observed bacterial OTUs.
+  replicate:
+    decision: Unit of replication
+    value: subjects, one sample for each subject
+    source: One meconium sample for each mother-infant pair (168 pairs).
+  sample_filter:
+    decision: Filter that keeps a subset of the samples
+    value: birth_type=natural
+    source: Results, Figure 2 and Figure 3 cover infants born via vaginal delivery. The number 132 matches vaginal births with complete data.
+  exclusions:
+    decision: Samples or features to exclude
+    value: none
+    source: The paper removes features in fewer than 5 percent of the samples. That is the prevalence limit.
+  min_prevalence:
+    decision: Smallest share of samples that must contain a feature
+    value: 0.05
+    source: Methods. All features detected in fewer than 5 percent of the samples were excluded.
+  beta_min_prevalence:
+    decision: Smallest share of samples that must contain a feature, for the distance
+    value: 0
+    source: Figure 2 uses the relative abundance table. The paper states no feature filter for the distance.
+  rarefy_depth:
+    decision: Rarefaction depth
+    value: none
+    source: Methods. The abundances were normalized with total sum scaling. No rarefaction is stated for MaAsLin 2.
+  alpha_index:
+    decision: Alpha diversity index
+    value: shannon
+    source: Figure 2e shows Shannon, Simpson and inverse Simpson. The MaAsLin 2 result does not use it.
+  group_variable:
+    decision: Column that defines the groups for alpha diversity
+    value: GWG
+    source: Figure 2e compares the GWG categories.
+  beta_normalization:
+    decision: Normalization before the distance
+    value: relative
+    source: Figure 2a uses Bray-Curtis distance on the relative abundance table. The MaAsLin 2 result does not use it.
+  distance:
+    decision: Distance measure
+    value: bray
+    source: Figure 2a, Bray-Curtis.
+  pseudocount:
+    decision: Pseudo-count for CLR
+    value: 1
+    source: Not used in the paper. The value is only an entry for the decision record.
+  permanova_terms:
+    decision: PERMANOVA terms
+    value: GWG
+    source: The PERMANOVA of GWG in Figure 2. The MaAsLin 2 result does not use it.
+  permutations:
+    decision: Number of permutations
+    value: 999
+    source: Not stated in the text. The value is the default of adonis2.
+  strata:
+    decision: Strata
+    value: none
+    source: Not used in the paper.
+  seed:
+    decision: Random seed
+    value: 1
+    source: Not stated. The linear model has no random step.
+  da_method:
+    decision: Differential abundance method
+    value: maaslin2
+    source: Methods, MaAsLin2 v1.16.0.
+  fixed_effects:
+    decision: Columns that are tested
+    value: gestational_age, GWG, age_mother, pre_pregnancy_BMI
+    source: Methods. Gestational age, GWG, maternal age and pre-BMI as fixed effects.
+  random_effects:
+    decision: Random effects
+    value: none
+    source: Methods. The paper names fixed effects only. Each mother-infant pair has one sample.
+  reference:
+    decision: Reference level
+    value: GWG, adequate
+    source: Methods. Adequate GWG as the reference category.
+  da_normalization:
+    decision: Normalization for MaAsLin 2
+    value: TSS
+    source: Methods. The OTU abundances were normalized with total sum scaling.
+  da_transform:
+    decision: Transform for MaAsLin 2
+    value: LOG
+    source: Methods. The default MaAsLin 2 transformation, which is the log transform.
+  standardize:
+    decision: Standardize continuous columns
+    value: true
+    source: Not stated. The default of MaAsLin 2 is true.
+  fdr:
+    decision: Adjusted p value limit
+    value: 0.05
+    source: Results. Significant after false discovery rate correction, q below 0.05.
+  mc_samples:
+    decision: Monte Carlo draws for ALDEx2
+    value: 128
+    source: Not used in the paper. ALDEx2 default.
+items:
+  samples_in_study:
+    source: published
+    where: "Methods. \"168 meconium samples were analyzed\" and \"168 mother-infant pairs were selected\"."
+    independence: independent
+    check: check_limit_maaslin.py reads the table and the sample table with pandas.
+  samples_in_model:
+    source: published
+    where: "Results. \"this OTU was present in only 7 of the 132 study participants\"."
+    independence: independent
+    check: check_limit_maaslin.py keeps the 142 vaginal births and drops the 10 with missing values, which leaves 132.
+  significant_otus:
+    source: published
+    where: "Results. \"identified a single significant association after multiple-testing correction\"."
+    independence: independent
+    check: check_limit_maaslin.py counts 1 result with q at or below 0.05 among 325 tests.
+  top_q:
+    source: published
+    where: "Results. \"OTU RS_GCF_002269255.1 (Klebsiella quasivariicola) was negatively associated with gestational age (q = 0.043)\"."
+    independence: independent
+    check: >-
+      check_limit_maaslin.py fits ordinary least squares models in statsmodels with the MaAsLin 2 steps and gives q 0.042647.
+      The paper value 0.043 is this value rounded.
+  top_otu_samples:
+    source: published
+    where: "Results. \"this OTU was present in only 7 of the 132 study participants, i.e. 5.3%\"."
+    independence: independent
+    check: check_limit_maaslin.py counts 7 samples with a read of this OTU.
+  otus_tested:
+    source: computed
+    tool: MaAsLin2 1.26.0 through the microbiome adapter
+    where: Not printed in the paper. The benchmark authors ran the model.
+    independence: independent
+    check: check_limit_maaslin.py applies the 5 percent prevalence limit and keeps 65 OTUs (325 tests).
+  shannon_gwg_p:
+    source: computed
+    tool: vegan 2.7.6 and R wilcox and kruskal tests through the microbiome adapter
+    where: Not printed. The paper states that alpha diversity does not differ between the GWG categories (Figure 2e, Kruskal-Wallis). The p value is in a figure only.
+    independence: independent
+    check: check_limit_diversity.py computes Shannon with numpy and the Kruskal-Wallis test with SciPy. It gives p 0.991662.
+  permanova_gwg_r2:
+    source: computed
+    tool: vegan 2.7.6 adonis2 through the microbiome adapter
+    where: Not printed. The paper states no effect of GWG on beta diversity (Supplementary Table S1).
+    independence: independent
+    check: check_limit_diversity.py implements the PERMANOVA of Anderson (2001) in numpy on Bray-Curtis distances. It gives R2 0.010403.
+  permanova_gwg_f:
+    source: computed
+    tool: vegan 2.7.6 adonis2 through the microbiome adapter
+    where: Not printed. Same as the R2 item.
+    independence: independent
+    check: check_limit_diversity.py gives F 0.678065. The F value does not depend on the seed.
+  permanova_gwg_p:
+    source: computed
+    tool: vegan 2.7.6 adonis2, 999 permutations
+    where: Not printed. The p value changes with the seed.
+    independence: independent
+    check: The numpy permutation test with seed 1 gives 0.910. The tolerance 0.06 covers the change with the seed.
+data:
+  source: Zenodo record 10.5281/zenodo.18376726 (files otutable.csv and metadata.csv), the study database of the paper
+  url: https://doi.org/10.5281/zenodo.18376726
+  license: CC BY 4.0 (Zenodo record). Pseudonymous mother-infant data without direct identifiers.
+  size: Two CSV files, 267 kB and 21 kB. 538 OTUs by 168 samples, and 168 sample rows with 28 columns.

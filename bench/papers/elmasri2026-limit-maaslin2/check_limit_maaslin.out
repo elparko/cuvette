@@ -1,0 +1,8 @@
+linear model like MaAsLin 2: vaginal births with complete data, 5 percent prevalence filter first, then total sum scaling over the kept features,
+log base 2 with half the smallest non-zero value of the feature, continuous columns as z-scores, GWG with adequate as reference
+vaginal births 142
+samples with complete data 132
+features after the prevalence filter 65
+RS_GCF_002269255.1 present in 7 samples
+tests 325, results with q <= 0.05: 1
+smallest p: RS_GCF_002269255.1 gestational_age coef -0.458835 p 0.000131222 q 0.042647

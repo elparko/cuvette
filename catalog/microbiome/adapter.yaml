@@ -1,0 +1,987 @@
+adapter:
+  name: microbiome
+  field: microbiome
+  file_types: [".csv", ".tsv"]
+  title: Microbiome feature tables (diversity, PERMANOVA, MaAsLin 2, ALDEx2)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Reads a 16S ASV or OTU table, or a shotgun species table, with a sample table. It computes alpha and
+    beta diversity with PERMANOVA, and tests differential abundance with MaAsLin 2 or ALDEx2. It replaces the
+    statistics steps of CLC Microbial Genomics.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: MaAsLin2
+  version: "1.26.0"
+  tested_versions: []
+  homepage: https://bioconductor.org/packages/Maaslin2
+  docs:
+    - https://github.com/biobakery/Maaslin2
+    - https://bioconductor.org/packages/release/bioc/vignettes/ALDEx2/inst/doc/ALDEx2_vignette.html
+    - https://vegandevs.github.io/vegan/
+  install: >
+    Install R (brew install r on macOS). Then install Maaslin2, ALDEx2, vegan, permute and jsonlite from CRAN and
+    Bioconductor into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER,
+    /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
+    Rscript -e 'install.packages("BiocManager"); BiocManager::install(c("Maaslin2", "ALDEx2", "vegan", "permute", "jsonlite"), lib = "~/.guided-analysis/R-library")'
+  citation:
+    - text: "Mallick, H., Rahnavard, A., McIver, L. J., Ma, S., Zhang, Y., Nguyen, L. H., Tickle, T. L., Weingart, G., Ren, B., Schwager, E. H., Chatterjee, S., Thompson, K. N., Wilkinson, J. E., Subramanian, A., Lu, Y., Waldron, L., Paulson, J. N., Franzosa, E. A., Bravo, H. C., & Huttenhower, C. (2021). Multivariable association discovery in population-scale meta-omics studies. PLOS Computational Biology, 17(11), e1009442. https://doi.org/10.1371/journal.pcbi.1009442"
+      doi: 10.1371/journal.pcbi.1009442
+      bibtex: |
+        @article{mallick2021maaslin2,
+          author  = {Mallick, Himel and Rahnavard, Ali and McIver, Lauren J. and Ma, Siyuan and Zhang, Yancong and Nguyen, Long H. and Tickle, Timothy L. and Weingart, George and Ren, Boyu and Schwager, Emma H. and Chatterjee, Suvo and Thompson, Kelsey N. and Wilkinson, Jeremy E. and Subramanian, Ayshwarya and Lu, Yiren and Waldron, Levi and Paulson, Joseph N. and Franzosa, Eric A. and Bravo, Hector Corrada and Huttenhower, Curtis},
+          title   = {Multivariable association discovery in population-scale meta-omics studies},
+          journal = {PLOS Computational Biology},
+          year    = {2021},
+          volume  = {17},
+          number  = {11},
+          pages   = {e1009442},
+          doi     = {10.1371/journal.pcbi.1009442}
+        }
+    - text: "Fernandes, A. D., Reid, J. N., Macklaim, J. M., McMurrough, T. A., Edgell, D. R., & Gloor, G. B. (2014). Unifying the analysis of high-throughput sequencing datasets: characterizing RNA-seq, 16S rRNA gene sequencing and selective growth experiments by compositional data analysis. Microbiome, 2, 15. https://doi.org/10.1186/2049-2618-2-15"
+      doi: 10.1186/2049-2618-2-15
+      bibtex: |
+        @article{fernandes2014aldex2,
+          author  = {Fernandes, Andrew D. and Reid, Jennifer Ns and Macklaim, Jean M. and McMurrough, Thomas A. and Edgell, David R. and Gloor, Gregory B.},
+          title   = {Unifying the analysis of high-throughput sequencing datasets: characterizing {RNA-seq}, {16S} {rRNA} gene sequencing and selective growth experiments by compositional data analysis},
+          journal = {Microbiome},
+          year    = {2014},
+          volume  = {2},
+          pages   = {15},
+          doi     = {10.1186/2049-2618-2-15}
+        }
+    - text: "Oksanen, J., Simpson, G. L., Blanchet, F. G., Kindt, R., Legendre, P., Minchin, P. R., O'Hara, R. B., Solymos, P., Stevens, M. H. H., Szoecs, E., Wagner, H., et al. (2026). vegan: Community Ecology Package [Computer software]. https://doi.org/10.32614/CRAN.package.vegan"
+      doi: 10.32614/CRAN.package.vegan
+      bibtex: |
+        @manual{oksanen2026vegan,
+          author = {Oksanen, Jari and Simpson, Gavin L. and Blanchet, F. Guillaume and Kindt, Roeland and Legendre, Pierre and Minchin, Peter R. and O'Hara, R. B. and Solymos, Peter and Stevens, M. Henry H. and Szoecs, Eduard and Wagner, Helene and others},
+          title  = {vegan: Community Ecology Package},
+          year   = {2026},
+          note   = {R package version 2.7-6},
+          doi    = {10.32614/CRAN.package.vegan},
+          url    = {https://CRAN.R-project.org/package=vegan}
+        }
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 1800
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that
+  exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library.
+  The program version in this adapter is the version of the R package Maaslin2, not of R. Each random step
+  (rarefaction, permutations, Monte Carlo draws) calls set.seed with the seed decision first. The tools never
+  change the input files.
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees read counts, diversity values, test results and small PNG previews. It never sees the sample table of a person.
+
+decisions:
+  - key: question
+    label: What question do you ask with these samples?
+    kind: text
+    group: Question
+    help: Example - Does the gut community differ between the treated and the control group?
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: replicate
+    label: What is the unit of replication?
+    kind: choice
+    choices:
+      - subjects (one sample for each subject)
+      - repeated samples from the same subject
+      - sequencing replicates of one sample
+    default: subjects (one sample for each subject)
+    group: Design
+    help: >
+      The tests treat each sample as independent. Repeated samples from one subject are not independent. Put the
+      subject in the random effects of the differential abundance test, or restrict the permutations with strata.
+    essential: true
+    owner: human
+    stage: setup
+
+  - key: sample_filter
+    label: Filter that keeps a subset of the samples
+    kind: text
+    default: none
+    group: Design
+    help: >
+      Write column=value to keep only the samples with that value, such as birth_type=natural. Write none to
+      keep all samples. A filter that you choose after you see the result is a data-driven choice.
+    owner: human
+    stage: setup
+    links:
+      - { tool: alpha_diversity, arg: sample_filter }
+      - { tool: beta_diversity, arg: sample_filter }
+      - { tool: differential_abundance, arg: sample_filter }
+
+  - key: exclusions
+    label: Samples or features that you exclude
+    kind: text
+    default: none
+    group: Design
+    help: Name each excluded sample or feature and the reason, such as a negative control or a host read. Write none if you exclude nothing.
+    owner: human
+    stage: setup
+
+  - key: min_prevalence
+    label: Smallest share of samples that must contain a feature, for differential abundance
+    kind: float
+    lo: 0
+    hi: 1
+    group: Features
+    help: >
+      The tests drop features that occur in a smaller share of the samples. Zero keeps every feature. A high limit
+      removes rare features and makes the test less strict. A low limit adds many tests of features with few
+      counts. Choose it before the test.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: min_prevalence }
+    sensitivity:
+      options: [0, 0.05, 0.1]
+      tool: differential_abundance
+      compare: [metrics.n_significant, metrics.n_features_tested, metrics.min_q]
+      max_runs: 3
+
+  - key: beta_min_prevalence
+    label: Smallest share of samples that must contain a feature, for the distance
+    kind: float
+    default: 0
+    lo: 0
+    hi: 1
+    group: Beta diversity
+    help: >
+      The distance leaves out features that occur in a smaller share of the samples. Zero keeps every feature. A
+      limit removes rare features and changes the distance. Record it.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: beta_diversity, arg: min_prevalence }
+
+  - key: rarefy_depth
+    label: Number of reads to rarefy each sample to
+    kind: text
+    default: none
+    group: Diversity
+    help: >
+      Rarefaction draws the same number of reads from each sample. Samples with fewer reads drop out. Write none to
+      keep all reads. Without rarefaction, richness grows with the reads of the sample. The depth is a choice that
+      can change a result. Record it.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: alpha_diversity, arg: rarefy_depth }
+      - { tool: beta_diversity, arg: rarefy_depth }
+
+  - key: alpha_index
+    label: Alpha diversity index
+    kind: choice
+    choices: [shannon, observed, simpson, invsimpson, chao1, pielou]
+    default: shannon
+    group: Diversity
+    help: >
+      Observed counts the features. Chao1 adds an estimate of the unseen features. Shannon and Simpson mix richness
+      and evenness. Pielou is the evenness. Shannon uses the natural logarithm.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: alpha_diversity, arg: index }
+
+  - key: group_variable
+    label: Column of the sample table that defines the groups
+    kind: text
+    group: Diversity
+    help: The groups for the test of the alpha diversity. Two groups use the Wilcoxon rank-sum test. More groups use Kruskal-Wallis.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: alpha_diversity, arg: group_by }
+
+  - key: beta_normalization
+    label: Normalization before the distance
+    kind: choice
+    choices: [relative, rarefy, clr, none]
+    group: Beta diversity
+    help: >
+      Relative divides by the reads of the sample. Rarefy draws the same number of reads. CLR is the centered
+      log-ratio with a pseudo-count, and it needs the Euclidean distance (the Aitchison distance). None uses the
+      raw counts, and the distance then depends on the depth of the samples.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: beta_diversity, arg: normalization }
+
+  - key: distance
+    label: Distance measure
+    kind: choice
+    choices: [bray, jaccard, euclidean]
+    default: bray
+    group: Beta diversity
+    help: >
+      Bray-Curtis uses abundance. Jaccard uses presence when the normalization is none. Euclidean on CLR values is
+      the Aitchison distance. The distance sets what different means and can change R2 and p.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: beta_diversity, arg: distance }
+    sensitivity:
+      options: [bray, jaccard]
+      tool: beta_diversity
+      compare: [metrics.r2, metrics.f, metrics.p]
+      max_runs: 2
+
+  - key: pseudocount
+    label: Pseudo-count for the CLR transform
+    kind: float
+    default: 1
+    lo: 0.000001
+    hi: 1000
+    group: Beta diversity
+    help: >
+      CLR needs the log of each cell, so it adds this count to every cell. A small value gives zeros a large weight.
+      A large value flattens differences. Record it.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: beta_diversity, arg: pseudocount }
+
+  - key: permanova_terms
+    label: Terms of the PERMANOVA model
+    kind: text
+    group: Beta diversity
+    help: >
+      The columns after the tilde, such as group or group + age. The tool tests the terms in the order that you write
+      them. Put a covariate first. The first term also gets the dispersion test.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: beta_diversity, arg: formula }
+
+  - key: permutations
+    label: Number of permutations
+    kind: int
+    default: 999
+    lo: 99
+    hi: 99999
+    group: Beta diversity
+    help: The smallest possible p value is 1 divided by the permutations plus 1. Use more permutations for a p value near the limit.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: beta_diversity, arg: permutations }
+
+  - key: strata
+    label: Column that restricts the permutations to blocks
+    kind: text
+    default: none
+    group: Beta diversity
+    help: Name a column such as the subject or the site. The tool permutes only inside each level of the column. Write none for free permutation.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: beta_diversity, arg: strata }
+
+  - key: seed
+    label: Random seed
+    kind: int
+    default: 1
+    lo: 0
+    hi: 1000000
+    group: Reproducibility
+    help: The seed fixes rarefaction, permutations and Monte Carlo draws. A repeat run with the same seed gives the same result. Record it.
+    owner: agent
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: alpha_diversity, arg: seed }
+      - { tool: beta_diversity, arg: seed }
+      - { tool: differential_abundance, arg: seed }
+
+  - key: da_method
+    label: Method for differential abundance
+    kind: choice
+    choices: [maaslin2, aldex2]
+    group: Differential abundance
+    help: >
+      MaAsLin 2 fits a linear model for each feature, with covariates and random effects. ALDEx2 compares two groups
+      with a compositional test on counts. The two methods can give different lists. Choose before you see the result.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: method }
+    sensitivity:
+      options: [maaslin2, aldex2]
+      tool: differential_abundance
+      compare: [metrics.n_significant, metrics.min_q]
+      max_runs: 2
+
+  - key: fixed_effects
+    label: Columns of the sample table that you test
+    kind: text
+    group: Differential abundance
+    help: >
+      A comma list of columns. MaAsLin 2 fits all columns together in one model for each feature. ALDEx2 takes one
+      column with two levels. Include the covariates that you adjust for.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: fixed_effects }
+
+  - key: random_effects
+    label: Columns that hold repeated measures
+    kind: text
+    default: none
+    group: Differential abundance
+    help: >
+      Name the subject column if one subject gives more than one sample. MaAsLin 2 then fits a random intercept for
+      each subject. Write none if each subject gives one sample.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: random_effects }
+
+  - key: reference
+    label: Reference level of a column
+    kind: text
+    default: none
+    group: Differential abundance
+    help: Write column,level, such as group,control. MaAsLin 2 compares the other levels of the column with this level. Write none to use the first level in alphabetical order.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: reference }
+
+  - key: da_normalization
+    label: Normalization for MaAsLin 2
+    kind: choice
+    choices: [TSS, CLR, NONE]
+    group: Differential abundance
+    help: >
+      TSS divides by the reads of the sample (relative abundance). CLR is the centered log-ratio. NONE keeps the values.
+      The choice changes the coefficients. The tool applies the prevalence filter before the normalization.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: normalization }
+    sensitivity:
+      options: [TSS, CLR]
+      tool: differential_abundance
+      compare: [metrics.n_significant, metrics.min_q]
+      max_runs: 2
+
+  - key: da_transform
+    label: Transform for MaAsLin 2
+    kind: choice
+    choices: [LOG, AST, NONE]
+    group: Differential abundance
+    help: >
+      LOG is the base 2 logarithm, with half of the smallest non-zero value of the feature in place of zero. AST is the
+      arcsine square root. NONE keeps the values.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: transform }
+
+  - key: standardize
+    label: Standardize the continuous columns
+    kind: bool
+    default: true
+    group: Differential abundance
+    help: With true, MaAsLin 2 converts each continuous column to z-scores. The coefficient is then the change for one standard deviation.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: standardize }
+
+  - key: fdr
+    label: Adjusted p value limit
+    kind: float
+    default: 0.05
+    lo: 0.001
+    hi: 0.5
+    group: Differential abundance
+    help: Results with a Benjamini-Hochberg adjusted p value (q) at or below this limit count as significant. A higher limit lets more false results in.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: fdr }
+
+  - key: mc_samples
+    label: Number of Monte Carlo draws for ALDEx2
+    kind: int
+    default: 128
+    lo: 16
+    hi: 2000
+    group: Differential abundance
+    help: Each draw samples the counts from a Dirichlet distribution. More draws give more stable p values and take more time. Record the number.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: differential_abundance, arg: mc_samples }
+
+checks:
+  - id: pseudoreplication
+    description: One subject gives several samples and the model ignores the subject.
+    severity: error
+    text: >
+      Report the answer if the sample table has several samples for each subject and the differential abundance ran
+      with random_effects none, or the PERMANOVA ran with strata none.
+
+  - id: depth_confound
+    description: The read depth differs by group and the diversity is not rarefied or tested for depth.
+    severity: warning
+    text: >
+      Report the answer if the answer compares alpha diversity between groups, the reads per sample differ a lot
+      between the groups, and the log shows rarefy_depth none and no check of the depth.
+
+  - id: single_method
+    description: The answer reports a list of differential features from one method only.
+    severity: info
+    text: Report the answer if it names differential features and the log shows only one differential abundance method. The methods give different lists.
+
+  - id: few_permutations
+    description: The PERMANOVA uses fewer than 999 permutations.
+    severity: warning
+    rule:
+      tool: beta_diversity
+      arg: permutations
+      op: "<"
+      value: 999
+      message: Fewer than 999 permutations give a coarse p value. The smallest p is 1 divided by permutations plus 1.
+
+  - id: dispersion_not_reported
+    description: The answer reports a PERMANOVA difference and does not report the dispersion test.
+    severity: warning
+    text: Report the answer if it says that groups differ by PERMANOVA and does not give the dispersion test of the same grouping variable.
+
+  - id: seed_not_reported
+    description: The answer gives a p value from a random step and does not name the seed.
+    severity: warning
+    text: Report the answer if it gives a permutation, rarefaction or Monte Carlo result and does not say the seed and the number of permutations or draws.
+
+map:
+  - tool: inspect_feature_table
+    route: "CLC Microbial Genomics: open the abundance table (Toolbox > Microbial Genomics Module > Abundance Analysis) and read the number of samples, features and reads in the table viewer. In R: dim(tab); colSums(tab)."
+    steps:
+      - "Open the abundance table and the metadata table."
+      - "Check that the sample names in both tables are the same."
+      - "Read the reads of each sample. Write down the smallest and the largest value."
+    fidelity: close
+    difference: >
+      The tool reads a CSV or TSV table and detects whether the samples are in rows or in columns. It lists the
+      columns of the sample table. A person has not compared the counts with CLC.
+    evidence:
+      source: docs
+      test: inspect_limit
+      note: Counts checked in Python (checks/check_limit.py).
+    summary: "{summary}"
+
+  - tool: alpha_diversity
+    route: "CLC Microbial Genomics: Toolbox > Microbial Genomics Module > Alpha and Beta Diversity > Alpha Diversity (choose the rarefaction depth first with Rarefy or use the Alpha Diversity rarefaction setting). R: vegan::diversity(), specnumber(), estimateR(), rrarefy()."
+    steps:
+      - "CLC: run Alpha Diversity on the abundance table. Choose the measures and set the rarefaction depth (or none)."
+      - "CLC: run the Alpha Diversity test (Kruskal-Wallis or Wilcoxon) on the metadata column of the groups."
+      - "R: set.seed(seed); rrarefy(tab, depth); diversity(tab, \"shannon\"); specnumber(tab); wilcox.test() or kruskal.test()."
+    params:
+      - { arg: rarefy_depth, label: "rarefaction depth", ui_default: "none" }
+      - { arg: index, label: "measure", ui_default: shannon }
+    fidelity: close
+    difference: >
+      The tool calls the vegan functions. Shannon uses the natural logarithm. CLC lets a person choose the base of
+      the logarithm and its own rarefaction procedure. Rarefied values differ with the seed and between programs.
+    evidence:
+      source: docs
+      test: alpha_limit
+      note: vegan help pages. The values were checked in Python.
+
+  - tool: beta_diversity
+    route: "CLC Microbial Genomics: Toolbox > Microbial Genomics Module > Alpha and Beta Diversity > Beta Diversity, then PERMANOVA Analysis. R: vegan::vegdist(), adonis2(), betadisper()."
+    steps:
+      - "CLC: run Beta Diversity with the measure that you chose (Bray-Curtis, Jaccard or Euclidean)."
+      - "CLC: run PERMANOVA Analysis on the metadata column and set the number of permutations."
+      - "R: set.seed(seed); d <- vegdist(x, method); adonis2(d ~ terms, data = md, permutations = n); permutest(betadisper(d, group))."
+    params:
+      - { arg: normalization, label: "normalization", ui_default: "none" }
+      - { arg: distance, label: "distance", ui_default: bray }
+      - { arg: permutations, label: "permutations", ui_default: 999 }
+    fidelity: close
+    difference: >
+      The tool normalizes the table, computes the distance with vegdist() and runs adonis2(). CLC runs its own
+      permutation test, so R2 and F match and the p value differs in the third decimal.
+    evidence:
+      source: docs
+      test: beta_limit_bray
+      note: vegan help of adonis2. The R2 and F were checked with a numpy PERMANOVA.
+
+  - tool: differential_abundance
+    route: "CLC Microbial Genomics: Toolbox > Microbial Genomics Module > Differential Abundance Analysis (a generalized linear model, not MaAsLin 2). MaAsLin 2: Maaslin2(input_data, input_metadata, output, fixed_effects, random_effects, reference). ALDEx2: aldex(reads, conditions, mc.samples, test = \"t\", effect = TRUE)."
+    steps:
+      - "Prepare the feature table and the sample table with the same sample names."
+      - "MaAsLin 2: Remove the samples with missing values in the model columns. Run Maaslin2() with the normalization, the transform, the prevalence limit and the reference level."
+      - "ALDEx2: run aldex() with the counts, the two group labels, mc.samples and test t. Read we.eBH."
+      - "Count the results with q at or below the limit."
+    params:
+      - { arg: method, label: "method", ui_default: "none" }
+      - { arg: normalization, label: "normalization", ui_default: TSS }
+      - { arg: transform, label: "transform", ui_default: LOG }
+      - { arg: min_prevalence, label: "min_prevalence", ui_default: 0.1 }
+      - { arg: fdr, label: "max_significance", ui_default: 0.25 }
+      - { arg: mc_samples, label: "mc.samples", ui_default: 128 }
+    fidelity: close
+    difference: >
+      The tool removes samples with missing values in the model columns before it calls Maaslin2(). Maaslin2() alone
+      takes the pseudo-count of the log transform from all samples, so the coefficients differ in the third decimal
+      when samples are removed. The tool uses a Benjamini-Hochberg adjustment over all tests. CLC runs another model.
+    evidence:
+      source: docs
+      test: maaslin2_limit_klebsiella
+      note: The MaAsLin 2 paper and manual. The result was checked with an OLS fit in Python and with the published q value.
+
+tests:
+  - id: inspect_limit
+    description: >
+      The LIMIT meconium OTU table (538 OTUs, 168 samples, features in rows, columns of taxonomy at the end) and its
+      sample table. The paper states 168 samples (El Masri 2026, Methods). The other numbers come from pandas and
+      numpy (checks/check_limit.py and checks/check_limit.out).
+    data: [data/limit_otutable.csv, data/limit_metadata.csv]
+    calls:
+      - tool: inspect_feature_table
+        args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/limit_metadata.csv" }
+    expect:
+      - { path: metrics.n_samples, equals: 168 }
+      - { path: metrics.n_features, equals: 538 }
+      - { path: metrics.min_depth, equals: 2688 }
+      - { path: metrics.max_depth, equals: 126205 }
+      - { path: metrics.median_depth, equals: 87214 }
+      - { path: metrics.fraction_zero, approx: 0.972927, abs: 0.000001 }
+      - { path: data.orientation, equals: "features in rows, samples in columns" }
+      - { path: data.whole_numbers, equals: true }
+
+  - id: inspect_hmp2
+    description: >
+      The MaAsLin 2 example table from the HMP2 study (1595 samples, 87 species, samples in rows). The package
+      documentation and the file give the sizes. The values are relative abundances, so they are not whole numbers.
+    data: [data/hmp2_taxonomy.tsv, data/hmp2_metadata.tsv]
+    calls:
+      - tool: inspect_feature_table
+        args: { counts: "{adapter_dir}/data/hmp2_taxonomy.tsv", metadata: "{adapter_dir}/data/hmp2_metadata.tsv" }
+    expect:
+      - { path: metrics.n_samples, equals: 1595 }
+      - { path: metrics.n_features, equals: 87 }
+      - { path: data.orientation, equals: "samples in rows, features in columns" }
+      - { path: data.whole_numbers, equals: false }
+
+  - id: alpha_limit
+    description: >
+      Shannon index of the 168 LIMIT samples without rarefaction, and the Kruskal-Wallis test of Shannon by
+      the GWG category (155 samples with a category). The values come from numpy and SciPy (checks/check_limit.out).
+      The paper reports no difference of alpha diversity between the GWG categories.
+    data: [data/limit_otutable.csv, data/limit_metadata.csv]
+    calls:
+      - tool: alpha_diversity
+        args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/limit_metadata.csv", group_by: GWG, index: shannon, rarefy_depth: none }
+    expect:
+      - { path: metrics.n_samples, equals: 168 }
+      - { path: metrics.mean_index, approx: 1.318698, abs: 0.000001 }
+      - { path: metrics.first_sample_index, approx: 1.640023, abs: 0.000001 }
+      - { path: metrics.mean_observed, approx: 14.565476, abs: 0.000001 }
+      - { path: metrics.test_statistic, approx: 1.348335, abs: 0.000001 }
+      - { path: metrics.test_p, approx: 0.509580, abs: 0.000001 }
+      - { path: metrics.n_groups, equals: 3 }
+
+  - id: alpha_rarefy_drops_samples
+    description: >
+      Rarefaction to 50000 reads drops the samples with fewer reads. The count of dropped samples is the count of
+      samples below 50000 reads (checks/check_limit.out). Observed richness is capped by the rarefaction.
+    data: [data/limit_otutable.csv, data/limit_metadata.csv]
+    calls:
+      - tool: alpha_diversity
+        args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/limit_metadata.csv", index: observed, rarefy_depth: "50000", seed: 1 }
+    expect:
+      - { path: metrics.n_dropped, equals: 57 }
+      - { path: metrics.n_samples, equals: 111 }
+
+  - id: beta_limit_bray
+    description: >
+      PERMANOVA of the relative abundances (Bray-Curtis) of the LIMIT samples by GWG. R2 and F come from a numpy
+      implementation of the PERMANOVA of Anderson (2001) on 155 samples (checks/check_limit.py and check_limit.out).
+      The paper reports no effect of GWG on the beta diversity. The p value changes in the third decimal with the seed.
+    data: [data/limit_otutable.csv, data/limit_metadata.csv]
+    calls:
+      - tool: beta_diversity
+        args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/limit_metadata.csv", formula: GWG, normalization: relative, distance: bray, permutations: 999, seed: 1 }
+    expect:
+      - { path: metrics.n_samples, equals: 155 }
+      - { path: metrics.df, equals: 2 }
+      - { path: metrics.r2, approx: 0.010907, abs: 0.000001 }
+      - { path: metrics.f, approx: 0.838060, abs: 0.000001 }
+      - { path: metrics.p, approx: 0.69, abs: 0.06 }
+      - { path: metrics.dispersion_p, min: 0.5 }
+
+  - id: beta_limit_aitchison
+    description: >
+      The same test on centered log-ratio values with pseudo-count 1 and Euclidean distance (the Aitchison distance).
+      R2 and F come from numpy (checks/check_limit.out). The distance choice changes R2.
+    data: [data/limit_otutable.csv, data/limit_metadata.csv]
+    calls:
+      - tool: beta_diversity
+        args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/limit_metadata.csv", formula: GWG, normalization: clr, distance: euclidean, pseudocount: 1, permutations: 999, seed: 1 }
+    expect:
+      - { path: metrics.r2, approx: 0.011843, abs: 0.000001 }
+      - { path: metrics.f, approx: 0.910857, abs: 0.000001 }
+
+  - id: maaslin2_limit_klebsiella
+    description: >
+      MaAsLin 2 on the 142 vaginal births of the LIMIT cohort, with gestational age, GWG (reference adequate), maternal
+      age and pre-pregnancy BMI as fixed effects, TSS, log transform and a prevalence limit of 5 percent. The paper
+      (El Masri 2026) reports 132 participants, 7 with the OTU, and one significant association, OTU RS_GCF_002269255.1 with gestational age, q = 0.043.
+      An OLS fit in Python (checks/check_limit_maaslin.py and its output) gives 65 features, 325 tests, coefficient
+      -0.458835, p 0.000131222 and q 0.042647.
+    data: [data/limit_otutable.csv, data/limit_metadata.csv]
+    calls:
+      - tool: differential_abundance
+        args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/limit_metadata.csv", method: maaslin2, fixed_effects: "gestational_age,GWG,age_mother,pre_pregnancy_BMI", reference: "GWG,adequate", normalization: TSS, transform: LOG, min_prevalence: 0.05, fdr: 0.05, sample_filter: "birth_type=natural", feature: RS_GCF_002269255.1 }
+    expect:
+      - { path: metrics.n_samples, equals: 132 }
+      - { path: metrics.n_removed_missing, equals: 10 }
+      - { path: metrics.n_features_tested, equals: 65 }
+      - { path: metrics.n_tests, equals: 325 }
+      - { path: metrics.n_significant, equals: 1 }
+      - { path: metrics.min_q, approx: 0.042647, abs: 0.000001 }
+      - { path: metrics.min_q, approx: 0.043, abs: 0.0005 }
+      - { path: data.top_feature, equals: RS_GCF_002269255.1 }
+      - { path: data.feature_coef.gestational_age.coef, approx: -0.458835, abs: 0.000001 }
+      - { path: data.feature_coef.gestational_age.p, approx: 0.000131222, rel: 0.0001 }
+
+  - id: maaslin2_hmp2_fixed
+    description: >
+      MaAsLin 2 linear model on the HMP2 example data (diagnosis with reference nonIBD, antibiotics, age) for the species
+      Faecalibacterium prausnitzii. An OLS fit in Python gives the coefficients and p values (checks/check_maaslin2.py and
+      check_maaslin2.out). Samples with a missing age (19) are removed first.
+    data: [data/hmp2_taxonomy.tsv, data/hmp2_metadata.tsv]
+    calls:
+      - tool: differential_abundance
+        args: { counts: "{adapter_dir}/data/hmp2_taxonomy.tsv", metadata: "{adapter_dir}/data/hmp2_metadata.tsv", method: maaslin2, fixed_effects: "diagnosis,antibiotics,age", reference: "diagnosis,nonIBD", normalization: TSS, transform: LOG, min_prevalence: 0, fdr: 0.25, feature: Faecalibacterium prausnitzii }
+    expect:
+      - { path: metrics.n_samples, equals: 1576 }
+      - { path: metrics.n_features_tested, equals: 87 }
+      - { path: data.feature_coef.diagnosis_CD.coef, approx: -1.553871, abs: 0.000001 }
+      - { path: data.feature_coef.diagnosis_CD.p, approx: 2.264e-11, rel: 0.001 }
+      - { path: data.feature_coef.antibiotics_Yes.coef, approx: -1.530598, abs: 0.000001 }
+      - { path: data.feature_coef.age.coef, approx: -0.887835, abs: 0.000001 }
+      - { path: data.feature_coef.age.p, approx: 1.035e-20, rel: 0.001 }
+
+  - id: maaslin2_hmp2_mixed
+    description: >
+      The same model with a random intercept for the subject. A mixed model in statsmodels (REML) gives the coefficients
+      (checks/check_maaslin2.py and check_maaslin2.out).
+    data: [data/hmp2_taxonomy.tsv, data/hmp2_metadata.tsv]
+    calls:
+      - tool: differential_abundance
+        args: { counts: "{adapter_dir}/data/hmp2_taxonomy.tsv", metadata: "{adapter_dir}/data/hmp2_metadata.tsv", method: maaslin2, fixed_effects: "diagnosis,antibiotics,age", random_effects: subject, reference: "diagnosis,nonIBD", normalization: TSS, transform: LOG, min_prevalence: 0, fdr: 0.25, feature: Faecalibacterium prausnitzii }
+    expect:
+      - { path: data.feature_coef.diagnosis_CD.coef, approx: -1.932142, abs: 0.00001 }
+      - { path: data.feature_coef.diagnosis_UC.coef, approx: 0.238756, abs: 0.00001 }
+      - { path: data.feature_coef.antibiotics_Yes.coef, approx: -1.111733, abs: 0.00001 }
+      - { path: data.feature_coef.age.coef, approx: -1.005417, abs: 0.00001 }
+      - { path: data.feature_coef.age.stderr, approx: 0.289835, rel: 0.001 }
+
+  - id: aldex2_selex
+    description: >
+      ALDEx2 on the last 400 features of its example data set selex (7 samples per group), 128 draws, seed 1. A Python
+      implementation with 2000 Dirichlet draws gives 11 features with a mean Benjamini-Hochberg q below 0.05 and a median
+      difference between groups of 9.236 for the feature S:E:G:D (checks/check_aldex.py and check_aldex.out). The draws
+      differ, so the tolerance is 2 percent.
+    data: [data/selex_last400.csv, data/selex_metadata.csv]
+    calls:
+      - tool: differential_abundance
+        args: { counts: "{adapter_dir}/data/selex_last400.csv", metadata: "{adapter_dir}/data/selex_metadata.csv", method: aldex2, fixed_effects: condition, min_prevalence: 0, fdr: 0.05, seed: 1, mc_samples: 128, feature: "S:E:G:D" }
+    expect:
+      - { path: metrics.n_features_tested, equals: 400 }
+      - { path: metrics.n_significant, equals: 11 }
+      - { path: data.feature_coef.condition_S.coef, approx: 9.236, rel: 0.02 }
+      - { path: metrics.min_q, approx: 1.6e-05, rel: 0.02 }
+
+  - id: missing-file
+    description: A feature table that does not exist fails, and the error names the file.
+    calls:
+      - { tool: inspect_feature_table, args: { counts: "{adapter_dir}/data/no_such_table.csv", metadata: "{adapter_dir}/data/limit_metadata.csv" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "not found" }
+      - { path: error, contains: "no_such_table.csv" }
+
+  - id: sample-names-do-not-match
+    description: A sample table with other sample names fails, and the error shows the names on both sides.
+    data: [data/limit_otutable.csv, data/selex_metadata.csv]
+    calls:
+      - { tool: inspect_feature_table, args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/selex_metadata.csv" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no sample id" }
+      - { path: error, contains: "X1_ANS" }
+
+  - id: rarefy-needs-counts
+    description: Rarefaction of a table of relative abundances fails, and the error says that counts are needed.
+    data: [data/hmp2_taxonomy.tsv, data/hmp2_metadata.tsv]
+    calls:
+      - { tool: alpha_diversity, args: { counts: "{adapter_dir}/data/hmp2_taxonomy.tsv", metadata: "{adapter_dir}/data/hmp2_metadata.tsv", rarefy_depth: "1000" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "whole-number counts" }
+
+  - id: filter-keeps-nothing
+    description: A sample filter that matches no sample fails, and the error lists the values of the column.
+    data: [data/limit_otutable.csv, data/limit_metadata.csv]
+    calls:
+      - { tool: alpha_diversity, args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/limit_metadata.csv", sample_filter: "birth_type=breech" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "keeps no sample" }
+      - { path: error, contains: "natural" }
+
+  - id: aldex2-needs-two-levels
+    description: ALDEx2 on a column with three levels fails, and the error names the column and the levels.
+    data: [data/limit_otutable.csv, data/limit_metadata.csv]
+    calls:
+      - { tool: differential_abundance, args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/limit_metadata.csv", method: aldex2, fixed_effects: GWG, min_prevalence: 0.1 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "exactly two levels" }
+      - { path: error, contains: "GWG" }
+
+  - id: clr-needs-euclidean
+    description: CLR values with the Bray-Curtis distance fail, and the error names the fix.
+    data: [data/limit_otutable.csv, data/limit_metadata.csv]
+    calls:
+      - { tool: beta_diversity, args: { counts: "{adapter_dir}/data/limit_otutable.csv", metadata: "{adapter_dir}/data/limit_metadata.csv", formula: GWG, normalization: clr, distance: bray } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "euclidean" }
+
+tools:
+  - name: inspect_feature_table
+    title: Inspect a feature table
+    description: >
+      Read a feature table (ASV, OTU or species counts) and a sample table. Return the samples, the features, the reads of each sample and the orientation of the table. List the columns of the sample table.
+    params:
+      counts: { type: string, description: "Path of the feature table (CSV or TSV). The first column holds the feature names (samples in columns) or the sample names (samples in rows). The tool skips text columns such as taxonomy." }
+      metadata: { type: string, description: "Path of the sample table (CSV or TSV). The first column holds the sample names. The names must match the names in the feature table." }
+    required: [counts, metadata]
+    read_only: true
+    batch: false
+    outputs:
+      table: { kind: table, ext: .csv, description: "One row for each sample with the reads and the number of features." }
+    script: scripts/inspect_feature_table.R
+    parse: json
+
+  - name: alpha_diversity
+    title: Alpha diversity
+    description: >
+      Compute observed richness, Chao1, Shannon, Simpson, inverse Simpson and Pielou evenness for each sample, with optional
+      rarefaction. With group_by, test the chosen index between the groups and draw a box plot.
+    params:
+      counts: { type: string, description: "Path of the feature table (CSV or TSV). Rarefaction and Chao1 need whole-number counts." }
+      metadata: { type: string, description: "Path of the sample table (CSV or TSV). The first column holds the sample names." }
+      group_by: { type: string, description: "Leave out. The harness sets it from the decision record. Column of the sample table for the group test and the box plot." }
+      index: { type: string, enum: [shannon, observed, simpson, invsimpson, chao1, pielou], description: "Leave out. The harness sets it from the decision record. Index for the summary and the test." }
+      rarefy_depth: { type: string, description: "Leave out. The harness sets it from the decision record. Reads per sample after rarefaction, or the word none. Samples with fewer reads drop out." }
+      sample_filter: { type: string, description: "Leave out. The harness sets it from the decision record. Text column=value that keeps the samples with that value, or none." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed of the rarefaction (unitless)." }
+    required: [counts, metadata]
+    read_only: true
+    outputs:
+      table: { kind: table, ext: .csv, description: "One row for each sample with all indices." }
+      plot: { kind: image, ext: .png, description: "Box plot by group, or a histogram of the index." }
+    script: scripts/alpha_diversity.R
+    parse: json
+    citations:
+      - text: "Shannon, C. E. (1948). A Mathematical Theory of Communication. Bell System Technical Journal, 27(3), 379-423. https://doi.org/10.1002/j.1538-7305.1948.tb01338.x"
+        doi: 10.1002/j.1538-7305.1948.tb01338.x
+        bibtex: |
+          @article{shannon1948mathematical,
+            author  = {Shannon, C. E.},
+            title   = {A Mathematical Theory of Communication},
+            journal = {Bell System Technical Journal},
+            year    = {1948},
+            volume  = {27},
+            number  = {3},
+            pages   = {379--423},
+            doi     = {10.1002/j.1538-7305.1948.tb01338.x}
+          }
+      - text: "Hurlbert, S. H. (1971). The Nonconcept of Species Diversity: A Critique and Alternative Parameters. Ecology, 52(4), 577-586. https://doi.org/10.2307/1934145"
+        doi: 10.2307/1934145
+        when: { rarefy_depth: set }
+        bibtex: |
+          @article{hurlbert1971nonconcept,
+            author  = {Hurlbert, Stuart H.},
+            title   = {The Nonconcept of Species Diversity: A Critique and Alternative Parameters},
+            journal = {Ecology},
+            year    = {1971},
+            volume  = {52},
+            number  = {4},
+            pages   = {577--586},
+            doi     = {10.2307/1934145}
+          }
+
+  - name: beta_diversity
+    title: Beta diversity with PERMANOVA
+    description: >
+      Normalize the feature table, compute a distance between samples, and test the model terms with PERMANOVA. Also run
+      the dispersion test for the first term and draw a PCoA plot.
+    params:
+      counts: { type: string, description: "Path of the feature table (CSV or TSV)." }
+      metadata: { type: string, description: "Path of the sample table (CSV or TSV). The first column holds the sample names." }
+      formula: { type: string, description: "Leave out. The harness sets it from the decision record. Terms of the model after the tilde, such as group or group + age. Samples with missing values in these columns drop out." }
+      normalization: { type: string, enum: [relative, rarefy, clr, none], description: "Leave out. The harness sets it from the decision record. Normalization before the distance." }
+      distance: { type: string, enum: [bray, jaccard, euclidean], description: "Leave out. The harness sets it from the decision record. Distance measure." }
+      pseudocount: { type: number, minimum: 0.000001, maximum: 1000, description: "Leave out. The harness sets it from the decision record. Count added to every cell before the CLR transform." }
+      rarefy_depth: { type: string, description: "Leave out. The harness sets it from the decision record. Reads per sample for normalization rarefy." }
+      min_prevalence: { type: number, minimum: 0, maximum: 1, description: "Leave out. The harness sets it from the decision record. Smallest share of samples that must contain a feature (fraction)." }
+      permutations: { type: integer, minimum: 99, maximum: 99999, description: "Leave out. The harness sets it from the decision record. Number of permutations (count)." }
+      strata: { type: string, description: "Leave out. The harness sets it from the decision record. Column that restricts the permutations to blocks, or none." }
+      sample_filter: { type: string, description: "Leave out. The harness sets it from the decision record. Text column=value that keeps the samples with that value, or none." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed (unitless)." }
+    required: [counts, metadata]
+    read_only: true
+    outputs:
+      table: { kind: table, ext: .csv, description: "PERMANOVA table with Df, sums of squares, R2, F and p." }
+      plot: { kind: image, ext: .png, description: "PCoA plot of the samples." }
+    script: scripts/beta_diversity.R
+    parse: json
+    citations:
+      - text: "Anderson, M. J. (2001). A new method for non-parametric multivariate analysis of variance. Austral Ecology, 26(1), 32-46. https://doi.org/10.1111/j.1442-9993.2001.01070.pp.x"
+        doi: 10.1111/j.1442-9993.2001.01070.pp.x
+        bibtex: |
+          @article{anderson2001new,
+            author  = {Anderson, Marti J.},
+            title   = {A new method for non-parametric multivariate analysis of variance},
+            journal = {Austral Ecology},
+            year    = {2001},
+            volume  = {26},
+            number  = {1},
+            pages   = {32--46},
+            doi     = {10.1111/j.1442-9993.2001.01070.pp.x}
+          }
+      - text: "Anderson, M. J. (2006). Distance-based tests for homogeneity of multivariate dispersions. Biometrics, 62(1), 245-253. https://doi.org/10.1111/j.1541-0420.2005.00440.x"
+        doi: 10.1111/j.1541-0420.2005.00440.x
+        bibtex: |
+          @article{anderson2006distance,
+            author  = {Anderson, Marti J.},
+            title   = {Distance-based tests for homogeneity of multivariate dispersions},
+            journal = {Biometrics},
+            year    = {2006},
+            volume  = {62},
+            number  = {1},
+            pages   = {245--253},
+            doi     = {10.1111/j.1541-0420.2005.00440.x}
+          }
+      - text: "Aitchison, J. (1982). The Statistical Analysis of Compositional Data. Journal of the Royal Statistical Society B, 44(2), 139-160. https://doi.org/10.1111/j.2517-6161.1982.tb01195.x"
+        doi: 10.1111/j.2517-6161.1982.tb01195.x
+        when: { normalization: clr }
+        bibtex: |
+          @article{aitchison1982statistical,
+            author  = {Aitchison, J.},
+            title   = {The Statistical Analysis of Compositional Data},
+            journal = {Journal of the Royal Statistical Society: Series B},
+            year    = {1982},
+            volume  = {44},
+            number  = {2},
+            pages   = {139--160},
+            doi     = {10.1111/j.2517-6161.1982.tb01195.x}
+          }
+
+  - name: differential_abundance
+    title: Differential abundance with MaAsLin 2 or ALDEx2
+    description: >
+      Test each feature for an association with the chosen sample columns, with MaAsLin 2 or ALDEx2. Return a table of
+      coefficients, p values and adjusted p values (q). Samples with missing values in the model columns drop out first.
+    params:
+      counts: { type: string, description: "Path of the feature table (CSV or TSV). ALDEx2 needs whole-number counts." }
+      metadata: { type: string, description: "Path of the sample table (CSV or TSV). The first column holds the sample names." }
+      method: { type: string, enum: [maaslin2, aldex2], description: "Leave out. The harness sets it from the decision record. Method." }
+      fixed_effects: { type: string, description: "Leave out. The harness sets it from the decision record. Comma list of the sample columns to test. ALDEx2 takes one column with two levels." }
+      random_effects: { type: string, description: "Leave out. The harness sets it from the decision record. Comma list of columns for random intercepts (MaAsLin 2 only), or none." }
+      reference: { type: string, description: "Leave out. The harness sets it from the decision record. Text column,level for the reference level of a column (MaAsLin 2 only), or none." }
+      normalization: { type: string, enum: [TSS, CLR, NONE], description: "Leave out. The harness sets it from the decision record. Normalization for MaAsLin 2." }
+      transform: { type: string, enum: [LOG, AST, NONE], description: "Leave out. The harness sets it from the decision record. Transform for MaAsLin 2." }
+      standardize: { type: boolean, description: "Leave out. The harness sets it from the decision record. Convert continuous columns to z-scores (MaAsLin 2 only)." }
+      min_prevalence: { type: number, minimum: 0, maximum: 1, description: "Leave out. The harness sets it from the decision record. Smallest share of samples that must contain a feature (fraction)." }
+      fdr: { type: number, minimum: 0.001, maximum: 0.5, description: "Leave out. The harness sets it from the decision record. Adjusted p value limit." }
+      mc_samples: { type: integer, minimum: 16, maximum: 2000, description: "Leave out. The harness sets it from the decision record. Number of Monte Carlo draws (ALDEx2 only)." }
+      sample_filter: { type: string, description: "Leave out. The harness sets it from the decision record. Text column=value that keeps the samples with that value, or none." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, description: "Leave out. The harness sets it from the decision record. Random seed (unitless)." }
+      feature: { type: string, description: "Optional. Name of one feature. The result then holds the coefficient, p and q of this feature for each tested term." }
+    required: [counts, metadata]
+    read_only: true
+    outputs:
+      table: { kind: table, ext: .csv, description: "One row for each feature and tested term with coefficient, p and q." }
+    script: scripts/differential_abundance.R
+    parse: json
+    citations:
+      - text: "Mallick, H., Rahnavard, A., McIver, L. J., Ma, S., Zhang, Y., Nguyen, L. H., Tickle, T. L., Weingart, G., Ren, B., Schwager, E. H., Chatterjee, S., Thompson, K. N., Wilkinson, J. E., Subramanian, A., Lu, Y., Waldron, L., Paulson, J. N., Franzosa, E. A., Bravo, H. C., & Huttenhower, C. (2021). Multivariable association discovery in population-scale meta-omics studies. PLOS Computational Biology, 17(11), e1009442. https://doi.org/10.1371/journal.pcbi.1009442"
+        doi: 10.1371/journal.pcbi.1009442
+        when: { method: maaslin2 }
+      - text: "Fernandes, A. D., Reid, J. N., Macklaim, J. M., McMurrough, T. A., Edgell, D. R., & Gloor, G. B. (2014). Unifying the analysis of high-throughput sequencing datasets: characterizing RNA-seq, 16S rRNA gene sequencing and selective growth experiments by compositional data analysis. Microbiome, 2, 15. https://doi.org/10.1186/2049-2618-2-15"
+        doi: 10.1186/2049-2618-2-15
+        when: { method: aldex2 }
+      - text: "Fernandes, A. D., Macklaim, J. M., Linn, T. G., Reid, G., & Gloor, G. B. (2013). ANOVA-like differential expression (ALDEx) analysis for mixed population RNA-seq. PLOS ONE, 8(7), e67019. https://doi.org/10.1371/journal.pone.0067019"
+        doi: 10.1371/journal.pone.0067019
+        when: { method: aldex2 }
+        bibtex: |
+          @article{fernandes2013aldex,
+            author  = {Fernandes, Andrew D. and Macklaim, Jean M. and Linn, Thomas G. and Reid, Gregor and Gloor, Gregory B.},
+            title   = {{ANOVA}-like differential expression ({ALDEx}) analysis for mixed population {RNA-seq}},
+            journal = {PLOS ONE},
+            year    = {2013},
+            volume  = {8},
+            number  = {7},
+            pages   = {e67019},
+            doi     = {10.1371/journal.pone.0067019}
+          }
+      - text: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society B, 57(1), 289-300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x"
+        doi: 10.1111/j.2517-6161.1995.tb02031.x
+        bibtex: |
+          @article{benjamini1995controlling,
+            author  = {Benjamini, Yoav and Hochberg, Yosef},
+            title   = {Controlling the false discovery rate: a practical and powerful approach to multiple testing},
+            journal = {Journal of the Royal Statistical Society: Series B},
+            year    = {1995},
+            volume  = {57},
+            number  = {1},
+            pages   = {289--300},
+            doi     = {10.1111/j.2517-6161.1995.tb02031.x}
+          }

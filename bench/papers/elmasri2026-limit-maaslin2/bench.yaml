@@ -1,0 +1,44 @@
+adapters: [microbiome]
+prompt: |
+  I have a 16S sequencing study of 168 newborn meconium samples. The OTU table is {data}/elmasri2026-limit-maaslin2/otutable.csv (OTU names in the first column, one column for each sample, and taxonomy columns at the end). The sample table is {data}/elmasri2026-limit-maaslin2/metadata.csv (first column id). I want to know which OTUs are associated with the gestational age of the newborn. Use only the babies born by vaginal delivery (the column birth_type has the value natural). Test gestational_age together with gestational weight gain (the column GWG, reference level adequate), maternal age (age_mother) and pre-pregnancy BMI (pre_pregnancy_BMI) in one model. Tell me how many samples the model uses after you remove the samples with missing values in these columns, how many OTUs you test, and how many OTUs are significantly associated with any of the four variables. For the most significant OTU, tell me its name, the variable, the adjusted p value (q), and in how many samples it occurs. Then, for the same babies, test if the Shannon diversity differs between the GWG categories, and if the bacterial community differs between the GWG categories with a PERMANOVA on the Bray-Curtis distance of the relative abundances (999 permutations). Tell me the p value of the Shannon test, and R2, F and p of the PERMANOVA. Write every number in the answer text.
+setup: {}
+answers:
+  question: "Which OTUs are associated with gestational age in babies born by vaginal delivery?"
+  replicate: "subjects (one sample for each subject)"
+  sample_filter: "birth_type=natural"
+  exclusions: none
+  min_prevalence: 0.05
+  beta_min_prevalence: 0
+  rarefy_depth: none
+  alpha_index: shannon
+  group_variable: GWG
+  beta_normalization: relative
+  distance: bray
+  pseudocount: 1
+  permanova_terms: GWG
+  permutations: 999
+  strata: none
+  seed: 1
+  da_method: maaslin2
+  fixed_effects: "gestational_age,GWG,age_mother,pre_pregnancy_BMI"
+  random_effects: none
+  reference: "GWG,adequate"
+  da_normalization: TSS
+  da_transform: LOG
+  standardize: true
+  fdr: 0.05
+  mc_samples: 128
+allow: all
+timeout_s: 1800
+data: [elmasri2026-limit-maaslin2/otutable.csv, elmasri2026-limit-maaslin2/metadata.csv]
+items:
+  - {key: samples_in_study, description: "Meconium samples in the study", value: 168, exact: true, tool: inspect_feature_table}
+  - {key: samples_in_model, description: "Samples in the model after the filter for vaginal delivery and the removal of missing values", value: 132, exact: true, tool: differential_abundance}
+  - {key: significant_otus, description: "Associations with q at or below 0.05", value: 1, exact: true, tool: differential_abundance}
+  - {key: top_q, description: "Adjusted p value (q) of the most significant OTU", value: 0.043, tolerance: 0.0005, tool: differential_abundance}
+  - {key: top_otu_samples, description: "Samples that contain the most significant OTU", value: 7, exact: true, tool: differential_abundance}
+  - {key: otus_tested, description: "OTUs tested after the prevalence limit (not printed in the paper)", value: 65, exact: true, reference: true, tool: differential_abundance}
+  - {key: shannon_gwg_p, description: "p value of the Kruskal-Wallis test of Shannon diversity by GWG category", value: 0.9917, tolerance: 0.005, tool: alpha_diversity}
+  - {key: permanova_gwg_r2, description: "PERMANOVA R2 of GWG (Bray-Curtis, relative abundances)", value: 0.0104, tolerance: 0.0005, tool: beta_diversity}
+  - {key: permanova_gwg_f, description: "PERMANOVA F of GWG", value: 0.678, tolerance: 0.005, tool: beta_diversity}
+  - {key: permanova_gwg_p, description: "PERMANOVA p of GWG, 999 permutations", value: 0.91, tolerance: 0.06, tool: beta_diversity}

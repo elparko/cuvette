@@ -1,0 +1,9 @@
+features 400, Dirichlet draws 2000, prior 0.5, log2 centered log-ratio over all features
+S:E:G:D diff.btw 9.236
+S:E:G:E diff.btw 7.644
+V:E:G:E diff.btw 6.523
+S:E:A:E diff.btw 6.190
+T:E:G:E diff.btw 5.764
+V:E:G:D diff.btw 5.750
+features with mean Benjamini-Hochberg q below 0.05 (Welch t-test): 11
+V:E:G:D mean Welch p 9.318e-08 mean q 1.599e-05

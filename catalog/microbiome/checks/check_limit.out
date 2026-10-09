@@ -1,0 +1,11 @@
+samples 168 features 538
+reads min 2688 median 87214 max 126205
+fraction zero 0.972927
+shannon sample 1 1.640023
+mean observed 14.565476
+mean shannon 1.318698
+kruskal shannon by GWG, 155 samples: H 1.348335 p 0.509580
+permanova bray relative GWG, 155 samples: R2 0.010907 F 0.838060
+permanova p, 999 permutations, numpy seed 1: 0.690
+permanova aitchison (clr, pseudo-count 1) GWG, 155 samples: R2 0.011843 F 0.910857
+samples below 50000 reads 57, kept 111

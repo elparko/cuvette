@@ -1,0 +1,5 @@
+vaginal births with a GWG category 132
+GWG categories adequate 55 excess 22 low 55
+shannon (natural log) by GWG, Kruskal-Wallis: H 0.016746 p 0.991662
+PERMANOVA Bray-Curtis on relative abundances by GWG: R2 0.010403 F 0.678065
+p with 999 permutations, numpy seed 1: 0.910
