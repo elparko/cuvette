@@ -11,9 +11,13 @@ These items are being built and are not on main yet:
 - New analyses: ELISA standard curves, dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
 - A map of proprietary lab software and the open-source alternatives that Cuvette supports.
 - A warning before likely patient identifiers go to a cloud model, and the session cost in the status line.
-- Rewind, branches and method templates.
 
 ## 9 October 2026
+
+### Session control
+- `/rewind` returns the session to an earlier message or stage. Later results stay in the folder, marked "rewound", and later decisions return to their earlier values.
+- `/branch <name>` copies the session to try another method. `/branches` lists them, and `/compare` shows their numbers side by side.
+- `/save-method <name>` saves a confirmed analysis as a method. `ga --method <name> <folder>` runs it on new data: the answers come pre-filled for you to confirm, and the demonstration on a sample still runs first. Methods export as one file to share with a lab.
 
 ### Security
 - Folder trust: settings, hooks and adapters in a data folder take effect only after you trust the folder. A card shows every setting, every command in full and every adapter that would replace a built-in one. Choose Trust, Trust once or Do not trust. If a trusted file changes, Cuvette asks again. `ga trust` and `/trust` manage the list.
