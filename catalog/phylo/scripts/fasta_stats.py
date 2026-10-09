@@ -1,7 +1,10 @@
+import os
 import sys
 
 
 def read_fasta(path):
+    if not os.path.isfile(path):
+        sys.exit("file not found: %s" % path)
     names, seqs = [], []
     for line in open(path):
         line = line.strip()

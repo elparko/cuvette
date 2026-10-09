@@ -458,3 +458,12 @@ tests:
       - { path: metrics.n_groups, equals: 2 }
       - { path: metrics.total_truth, equals: 27 }
       - { path: metrics.mean_dice, approx: 0.70745, abs: 0.0005 }
+
+  - id: missing_image
+    description: An image file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: inspect_image, args: { path: "{adapter_dir}/data/no_such_image.tif" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "file not found" }
+      - { path: error, contains: "no_such_image.tif" }

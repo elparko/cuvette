@@ -1138,3 +1138,13 @@ tests:
       - { path: metrics.region_area_mm2, approx: 0.00463148, rel: 0.00001 }
       - { path: metrics.n_cells, equals: 67 }
       - { path: metrics.n_positive, equals: 4 }
+
+  - id: open_missing_file
+    gui: true
+    description: An image file that does not exist fails, and the error names the file. The text comes from gaLoad in lib.groovy.
+    calls:
+      - { tool: open_image, args: { input: "{adapter_dir}/data/no_such_image.tif" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "File not found:" }
+      - { path: error, contains: "no_such_image.tif" }

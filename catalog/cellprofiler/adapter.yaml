@@ -458,6 +458,16 @@ tests:
       - { path: metrics.n_objects_total, equals: 16 }
       - { path: metrics.true_total, equals: 16 }
 
+  - id: pattern_matches_no_file
+    description: A file pattern that matches no image fails before CellProfiler starts, and the error names the folder and the pattern.
+    calls:
+      - tool: count_nuclei
+        args: { folder: "{adapter_dir}/data/bbbc005", pattern: "*.no_such_ext" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "No files in" }
+      - { path: error, contains: "match *.no_such_ext" }
+
 tools:
   - name: write_pipeline
     title: Write a CellProfiler pipeline

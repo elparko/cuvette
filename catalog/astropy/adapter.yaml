@@ -685,6 +685,7 @@ tests:
     description: >
       Two tools in order. Background2D with masking, detection at 3 sigma, then aperture photometry at the
       detected centroids. The count is the value of the run, so this test proves that the tools are stable.
+      The aperture area is pi x 8 x 8 = 201.0619 pixels by geometry.
     data: [data/gaussians_noisy.fits]
     calls:
       - tool: estimate_background
@@ -699,3 +700,20 @@ tests:
       - { path: saved.det.metrics.n_sources, min: 80 }
       - { path: saved.det.metrics.n_sources, max: 90 }
       - { path: metrics.n_sources, min: 80 }
+      - { path: metrics.aperture_area, approx: 201.0619, abs: 0.001 }
+
+  - id: unknown-position-column
+    description: A positions table with no column of the given name fails, and the error names the column.
+    data: [data/gaussians_noiseless.fits, data/isolated_truth.csv]
+    calls:
+      - tool: measure_apertures
+        args:
+          path: "{adapter_dir}/data/gaussians_noiseless.fits"
+          positions_csv: "{adapter_dir}/data/isolated_truth.csv"
+          x_column: no_such_x
+          y_column: y_mean
+          radius: 10
+          local_background: none
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Unknown column: no_such_x" }

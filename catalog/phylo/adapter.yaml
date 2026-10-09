@@ -462,3 +462,12 @@ tests:
         args: { path: "{adapter_dir}/data/example.phy", model: HKY, bootstrap_type: none, seed: 1 }
     expect:
       - { path: metrics.log_likelihood, approx: -23117.03, abs: 2 }
+
+  - id: missing-file
+    description: A FASTA file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: alignment_stats, args: { path: "{adapter_dir}/data/no_such_file.fasta" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "file not found" }
+      - { path: error, contains: "no_such_file.fasta" }

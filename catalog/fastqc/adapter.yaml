@@ -135,6 +135,7 @@ tests:
       The first 10000 reads of the FastQC example file good_sequence_short. The numbers are from
       a FastQC 0.13.0 run on this file (stability test). The full file has 250000 reads, length 40.
     data: [data/good_sequence_short.fastq.gz]
+    fetch: data/fetch.sh
     calls:
       - tool: run_fastqc
         args: { path: "{adapter_dir}/data/good_sequence_short.fastq.gz" }
@@ -153,6 +154,7 @@ tests:
       FastQC 0.13.0 run on this file (stability test). The file has one FAIL module with the
       default encoding.
     data: [data/bad_sequence.fastq.gz]
+    fetch: data/fetch.sh
     calls:
       - tool: run_fastqc
         args: { path: "{adapter_dir}/data/bad_sequence.fastq.gz" }
@@ -173,6 +175,7 @@ tests:
       Illumina 1.5, so per base sequence quality is FAIL with phred64 and PASS with auto. The full
       file shows the same change.
     data: [data/bad_sequence.fastq.gz]
+    fetch: data/fetch.sh
     calls:
       - tool: run_fastqc
         args: { path: "{adapter_dir}/data/bad_sequence.fastq.gz", encoding: phred64 }
@@ -180,3 +183,12 @@ tests:
       - { path: data.encoding, equals: "Illumina 1.5" }
       - { path: data.module_per_base_sequence_quality, equals: FAIL }
       - { path: metrics.n_fail, equals: 2 }
+
+  - id: modules_missing_file
+    description: A report data file that does not exist fails, and the error names the file that read_modules needs.
+    calls:
+      - { tool: read_modules, args: { data_file: "{adapter_dir}/data/no_such_dir/fastqc_data.txt" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "No file at" }
+      - { path: error, contains: "Use data_file from run_fastqc" }

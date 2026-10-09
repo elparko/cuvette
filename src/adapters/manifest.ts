@@ -139,6 +139,7 @@ export const KnownAnswerTest = z.strictObject({
   data: z.array(z.string()).default([]),
   manual_route_checked: z.boolean().default(false),
   gui: z.boolean().optional(),
+  fetch: z.string().default(""),
 });
 
 const OutputSpec = z.strictObject({
@@ -163,6 +164,7 @@ export const ToolDef = z.strictObject({
   macro: z.string().default(""),
   request: z.record(z.string(), z.unknown()).default({}),
   parse: z.enum(["text", "json", "csv", "keyvalue"]).default("text"),
+  returns: z.enum(["values", "text"]).default("values"),
 });
 
 const AdapterInfo = z.strictObject({
@@ -198,6 +200,7 @@ export const Manifest = z
     tests: z.array(KnownAnswerTest).default([]),
     tools: z.array(ToolDef).default([]),
     batch_tools: z.array(z.string()).default([]),
+    text_tools: z.array(z.string()).default([]),
     data_rules: DataRules.default({ cloud_visibility: "all", note: "" }),
   })
   .superRefine((m, ctx) => {

@@ -886,3 +886,69 @@ tests:
     expect:
       - { path: metrics.n_epochs, equals: 18 }
       - { path: "outputs[0].name", contains: tfr }
+
+  - id: missing-file
+    description: A FIF file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: load_raw, args: { path: "{adapter_dir}/data/no_such_raw.fif" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "path not found" }
+      - { path: error, contains: "no_such_raw.fif" }
+
+  - id: synthetic-ica-remove-all
+    description: >
+      A synthetic file made by data/make_synthetic_ica_raw.py. Three EEG channels mix two sources,
+      an evoked bump of -5, -3 and -4 uV and a blink, so the data have rank 2. Before ICA the
+      peak global field power of cond_a is the RMS of -5, -3 and -4 uV, 4.0825 uV. ICA with 2
+      components spans all of the signal, so the removal of both components leaves 0 uV after the
+      baseline correction. Both values follow from the construction.
+    data: [data/synthetic_ica_raw.fif]
+    calls:
+      - tool: load_raw
+        args: { path: "{adapter_dir}/data/synthetic_ica_raw.fif" }
+        save_as: a
+      - tool: make_epochs
+        args: { raw: { handle: "{saved.a.data.inst.handle}" }, event_id: "cond_a=1", tmin: -0.2, tmax: 0.5, baseline_end: 0 }
+        save_as: e0
+      - tool: compute_evoked
+        args: { epochs: { handle: "{saved.e0.data.inst.handle}" }, condition: cond_a }
+        save_as: v0
+      - tool: measure_peak
+        args: { evoked: { handle: "{saved.v0.data.inst.handle}" }, ch_type: eeg, tmin: 0.08, tmax: 0.12, mode: abs }
+        save_as: p0
+      - tool: run_ica
+        args: { raw: { handle: "{saved.a.data.inst.handle}" }, n_components: 2, method: fastica, random_state: 97, picks: eeg }
+        save_as: ica
+      - tool: apply_ica
+        args: { raw: { handle: "{saved.a.data.inst.handle}" }, ica: { handle: "{saved.ica.data.ica.handle}" }, exclude: "0,1" }
+        save_as: c
+      - tool: make_epochs
+        args: { raw: { handle: "{saved.c.data.inst.handle}" }, event_id: "cond_a=1", tmin: -0.2, tmax: 0.5, baseline_end: 0 }
+        save_as: e1
+      - tool: compute_evoked
+        args: { epochs: { handle: "{saved.e1.data.inst.handle}" }, condition: cond_a }
+        save_as: v1
+      - tool: measure_peak
+        args: { evoked: { handle: "{saved.v1.data.inst.handle}" }, ch_type: eeg, tmin: 0.08, tmax: 0.12, mode: abs }
+    expect:
+      - { path: saved.p0.metrics.gfp_amplitude, approx: 4.0825, abs: 0.001 }
+      - { path: saved.ica.metrics.n_components, equals: 2 }
+      - { path: saved.c.metrics.n_removed, equals: 2 }
+      - { path: metrics.gfp_amplitude, approx: 0, abs: 0.01 }
+
+  - id: ica-component-out-of-range
+    description: A component number that the fitted ICA does not have fails, and the error names the number.
+    data: [data/synthetic_ica_raw.fif]
+    calls:
+      - tool: load_raw
+        args: { path: "{adapter_dir}/data/synthetic_ica_raw.fif" }
+        save_as: a
+      - tool: run_ica
+        args: { raw: { handle: "{saved.a.data.inst.handle}" }, n_components: 2, method: fastica, random_state: 97, picks: eeg }
+        save_as: ica
+      - tool: apply_ica
+        args: { raw: { handle: "{saved.a.data.inst.handle}" }, ica: { handle: "{saved.ica.data.ica.handle}" }, exclude: "5" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "components not found: [5]" }

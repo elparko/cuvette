@@ -400,6 +400,8 @@ checks:
     description: The image background differs across the field but the steps do not subtract it.
     severity: warning
 
+text_tools: [list_commands]
+
 tests:
   - id: blobs_info
     gui: true
@@ -579,13 +581,18 @@ tests:
 
   - id: discs_gradient_info
     gui: true
-    description: open_image flags the uneven background.
+    description: >
+      open_image flags the uneven background. The background variation 0.4767 (block medians 21,
+      102, 20, 102 and 61, range 4 to 176) comes from a Python version of the same calculation
+      with the ImageJ histogram median (checks/background_variation.py and its output
+      checks/background_variation.txt). The tolerance allows 2 grey levels of median difference.
     data: [data/discs_gradient.png]
     calls:
       - tool: open_image
         args: { path: "{adapter_dir}/data/discs_gradient.png" }
     expect:
       - { path: metrics.background_variation, min: 0.3 }
+      - { path: metrics.background_variation, approx: 0.4767, abs: 0.012 }
 
   - id: discs_run_command
     gui: true
@@ -619,6 +626,85 @@ tests:
       - { path: metrics.total_count, equals: 49 }
       - { path: metrics.min_count, equals: 6 }
       - { path: metrics.max_count, equals: 12 }
+
+  - id: blobs_image_info
+    gui: true
+    description: >
+      image_info reads blobs.gif without a change. 256 by 254 pixels, 8 bit, raw values 8 to 248.
+      The scikit-image adapter test and a Python read (checks/background_variation.txt) give the
+      same numbers.
+    data: [data/blobs.gif]
+    calls:
+      - tool: image_info
+        args: { path: "{adapter_dir}/data/blobs.gif" }
+    expect:
+      - { path: metrics.width, equals: 256 }
+      - { path: metrics.height, equals: 254 }
+      - { path: metrics.bit_depth, equals: 8 }
+      - { path: metrics.min_value, equals: 8 }
+      - { path: metrics.max_value, equals: 248 }
+
+  - id: discs_watershed_steps
+    gui: true
+    description: >
+      The image has six pairs of touching discs, twelve discs by construction (data/make-synthetic.ts).
+      threshold, then watershed, then analyze_particles gives twelve objects, the same count as the
+      test discs_touching_watershed.
+    data: [data/discs_touching.png]
+    calls:
+      - tool: threshold
+        args: { input: "{adapter_dir}/data/discs_touching.png", method: Default, dark_background: true }
+        save_as: thr
+      - tool: watershed
+        args: { mask: "{saved.thr.data.files.mask}" }
+        save_as: ws
+      - tool: analyze_particles
+        args: { mask: "{saved.ws.data.files.mask}", exclude_edges: false }
+    expect:
+      - { path: metrics.count, equals: 12 }
+
+  - id: run_macro_new_image
+    gui: true
+    description: Macro code makes a new 10 by 20 pixel image and prints its size. The size is set by the code.
+    calls:
+      - tool: run_macro
+        args: { code: "newImage(\"t\", \"8-bit black\", 10, 20, 1); print(\"width=\" + getWidth()); print(\"height=\" + getHeight());" }
+    expect:
+      - { path: metrics.width, equals: 10 }
+      - { path: metrics.height, equals: 20 }
+
+  - id: list_commands_gaussian
+    gui: true
+    description: The ImageJ menu has Gaussian Blur under Process > Filters (ImageJ user guide, https://imagej.net/ij/docs/menus/process.html). list_commands returns text (text_tools).
+    calls:
+      - tool: list_commands
+        args: { query: gaussian blur }
+    expect:
+      - { path: text, contains: "Process > Filters > Gaussian Blur..." }
+
+  - id: read_recording_blobs
+    gui: true
+    description: >
+      data/recording-blobs.ijm has nine macro lines. setAutoThreshold and Convert to Mask make one
+      threshold step, so the file holds eight steps (count by hand; tests/imagej.test.ts checks
+      the same list).
+    data: [data/recording-blobs.ijm]
+    calls:
+      - tool: read_recording
+        args: { path: "{adapter_dir}/data/recording-blobs.ijm" }
+    expect:
+      - { path: metrics.n_steps, equals: 8 }
+
+  - id: read_recording_missing_file
+    gui: true
+    description: A macro file that does not exist fails, and the error names the file.
+    calls:
+      - tool: read_recording
+        args: { path: "{adapter_dir}/data/no_such_recording.ijm" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "No file at" }
+      - { path: error, contains: "no_such_recording.ijm" }
 
 tools:
   - name: open_image

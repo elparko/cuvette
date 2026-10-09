@@ -152,6 +152,7 @@ tools:
       noflat: { type: string, enum: ["-noflat"], description: 'Write "-noflat" to list the sub-resolutions of one series.' }
     required: [path]
     command: ["{program_path}/showinf", "-nopix", "-nometa", "-no-upgrade", "{noflat}", "{path}"]
+    returns: text
 
   - name: read_ome_xml
     title: Read the OME-XML metadata of an image file
@@ -164,6 +165,7 @@ tools:
       path: { type: string, minLength: 1, description: Absolute path of the image file. }
     required: [path]
     command: ["{program_path}/showinf", "-nopix", "-omexml-only", "-no-upgrade", "{path}"]
+    returns: text
 
   - name: convert_to_ome_tiff
     title: Convert one series or plane to OME-TIFF
@@ -333,3 +335,11 @@ tests:
       - { tool: read_ome_xml, args: { path: "{saved.s0.outputs[0].path}" } }
     expect:
       - { path: text, contains: 'PhysicalSizeX="0.4536793' }
+
+  - id: info_missing_file
+    description: An image file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: read_image_info, args: { path: "{adapter_dir}/data/no_such_image.tif" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_image.tif (No such file or directory)" }

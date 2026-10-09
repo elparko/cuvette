@@ -1377,6 +1377,17 @@ tests:
       - { path: summary, contains: "Top 3 higher in rim: m/z" }
       - { path: summary, contains: "Top 5 higher in core: m/z" }
       - { path: summary, contains: "putatively" }
+
+  - id: state-without-slide
+    gui: true
+    description: After close_slide, a call that needs a slide fails, and the error says to call open_slide first. The text comes from _slide() in smile_msi/mcpserver.py of SMILE MSI. Not run in this change.
+    calls:
+      - { tool: close_slide }
+      - { tool: state }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no slide open" }
+      - { path: error, contains: "call open_slide first" }
 data_rules:
   cloud_visibility: all
   note: The tools return summaries and tables of at most 12 rows. Full tables stay in the work folder.

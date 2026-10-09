@@ -1,0 +1,6 @@
+sites 20 species 30
+max value 9.0 min positive 1.0
+site totals min 15.0 max 48.0
+site 1 total 18.0 richness 5
+fraction zero 0.671667
+Management counts [('BF', 3), ('HF', 5), ('NM', 6), ('SF', 6)]

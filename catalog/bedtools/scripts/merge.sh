@@ -1,4 +1,5 @@
 bt=$1; out=$2; in=$3; shift 3
+[ -f "$in" ] || { echo "the BED file $in does not exist" >&2; exit 1; }
 dist=0; strand=
 while [ $# -gt 0 ]; do
   case $1 in --distance) dist=$2;; --strand) strand=$2;; esac

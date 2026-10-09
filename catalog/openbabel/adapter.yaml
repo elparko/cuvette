@@ -58,7 +58,8 @@ tools:
     required: [path]
     outputs:
       result: { kind: text, ext: .txt, description: The converted molecules. }
-    command: ["{program_path}", "{path}", "-o{to}", "-e", "-O{output.result}"]
+    command: ["/bin/sh", "{adapter_dir}/scripts/obabel.sh", "{program_path}", "{path}", "-o{to}", "-e", "-O{output.result}"]
+    returns: text
   - name: convert_largest_fragment
     title: Convert and keep the largest fragment
     description: Convert a molecule file to another format and remove all but the largest fragment of each molecule. This removes salt counter-ions.
@@ -69,7 +70,8 @@ tools:
     required: [path]
     outputs:
       result: { kind: text, ext: .txt, description: The converted molecules. }
-    command: ["{program_path}", "{path}", "-o{to}", "-e", "-r", "-O{output.result}"]
+    command: ["/bin/sh", "{adapter_dir}/scripts/obabel.sh", "{program_path}", "{path}", "-o{to}", "-e", "-r", "-O{output.result}"]
+    returns: text
   - name: append_descriptors
     title: Append descriptors to SMILES
     description: "Write each molecule as SMILES and name, followed by the values of the descriptors in the order of the list. The output has one line for each molecule."
@@ -80,7 +82,8 @@ tools:
     required: [path, descriptors]
     outputs:
       result: { kind: text, ext: .smi, description: "Lines of SMILES, name and descriptor values." }
-    command: ["{program_path}", "{path}", "-osmi", "-e", "-O{output.result}", "--append", "{descriptors}"]
+    command: ["/bin/sh", "{adapter_dir}/scripts/obabel.sh", "{program_path}", "{path}", "-osmi", "-e", "-O{output.result}", "--append", "{descriptors}"]
+    returns: text
 map:
   - tool: convert_molecules
     route: "Run: obabel <file> -o<format> -e -O<output file>"
@@ -129,7 +132,7 @@ tests:
     expect:
       - { path: text, contains: "BSYNRYMUTXBXSQ-UHFFFAOYSA-N" }
   - id: mini-largest-fragment
-    description: Sodium acetate becomes the acetate ion [O-]C(=O)C when the largest fragment is kept.
+    description: Sodium acetate becomes the acetate ion [O-]C(=O)C when the largest fragment is kept. RDKit gives the same ion (checks/aspirin_descriptors.txt).
     data: [data/mini.smi]
     calls:
       - tool: convert_molecules
@@ -141,10 +144,18 @@ tests:
       - { path: saved.kept.text, contains: "[Na+]" }
       - { path: text, contains: "[O-]C(=O)C" }
   - id: mini-descriptors
-    description: "Aspirin molecular weight 180.157 and logP 1.3101 are read from obabel. The values are from a run of the program, not from a publication."
+    description: "Aspirin C9H8O4. The molecular weight 180.157 is a hand sum with the IUPAC 2005 atomic weights. logP 1.3101 (Crippen), TPSA 63.6 and 1 donor come from RDKit 2026.03.6, an independent program. The script and its output are in checks/aspirin_descriptors.*."
     data: [data/mini.smi]
     calls:
       - tool: append_descriptors
         args: { path: "{adapter_dir}/data/mini.smi", descriptors: "MW logP TPSA HBD" }
     expect:
       - { path: text, contains: "aspirin 180.157 1.3101 63.6 1" }
+  - id: missing-file
+    description: An input file that does not exist fails, and the error names the file. obabel exits with 0 here, so scripts/obabel.sh reads its message.
+    calls:
+      - { tool: convert_molecules, args: { path: "{adapter_dir}/data/no_such_file.smi" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Cannot open" }
+      - { path: error, contains: "no_such_file.smi" }

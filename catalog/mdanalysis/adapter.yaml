@@ -739,3 +739,12 @@ tests:
       - { path: metrics.n_atoms_fitted, equals: 214 }
       - { path: metrics.rmsd_before_fit, approx: 48.266043, abs: 0.001 }
       - { path: metrics.rmsd_after_fit, approx: 0.607165, abs: 0.0005 }
+
+  - id: missing_structure
+    description: A structure file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: inspect_structure, args: { path: "{adapter_dir}/data/no_such_file.pdb" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "file not found" }
+      - { path: error, contains: "no_such_file.pdb" }

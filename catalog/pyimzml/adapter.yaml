@@ -358,6 +358,15 @@ tests:
       - { path: metrics.ibd_bytes_b, equals: 240 }
       - { path: data.data.storage_a, equals: processed }
       - { path: data.data.storage_b, equals: continuous }
+
+  - id: missing-file
+    description: An imzML file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: read_file_info, args: { path: "{adapter_dir}/data/no_such_file.imzML" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "file not found" }
+      - { path: error, contains: "no_such_file.imzML" }
 data_rules:
   cloud_visibility: all
   note: The tools return summaries and tables of at most 10 rows. Full images and tables stay in the work folder.

@@ -376,6 +376,38 @@ tests:
       - { path: metrics.n_segments, equals: 3 }
       - { path: "table.columns[1]", equals: mz }
 
+  - id: missing-file
+    description: An image file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: load_image, args: { path: "{adapter_dir}/data/no_such_file.rds" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "file not found" }
+      - { path: error, contains: "no_such_file.rds" }
+
+  - id: plot_segments_unfitted_s
+    description: >
+      plot_segments draws one fitted model. A model file fitted with s 8 has no model with s 5, so
+      the call fails and the error lists the fitted s values. The values are the test settings, not
+      measured numbers.
+    data: [data/pig206_mini.rds]
+    calls:
+      - tool: load_image
+        args: { path: "{adapter_dir}/data/pig206_mini.rds" }
+        save_as: img
+      - tool: process_peaks
+        args: { image: "{saved.img.data.image_file}", normalize: tic, snr: 3, tolerance: 0.5, sample_size: 0.1, seed: 1 }
+        save_as: pk
+      - tool: segment_image
+        args: { peaks: "{saved.pk.data.peaks_file}", r: 2, k: 4, s: [8], weights: adaptive, seed: 1 }
+        save_as: fit
+      - tool: plot_segments
+        args: { model: "{saved.fit.data.model_file}", s: 5 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no model with s = 5" }
+      - { path: error, contains: "Fitted s values: 8" }
+
 tools:
   - name: load_image
     title: Load an imaging run

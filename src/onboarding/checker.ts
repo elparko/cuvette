@@ -34,13 +34,14 @@ function lintTools(adapter: LoadedAdapter, raw: Record<string, any>, extra: Sche
     params: t.params,
     required: t.required,
     batch: rawTools.find((r) => r?.name === t.name)?.batch,
+    returns: t.returns,
     source: "manifest",
   }));
   for (const t of extra) {
     const name = t.remoteName ?? t.name;
     if (out.some((o) => o.name === name)) continue;
     const schema = t.inputSchema as { properties?: Record<string, Record<string, unknown>>; required?: string[] };
-    out.push({ name, description: t.description ?? "", params: schema.properties ?? {}, required: schema.required ?? [], batch: m.batch_tools.includes(name) ? true : undefined, source });
+    out.push({ name, description: t.description ?? "", params: schema.properties ?? {}, required: schema.required ?? [], batch: m.batch_tools.includes(name) ? true : undefined, returns: m.text_tools.includes(name) ? "text" : "values", source });
   }
   return out;
 }
@@ -159,8 +160,9 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
       }
       if (call.save_as) earlier.add(call.save_as);
     }
+    if (t.fetch && !existsSync(join(adapter.root, t.fetch))) errors.push(`test "${t.id}": the fetch script "${t.fetch}" does not exist`);
     for (const rel of t.data) {
-      if (!existsSync(join(adapter.root, rel))) errors.push(`test "${t.id}": data file "${rel}" does not exist`);
+      if (!t.fetch && !existsSync(join(adapter.root, rel))) errors.push(`test "${t.id}": data file "${rel}" does not exist`);
     }
     if (!t.expect.length) warnings.push(`test "${t.id}": no expectations`);
     for (const e of t.expect) {
@@ -272,6 +274,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
       const skipped = m.tests.filter((t) => t.gui && !opts.gui).length;
       if (skipped) warnings.push(`${skipped} known-answer test(s) open a window (gui: true) and did not run. Run with --gui to include them`);
       for (const t of tests) for (const f of t.failures) errors.push(`test "${t.id}" failed: ${f}`);
+      for (const t of tests) if (t.skipped) warnings.push(`test "${t.id}" did not run: ${t.skipped}`);
     } catch (err) {
       errors.push(`the adapter did not start: ${(err as Error).message}`);
       if (!runtime) checkStatic(adapter, errors, warnings, tools, toolsKnown);

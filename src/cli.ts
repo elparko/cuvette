@@ -345,7 +345,7 @@ async function main() {
         const r = await checker.checkAdapter(a2, { runTests: !!o["run-tests"], gui: !!o.gui });
         for (const e of r.errors) console.log(`error: ${e}`);
         for (const w of r.warnings) console.log(`warning: ${w}`);
-        for (const t of r.tests ?? []) console.log(`${t.ok ? "pass" : "FAIL"} ${t.id}${t.failures.length ? ": " + t.failures.join("; ") : ""}`);
+        for (const t of r.tests ?? []) console.log(t.skipped ? `skip ${t.id}: ${t.skipped}` : `${t.ok ? "pass" : "FAIL"} ${t.id}${t.failures.length ? ": " + t.failures.join("; ") : ""}`);
         console.log(r.ok ? "The adapter passes." : "The adapter does not pass.");
         process.exitCode = r.ok ? 0 : 1;
         return;

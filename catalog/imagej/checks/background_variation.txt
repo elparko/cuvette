@@ -1,0 +1,2 @@
+discs_gradient.png mode L size 256 256 min 4 max 176 block medians [21, 102, 20, 102, 61] spread 82 variation 0.4767
+blobs.gif mode P size 256 254 min 8 max 248 block medians [56, 64, 64, 56, 64] spread 8 variation 0.0333

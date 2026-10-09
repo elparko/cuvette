@@ -612,6 +612,36 @@ tests:
       - { path: metrics.adj_r2, approx: 0.221801, abs: 0.0001 }
       - { path: metrics.global_f, approx: 2.35384, abs: 0.001 }
 
+  - id: missing-file
+    description: A community table that does not exist fails, and the error names the file.
+    calls:
+      - { tool: inspect_community, args: { community: "{adapter_dir}/data/no_such_file.csv" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "file not found" }
+      - { path: error, contains: "no_such_file.csv" }
+
+  - id: inspect_dune
+    description: >
+      The vegan help page for dune gives 30 species at 20 sites, and dune.env gives Management
+      with the levels BF, HF, NM and SF. The other numbers come from a count in Python, a
+      different language (checks/dune_inspect.py and its output checks/dune_inspect.txt).
+    data: [data/dune.csv, data/dune_env.csv]
+    calls:
+      - tool: inspect_community
+        args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv" }
+    expect:
+      - { path: metrics.n_sites, equals: 20 }
+      - { path: metrics.n_species, equals: 30 }
+      - { path: metrics.max_value, equals: 9 }
+      - { path: metrics.min_site_total, equals: 15 }
+      - { path: metrics.max_site_total, equals: 48 }
+      - { path: metrics.fraction_zero, approx: 0.671667, abs: 0.000001 }
+      - { path: "table.rows[0][1]", equals: 18 }
+      - { path: "table.rows[0][2]", equals: 5 }
+      - { path: "data.environment[2].name", equals: Management }
+      - { path: "data.environment[2].counts", equals: [3, 5, 6, 6] }
+
 tools:
   - name: inspect_community
     title: Inspect a community table

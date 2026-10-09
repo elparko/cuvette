@@ -378,6 +378,15 @@ tests:
       - { path: "saved.re.table.rows[0][3]", approx: 2.2586, abs: 0.001 }
       - { path: "outputs[0].path", contains: ".png" }
 
+  - id: missing-file
+    description: A data file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: inspect_data, args: { data: "{adapter_dir}/data/no_such_file.csv" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "file not found" }
+      - { path: error, contains: "no_such_file.csv" }
+
 tools:
   - name: inspect_data
     title: Inspect a data table

@@ -23,7 +23,7 @@ def _parser(path):
     ibd = path[:-6] + ".ibd"
     for f in (path, ibd):
         if not os.path.isfile(f):
-            raise FileNotFoundError(f)
+            raise FileNotFoundError("file not found: %s" % f)
     key = (path, os.path.getmtime(path))
     if key not in _parsers:
         _parsers.clear()

@@ -270,6 +270,7 @@ tests:
   - id: esol-full
     description: "Full ESOL set of 1128 molecules. The counts and the scores are computed with RDKit 2026.03.6 and are not published numbers. The coefficients are the published ESOL constants."
     data: [data/delaney-processed.csv]
+    fetch: data/fetch.sh
     calls:
       - tool: load_molecules
         args: { path: "{adapter_dir}/data/delaney-processed.csv", smiles_column: smiles, id_column: Compound ID, target_column: measured log solubility in mols per litre }
@@ -293,6 +294,7 @@ tests:
   - id: esol-refit
     description: "Refit with seed 42 and 20 percent held out. The numbers are from a run of this tool. They show that the tool is stable. They are not published numbers."
     data: [data/delaney-processed.csv]
+    fetch: data/fetch.sh
     calls:
       - tool: load_molecules
         args: { path: "{adapter_dir}/data/delaney-processed.csv", smiles_column: smiles, id_column: Compound ID, target_column: measured log solubility in mols per litre }

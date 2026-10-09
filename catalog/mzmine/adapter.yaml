@@ -268,6 +268,7 @@ tests:
       scans. The scan count comes from pyOpenMS and is independent of this tool. mzmine reads 238 scans and
       runs three steps (import, mass detection, chromatogram builder). Later steps need a user login.
     data: [data/PStd_050_1_rt600-660_mz100-200.mzML]
+    fetch: data/fetch.sh
     calls:
       - tool: detect_features
         args:
@@ -286,6 +287,7 @@ tests:
   - id: two_tools_chromatograms
     description: write_batch then run_batch in order, with the same result as chromatograms_only.
     data: [data/PStd_050_1_rt600-660_mz100-200.mzML]
+    fetch: data/fetch.sh
     calls:
       - tool: write_batch
         args: { noise_level: 1000, mz_tolerance_ppm: 10, min_height: 3000, rt_tolerance_min: 0.1, stop_after: chromatograms }
@@ -310,6 +312,16 @@ tests:
       - { path: metrics.n_features_in_all_files, equals: 2 }
       - { path: metrics.mean_mz, approx: 175.125, abs: 0.0001 }
       - { path: metrics.median_height, approx: 2250, abs: 0.1 }
+
+  - id: read_table_missing_file
+    description: A feature table that does not exist fails before mzmine starts, and the error names the file. The text comes from scripts/read_feature_table.mjs. Not run in this change, because Parker runs the mzmine tests himself.
+    calls:
+      - tool: read_feature_table
+        args: { path: "{adapter_dir}/data/no_such_table.csv" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "File not found:" }
+      - { path: error, contains: "no_such_table.csv" }
 
 tools:
   - name: write_batch

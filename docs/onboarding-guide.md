@@ -91,8 +91,11 @@ Data and tests:
 - Write known-answer tests. [kat-present]
 - Call each tool in at least one test. The drive test needs a test input for each tool. [kat-coverage]
 - Pin each test with `equals` or `approx` on a number from a trusted source, not only `ok` or a range. [kat-exact]
+- Set `returns: text` on a tool that returns only text, such as converted molecules, a file listing or OME-XML. For a tool from the module or an MCP server, put its name in `text_tools`. A test that reads only these tools can pin the exact text with `contains`. [kat-exact]
+- If you calculate an expected value with a different program or language, save the script and its output in `checks/` in the adapter folder. Name both files in the test description.
 - Add a test with bad input that expects `ok: false` and a `contains` on the error. [kat-failure-path]
 - Use public or synthetic data. List each file in `data/SOURCES.md`: `| File | Source | License |`. [kat-data-license]
+- Do not commit a file whose license does not allow redistribution. Write `data/fetch.sh`: it downloads the file, checks its SHA-256 sum and stops on a mismatch. Set `fetch: data/fetch.sh` on each test that reads the file, and add the file to `.gitignore`. The test downloads the file when it is missing, and it skips if the computer has no network. [kat-data-license]
 - A test runs headless, or it has `gui: true`. Default test runs skip `gui: true` tests; `--gui` runs them. A macro or screen adapter states `gui` on each test. [kat-gui]
 - Take expected numbers from a real program run or a publication, never from your own tool.
 

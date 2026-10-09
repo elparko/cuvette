@@ -780,3 +780,42 @@ tests:
       - { path: data.method, equals: wilcoxon }
       - { path: "table.rows[0][1]", equals: NKG7 }
       - { path: summary, contains: S100A8 }
+
+  - id: missing-file
+    description: A data path that does not exist fails, and the error names the path.
+    calls:
+      - { tool: load_data, args: { path: "{adapter_dir}/data/no_such_file.h5ad" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "path not found" }
+      - { path: error, contains: "no_such_file.h5ad" }
+
+  - id: plot-genes-umap
+    description: >
+      plot_genes draws the genes that are in the file and names the others. CD3E and MS4A1 are
+      in the 1000 genes of the small file and NOT_A_GENE is not. h5py, not scanpy, read the gene
+      names (checks/genes_in_file.py and its output checks/genes_in_file.txt).
+    data: [data/pbmc3k_small.h5ad]
+    calls:
+      - tool: load_data
+        args: { path: "{adapter_dir}/data/pbmc3k_small.h5ad" }
+        save_as: a
+      - tool: normalize_log
+        args: { adata: { handle: "{saved.a.data.adata.handle}" }, target_sum: 10000 }
+        save_as: b
+      - tool: run_pca
+        args: { adata: { handle: "{saved.b.data.adata.handle}" }, random_state: 0 }
+        save_as: c
+      - tool: build_neighbors
+        args: { adata: { handle: "{saved.c.data.adata.handle}" }, n_neighbors: 10, n_pcs: 10, random_state: 0 }
+        save_as: d
+      - tool: run_umap
+        args: { adata: { handle: "{saved.d.data.adata.handle}" }, random_state: 0 }
+        save_as: e
+      - tool: plot_genes
+        args: { adata: { handle: "{saved.e.data.adata.handle}" }, genes: [CD3E, MS4A1, NOT_A_GENE], kind: umap }
+    expect:
+      - { path: metrics.n_genes_plotted, equals: 2 }
+      - { path: metrics.n_genes_missing, equals: 1 }
+      - { path: summary, contains: "Genes not found: NOT_A_GENE" }
+      - { path: "outputs[0].path", contains: ".png" }

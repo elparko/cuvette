@@ -1,4 +1,6 @@
 bt=$1; out=$2; a=$3; b=$4; shift 4
+[ -f "$a" ] || { echo "the BED file $a does not exist" >&2; exit 1; }
+[ -f "$b" ] || { echo "the BED file $b does not exist" >&2; exit 1; }
 strand=
 while [ $# -gt 0 ]; do
   case $1 in --strand) strand=$2;; esac

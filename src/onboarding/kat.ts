@@ -1,4 +1,5 @@
-import { mkdtempSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { KnownAnswerTest, LoadedAdapter } from "../adapters/manifest.ts";
@@ -10,6 +11,7 @@ export interface TestOutcome {
   failures: string[];
   durationMs: number;
   outputs: OutputFile[];
+  skipped?: string;
 }
 
 export interface RuntimeLike {
@@ -115,6 +117,26 @@ function makeContext(workDir: string, sessionDir: string, signal: AbortSignal, b
   return ctx;
 }
 
+const OFFLINE_CODES = new Set([6, 7, 28, 35, 56]);
+
+export function fetchData(test: KnownAnswerTest, root: string, timeoutMs = 1_800_000): Promise<{ skip?: string; error?: string }> {
+  if (test.data.every((d) => existsSync(join(root, d)))) return Promise.resolve({});
+  const script = join(root, test.fetch);
+  if (!existsSync(script)) return Promise.resolve({ error: `the fetch script ${test.fetch} does not exist` });
+  return new Promise((done) => {
+    execFile("bash", [script], { cwd: join(script, ".."), timeout: timeoutMs, maxBuffer: 1 << 24 }, (err, _out, stderr) => {
+      const last = String(stderr).trim().split("\n").pop() ?? "";
+      if (err) {
+        const code = typeof err.code === "number" ? err.code : -1;
+        if (OFFLINE_CODES.has(code)) return done({ skip: `the test data is not in the repository and ${test.fetch} could not download it (no network, exit code ${code}). Connect to the network and run the test again` });
+        return done({ error: `${test.fetch} failed with exit code ${code}${last ? `: ${last}` : ""}` });
+      }
+      const missing = test.data.filter((d) => !existsSync(join(root, d)));
+      done(missing.length ? { error: `${test.fetch} finished but did not make ${missing.join(", ")}` } : {});
+    });
+  });
+}
+
 async function runOne(
   test: KnownAnswerTest,
   adapter: LoadedAdapter,
@@ -124,6 +146,11 @@ async function runOne(
   const started = Date.now();
   const failures: string[] = [];
   const outputs: OutputFile[] = [];
+  if (test.fetch) {
+    const got = await fetchData(test, adapter.root);
+    if (got.skip) return { id: test.id, ok: true, failures, durationMs: Date.now() - started, outputs, skipped: got.skip };
+    if (got.error) return { id: test.id, ok: false, failures: [got.error], durationMs: Date.now() - started, outputs };
+  }
   const saved: Record<string, ToolOutput> = {};
   let last: ToolOutput = { ok: false, error: "the test has no calls" };
   const nextWanted = test.expect.some((e) => e.path === "ok");

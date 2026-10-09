@@ -27,7 +27,7 @@ _cache = {}
 def _path(path):
     path = os.path.abspath(os.path.expanduser(path))
     if not os.path.isfile(path):
-        raise FileNotFoundError(path)
+        raise FileNotFoundError("file not found: %s" % path)
     return path
 
 

@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { loadAdapter, Manifest } from "../src/adapters/manifest.ts";
 import { locate } from "../src/adapters/locate.ts";
 import { checkAdapter } from "../src/onboarding/checker.ts";
-import { runTests } from "../src/onboarding/kat.ts";
+import { fetchData, runTests } from "../src/onboarding/kat.ts";
 import { lint, numbersIn, readSources, RULES, scanErrors } from "../src/onboarding/lint.ts";
 import type { Finding, LintTool } from "../src/onboarding/lint.ts";
 
@@ -257,8 +257,28 @@ describe("lint: known-answer tests and data", () => {
   test("kat-exact", async () => {
     expect(await findings(make((y) => y.replace("{ path: metrics.mean, approx: 12.75 }", "{ path: metrics.mean, min: 1 }")), "kat-exact")).toHaveLength(1);
   });
+  test("kat-exact: a test of a text tool can pin the text with contains", async () => {
+    const textTest = (y: string) => y.replace("{ path: metrics.mean, approx: 12.75 }", '{ path: text, contains: "12.75" }');
+    expect(await findings(make(textTest), "kat-exact")).toHaveLength(1);
+    expect(await findings(make((y) => textTest(y).replace("    parse: keyvalue", "    parse: keyvalue\n    returns: text")), "kat-exact")).toHaveLength(0);
+    expect(await findings(make((y) => textTest(y).replace("tests:\n", "text_tools: [summarize]\ntests:\n")), "kat-exact")).toHaveLength(0);
+  });
   test("kat-failure-path", async () => {
     expect(await findings(make((y) => y.replace(/  - id: bad-column[\s\S]*?equals: false \}\]\n/, "")), "kat-failure-path")).toHaveLength(1);
+  });
+  test("kat-data-license: a fetched file needs a source row and a fetch script with a SHA-256 check", async () => {
+    const fetched = (y: string) => y.replace("    data: [data/a.csv]\n", "    data: [data/a.csv]\n    fetch: data/fetch.sh\n");
+    const row = { "data/SOURCES.md": "| File | Source | License |\n| --- | --- | --- |\n| a.csv | Not in the repository. data/fetch.sh downloads it. | No license stated |\n" };
+    expect(await findings(make(fetched, { ...row, "data/fetch.sh": "curl -fL -o a.csv https://example.org/a.csv\nshasum -a 256 a.csv\n" }), "kat-data-license")).toHaveLength(0);
+    expect(await findings(make(fetched, { ...row, "data/fetch.sh": "curl -fL -o a.csv https://example.org/a.csv\n" }), "kat-data-license")).toHaveLength(1);
+    expect((await findings(make(fetched, row), "kat-data-license"))[0].severity).toBe("error");
+  });
+  test("a fetch script that cannot reach the network skips the test", async () => {
+    const dir = make((y) => y.replace("    data: [data/a.csv]\n", "    data: [data/missing.csv]\n    fetch: data/fetch.sh\n"), { "data/fetch.sh": "exit 7\n" });
+    const t = loadAdapter(dir).manifest.tests[0];
+    expect((await fetchData(t, dir)).skip).toContain("exit code 7");
+    writeFileSync(join(dir, "data/fetch.sh"), "echo 'checksum mismatch' >&2; exit 1\n");
+    expect((await fetchData(t, dir)).error).toContain("checksum mismatch");
   });
   test("kat-data-license: missing file, missing row, unconfirmed license, folder row", async () => {
     expect((await findings(make((y) => y, { "data/SOURCES.md": null }), "kat-data-license"))[0].severity).toBe("error");

@@ -19,6 +19,7 @@ export interface LintTool {
   params: Record<string, Record<string, unknown>>;
   required: string[];
   batch?: boolean;
+  returns?: "values" | "text";
   source: "manifest" | "module" | "server";
 }
 
@@ -62,12 +63,12 @@ export const RULES: Record<string, { severity: Severity; rule: string }> = {
   "approval-code": { severity: "error", rule: "A tool that runs code that the model writes sets approval: true." },
   "fail-without-error": { severity: "warning", rule: "A result with ok false also has an error text." },
   "sensitivity-compare": { severity: "error", rule: "Each sensitivity compare entry is a full result path, such as metrics.n_objects." },
-  "kat-exact": { severity: "warning", rule: "Each known-answer test pins at least one value with equals or approx." },
+  "kat-exact": { severity: "warning", rule: "Each known-answer test pins at least one value with equals or approx. A test that reads only tools with returns: text (or listed in text_tools) can pin the exact text with contains." },
   "kat-failure-path": { severity: "warning", rule: "At least one known-answer test calls a tool with bad input and expects ok: false." },
   "kat-gui": { severity: "error", rule: "A known-answer test runs headless, or it is marked gui: true so that test loops skip it. A macro or screen adapter states gui on each test." },
   "kat-present": { severity: "error", rule: "The adapter has known-answer tests." },
   "kat-coverage": { severity: "warning", rule: "Each tool is called in at least one known-answer test." },
-  "kat-data-license": { severity: "error", rule: "data/SOURCES.md lists each test data file with its source and license. A license that is not confirmed is a warning." },
+  "kat-data-license": { severity: "error", rule: "data/SOURCES.md lists each test data file with its source and license. A license that is not confirmed is a warning. A file that a test fetches is not in the repository: its row needs a source, and its fetch script checks a SHA-256 sum." },
 };
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -330,12 +331,17 @@ export function benchmarkValues(dir = BENCH_PAPERS): KnownValue[] {
   return out;
 }
 
-function testDataFiles(a: LoadedAdapter): string[] {
+function testDataFiles(a: LoadedAdapter, fetched = false): string[] {
   const files = new Set<string>();
   for (const t of a.manifest.tests) {
+    if (!!t.fetch !== fetched) continue;
     for (const d of t.data) files.add(d.replace(/^\.\//, ""));
+    const failure = t.expect.some((e) => e.path === "ok" && e.equals === false);
     const text = JSON.stringify(t.calls);
-    for (const x of text.matchAll(/\{adapter_dir\}\/(data\/[^"{}*?\s]+)/g)) files.add(x[1].replace(/\/$/, ""));
+    for (const x of text.matchAll(/\{adapter_dir\}\/(data\/[^"{}*?\s]+)/g)) {
+      const f = x[1].replace(/\/$/, "");
+      if (!(failure && !existsSync(join(a.root, f)))) files.add(f);
+    }
   }
   return [...files].filter((f) => f.startsWith("data/"));
 }
@@ -354,18 +360,28 @@ export function readSources(text: string): { file: string; source: string; licen
 const UNCONFIRMED = /\b(unknown|not confirmed|unconfirmed|unclear|to check|check before|tbd|todo)\b/i;
 
 function lintData(a: LoadedAdapter, out: Finding[]) {
-  const files = testDataFiles(a);
-  if (!files.length) return;
+  const fetchedFiles = testDataFiles(a, true);
+  const files = testDataFiles(a).filter((f) => !fetchedFiles.includes(f));
+  for (const script of new Set(a.manifest.tests.map((t) => t.fetch).filter(Boolean))) {
+    const p = join(a.root, script);
+    if (!existsSync(p)) add(out, "kat-data-license", script, "the fetch script does not exist. Write it: it downloads the file, checks its SHA-256 sum and stops on a mismatch.");
+    else if (!/sha256|shasum/i.test(readFileSync(p, "utf8"))) add(out, "kat-data-license", script, "the fetch script does not check a SHA-256 sum. Compare the download with a fixed sum and stop on a mismatch.", "warning");
+  }
+  const all = [...files, ...fetchedFiles];
+  if (!all.length) return;
   const note = join(a.root, "data", "SOURCES.md");
   if (!existsSync(note)) {
-    add(out, "kat-data-license", "data/SOURCES.md", `the tests read ${files.length} data file(s) but data/SOURCES.md does not exist. Write a table | File | Source | License | with one row for each file or folder. For a made-up file write the script that makes it and "synthetic".`);
+    add(out, "kat-data-license", "data/SOURCES.md", `the tests read ${all.length} data file(s) but data/SOURCES.md does not exist. Write a table | File | Source | License | with one row for each file or folder. For a made-up file write the script that makes it and "synthetic".`);
     return;
   }
   const rows = readSources(readFileSync(note, "utf8"));
-  for (const f of files) {
+  for (const f of all) {
     const rel = f.replace(/^data\//, "");
     const row = rows.find((r) => r.file && (rel === r.file || rel.startsWith(r.file.replace(/\/?$/, "/")) || (r.file.includes("*") && new RegExp(`^${r.file.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")}$`).test(rel))));
     if (!row) add(out, "kat-data-license", "data/SOURCES.md", `the test data file ${f} has no row. Add its source and license.`);
+    else if (fetchedFiles.includes(f)) {
+      if (!row.source) add(out, "kat-data-license", "data/SOURCES.md", `the row for ${row.file} has no source. A fetched file needs the address that the fetch script downloads.`);
+    }
     else if (!row.license || !row.source) add(out, "kat-data-license", "data/SOURCES.md", `the row for ${row.file} has no ${row.source ? "license" : "source"}.`);
     else if (UNCONFIRMED.test(row.license)) add(out, "kat-data-license", "data/SOURCES.md", `the license of ${row.file} is not confirmed ("${row.license}"). Confirm it before the adapter is public, or replace the file with public or synthetic data.`, "warning");
   }
@@ -491,8 +507,15 @@ export function lint(input: LintInput): Finding[] {
       if (rawTests.find((r) => r?.id === t.id)?.gui === undefined)
         add(out, "kat-gui", `test "${t.id}"`, `a ${m.connection.kind} adapter can open a program window. Set gui: true if the test opens a window or takes the focus (default test runs skip it; --gui runs it), or gui: false if you checked that it runs headless.`);
   if (!m.tests.length) add(out, "kat-present", "tests", "the adapter has no known-answer tests. Add at least one test on small public or synthetic data with a number from a trusted source.");
+  const textTools = new Set([...tools.filter((t) => t.returns === "text").map((t) => t.name), ...m.text_tools]);
+  const readsText = (t: (typeof m.tests)[number], path: string) => {
+    const saved = /^saved\.([^.]+)/.exec(path);
+    const call = saved ? t.calls.find((c) => c.save_as === saved[1]) : t.calls[t.calls.length - 1];
+    return !!call && textTools.has(call.tool);
+  };
   for (const t of m.tests) {
     if (t.expect.some((e) => e.path === "ok" && e.equals === false)) continue;
+    if (t.expect.some((e) => e.contains !== undefined) && t.expect.every((e) => e.path === "ok" || readsText(t, e.path))) continue;
     if (t.expect.length && !t.expect.some((e) => (e.equals !== undefined && e.path !== "ok") || e.approx !== undefined))
       add(out, "kat-exact", `test "${t.id}"`, "the test pins no value: it checks only ok, a range or a text. Add equals or approx for a number from a trusted source.");
   }

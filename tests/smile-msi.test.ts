@@ -113,7 +113,7 @@ describe("smile-msi manifest", () => {
   });
 
   test("known-answer tests are declared", () => {
-    expect(adapter.manifest.tests.map((t) => t.id)).toEqual(["demo-opens", "settings-apply", "demo-planted-lipids", "demo-rim-vs-core", "demo-norm-none", "demo-make-regions"]);
+    expect(adapter.manifest.tests.map((t) => t.id)).toEqual(["demo-opens", "settings-apply", "demo-planted-lipids", "demo-rim-vs-core", "demo-norm-none", "demo-make-regions", "state-without-slide"]);
   });
 
   test("manualRoute joins the map route and the argument values", async () => {

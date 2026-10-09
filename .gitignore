@@ -6,3 +6,6 @@ __pycache__/
 *.pyc
 bench/results/home/
 .claude/worktrees/
+catalog/fastqc/data/*.fastq.gz
+catalog/mzmine/data/PStd_050_1_rt600-660_mz100-200.mzML
+catalog/rdkit/data/delaney-processed.csv

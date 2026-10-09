@@ -784,3 +784,12 @@ tests:
       - { path: metrics.count, equals: 252 }
       - { path: metrics.parent_count, equals: 13367 }
       - { path: "outputs[0].path", contains: ".png" }
+
+  - id: missing_fcs
+    description: An FCS file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: inspect_fcs, args: { path: "{adapter_dir}/data/no_such_file.fcs" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "FCS file not found" }
+      - { path: error, contains: "no_such_file.fcs" }

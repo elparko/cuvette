@@ -590,6 +590,31 @@ tests:
       - { path: "saved.student.metrics.p_value", approx: 0.07919, abs: 0.00001 }
       - { path: "saved.student.metrics.df", equals: 18 }
 
+  - id: sleepstudy-inspect
+    description: >
+      The lme4 help page for sleepstudy gives 180 observations, a Subject factor with 18 levels and
+      days 0 to 9. The Rdatasets file adds a rownames column, so Days is the third column.
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: inspect_table
+        args: { path: "{adapter_dir}/data/sleepstudy.csv" }
+    expect:
+      - { path: metrics.n_rows, equals: 180 }
+      - { path: "table.rows[2][0]", equals: Days }
+      - { path: "table.rows[2][4]", equals: 0 }
+      - { path: "table.rows[2][5]", equals: 9 }
+      - { path: "table.rows[3][3]", equals: 18 }
+
+  - id: unknown-outcome-column
+    description: An outcome column that is not in the file fails, and the error names the column.
+    data: [data/sleep.csv]
+    calls:
+      - tool: compare_two_groups
+        args: { path: "{adapter_dir}/data/sleep.csv", outcome: no_such_column, group: group }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Unknown column: no_such_column" }
+
   - id: plantgrowth-anova
     description: >
       R PlantGrowth data. summary(aov(weight ~ group)) gives F = 4.846 on 2 and 27 df, p = 0.01591.

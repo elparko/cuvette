@@ -138,6 +138,7 @@ tools:
     description: List the public molecular databases of METASPACE with their ids and versions.
     read_only: true
     function: "wrapper:list_databases"
+    returns: text
 
   - name: list_annotations
     title: List annotations
@@ -333,12 +334,15 @@ checks:
 
 tests:
   - id: search-group
-    description: "Network test. The two Michael et al. 2022 mouse brain datasets of the Ellis group are in the search result. The number comes from the benchmark folder alexandrov2019-metaspace."
+    description: "Network test. The two Michael et al. 2022 mouse brain datasets of the Ellis group are in the search result, newest first. The ids and names come from bench/papers/alexandrov2019-metaspace/paper.md."
     calls:
       - { tool: search_datasets, args: { group: Ellis, submitter: Jesse, polarity: Positive, limit: 10 } }
     expect:
       - { path: metrics.n_found, min: 2 }
-      - { path: "table.rows[0][0]", contains: "2022-08-16_" }
+      - { path: "table.rows[0][0]", equals: "2022-08-16_12h31m33s" }
+      - { path: "table.rows[0][1]", equals: MouseBrain_PlasmaPI_Pos_TIMS }
+      - { path: "table.rows[1][0]", equals: "2022-08-16_10h14m23s" }
+      - { path: "table.rows[1][1]", equals: MouseBrain_PlasmaPI_Pos20um }
 
   - id: info-pinned
     description: "Network test. Metadata of 2022-08-16_10h14m23s, a dataset of the published project Michael et al. 2022. The values match the website dataset card read on 2026-10-08."
@@ -354,11 +358,13 @@ tests:
       - { path: "data.adducts[0]", equals: "+H" }
 
   - id: databases-list
-    description: "Network test. The public database list has HMDB v4 and LipidMaps 2017-12-12."
+    description: "Network test. The public database list has HMDB v4 and LipidMaps 2017-12-12, the databases of bench/papers/alexandrov2019-metaspace. The tool returns names (returns: text). The count grows when users publish databases, so the test pins the names, not the count."
     calls:
       - { tool: list_databases }
     expect:
       - { path: metrics.n_databases, min: 10 }
+      - { path: table.rows, contains: ",HMDB,v4" }
+      - { path: table.rows, contains: ",LipidMaps,2017-12-12" }
 
   - id: annotations-lipidmaps-fdr10
     description: "Network test. 414 annotations at FDR 10 percent in LipidMaps 2017-12-12 for 2022-08-16_10h14m23s; 26 are off-sample. The 414 was read on the website on 2026-10-08."
@@ -420,3 +426,11 @@ tests:
     expect:
       - { path: metrics.n_annotations, equals: 191 }
       - { path: saved.counts.metrics.n_fdr_10, equals: 191 }
+
+  - id: fdr-not-allowed
+    description: An FDR level that METASPACE does not compute fails before any network call, and the error names the valid levels.
+    calls:
+      - { tool: list_annotations, args: { dataset_id: "2022-08-16_10h14m23s", database: "LipidMaps 2017-12-12", fdr: 0.3 } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "fdr must be one of 0.05, 0.1, 0.2, 0.5" }

@@ -359,3 +359,11 @@ tests:
       - { path: saved.half.metrics.n_result, equals: 2 }
       - { path: saved.half.metrics.overlap_bases, equals: 227 }
       - { path: metrics.n_result, equals: 4 }
+
+  - id: merge_missing_file
+    description: A BED file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: merge_intervals, args: { path: "{adapter_dir}/data/no_such_file.bed" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_file.bed does not exist" }

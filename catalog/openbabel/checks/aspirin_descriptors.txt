@@ -1,0 +1,8 @@
+rdkit 2026.03.6
+formula C9H8O4
+MW by hand, C9H8O4 180.157
+logP, RDKit Crippen 1.3101
+TPSA, RDKit Ertl 63.6
+HBD, RDKit Lipinski NHOH count 1
+InChIKey, RDKit BSYNRYMUTXBXSQ-UHFFFAOYSA-N
+acetate largest fragment, RDKit canonical CC(=O)[O-]

@@ -344,6 +344,15 @@ tests:
       - { path: metrics.m1_over_m0, approx: 0.47, abs: 0.02 }
       - { path: metrics.monoisotopic_mass, approx: 759.5778, abs: 0.0002 }
       - { path: metrics.n_peaks, equals: 4 }
+
+  - id: missing-file
+    description: An mzML file that does not exist fails, and the error names the file.
+    calls:
+      - { tool: load_mzml, args: { path: "{adapter_dir}/data/no_such_file.mzML" } }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "file not found" }
+      - { path: error, contains: "no_such_file.mzML" }
 data_rules:
   cloud_visibility: all
   note: The tools return summaries and tables of at most 10 rows. Full tables stay in the work folder.
