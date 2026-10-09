@@ -18,6 +18,8 @@
     "src/",
     "catalog/",
     "samples/",
+    "scripts/build-registry-index.mjs",
+    "registry-template/",
     "README.md",
     "!**/__pycache__/",
     "!**/*.pyc"

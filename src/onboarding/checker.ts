@@ -172,13 +172,14 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
   }
 }
 
-async function checkModule(adapter: LoadedAdapter, errors: string[]): Promise<Awaited<ReturnType<LoadedAdapter["module"]>>> {
+async function checkModule(adapter: LoadedAdapter, errors: string[], noImport = false): Promise<Awaited<ReturnType<LoadedAdapter["module"]>>> {
   const m = adapter.manifest;
   const needsFn = m.checks.filter((c) => !c.rule && !c.text);
   if (m.module && !existsSync(join(adapter.root, m.module))) {
     errors.push(`module "${m.module}" does not exist`);
     return {};
   }
+  if (noImport) return {};
   let mod: Awaited<ReturnType<LoadedAdapter["module"]>> = {};
   try {
     mod = await adapter.module();
@@ -209,20 +210,20 @@ function checkFiles(adapter: LoadedAdapter, errors: string[], warnings: string[]
   }
 }
 
-async function checkVersions(adapter: LoadedAdapter, warnings: string[]) {
+async function checkVersions(adapter: LoadedAdapter, warnings: string[], noRun = false) {
   const { adapter: info, program } = adapter.manifest;
   if (info.status !== "draft") {
     if (!program.tested_versions.length) warnings.push(`status is "${info.status}" but "tested_versions" is empty`);
     if (!info.approved_by) warnings.push(`status is "${info.status}" but "approved_by" is empty`);
     if (!info.approved_on) warnings.push(`status is "${info.status}" but "approved_on" is empty`);
   }
-  const found = await locatedVersion(adapter);
+  const found = noRun ? "" : await locatedVersion(adapter);
   if (found && program.tested_versions.length && !program.tested_versions.includes(found)) {
     warnings.push(`the installed version "${found}" is not in tested_versions (${program.tested_versions.join(", ")}). Run the tests again`);
   }
 }
 
-export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean; gui?: boolean } = {}): Promise<Report> {
+export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean; gui?: boolean; static?: boolean } = {}): Promise<Report> {
   const errors: string[] = [];
   const warnings: string[] = [];
   const dir = resolveDir(dirOrName);
@@ -246,7 +247,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
     for (const r of t.required) if (!(r in t.params)) errors.push(`tool "${t.name}": required argument "${r}" is not in "params"`);
   }
   if (m.connection.kind === "files") for (const n of ["list_files", "read_table", "image_info", "wait_for_file"]) tools.set(n, { args: undefined });
-  const mod = await checkModule(adapter, errors);
+  const mod = await checkModule(adapter, errors, opts.static);
   const schemaTools: SchemaTool[] = (mod.tools ?? []).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
   let serverTools: SchemaTool[] = [];
   for (const t of mod.tools ?? []) {
@@ -256,7 +257,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
 
   let tests: TestOutcome[] | undefined;
   let toolsKnown = (tools.size > 0 && m.connection.kind !== "mcp") || m.connection.kind === "files";
-  if (opts.runTests) {
+  if (opts.runTests && !opts.static) {
     const work = mkdtempSync(join(tmpdir(), "cuvette-check-"));
     let runtime: Awaited<ReturnType<typeof import("../adapters/runtime.ts").startAdapter>> | undefined;
     try {
@@ -287,7 +288,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   }
 
   checkFiles(adapter, errors, warnings);
-  await checkVersions(adapter, warnings);
+  await checkVersions(adapter, warnings, opts.static);
   benchCache ??= benchmarkValues();
   const toolsForLint = [...lintTools(adapter, raw as Record<string, any>, schemaTools, "module"), ...lintTools(adapter, raw as Record<string, any>, serverTools, "server").filter((t) => t.source === "server")];
   const findings = lint({ adapter, raw: raw as Record<string, any>, tools: dedupe(toolsForLint), toolsKnown, benchmark: benchCache });

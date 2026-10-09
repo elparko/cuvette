@@ -15,6 +15,7 @@ import { fidelityLabel, type Item } from "../ui/items.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
 import { pointTime } from "../core/rewind.ts";
 import { lastUseText, originText, sizeText, STATE_LABEL, type ProgramRow } from "../core/programs.ts";
+import { TRUST_NAME } from "../adapters/source.ts";
 import { fieldTitle, groupRows, rowActions, summaryLine } from "../ui/programs.ts";
 import { changeCell, num, reruns, stepStatus, type RerunData, type StepState } from "../core/status.ts";
 import { formatRef, sessionCitations, type CitationStyle, type Ref } from "../core/citations.ts";
@@ -416,11 +417,12 @@ export function programsHtml(rows: ProgramRow[], opts: { checking?: boolean; now
           const more = acts.filter((a) => !main.includes(a));
           const b = (a: { action: string; label: string }, cls = "") => btn(a.label, `data-prog-act="${esc(a.action)}"`, cls);
           const meta = [r.version ? `<span title="${esc(r.version)}">${esc(r.version.length > 40 ? r.version.slice(0, 39) + "…" : r.version)}</span>` : "", r.size !== undefined ? esc(sizeText(r.size)) : "", `last use: ${esc(lastUseText(r.lastUsed, now))}`, esc(originText(r))].filter(Boolean).join(" · ");
-          const tags = [r.adapterStatus === "approved" ? "" : `<span class="tag">${esc(r.adapterStatus)}</span>`, r.access.off ? `<span class="tag warn">off</span>` : "", r.network !== undefined ? `<span class="tag">${r.network ? "network allowed" : "no network"}</span>` : "", r.code === false ? `<span class="tag">own code blocked</span>` : ""].join("");
+          const tags = [`<span class="tag trust-${r.trust}${r.trust === "unlisted" ? " warn" : ""}" title="${esc(r.trustDetail)}">${TRUST_NAME[r.trust]}</span>`, r.adapterStatus === "approved" ? "" : `<span class="tag">${esc(r.adapterStatus)}</span>`, r.access.off ? `<span class="tag warn">off</span>` : "", r.network !== undefined ? `<span class="tag">${r.network ? "network allowed" : "no network"}</span>` : "", r.code === false ? `<span class="tag">own code blocked</span>` : ""].join("");
           return `<li class="prow${r.access.off ? " off" : ""}" data-prog="${esc(r.name)}" data-prog-path="${esc(r.access.path ?? "")}" data-prog-program="${esc(r.program)}">
 <div class="phead"><span class="pname"><strong>${esc(r.program)}</strong> <span class="dim small">${esc(r.name)}</span></span><span class="pstat ${STATE_CLASS[r.state]}">${esc(STATE_LABEL[r.state])}</span>${tags}</div>
 <div class="pmeta small dim">${meta}</div>
 <div class="pdetail small">${shortPaths(esc(r.detail))}</div>
+${r.trust === "unlisted" ? `<div class="pwarn small">${esc(r.trustDetail)}${r.codePending ? " Its code needs your permission before it first runs." : ""}</div>` : ""}
 ${r.cite ? `<div class="pcite small dim">How to cite: ${esc(r.cite)}</div>` : ""}
 <div class="row pacts">${main.map((a) => b(a, a.action === "install" ? "primary" : a.action === "check" ? "quiet" : "")).join("")}${more.length ? `<details class="pmore"><summary>More</summary><div class="row">${more.map((a) => b(a, a.action === "remove" ? "danger" : "")).join("")}</div></details>` : ""}</div>
 <pre class="plog hidden" aria-live="polite"></pre></li>`;

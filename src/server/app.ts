@@ -20,8 +20,9 @@ import { removeSecret, resetRow, saveSetting } from "../ui/config.ts";
 import type { SessionLike } from "../ui/types.ts";
 import { decisionsHtml, doctorHtml, planTextHtml, programsHtml, resultsHtml, sessionsHtml, statusHtml, stepsHtml, type Ctx } from "./app-html.ts";
 import { settingsHtml } from "./app-settings.ts";
-import { isProgramAction, listPrograms } from "../core/programs.ts";
-import { planFor, runFor, type ProgramHooks } from "../ui/programs.ts";
+import { isProgramAction, listPrograms, planByInstall } from "../core/programs.ts";
+import { dropInstall } from "../ui/programs.ts";
+import { addFor, planFor, reviewFor, runFor, type ProgramHooks } from "../ui/programs.ts";
 import { appPageHtml } from "./app-page.ts";
 import { WebView } from "./app-view.ts";
 import { hostAllowed, windowRoutes, type WindowSession } from "./window.ts";
@@ -42,6 +43,8 @@ export interface AppOptions {
   fetch?: typeof fetch;
   onQuit?: () => void;
   programs?: ProgramHooks;
+  registry?: string;
+  review?: { model?: string; provider?: import("../core/types.ts").Provider };
 }
 
 export interface AppHandle {
@@ -365,13 +368,26 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       if (c) c.view.ctx.refresh();
       return send(res, r.color === "red" ? 400 : 200, r);
     }
+    if (p === "/api/adapters/plan") {
+      const r = await addFor(String(body.source ?? ""), { registry: opts.registry });
+      return r.plan ? send(res, 200, { plan: r.plan }) : send(res, 400, { error: r.error });
+    }
+    if (p === "/api/adapters/review") {
+      const r = await reviewFor(String(body.install ?? ""), opts.review);
+      return r.plan ? send(res, 200, { plan: r.plan }) : send(res, 400, { error: r.error });
+    }
+    if (p === "/api/adapters/drop") {
+      dropInstall(String(body.install ?? ""));
+      return send(res, 200, { ok: true });
+    }
     if (p === "/api/programs/plan" || p === "/api/programs/run") {
       const name = String(body.name ?? "");
       const action = String(body.action ?? "");
-      if (!isProgramAction(action)) return send(res, 400, { error: "unknown action" });
+      const staged = typeof body.install === "string" && body.install ? planByInstall(body.install) : undefined;
+      if (!staged && !isProgramAction(action)) return send(res, 400, { error: "unknown action" });
       const hooks = progHooks();
-      const r = await planFor(name, action, { ...hooks, path: typeof body.path === "string" ? body.path : undefined });
-      if (!r.plan) return send(res, 404, { error: r.error });
+      const r = staged ? { plan: staged } : await planFor(name, action as never, { ...hooks, path: typeof body.path === "string" ? body.path : undefined });
+      if (!r.plan) return send(res, 404, { error: (r as { error?: string }).error });
       if (p === "/api/programs/plan") return send(res, 200, { plan: r.plan });
       const run = { ...hooks, confirmed: body.confirmed === true, record: current?.session.record as ProgramHooks["record"] };
       const long = (action === "install" || action === "update") && r.plan.runs && !r.plan.refused && run.confirmed;

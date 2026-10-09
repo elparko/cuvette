@@ -7,15 +7,17 @@ import { accessAll, accessFile, codeTools, networkControl, saveAccess, type Acce
 import { T7_ROOT } from "../adapters/blind.ts";
 import { CUSTOM_HOW, findProgram, locate, type Located } from "../adapters/locate.ts";
 import { adapterDirs, cuvetteHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
+import { applyInstall, getInstallPlan, installLines as installCardLines, prepareUpdate, removeInstalled, removeLines, type InstallPlan } from "../adapters/install.ts";
+import { adapterTrust, confirmCode, TRUST_NAME, type InstalledEntry, type TrustLevel } from "../adapters/source.ts";
 import { defaultFind, defaultRun, ENVS, envNameIn, importCheck, older, PROGRAM_INSTALL, q, R_PACKAGES, rInstallCommand, rLibrary, uvCommand, versionParts, type Run } from "./doctor.ts";
 import { ageText } from "./sessions.ts";
 import { howToCite } from "./citations.ts";
 
 export type State = "installed" | "custom" | "found" | "missing" | "old" | "none";
-export type Action = "install" | "update" | "remove" | "path" | "enable" | "disable" | "network-on" | "network-off" | "code-on" | "code-off" | "approve" | "check";
+export type Action = "install" | "update" | "remove" | "path" | "enable" | "disable" | "network-on" | "network-off" | "code-on" | "code-off" | "approve" | "check" | "adapter-add" | "adapter-update" | "adapter-remove" | "trust-code";
 export type Via = "terminal" | "app" | "command line";
 
-export const ACTIONS: Action[] = ["install", "update", "remove", "path", "enable", "disable", "network-on", "network-off", "code-on", "code-off", "approve", "check"];
+export const ACTIONS: Action[] = ["install", "update", "remove", "path", "enable", "disable", "network-on", "network-off", "code-on", "code-off", "approve", "check", "adapter-update", "adapter-remove", "trust-code"];
 
 export interface Install {
   kind: "uv" | "r" | "brew" | "link" | "manual";
@@ -54,6 +56,11 @@ export interface ProgramRow {
   codeTools: string[];
   install?: Install;
   cite?: string;
+  trust: TrustLevel;
+  trustDetail: string;
+  installed?: InstalledEntry;
+  codePending: boolean;
+  codeFiles: string[];
 }
 
 export interface Plan {
@@ -70,6 +77,8 @@ export interface Plan {
   paths?: string[];
   size?: number;
   customPath?: string;
+  installId?: string;
+  review?: string;
 }
 
 export interface ProgramsOpts {
@@ -298,8 +307,14 @@ export async function listPrograms(opts: ProgramsOpts = {}): Promise<ProgramRow[
       if (dir) owned = { kind: "folder", paths: [dir], shared: [] };
     }
 
+    const trust = adapterTrust(root);
     return {
       name,
+      trust: trust.level,
+      trustDetail: trust.detail,
+      installed: trust.entry,
+      codePending: !trust.codeConfirmed,
+      codeFiles: trust.codeFiles,
       program: m.program.name,
       field: m.adapter.field || "other",
       root,
@@ -367,6 +382,8 @@ export function availableActions(r: ProgramRow): Action[] {
   if (r.network !== undefined) out.push(r.network ? "network-off" : "network-on");
   if (r.code !== undefined) out.push(r.code ? "code-off" : "code-on");
   if (r.adapterStatus === "draft") out.push("approve");
+  if (r.installed) out.push("adapter-update", "adapter-remove");
+  if (r.codePending) out.push("trust-code");
   out.push("check");
   return out;
 }
@@ -384,6 +401,10 @@ export const ACTION_LABEL: Record<Action, string> = {
   "code-off": "Block its own code",
   approve: "Approve",
   check: "Check again",
+  "adapter-add": "Add an adapter",
+  "adapter-update": "Update the adapter",
+  "adapter-remove": "Remove the adapter",
+  "trust-code": "Allow its code to run",
 };
 
 function installLines(r: ProgramRow, i: Install, update: boolean): Partial<Plan> {
@@ -455,6 +476,23 @@ export async function planAction(r: ProgramRow, action: Action, opts: { path?: s
       const today = new Date().toISOString().slice(0, 10);
       return { ...base, lines: ["Cuvette checks the adapter for errors.", `Then it writes status: approved, approved_by: ${opts.by ?? "you"} and approved_on: ${today} in ${tilde(join(r.root, "adapter.yaml"))}.`, "Approve only an adapter that you checked: its tools, its standards and its tests."], confirm: "Approve" };
     }
+    case "adapter-update": {
+      if (!r.installed) return refuse(`${r.name} was not installed with cuvette adapter add.`);
+      try {
+        const p = await prepareUpdate(r.name);
+        return planFromInstall(p, base);
+      } catch (e) {
+        return refuse((e as Error).message);
+      }
+    }
+    case "adapter-remove":
+      if (!r.installed) return refuse(`${r.name} was not installed with cuvette adapter add.`);
+      return { ...base, title: `Remove the adapter: ${r.name}`, lines: removeLines(r.name), confirm: "Remove", danger: true };
+    case "trust-code":
+      if (!r.codePending) return refuse(`${r.name} needs no confirmation.`);
+      return { ...base, title: `Allow the code of ${r.name} to run`, lines: [`${r.name} is Unlisted: nobody reviewed or checked it.`, `Cuvette runs this code with your user permissions: ${r.codeFiles.join(", ")}.`, "Allow it only if you read every one of these files.", "The permission ends when the files change."], confirm: "Allow", danger: true };
+    case "adapter-add":
+      return refuse("Use Add an adapter.");
     case "check":
       return { ...base, title: `Check again: ${r.program} (${r.name})`, lines: [`Cuvette looks for ${r.program} and checks its version.`] };
   }
@@ -543,6 +581,21 @@ export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolea
     case "code-off":
       saveAccess(plan.name, { code: plan.action === "code-on" ? undefined : false });
       return done(true, `${plan.name}: its own code is ${plan.action === "code-on" ? "allowed" : "blocked"}.`, { code: plan.action === "code-on" });
+    case "adapter-add":
+    case "adapter-update": {
+      const r = applyInstall(plan.installId ?? "", { confirmed: true });
+      return done(r.ok, r.text);
+    }
+    case "adapter-remove": {
+      const r = removeInstalled(plan.name);
+      return done(r.ok, r.text);
+    }
+    case "trust-code": {
+      const root = manifests(opts)[plan.name]?.root;
+      if (!root) return done(false, `No adapter ${plan.name}.`);
+      confirmCode(root);
+      return done(true, `${plan.name}: the code may run. The permission ends when the files change.`);
+    }
     case "approve": {
       const root = manifests(opts)[plan.name]?.root;
       if (!root) return done(false, `No adapter ${plan.name}.`);
@@ -559,8 +612,8 @@ export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolea
 }
 
 export function programsTable(rows: ProgramRow[], now = Date.now()): string {
-  const head = ["Adapter", "Program", "Status", "Version", "Size", "Last use", "Installed by", "Adapter status", "Access"];
-  const body = rows.map((r) => [r.name, r.program, stateText(r), r.version.length > 24 ? r.version.slice(0, 23) + "…" : r.version, sizeText(r.size), lastUseText(r.lastUsed, now), originText(r) === "Installed outside Cuvette" ? "outside Cuvette" : originText(r), r.adapterStatus, accessText(r)]);
+  const head = ["Adapter", "Program", "Status", "Version", "Size", "Last use", "Installed by", "Adapter status", "Trust", "Access"];
+  const body = rows.map((r) => [r.name, r.program, stateText(r), r.version.length > 24 ? r.version.slice(0, 23) + "…" : r.version, sizeText(r.size), lastUseText(r.lastUsed, now), originText(r) === "Installed outside Cuvette" ? "outside Cuvette" : originText(r), r.adapterStatus, TRUST_NAME[r.trust], accessText(r)]);
   const widths = head.map((h, i) => Math.max(h.length, ...body.map((b) => b[i]!.length)));
   const fmt = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i]!)).join("  ").trimEnd();
   const out = ["  " + fmt(head), "  " + fmt(widths.map((w) => "-".repeat(w)))];
@@ -582,6 +635,27 @@ export function planText(p: Plan): string {
   if (p.command) out.push(`Command: ${p.command}`);
   if (p.link) out.push(`Link: ${p.link}`);
   return out.join("\n");
+}
+
+export function planFromInstall(p: InstallPlan, base?: Plan): Plan {
+  const add = p.mode === "add";
+  const verb = add ? "Add" : "Update";
+  return {
+    ...(base ?? { action: add ? "adapter-add" : "adapter-update", name: p.name, runs: true, lines: [] }),
+    title: `${verb} the adapter: ${p.name}`,
+    lines: installCardLines(p),
+    runs: !p.refused && !p.upToDate,
+    refused: p.upToDate ? `${p.name} is up to date.` : p.refused,
+    confirm: add ? "Install" : "Update",
+    danger: p.card.trust === "unlisted",
+    installId: p.id,
+    review: p.review ? `Ask Claude to review the files (${p.review.text})` : undefined,
+  };
+}
+
+export function planByInstall(id: string): Plan | undefined {
+  const p = getInstallPlan(id);
+  return p ? planFromInstall(p) : undefined;
 }
 
 export function isProgramAction(a: string): a is Action {

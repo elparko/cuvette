@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { accessAll } from "../adapters/access.ts";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
+import { DEFAULT_REGISTRY } from "../adapters/registry.ts";
 import { CLAUDE_MODELS } from "../providers/index.ts";
 import { DEFAULTS } from "./config.ts";
 import { claudeKey, elabftwConfig } from "./credentials.ts";
@@ -309,6 +310,15 @@ export const SETTINGS: SettingDef[] = [
     scopes: ["user", "project"],
     free: true,
     list: true,
+  },
+  {
+    name: "adapter_registry",
+    group: "Adapters",
+    label: "Adapter registry",
+    help: "The address of the index.json that cuvette adapter add reads to find an adapter by name. A web address, a file:// address or a file path. Only the user settings file sets it.",
+    scopes: ["user"],
+    free: true,
+    def: DEFAULT_REGISTRY,
   },
   {
     name: "programs",

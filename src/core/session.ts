@@ -25,6 +25,7 @@ import { ADAPTER_DECISION, decisionHook, DecisionRecord } from "./decisions.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
 import { accessOf, blocksCode, isCodeTool, usable } from "../adapters/access.ts";
+import { adapterTrust, confirmCode } from "../adapters/source.ts";
 import { compareNote, instruction, teachReview, type TeachSummary } from "./modes.ts";
 import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
@@ -215,7 +216,8 @@ export class Session {
   refereeProvider?: Provider;
   adapters: LoadedAdapter[] = [];
   runtimes: AdapterRuntime[] = [];
-  adapterInfo: { name: string; title: string; version: string; programVersion: string }[] = [];
+  adapterInfo: { name: string; title: string; version: string; programVersion: string; trust?: string }[] = [];
+  private codeAsks = new Map<string, string>();
   pick = false;
   setupPreset: Record<string, unknown> = {};
   history: Message[] = [];
@@ -537,12 +539,14 @@ export class Session {
   }
 
   private async startOne(a: LoadedAdapter): Promise<string[]> {
+    const trust = adapterTrust(a.root);
+    if (!trust.codeConfirmed) throw new Error(`The adapter ${a.name} is Unlisted and ships code (${trust.codeFiles.join(", ")}). Confirm that it can run: cuvette adapter allow-code ${a.name}`);
     const { startAdapter } = await import("../adapters/runtime.ts");
     const rt = await startAdapter(a, this.dirs());
     this.runtimes.push(rt);
     this.envTargets.set(a.name, envTarget({ kind: a.manifest.connection.kind, interpreter: rt.interpreter ?? [], programPath: rt.programPath, program: a.manifest.program.name, programVersion: rt.programVersion }));
     this.runtimeInfo.push({ adapter: a, programVersion: rt.programVersion, instructions: rt.instructions });
-    this.adapterInfo.push({ name: a.name, title: a.manifest.adapter.title || a.manifest.program.name, version: a.manifest.adapter.version, programVersion: rt.programVersion });
+    this.adapterInfo.push({ name: a.name, title: a.manifest.adapter.title || a.manifest.program.name, version: a.manifest.adapter.version, programVersion: rt.programVersion, trust: trust.label });
     const mod = await a.module();
     const names: string[] = [];
     const noCode = blocksCode(a.name, this.cwd);
@@ -636,7 +640,7 @@ export class Session {
     const q = await this.questions.ask({
       decisionKey: key,
       title: ADAPTER_DECISION.label,
-      text: `The agent wants to use ${a.manifest.program.name} through the ${a.name} adapter: ${why}`,
+      text: `The agent wants to use ${a.manifest.program.name} through the ${a.name} adapter (trust: ${adapterTrust(a.root).label}): ${why}`,
       options,
       recommendation: { value: options[0].value, reason: why },
       evidence: others.length ? `Other adapters that read the same file types: ${others.join(", ")}.` : "",
@@ -680,7 +684,44 @@ export class Session {
     return { ok: true, text: `The program is now ${a.manifest.program.name} through ${a.name}. The agent uses it from the next step.` };
   }
 
+  private async confirmUnlistedCode(a: LoadedAdapter): Promise<string | undefined> {
+    const t = adapterTrust(a.root);
+    if (t.codeConfirmed) return undefined;
+    let q = this.codeAsks.has(a.name) ? this.questions.get(this.codeAsks.get(a.name)!) : undefined;
+    if (!q) {
+      q = await this.questions.ask({
+        decisionKey: "",
+        title: `Run the code of ${a.name}?`,
+        text: `The adapter ${a.name} is Unlisted: nobody reviewed or checked it. It ships code that runs on this computer with your user permissions: ${t.codeFiles.join(", ")}. Run it only if you read these files.`,
+        options: [{ value: "run", label: `Run the code of ${a.name}` }, { value: "no", label: "Do not run it" }],
+        evidence: `Source: ${t.entry?.source ?? "unknown"}. SHA-256 ${t.entry?.sha256.slice(0, 16) ?? ""}.`,
+      });
+      this.codeAsks.set(a.name, q.qid);
+      this.bus.emit({ type: "question", question: q });
+      this.record.append("blocked", { tool: "use_adapter", reason: `waiting for the scientist: run the code of ${a.name}`, qid: q.qid });
+    }
+    if (q.status === "open") {
+      if (!this.settings.askWaits) return `BLOCKED: ${a.name} is Unlisted and ships code. Question ${q.qid} waits for the scientist. Or run: cuvette adapter allow-code ${a.name}`;
+      this.waitedQids.add(q.qid);
+      this.bus.emit({ type: "status", state: "waiting", tool: "use_adapter" });
+      try {
+        await abortable(this.questions.wait(q.qid), this.abort?.signal);
+      } catch {
+        return `The question ${q.qid} about the code of ${a.name} is still open.`;
+      }
+      q = this.questions.get(q.qid) ?? q;
+    }
+    if (q.answer === "run") {
+      confirmCode(a.root);
+      this.record.append("notice", { text: `The scientist allowed the code of the Unlisted adapter ${a.name} to run.` });
+      return undefined;
+    }
+    return `The scientist did not allow the code of ${a.name} to run.`;
+  }
+
   private async loadOne(a: LoadedAdapter, reason: string, by: string): Promise<ToolOutput> {
+    const denied = await this.confirmUnlistedCode(a);
+    if (denied) return { ok: false, error: denied };
     const m = a.manifest;
     const where = programFound(m, this.found);
     const checked = Boolean(m.locate.env || m.locate.paths.length || m.locate.which.length);
@@ -713,7 +754,7 @@ export class Session {
     this.system = this.buildSystem();
     const info = this.adapterInfo.at(-1)!;
     const envHash = await this.envHashFor(a.name);
-    this.record.append("adapter", { name: a.name, program: m.program.name, version: info.version, programVersion: info.programVersion, envHash, reason, by, status: m.adapter.status, path: a.root, programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
+    this.record.append("adapter", { name: a.name, program: m.program.name, version: info.version, programVersion: info.programVersion, envHash, reason, by, status: m.adapter.status, trust: info.trust, path: a.root, programFound: checked ? !!where.path : null, how: where.how, tools: names, notices });
     const shown = names.filter((n) => this.active.has(n));
     const skills = a.skills();
     const brief = added.length ? this.decisions.brief(added) : "";

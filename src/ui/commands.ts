@@ -835,8 +835,8 @@ export const commands: Command[] = [
     name: "adapters",
     help: "List the programs this session controls.",
     run(_, ctx) {
-      const rows = ctx.session.adapterInfo.map((a) => [a.name, a.title, a.version, a.programVersion]);
-      ctx.print(rows.length ? table(["Adapter", "Program", "Adapter version", "Program version"], rows) : "No adapters.", "Adapters");
+      const rows = ctx.session.adapterInfo.map((a) => [a.name, a.title, a.version, a.programVersion, a.trust ?? ""]);
+      ctx.print(rows.length ? table(["Adapter", "Program", "Adapter version", "Program version", "Trust"], rows) : "No adapters.", "Adapters");
     },
   },
   {
@@ -845,8 +845,8 @@ export const commands: Command[] = [
     help: "Show the program the agent uses, or change it to another adapter.",
     async run([name], ctx) {
       if (!name) {
-        const rows = ctx.session.adapterInfo.map((a) => [a.name, a.title, a.programVersion]);
-        return ctx.print(`${rows.length ? table(["Adapter", "Program", "Program version"], rows) : "No program is loaded yet. The agent chooses one when the analysis needs it."}\n\nChange it: /program <adapter name>.`, "Program");
+        const rows = ctx.session.adapterInfo.map((a) => [a.name, a.title, a.programVersion, a.trust ?? ""]);
+        return ctx.print(`${rows.length ? table(["Adapter", "Program", "Program version", "Trust"], rows) : "No program is loaded yet. The agent chooses one when the analysis needs it."}\n\nChange it: /program <adapter name>.`, "Program");
       }
       if (!ctx.session.changeProgram) return unavailable(ctx);
       const r = await ctx.session.changeProgram(name);

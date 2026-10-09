@@ -39,7 +39,21 @@ Usage
   to the agent); plan and teach mode still block steps; blind benchmark rules and the macOS
   sandbox still apply; a push to eLabFTW still asks; "deny" rules in settings still deny.
 
-  cuvette adapters                   list the adapters (name, kind, status, field, program)
+  cuvette adapters                   list the adapters (name, kind, status, trust, field, program)
+  cuvette adapter check <name|dir> --static
+                                     check the files only. It imports no code and starts no program.
+  cuvette adapter add <name | git address | folder | .zip> [--run-tests]
+                                     install an adapter in the user adapter folder. A git address
+                                     is pinned to a commit (add #ref to choose one). A name comes
+                                     from the registry (setting adapter_registry). Cuvette checks
+                                     the adapter, shows what it can do, and asks before it installs.
+  cuvette adapter update [name]      show what changed (files, tools, permissions), then ask
+  cuvette adapter remove <name>
+  cuvette adapter list --installed   the source, version, commit and SHA-256 of each installed adapter
+  cuvette adapter list --registry    the adapters in the registry
+  cuvette adapter audit <folder|name> [--model claude:<id>]
+                                     ask Claude to review the files; asks first because it costs tokens
+  cuvette adapter allow-code <name>  allow the code of an installed Unlisted adapter to run
   cuvette adapter check <name|dir> [--run-tests] [--gui]
                                      --gui also runs the tests marked gui: true (they open a window)
   cuvette adapter check <name|dir> --drive [--model ollama:qwen3:8b] [--tool <name>]
@@ -169,6 +183,9 @@ const { values: o, positionals: pos } = parseArgs({
     user: { type: "boolean" },
     project: { type: "boolean" },
     "run-tests": { type: "boolean" },
+    static: { type: "boolean" },
+    installed: { type: "boolean" },
+    registry: { type: "boolean" },
     drive: { type: "boolean" },
     gui: { type: "boolean" },
     tool: { type: "string", multiple: true },
@@ -373,7 +390,8 @@ async function main() {
         try {
           const a = loadAdapter(dir);
           const m = a.manifest;
-          console.log(`${name.padEnd(16)} ${m.connection.kind.padEnd(7)} ${m.adapter.status.padEnd(9)} ${m.adapter.field.padEnd(28)} ${m.program.name} ${m.program.tested_versions.join(", ")}  ${dir}`);
+          const trust = (await import("./adapters/source.ts")).adapterTrust(dir).label;
+          console.log(`${name.padEnd(16)} ${m.connection.kind.padEnd(7)} ${m.adapter.status.padEnd(9)} ${trust.padEnd(9)} ${m.adapter.field.padEnd(28)} ${m.program.name} ${m.program.tested_versions.join(", ")}  ${dir}`);
         } catch (e) {
           console.log(`${name.padEnd(16)} invalid: ${(e as Error).message.split("\n")[0]}`);
         }
@@ -381,6 +399,11 @@ async function main() {
       return;
     }
     case "adapter": {
+      const ac = await import("./adapters/commands.ts");
+      if (ac.ADAPTER_SUBS.includes(a1 ?? "")) {
+        process.exitCode = await ac.adapterCommand(a1!, a2, { ask, say: (l) => console.log(l) }, { runTests: !!o["run-tests"], model: str(o.model), installed: !!o.installed, registry: !!o.registry, by: str(o.by) ?? process.env.USER ?? "scientist" });
+        return;
+      }
       const checker = await import("./onboarding/checker.ts");
       if (a1 === "check" && o.drive) {
         const { runDrive, driveText } = await import("./onboarding/drive.ts");
@@ -390,7 +413,7 @@ async function main() {
         return;
       }
       if (a1 === "check") {
-        const r = await checker.checkAdapter(a2, { runTests: !!o["run-tests"], gui: !!o.gui });
+        const r = await checker.checkAdapter(a2, { runTests: !!o["run-tests"], gui: !!o.gui, static: !!o.static });
         for (const e of r.errors) console.log(`error: ${e}`);
         for (const w of r.warnings) console.log(`warning: ${w}`);
         for (const t of r.tests ?? []) console.log(t.skipped ? `skip ${t.id}: ${t.skipped}` : `${t.ok ? "pass" : "FAIL"} ${t.id}${t.failures.length ? ": " + t.failures.join("; ") : ""}`);
@@ -404,7 +427,7 @@ async function main() {
         await checker.approveAdapter(dir, str(o.by) ?? process.env.USER ?? "scientist");
         return console.log(`Approved ${a2}.`);
       }
-      return fail("usage: cuvette adapter check|approve <name|dir>");
+      return fail("usage: cuvette adapter add|update|remove|list|audit|allow-code|check|approve");
     }
     case "onboard": {
       const { onboardCommand } = await import("./onboarding/agent.ts");

@@ -3,12 +3,14 @@ import { Box, Text, useInput } from "ink";
 import { CardRows, Fit } from "./fit.tsx";
 import { Field } from "./input-box.tsx";
 import { lastUseText, listPrograms, sizeText, stateText, originText, type Action, type Plan, type ProgramRow } from "../core/programs.ts";
-import { copyText, fieldTitle, mergeRows, planFor, rowActions, runFor, summaryLine, type ProgramHooks } from "../ui/programs.ts";
+import { addFor, copyText, dropInstall, fieldTitle, mergeRows, planFor, reviewFor, rowActions, runFor, summaryLine, type ProgramHooks } from "../ui/programs.ts";
+import { TRUST_NAME } from "../adapters/source.ts";
 
 type Step =
   | { t: "list" }
   | { t: "actions"; sel: number }
   | { t: "path"; text: string }
+  | { t: "add"; text: string }
   | { t: "plan"; plan: Plan; sel: number; path?: string }
   | { t: "busy"; text: string; lines: string[] };
 
@@ -82,15 +84,33 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
 
   const planButtons = (s: Extract<Step, { t: "plan" }>) => {
     const out: { label: string; go: () => void }[] = [];
-    const back = () => setStep({ t: "list" });
+    const back = () => {
+      if (s.plan.installId) dropInstall(s.plan.installId);
+      setStep({ t: "list" });
+    };
     if (!s.plan.refused && s.plan.runs) out.push({ label: s.plan.confirm ?? "Run", go: () => void run(s.plan, true) });
+    if (s.plan.review && s.plan.installId)
+      out.push({
+        label: s.plan.review,
+        go: () =>
+          void (async () => {
+            setStep({ t: "busy", text: "Claude is reading the files...", lines: [] });
+            const r = await reviewFor(s.plan.installId!);
+            if (!alive.current) return;
+            if (r.plan) setStep({ t: "plan", plan: r.plan, sel: 0 });
+            else {
+              setStep({ t: "list" });
+              setMsg({ text: r.error ?? "The review failed.", color: "red" });
+            }
+          })(),
+      });
     if (s.plan.command || s.plan.link) out.push({ label: "Copy", go: () => setMsg({ text: copyText(s.plan.command ?? s.plan.link!) ? "Copied." : `Copy this: ${s.plan.command ?? s.plan.link}`, color: "cyan" }) });
     out.push({ label: s.plan.runs && !s.plan.refused ? "Cancel" : "Back", go: back });
     return out;
   };
 
   useInput((ch, key) => {
-    if (step.t === "path" || step.t === "busy") return;
+    if (step.t === "path" || step.t === "busy" || step.t === "add") return;
     const up = key.upArrow || key.leftArrow, down = key.downArrow || key.rightArrow;
     if (step.t === "list") {
       if (key.escape) return props.onClose();
@@ -101,6 +121,10 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
         setMsg(undefined);
         setStep({ t: "actions", sel: 0 });
       } else if (ch === "r") void load();
+      else if (ch === "a") {
+        setMsg(undefined);
+        setStep({ t: "add", text: "" });
+      }
       return;
     }
     if (key.escape) return setStep({ t: "list" });
@@ -147,6 +171,7 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
         <Text color={on ? "cyan" : undefined}>{(on ? "▸ " : "  ") + r.name.padEnd(nameW)}</Text>
         <Text>{clip(r.program, progW - 2).padEnd(progW)}</Text>
         <Text color={r.access.off ? "gray" : COLOR[r.state]}>{stateText(r).padEnd(18)}</Text>
+        <Text color={r.trust === "unlisted" ? "yellow" : undefined}>{TRUST_NAME[r.trust].padEnd(10)}</Text>
         <Text dimColor>{[clip(r.version, 18), sizeText(r.size), r.lastUsed ? `used ${lastUseText(r.lastUsed)}` : ""].filter(Boolean).join(" · ")}</Text>
       </Box>,
     );
@@ -207,6 +232,32 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
       </Box>
     );
   }
+  const adding =
+    step.t === "add" ? (
+      <Box flexDirection="column" marginTop={1}>
+        <Text>Address of a repository, a folder, a zip file, or the name of an adapter in the registry:</Text>
+        <Box>
+          <Field
+            value={step.text}
+            onChange={(v) => setStep({ t: "add", text: v })}
+            onSubmit={(v) =>
+              void (async () => {
+                setStep({ t: "busy", text: "Fetching and checking the adapter...", lines: [] });
+                const r = await addFor(v);
+                if (!alive.current) return;
+                if (r.plan) setStep({ t: "plan", plan: r.plan, sel: 0 });
+                else {
+                  setStep({ t: "list" });
+                  setMsg({ text: r.error ?? "No plan.", color: "red" });
+                }
+              })()
+            }
+            onCancel={() => setStep({ t: "list" })}
+            indent={0}
+          />
+        </Box>
+      </Box>
+    ) : null;
   const busy =
     step.t === "busy" ? (
       <Box flexDirection="column" marginTop={1}>
@@ -219,7 +270,7 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
       </Box>
     ) : null;
 
-  const keys = step.t === "list" ? "↑↓ move · Enter actions · r check all again · Esc close" : step.t === "actions" ? "↑↓ move · Enter choose · Esc back" : step.t === "path" ? "Enter checks the path · Esc back" : "";
+  const keys = step.t === "list" ? "↑↓ move · Enter actions · a add an adapter · r check all again · Esc close" : step.t === "actions" ? "↑↓ move · Enter choose · Esc back" : step.t === "path" ? "Enter checks the path · Esc back" : "";
   const tail = (
     <Box flexDirection="column" marginTop={1}>
       {row && step.t === "list" ? (
@@ -227,9 +278,11 @@ export function ProgramsPanel(props: { cwd: string; start?: string; hooks?: Prog
           <Text>{row.detail}</Text>
           {row.cite ? <Text dimColor wrap="truncate-end">How to cite: {row.cite}</Text> : null}
           <Text dimColor>{[originText(row), `adapter status: ${row.adapterStatus}`, row.access.off ? "turned off" : ""].filter(Boolean).join(" · ")}</Text>
+          <Text color={row.trust === "unlisted" ? "yellow" : undefined} dimColor={row.trust !== "unlisted"}>{row.trustDetail}{row.codePending ? " Its code needs your permission before it first runs." : ""}</Text>
         </>
       ) : null}
       {confirm}
+      {adding}
       {busy}
       {msg ? <Text color={msg.color}>{msg.text}</Text> : null}
       {keys ? <Text dimColor>{keys}</Text> : null}

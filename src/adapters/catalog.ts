@@ -4,6 +4,7 @@ import { pathsIn } from "./blind.ts";
 import { accessAll } from "./access.ts";
 import { findProgram } from "./locate.ts";
 import { adapterDirs, loadAdapter, type Manifest } from "./manifest.ts";
+import { adapterTrust } from "./source.ts";
 
 export interface AdapterSummary {
   name: string;
@@ -12,6 +13,7 @@ export interface AdapterSummary {
   does: string;
   fileTypes: string[];
   status: string;
+  trust: string;
   found: "yes" | "no" | "not checked";
   root: string;
   problem?: string;
@@ -60,11 +62,12 @@ export function adapterIndex(cwd: string, cache: FoundCache = new Map()): Adapte
         does: firstSentence(m.adapter.description),
         fileTypes: m.adapter.file_types,
         status: m.adapter.status,
+        trust: adapterTrust(root).label,
         found: checks(m) ? (programFound(m, cache).path ? "yes" : "no") : "not checked",
         root,
       });
     } catch (e) {
-      out.push({ name, program: "", field: "", does: "", fileTypes: [], status: "invalid", found: "not checked", root, problem: (e as Error).message.split("\n")[0] });
+      out.push({ name, program: "", field: "", does: "", fileTypes: [], status: "invalid", trust: "Unlisted", found: "not checked", root, problem: (e as Error).message.split("\n")[0] });
     }
   }
   return out;
@@ -78,9 +81,9 @@ export function formatIndex(list: AdapterSummary[], filter = ""): string {
   const lines = hits.map((a) =>
     a.problem
       ? `- ${a.name}: invalid manifest (${a.problem})`
-      : `- ${a.name} | ${a.program} | ${a.field || "no field"} | ${a.does} | files: ${a.fileTypes.join(" ") || "none listed"} | ${a.status} | program found: ${a.found}`,
+      : `- ${a.name} | ${a.program} | ${a.field || "no field"} | ${a.does} | files: ${a.fileTypes.join(" ") || "none listed"} | ${a.status} | trust: ${a.trust} | program found: ${a.found}`,
   );
-  return [`${hits.length} adapters (name | program | field | what it does | input files | status | program found):`, ...lines, "Load one with use_adapter(name, reason)."].join("\n");
+  return [`${hits.length} adapters (name | program | field | what it does | input files | status | trust | program found):`, ...lines, "Load one with use_adapter(name, reason)."].join("\n");
 }
 
 function matches(type: string, file: string): boolean {

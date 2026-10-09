@@ -236,6 +236,7 @@ li.prow.off { opacity: .75; }
 .pstat.warn { color: var(--warn); }
 .pstat.none { color: var(--dim); }
 .tag.warn { color: var(--warn); border-color: var(--warn); }
+.pwarn { color: var(--warn); }
 .pmeta, .pdetail { overflow-wrap: anywhere; margin: 2px 0; }
 .pacts { margin: 6px 0 0; }
 .pacts .btn { min-height: 30px; padding: 3px 10px; }
@@ -373,7 +374,7 @@ ul.dirs li button .dim { margin-left: 6px; }
 
 <main class="page hidden" id="p-programs">
   <div class="panel">
-    <div class="row" style="justify-content: space-between"><h2 style="margin:0">Programs</h2><button type="button" class="btn" id="progcheck">Check all again</button></div>
+    <div class="row" style="justify-content: space-between"><h2 style="margin:0">Programs</h2><span><button type="button" class="btn" id="progaddbtn">Add an adapter</button> <button type="button" class="btn" id="progcheck">Check all again</button></span></div>
     <p class="dim small">The programs that the adapters use, grouped by field. The same list as /programs in the terminal and cuvette programs. Each change asks first and shows what it does. It goes in the programs log and in the session record.</p>
     <div id="programsbody"><p class="dim">Looking for the programs...</p></div>
   </div>
@@ -383,12 +384,13 @@ ul.dirs li button .dim { margin-left: 6px; }
   <h3 id="progtitle" style="margin-top:0"></h3>
   <p class="cardmsg" id="progrefused" role="alert"></p>
   <div id="progpath" class="hidden"><label class="field"><span>Path of the program, or of the folder that holds it</span><input type="text" id="progpathin" placeholder="~/Applications/Fiji.app"></label><div class="row"><button type="button" class="btn" id="progpathcheck">Check this path</button></div></div>
+  <div id="progadd" class="hidden"><label class="field"><span>Address of a repository, a folder, a zip file, or the name of an adapter in the registry</span><input type="text" id="progaddin" placeholder="https://github.com/name/adapter.git"></label><div class="row"><button type="button" class="btn" id="progaddcheck">Check the adapter</button></div></div>
   <ul id="proglines"></ul>
   <div id="progcmdwrap" class="hidden"><div class="small dim">Command</div><div class="pcmd"><pre id="progcmd"></pre><button type="button" class="btn" id="progcopy">Copy</button></div></div>
   <p id="proglinkwrap" class="hidden small">Link: <a id="proglink" target="_blank" rel="noopener"></a> <button type="button" class="link" id="proglinkcopy">Copy</button></p>
   <pre id="proglog" class="hidden" aria-live="polite"></pre>
   <p id="progresult" role="status"></p>
-  <div class="row end"><button type="button" class="btn quiet" id="progcancel">Cancel</button><button type="button" class="btn primary hidden" id="progok">Confirm</button></div>
+  <div class="row end"><button type="button" class="btn quiet" id="progcancel">Cancel</button><button type="button" class="btn hidden" id="progreview">Review</button><button type="button" class="btn primary hidden" id="progok">Confirm</button></div>
 </dialog>
 
 <main class="page hidden" id="p-sessions">
@@ -920,6 +922,28 @@ async function loadPrograms(quiet) {
   if (progStart) { const li = box.querySelector('[data-prog="' + CSS.escape(progStart) + '"]'); progStart = ""; if (li) { li.scrollIntoView({ block: "center" }); const b = li.querySelector("button"); if (b) b.focus(); } }
 }
 $("progcheck").addEventListener("click", () => loadPrograms());
+$("progaddbtn").addEventListener("click", () => {
+  resetDialog();
+  $("progtitle").textContent = "Add an adapter";
+  $("progadd").classList.remove("hidden");
+  $("progaddin").value = "";
+  progRun = {};
+  $("progdlg").showModal();
+  $("progaddin").focus();
+});
+$("progaddcheck").addEventListener("click", async () => {
+  if (!progRun) return;
+  $("progresult").textContent = "Fetching and checking the adapter...";
+  try { const r = await call("api/adapters/plan", { source: $("progaddin").value }); progRun = { action: r.plan.action, name: r.plan.name }; drawPlan(r.plan); $("progresult").textContent = ""; $("progadd").classList.add("hidden"); } catch (e) { $("progresult").textContent = e.message; }
+});
+$("progaddin").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("progaddcheck").click(); } });
+$("progreview").addEventListener("click", async () => {
+  if (!progRun || !progRun.install) return;
+  $("progreview").disabled = true;
+  $("progresult").textContent = "Claude is reading the files...";
+  try { const r = await call("api/adapters/review", { install: progRun.install }); drawPlan(r.plan); $("progresult").textContent = ""; } catch (e) { $("progresult").textContent = e.message; }
+  $("progreview").disabled = false;
+});
 function copy(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(() => toast("Copied."), () => fallbackCopy(text)); return; }
   fallbackCopy(text);
@@ -947,6 +971,9 @@ function drawPlan(plan) {
   ok.textContent = plan.confirm || "Run";
   ok.className = "btn " + (plan.danger ? "danger" : "primary") + (can ? "" : " hidden");
   ok.disabled = false;
+  $("progreview").classList.toggle("hidden", !plan.review);
+  $("progreview").textContent = plan.review || "";
+  if (progRun && plan.installId) progRun.install = plan.installId;
   $("progcancel").textContent = can ? "Cancel" : "Close";
 }
 function resetDialog() {
@@ -956,6 +983,7 @@ function resetDialog() {
   $("progresult").textContent = "";
   $("progresult").className = "";
   $("progpath").classList.add("hidden");
+  $("progadd").classList.add("hidden");
   drawPlan({ title: "", lines: [], runs: false });
 }
 async function progAction(li, action) {
@@ -991,7 +1019,7 @@ $("progpathin").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.
 $("progcopy").addEventListener("click", () => copy($("progcmd").textContent));
 $("proglinkcopy").addEventListener("click", () => copy($("proglink").textContent));
 $("progcancel").addEventListener("click", () => $("progdlg").close());
-$("progdlg").addEventListener("close", () => { progRun = null; });
+$("progdlg").addEventListener("close", () => { if (progRun && progRun.install) call("api/adapters/drop", { install: progRun.install }).catch(() => {}); progRun = null; });
 $("progok").addEventListener("click", async () => {
   if (!progRun) return;
   const ok = $("progok");
@@ -1013,6 +1041,8 @@ function finishRun(r) {
   $("progresult").textContent = r.text;
   $("progresult").className = r.ok ? "okline" : "cardmsg";
   $("progok").classList.add("hidden");
+  $("progreview").classList.add("hidden");
+  if (progRun) progRun.install = "";
   $("progcancel").textContent = "Close";
   loadPrograms(true);
 }

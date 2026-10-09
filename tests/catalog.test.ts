@@ -32,7 +32,7 @@ test("the index lists every adapter with its field, file types, status and progr
   expect(list.find((a) => a.name === "biostats")?.field).toBe("statistics");
   const text = formatIndex(list);
   expect(text).toMatch(/^\d+ adapters \(name \| program/);
-  expect(text).toContain("- stats-here | Stats here | statistics | Runs t tests on a CSV file. | files: .csv .tsv | approved | program found: no");
+  expect(text).toContain("- stats-here | Stats here | statistics | Runs t tests on a CSV file. | files: .csv .tsv | approved | trust: Unlisted | program found: no");
   expect(text).toMatch(/use_adapter\(name, reason\)/);
 });
 

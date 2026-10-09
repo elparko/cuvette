@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { loadAdapter } from "../adapters/manifest.ts";
-import { ACTION_LABEL, availableActions, listPrograms, planAction, runAction, type Action, type Plan, type ProgramRow, type ProgramsOpts, type RunOpts, type Via } from "../core/programs.ts";
+import { prepareAdd, discardPlan, reviewPlan, type PrepareOpts } from "../adapters/install.ts";
+import { ACTION_LABEL, availableActions, listPrograms, planAction, planFromInstall, runAction, type Action, type Plan, type ProgramRow, type ProgramsOpts, type RunOpts, type Via } from "../core/programs.ts";
 
 export type ProgramHooks = Partial<RunOpts>;
 
@@ -36,6 +37,25 @@ export async function planFor(name: string, action: Action, opts: ProgramsOpts &
   const manifest = opts.adapters?.[name]?.manifest ?? (action === "path" ? loadAdapter(row.root).manifest : undefined);
   return { row, plan: await planAction(row, action, { path: opts.path, by: opts.by, locate: opts.locate, manifest }) };
 }
+
+export async function addFor(source: string, opts: PrepareOpts = {}): Promise<{ plan?: Plan; error?: string }> {
+  if (!source.trim()) return { error: "Give an address of a repository, a folder, a zip file or an adapter name." };
+  try {
+    return { plan: planFromInstall(await prepareAdd(source.trim(), opts)) };
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+export async function reviewFor(id: string, opts: { model?: string; provider?: import("../core/types.ts").Provider } = {}): Promise<{ plan?: Plan; error?: string }> {
+  try {
+    return { plan: planFromInstall(await reviewPlan(id, opts)) };
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+export const dropInstall = discardPlan;
 
 export async function runFor(plan: Plan, via: Via, hooks: ProgramHooks & { confirmed?: boolean; onLine?: (l: string) => void } = {}): Promise<{ ok: boolean; text: string; rows?: ProgramRow[] }> {
   return runAction(plan, { ...hooks, via });
