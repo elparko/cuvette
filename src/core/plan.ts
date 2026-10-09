@@ -1,5 +1,5 @@
 import { pilotText, validationRows, type PilotRun } from "./pilot.ts";
-import type { AnalysisRecord } from "./record.ts";
+import { liveEntries, type AnalysisRecord } from "./record.ts";
 import type { FindingIn } from "./types.ts";
 
 export interface PlanDecision {
@@ -238,10 +238,9 @@ export interface ApprovedPlan {
 }
 
 export function approvedPlan(record: AnalysisRecord): ApprovedPlan | undefined {
-  const a = record.live(["plan_approved"]).at(-1);
+  const a = liveEntries(record, ["plan_approved"]).at(-1);
   if (!a) return undefined;
-  const updates = record
-    .live(["plan"])
+  const updates = liveEntries(record, ["plan"])
     .filter((e) => e.id > a.id && e.data.action === "updated")
     .map((e) => ({ version: Number(e.data.version), reason: str(e.data.reason), text: str(e.data.text), ts: e.ts }));
   return { version: Number(a.data.version), text: str(a.data.text), plan: a.data.plan as unknown as AnalysisPlan, ts: a.ts, entry: a.id, updates, pilot: (a.data.pilot as PilotRun | undefined) ?? undefined };
@@ -250,12 +249,12 @@ export function approvedPlan(record: AnalysisRecord): ApprovedPlan | undefined {
 export function currentPlan(record: AnalysisRecord): AnalysisPlan | undefined {
   const a = approvedPlan(record);
   if (!a) return undefined;
-  const last = record.live(["plan"]).filter((e) => e.id > a.entry && (e.data.action === "updated" || e.data.action === "status") && e.data.plan).at(-1);
+  const last = liveEntries(record, ["plan"]).filter((e) => e.id > a.entry && (e.data.action === "updated" || e.data.action === "status") && e.data.plan).at(-1);
   return (last?.data.plan as unknown as AnalysisPlan | undefined) ?? a.plan;
 }
 
 export function questionsOf(record: AnalysisRecord, before = Infinity): string[] {
-  const e = record.live(["clarify"]).filter((x) => x.id < before && x.data.action === "answered").at(-1);
+  const e = liveEntries(record, ["clarify"]).filter((x) => x.id < before && x.data.action === "answered").at(-1);
   if (!e) return [];
   return [String(e.data.found ?? ""), ...((e.data.answers as string[]) ?? []).map((x) => `- ${x}`), ...((e.data.skipped as string[]) ?? []).map((x) => `- Not asked: ${x}`)].filter(Boolean);
 }
@@ -302,8 +301,8 @@ export function planFindings(record: AnalysisRecord): FindingIn[] {
 
 export function planView(record: AnalysisRecord): { approved: boolean; version: number; text: string; updates: { version: number; reason: string }[] } | undefined {
   const a = approvedPlan(record);
-  const proposed = record.live(["plan"]).filter((e) => e.data.action === "proposed" || e.data.action === "update_proposed").at(-1);
-  const cancelled = proposed && record.live(["plan"]).some((e) => e.id > proposed.id && e.data.action === "cancelled");
+  const proposed = liveEntries(record, ["plan"]).filter((e) => e.data.action === "proposed" || e.data.action === "update_proposed").at(-1);
+  const cancelled = proposed && liveEntries(record, ["plan"]).some((e) => e.id > proposed.id && e.data.action === "cancelled");
   if (proposed && !cancelled && (!a || proposed.id > a.entry)) return { approved: false, version: Number(proposed.data.version), text: str(proposed.data.full ?? proposed.data.text), updates: [] };
   if (!a) return undefined;
   const now = currentPlan(record);

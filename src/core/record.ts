@@ -27,6 +27,8 @@ function sha256File(path: string): string {
   return h.digest("hex");
 }
 
+export const liveEntries = (r: Pick<AnalysisRecord, "entries"> & { live?: AnalysisRecord["live"] }, kinds?: EntryKind[]): Entry[] => (r.live ? r.live(kinds) : r.entries(kinds));
+
 export class AnalysisRecord {
   dir: string;
   workDir: string;

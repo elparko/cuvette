@@ -1,5 +1,5 @@
 import { existsSync, statSync } from "node:fs";
-import type { AnalysisRecord } from "./record.ts";
+import { liveEntries, type AnalysisRecord } from "./record.ts";
 import type { Args, Entry } from "./types.ts";
 
 export const BATCH_FILES = 3;
@@ -40,14 +40,14 @@ export interface PilotRun {
 }
 
 export function lastPilot(record: AnalysisRecord): PilotRun | undefined {
-  const e = record.live(["pilot_run"]).at(-1);
+  const e = liveEntries(record, ["pilot_run"]).at(-1);
   return e ? ({ entry: e.id, ...(e.data as object) } as PilotRun) : undefined;
 }
 
 export function pilotState(record: AnalysisRecord): { approved?: Entry; stale?: string } {
-  const approved = record.live(["pilot_approved"]).at(-1);
+  const approved = liveEntries(record, ["pilot_approved"]).at(-1);
   if (!approved) return {};
-  const later = record.live(["decision", "adapter"]).filter((e) => e.id > approved.id && (e.kind === "adapter" || (!e.data.rewind && e.data.old !== undefined && e.data.old !== null)));
+  const later = liveEntries(record, ["decision", "adapter"]).filter((e) => e.id > approved.id && (e.kind === "adapter" || (!e.data.rewind && e.data.old !== undefined && e.data.old !== null)));
   const first = later[0];
   if (!first) return { approved };
   const what = first.kind === "adapter" ? `the program changed (${String(first.data.name)} loaded)` : String(first.data.key).startsWith("definition:") ? `the definition of ${String(first.data.key).slice(11)} changed` : `${String(first.data.key)} changed to ${JSON.stringify(first.data.new)}`;
@@ -83,7 +83,7 @@ export function pilotRows(record: AnalysisRecord): { columns: string[]; rows: (s
 }
 
 export function validationRows(record: AnalysisRecord): { columns: string[]; rows: (string | number)[][]; summary: string[]; plot?: string } | undefined {
-  const v = record.live(["validation"]).at(-1);
+  const v = liveEntries(record, ["validation"]).at(-1);
   if (!v) return undefined;
   const pairs = (v.data.pairs as { sample: string; ours: number; ref: number; pilot: boolean }[]) ?? [];
   return {
