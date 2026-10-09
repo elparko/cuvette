@@ -72,9 +72,10 @@ test("a 10x folder named in the request matches through the files in it", () => 
 
 test("alternatives share a file type with the proposed adapter", () => {
   const list = adapterIndex(cwd);
-  expect(alternatives(list, "biostats")).toEqual(expect.arrayContaining(["lme4", "stats-here"]));
-  expect(alternatives(list, "biostats")).not.toContain("samtools");
-  expect(alternatives(list, "biostats", ["lme4"])).not.toContain("lme4");
+  expect(alternatives(list, "biostats", [], 20)).toEqual(expect.arrayContaining(["lme4", "stats-here"]));
+  expect(alternatives(list, "biostats", [], 20)).not.toContain("samtools");
+  expect(alternatives(list, "biostats")).toHaveLength(4);
+  expect(alternatives(list, "biostats", ["lme4"], 20)).not.toContain("lme4");
   expect(filesFor("see /d/a.csv and /d/b.bam", list.find((a) => a.name === "biostats")!, cwd)).toEqual(["a.csv"]);
 });
 
