@@ -9,10 +9,11 @@ import { extractNumbers } from "./claims.ts";
 import { mainNodes, methodsSentence, stepLines } from "./exports.ts";
 import { stepNumbers } from "./housekeeping.ts";
 import { inProject, outputRoot, placeAt, readIndex } from "./places.ts";
+import { pilotRows, validationRows } from "./pilot.ts";
 import { AnalysisRecord } from "./record.ts";
 import { find, resolve as resolveSetting, type Paper } from "./settings.ts";
 export { localePaper, type Paper } from "./settings.ts";
-import { dataUri, esc, findChrome, findPandoc, renderMarkdown, show } from "./trail.ts";
+import { dataUri, esc, fillTemplate, findChrome, findPandoc, renderMarkdown, show } from "./trail.ts";
 import type { Claim, Entry, Node } from "./types.ts";
 
 export type BookFormat = "pdf" | "html" | "docx";
@@ -218,6 +219,7 @@ interface Part {
   steps: Map<string, number>;
   all: Node[];
   outDir?: string;
+  shown: Set<string>;
 }
 
 const anchor = (p: Part, step: number) => `p${p.k}-step-${step}`;
@@ -354,8 +356,8 @@ function definitions(plan: Record<string, unknown>): [string, string, string][] 
   }).filter((r) => r[0] || r[1]);
 }
 
-function exclusions(p: Part, plan: Record<string, unknown>): [string, string, string][] {
-  const items = [...arr(plan.exclusions), ...kinds(p.record, "exclusion").map((e) => e.data)];
+function exclusions(plan: Record<string, unknown>): [string, string, string][] {
+  const items = arr(plan.exclusions);
   return items.map((x) => {
     const o = typeof x === "string" ? { rule: x } : rec(x);
     const removed = pick(o, "effect", "removed", "n_removed", "result");
@@ -366,6 +368,7 @@ function exclusions(p: Part, plan: Record<string, unknown>): [string, string, st
 function programRows(p: Part): { name: string; version: string; adapter: string; adapterVersion: string; a?: LoadedAdapter }[] {
   const out = new Map<string, { name: string; version: string; adapter: string; adapterVersion: string; a?: LoadedAdapter }>();
   for (const n of p.nodes) {
+    if (!n.adapter) continue;
     const a = p.adapters.find((x) => x.name === n.adapter);
     const name = a?.manifest.program.name ?? n.adapter;
     const listed = a?.manifest.program.version ?? "";
@@ -384,11 +387,14 @@ function sectionMethods(w: Writer, p: Part, level: number, refs: References): vo
     const named = progs.map((g) => `${g.name}${g.version ? ` (version ${g.version})` : ""}${refText(refs.forAdapter(g.a, g.adapter, g.version))}`);
     sentences.push(`The analysis used ${named.join(" and ")}.`);
     const ads = [...new Set(progs.map((g) => `${g.adapter} ${g.adapterVersion}`))];
-    sentences.push(`Cuvette ${CUVETTE_VERSION} [${cuv}] ran each step through the ${ads.join(" and ")} adapter${ads.length === 1 ? "" : "s"} and kept a record of each step.`);
-  } else sentences.push(`Cuvette ${CUVETTE_VERSION} [${cuv}] kept the record of this session. The record has no analysis steps.`);
+    sentences.push(`Cuvette ${CUVETTE_VERSION} [${cuv}] ran the program steps through the ${ads.join(" and ")} adapter${ads.length === 1 ? "" : "s"} and kept a record of each step.`);
+  } else sentences.push(`Cuvette ${CUVETTE_VERSION} [${cuv}] kept the record of this session.${p.nodes.length ? "" : " The record has no analysis steps."}`);
+  const scripts = p.nodes.filter((n) => !n.adapter).map((n) => p.steps.get(n.id));
+  if (scripts.length) sentences.push(`${scripts.length === 1 ? "Step" : "Steps"} ${scripts.join(", ")} ran ${scripts.length === 1 ? "a script" : "scripts"} that the agent wrote. Appendix A has the code.`);
   for (const n of p.nodes) {
-    const m = methodsSentence(p.adapters, n);
-    sentences.push(`Step ${p.steps.get(n.id)} (${n.tool}): ${sentence(looksLikeCode(m) ? n.summary || n.tool : m)}`);
+    let m = fillTemplate(methodsSentence(p.adapters, n), rec(n.result));
+    if (looksLikeCode(m) || /\{[\w.]+\}/.test(m)) m = n.summary || n.tool;
+    sentences.push(`Step ${p.steps.get(n.id)} (${n.tool}): ${sentence(m)}`);
   }
   const rows = decisionRows(p);
   const by = (who: RegExp) => rows.filter((r) => who.test(r.by)).map((r) => `${r.label.replace(/\?$/, "")} = ${show(r.value)}`);
@@ -404,44 +410,42 @@ function sectionMethods(w: Writer, p: Part, level: number, refs: References): vo
   const defs = definitions(plan);
   const unit = defs.some((d) => d[2]);
   if (defs.length) w.table("Definitions of each measure.", unit ? ["Measure", "Definition", "Unit"] : ["Measure", "Definition"], defs.map((d) => (unit ? d : d.slice(0, 2))));
-  const ex = exclusions(p, plan);
-  if (ex.length) w.table("Exclusions and their effect on the data.", ["Exclusion", "Reason", "Effect"], ex);
+  const ex = exclusions(plan);
+  const why = ex.some((x) => x[1]);
+  if (ex.length) w.table("Exclusions and their effect on the data.", why ? ["Exclusion", "Reason", "Effect"] : ["Exclusion", "Effect"], ex.map((x) => (why ? x : [x[0], x[2]])));
 }
 
 function sectionPilot(w: Writer, p: Part, level: number): void {
-  const runs = kinds(p.record, "pilot_run");
-  const approvals = kinds(p.record, "pilot_approved");
-  const refs = [...kinds(p.record, "reference_comparison").map((e) => e.data), ...runs.map((e) => rec(e.data.reference)).filter((o) => Object.keys(o).length)];
-  if (!runs.length && !approvals.length && !refs.length) return;
+  const runs = p.record.entries(["pilot_run"]);
+  const v = validationRows(p.record);
+  const ref = p.record.entries(["reference"]).filter((e) => e.data.mode !== "none" && !e.data.revealed).at(-1);
+  if (!runs.length && !v) return;
   w.head(level, "Pilot and validation");
+  const status = new Map<number, Entry>();
+  for (const e of p.record.entries(["pilot_approved", "pilot_rejected"])) status.set(Number(e.data.run), e);
+  if (ref) w.p(`Reference: ${str(ref.data.path)}${ref.data.sheet ? `, sheet ${str(ref.data.sheet)}` : ""}. ${ref.data.mode === "blind" ? "The harness held the reference back from the agent until all samples were done (blind comparison)." : "The pilot compared its values with this reference."}`);
   runs.forEach((e, i) => {
     const d = e.data;
-    const sample = arr(pick(d, "sample", "files", "inputs")).map(str).filter(Boolean);
-    const n = pick(d, "n", "size");
-    w.p(`Pilot run ${i + 1} on ${time(e.ts)}.${sample.length ? ` Pilot sample: ${sample.join(", ")}.` : ""}${n !== undefined ? ` n = ${str(n)}.` : ""}`);
-    if (pick(d, "summary", "text")) w.p(str(pick(d, "summary", "text")));
-    if (d.table) {
-      const t = rec(d.table);
-      w.table(`Pilot result, run ${i + 1}.`, arr(t.columns).map(str), arr(t.rows).slice(0, MAX_ROWS) as unknown[][]);
-    }
-    for (const img of [...arr(d.qc_image), ...arr(d.qc), ...arr(d.images), ...arr(d.image)]) {
+    const st = status.get(e.id);
+    const verdict = !st ? "The record has no decision on this pilot." : st.kind === "pilot_approved" ? `The scientist approved this pilot on ${time(st.ts)}.` : `The scientist did not approve this pilot (${str(st.data.reason) || "no reason given"}).`;
+    w.p(`Pilot run ${i + 1} on ${time(e.ts)}. Pilot sample: ${str(d.sample)}. ${verdict}`);
+    const comparison = arr(d.comparison).map(str).filter(Boolean);
+    if (comparison.length) w.add(`<p>Comparison with the reference:</p><ul>${comparison.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>`);
+    if (d.check) w.p(`The agent's check: ${sentence(str(d.check))}`);
+    arr(d.images).forEach((img, k) => {
       const src = imageSrc(p.record, img);
-      if (src) w.figure(src, `Quality-control image of the pilot sample, run ${i + 1}. The scientist looked at this image before the pilot approval.`);
-    }
+      p.shown.add(basename(str(img)));
+      if (src) w.figure(src, `Quality-control image ${k + 1} of the pilot sample ${str(d.sample)}, run ${i + 1}. The scientist looked at this image before the decision on the pilot. n = 1 sample. Error bars: none, this image is not a plot.`);
+    });
   });
-  for (const a of approvals) {
-    const who = str(a.data.by) || "the scientist";
-    const note = str(pick(a.data, "note", "reason"));
-    w.p(`${who === "human" ? "The scientist" : who.charAt(0).toUpperCase() + who.slice(1)} approved the pilot on ${time(a.ts)}.${note ? ` Note: ${note}` : ""}`);
-  }
-  for (const r of refs) {
-    const t = rec(r.table);
-    if (arr(t.columns).length) w.table(`Comparison with the blind reference.${r.summary ? ` ${str(r.summary)}` : ""}`, arr(t.columns).map(str), arr(t.rows).slice(0, MAX_ROWS) as unknown[][]);
-    else if (r.summary) w.p(`Comparison with the blind reference: ${str(r.summary)}`);
-    for (const img of [...arr(r.image), ...arr(r.images), ...arr(r.plot)]) {
-      const src = imageSrc(p.record, img);
-      if (src) w.figure(src, `Agreement between this analysis and the blind reference.${r.n ? ` n = ${str(r.n)}.` : ""}`);
-    }
+  const pr = pilotRows(p.record);
+  if (pr.rows.length) w.table("Pilot results: each measure on the pilot sample, with its definition, the reference value and the decision.", pr.columns.slice(0, 7), pr.rows.map((r) => r.slice(0, 7)));
+  if (v) {
+    if (v.summary.length) w.add(`<p>Comparison of every sample with the reference:</p><ul>${v.summary.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`);
+    w.table("Each sample: the agent's value, the reference value and the difference.", v.columns, v.rows);
+    const src = v.plot ? fileUri(v.plot) : undefined;
+    if (v.plot) p.shown.add(basename(v.plot));
+    if (src) w.figure(src, `Bland-Altman plot of the agent's values against the reference. Each dot is one sample: the mean of the two values (across) against the agent minus the reference (up). n = ${v.rows.length} samples. The solid line is the mean difference. The dashed lines are the mean plus and minus 1.96 SD (limits of agreement); the plot has no error bars. The gray dot is the pilot sample.`);
   }
 }
 
@@ -545,7 +549,7 @@ function sectionResults(w: Writer, p: Part, level: number): void {
   const figDir = p.outDir ? join(p.outDir, "figures") : "";
   if (figDir && existsSync(figDir)) {
     const stepOf = (f: string) => Number(/^step(\d+)-/.exec(f)?.[1] ?? 0);
-    const files = readdirSync(figDir).filter((f) => /\.(png|jpe?g|svg)$/i.test(f) && !used.has(f) && !drawn.has(stepOf(f))).sort();
+    const files = readdirSync(figDir).filter((f) => /\.(png|jpe?g|svg)$/i.test(f) && !used.has(f) && !p.shown.has(f) && !drawn.has(stepOf(f))).sort();
     const pngStems = new Set(files.filter((f) => !/\.svg$/i.test(f)).map((f) => f.replace(/\.[^.]+$/, "")));
     for (const f of files.filter((x) => !/\.svg$/i.test(x) || !pngStems.has(x.replace(/\.[^.]+$/, "")))) {
       const src = fileUri(join(figDir, f));
@@ -733,7 +737,7 @@ export function buildDatabook(input: BookInput): Book {
     const entries = record.entries();
     const adapters = loadAdapters(entries);
     const nodes = mainNodes(record);
-    return { k: k + 1, record, adapters, labels: labelMap(entries, adapters, undefined), nodes, all: record.nodes(), steps: stepNumbers(record.nodes()), outDir: input.outDirs?.[k] };
+    return { k: k + 1, record, adapters, labels: labelMap(entries, adapters, undefined), nodes, all: record.nodes(), steps: stepNumbers(record.nodes()), outDir: input.outDirs?.[k], shown: new Set<string>() };
   });
   const L = single ? 1 : 2;
   for (const p of parts) {

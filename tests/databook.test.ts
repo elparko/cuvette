@@ -34,11 +34,22 @@ function session(opts: { plan?: boolean; dir?: string } = {}): AnalysisRecord {
 }
 
 function addPilot(r: AnalysisRecord): void {
-  const qc = r.putBlob(PNG, ".png");
-  const plot = r.putBlob(Buffer.concat([PNG, Buffer.from([0])]), ".png");
-  r.append("pilot_run" as never, { sample: ["/data/sleep_pilot.csv"], n: 4, summary: "The pilot ran the paired t-test on four patients.", qc_image: qc });
-  r.append("pilot_approved" as never, { by: "human", note: "The QC image looks correct." });
-  r.append("reference_comparison" as never, { summary: "The blind reference gave the same mean difference.", table: { columns: ["measure", "this analysis", "reference"], rows: [["mean_diff", 1.58, 1.58]] }, image: plot, n: 10 });
+  const dir = mkdtempSync(join(tmpdir(), "ga-db-fig-"));
+  const qc = join(dir, "pilot-qc.png");
+  const plot = join(dir, "bland-altman-mean_diff.png");
+  writeFileSync(qc, PNG);
+  writeFileSync(plot, Buffer.concat([PNG, Buffer.from([0])]));
+  const run = r.append("pilot_run", {
+    sample: "/data/sleep_pilot.csv", values: { mean_diff: 1.6 }, images: [qc], check: "The pilot difference is close to the reference.",
+    comparison: ["The agent found 1.6 hours; the reference has 1.58 hours."], reference: { path: "/data/reference.xlsx", mode: "compare", values: { mean_diff: 1.58 } },
+    definitions: [{ measure: "mean_diff", definition: "mean of drug 2 minus drug 1 for each patient" }],
+  });
+  r.append("pilot_approved", { run: run.id, sample: "/data/sleep_pilot.csv" });
+  r.append("validation", {
+    measure: "mean_diff", reference: "/data/reference.xlsx", mode: "compare", plot,
+    pairs: [{ sample: "a", ours: 1.6, ref: 1.58, pilot: true }, { sample: "b", ours: 1.5, ref: 1.55, pilot: false }],
+    summary: ["The mean difference is 0.01 hours."],
+  });
 }
 
 function addFigure(r: AnalysisRecord): void {
@@ -82,20 +93,25 @@ describe("databook", () => {
 
   it("shows the confirmed version and lists earlier versions in the appendix", () => {
     const r = session();
-    r.append("plan" as never, { action: "update_proposed", version: 2, text: "Question: version two" });
-    r.append("plan_approved" as never, { version: 2, text: "Question: version two, confirmed" });
+    r.append("plan", { action: "update_proposed", version: 2, text: "Question: version two" });
+    r.append("plan_approved", {
+      version: 2, text: "Question: version two, confirmed",
+      plan: { question: "Is drug 2 better?", steps: [], definitions: [{ measure: "extra sleep", definition: "hours of sleep above the baseline night" }], exclusions: [{ what: "Patients with a missing night", effect: "removes 0 of 10 patients" }] },
+    });
     const b = book([r]);
     expect(b.html).toContain("The scientist confirmed version 2 of the proposed analysis");
     expect(b.html).toContain("Question: version two, confirmed");
     expect(titles(b).at(-1)).toBe("Earlier versions of the analysis");
     expect(b.html).toMatch(/version 1, proposed on/);
+    expect(b.html).toMatch(/Definitions of each measure\.<\/caption>.*<td>extra sleep<\/td><td>hours of sleep above the baseline night<\/td>/);
+    expect(b.html).toMatch(/Exclusions and their effect on the data\.<\/caption>.*Patients with a missing night.*removes 0 of 10 patients/);
   });
 
   it("writes the methods paragraph from the record", () => {
     const b = book([session()]);
     const methods = /<p class="methods">([^<]*)<\/p>/.exec(b.html)![1]!.replace(/&quot;/g, '"');
     expect(methods).toMatch(/^The analysis used statsmodels, pingouin, lifelines \(version lifelines 0\.30\.3[^)]*\) \[2\]\./);
-    expect(methods).toContain("ran each step through the biostats 0.1.1 adapter");
+    expect(methods).toContain("ran the program steps through the biostats 0.1.1 adapter");
     expect(methods).toContain("Step 1 (inspect_table): 20 rows x 4 columns.");
     expect(methods).toContain("Step 2 (compare_two_groups): paired t-test, two-sided");
     expect(methods).toContain("The scientist chose these settings: Paired test = true");
@@ -116,11 +132,12 @@ describe("databook", () => {
     expect(tabs).toEqual(Array.from({ length: tabs.length }, (_, i) => i + 1));
     expect(b.figures).toBe(3);
     expect(b.tables).toBe(tabs.length);
-    expect(b.html).toMatch(/Figure 1\.<\/b> Quality-control image of the pilot sample/);
-    expect(b.html).toMatch(/Figure 2\.<\/b> Agreement between this analysis and the blind reference\. n = 10\./);
+    expect(b.html).toMatch(/Figure 1\.<\/b> Quality-control image 1 of the pilot sample \/data\/sleep_pilot\.csv/);
+    expect(b.html).toMatch(/Figure 2\.<\/b> Bland-Altman plot[^<]*n = 2 samples\./);
     expect(b.html).toMatch(/Figure 3\.<\/b> Extra sleep by drug\. Step 3 \(plot_groups\)[^<]*n: n_a = 10, n_b = 10\. Error bars: 95% confidence interval\./);
-    expect(b.html).toContain("Comparison with the blind reference.");
-    expect(b.html).toMatch(/approved the pilot on/);
+    expect(b.html).toContain("Pilot results: each measure on the pilot sample");
+    expect(b.html).toContain("The agent found 1.6 hours; the reference has 1.58 hours.");
+    expect(b.html).toMatch(/The scientist approved this pilot on/);
   });
 
   it("links each number in the final answer to its step", () => {
