@@ -8,6 +8,21 @@ import type { Hook, Tool } from "../core/types.ts";
 
 export const SPEC_VERSION = "1";
 
+export const CitationKind = z.enum(["program", "method", "model", "dataset"]);
+
+export const Citation = z.strictObject({
+  text: z.string().min(1),
+  doi: z.string().default(""),
+  url: z.string().default(""),
+  bibtex: z.string().default(""),
+  kind: CitationKind.default("program"),
+  when: z.record(z.string(), z.unknown()).default({}),
+});
+
+const CitationList = z.preprocess((v) => (v && !Array.isArray(v) && typeof v === "object" ? [v] : v), z.array(Citation));
+
+const ToolCitation = Citation.extend({ tool: z.string(), kind: CitationKind.default("method") });
+
 const Program = z.strictObject({
   name: z.string(),
   version: z.string().default(""),
@@ -15,6 +30,7 @@ const Program = z.strictObject({
   homepage: z.string().default(""),
   docs: z.array(z.string()).default([]),
   install: z.string().default(""),
+  citation: CitationList.default([]),
 });
 
 const Locate = z.strictObject({
@@ -165,6 +181,7 @@ export const ToolDef = z.strictObject({
   request: z.record(z.string(), z.unknown()).default({}),
   parse: z.enum(["text", "json", "csv", "keyvalue"]).default("text"),
   returns: z.enum(["values", "text"]).default("values"),
+  citations: z.array(Citation.extend({ kind: CitationKind.default("method") })).default([]),
 });
 
 const AdapterInfo = z.strictObject({
@@ -201,6 +218,7 @@ export const Manifest = z
     tools: z.array(ToolDef).default([]),
     batch_tools: z.array(z.string()).default([]),
     text_tools: z.array(z.string()).default([]),
+    citations: z.array(ToolCitation).default([]),
     data_rules: DataRules.default({ cloud_visibility: "all", note: "" }),
   })
   .superRefine((m, ctx) => {
@@ -223,6 +241,7 @@ export type Decision = z.infer<typeof Decision>;
 export type MapEntry = z.infer<typeof MapEntry>;
 export type ToolDef = z.infer<typeof ToolDef>;
 export type KnownAnswerTest = z.infer<typeof KnownAnswerTest>;
+export type Citation = z.infer<typeof Citation>;
 
 export interface Skill {
   name: string;

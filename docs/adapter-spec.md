@@ -73,6 +73,7 @@ The top level has these keys. A key with a default can be left out.
 | `tests` | list | `[]` | Known-answer tests. |
 | `tools` | list | `[]` | Tools that the adapter declares. |
 | `batch_tools` | list of text | `[]` | Tools from an MCP server or the module that process many files in each call. A tool in `tools` uses its own `batch` field. |
+| `citations` | list | `[]` | Method citations for tools that `tools` does not declare. Each has `tool` and the citation fields. See `tools`. |
 | `data_rules` | object | see below | What the cloud model can see. |
 
 Every object is strict. An unknown key is an error. A duplicate decision key, check id, test id
@@ -104,6 +105,32 @@ or tool name is an error. Two map entries with the same tool and the same `match
 | `homepage` | text | `""` | Web address. |
 | `docs` | list of text | `[]` | Documentation addresses. |
 | `install` | text | `""` | How to install the program, in one or two sentences. If the program is not found when the agent loads the adapter, the harness shows this text. If it is empty, the harness makes a hint from `homepage` and `locate`. |
+| `citation` | list of citations | `[]` | The references that the authors of the program ask users to cite. A program adapter must have at least one citation with a `doi` or a `url`. One citation without a list is also accepted. |
+
+A citation has these fields:
+
+| Field | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `text` | text | required | The full reference in APA style, such as `Love, M. I., Huber, W., & Anders, S. (2014). Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology, 15(12), 550.` |
+| `doi` | text | `""` | The DOI without `https://doi.org/`, such as `10.1186/s13059-014-0550-8`. |
+| `url` | text | `""` | A web address. Use it when the reference has no DOI. |
+| `bibtex` | text | `""` | A BibTeX entry. If it is empty, the harness makes one from `text` and `doi`. |
+| `kind` | `program`, `method`, `model`, `dataset` | `program` in `program.citation`, `method` in a tool | What the reference describes. |
+| `when` | argument name to value | `{}` | Only in a tool citation. The citation applies only to a call whose arguments have these values, such as `{ adjust: BH }`. |
+
+Use the citation that the program asks for. Look on the program website, in `citation("Package")`
+for an R package, and in `CITATION.cff` or the package metadata for a Python package. Do not
+write a reference from memory. Check that each DOI resolves.
+
+Example:
+
+```yaml
+program:
+  name: DESeq2
+  citation:
+    - text: "Love, M. I., Huber, W., & Anders, S. (2014). Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology, 15(12), 550."
+      doi: 10.1186/s13059-014-0550-8
+```
 
 ### `locate`
 
@@ -177,11 +204,18 @@ A tool is one job. The harness shows each tool to the model with its parameters.
 | `macro` | text | `""` | For `macro`. The macro text with placeholders. |
 | `request` | object | `{}` | For `http`. `method`, `path`, `query`, `body`, `headers`. |
 | `parse` | `text`, `json`, `csv`, `keyvalue` | `text` | How to read the output of a `cli` or `script` tool. |
+| `citations` | list of citations | `[]` | The published methods that the tool uses, such as the Benjamini-Hochberg adjustment of p values. The fields are the same as in `program.citation`. `kind` is `method` by default. Use `when` for a method that applies only to some arguments. |
 
 An output spec has these fields: `kind` (`image`, `table`, `file`, `text`, `json`; default
 `file`), `ext` (default empty) and `description` (default empty).
 
-An `mcp` adapter declares no tools. The server lists them. A `files` adapter gets four built-in
+An `mcp` adapter declares no tools. The server lists them. To cite a method of a tool that the
+adapter does not declare in `tools`, such as a tool of an MCP server or of the module, add a
+citation to the top-level `citations` list with the field `tool` set to the tool name.
+
+The harness cites only what ran. The program citations apply when the session loads the
+adapter. A tool citation applies when the tool runs with arguments that match `when`. A citation
+that applies only in a comparison run goes in a separate list, "Used in a comparison". A `files` adapter gets four built-in
 tools: `list_files`, `read_table`, `image_info` and `wait_for_file`.
 
 Template rules for `command`, `macro` and `request`:
