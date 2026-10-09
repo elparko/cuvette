@@ -3,7 +3,8 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { blindPolicy, setBlindPolicy } from "../adapters/blind.ts";
-import { adapterDirs, gaHome } from "../adapters/manifest.ts";
+import { adapterDirs, CATALOG_DIR, gaHome } from "../adapters/manifest.ts";
+import { checkoutModelOptions, endTrustOnce, trustOnce } from "../core/trust.ts";
 import { applyHeadlessSetup, attachHeadless } from "../core/headless.ts";
 import type { Provider } from "../core/types.ts";
 import { finalAnswer, processMetrics, rescoreItems, scoreItems, type ItemScore, type ProcessMetrics } from "./papers-score.ts";
@@ -42,6 +43,7 @@ export interface PapersOptions {
   resultsDir?: string;
   providerFor?: (spec: string) => Provider | undefined;
   log?: (line: string) => void;
+  checkout?: string;
 }
 
 export interface PapersResult {
@@ -52,9 +54,11 @@ export interface PapersResult {
   runs: PaperRun[];
   paths?: { md: string; json: string };
   problems: string[];
+  modelOptions?: Record<string, unknown>;
 }
 
 const T7 = "/Volumes/T7";
+export const REPO_ROOT = resolve(CATALOG_DIR, "..");
 const RESULTS_DIR = resolve(PAPERS_DIR, "../results");
 
 export function scratchRoot(date: string): string {
@@ -95,7 +99,7 @@ function runId(): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${randomBytes(2).toString("hex")}`;
 }
 
-type RunOpts = { scratch: string; blind?: boolean; papersDir?: string; resultsDir?: string; providerFor?: PapersOptions["providerFor"] };
+type RunOpts = { scratch: string; blind?: boolean; papersDir?: string; resultsDir?: string; providerFor?: PapersOptions["providerFor"]; modelOptions?: Record<string, unknown> };
 
 export async function runPaper(paper: Paper, model: string, run: number, opts: RunOpts): Promise<PaperRun> {
   const runDir = join(opts.scratch, slug(model), paper.id, `run${run}`);
@@ -122,7 +126,7 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: R
   let thrown: string | undefined;
   try {
     const { Session } = await import("../core/session.ts");
-    session = await Session.create({ adapters: paper.adapters, model, provider: opts.providerFor?.(model), settings: { headless: true, ...(paper.plan ? { planFirst: true } : {}) }, home: true, ...(blind ? { id, cwd } : {}) });
+    session = await Session.create({ adapters: paper.adapters, model, provider: opts.providerFor?.(model), settings: { ...(opts.modelOptions ?? {}), headless: true, ...(paper.plan ? { planFirst: true } : {}) }, home: true, ...(blind ? { id, cwd } : {}) });
     const answers = readValues(paper, "answers");
     const setup = readValues(paper, "setup");
     attachHeadless(session, { answers, allow: new Set(paper.allow === "all" ? ["all"] : paper.allow) });
@@ -208,6 +212,23 @@ export async function runPapers(opts: PapersOptions): Promise<PapersResult> {
     return result;
   }
   if (problems.length) throw new Error(problems.join("\n"));
+  const checkout = opts.checkout ?? REPO_ROOT;
+  const modelOptions = checkoutModelOptions(checkout);
+  if (Object.keys(modelOptions).length) {
+    result.modelOptions = modelOptions;
+    log(`model options from the settings of ${checkout}: ${Object.entries(modelOptions).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")}`);
+  }
+  trustOnce(checkout);
+  try {
+    return await runAll(opts, papers, result, { log, dir, date, modelOptions });
+  } finally {
+    endTrustOnce(checkout);
+  }
+}
+
+async function runAll(opts: PapersOptions, papers: Paper[], result: PapersResult, c: { log: (l: string) => void; dir: string; date: string; modelOptions: Record<string, unknown> }): Promise<PapersResult> {
+  const { log, dir, date, modelOptions } = c;
+  const runsPerCell = result.runsPerCell;
   const scratch = opts.scratch ?? scratchRoot(date);
   const resultsDir = opts.resultsDir ?? RESULTS_DIR;
   mkdirSync(resultsDir, { recursive: true });
@@ -223,7 +244,7 @@ export async function runPapers(opts: PapersOptions): Promise<PapersResult> {
     for (const paper of papers)
       for (let n = 1; n <= runsPerCell; n++) {
         log(`run ${model} ${paper.id} #${n}`);
-        const r = await runPaper(paper, model, n, { scratch, blind: opts.blind, papersDir: dir, resultsDir, providerFor: opts.providerFor });
+        const r = await runPaper(paper, model, n, { scratch, blind: opts.blind, papersDir: dir, resultsDir, providerFor: opts.providerFor, modelOptions });
         const c = r.items.filter((i) => i.computed.pass).length;
         const rp = r.items.filter((i) => i.reported.pass).length;
         const leak = r.leaks ? ` blind: ${r.leaks.outside.length} outside, ${r.leaks.blocked} blocked, ${r.leaks.unsourced} unsourced` : "";

@@ -190,7 +190,8 @@ node bin/ga.js --adapter imagej --bypass-permissions
 
 To start bypass in a session, type `/permissions bypass`. To stop it, type `/permissions ask`.
 To start each session in bypass, put `"permissions": "bypass"` in
-`~/.guided-analysis/settings.json` or in `.ga/settings.json` of the project. To keep rules in
+`~/.guided-analysis/settings.json` or in `.ga/settings.json` of the project. A project file
+applies only after you trust the folder (see Folder trust). To keep rules in
 the same file, use `"permissionMode": "bypass"` and keep the rules in `"permissions"`.
 
 In bypass, the harness allows each call that has a permission card. The record logs each of
@@ -206,6 +207,53 @@ Bypass does not change these:
 - The blind rules of the benchmark and the macOS sandbox of `run_script` still apply.
 - A push to eLabFTW sends data out of the computer, so it still asks.
 - A `deny` rule in a settings file still denies the call.
+
+### Folder trust
+
+WARNING: The settings, hooks and adapters of a project folder can run programs on this computer.
+
+A project folder can have Cuvette files in `.ga/` or `.cuvette/`:
+
+- `settings.json` and `settings.local.json`. These can set hooks, permission rules and bypass permissions.
+- `adapters/`. An adapter here replaces a catalog adapter with the same name.
+
+Cuvette reads these files only in the project folder. It does not read them in a parent folder.
+Cuvette ignores these files until you trust the folder. Only display settings apply without trust:
+`animations`, `input_keys`, `openImages`, `databook_paper` and `databook_author`.
+
+When a session starts in a folder that is not trusted, a card shows:
+
+- The folder path.
+- Each settings key that would change, with its value.
+- Each hook command in full.
+- Each adapter, with "replaces the catalog adapter X" when it replaces one.
+- Whether the files turn on bypass permissions.
+
+The card has three choices:
+
+1. Trust this folder. Cuvette saves the folder in `trusted_folders` in
+   `~/.guided-analysis/settings.json`, with a SHA-256 hash of each file.
+2. Trust once (this session). Nothing is saved.
+3. Do not trust. The session runs with your user settings only.
+
+If a trusted file changes, the card shows again with a list of the changes. A setting that you
+save with `/config` keeps the folder trusted.
+
+A run with `-p` and `ga mcp` show no card. They ignore the files and write one line about it.
+To use the files in a script, add `--trust-folder`. This trusts the folder for that run only.
+
+```
+ga trust list                  # the trusted folders
+ga trust add <folder>          # trust a folder
+ga trust remove <folder>       # remove the trust
+ga trust show <folder>         # what the folder contains
+```
+
+In a session, `/trust` shows the folder and its files. `/trust on`, `/trust once` and
+`/trust off` change the trust. `/config` and the Settings page of the app have a "Folder trust" row.
+
+The benchmark (`ga bench papers`) trusts its own checkout. It passes the model options `think`,
+`numCtx` and `effort` from the `.ga` settings of the checkout to each run.
 
 ## What the harness enforces
 

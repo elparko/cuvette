@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { folderTrusted, projectSettingFiles } from "../core/trust.ts";
 import { gaHome, type LoadedAdapter, type Manifest } from "./manifest.ts";
 
 export interface Access {
@@ -32,7 +33,8 @@ function programsIn(path: string): Record<string, Access> {
 
 export function accessAll(cwd = process.cwd()): Record<string, Access> {
   const out: Record<string, Access> = {};
-  for (const f of [accessFile(), join(cwd, ".ga", "settings.json"), join(cwd, ".ga", "settings.local.json")])
+  const project = folderTrusted(cwd) ? projectSettingFiles(cwd).map((f) => f.path) : [];
+  for (const f of [accessFile(), ...project])
     for (const [name, a] of Object.entries(programsIn(f))) out[name] = { ...out[name], ...a };
   return out;
 }

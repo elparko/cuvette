@@ -99,7 +99,11 @@ export class HookRunner {
     private cwd: string = process.cwd(),
   ) {}
 
-  add(hooks: Hook[]): void {
+  setCommands(commands: Partial<Record<HookEvent, CommandHook[]>>): void {
+    this.commandHooks = commands;
+  }
+
+    add(hooks: Hook[]): void {
     this.hooks.push(...hooks);
   }
 

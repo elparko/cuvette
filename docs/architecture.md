@@ -277,6 +277,32 @@ Owner `agent`: the agent's first value is recorded as a `decision` by `agent`. A
 be a dotted path into nested objects (`params.tol_ppm`). The harness adds one built-in
 decision: `question` (text, human, setup, "What question are you asking?").
 
+## Folder trust (`src/core/trust.ts`)
+
+WARNING: Project files in `.ga/` or `.cuvette/` can run programs. A change here can open a security gap.
+
+```ts
+function scanFolder(folder: string): FolderScan   // files with SHA-256, keys, hook lines, adapters, bypass
+function trustStatus(folder: string): { state: "none" | "trusted" | "once" | "new" | "changed"; scan; changes: string[] }
+function folderTrusted(folder: string): boolean   // "trusted" or "once"
+function trustFolder(folder: string): TrustEntry  // saves trusted_folders in GA_HOME/settings.json
+function untrustFolder(folder: string): boolean
+function trustOnce(folder: string): void          // in this process; Session.close ends it
+function checkoutModelOptions(checkout: string): Record<string, unknown>   // think, numCtx, effort
+```
+
+Rules:
+
+- The project files are `settings.json`, `settings.local.json` and `adapters/` in `.ga/` and `.cuvette/` of the project folder. The harness does not read them in a parent folder.
+- `loadSettings` (`config.ts`), `layers` (`settings.ts`) and `adapterDirs` (`manifest.ts`) use the project files only if `folderTrusted` is true. Without trust, only `SAFE_KEYS` apply: display settings with no effect on code.
+- `findAdapter` does not load a path in a project adapter folder without trust. It loads the adapter with the same name from the user or catalog folder.
+- A folder is trusted if its entry in `trusted_folders` has the same hash as the files now. A new or changed file, key, hook or adapter sets the state to `changed`.
+- A folder with only `SAFE_KEYS` has the state `none`. It needs no card.
+- `Session.init` checks the trust before the `SessionStart` hooks. An interactive session asks a question with the title `Trust this folder?` and no decision key. Other sessions write one `notice` entry, and `session.trustNotice` holds the text.
+- `Session.answer` sends an answer to that question to `setTrust`. `setTrust` writes a `trust` entry. On trust, `applyProjectFiles` loads the settings again, sets the permission rules and command hooks, turns on bypass if a file sets it, and runs the `SessionStart` hooks of the folder. Model, mode and default adapter settings apply in the next session.
+- `SessionOptions.trustFolder` (`--trust-folder`) trusts the folder once for that session.
+- `runPapers` trusts its own checkout once and passes `checkoutModelOptions` of the checkout to each run as session settings. The session folder of a blind run is a work folder with no project files.
+
 ## Claims, review, lab memory (`src/core/`, owner E)
 
 ```ts

@@ -1,9 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { folderKey, folderTrusted, projectAdapterDirs } from "../core/trust.ts";
 import type { Hook, Tool } from "../core/types.ts";
 
 export const SPEC_VERSION = "1";
@@ -338,7 +339,7 @@ export const CATALOG_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../
 
 export function adapterDirs(cwd = process.cwd()): Record<string, string> {
   const found: Record<string, string> = {};
-  for (const base of [join(cwd, ".ga", "adapters"), join(gaHome(), "adapters"), CATALOG_DIR]) {
+  for (const base of [...(folderTrusted(cwd) ? projectAdapterDirs(cwd) : []), join(gaHome(), "adapters"), CATALOG_DIR]) {
     if (!existsSync(base)) continue;
     for (const d of readdirSync(base)) {
       const p = join(base, d);
@@ -349,7 +350,9 @@ export function adapterDirs(cwd = process.cwd()): Record<string, string> {
 }
 
 export function findAdapter(nameOrPath: string, cwd = process.cwd()): LoadedAdapter {
-  if (existsSync(nameOrPath)) return loadAdapter(nameOrPath);
+  const inProject = [...projectAdapterDirs(resolve(cwd)), ...projectAdapterDirs(folderKey(cwd))].some((d) => resolve(nameOrPath).startsWith(d + sep));
+  if (existsSync(nameOrPath) && !(inProject && !folderTrusted(cwd))) return loadAdapter(nameOrPath);
+  if (inProject) nameOrPath = basename(resolve(nameOrPath));
   const dirs = adapterDirs(cwd);
   const dir = dirs[nameOrPath];
   if (!dir) throw new Error(`no adapter named "${nameOrPath}". Known: ${Object.keys(dirs).join(", ") || "none"}`);

@@ -327,6 +327,30 @@ export const commands: Command[] = [
     },
   },
   {
+    name: "trust",
+    args: "[on|once|off]",
+    help: "Show whether this folder is trusted, and what its .ga or .cuvette folder contains. on trusts it, once trusts it for this session, off removes the trust.",
+    async run([m], ctx) {
+      const choice = { on: "trust", once: "once", off: "no" }[m ?? ""] as "trust" | "once" | "no" | undefined;
+      if (m && !choice) return ctx.error("Use: /trust, /trust on, /trust once or /trust off");
+      const cwd = ctx.session.cwd ?? process.cwd();
+      const tr = await import("../core/trust.ts");
+      if (choice) {
+        if (!ctx.session.setTrust) return unavailable(ctx);
+        ctx.notice(await ctx.session.setTrust(choice));
+        ctx.refresh();
+        return;
+      }
+      const t = tr.trustStatus(cwd);
+      const lines = [`Folder: ${t.scan.folder}`, `Trust: ${tr.stateLabel(t)}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : tr.folderLines(t.scan)), ...(t.changes.length ? ["Changes since you trusted the folder:", ...t.changes.map((c) => `  ${c}`)] : [])];
+      ctx.print(lines.join("\n"), "Folder trust");
+      if ((t.state === "new" || t.state === "changed") && ctx.session.askTrust) {
+        const q = await ctx.session.askTrust();
+        if (q && !ctx.hasQuestionCard(q.qid)) ctx.openCard({ t: "question", q });
+      }
+    },
+  },
+  {
     name: "mode",
     args: "<watch|follow|teach|plan>",
     help: "Change the mode.",

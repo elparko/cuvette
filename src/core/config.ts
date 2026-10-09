@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gaHome } from "../adapters/manifest.ts";
+import { folderTrusted, projectSettings, safeOnly } from "./trust.ts";
 import type { HookEvent, Mode } from "./types.ts";
 
 export interface Settings {
@@ -98,8 +99,8 @@ function merge(a: Settings, b: Partial<Settings>): Settings {
 }
 
 export function loadSettings(cwd: string, overrides: Partial<Settings> = {}): Settings {
-  let s = DEFAULTS;
-  for (const p of [join(gaHome(), "settings.json"), join(cwd, ".ga", "settings.json"), join(cwd, ".ga", "settings.local.json")])
-    s = merge(s, readJson(p));
+  let s = merge(DEFAULTS, readJson(join(gaHome(), "settings.json")));
+  const trusted = folderTrusted(cwd);
+  for (const layer of projectSettings(cwd)) s = merge(s, (trusted ? layer : safeOnly(layer)) as Partial<Settings>);
   return merge(s, Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined)));
 }

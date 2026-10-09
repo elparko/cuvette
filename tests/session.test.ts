@@ -8,6 +8,7 @@ import { Session, announcesStep, endsWithPromise } from "../src/core/session.ts"
 import { FakeProvider } from "../src/providers/fake.ts";
 import { unzip } from "./fixtures/unzip.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
+import { trustFolder } from "../src/core/trust.ts";
 
 let session: Session | undefined;
 beforeEach(() => {
@@ -429,6 +430,7 @@ function pickCwd(): string {
     symlinkSync(join(__dirname, "fixtures/lab/server.ts"), join(dir, "server.ts"));
     writeFileSync(join(dir, "skills", "recount.md"), "---\nname: recount\ndescription: Count again with another method.\n---\nCount again.\n");
   }
+  trustFolder(cwd);
   return cwd;
 }
 

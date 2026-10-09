@@ -7,6 +7,7 @@ import { Permissions, modeHook } from "../src/core/permissions.ts";
 import { Session } from "../src/core/session.ts";
 import type { Mode, Tool } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
+import { trustFolder } from "../src/core/trust.ts";
 
 const tool = (o: Partial<Tool>): Tool => ({ name: "t", description: "", inputSchema: {}, source: "adapter", execute: async () => ({ ok: true }), ...o });
 
@@ -140,6 +141,8 @@ test('the settings file can say "permissions": "bypass"', () => {
   mkdirSync(join(cwd, ".ga"));
   writeFileSync(join(cwd, ".ga", "settings.json"), JSON.stringify({ permissions: "bypass" }));
   writeFileSync(join(cwd, ".ga", "settings.local.json"), JSON.stringify({ permissions: { "run_command:rm *": "deny" } }));
+  expect(loadSettings(cwd).permissionMode).toBe("ask");
+  trustFolder(cwd);
   const s = loadSettings(cwd);
   expect(s.permissionMode).toBe("bypass");
   expect(s.permissions).toEqual({ "run_command:rm *": "deny" });

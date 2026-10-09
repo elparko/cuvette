@@ -8,6 +8,7 @@ import { CUSTOM_HOW, type Located } from "../src/adapters/locate.ts";
 import { Manifest } from "../src/adapters/manifest.ts";
 import { lastUsedMap, listPrograms, planAction, programsTable, readLog, runAction, type Plan, type ProgramRow, type ProgramsOpts } from "../src/core/programs.ts";
 import { Session } from "../src/core/session.ts";
+import { trustFolder } from "../src/core/trust.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { startApp, type AppHandle } from "../src/server/app.ts";
 import { appPageHtml } from "../src/server/app-page.ts";
@@ -276,6 +277,7 @@ tools:
   - { name: run_code, description: Run code., params: { code: { type: string } }, command: [echo, "{code}"] }
 `,
   );
+  trustFolder(cwd);
   return cwd;
 }
 

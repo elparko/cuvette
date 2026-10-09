@@ -6,7 +6,6 @@ The project is in early development. Version numbers start at the first public r
 ## Unreleased: work in progress on 8 and 9 October 2026
 
 These items are being built and are not on main yet:
-- Folder trust: settings, hooks and adapters in a data folder take effect only after you trust the folder.
 - A desktop app for macOS (Tauri), about one third the size of an Electron app.
 - Citations for every program and method that a session uses: `/cite`, BibTeX, RIS, APA and Vancouver.
 - New analyses: ELISA standard curves, dose-response, qPCR, growth curves and enzyme kinetics; logistic regression, chi-square, Fisher and McNemar tests; meta-analysis; ROC curves; power analysis; blot and gel densitometry, colony counts, wound healing and colocalization.
@@ -17,6 +16,9 @@ These items are being built and are not on main yet:
 - Rewind, branches and method templates.
 
 ## 9 October 2026
+
+### Security
+- Folder trust: the settings, hooks and adapters in `.ga/` or `.cuvette/` of a project folder take effect only after you trust the folder. A card shows what the folder contains. A changed file asks again. `ga trust`, `/trust`, `--trust-folder`, and a Folder trust row in `/config` and the app Settings page.
 
 ### Programs
 - A Programs manager in the app, in the terminal (`/programs`) and on the command line (`ga programs`). It shows each science program with its status, version, size, last use and access. It installs, updates and removes the environments that Cuvette made, sets a custom program path, turns adapters on or off, and controls whether an adapter may run code that the agent writes. Every change asks first. Cuvette never removes a program that you installed yourself.

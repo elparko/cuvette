@@ -62,6 +62,8 @@ export interface SessionLike {
   changeProgram?(name: string): Promise<{ ok: boolean; text: string }>;
   setMode(mode: Mode): void;
   setPermissionMode(m: "ask" | "bypass"): void;
+  setTrust?(choice: "trust" | "once" | "no"): Promise<string>;
+  askTrust?(): Promise<Question | undefined>;
   followDone(step: number, note?: string, agentDoes?: boolean): Promise<void>;
   review(): Promise<Finding[]>;
   compact(): Promise<void>;

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { beforeEach, expect, test } from "vitest";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint } from "../src/adapters/catalog.ts";
 import { Manifest } from "../src/adapters/manifest.ts";
+import { trustFolder } from "../src/core/trust.ts";
 
 let cwd = "";
 beforeEach(() => {
@@ -20,6 +21,7 @@ beforeEach(() => {
       "locate: { env: GA_STATS_HERE, paths: ['/nowhere/stats-here'] }",
     ].join("\n"),
   );
+  trustFolder(cwd);
 });
 
 test("the index lists every adapter with its field, file types, status and program check", () => {

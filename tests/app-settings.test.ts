@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { saveClaudeKey } from "../src/core/credentials.ts";
 import { describe as rows, settingsPath } from "../src/core/settings.ts";
 import { startApp, type AppHandle } from "../src/server/app.ts";
+import { trustFolder } from "../src/core/trust.ts";
 import { settingsHtml } from "../src/server/app-settings.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
@@ -97,6 +98,7 @@ test("the source badges name the scope, and a project value names its file", asy
   writeJson(settingsPath("user", cwd), { referee: "none" });
   writeJson(join(cwd, ".ga", "settings.local.json"), { openImages: "off" });
   writeJson(settingsPath("project", cwd), { export_xlsx: "off" });
+  trustFolder(cwd);
   const c = await serve();
   await c.post("api/setting", { name: "mode", value: "teach", scope: "session" });
   const html = await c.html();
@@ -192,6 +194,11 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
     proj = mkdtempSync(join(tmpdir(), "ga-proj-"));
     writeJson(join(home, "settings.json"), { model: "claude:claude-sonnet-5-5", budgetUsd: 50 });
     writeJson(join(proj, ".ga", "settings.local.json"), { mode: "plan" });
+    const before = process.env.GA_HOME;
+    process.env.GA_HOME = home;
+    trustFolder(proj);
+    if (before === undefined) delete process.env.GA_HOME;
+    else process.env.GA_HOME = before;
     const spend = join(home, "spend.jsonl");
     writeFileSync(spend, JSON.stringify({ t: new Date().toISOString(), model: "claude-sonnet-5-5", usd: 12.4 }) + "\n");
     const env = { ...process.env, GA_HOME: home, GA_SPEND_FILE: spend, ANTHROPIC_API_KEY: "sk-ant-api03-" + "x".repeat(90), GA_NO_OPEN: "1" };

@@ -10,9 +10,10 @@ type Handler = (a: Args) => Promise<{ text: string; isError?: boolean }>;
 
 const SHARED = new Set(["read_file", "list_dir", "load_skill", "note", "plan", "propose_change", "compare_options", "calculate", "list_adapters", "use_adapter"]);
 
-export async function runMcpServer(opts: { adapters: string[] }) {
+export async function runMcpServer(opts: { adapters: string[]; trustFolder?: boolean }) {
   const session = await Session.create({
     adapters: opts.adapters,
+    trustFolder: opts.trustFolder,
     defaults: true,
     provider: new FakeProvider([]),
     settings: { askWaits: false, autoResume: false, guidance: true },
@@ -99,7 +100,8 @@ export async function runMcpServer(opts: { adapters: string[] }) {
       capabilities: { tools: { listChanged: true } },
       instructions:
         "Guided analysis harness. Program tools run under the scientist's decision record: the harness fills decisions, logs deviations, and blocks a call when a decision belongs to the scientist. Call ga_setup first. Ask the scientist before you call ga_answer. Each result has a manual route that the scientist can repeat by hand." +
-        (session.pick ? " No adapter is loaded at the start. Call list_adapters, then use_adapter with the adapter that fits the request. The program tools of that adapter are added to the tool list." : ""),
+        (session.pick ? " No adapter is loaded at the start. Call list_adapters, then use_adapter with the adapter that fits the request. The program tools of that adapter are added to the tool list." : "") +
+        (session.trustNotice ? ` ${session.trustNotice} Tell the scientist. Only the scientist can trust the folder, in a terminal.` : ""),
     },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -115,6 +117,7 @@ export async function runMcpServer(opts: { adapters: string[] }) {
       return { content: [{ type: "text", text: (e as Error).message }], isError: true };
     }
   });
+  if (session.trustNotice) process.stderr.write(`Note: ${session.trustNotice}\n`);
   const stop = () => {
     const force = setTimeout(() => process.exit(0), 3000);
     force.unref();

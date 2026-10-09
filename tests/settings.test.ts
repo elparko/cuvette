@@ -6,6 +6,7 @@ import { saveClaudeKey, saveElabftw } from "../src/core/credentials.ts";
 import { changeSetting, describe, find, recordSetting, settingsPath, type SettingSession } from "../src/core/settings.ts";
 import { budgetUsd } from "../src/core/spend.ts";
 import { loadSettings, xlsxOn } from "../src/core/config.ts";
+import { trustFolder } from "../src/core/trust.ts";
 
 const KEY = "sk-ant-api03-secretsecretsecret-WXYZ";
 const old = process.env.GA_HOME;
@@ -47,6 +48,7 @@ test("the merged settings show each value and its source", () => {
   writeJson(settingsPath("user", cwd), { model: "claude:claude-haiku-5-5", permissions: { "run_script": "deny" } });
   writeJson(settingsPath("project", cwd), { referee: "none", permissions: { "imagej_*": "allow" } });
   writeJson(join(cwd, ".ga", "settings.local.json"), { mode: "plan" });
+  trustFolder(cwd);
   const rows = describe({ cwd, env: {} });
   expect(row(rows, "model")).toMatchObject({ value: "claude:claude-haiku-5-5", source: "user" });
   expect(row(rows, "referee")).toMatchObject({ value: "none", source: "project" });
@@ -86,6 +88,7 @@ test("export_xlsx and figure_formats are in the registry, on and png,svg by defa
 
 test("effort shows only for a Claude model", () => {
   writeJson(settingsPath("project", cwd), { model: "ollama:qwen3:8b" });
+  trustFolder(cwd);
   expect(describe({ cwd, env: {} }).some((r) => r.def.name === "effort")).toBe(false);
 });
 
@@ -165,6 +168,7 @@ test("secrets never show and the record keeps only that they changed", async () 
 test("permission mode reads the bypass shorthand and a save keeps the rules", async () => {
   writeJson(settingsPath("project", cwd), { permissions: "bypass" });
   writeJson(settingsPath("user", cwd), { permissions: { "run_script": "deny" } });
+  trustFolder(cwd);
   const { s, events } = fakeSession({ permissionMode: "bypass", setPermissionMode: (m: string) => void (s.permissionMode = m) } as never);
   const ctx = { cwd, env: {}, session: s };
   expect(row(describe(ctx), "permissionMode")).toMatchObject({ value: "bypass", source: "project" });
@@ -196,5 +200,5 @@ test("the adapters for every session are a list, and none clears the list", asyn
   expect(JSON.parse(readFileSync(settingsPath("project", cwd), "utf8"))).toEqual({ defaultAdapters: ["tables", "biostats"] });
   expect(row(describe({ cwd, env: {} }), "defaultAdapters")).toMatchObject({ value: "tables, biostats", source: "project" });
   await changeSetting({ cwd, env: {} }, "defaultAdapters", "none", "user");
-  expect(JSON.parse(readFileSync(settingsPath("user", cwd), "utf8"))).toEqual({ defaultAdapters: [] });
+  expect(JSON.parse(readFileSync(settingsPath("user", cwd), "utf8")).defaultAdapters).toEqual([]);
 });

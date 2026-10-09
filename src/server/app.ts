@@ -28,6 +28,7 @@ import { hostAllowed, windowRoutes, type WindowSession } from "./window.ts";
 
 export interface AppOptions {
   folder?: string;
+  trustFolder?: boolean;
   start?: string;
   resume?: string;
   session?: SessionLike;
@@ -131,8 +132,9 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     opts.makeSession ??
     (async (o: { folder?: string; resume?: string; model?: string }) => {
       const { Session } = await import("../core/session.ts");
-      if (o.resume) return (await Session.resume(o.resume, { model: o.model, interactive: true, settings: {} })) as unknown as SessionLike;
-      return (await Session.create({ adapters: opts.adapters ?? [], model: o.model, cwd: o.folder, defaults: true, interactive: true, settings: {} })) as unknown as SessionLike;
+      const trustFolder = !!opts.trustFolder && resolve(o.folder ?? process.cwd()) === resolve(opts.folder ?? process.cwd());
+      if (o.resume) return (await Session.resume(o.resume, { model: o.model, interactive: true, trustFolder, settings: {} })) as unknown as SessionLike;
+      return (await Session.create({ adapters: opts.adapters ?? [], model: o.model, cwd: o.folder, defaults: true, interactive: true, trustFolder, settings: {} })) as unknown as SessionLike;
     });
 
   const broadcastIdle = (msg: unknown) => {

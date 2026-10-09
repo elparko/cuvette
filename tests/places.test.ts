@@ -6,6 +6,7 @@ import { COPY_LIMIT_BYTES, findPlace, listPlaces, readIndex, slug } from "../src
 import { AnalysisRecord } from "../src/core/record.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
+import { trustFolder } from "../src/core/trust.ts";
 
 let session: Session | undefined;
 let home = "";
@@ -204,6 +205,7 @@ test("a project setting for the output folder wins over a user setting", async (
   await session.close();
   mkdirSync(join(cwd, ".ga"));
   writeFileSync(join(cwd, ".ga", "settings.json"), JSON.stringify({ output_folder: "project-results" }));
+  trustFolder(cwd);
   session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.folderLine).toBe(`Results go to ${join(cwd, "project-results")}/<date>-<title>/`);
 });

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { adapterDirs, gaHome, loadAdapter } from "./adapters/manifest.ts";
 import { applyHeadlessSetup, attachHeadless } from "./core/headless.ts";
@@ -65,6 +65,14 @@ Usage
 
   On the first start with no Claude API key and no local model, ga asks which model to use,
   checks this Mac, and offers a 2-minute sample analysis.
+
+  ga trust list                        list the trusted folders
+  ga trust add|remove|show <folder>    trust a folder, remove the trust, or show what the folder contains
+  --trust-folder                       trust the project folder for this run only (for scripts and -p)
+
+  WARNING: The settings, hooks and adapters in <folder>/.ga or <folder>/.cuvette can run programs.
+  Cuvette ignores them until you trust the folder. A session shows a card with what the folder
+  contains. If a trusted file changes, the card shows again.
 
   ga models                            list the models
   ga config                            show each setting, its value and where it comes from
@@ -151,6 +159,7 @@ const { values: o, positionals: pos } = parseArgs({
     tool: { type: "string", multiple: true },
     generic: { type: "boolean" },
     "bypass-permissions": { type: "boolean" },
+    "trust-folder": { type: "boolean" },
     plan: { type: "boolean" },
     "no-plan": { type: "boolean" },
     fix: { type: "boolean" },
@@ -172,6 +181,7 @@ const outputFolder = () => {
   const v = str(o.output);
   return v && !FORMATS.has(v) ? { output_folder: v } : {};
 };
+const trustFolder = !!o["trust-folder"];
 const bypass = () => ({ ...(o["bypass-permissions"] ? { permissionMode: "bypass" as const } : {}), ...outputFolder() });
 
 async function headless(prompt: string) {
@@ -179,7 +189,8 @@ async function headless(prompt: string) {
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = FORMATS.has(str(o.output) ?? "") ? str(o.output)! : "text";
-  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, settings: { headless: true, ...bypass(), ...planSetting() } });
+  const s = await Session.create({ adapters: (o.adapter as string[]) ?? [], model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, trustFolder, settings: { headless: true, ...bypass(), ...planSetting() } });
+  if (s.trustNotice) process.stderr.write(`Note: ${s.trustNotice}\n`);
   attachHeadless(s, { answers, allow });
   s.bus.on((e) => {
     if (out === "stream-json") process.stdout.write(JSON.stringify(e) + "\n");
@@ -267,8 +278,8 @@ async function interactive(resumeId?: string) {
   }
   if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
   const s = resumeId
-    ? await Session.resume(resumeId, { model: str(o.model), interactive: true, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See ga sessions.`))
-    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, cwd: sample?.cwd, settings: { ...bypass(), ...planSetting() } });
+    ? await Session.resume(resumeId, { model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See ga sessions.`))
+    : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, trustFolder, cwd: sample?.cwd, settings: { ...bypass(), ...planSetting() } });
   await runTui(s as never, { firstMessage: sample?.message });
   await s.close();
 }
@@ -314,7 +325,7 @@ async function app(folder?: string) {
       return;
     }
   }
-  const a = await startApp({ folder, start: process.cwd(), resume, model: str(o.model), adapters: (o.adapter as string[]) ?? [] }).catch((e: Error) => fail(`The app did not start: ${e.message}`));
+  const a = await startApp({ folder, start: process.cwd(), resume, model: str(o.model), adapters: (o.adapter as string[]) ?? [], trustFolder }).catch((e: Error) => fail(`The app did not start: ${e.message}`));
   console.log(`Cuvette app: ${a.url}\nThe app runs on this computer only. Press Ctrl+C to stop it.`);
   if (!o["no-open"]) openWithOs(a.url);
   await new Promise<void>((done) => {
@@ -493,6 +504,32 @@ async function main() {
         return;
       }
       return fail("usage: ga config [get <name> | set <name> <value> [--user|--project]]");
+    }
+    case "trust": {
+      const tr = await import("./core/trust.ts");
+      if (!a1 || a1 === "list") {
+        const list = tr.trustedFolders();
+        if (!list.length) return console.log("No folder is trusted. ga trust add <folder> trusts one.");
+        for (const e of list) {
+          const t = existsSync(e.path) ? tr.trustStatus(e.path) : undefined;
+          console.log(`${e.path}  ${!t ? "missing" : t.state === "trusted" ? "trusted" : t.state === "changed" ? "files changed: asks again" : tr.stateLabel(t)}  ${e.trusted.slice(0, 10)}`);
+        }
+        return;
+      }
+      const folder = resolve(a2 ?? ".");
+      if (a1 === "add") {
+        if (!existsSync(folder)) return fail(`No folder ${folder}.`);
+        const t = tr.trustStatus(folder);
+        tr.trustFolder(folder);
+        console.log([`Trusted ${t.scan.folder}.`, ...(t.state === "none" ? ["It has no settings, hooks or adapters that need trust now. A file that it gets later asks again."] : tr.folderLines(t.scan))].join("\n"));
+        return;
+      }
+      if (a1 === "remove") return console.log(tr.untrustFolder(folder) ? `${tr.folderKey(folder)} is not trusted now.` : `${tr.folderKey(folder)} was not in the list.`);
+      if (a1 === "show") {
+        const t = tr.trustStatus(folder);
+        return console.log([`${t.scan.folder}: ${tr.stateLabel(t)}`, ...(t.state === "none" ? [] : tr.folderLines(t.scan)), ...t.changes.map((c) => `  ${c}`)].join("\n"));
+      }
+      return fail("usage: ga trust [list | add <folder> | remove <folder> | show <folder>]");
     }
     case "doctor": {
       const dr = await import("./core/doctor.ts");
@@ -708,7 +745,7 @@ async function main() {
     }
     case "mcp": {
       const { runMcpServer } = await import("./mcp-server.ts");
-      return runMcpServer({ adapters: (o.adapter as string[]) ?? [] });
+      return runMcpServer({ adapters: (o.adapter as string[]) ?? [], trustFolder });
     }
     default:
       fail(`unknown command ${cmd}\n\n${HELP}`);

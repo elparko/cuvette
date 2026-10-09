@@ -6,6 +6,7 @@ import { CLAUDE_MODELS } from "../providers/index.ts";
 import { DEFAULTS } from "./config.ts";
 import { claudeKey, elabftwConfig } from "./credentials.ts";
 import { budgetUsd, monthStart, totalSpend } from "./spend.ts";
+import { afterProjectWrite, endTrustOnce, folderLines, folderTrusted, projectAdapterDirs, projectSettingFiles, safeOnly, SAFE_KEYS, stateLabel, trustFolder, trustOnce, trustStatus, untrustFolder, type TrustChoice } from "./trust.ts";
 
 export type Scope = "session" | "user" | "project";
 export type Source = "default" | "user" | "project" | "session" | "env" | "";
@@ -20,6 +21,7 @@ export interface SettingSession {
   record: { append(kind: "setting", data: Record<string, unknown>): unknown };
   setMode(mode: never): void;
   applySetting?(name: string, value: unknown): Promise<void> | void;
+  setTrust?(choice: TrustChoice): Promise<string>;
 }
 
 export interface SettingCtx {
@@ -244,6 +246,22 @@ export const SETTINGS: SettingDef[] = [
     choices: () => ["ask", "bypass"],
   },
   {
+    name: "folder_trust",
+    group: "Permissions",
+    label: "Folder trust",
+    help: "Whether Cuvette uses the settings, hooks and adapters in the .ga or .cuvette folder of this project folder. trusted: always, until a file changes. trust once: this session only. not trusted: Cuvette ignores them. /trust shows what the folder contains.",
+    scopes: ["user"],
+    choices: () => [...TRUST_CHOICES],
+    read: (ctx) => {
+      const t = trustStatus(ctx.cwd);
+      return { value: stateLabel(t), source: t.state === "trusted" ? "user" : t.state === "once" ? "session" : "" };
+    },
+    details: (ctx) => {
+      const t = trustStatus(ctx.cwd);
+      return [`Folder: ${t.scan.folder}`, ...(t.state === "none" ? ["This folder has no settings, hooks or adapters that need trust."] : folderLines(t.scan))];
+    },
+  },
+  {
     name: "permissions",
     group: "Permissions",
     label: "Allow and deny rules",
@@ -301,7 +319,10 @@ export const SETTINGS: SettingDef[] = [
     help: "The folders where the harness looks for adapters, in this order.",
     scopes: [],
     read: (ctx) => ({ value: `${adapterFolders(ctx.cwd).filter((f) => existsSync(f)).length} of ${adapterFolders(ctx.cwd).length} folders exist`, source: "default" }),
-    details: (ctx) => adapterFolders(ctx.cwd).map((f) => `${f}${existsSync(f) ? "" : "  (missing)"}`),
+    details: (ctx) => {
+      const ignored = new Set(folderTrusted(ctx.cwd) ? [] : projectAdapterDirs(ctx.cwd));
+      return adapterFolders(ctx.cwd).map((f) => `${f}${!existsSync(f) ? "  (missing)" : ignored.has(f) ? "  (ignored: the folder is not trusted)" : ""}`);
+    },
   },
   {
     name: "animations",
@@ -403,16 +424,33 @@ function readJson(path: string): Record<string, unknown> {
 }
 
 function layers(cwd: string): [Source, Record<string, unknown>, string][] {
-  const paths = [settingsPath("user", cwd), settingsPath("project", cwd), join(cwd, ".ga", "settings.local.json")];
-  return paths.map((p, i) => {
-    const { permissions, ...rest } = readJson(p);
-    const layer = typeof permissions === "string" ? { ...rest, permissionMode: permissions } : permissions === undefined ? rest : { ...rest, permissions };
-    return [i ? "project" : "user", layer, p];
-  });
+  const user = settingsPath("user", cwd);
+  const { permissions, ...rest } = readJson(user);
+  const layer = typeof permissions === "string" ? { ...rest, permissionMode: permissions } : permissions === undefined ? rest : { ...rest, permissions };
+  const trusted = folderTrusted(cwd);
+  return [["user", layer, user], ...projectSettingFiles(cwd).map((f): [Source, Record<string, unknown>, string] => ["project", trusted ? f.layer : safeOnly(f.layer), f.path])];
 }
 
 export function adapterFolders(cwd: string): string[] {
-  return [join(cwd, ".ga", "adapters"), join(gaHome(), "adapters"), CATALOG_DIR];
+  return [...projectAdapterDirs(cwd), join(gaHome(), "adapters"), CATALOG_DIR];
+}
+
+const TRUST_CHOICES = ["trusted", "trust once", "not trusted"] as const;
+
+async function changeTrust(ctx: SettingCtx, raw: unknown): Promise<{ old: unknown; value: unknown; note?: string }> {
+  const value = String(raw ?? "").trim();
+  if (!TRUST_CHOICES.includes(value as never)) throw new Error(`Folder trust must be one of: ${TRUST_CHOICES.join(", ")}.`);
+  const old = stateLabel(trustStatus(ctx.cwd));
+  const choice: TrustChoice = value === "trusted" ? "trust" : value === "trust once" ? "once" : "no";
+  if (ctx.session?.setTrust) return { old, value, note: await ctx.session.setTrust(choice) };
+  if (choice === "trust") trustFolder(ctx.cwd);
+  else if (choice === "no") untrustFolder(ctx.cwd);
+  else {
+    trustOnce(ctx.cwd);
+    endTrustOnce(ctx.cwd);
+    return { old, value: old, note: "Trust once applies only to an open session. Use it in a session, or use --trust-folder." };
+  }
+  return { old, value };
 }
 
 export function permissionRules(cwd: string): { pattern: string; rule: string; source: Source }[] {
@@ -498,6 +536,7 @@ export function recordSetting(session: SettingSession | undefined, d: SettingDef
 export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown, scope: Scope): Promise<{ old: unknown; value: unknown; note?: string }> {
   const d = find(name);
   if (!d) throw new Error(`No setting named ${name}. Type ga config to see the names.`);
+  if (name === "folder_trust") return changeTrust(ctx, raw);
   if (d.secret || !d.scopes.length) throw new Error(`${d.label} cannot change here. ${d.help}`);
   if (!d.scopes.includes(scope)) throw new Error(`${d.label} can be saved only in: ${d.scopes.map(scopeLabel).join(", ")}.`);
   if (d.lockedInTurn && ctx.session?.busy) throw new Error(`${d.label} is locked until the turn ends.`);
@@ -507,13 +546,19 @@ export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown,
   const s = ctx.session;
   if (name === "details" && value !== old) ctx.ui?.toggleDetails();
   if (!d.read) await applyLive(ctx, name, value);
-  if (scope !== "session") writeSetting(settingsPath(scope, ctx.cwd), name, value);
+  if (scope === "project") {
+    const before = trustStatus(ctx.cwd).state;
+    writeSetting(settingsPath(scope, ctx.cwd), name, value);
+    afterProjectWrite(ctx.cwd, before);
+  } else if (scope !== "session") writeSetting(settingsPath(scope, ctx.cwd), name, value);
   recordSetting(s, d, old, value, scope);
   const after = d.read ? undefined : fileValue(d, ctx.cwd);
   const env = name === "budgetUsd" && Number((ctx.env ?? process.env).GA_BUDGET_USD) > 0;
   const note = env
     ? "GA_BUDGET_USD in this shell still wins."
-    : scope !== "session" && after && !same(after.value, value)
+    : scope === "project" && !folderTrusted(ctx.cwd) && !SAFE_KEYS.has(name)
+      ? "This folder is not trusted, so Cuvette ignores its project settings. /trust shows the folder."
+      : scope !== "session" && after && !same(after.value, value)
       ? `The ${after.source} setting (${show(after.value)}) still wins in new sessions in this folder.`
       : undefined;
   return { old, value, note };

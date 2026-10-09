@@ -34,6 +34,7 @@ import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./hou
 import { QuestionQueue } from "./questions.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyEdit, designChecks, groupSummary, readSheet, SAMPLE_COLUMNS, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet } from "./samples.ts";
+import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { Findings, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
@@ -78,6 +79,7 @@ export interface SessionOptions {
   home?: boolean;
   place?: Place;
   defaults?: boolean;
+  trustFolder?: boolean;
 }
 
 interface Pending<T> {
@@ -207,6 +209,10 @@ export class Session {
   private envNow = new Map<string, EnvLock>();
   private found: FoundCache = new Map();
   private index?: AdapterSummary[];
+  private overrides: Partial<Settings> = {};
+  private onceTrusted = false;
+  untrusted?: TrustStatus;
+  trustQid?: string;
   private tools = new Map<string, Tool>();
   private active = new Set<string>();
   private hooks!: HookRunner;
@@ -296,10 +302,14 @@ export class Session {
 
   static async create(opts: SessionOptions): Promise<Session> {
     const cwd = opts.cwd ?? process.cwd();
-    const settings = loadSettings(cwd, { ...(opts.settings ?? {}), mode: opts.mode, model: opts.model, referee: opts.referee });
+    if (opts.trustFolder) trustOnce(cwd);
+    const overrides = { ...(opts.settings ?? {}), mode: opts.mode, model: opts.model, referee: opts.referee };
+    const settings = loadSettings(cwd, overrides);
     const id = opts.place?.id ?? opts.id ?? newId();
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
     const s = new Session(id, cwd, settings, place);
+    s.overrides = overrides;
+    s.onceTrusted = !!opts.trustFolder;
     await s.init(opts);
     if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
     return s;
@@ -418,6 +428,7 @@ export class Session {
     for (const a of this.adapterInfo) await this.envHashFor(a.name);
     if (resumed) await this.checkStatus();
     if (this.permissionMode === "bypass") this.record.append("permission_mode", { old: "ask", new: "bypass", how: opts.settings?.permissionMode === "bypass" ? "the --bypass-permissions flag" : "a settings file" });
+    await this.checkTrust(!!opts.interactive);
     await this.hooks.event("SessionStart", { session: this.id });
     this.markOpen({ app: undefined });
     this.timer = setInterval(() => this.expireQuestions(), 30_000);
@@ -1742,7 +1753,84 @@ export class Session {
     for (const rt of this.runtimes) rt.cancel().catch(() => {});
   }
 
+  private async checkTrust(interactive: boolean): Promise<void> {
+    const t = trustStatus(this.cwd);
+    for (const q of this.questions.open()) if (q.title === TRUST_TITLE) this.questions.answer(q.qid, "no", "the session started again", "system");
+    if (t.state !== "new" && t.state !== "changed") return;
+    this.untrusted = t;
+    if (interactive) await this.askTrust();
+    else this.record.append("notice", { text: untrustedNotice(t) });
+  }
+
+  get trustNotice(): string | undefined {
+    return this.untrusted ? untrustedNotice(this.untrusted) : undefined;
+  }
+
+  async askTrust(): Promise<Question | undefined> {
+    const open = this.trustQid ? this.questions.get(this.trustQid) : undefined;
+    if (open?.status === "open") return open;
+    const t = trustStatus(this.cwd);
+    if (t.state === "none") return undefined;
+    const q = await this.questions.ask({ decisionKey: "", title: TRUST_TITLE, text: trustText(t), options: TRUST_OPTIONS, evidence: trustEvidence(t) });
+    this.trustQid = q.qid;
+    this.bus.emit({ type: "question", question: q });
+    return q;
+  }
+
+  async setTrust(choice: TrustChoice): Promise<string> {
+    const t = trustStatus(this.cwd);
+    const open = this.trustQid ? this.questions.get(this.trustQid) : undefined;
+    if (open?.status === "open") this.questions.answer(open.qid, choice);
+    this.record.append("trust", { folder: t.scan.folder, choice, hash: t.scan.hash });
+    if (choice === "no") {
+      const removed = untrustFolder(this.cwd);
+      this.onceTrusted = false;
+      if (!this.untrusted && t.state !== "none" && (removed || t.state === "once")) return "The folder is not trusted now. This session keeps the folder settings that it already uses. New sessions ignore them.";
+      return "The session runs with user settings only. Cuvette ignores the settings, hooks and adapters of this folder.";
+    }
+    if (choice === "trust") trustFolder(this.cwd);
+    else if (!this.onceTrusted) {
+      trustOnce(this.cwd);
+      this.onceTrusted = true;
+    }
+    if (!this.untrusted) return choice === "trust" ? "This folder is trusted." : "This folder is trusted for this session.";
+    return this.applyProjectFiles(choice);
+  }
+
+  private async applyProjectFiles(choice: TrustChoice): Promise<string> {
+    this.untrusted = undefined;
+    const before = { ...this.settings };
+    const fresh = loadSettings(this.cwd, this.overrides);
+    Object.assign(this.settings, fresh);
+    this.permissions = new Permissions(this.settings.permissions);
+    this.hooks.setCommands(this.settings.hooks);
+    if (fresh.permissionMode === "bypass" && this.permissionMode !== "bypass") {
+      this.record.append("permission_mode", { old: this.permissionMode, new: "bypass", how: "a settings file of the trusted folder" });
+      this.permissionMode = "bypass";
+    }
+    this.index = undefined;
+    const project = projectSettings(this.cwd).reduce<Record<string, unknown>>((a, l) => Object.assign(a, l), {});
+    const start = (project.hooks as Settings["hooks"] | undefined)?.SessionStart;
+    if (start?.length) await new HookRunner([], { SessionStart: start }, this.cwd).event("SessionStart", { session: this.id });
+    const later = ["model", "referee", "mode", "effort", "numCtx", "think", "defaultAdapters", "output_folder"].filter((k) => k in project && JSON.stringify(project[k]) !== JSON.stringify((before as Record<string, unknown>)[k]));
+    const shadowed = this.adapters.filter((a) => { try { return findAdapter(a.name, this.cwd).root !== a.root; } catch { return false; } }).map((a) => a.name);
+    const parts = [choice === "trust" ? "This folder is trusted. Its settings, hooks and adapters apply now." : "This folder is trusted for this session. Its settings, hooks and adapters apply now."];
+    if (later.length) parts.push(`These folder settings apply in the next session: ${later.join(", ")}.`);
+    if (shadowed.length) parts.push(`The session already uses the catalog version of ${shadowed.join(", ")}. Start a new session to use the folder version.`);
+    const text = parts.join(" ");
+    this.record.append("notice", { text });
+    return text;
+  }
+
   async answer(qid: string, value: unknown, note = ""): Promise<void> {
+    if (qid === this.trustQid || this.questions.get(qid)?.title === TRUST_TITLE) {
+      const q = this.questions.get(qid);
+      if (q?.status === "open") {
+        const v = String(this.questions.match(q, value ?? "no"));
+        await this.setTrust(v === "trust" || v === "once" ? v : "no");
+      }
+      return;
+    }
     const waited = this.waitedQids.has(qid);
     const open = this.questions.get(qid);
     if (open && (value === undefined || value === null)) {
@@ -2754,6 +2842,10 @@ export class Session {
 
   async close(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
+    if (this.onceTrusted) {
+      endTrustOnce(this.cwd);
+      this.onceTrusted = false;
+    }
     this.interrupt();
     await this.titling?.catch(() => {});
     try {
