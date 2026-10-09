@@ -1,0 +1,492 @@
+{
+ "date": "2026-10-09",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 1,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "hahne2009-flowcore-compdata",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 68.887,
+   "session": "20261009-034053-e251",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hahne2009-flowcore-compdata/run1/home/sessions/20261009-034053-e251",
+   "answer": "The spillover matrix is computed. The four controls are FL1-H, FL2-H, FL3-H and FL4-H. Each coefficient is the share of a control's signal that appears in another channel. The diagonal is 1.\n\n**What I did**\n1. I read the procedure for spillover and percent-positive work.\n2. I ran the spillover step on the four single-stain controls, using compdata_060909_001.fcs as the unstained control.\n3. I read the saved matrix file (spillover.csv).\n\n**Settings used**\n- Method: median method. For each control, the median of the positive events minus the median of the unstained control, divided by the same difference in the primary channel.\n- Positive events: the events above the 80th percentile of the unstained control in the primary channel. The 80th percentile came from the decision record.\n- Scale: the instrument writes log-amplified channel numbers. The decades setting comes from the decision record. The tool output does not echo the value it used. See the uncertainties below.\n- Scatter gate: the tool output does not state the gate. The value from the decision record applies.\n- Software: flowCore 4.6.1.\n- Controls: 4 single-stain files, one for each channel. One control is one replicate.\n\n**Off-diagonal coefficients (control channel first)**\n\n1. FL1-H into FL2-H: 0.242\n2. FL1-H into FL3-H: 0.032\n3. FL1-H into FL4-H: 0.0011\n4. FL2-H into FL1-H: 0.0077\n5. FL2-H into FL3-H: 0.141\n6. FL2-H into FL4-H: 0.0027\n7. FL3-H into FL1-H: 0.015\n8. FL3-H into FL2-H: 0.176\n9. FL3-H into FL4-H: 0.230\n10. FL4-H into FL1-H: 0.00076\n11. FL4-H into FL2-H: 0.00096\n12. FL4-H into FL3-H: 0.0032\n\nThe full-precision values are in spillover.csv. The largest off-diagonal coefficient is 0.242 (FL1-H into FL2-H). The tool reports a maximum residual after compensation of 0.032.\n\n**What I found**\n- The largest spillovers are FL1-H into FL2-H (0.242), FL3-H into FL4-H (0.230) and FL3-H into FL2-H (0.176).\n- FL4-H spills very little into the other channels. Its coefficients are all below 0.004.\n- No coefficient is above 1. The four controls have four different primary channels.\n\n**What is uncertain**\n- I could not confirm that the log decades were applied. The tool output does not show the decades value. The data are log-amplified, so a wrong decades value would change every coefficient. Please check the decades value in the decision record.\n- The positive cutoff is the 80th percentile of the unstained control. Other cutoffs change the median of the positive events and so change the coefficients. I did not test other cutoffs.\n- I could not read the file headers. The inspection tool failed with a permission error, so I did not check the channel names or the header values.\n- One control per channel gives no estimate of spread. I cannot give a confidence interval.\n\n**What waits for you**\n- Confirm the log decades value (the data are four decades over 1024 channels, so 4 is expected).\n- Confirm the 80th percentile positive cutoff and the scatter gate, if you want other values. I can run the matrix again with other values using compare_options.\n\nSettings used, from the decision record: Cutoff for positive events in a control: 80 · Decades of a log-amplified scale: 4 · Parent gate on scatter: none.",
+   "items": [
+    {
+     "key": "spill_fl1_to_fl2",
+     "description": "Spillover of the FL1-H control into FL2-H",
+     "expected": 0.242022,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.242022277630705,
+      "diff": 2.776307050089688e-7,
+      "node": "n1",
+      "path": "metrics.max_off_diagonal",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.242,
+      "diff": 0.000021999999999994246,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL1-H into FL2-H: 0.242"
+     }
+    },
+    {
+     "key": "spill_fl1_to_fl3",
+     "description": "Spillover of the FL1-H control into FL3-H",
+     "expected": 0.032084,
+     "tolerance": 0.0004,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.032409195855216,
+      "diff": 0.0003251958552159956,
+      "node": "n1",
+      "path": "metrics.spill_FL1_H_to_FL3_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.032,
+      "diff": 0.00008400000000000074,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL1-H into FL3-H: 0.032"
+     }
+    },
+    {
+     "key": "spill_fl1_to_fl4",
+     "description": "Spillover of the FL1-H control into FL4-H",
+     "expected": 0.001128,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0011278155536909,
+      "diff": 1.8444630909999864e-7,
+      "node": "n1",
+      "path": "metrics.spill_FL1_H_to_FL4_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0011,
+      "diff": 0.00002800000000000003,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL1-H into FL4-H: 0.0011"
+     }
+    },
+    {
+     "key": "spill_fl2_to_fl1",
+     "description": "Spillover of the FL2-H control into FL1-H",
+     "expected": 0.007722,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.00772204774835748,
+      "diff": 4.774835748056622e-8,
+      "node": "n1",
+      "path": "metrics.spill_FL2_H_to_FL1_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0077,
+      "diff": 0.00002199999999999945,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL2-H into FL1-H: 0.0077"
+     }
+    },
+    {
+     "key": "spill_fl2_to_fl3",
+     "description": "Spillover of the FL2-H control into FL3-H",
+     "expected": 0.140788,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.140788231940242,
+      "diff": 2.319402420125627e-7,
+      "node": "n1",
+      "path": "metrics.spill_FL2_H_to_FL3_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.141,
+      "diff": 0.00021199999999998997,
+      "via": "rounding",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL2-H into FL3-H: 0.141"
+     }
+    },
+    {
+     "key": "spill_fl2_to_fl4",
+     "description": "Spillover of the FL2-H control into FL4-H",
+     "expected": 0.002633,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.00273952974018471,
+      "diff": 0.00010652974018471014,
+      "node": "n1",
+      "path": "metrics.spill_FL2_H_to_FL4_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0027,
+      "diff": 0.00006700000000000022,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL2-H into FL4-H: 0.0027"
+     }
+    },
+    {
+     "key": "spill_fl3_to_fl1",
+     "description": "Spillover of the FL3-H control into FL1-H",
+     "expected": 0.015081,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0150806322244329,
+      "diff": 3.677755671012417e-7,
+      "node": "n1",
+      "path": "metrics.spill_FL3_H_to_FL1_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.015,
+      "diff": 0.00008100000000000121,
+      "via": "rounding",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL3-H into FL1-H: 0.015"
+     }
+    },
+    {
+     "key": "spill_fl3_to_fl2",
+     "description": "Spillover of the FL3-H control into FL2-H",
+     "expected": 0.17559,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.175589903184424,
+      "diff": 9.681557600060842e-8,
+      "node": "n1",
+      "path": "metrics.spill_FL3_H_to_FL2_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.176,
+      "diff": 0.0004099999999999937,
+      "via": "rounding",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL3-H into FL2-H: 0.176"
+     }
+    },
+    {
+     "key": "spill_fl3_to_fl4",
+     "description": "Spillover of the FL3-H control into FL4-H",
+     "expected": 0.229594,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.229593859843027,
+      "diff": 1.4015697299973873e-7,
+      "node": "n1",
+      "path": "metrics.spill_FL3_H_to_FL4_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.23,
+      "diff": 0.00040600000000001746,
+      "via": "rounding",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL3-H into FL4-H: 0.230"
+     }
+    },
+    {
+     "key": "spill_fl4_to_fl1",
+     "description": "Spillover of the FL4-H control into FL1-H",
+     "expected": 0.000759,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.000759031864601862,
+      "diff": 3.1864601861947804e-8,
+      "node": "n1",
+      "path": "metrics.spill_FL4_H_to_FL1_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00076,
+      "diff": 0.0000010000000000000243,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL4-H into FL1-H: 0.00076"
+     }
+    },
+    {
+     "key": "spill_fl4_to_fl2",
+     "description": "Spillover of the FL4-H control into FL2-H",
+     "expected": 0.000962,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.000962045888046345,
+      "diff": 4.588804634506841e-8,
+      "node": "n1",
+      "path": "metrics.spill_FL4_H_to_FL2_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00096,
+      "diff": 0.00000199999999999994,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL4-H into FL2-H: 0.00096"
+     }
+    },
+    {
+     "key": "spill_fl4_to_fl3",
+     "description": "Spillover of the FL4-H control into FL3-H",
+     "expected": 0.003219,
+     "tolerance": 0.00005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.00321861379453393,
+      "diff": 3.862054660701622e-7,
+      "node": "n1",
+      "path": "metrics.spill_FL4_H_to_FL3_H",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0032,
+      "diff": 0.00001899999999999992,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 64,
+      "text": "FL4-H into FL3-H: 0.0032"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 14,
+    "outputTokens": 5476,
+    "cacheRead": 46300,
+    "cacheWrite": 15393,
+    "toolCalls": 4,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 5,
+     "error": 2
+    },
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 1
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hahne2009-flowcore-compdata/run1/home/sessions/20261009-034053-e251/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hahne2009-flowcore-compdata/run1",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/catalog/flowcore",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/src/adapters",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/node_modules",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/package.json",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/tsconfig.json",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470",
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/bench/papers",
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/.claude/worktrees/agent-a9b129685a578d470/catalog/flowcore"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata",
+     "/Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_001.fcs",
+     "/Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_002.fcs",
+     "/Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_003.fcs",
+     "/Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_004.fcs",
+     "/Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_005.fcs",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-09/claude_claude-haiku-5-5/hahne2009-flowcore-compdata/run1/home/sessions/20261009-034053-e251/work/compute_spillover-1/spillover.csv"
+    ],
+    "outside": [],
+    "blocked": 1,
+    "unsourced": 1,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/papers-compdata-run1.md",
+  "json": "bench/results/papers-compdata-run1.json"
+ },
+ "summary": {
+  "cells": {
+   "hahne2009-flowcore-compdata": {
+    "claude:claude-haiku-5-5": {
+     "computed": 12,
+     "computedOf": 12,
+     "reported": 12,
+     "reportedOf": 12,
+     "runs": 1,
+     "statuses": {
+      "answer": 1
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 12,
+    "computedOf": 12,
+    "reported": 12,
+    "reportedOf": 12,
+    "runs": 1,
+    "statuses": {
+     "answer": 1
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 1,
+    "durationS": 68.887,
+    "requests": 5,
+    "inputTokens": 14,
+    "outputTokens": 5476,
+    "cacheRead": 46300,
+    "cacheWrite": 15393,
+    "toolCalls": 4,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings_info": 5,
+    "findings_warning": 5,
+    "findings_error": 2,
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 1
+   }
+  },
+  "skipped": []
+ }
+}

@@ -1,0 +1,36 @@
+adapters: [flowcore]
+prompt: |
+  I have an unstained control and four single-stain controls from a four-colour flow cytometry experiment. The files are in {data}/hahne2009-flowcore-compdata/ : compdata_060909_001.fcs is the unstained control. compdata_060909_002.fcs is the control of the channel FL1-H, compdata_060909_003.fcs of FL2-H, compdata_060909_005.fcs of FL3-H and compdata_060909_004.fcs of FL4-H. The instrument is an old one that writes log-amplified channel numbers (four decades over 1024 channels). Compute the spillover matrix: the share of the signal of each single-stain control that appears in each other channel. Write the 12 off-diagonal coefficients in your final answer text, with the channel of the control first. For example, FL1-H into FL2-H.
+answers:
+  positive_percentile: 80
+  log_decades: 4
+  pregate: none
+  compensation: none
+  transform: none
+  cofactor: 150
+  thresholds: none
+  control_percentile: 99
+  test: welch
+  adjust: holm
+  "*": "Use the values in the decision record."
+allow: all
+timeout_s: 900
+data:
+  - hahne2009-flowcore-compdata/compdata_060909_001.fcs
+  - hahne2009-flowcore-compdata/compdata_060909_002.fcs
+  - hahne2009-flowcore-compdata/compdata_060909_003.fcs
+  - hahne2009-flowcore-compdata/compdata_060909_004.fcs
+  - hahne2009-flowcore-compdata/compdata_060909_005.fcs
+items:
+  - {key: spill_fl1_to_fl2, description: "Spillover of the FL1-H control into FL2-H", value: 0.242022, tolerance: 0.00005, tool: compute_spillover}
+  - {key: spill_fl1_to_fl3, description: "Spillover of the FL1-H control into FL3-H", value: 0.032084, tolerance: 0.00040, tool: compute_spillover}
+  - {key: spill_fl1_to_fl4, description: "Spillover of the FL1-H control into FL4-H", value: 0.001128, tolerance: 0.00005, tool: compute_spillover}
+  - {key: spill_fl2_to_fl1, description: "Spillover of the FL2-H control into FL1-H", value: 0.007722, tolerance: 0.00005, tool: compute_spillover}
+  - {key: spill_fl2_to_fl3, description: "Spillover of the FL2-H control into FL3-H", value: 0.140788, tolerance: 0.00005, tool: compute_spillover}
+  - {key: spill_fl2_to_fl4, description: "Spillover of the FL2-H control into FL4-H", value: 0.002633, tolerance: 0.00020, tool: compute_spillover}
+  - {key: spill_fl3_to_fl1, description: "Spillover of the FL3-H control into FL1-H", value: 0.015081, tolerance: 0.00005, tool: compute_spillover}
+  - {key: spill_fl3_to_fl2, description: "Spillover of the FL3-H control into FL2-H", value: 0.17559, tolerance: 0.00005, tool: compute_spillover}
+  - {key: spill_fl3_to_fl4, description: "Spillover of the FL3-H control into FL4-H", value: 0.229594, tolerance: 0.00005, tool: compute_spillover}
+  - {key: spill_fl4_to_fl1, description: "Spillover of the FL4-H control into FL1-H", value: 0.000759, tolerance: 0.00005, tool: compute_spillover}
+  - {key: spill_fl4_to_fl2, description: "Spillover of the FL4-H control into FL2-H", value: 0.000962, tolerance: 0.00005, tool: compute_spillover}
+  - {key: spill_fl4_to_fl3, description: "Spillover of the FL4-H control into FL3-H", value: 0.003219, tolerance: 0.00005, tool: compute_spillover}

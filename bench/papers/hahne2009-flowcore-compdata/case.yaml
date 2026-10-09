@@ -1,0 +1,123 @@
+kind: tool tutorial or test suite
+short: Hahne 2009
+field: Flow cytometry
+program: flowCore (R), through the flowcore adapter
+citation:
+  authors: Hahne F, LeMeur N, Brinkman RR, Ellis B, Haaland P, Sarkar D, Spidlen J, Strain E, Gentleman R
+  title: "flowCore: a Bioconductor package for high throughput flow cytometry"
+  venue: BMC Bioinformatics 10:106
+  year: 2009
+  doi: 10.1186/1471-2105-10-106
+related:
+  - text: "Data and reference matrix: the data set compdata in the Bioconductor package flowCore 2.24.0 (extdata/compdata), Artistic-2.0. Ellis B et al., flowCore, DOI 10.18129/B9.bioc.flowCore."
+    doi: 10.18129/B9.bioc.flowCore
+measured: >-
+  The data set compdata holds an unstained control and four single-stain controls (FL1-H to FL4-H) of one experiment on a
+  BD instrument that writes log-amplified channel numbers. The flowCore package stores the spillover matrix of this
+  experiment (compref) as the result of its own tests. A spillover coefficient is the median shift of a channel in the
+  positive events of a control, divided by the median shift of the primary channel of that control.
+instruction: >-
+  Compute the spillover matrix from the controls and give the 12 off-diagonal coefficients.
+instruction_basis: >-
+  The compdata files, the file comp_match (which file holds which control), and the reference matrix compref of the package.
+answers:
+  positive_percentile:
+    decision: Cutoff for positive events in a control
+    value: 80
+    source: Not in the package text. The percentiles 50 to 80 of the unstained control reproduce compref within 0.0004 (check_spillover.out). The 99th percentile differs by 0.008.
+  log_decades:
+    decision: Decades of a log-amplified scale
+    value: 4
+    source: The files hold log-amplified channel numbers of 1024 channels over four decades. Linear values are 10 to the power of (value divided by 256).
+  pregate:
+    decision: Parent gate on scatter
+    value: none
+    source: Not in the package text. The reference matrix uses all events.
+  compensation:
+    decision: Compensation of the samples
+    value: none
+    source: Not used. The benchmark makes the matrix only.
+  transform:
+    decision: Transform of the fluorescence channels
+    value: none
+    source: Not used.
+  cofactor:
+    decision: Cofactor of the asinh transform
+    value: 150
+    source: Not used.
+  thresholds:
+    decision: Cutoff between negative and positive
+    value: none
+    source: Not used.
+  control_percentile:
+    decision: Percentile of the control for the cutoff
+    value: 99
+    source: Not used.
+  test:
+    decision: Statistical test for the groups
+    value: welch
+    source: Not used.
+  adjust:
+    decision: Correction for many comparisons
+    value: holm
+    source: Not used.
+  "*":
+    decision: Other questions of the agent
+    value: Use the values in the decision record.
+    source: Not in the package text. The benchmark answers each free question with this text, so that the record of decisions stays the only source of the settings.
+items:
+  spill_fl1_to_fl2:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL1-H, column FL2-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl1_to_fl3:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL1-H, column FL3-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl1_to_fl4:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL1-H, column FL4-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl2_to_fl1:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL2-H, column FL1-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl2_to_fl3:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL2-H, column FL3-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl2_to_fl4:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL2-H, column FL4-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl3_to_fl1:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL3-H, column FL1-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl3_to_fl2:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL3-H, column FL2-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl3_to_fl4:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL3-H, column FL4-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl4_to_fl1:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL4-H, column FL1-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl4_to_fl2:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL4-H, column FL2-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+  spill_fl4_to_fl3:
+    source: tutorial
+    where: "R package flowCore 2.24.0, extdata/compdata/compref, the reference matrix of the flowCore tests (row FL4-H, column FL3-H)."
+    check: check_spillover.py recomputes the matrix with NumPy and flowio (check_spillover.out).
+data:
+  source: >-
+    The data set compdata of flowCore 2.24.0 (extdata/compdata/data/060909.001 to 060909.005). fetch.sh copies the files from the
+    installed package and keeps the reference matrix compref in the reference folder.
+  url: https://bioconductor.org/packages/flowCore
+  license: Artistic-2.0, the license of flowCore
+  size: 660 KB for 5 FCS files with 7500 to 10000 events

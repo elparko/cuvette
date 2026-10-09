@@ -1,6 +1,6 @@
 local({
   home <- Sys.getenv("HOME")
-  cand <- c(Sys.getenv("GA_R_LIBS"), Sys.getenv("R_LIBS_USER"), "/Volumes/T7/guided-analysis/tools/R-library-micro", "/Volumes/T7/guided-analysis/tools/R-library", file.path(home, ".guided-analysis", "R-library"))
+  cand <- c(Sys.getenv("GA_R_LIBS"), Sys.getenv("R_LIBS_USER"), "/Volumes/T7/guided-analysis/tools/R-library", file.path(home, ".guided-analysis", "R-library"))
   cand <- unique(cand[nzchar(cand) & dir.exists(cand)])
   if (length(cand)) {
     Sys.setenv(R_LIBS_USER = cand[1])

@@ -1,0 +1,12 @@
+positive cutoff: 50th percentile of unstained; max |difference| to flowCore compref: 0.000325
+positive cutoff: 80th percentile of unstained; max |difference| to flowCore compref: 0.000325
+[[1.00000e+00 2.42022e-01 3.24090e-02 1.12800e-03]
+ [7.72200e-03 1.00000e+00 1.40788e-01 2.74000e-03]
+ [1.50810e-02 1.75590e-01 1.00000e+00 2.29594e-01]
+ [7.59000e-04 9.62000e-04 3.21900e-03 1.00000e+00]]
+positive cutoff: 99th percentile of unstained; max |difference| to flowCore compref: 0.008280
+flowCore reference (compref)
+[[1.00000e+00 2.42022e-01 3.20840e-02 1.12800e-03]
+ [7.72200e-03 1.00000e+00 1.40788e-01 2.63300e-03]
+ [1.50810e-02 1.75590e-01 1.00000e+00 2.29594e-01]
+ [7.59000e-04 9.62000e-04 3.21900e-03 1.00000e+00]]

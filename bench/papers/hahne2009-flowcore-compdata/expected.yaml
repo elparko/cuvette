@@ -1,0 +1,29 @@
+tool: flowCore data structures, compute_spillover of the flowcore adapter
+adapter_kind: script
+data:
+  - /Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_001.fcs
+  - /Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_002.fcs
+  - /Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_003.fcs
+  - /Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_004.fcs
+  - /Volumes/T7/guided-analysis/data/hahne2009-flowcore-compdata/compdata_060909_005.fcs
+decisions:
+  positive_percentile: "80 (the 50th to 80th percentile of the unstained control reproduce the reference)"
+  log_decades: "4 (the files hold log-amplified channel numbers)"
+expected:
+  - {description: "Spillover of the FL1-H control into FL2-H", value: 0.242022, tolerance: 0.00005, source: "flowCore compref"}
+  - {description: "Spillover of the FL1-H control into FL3-H", value: 0.032084, tolerance: 0.00040, source: "flowCore compref"}
+  - {description: "Spillover of the FL1-H control into FL4-H", value: 0.001128, tolerance: 0.00005, source: "flowCore compref"}
+  - {description: "Spillover of the FL2-H control into FL1-H", value: 0.007722, tolerance: 0.00005, source: "flowCore compref"}
+  - {description: "Spillover of the FL2-H control into FL3-H", value: 0.140788, tolerance: 0.00005, source: "flowCore compref"}
+  - {description: "Spillover of the FL2-H control into FL4-H", value: 0.002633, tolerance: 0.00020, source: "flowCore compref"}
+  - {description: "Spillover of the FL3-H control into FL1-H", value: 0.015081, tolerance: 0.00005, source: "flowCore compref"}
+  - {description: "Spillover of the FL3-H control into FL2-H", value: 0.17559, tolerance: 0.00005, source: "flowCore compref"}
+  - {description: "Spillover of the FL3-H control into FL4-H", value: 0.229594, tolerance: 0.00005, source: "flowCore compref"}
+  - {description: "Spillover of the FL4-H control into FL1-H", value: 0.000759, tolerance: 0.00005, source: "flowCore compref"}
+  - {description: "Spillover of the FL4-H control into FL2-H", value: 0.000962, tolerance: 0.00005, source: "flowCore compref"}
+  - {description: "Spillover of the FL4-H control into FL3-H", value: 0.003219, tolerance: 0.00005, source: "flowCore compref"}
+notes: |
+  compref is the reference matrix of the flowCore tests for compdata. The tool matches 10 of the 12 off-diagonal coefficients to 1e-6 and the others to 0.0004
+  (FL1-H into FL3-H: 0.032409 against 0.032084) and 0.0001 (FL2-H into FL4-H: 0.002740 against 0.002633).
+  Trap: without the log_decades conversion the same method gives coefficients that are 3 to 100 times too large (0.72 for FL1-H into FL2-H).
+  Trap: the 99th percentile of the unstained control as the positive cutoff changes the FL3-H row by up to 0.008.

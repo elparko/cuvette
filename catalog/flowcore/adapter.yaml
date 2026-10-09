@@ -1,0 +1,503 @@
+adapter:
+  name: flowcore
+  field: flow cytometry (spillover and population statistics)
+  file_types: [".fcs"]
+  title: flowCore (spillover from single-stain controls, percent positive and MFI)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Computes a spillover matrix from single-stain controls with the R package flowCore data structures. It reports percent
+    positive and median fluorescence intensity (MFI) of each sample from gates that the scientist sets. It compares groups of
+    samples with a t test or a rank test.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: flowCore
+  version: "2.24.0"
+  tested_versions: []
+  homepage: https://bioconductor.org/packages/flowCore
+  docs:
+    - https://bioconductor.org/packages/release/bioc/vignettes/flowCore/inst/doc/HowTo-flowCore.pdf
+    - https://doi.org/10.1002/cyto.a.22171
+  install: >
+    Install R (brew install r on macOS). Then install flowCore from Bioconductor, and jsonlite and svglite from CRAN, into a
+    library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("BiocManager", "jsonlite", "svglite"), repos = "https://cloud.r-project.org"); BiocManager::install("flowCore")'
+  citation:
+    - text: "Ellis B, Haaland P, Hahne F, Le Meur N, Gopalakrishnan N, Spidlen J, Jiang M, Finak G. flowCore: Basic structures for flow cytometry data. Bioconductor R package version 2.24.0."
+      doi: 10.18129/B9.bioc.flowCore
+    - text: "Hahne F, LeMeur N, Brinkman RR, Ellis B, Haaland P, Sarkar D, Spidlen J, Strain E, Gentleman R (2009). flowCore: a Bioconductor package for high throughput flow cytometry. BMC Bioinformatics 10: 106."
+      doi: 10.1186/1471-2105-10-106
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that exists
+  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  /Volumes/T7/guided-analysis/tools/R-library-microcyto, ~/.guided-analysis/R-library. The program version in this adapter is the
+  version of the R package flowCore, not of R. The spillover method is the median method (Roederer). For each control, take the
+  median of the positive events minus the median of the unstained control. Divide it by the same difference in the primary
+  channel.
+
+data_rules:
+  cloud_visibility: summaries
+  note: The tools return counts, percents, medians and the spillover matrix. They do not send single events.
+
+decisions:
+  - key: positive_percentile
+    label: Cutoff for positive events in a control
+    kind: float
+    default: 99
+    lo: 0
+    hi: 100
+    group: Compensation
+    help: >
+      An event of a single-stain control is positive if its primary channel is above this percentile of the unstained control.
+      99 keeps only the clear positives. A lower value keeps dim events and mixed populations. The coefficients change little if
+      the control is one clean population.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compute_spillover, arg: positive_percentile }
+
+  - key: log_decades
+    label: Decades of a log-amplified scale
+    kind: float
+    default: 0
+    lo: 0
+    hi: 8
+    group: Compensation
+    help: >
+      0 means that the file holds linear values, as digital cytometers write them. Write the decades of the scale, such as 4,
+      for an old instrument that writes log-amplified channel numbers. The tool then converts each value to a linear value
+      with 10 to the power of value times decades divided by the range. Spillover from log data is wrong.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compute_spillover, arg: log_decades }
+      - { tool: population_stats, arg: log_decades }
+
+  - key: pregate
+    label: Parent gate on scatter
+    kind: text
+    default: none
+    group: Gating
+    help: >
+      The gate that selects the cells before you count positives, as limits on channels. Write FSC-A:50000:250000 for a range
+      of FSC-A. Write several gates with commas. Use min or max for no limit. Write none to use all events. Choose the limits from
+      the scatter plot of an unstained or control sample.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compute_spillover, arg: pregate }
+      - { tool: population_stats, arg: pregate }
+
+  - key: compensation
+    label: Compensation of the samples
+    kind: choice
+    choices: [none, keyword, file]
+    default: none
+    group: Gating
+    help: >
+      none uses the values as they are. keyword uses the spillover matrix in the file header. file uses a CSV matrix that you
+      give. Use none if the instrument already compensated the data.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: population_stats, arg: compensation }
+
+  - key: transform
+    label: Transform of the fluorescence channels
+    kind: choice
+    choices: [none, asinh, log10]
+    default: none
+    group: Gating
+    help: >
+      The transform applies before the cutoff. The cutoff must use the same scale. none keeps the instrument values. asinh
+      divides by the cofactor, then takes the inverse hyperbolic sine. log10 takes the logarithm.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: population_stats, arg: transform }
+
+  - key: cofactor
+    label: Cofactor of the asinh transform
+    kind: float
+    default: 150
+    lo: 1
+    hi: 100000
+    group: Gating
+    help: >
+      The asinh transform divides each value by this number first. 150 is common for fluorescence cytometry. A larger value
+      compresses the negative population less.
+    owner: human
+    stage: when_needed
+    changes_conclusion: false
+    links:
+      - { tool: population_stats, arg: cofactor }
+
+  - key: thresholds
+    label: Cutoff between negative and positive
+    kind: text
+    default: none
+    group: Gating
+    help: >
+      The value on the channel that separates negative from positive, in the scale after the transform. Write one pair for each
+      marker, such as CD4=2500, CD8=1800. Set it from an unstained or fluorescence-minus-one control. Write none to take
+      the cutoff from the control file.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: population_stats, arg: thresholds }
+
+  - key: control_percentile
+    label: Percentile of the control for the cutoff
+    kind: float
+    default: 99
+    lo: 50
+    hi: 100
+    group: Gating
+    help: >
+      If you give a control file and no threshold, the cutoff is this percentile of the control in the channel of the marker.
+      The percentile sets the false positive rate of the control. 99 means 1 percent of the control is positive.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: population_stats, arg: control_percentile }
+
+  - key: test
+    label: Statistical test for the groups
+    kind: choice
+    choices: [welch, student, mann-whitney, paired]
+    default: welch
+    group: Comparison
+    help: >
+      welch is a t test for unequal variances. student assumes equal variances. mann-whitney is a rank test for skewed samples.
+      paired needs a design column that names the subject of each sample.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_groups, arg: test }
+
+  - key: adjust
+    label: Correction for many comparisons
+    kind: choice
+    choices: [holm, BH, bonferroni, none]
+    default: holm
+    group: Comparison
+    help: >
+      The correction applies to all comparisons of one run. holm and bonferroni control the chance of any false positive. BH
+      controls the false discovery rate. Use none for one planned comparison.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: compare_groups, arg: adjust }
+
+checks:
+  - id: cutoff_source_named
+    description: The answer gives percent positive and does not say where the cutoff came from.
+    severity: warning
+    text: Report the answer if it gives a percent positive and does not name the control sample or the rule that set the cutoff.
+  - id: few_events
+    description: The answer gives a percent from a parent gate with few events.
+    severity: warning
+    text: Report the answer if it gives a percent positive for a sample whose parent gate has fewer than 1000 events and does not say so.
+  - id: log_data_spillover
+    description: The answer computes spillover from log-amplified data as if it were linear.
+    severity: warning
+    text: Report the answer if the file header shows a log amplifier ($PnE other than 0,0) and log_decades is 0 in a spillover run.
+  - id: unit_of_n
+    description: The answer compares groups and does not say what one sample is.
+    severity: warning
+    text: Report the answer if it gives a p value for groups and does not say whether one sample is one animal, one donor or one tube.
+
+map:
+  - tool: compute_spillover
+    route: "FlowJo: Compensation Wizard or Experiment > Compensation > Create Compensation. FCS Express: Compensation > Calculate. Matrix = (median positive - median unstained) / same difference in the primary channel."
+    steps:
+      - "FlowJo: Open the Layout Editor. Click Compensation, then Create Compensation. Drop the unstained control and each single-stain control. Set the positive gate of each control and the primary channel. Click Calculate."
+      - "FCS Express: Compensation, Compensation Setup. Assign each control to its channel, set the positive gate and the unstained control, then Calculate."
+      - "R: the median method of flowStats::spillover gives the same coefficients. The tool follows it."
+      - "Excel: for each control i and each channel j, (median of channel j in the positive gate - median of channel j in the unstained control) divided by the same difference in channel i."
+    params:
+      - { arg: positive_percentile, label: "the positive gate of each control", ui_default: "99" }
+      - { arg: log_decades, label: "linearize the log scale", ui_default: "0" }
+    fidelity: close
+    difference: >
+      FlowJo and FCS Express draw the positive gate by hand, so the coefficients differ a little from the tool. The tool uses a
+      percentile of the unstained control as the gate. The FlowJo and FCS Express routes were not run.
+    evidence:
+      source: docs
+      test: compdata-spillover
+      note: The flowCore data set compdata has a reference matrix (compref) that the tool matches to 0.0005.
+
+  - tool: population_stats
+    route: "FlowJo: gate the parent population, draw a gate on each marker, then Table Editor with Freq. of Parent and Median."
+    steps:
+      - "FlowJo: Layout Editor, draw the parent gate on FSC-A and SSC-A. Draw a gate on each marker at the cutoff from the control. Open Table Editor, drag Freq. of Parent and Median (channel) into the table, then Create Table."
+      - "FCS Express: gate the plots, then Statistics Table with Percent of Parent and Median."
+      - "R: flowCore rectangleGate or manual cutoffs: mean(exprs(ff)[, channel] > cutoff) and median()."
+    params:
+      - { arg: thresholds, label: "the gate position on each marker" }
+      - { arg: pregate, label: "the parent gate" }
+      - { arg: transform, label: "the axis scale (biexponential or log)" }
+    fidelity: close
+    difference: >
+      FlowJo biexponential display differs from asinh and log10. Put the cutoff in the scale that you choose. A gate on a plot
+      has the same counts as a cutoff on the channel when the gate has no upper limit. The FlowJo and FCS Express routes were
+      not run.
+    evidence:
+      source: docs
+      test: synthetic-percent-positive
+      note: Synthetic events with a known number above each cutoff.
+
+  - tool: compare_groups
+    route: "Prism: Column table with one column for each group, then Analyze > t tests. Excel: T.TEST(range1, range2, 2, 3) for Welch."
+    steps:
+      - "Prism: paste the percent positive of each sample into a Column table, one column for each group. Analyze, t tests (unpaired, Welch correction) or Mann-Whitney."
+      - "Excel: T.TEST(group1, group2, 2, 3) gives the two-sided Welch p value."
+      - "R: t.test(b, a) is Welch by default. wilcox.test(b, a) is the rank test."
+    params:
+      - { arg: test, label: "test of the Prism analysis" }
+    fidelity: exact
+    difference: The tool uses t.test and wilcox.test of R. The Prism and Excel routes were not run.
+    evidence:
+      source: docs
+      test: groups-welch
+      note: A SciPy calculation gives the same p values (checks).
+
+tests:
+  - id: compdata-spillover
+    description: >
+      The flowCore data set compdata (four single-stain controls and an unstained control, log-amplified, 4 decades). The package
+      stores the reference matrix compref. The tool matches it to 0.0005 in all 12 off-diagonal coefficients. 14 of 16 values
+      agree to 1e-6. A SciPy calculation (checks/check_spillover.py and check_spillover.out) gives the same values.
+    data: [data/compdata_060909_001.fcs, data/compdata_060909_002.fcs, data/compdata_060909_003.fcs, data/compdata_060909_004.fcs, data/compdata_060909_005.fcs]
+    calls:
+      - tool: compute_spillover
+        args:
+          controls: ["{adapter_dir}/data/compdata_060909_002.fcs", "{adapter_dir}/data/compdata_060909_003.fcs", "{adapter_dir}/data/compdata_060909_005.fcs", "{adapter_dir}/data/compdata_060909_004.fcs"]
+          primary_channels: [FL1-H, FL2-H, FL3-H, FL4-H]
+          unstained: "{adapter_dir}/data/compdata_060909_001.fcs"
+          positive_percentile: 80
+          log_decades: 4
+    expect:
+      - { path: metrics.spill_FL1_H_to_FL2_H, approx: 0.242022, abs: 0.0005 }
+      - { path: metrics.spill_FL1_H_to_FL3_H, approx: 0.032084, abs: 0.0005 }
+      - { path: metrics.spill_FL2_H_to_FL3_H, approx: 0.140788, abs: 0.0005 }
+      - { path: metrics.spill_FL2_H_to_FL1_H, approx: 0.007722, abs: 0.0005 }
+      - { path: metrics.spill_FL3_H_to_FL2_H, approx: 0.175590, abs: 0.0005 }
+      - { path: metrics.spill_FL3_H_to_FL4_H, approx: 0.229594, abs: 0.0005 }
+      - { path: metrics.spill_FL4_H_to_FL3_H, approx: 0.003219, abs: 0.0005 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: facsdiva-spillover
+    description: >
+      Li et al. 2024 (Zenodo 10.5281/zenodo.13977209, CC BY 4.0): seven single-stain controls and an unstained control on a BD
+      FACSAria II, 5000 events each. The sample files of the same run hold the matrix that BD FACSDiva calculated (data/diva_spillover.csv,
+      data/make_diva_matrix.py). The tool matches the 10 coefficients above 0.01 within 0.001. The positive cutoff is the 99.5th
+      percentile of the unstained control.
+    data: [data/diva_unstained.fcs, data/diva_fitc.fcs, data/diva_pe.fcs, data/diva_pecy7.fcs, data/diva_apc.fcs, data/diva_apccy7.fcs, data/diva_bv421.fcs, data/diva_bv510.fcs, data/diva_spillover.csv]
+    calls:
+      - tool: compute_spillover
+        args:
+          controls: ["{adapter_dir}/data/diva_fitc.fcs", "{adapter_dir}/data/diva_pe.fcs", "{adapter_dir}/data/diva_pecy7.fcs", "{adapter_dir}/data/diva_apc.fcs", "{adapter_dir}/data/diva_apccy7.fcs", "{adapter_dir}/data/diva_bv421.fcs", "{adapter_dir}/data/diva_bv510.fcs"]
+          primary_channels: [FITC-A, PE-A, PE-Cy7-A, APC-A, APC-Cy7-A, BV421-A, BV510-A]
+          unstained: "{adapter_dir}/data/diva_unstained.fcs"
+          positive_percentile: 99.5
+    expect:
+      - { path: metrics.spill_FITC_A_to_PE_A, approx: 0.130122, abs: 0.001 }
+      - { path: metrics.spill_FITC_A_to_BV510_A, approx: 0.030627, abs: 0.001 }
+      - { path: metrics.spill_PE_A_to_FITC_A, approx: 0.013099, abs: 0.001 }
+      - { path: metrics.spill_PE_A_to_PE_Cy7_A, approx: 0.009659, abs: 0.001 }
+      - { path: metrics.spill_PE_Cy7_A_to_PE_A, approx: 0.014781, abs: 0.001 }
+      - { path: metrics.spill_PE_Cy7_A_to_APC_Cy7_A, approx: 0.454961, abs: 0.001 }
+      - { path: metrics.spill_APC_A_to_APC_Cy7_A, approx: 0.866040, abs: 0.001 }
+      - { path: metrics.spill_BV421_A_to_BV510_A, approx: 0.144831, abs: 0.001 }
+      - { path: metrics.spill_BV510_A_to_FITC_A, approx: 0.015569, abs: 0.001 }
+      - { path: metrics.spill_BV510_A_to_BV421_A, approx: 0.068714, abs: 0.001 }
+
+  - id: synthetic-percent-positive
+    description: >
+      Six synthetic samples of 2000 events (data/make_synthetic.py). 200 events lie outside the scatter gate (FSC-A below 20000).
+      The cutoff is 2500 on CD4 and CD8. The made counts give 50% CD4 positive in ctl1, 46.6667% in ctl2, 38.8889% CD8 positive in
+      trt3, a median CD4 of 3155 in ctl1 and 6049.917 for the positive events of trt1. No event is positive for both markers
+      (checks/check_synthetic.out).
+    data: [data/synthetic_ctl1.fcs, data/synthetic_ctl2.fcs, data/synthetic_ctl3.fcs, data/synthetic_trt1.fcs, data/synthetic_trt2.fcs, data/synthetic_trt3.fcs]
+    calls:
+      - tool: population_stats
+        args:
+          data: ["{adapter_dir}/data/synthetic_ctl1.fcs", "{adapter_dir}/data/synthetic_ctl2.fcs", "{adapter_dir}/data/synthetic_ctl3.fcs", "{adapter_dir}/data/synthetic_trt1.fcs", "{adapter_dir}/data/synthetic_trt2.fcs", "{adapter_dir}/data/synthetic_trt3.fcs"]
+          markers: [CD4, CD8]
+          thresholds: ["CD4=2500", "CD8=2500"]
+          pregate: ["FSC-A:20000:max"]
+          populations: ["CD4+ CD8+", "CD4+ CD8-"]
+    expect:
+      - { path: metrics.pct_synthetic_ctl1_CD4pos, approx: 50, abs: 0.000001 }
+      - { path: metrics.n_synthetic_ctl1_CD4pos, equals: 900 }
+      - { path: metrics.pct_synthetic_ctl2_CD4pos, approx: 46.666667, abs: 0.00001 }
+      - { path: metrics.pct_synthetic_trt3_CD8pos, approx: 38.888889, abs: 0.00001 }
+      - { path: metrics.med_synthetic_ctl1_CD4pos, approx: 3155, abs: 0.01 }
+      - { path: metrics.medpos_synthetic_trt1_CD4pos, approx: 6049.917, abs: 0.01 }
+      - { path: metrics.pct_synthetic_ctl1_CD4pos_CD8pos, equals: 0 }
+      - { path: metrics.pct_synthetic_ctl1_CD4pos_CD8neg, approx: 50, abs: 0.000001 }
+
+  - id: groups-welch
+    description: >
+      The three ctl samples and the three trt samples. Percent CD4 positive: ctl 50, 46.6667, 53.3333; trt 33.3333, 36.6667, 30.
+      A SciPy Welch test (data/make_synthetic.py, checks/check_synthetic.out) gives p 0.0036022 and, for CD8, p 0.0018486. The
+      Mann-Whitney test gives p 0.080856.
+    data: [data/synthetic_design.csv]
+    calls:
+      - tool: population_stats
+        args:
+          data: ["{adapter_dir}/data/synthetic_ctl1.fcs", "{adapter_dir}/data/synthetic_ctl2.fcs", "{adapter_dir}/data/synthetic_ctl3.fcs", "{adapter_dir}/data/synthetic_trt1.fcs", "{adapter_dir}/data/synthetic_trt2.fcs", "{adapter_dir}/data/synthetic_trt3.fcs"]
+          markers: [CD4, CD8]
+          thresholds: ["CD4=2500", "CD8=2500"]
+          pregate: ["FSC-A:20000:max"]
+        save_as: stats
+      - tool: compare_groups
+        args: { stats: "{saved.stats.data.stats_file}", design: "{adapter_dir}/data/synthetic_design.csv", populations: ["CD4+", "CD8+"], test: welch, adjust: none }
+        save_as: welch
+      - tool: compare_groups
+        args: { stats: "{saved.stats.data.stats_file}", design: "{adapter_dir}/data/synthetic_design.csv", populations: ["CD4+"], test: mann-whitney, adjust: none }
+    expect:
+      - { path: saved.welch.metrics.mean_CD4pos_ctl, approx: 50, abs: 0.000001 }
+      - { path: saved.welch.metrics.mean_CD4pos_trt, approx: 33.333333, abs: 0.00001 }
+      - { path: saved.welch.metrics.p_CD4pos_ctl_trt, approx: 0.0036022, abs: 0.0000001 }
+      - { path: saved.welch.metrics.p_CD8pos_ctl_trt, approx: 0.0018486, abs: 0.0000001 }
+      - { path: metrics.p_CD4pos_ctl_trt, approx: 0.080856, abs: 0.000001 }
+
+  - id: stats-without-cutoff
+    description: A marker with no threshold and no control file fails, and the error names the marker.
+    data: [data/synthetic_ctl1.fcs]
+    calls:
+      - tool: population_stats
+        args: { data: ["{adapter_dir}/data/synthetic_ctl1.fcs"], markers: [CD4] }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "CD4" }
+
+  - id: stats-unknown-marker
+    description: A marker that the file does not have fails, and the error lists the channels.
+    data: [data/synthetic_ctl1.fcs]
+    calls:
+      - tool: population_stats
+        args: { data: ["{adapter_dir}/data/synthetic_ctl1.fcs"], markers: [CD99], thresholds: ["CD99=100"] }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "FL1-A" }
+
+  - id: spillover-one-control
+    description: One control file fails, and the error says that two are needed.
+    data: [data/compdata_060909_001.fcs]
+    calls:
+      - tool: compute_spillover
+        args: { controls: ["{adapter_dir}/data/compdata_060909_002.fcs"], unstained: "{adapter_dir}/data/compdata_060909_001.fcs" }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "at least two" }
+
+tools:
+  - name: compute_spillover
+    title: Spillover matrix from single-stain controls
+    description: >
+      Compute the spillover matrix from single-stain controls and an unstained control. For each control it takes the events
+      above a percentile of the unstained control in its primary channel. It divides the median shift of every channel by the
+      shift of the primary channel. Saves the matrix as CSV and a heat map as PNG and SVG.
+    params:
+      controls: { type: [array, string], minItems: 1, items: { type: string }, description: "Paths of the single-stain control FCS files, as a list or as comma text. One file for each fluorochrome." }
+      primary_channels: { type: [array, string], items: { type: string }, description: "The channel of each control, in the same order as controls. Leave out to take the channel with the largest shift from the unstained control." }
+      unstained: { type: string, description: "Path of the unstained control FCS file." }
+      positive_percentile: { type: number, minimum: 0, maximum: 100, description: "Leave out. The harness sets it from the decision record. Percentile of the unstained control that sets the positive cutoff." }
+      log_decades: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 0 for linear data. The decades of a log-amplified scale otherwise." }
+      pregate: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Scatter gate such as FSC-A:50000:250000. none uses all events." }
+    required: [controls, unstained]
+    read_only: true
+    batch: false
+    outputs:
+      spillover: { kind: table, ext: .csv, description: "The spillover matrix. One row for each control, one column for each channel." }
+      plot: { kind: image, ext: .png, description: A heat map of the matrix. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    script: scripts/compute_spillover.R
+    parse: json
+
+  - name: population_stats
+    title: Percent positive and MFI of each sample
+    description: >
+      Count the events above a cutoff on each marker, for each FCS file, inside an optional scatter gate. It gives the percent of
+      the parent and the median fluorescence intensity (MFI) of all, positive and negative events. It also gives the percent
+      of combined populations such as CD3+ CD4-. Saves a table and a bar plot as PNG and SVG.
+    params:
+      data: { type: [array, string], minItems: 1, items: { type: string }, description: "FCS files or a folder of FCS files, as a list or as comma text." }
+      markers: { type: [array, string], items: { type: string }, description: "Markers or channel names to report, as a list or as comma text. Default the markers in thresholds." }
+      thresholds: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Cutoffs such as CD4=2500, CD8=1800 in the scale after the transform." }
+      control: { type: string, description: "Path of a control FCS file (unstained or fluorescence minus one). The cutoff is a percentile of it, for each marker without a threshold." }
+      control_percentile: { type: number, minimum: 50, maximum: 100, description: "Leave out. The harness sets it from the decision record. Percentile of the control that sets the cutoff." }
+      populations: { type: [array, string], items: { type: string }, description: "Combined populations, such as CD3+ CD4-, as a list or as comma text. Each part is a marker from markers with + or -." }
+      pregate: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Scatter gate such as FSC-A:50000:250000. none uses all events." }
+      compensation: { type: string, enum: [none, keyword, file], description: "Leave out. The harness sets it from the decision record." }
+      comp_file: { type: string, description: "CSV spillover matrix, used if compensation is file. Use the output of compute_spillover." }
+      transform: { type: string, enum: [none, asinh, log10], description: "Leave out. The harness sets it from the decision record." }
+      cofactor: { type: number, minimum: 1, description: "Leave out. The harness sets it from the decision record. Cofactor of the asinh transform." }
+      log_decades: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. 0 for linear data." }
+    required: [data]
+    read_only: true
+    batch: false
+    outputs:
+      stats: { kind: table, ext: .csv, description: One row for each sample and population. }
+      plot: { kind: image, ext: .png, description: Percent of parent for each sample and population. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    script: scripts/population_stats.R
+    parse: json
+
+  - name: compare_groups
+    title: Compare groups of samples
+    description: >
+      Compare a statistic between groups of samples with a t test or a rank test. It takes the table of population_stats and a
+      design file with the group of each sample. It gives the mean, SD and n of each group and the p value of each pair.
+    params:
+      stats: { type: string, description: "The stats_file of population_stats (CSV with the columns sample and population)." }
+      design: { type: string, description: "CSV file with the column sample and the group column. Add a subject column for a paired test." }
+      group_col: { type: string, description: "The design column that holds the group. Default group." }
+      metric: { type: string, enum: [percent_of_parent, median_all, median_positive, median_negative, mean_all, n_events], description: "The statistic to compare. Default percent_of_parent." }
+      populations: { type: [array, string], items: { type: string }, description: "Populations to compare, as a list or as comma text. Default all." }
+      reference: { type: string, description: "The tool compares every other group with this group. Leave out to compare all pairs." }
+      pair_col: { type: string, description: "Design column that names the subject, for the paired test." }
+      test: { type: string, enum: [welch, student, mann-whitney, paired], description: "Leave out. The harness sets it from the decision record." }
+      adjust: { type: string, enum: [holm, BH, bonferroni, none], description: "Leave out. The harness sets it from the decision record. Correction for many comparisons." }
+    required: [stats, design]
+    read_only: true
+    batch: false
+    outputs:
+      groups: { kind: table, ext: .csv, description: One row for each population and group. }
+      comparisons: { kind: table, ext: .csv, description: One row for each pair of groups. }
+      plot: { kind: image, ext: .png, description: The value of each sample with the group mean. }
+      plot_svg: { kind: file, ext: .svg, description: The same plot as SVG. }
+    script: scripts/compare_groups.R
+    parse: json
