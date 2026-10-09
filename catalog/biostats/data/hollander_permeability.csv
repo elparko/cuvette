@@ -1,0 +1,16 @@
+"sample","treatment","permeability"
+1,"treated",0.8
+2,"treated",0.83
+3,"treated",1.89
+4,"treated",1.04
+5,"treated",1.45
+6,"treated",1.38
+7,"treated",1.91
+8,"treated",1.64
+9,"treated",0.73
+10,"treated",1.46
+11,"control",1.15
+12,"control",0.88
+13,"control",0.9
+14,"control",0.74
+15,"control",1.21

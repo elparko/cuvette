@@ -1,0 +1,93 @@
+R version 4.6.1 (2026-06-24) 
+
+## warpbreaks, two-way ANOVA: summary(aov(breaks ~ wool * tension))
+             Df Sum Sq Mean Sq F value   Pr(>F)    
+wool          1    451   450.7   3.765 0.058213 .  
+tension       2   2034  1017.1   8.498 0.000693 ***
+wool:tension  2   1003   501.4   4.189 0.021044 *  
+Residuals    48   5745   119.7                     
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+## Tukey on the six cells (wool:tension)
+              diff        lwr       upr       p adj
+B:H-A:H -5.7777778 -21.084100  9.528544 0.870557153
+A:L-A:H 20.0000000   4.693678 35.306322 0.004095467
+B:L-A:H  3.6666667 -11.639655 18.972988 0.979712286
+A:M-A:H -0.5555556 -15.861877 14.750766 0.999997824
+
+## PlantGrowth, Kruskal-Wallis and Dunn (FSA, bonferroni)
+
+	Kruskal-Wallis rank sum test
+
+data:  weight by group
+Kruskal-Wallis chi-squared = 7.9882, df = 2, p-value = 0.01842
+
+  Kruskal-Wallis rank sum test
+
+data: x and g
+Kruskal-Wallis chi-squared = 7.9882, df = 2, p-value = 0.02
+
+
+                      Dunn's Pairwise Comparison of x by g                      
+                                  (Bonferroni)                                  
+
+Col Mean-│
+Row Mean │       ctrl       trt1
+─────────┼──────────────────────
+    trt1 │   1.117725
+         │     0.7911 
+         │
+    trt2 │  -1.689289  -2.807015
+         │     0.2735     0.0150*
+
+FWER = 0.05
+Reject Ho if adjusted p ≤ FWER, where (unadjusted) p = Pr(|Z| ≥ |z|)
+   Comparison         Z    P.unadj      P.adj
+1 ctrl - trt1  1.117725 0.26368427 0.79105280
+2 ctrl - trt2 -1.689290 0.09116394 0.27349183
+3 trt1 - trt2 -2.807015 0.00500029 0.01500087
+
+## RoundingTimes (Hollander & Wolfe 1973 p.140), Friedman
+
+	Friedman rank sum test
+
+data:  m
+Friedman chi-squared = 11.143, df = 2, p-value = 0.003805
+
+
+## sleepstudy, repeated measures over Days, aov with an error term
+
+Error: Subject
+          Df Sum Sq Mean Sq F value Pr(>F)
+Residuals 17 250618   14742               
+
+Error: Subject:Days
+           Df Sum Sq Mean Sq F value Pr(>F)    
+Days        9 166235   18471    18.7 <2e-16 ***
+Residuals 153 151101     988                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+## Hollander & Wolfe (1973) p.29 and p.69: wilcox.test exact
+
+	Wilcoxon signed rank exact test
+
+data:  x and y
+V = 40, p-value = 0.01953
+alternative hypothesis: true location shift is greater than 0
+
+
+	Wilcoxon rank sum exact test
+
+data:  x2 and y2
+W = 35, p-value = 0.1272
+alternative hypothesis: true location shift is greater than 0
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  x2 and y2
+W = 35, p-value = 0.1223
+alternative hypothesis: true location shift is greater than 0
+

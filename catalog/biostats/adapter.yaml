@@ -14,7 +14,7 @@ adapter:
 
 program:
   name: statsmodels, pingouin, lifelines
-  version: "lifelines 0.30.3, statsmodels 0.15.0, pingouin 0.7.0, scipy 1.18.1"
+  version: "lifelines 0.30.3, statsmodels 0.15.0, pingouin 0.7.0, scipy 1.18.1, scikit-posthocs 0.17.0"
   tested_versions: ["0.30.3"]
   homepage: https://lifelines.readthedocs.io
   docs:
@@ -26,7 +26,7 @@ program:
     The adapter uses a Python environment in ~/.guided-analysis/envs/biostats. Make it and install the packages
     that ga_biostats.py imports:
     uv venv ~/.guided-analysis/envs/biostats && uv pip install --python ~/.guided-analysis/envs/biostats/bin/python
-    statsmodels pingouin lifelines scipy pandas matplotlib
+    statsmodels pingouin lifelines scipy pandas matplotlib scikit-posthocs
   citation:
     - text: "Seabold, S., & Perktold, J. (2010). Statsmodels: Econometric and Statistical Modeling with Python. In Proceedings of the 9th Python in Science Conference (pp. 92–96). https://doi.org/10.25080/Majora-92bf1922-011"
       doi: 10.25080/Majora-92bf1922-011
@@ -313,6 +313,90 @@ decisions:
     stage: when_needed
     links:
       - { tool: fit_cox, arg: strata }
+
+  - key: ss_type
+    label: Type of sums of squares
+    kind: choice
+    choices: [1, 2, 3]
+    default: 2
+    group: ANOVA
+    help: >
+      The types differ only for an unbalanced design, that is, when the groups hold different numbers of rows.
+      Type 1 depends on the order of the factors. Type 2 tests each main effect after the other main effects.
+      Type 3 tests each effect after every other term, as SPSS, SAS and Prism do.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: anova_factorial, arg: ss_type }
+    sensitivity:
+      options: [1, 2, 3]
+      tool: anova_factorial
+      compare: [metrics.levene_p, metrics.df_residual]
+      max_runs: 3
+
+  - key: factorial_posthoc
+    label: Comparisons of the cell means after a factorial ANOVA
+    kind: choice
+    choices: [none, tukey, bonferroni, holm, sidak, fdr_bh]
+    default: none
+    group: Multiple comparisons
+    help: >
+      The comparisons use the pooled error of the model, as Prism and SPSS do. Tukey controls the error rate over all cell pairs.
+      Bonferroni, Holm and Sidak adjust the t-test p values. Run comparisons only for the question that you planned.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: anova_factorial, arg: posthoc }
+
+  - key: sphericity_correction
+    label: Sphericity correction for repeated measures
+    kind: choice
+    choices: [greenhouse-geisser, none, auto]
+    default: greenhouse-geisser
+    group: Repeated measures
+    help: >
+      A repeated-measures ANOVA assumes that the variance of every difference is the same (sphericity). Greenhouse-Geisser lowers
+      the degrees of freedom when it is not. auto applies the correction only if the Mauchly test p is below alpha.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: anova_repeated, arg: correction }
+
+  - key: rank_p_adjust
+    label: Correction after a rank test over many groups
+    kind: choice
+    choices: [bonferroni, holm, sidak, fdr_bh, none]
+    default: holm
+    group: Multiple comparisons
+    help: >
+      The Dunn or pairwise Wilcoxon tests are many tests. Bonferroni is the choice in Prism and in the R FSA package example.
+      Holm rejects at least as many pairs as Bonferroni. none reports the raw p values, which are too small.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: kruskal_dunn, arg: p_adjust }
+      - { tool: friedman_test, arg: p_adjust }
+
+  - key: exact_p
+    label: Exact or approximate p value for a rank test
+    kind: choice
+    choices: [exact, asymptotic]
+    default: exact
+    group: Two-group comparison
+    help: >
+      exact counts the permutations. It needs a small sample and no ties. asymptotic uses the normal approximation with a
+      continuity correction. R picks exact for fewer than 50 values with no ties. The two can differ in the second digit.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: rank_test, arg: method }
+    sensitivity:
+      options: [exact, asymptotic]
+      tool: rank_test
+      compare: [metrics.p_value, metrics.statistic]
+      max_runs: 2
 
 tools:
   - name: inspect_table
@@ -705,6 +789,121 @@ tools:
             doi     = {10.1093/biomet/81.3.515}
           }
 
+  - name: anova_factorial
+    title: Two-way or three-way ANOVA
+    description: >
+      Test the effect of 2 or 3 categorical factors on an outcome, with every interaction. Reports F, p and partial eta squared
+      for each term, the Levene test, an interaction plot and optional comparisons of the cell means.
+    function: "ga_anova:anova_factorial"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      outcome: { type: string, description: Column of the measured values. It must be numeric. }
+      factors: { type: array, items: { type: string }, minItems: 2, maxItems: 3, description: "2 or 3 columns of group labels, such as [treatment, time]. A text with commas also works." }
+      ss_type: { type: integer, enum: [1, 2, 3], description: "Type of sums of squares: 1, 2 or 3. The value is a unitless code." }
+      posthoc: { type: string, enum: [none, tukey, bonferroni, holm, sidak, fdr_bh], default: none, description: Comparisons of the cell means after the F tests. }
+      compare_within: { type: string, description: "One factor. The comparisons then run inside each level of it, as in the Prism 'within each row' choice." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+    required: [path, outcome, factors]
+    outputs:
+      anova: { kind: table, ext: csv, description: The ANOVA table. }
+      posthoc: { kind: table, ext: csv, description: The comparisons of the cell means. }
+      plot: { kind: image, ext: png, description: "Interaction plot, mean with standard error (PNG and SVG)." }
+    citations:
+      - text: "Tukey, J. W. (1949). Comparing individual means in the analysis of variance. Biometrics, 5(2), 99-114."
+        doi: 10.2307/3001913
+        when: { posthoc: tukey }
+
+  - name: anova_repeated
+    title: Repeated-measures ANOVA
+    description: >
+      Test an outcome measured more than once in each subject. Reports F, the Mauchly test of sphericity, the Greenhouse-Geisser
+      epsilon and the corrected p value. With between, it runs a mixed ANOVA with one between-subject factor.
+    function: "ga_anova:anova_repeated"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the CSV file, one row for each subject and time point." }
+      outcome: { type: string, description: Column of the measured values. }
+      within: { type: string, description: "Column of the repeated condition, such as time or dose." }
+      subject: { type: string, description: Column that names the subject. }
+      between: { type: string, description: "Column of a factor between subjects, such as the treatment group." }
+      correction: { type: string, enum: [greenhouse-geisser, none, auto], description: "Sphericity correction. auto uses Greenhouse-Geisser if the Mauchly p is below alpha." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+    required: [path, outcome, within, subject]
+    outputs:
+      anova: { kind: table, ext: csv, description: The ANOVA table. }
+      plot: { kind: image, ext: png, description: "One line for each subject, with the mean (PNG and SVG)." }
+    citations:
+      - text: "Greenhouse, S. W., & Geisser, S. (1959). On methods in the analysis of profile data. Psychometrika, 24(2), 95-112."
+        doi: 10.1007/BF02289823
+      - text: "Mauchly, J. W. (1940). Significance test for sphericity of a normal n-variate distribution. The Annals of Mathematical Statistics, 11(2), 204-209."
+        doi: 10.1214/aoms/1177731915
+
+  - name: kruskal_dunn
+    title: Kruskal-Wallis test with Dunn comparisons
+    description: >
+      Compare the ranks of an outcome across 3 or more groups without a normal distribution. Reports the chi-squared statistic,
+      the p value, the medians and the Dunn test for each pair with a correction.
+    function: "ga_anova:kruskal_dunn"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      outcome: { type: string, description: Column of the measured values. }
+      group: { type: string, description: Column with the group labels. }
+      p_adjust: { type: string, enum: [bonferroni, holm, sidak, fdr_bh, none], description: Correction for the pairwise Dunn tests. }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+    required: [path, outcome, group]
+    outputs:
+      dunn: { kind: table, ext: csv, description: The Dunn test for each pair. }
+      plot: { kind: image, ext: png, description: Box plot with the points (PNG and SVG). }
+    citations:
+      - text: "Kruskal, W. H., & Wallis, W. A. (1952). Use of ranks in one-criterion variance analysis. Journal of the American Statistical Association, 47(260), 583-621."
+        doi: 10.1080/01621459.1952.10483441
+      - text: "Dunn, O. J. (1964). Multiple comparisons using rank sums. Technometrics, 6(3), 241-252."
+        doi: 10.1080/00401706.1964.10490181
+
+  - name: friedman_test
+    title: Friedman test for repeated measures
+    description: >
+      Compare the ranks of an outcome over 3 or more conditions measured in the same subjects. Reports the chi-squared statistic,
+      Kendall W and a Wilcoxon signed-rank test for each pair with a correction. Use it in place of a repeated-measures ANOVA.
+    function: "ga_anova:friedman_test"
+    params:
+      path: { type: string, minLength: 1, description: "Absolute path of the CSV file, one row for each subject and condition." }
+      outcome: { type: string, description: Column of the measured values. }
+      within: { type: string, description: Column of the repeated condition. }
+      subject: { type: string, description: Column that names the subject. }
+      p_adjust: { type: string, enum: [bonferroni, holm, sidak, fdr_bh, none], description: Correction for the pairwise tests. }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: Significance level. }
+    required: [path, outcome, within, subject]
+    outputs:
+      pairs: { kind: table, ext: csv, description: The pairwise Wilcoxon tests. }
+      plot: { kind: image, ext: png, description: "One line for each subject, with the median (PNG and SVG)." }
+    citations:
+      - text: "Friedman, M. (1937). The use of ranks to avoid the assumption of normality implicit in the analysis of variance. Journal of the American Statistical Association, 32(200), 675-701."
+        doi: 10.1080/01621459.1937.10503522
+
+  - name: rank_test
+    title: Rank test with an exact p value
+    description: >
+      Compare two groups by ranks and give an exact p value when the sample is small and has no ties. Paired gives the Wilcoxon
+      signed-rank test, unpaired gives the Mann-Whitney test. compare_two_groups gives the same tests with a normal approximation.
+    read_only: true
+    function: "ga_anova:rank_test"
+    params:
+      path: { type: string, minLength: 1, description: Absolute path of the CSV file. }
+      outcome: { type: string, description: Column of the measured values. }
+      group: { type: string, description: Column with exactly 2 group labels. }
+      paired: { type: boolean, default: false, description: True if the same subject is in both groups. }
+      id_column: { type: string, description: Column that names the subject. Needed if paired. }
+      alternative: { type: string, enum: [two-sided, greater, less], default: two-sided, description: "greater means the second group label, in sorted order, is greater than the first." }
+      method: { type: string, enum: [exact, asymptotic], description: "exact is the permutation p value. asymptotic is the normal approximation with a continuity correction." }
+    required: [path, outcome, group]
+    citations:
+      - text: "Wilcoxon, F. (1945). Individual comparisons by ranking methods. Biometrics Bulletin, 1(6), 80-83."
+        doi: 10.2307/3001968
+        when: { paired: true }
+      - text: "Mann, H. B., & Whitney, D. R. (1947). On a test of whether one of two random variables is stochastically larger than the other. The Annals of Mathematical Statistics, 18(1), 50-60."
+        doi: 10.1214/aoms/1177730491
+        when: { paired: false }
+
 map:
   - tool: inspect_table
     route: "print(pd.read_csv(path).describe(include='all'))"
@@ -801,6 +1000,78 @@ map:
     fidelity: close
     difference: lifelines has no Breslow option, so this route uses statsmodels. The concordance is computed with lifelines from the linear predictor. The proportional hazards test is not run. R coxph(ties = "breslow") was not run.
     evidence: { source: code, test: rossi-cox-breslow }
+
+  - tool: anova_factorial
+    route: |
+      m = statsmodels.formula.api.ols("breaks ~ C(wool, Sum)*C(tension, Sum)", df).fit()
+      statsmodels.api.stats.anova_lm(m, typ=2)
+    steps:
+      - "R: summary(aov(breaks ~ wool * tension, data = df)) for type I, or car::Anova(m, type = 2)."
+      - "In Prism: Analyze > Grouped analyses > Two-way ANOVA. Prism asks for the post-hoc test on the Multiple Comparisons tab."
+      - "In SPSS: Analyze > General Linear Model > Univariate. SPSS uses type III by default."
+    params:
+      - { arg: ss_type, label: typ, ui_default: 2, note: "R aov gives type I. SPSS, SAS and Prism give type III. statsmodels anova_lm has no default." }
+      - { arg: posthoc, label: post-hoc test, ui_default: none }
+      - { arg: compare_within, label: "compare within each row (Prism)" }
+    fidelity: exact
+    evidence: { source: docs, test: warpbreaks-twoway, note: "R aov and TukeyHSD give the same F, p and adjusted p (checks/anova_r.R)." }
+
+  - tool: anova_repeated
+    route: |
+      pingouin.rm_anova(df, dv="Reaction", within="Days", subject="Subject", correction=True, detailed=True)
+      pingouin.mixed_anova(df, dv=..., within=..., subject=..., between=...)   # with a between-subject factor
+    steps:
+      - "R: summary(aov(Reaction ~ Days + Error(Subject/Days), data = df))."
+      - "In Prism: Analyze > Grouped analyses > Two-way ANOVA, then 'Repeated measures' on the design tab."
+      - "In SPSS: Analyze > General Linear Model > Repeated Measures."
+    params:
+      - { arg: within, label: within-subject factor }
+      - { arg: subject, label: subject }
+      - { arg: between, label: between-subject factor }
+      - { arg: correction, label: sphericity correction, ui_default: "Greenhouse-Geisser (Prism and SPSS report it next to the uncorrected p)" }
+    fidelity: exact
+    evidence: { source: docs, test: sleepstudy-repeated, note: "R aov with an error term gives the same F and df (checks/anova_r.R)." }
+
+  - tool: kruskal_dunn
+    route: |
+      scipy.stats.kruskal(*groups)
+      scikit_posthocs.posthoc_dunn(df, val_col="weight", group_col="group", p_adjust="bonferroni")
+    steps:
+      - "R: kruskal.test(weight ~ group, data = df); FSA::dunnTest(weight ~ group, data = df, method = 'bonferroni')."
+      - "In Prism: Analyze > Column analyses > One-way ANOVA, then choose 'Non-parametric' and Dunn's multiple comparisons."
+      - "In SPSS: Analyze > Nonparametric Tests > Independent Samples."
+    params:
+      - { arg: p_adjust, label: method, ui_default: "none (scikit-posthocs does not adjust by default)" }
+    fidelity: exact
+    evidence: { source: docs, test: plantgrowth-kruskal-dunn, note: "R kruskal.test and FSA::dunnTest give the same chi-squared, Z and adjusted p (checks/anova_r.R)." }
+
+  - tool: friedman_test
+    route: |
+      wide = df.pivot(index="player", columns="method", values="time")
+      scipy.stats.friedmanchisquare(*[wide[c] for c in wide.columns])
+    steps:
+      - "R: friedman.test(as.matrix(wide))."
+      - "In Prism: Analyze > Column analyses > One-way ANOVA, with 'Repeated measures' and 'Non-parametric'."
+    params:
+      - { arg: within, label: columns of the matrix }
+      - { arg: subject, label: rows of the matrix }
+      - { arg: p_adjust, label: correction of the pairwise tests }
+    fidelity: close
+    difference: "The chi-squared statistic, df and p are the same as R. R has no pairwise test after friedman.test, so the pairwise Wilcoxon signed-rank tests come from this tool."
+    evidence: { source: docs, test: rounding-friedman }
+
+  - tool: rank_test
+    route: |
+      scipy.stats.wilcoxon(diff, alternative="greater", method="exact")        # paired
+      scipy.stats.mannwhitneyu(x, y, alternative="greater", method="exact")    # unpaired
+    steps:
+      - "R: wilcox.test(x, y, paired = TRUE, alternative = 'greater') and wilcox.test(x, y, alternative = 'greater')."
+      - "In Prism: Analyze > Column analyses > t tests, then 'Non-parametric' and the exact p value."
+    params:
+      - { arg: method, label: exact, ui_default: "exact if the sample is small and has no ties (R rule)" }
+      - { arg: alternative, label: alternative, ui_default: two-sided }
+    fidelity: exact
+    evidence: { source: docs, test: hollander-exact-ranks, note: "R wilcox.test gives V = 40 with p = 0.01953 and W = 35 with p = 0.1272 (checks/anova_r.R)." }
 
 checks:
   - id: id_column_missing
@@ -1034,3 +1305,97 @@ tests:
       - { path: saved.grouped.metrics.logrank_chi2, approx: 3.838, abs: 0.001 }
       - { path: saved.grouped.metrics.logrank_p, approx: 0.0501, abs: 0.0002 }
       - { path: saved.grouped.metrics.events, equals: 114 }
+
+  - id: warpbreaks-twoway
+    description: >
+      R warpbreaks data. summary(aov(breaks ~ wool * tension)) gives wool F = 3.765 on 1 and 48 df (p = 0.058213), tension
+      F = 8.498 on 2 df (p = 0.000693) and the interaction F = 4.189 (p = 0.021044). TukeyHSD on wool:tension gives adjusted
+      p = 0.004095 for A:L against A:H. The design is balanced, so type I, II and III agree (checks/anova_r.R, output checks/anova_r.out).
+    data: [data/warpbreaks.csv]
+    calls:
+      - tool: anova_factorial
+        args: { path: "{adapter_dir}/data/warpbreaks.csv", outcome: breaks, factors: [wool, tension], ss_type: 2, posthoc: tukey }
+    expect:
+      - { path: metrics.F_wool, approx: 3.765288, abs: 0.000005 }
+      - { path: metrics.p_wool, approx: 0.058213, abs: 0.000001 }
+      - { path: metrics.F_tension, approx: 8.498047, abs: 0.000005 }
+      - { path: metrics.p_tension, approx: 0.000693, abs: 0.0000005 }
+      - { path: metrics.F_wool_x_tension, approx: 4.189069, abs: 0.000005 }
+      - { path: metrics.p_wool_x_tension, approx: 0.021044, abs: 0.000001 }
+      - { path: metrics.df_residual, equals: 48 }
+      - { path: "table.rows[0][10]", approx: 0.0040955, abs: 0.0000005 }
+
+  - id: sleepstudy-repeated
+    description: >
+      R lme4 sleepstudy, 18 subjects over 10 days. summary(aov(Reaction ~ Days + Error(Subject/Days))) gives F = 18.70 on
+      9 and 153 df. The Greenhouse-Geisser epsilon is 0.36903 (checks/anova_r.out shows the R ANOVA table).
+    data: [data/sleepstudy.csv]
+    calls:
+      - tool: anova_repeated
+        args: { path: "{adapter_dir}/data/sleepstudy.csv", outcome: Reaction, within: Days, subject: Subject, correction: greenhouse-geisser }
+    expect:
+      - { path: metrics.F, approx: 18.7027, abs: 0.0005 }
+      - { path: metrics.df_effect, equals: 9 }
+      - { path: metrics.df_error, equals: 153 }
+      - { path: metrics.n_subjects, equals: 18 }
+      - { path: metrics.epsilon_gg, approx: 0.36903, abs: 0.00001 }
+      - { path: metrics.p_gg, max: 0.000001 }
+
+  - id: plantgrowth-kruskal-dunn
+    description: >
+      R PlantGrowth data. kruskal.test(weight ~ group) gives chi-squared = 7.9882 on 2 df, p = 0.01842. FSA::dunnTest with the
+      Bonferroni correction gives Z = 2.807015 and adjusted p = 0.01500087 for trt1 against trt2 (checks/anova_r.out).
+    data: [data/plantgrowth.csv]
+    calls:
+      - tool: kruskal_dunn
+        args: { path: "{adapter_dir}/data/plantgrowth.csv", outcome: weight, group: group, p_adjust: bonferroni }
+    expect:
+      - { path: metrics.H, approx: 7.98823, abs: 0.00001 }
+      - { path: metrics.df, equals: 2 }
+      - { path: metrics.p_value, approx: 0.018423, abs: 0.000001 }
+      - { path: "table.rows[2][4]", approx: 2.807015, abs: 0.000001 }
+      - { path: "table.rows[2][6]", approx: 0.01500087, abs: 0.0000001 }
+      - { path: metrics.n_pairs_significant, equals: 1 }
+
+  - id: rounding-friedman
+    description: >
+      The RoundingTimes data of the R friedman.test help page, from Hollander and Wolfe (1973), page 140. 22 players ran
+      first base by 3 methods. R friedman.test gives chi-squared = 11.143 on 2 df, p = 0.003805.
+    data: [data/rounding_times.csv]
+    calls:
+      - tool: friedman_test
+        args: { path: "{adapter_dir}/data/rounding_times.csv", outcome: time, within: method, subject: player, p_adjust: holm }
+    expect:
+      - { path: metrics.chi2, approx: 11.142857, abs: 0.000005 }
+      - { path: metrics.df, equals: 2 }
+      - { path: metrics.p_value, approx: 0.003805, abs: 0.0000005 }
+      - { path: metrics.n_subjects, equals: 22 }
+
+  - id: hollander-exact-ranks
+    description: >
+      Two examples of the R wilcox.test help page, from Hollander and Wolfe (1973). Page 29, the depression data: the paired
+      exact test gives V = 40 and a one-sided p of 0.01953. Page 69, the permeability data: the unpaired exact test gives
+      W = 35 and a one-sided p of 0.1272 (checks/anova_r.out).
+    data: [data/hollander_depression.csv, data/hollander_permeability.csv]
+    calls:
+      - tool: rank_test
+        args: { path: "{adapter_dir}/data/hollander_depression.csv", outcome: value, group: group, paired: true, id_column: subject, alternative: greater, method: exact }
+        save_as: paired
+      - tool: rank_test
+        args: { path: "{adapter_dir}/data/hollander_permeability.csv", outcome: permeability, group: treatment, alternative: greater, method: exact }
+    expect:
+      - { path: saved.paired.metrics.statistic, approx: 40, abs: 0.0000001 }
+      - { path: saved.paired.metrics.p_value, approx: 0.01953125, abs: 0.0000001 }
+      - { path: saved.paired.metrics.exact, equals: 1 }
+      - { path: metrics.statistic, approx: 35, abs: 0.0000001 }
+      - { path: metrics.p_value, approx: 0.1272061, abs: 0.0000005 }
+
+  - id: anova-unknown-factor
+    description: A factor column that is not in the file fails, and the error names the column and the columns that exist.
+    data: [data/warpbreaks.csv]
+    calls:
+      - tool: anova_factorial
+        args: { path: "{adapter_dir}/data/warpbreaks.csv", outcome: breaks, factors: [wool, no_such_column], ss_type: 2 }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Unknown column: no_such_column" }
