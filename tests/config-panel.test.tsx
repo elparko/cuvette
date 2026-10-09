@@ -11,11 +11,11 @@ import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 
 const KEY = "sk-ant-api03-panelsecretpanel-QRST";
 const DOWN = "\x1b[B";
-const old = process.env.GA_HOME;
+const old = process.env.CUVETTE_HOME;
 let live: { h: Harness; done: Promise<void> } | undefined;
 
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-home-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-home-"));
 });
 afterEach(async () => {
   if (live) {
@@ -25,8 +25,8 @@ afterEach(async () => {
     await Promise.race([live.done, sleep(500)]);
     live = undefined;
   }
-  if (old === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = old;
+  if (old === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = old;
 });
 
 async function key(h: Harness, k: string) {
@@ -167,7 +167,7 @@ test("reset to default is the last choice, and the next save remembers the scope
 });
 
 test("the spend row shows a bar against the budget", async () => {
-  appendFileSync(process.env.GA_SPEND_FILE!, JSON.stringify({ t: new Date().toISOString(), model: "claude-opus-5-5", usd: 30 }) + "\n");
+  appendFileSync(process.env.CUVETTE_SPEND_FILE!, JSON.stringify({ t: new Date().toISOString(), model: "claude-opus-5-5", usd: 30 }) + "\n");
   writeFileSync(settingsPath("user", "/"), JSON.stringify({ budgetUsd: 40 }));
   const { h } = await open();
   await until(() => /█+░*\s\$[\d.]+ of \$40\.00 this month/.test(h.last()));

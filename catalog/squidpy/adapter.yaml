@@ -22,8 +22,8 @@ program:
     - https://squidpy.readthedocs.io/en/stable/notebooks/examples/graph/compute_spatial_neighbors.html
     - https://squidpy.readthedocs.io/en/stable/notebooks/examples/graph/compute_nhood_enrichment.html
   install: >
-    The adapter uses the Python environment at ~/.guided-analysis/envs/squidpy. Make it and add squidpy:
-    uv venv --python 3.12 ~/.guided-analysis/envs/squidpy && uv pip install --python ~/.guided-analysis/envs/squidpy/bin/python squidpy igraph leidenalg
+    The adapter uses the Python environment at ~/.cuvette/envs/squidpy. Make it and add squidpy:
+    uv venv --python 3.12 ~/.cuvette/envs/squidpy && uv pip install --python ~/.cuvette/envs/squidpy/bin/python squidpy igraph leidenalg
   citation:
     - text: "Palla, G., Spitzer, H., Klein, M., Fischer, D., Schaar, A. C., Kuemmerle, L. B., Rybakov, S., Ibarra, I. L., Holmberg, O., Virshup, I., Lotfollahi, M., Richter, S., & Theis, F. J. (2022). Squidpy: a scalable framework for spatial omics analysis. Nature Methods, 19(2), 171-178. https://doi.org/10.1038/s41592-021-01358-2"
       doi: 10.1038/s41592-021-01358-2
@@ -59,10 +59,10 @@ connection:
   call_timeout_s: 1800
 
 locate:
-  env: GA_SQUIDPY_PYTHON
+  env: CUVETTE_SQUIDPY_PYTHON
   paths:
-    - ~/.guided-analysis/envs/squidpy/bin/python
-    - ~/.guided-analysis/envs/squidpy/Scripts/python.exe
+    - ~/.cuvette/envs/squidpy/bin/python
+    - ~/.cuvette/envs/squidpy/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-W", "ignore", "-c", "import importlib.metadata as m; print('squidpy', m.version('squidpy'))"]
   version_pattern: 'squidpy (\S+)'

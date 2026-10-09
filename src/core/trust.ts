@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { CATALOG_DIR, gaHome } from "../adapters/manifest.ts";
+import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 
 export const PROJECT_DIRS = [".ga", ".cuvette"];
 export const SETTINGS_FILES = ["settings.json", "settings.local.json"];
@@ -115,7 +115,7 @@ function hookLines(layers: Record<string, unknown>[]): string[] {
 
 function shadows(name: string): string | undefined {
   if (existsSync(join(CATALOG_DIR, name, "adapter.yaml"))) return `the catalog adapter ${name}`;
-  if (existsSync(join(gaHome(), "adapters", name, "adapter.yaml"))) return `your adapter ${name}`;
+  if (existsSync(join(cuvetteHome(), "adapters", name, "adapter.yaml"))) return `your adapter ${name}`;
   return undefined;
 }
 
@@ -153,7 +153,7 @@ export function scanFolder(folder: string): FolderScan {
 export const needsTrust = (s: FolderScan) => s.keys.length > 0 || s.hooks.length > 0 || s.adapters.length > 0 || s.methods.length > 0;
 
 function userFile(): string {
-  return join(gaHome(), "settings.json");
+  return join(cuvetteHome(), "settings.json");
 }
 
 function readUser(): Record<string, unknown> {
@@ -272,7 +272,7 @@ export function trustEvidence(t: TrustStatus): string {
 }
 
 export function untrustedNotice(t: TrustStatus): string {
-  return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or ga trust add ${t.scan.folder}.`;
+  return `Cuvette ignored the settings, hooks and adapters in ${t.scan.folder}: the folder is not trusted${t.state === "changed" ? " since its files changed" : ""}. Use --trust-folder, or cuvette trust add ${t.scan.folder}.`;
 }
 
 export function stateLabel(t: TrustStatus): string {

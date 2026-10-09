@@ -170,12 +170,12 @@ export function collect(src: ElnSource): ElnContent {
     `<h2>Review findings</h2>${findings.length ? `<ul>${findings.map((f) => `<li>[${esc(f.severity)}] ${esc(f.message)} (${esc(f.status)})</li>`).join("")}</ul>` : "<p>No findings.</p>"}`,
     `<p>Log SHA-256: <code>${sha(logBuf)}</code></p>`,
   ].join("\n");
-  const title = `Guided analysis ${id}${question ? `: ${question.replace(/\s+/g, " ").slice(0, 80)}` : ""}`;
+  const title = `Cuvette session ${id}${question ? `: ${question.replace(/\s+/g, " ").slice(0, 80)}` : ""}`;
   return {
     id, title, question, answer, settings,
     created: entries[0]?.ts ?? new Date().toISOString(),
     modified: entries.at(-1)?.ts ?? new Date().toISOString(),
-    keywords: ["guided-analysis", ...adapterNames],
+    keywords: ["cuvette", ...adapterNames],
     files, steps, decisionRows, findings, logSha256: sha(logBuf), bodyHtml: html,
   };
 }
@@ -215,14 +215,14 @@ export function buildElnFiles(c: ElnContent): ZipFile[] {
       about: ref("./"),
       conformsTo: ref("https://w3id.org/ro/crate/1.2"),
       dateCreated: new Date().toISOString(),
-      sdPublisher: ref("#guided-analysis"),
+      sdPublisher: ref("#cuvette"),
     },
-    { "@id": "#guided-analysis", "@type": "Organization", name: "guided-analysis" },
+    { "@id": "#cuvette", "@type": "Organization", name: "Cuvette" },
     {
       "@id": "./",
       "@type": "Dataset",
       name: c.title,
-      description: `Export of the guided-analysis session ${c.id}.`,
+      description: `Export of the Cuvette session ${c.id}.`,
       datePublished: new Date().toISOString(),
       author: ref(me.id),
       hasPart: [ref("./analysis/")],

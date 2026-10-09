@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/jang2016-hcc-biomarkers"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/jang2016-hcc-biomarkers"
 mkdir -p "$D"
 cd "$D"
 curl -fsSL -o hcc_raw.xlsx https://zenodo.org/api/records/4952129/files/HCC_biomarker_160206_data.xlsx/content

@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { blindPolicy, setBlindPolicy } from "../adapters/blind.ts";
-import { adapterDirs, CATALOG_DIR, gaHome } from "../adapters/manifest.ts";
+import { adapterDirs, CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { checkoutModelOptions, endTrustOnce, trustOnce } from "../core/trust.ts";
 import { applyHeadlessSetup, attachHeadless } from "../core/headless.ts";
 import type { Provider } from "../core/types.ts";
@@ -62,7 +62,7 @@ export const REPO_ROOT = resolve(CATALOG_DIR, "..");
 const RESULTS_DIR = resolve(PAPERS_DIR, "../results");
 
 export function scratchRoot(date: string): string {
-  return existsSync(T7) ? join(T7, "guided-analysis/tools/bench-runs", date) : join(tmpdir(), "ga-bench-runs", date);
+  return existsSync(T7) ? join(T7, "guided-analysis/tools/bench-runs", date) : join(tmpdir(), "cuvette-bench-runs", date);
 }
 
 const slug = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, "_");
@@ -105,7 +105,7 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: R
   const runDir = join(opts.scratch, slug(model), paper.id, `run${run}`);
   const home = join(runDir, "home");
   mkdirSync(home, { recursive: true });
-  const realHome = gaHome();
+  const realHome = cuvetteHome();
   const realCredentials = join(realHome, "credentials.json");
   if (existsSync(realCredentials)) copyFileSync(realCredentials, join(home, "credentials.json"));
   const id = runId();
@@ -117,8 +117,8 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: R
     const policy = setBlindPolicy(blindPolicyFor({ paper, runDir, scratch: opts.scratch, home: realHome, adapterRoots: roots, programs, papersDir: opts.papersDir, resultsDir: opts.resultsDir }))!;
     blind = { cwd, allow: policy.allow, deny: policy.deny, hide: policy.hide, sandbox: policy.sandbox };
   }
-  const oldHome = process.env.GA_HOME;
-  process.env.GA_HOME = home;
+  const oldHome = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
   const started = Date.now();
   const base = { paper: paper.id, model, run };
   let session: import("../core/session.ts").Session | undefined;
@@ -170,8 +170,8 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: R
     await session?.close();
   } catch {}
   setBlindPolicy(undefined);
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
   return result;
 }
 

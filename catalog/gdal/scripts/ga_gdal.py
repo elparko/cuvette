@@ -8,8 +8,8 @@ import subprocess
 import sys
 
 warnings.filterwarnings("ignore")
-BIN = os.path.dirname(os.environ.get("GA_PROGRAM_PATH") or "") or "/opt/homebrew/bin"
-CALL_DIR = os.environ.get("GA_CALL_DIR", ".")
+BIN = os.path.dirname(os.environ.get("CUVETTE_PROGRAM_PATH") or "") or "/opt/homebrew/bin"
+CALL_DIR = os.environ.get("CUVETTE_CALL_DIR", ".")
 
 
 def exe(name):
@@ -67,7 +67,7 @@ def raster_facts(path, band=1, stats=True):
 
 
 def out_path(ext):
-    return os.environ.get("GA_OUTPUT_RESULT") or os.path.join(CALL_DIR, "result" + ext)
+    return os.environ.get("CUVETTE_OUTPUT_RESULT") or os.path.join(CALL_DIR, "result" + ext)
 
 
 def emit(metrics, data=None, route="", **extra):

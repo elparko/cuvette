@@ -39,14 +39,14 @@ let home: string;
 let oldHome: string | undefined;
 
 beforeEach(() => {
-  oldHome = process.env.GA_HOME;
-  home = mkdtempSync(join(tmpdir(), "ga-deck-home-"));
-  process.env.GA_HOME = home;
+  oldHome = process.env.CUVETTE_HOME;
+  home = mkdtempSync(join(tmpdir(), "cuvette-deck-home-"));
+  process.env.CUVETTE_HOME = home;
 });
 
 afterEach(() => {
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
 });
 
 interface Fixture {
@@ -55,7 +55,7 @@ interface Fixture {
 }
 
 function session(): Fixture {
-  const root = mkdtempSync(join(tmpdir(), "ga-deck-"));
+  const root = mkdtempSync(join(tmpdir(), "cuvette-deck-"));
   const dir = join(root, "s");
   const out = join(root, "out");
   const files = join(root, "files");

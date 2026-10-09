@@ -95,7 +95,7 @@ describe("the review", () => {
 });
 
 describe("the docs lint", () => {
-  const root = mkdtempSync(join(tmpdir(), "ga-ste-"));
+  const root = mkdtempSync(join(tmpdir(), "cuvette-ste-"));
   mkdirSync(join(root, "docs"));
   mkdirSync(join(root, "src", "ui"), { recursive: true });
   writeFileSync(join(root, "README.md"), "# Tool\n\nThe file is read by the tool.\n");

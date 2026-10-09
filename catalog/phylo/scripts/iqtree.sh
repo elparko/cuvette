@@ -1,7 +1,7 @@
 prog=$1
 mode=$2
 shift 2
-dir=${GA_CALL_DIR:-.}
+dir=${CUVETTE_CALL_DIR:-.}
 pre="$dir/run"
 set -- "$@"
 aln= model= btype=none nrep=1000 outgroup= seed=1

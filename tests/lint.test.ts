@@ -60,8 +60,8 @@ tools:
 let tmp: string;
 let n = 0;
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "ga-lint-"));
-  process.env.GA_HOME = join(tmp, "home");
+  tmp = mkdtempSync(join(tmpdir(), "cuvette-lint-"));
+  process.env.CUVETTE_HOME = join(tmp, "home");
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 

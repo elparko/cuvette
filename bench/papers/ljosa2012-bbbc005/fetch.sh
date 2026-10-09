@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/ljosa2012-bbbc005"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/ljosa2012-bbbc005"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/ljosa2012-bbbc005"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/ljosa2012-bbbc005"
 mkdir -p "$D" "$R"
 cd "$D"
 base=https://data.broadinstitute.org/bbbc/BBBC005

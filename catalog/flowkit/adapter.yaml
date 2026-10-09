@@ -22,9 +22,9 @@ program:
     - https://github.com/whitews/FlowKit/tree/master/docs/notebooks
     - https://pubmed.ncbi.nlm.nih.gov/34248832/
   install: >
-    The adapter uses a Python environment in ~/.guided-analysis/envs/flowkit. Make it and install FlowKit
+    The adapter uses a Python environment in ~/.cuvette/envs/flowkit. Make it and install FlowKit
     and the packages that ga_flowkit.py imports:
-    uv venv ~/.guided-analysis/envs/flowkit && uv pip install --python ~/.guided-analysis/envs/flowkit/bin/python
+    uv venv ~/.cuvette/envs/flowkit && uv pip install --python ~/.cuvette/envs/flowkit/bin/python
     flowkit numpy pandas matplotlib
   citation:
     - text: "White, S., Quinn, J., Enzor, J., Staats, J., Mosier, S. M., Almarode, J., Denny, T. N., Weinhold, K. J., Ferrari, G., & Chan, C. (2021). FlowKit: A Python Toolkit for Integrated Manual and Automated Cytometry Analysis Workflows. Frontiers in Immunology, 12, 768541. https://doi.org/10.3389/fimmu.2021.768541"
@@ -47,10 +47,10 @@ connection:
   call_timeout_s: 900
 
 locate:
-  env: GA_FLOWKIT_PYTHON
+  env: CUVETTE_FLOWKIT_PYTHON
   paths:
-    - ~/.guided-analysis/envs/flowkit/bin/python
-    - ~/.guided-analysis/envs/flowkit/Scripts/python.exe
+    - ~/.cuvette/envs/flowkit/bin/python
+    - ~/.cuvette/envs/flowkit/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-W", "ignore", "-c", "import flowkit; print('flowkit', flowkit.__version__)"]
   version_pattern: 'flowkit (\S+)'

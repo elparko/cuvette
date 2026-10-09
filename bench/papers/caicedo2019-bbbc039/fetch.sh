@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/caicedo2019-bbbc039"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/caicedo2019-bbbc039"
 mkdir -p "$D"
 cd "$D"
 base=https://data.broadinstitute.org/bbbc/BBBC039

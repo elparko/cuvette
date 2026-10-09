@@ -22,9 +22,9 @@ program:
     - https://cellpose.readthedocs.io/en/latest/settings.html
     - https://github.com/MouseLand/cellpose
   install: >
-    The adapter uses its own Python environment at ~/.guided-analysis/envs/cellpose, or the Python in CELLPOSE_PYTHON.
+    The adapter uses its own Python environment at ~/.cuvette/envs/cellpose, or the Python in CELLPOSE_PYTHON.
     Make the environment and install Cellpose with packaging, which Cellpose needs but does not list:
-    uv venv ~/.guided-analysis/envs/cellpose && uv pip install --python ~/.guided-analysis/envs/cellpose/bin/python cellpose packaging
+    uv venv ~/.cuvette/envs/cellpose && uv pip install --python ~/.cuvette/envs/cellpose/bin/python cellpose packaging
   citation:
     - text: "Pachitariu, M., Rariden, M., & Stringer, C. (2025). Cellpose-SAM: superhuman generalization for cellular segmentation. bioRxiv. https://doi.org/10.1101/2025.04.28.651001"
       doi: 10.1101/2025.04.28.651001
@@ -60,8 +60,8 @@ connection:
 locate:
   env: CELLPOSE_PYTHON
   paths:
-    - ~/.guided-analysis/envs/cellpose/bin/python
-    - ~/.guided-analysis/envs/cellpose/Scripts/python.exe
+    - ~/.cuvette/envs/cellpose/bin/python
+    - ~/.cuvette/envs/cellpose/Scripts/python.exe
   version_command: ["{program_path}", "-c", "import importlib.metadata as m; print('cellpose', m.version('cellpose'))"]
   version_pattern: 'cellpose (\S+)'
   identity: 'cellpose \d'

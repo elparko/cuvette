@@ -3,9 +3,9 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { ACTION_NAME, actionFiles, actionPath, actionScript, installFinderAction, installLauncher, launcherFiles, launcherPath, launcherScript, LAUNCHER_ID, uninstallFinderAction, uninstallLauncher, type GaPaths } from "../src/core/macos.ts";
+import { ACTION_NAME, actionFiles, actionPath, actionScript, installFinderAction, installLauncher, launcherFiles, launcherPath, launcherScript, LAUNCHER_ID, uninstallFinderAction, uninstallLauncher, type CuvettePaths } from "../src/core/macos.ts";
 
-const P: GaPaths = { node: "/opt/homebrew/bin/node", ga: "/Users/a/Code/guided-analysis/bin/ga.js", path: "/opt/homebrew/bin:/usr/bin" };
+const P: CuvettePaths = { node: "/opt/homebrew/bin/node", cuvette: "/Users/a/Code/guided-analysis/bin/cuvette.js", path: "/opt/homebrew/bin:/usr/bin" };
 const mac = process.platform === "darwin";
 const unxml = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 
@@ -25,10 +25,10 @@ test("the Quick Action is a Finder service for files and folders with the absolu
   const script = unxml(/<key>COMMAND_STRING<\/key>\n\t+<string>([\s\S]*?)<\/string>/.exec(doc)![1]!);
   expect(script).toBe(actionScript(P));
   expect(script).toContain("NODE='/opt/homebrew/bin/node'");
-  expect(script).toContain("GA='/Users/a/Code/guided-analysis/bin/ga.js'");
+  expect(script).toContain("CUVETTE_JS='/Users/a/Code/guided-analysis/bin/cuvette.js'");
   expect(script).toContain(`export PATH="$PATH:"'/opt/homebrew/bin:/usr/bin:/opt/homebrew/bin:/usr/local/bin'`);
   expect(script).toContain(`open -a "$app" --args "$dir"`);
-  expect(script).toContain(`"$NODE" "$GA" app "$dir"`);
+  expect(script).toContain(`"$NODE" "$CUVETTE_JS" app "$dir"`);
   expect(script).toContain("open -a Terminal");
 });
 
@@ -47,7 +47,7 @@ test("the launcher is a small app bundle that asks for a folder", () => {
 });
 
 test("install and uninstall write and remove the bundles in a home folder", () => {
-  const home = mkdtempSync(join(tmpdir(), "ga-mac-"));
+  const home = mkdtempSync(join(tmpdir(), "cuvette-mac-"));
   const a = installFinderAction({ home, paths: P });
   expect(a).toBe(join(home, "Library/Services", `${ACTION_NAME}.workflow`));
   expect(a).toBe(actionPath(home));
@@ -66,7 +66,7 @@ test("install and uninstall write and remove the bundles in a home folder", () =
 });
 
 function sandbox(withApp: boolean) {
-  const root = mkdtempSync(join(tmpdir(), "ga-mac-run-"));
+  const root = mkdtempSync(join(tmpdir(), "cuvette-mac-run-"));
   const bin = join(root, "bin");
   mkdirSync(bin);
   const log = join(root, "calls.log");
@@ -77,14 +77,14 @@ function sandbox(withApp: boolean) {
   };
   stub("open", `echo "open $*" >> '${log}'`);
   stub("osascript", `echo "osascript" >> '${log}'`);
-  const node = stub("node", `if [ "$2" = help ]; then ${withApp ? "echo '  ga app [<folder>]'" : "echo '  ga models'"}; else echo "node $* in $(pwd)" >> '${log}'; fi`);
-  const ga = join(root, "ga.js");
-  writeFileSync(ga, "");
+  const node = stub("node", `if [ "$2" = help ]; then ${withApp ? "echo '  cuvette app [<folder>]'" : "echo '  cuvette models'"}; else echo "node $* in $(pwd)" >> '${log}'; fi`);
+  const cuvette = join(root, "cuvette.js");
+  writeFileSync(cuvette, "");
   const data = join(root, "data dir");
   mkdirSync(data);
   writeFileSync(join(data, "a.csv"), "x\n");
   const env = { PATH: `${bin}:/usr/bin:/bin`, HOME: join(root, "home"), TMPDIR: root + "/" };
-  return { root, log, data, env, paths: { node, ga, path: "" } };
+  return { root, log, data, env, paths: { node, cuvette, path: "" } };
 }
 
 const waitFor = (f: string) => {
@@ -92,27 +92,27 @@ const waitFor = (f: string) => {
   return existsSync(f) ? readFileSync(f, "utf8") : "";
 };
 
-test.runIf(mac)("the launcher starts ga app in the folder when ga has the app command", () => {
+test.runIf(mac)("the launcher starts cuvette app in the folder when cuvette has the app command", () => {
   const s = sandbox(true);
   const r = spawnSync("/bin/bash", ["-c", launcherScript(s.paths), "Cuvette", s.data], { env: s.env, encoding: "utf8" });
   expect(r.status).toBe(0);
-  expect(waitFor(s.log)).toContain(`node ${s.paths.ga} app ${s.data} in ${s.data}`);
-  expect(readFileSync(join(s.env.HOME, ".guided-analysis/logs/launcher.log"), "utf8")).toContain(`ga app ${s.data}`);
+  expect(waitFor(s.log)).toContain(`node ${s.paths.cuvette} app ${s.data} in ${s.data}`);
+  expect(readFileSync(join(s.env.HOME, ".cuvette/logs/launcher.log"), "utf8")).toContain(`cuvette app ${s.data}`);
 });
 
-test.runIf(mac)("the launcher falls back to Terminal with ga in the folder", () => {
+test.runIf(mac)("the launcher falls back to Terminal with cuvette in the folder", () => {
   const s = sandbox(false);
   spawnSync("/bin/bash", ["-c", launcherScript(s.paths), "Cuvette", s.data], { env: s.env });
   const call = readFileSync(s.log, "utf8").trim();
   expect(call).toMatch(/^open -a Terminal .*cuvette-\d+\.command$/);
   const cmd = readFileSync(call.split(" ").pop()!, "utf8");
-  expect(cmd).toBe(`#!/bin/bash\nrm -f "$0"\ncd ${s.data.replace(/ /g, "\\ ")} && exec ${s.paths.node} ${s.paths.ga}\n`);
+  expect(cmd).toBe(`#!/bin/bash\nrm -f "$0"\ncd ${s.data.replace(/ /g, "\\ ")} && exec ${s.paths.node} ${s.paths.cuvette}\n`);
 });
 
 test.runIf(mac && !existsSync("/Applications/Cuvette.app"))("the Quick Action uses the folder of a file, and opens Cuvette.app when it is installed", () => {
   const s = sandbox(true);
   spawnSync("/bin/bash", ["-c", actionScript(s.paths), "action", join(s.data, "a.csv")], { env: s.env });
-  expect(waitFor(s.log)).toContain(`node ${s.paths.ga} app ${s.data} in ${s.data}`);
+  expect(waitFor(s.log)).toContain(`node ${s.paths.cuvette} app ${s.data} in ${s.data}`);
   const t = sandbox(true);
   mkdirSync(join(t.env.HOME, "Applications/Cuvette.app"), { recursive: true });
   spawnSync("/bin/bash", ["-c", actionScript(t.paths), "action", t.data], { env: t.env });

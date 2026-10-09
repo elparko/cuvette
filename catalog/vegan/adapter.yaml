@@ -24,9 +24,9 @@ program:
     - https://cran.r-project.org/web/packages/vegan/vignettes/diversity-vegan.pdf
   install: >
     Install R (brew install r on macOS). Then install the R packages that the scripts load (vegan, permute
-    and jsonlite) into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER,
-    /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
-    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("vegan", "permute", "jsonlite"), repos = "https://cloud.r-project.org")'
+    and jsonlite) into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER,
+    /Volumes/T7/guided-analysis/tools/R-library or ~/.cuvette/R-library.
+    mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages(c("vegan", "permute", "jsonlite"), repos = "https://cloud.r-project.org")'
   citation:
     - text: "Oksanen, J., Simpson, G. L., Blanchet, F. G., Kindt, R., Legendre, P., Minchin, P. R., O'Hara, R. B., Solymos, P., Stevens, M. H. H., Szoecs, E., Wagner, H., et al. (2026). vegan: Community Ecology Package [Computer software]. https://doi.org/10.32614/CRAN.package.vegan"
       doi: 10.32614/CRAN.package.vegan
@@ -61,8 +61,8 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first
-  folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
-  ~/.guided-analysis/R-library. The program version in this adapter is the version of the R
+  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  ~/.cuvette/R-library. The program version in this adapter is the version of the R
   package vegan, not of R. Each permutation tool calls set.seed with the seed decision before it
   permutes, so a repeat run gives the same p value.
 

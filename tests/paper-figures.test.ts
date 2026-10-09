@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 
 const ROOT = join(__dirname, "..");
 const FIXTURES = join(__dirname, "fixtures/paper-figures");
-const PY = join(homedir(), ".guided-analysis/envs/science/bin/python");
+const PY = join(homedir(), ".cuvette/envs/science/bin/python");
 const ids = existsSync(FIXTURES) ? readdirSync(FIXTURES).filter((d) => existsSync(join(FIXTURES, d, "run.json"))) : [];
 
 describe.skipIf(!existsSync(PY))("paper figures", () => {

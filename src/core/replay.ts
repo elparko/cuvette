@@ -19,7 +19,7 @@ export class ToolRunner implements Runner {
 
   static async start(adapters: string[], opts: { workDir?: string } = {}): Promise<ToolRunner> {
     const { startAdapter } = await import("../adapters/runtime.ts");
-    const workDir = opts.workDir ?? mkdtempSync(join(tmpdir(), "ga-run-"));
+    const workDir = opts.workDir ?? mkdtempSync(join(tmpdir(), "cuvette-run-"));
     const tools: Tool[] = [];
     const closers: (() => Promise<void>)[] = [];
     for (const name of adapters) {

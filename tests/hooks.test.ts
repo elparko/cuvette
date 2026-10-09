@@ -6,7 +6,7 @@ import { HookRunner } from "../src/core/hooks.ts";
 import type { Hook, PreToolUseInput } from "../src/core/types.ts";
 
 const input: PreToolUseInput = { event: "PreToolUse", session: "s", mode: "watch", tool: "seg", args: { a: 1 } };
-const dir = mkdtempSync(join(tmpdir(), "ga-hook-"));
+const dir = mkdtempSync(join(tmpdir(), "cuvette-hook-"));
 const script = (name: string, body: string) => {
   const p = join(dir, name);
   writeFileSync(p, body);

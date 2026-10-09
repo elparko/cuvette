@@ -23,9 +23,9 @@ program:
     - https://mne.tools/stable/auto_tutorials/preprocessing/40_artifact_correction_ica.html
     - https://mne.tools/stable/auto_tutorials/time-freq/20_sensors_time_frequency.html
   install: >
-    The adapter uses a Python environment in ~/.guided-analysis/envs/mne. Make it and install MNE-Python, the
+    The adapter uses a Python environment in ~/.cuvette/envs/mne. Make it and install MNE-Python, the
     packages that ga_mne.py imports, and scikit-learn for the fastica method of ICA:
-    uv venv ~/.guided-analysis/envs/mne && uv pip install --python ~/.guided-analysis/envs/mne/bin/python
+    uv venv ~/.cuvette/envs/mne && uv pip install --python ~/.cuvette/envs/mne/bin/python
     mne matplotlib pandas scikit-learn
   citation:
     - text: Gramfort, A., Luessi, M., Larson, E., Engemann, D. A., Strohmeier, D., Brodbeck, C., Goj, R., Jas, M., Brooks, T., Parkkonen, L., & Hämäläinen, M. S. (2013). MEG and EEG data analysis with MNE-Python. Frontiers in Neuroscience, 7, 267. https://doi.org/10.3389/fnins.2013.00267
@@ -60,10 +60,10 @@ connection:
   call_timeout_s: 900
 
 locate:
-  env: GA_MNE_PYTHON
+  env: CUVETTE_MNE_PYTHON
   paths:
-    - ~/.guided-analysis/envs/mne/bin/python
-    - ~/.guided-analysis/envs/mne/Scripts/python.exe
+    - ~/.cuvette/envs/mne/bin/python
+    - ~/.cuvette/envs/mne/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-W", "ignore", "-c", "import mne; print('mne', mne.__version__)"]
   version_pattern: 'mne (\S+)'

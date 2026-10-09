@@ -15,7 +15,7 @@ import type { SessionLike } from "../src/ui/types.ts";
 
 let session: Session | undefined;
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-status-home-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-status-home-"));
 });
 afterEach(async () => {
   await session?.close();
@@ -28,7 +28,7 @@ const env = (packages: [string, string][]): EnvLock => {
 };
 
 async function nodeWithInput(record: AnalysisRecord, extra: Partial<NodeIn> = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "ga-status-in-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-status-in-"));
   const path = join(dir, "sleep.csv");
   writeFileSync(path, "id,stage\n1,N2\n");
   const st = statSync(path);
@@ -43,7 +43,7 @@ async function nodeWithInput(record: AnalysisRecord, extra: Partial<NodeIn> = {}
 const current = (o: Partial<{ version: string; programVersion: string; env: EnvLock }> = {}): Current => new Map([["biostats", { version: "1.0.0", programVersion: "0.30.3", program: "lifelines", ...o }]]);
 
 test("each reason for out of date has a plain sentence", async () => {
-  const record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "ga-status-")), "s1");
+  const record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-status-")), "s1");
   const old = env([["numpy", "1.26.4"], ["pandas", "2.2.2"]]);
   record.addEnvironment(old, "biostats");
   const { n, path } = await nodeWithInput(record, { envHash: old.hash });
@@ -81,7 +81,7 @@ test("each reason for out of date has a plain sentence", async () => {
 });
 
 test("/status lists each step as up to date or out of date, with the reason", async () => {
-  const record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "ga-status-")), "s1");
+  const record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-status-")), "s1");
   await nodeWithInput(record);
   await nodeWithInput(record, { decisions: {}, summary: "Counted the epochs." });
   record.markStale("alpha", "changed");
@@ -119,12 +119,12 @@ test("the before and after table shows each number that changed, with the differ
 });
 
 test("a rerun after /change replaces the old step, records the before and after table, and the status is up to date again; a changed input file makes it out of date", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "ga-status-data-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-status-data-"));
   const input = join(dir, "a.tif");
   writeFileSync(input, "image 1");
   const count = (method: string) => ({ calls: [{ name: "count", args: { input, method, min_size: 5 } }] });
   const provider = new FakeProvider([count("Otsu"), { text: "41 particles (step 1)." }, count("Triangle"), { text: "66 particles (step 2)." }, count("Triangle"), { text: "66 particles (step 3)." }]);
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
   session.decisions.applySetup({ question: "How many particles?", method: "Otsu" });
   await session.send("Count the particles in a.tif");
   const first = session.record.nodes().filter((n) => !n.sensitivityOf);

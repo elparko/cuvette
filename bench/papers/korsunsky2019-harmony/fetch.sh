@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/korsunsky2019-harmony"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/korsunsky2019-harmony"
 mkdir -p "$D"
 cd "$D"
 # 10x Genomics Cell Ranger 1.1.0 filtered matrices of the Jurkat, 293T and 50:50 mix cell lines (hg19).

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 import { which } from "../adapters/locate.ts";
 import { runProcess } from "../adapters/kinds/common.ts";
 
@@ -51,7 +51,7 @@ cat(paste0("PKG\\t", ip[, "Package"], "\\t", ip[, "Version"], "\\n"), sep = "")`
 const memory = new Map<string, Cached>();
 
 function cacheFile(): string {
-  return join(gaHome(), "cache", "env-locks.json");
+  return join(cuvetteHome(), "cache", "env-locks.json");
 }
 
 function readDisk(): Record<string, Cached> {

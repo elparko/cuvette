@@ -15,18 +15,18 @@ let home: string;
 let oldHome: string | undefined;
 
 beforeEach(() => {
-  oldHome = process.env.GA_HOME;
-  home = mkdtempSync(join(tmpdir(), "ga-db-home-"));
-  process.env.GA_HOME = home;
+  oldHome = process.env.CUVETTE_HOME;
+  home = mkdtempSync(join(tmpdir(), "cuvette-db-home-"));
+  process.env.CUVETTE_HOME = home;
 });
 
 afterEach(() => {
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
 });
 
 function session(opts: { plan?: boolean; dir?: string } = {}): AnalysisRecord {
-  const dir = opts.dir ?? join(mkdtempSync(join(tmpdir(), "ga-db-")), "s");
+  const dir = opts.dir ?? join(mkdtempSync(join(tmpdir(), "cuvette-db-")), "s");
   mkdirSync(dir, { recursive: true });
   const lines = readFileSync(FIXTURE, "utf8").split("\n").filter(Boolean).filter((l) => opts.plan !== false || !PLAN_KINDS.has(JSON.parse(l).kind));
   writeFileSync(join(dir, "log.jsonl"), lines.join("\n") + "\n");
@@ -34,7 +34,7 @@ function session(opts: { plan?: boolean; dir?: string } = {}): AnalysisRecord {
 }
 
 function addPilot(r: AnalysisRecord): void {
-  const dir = mkdtempSync(join(tmpdir(), "ga-db-fig-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-db-fig-"));
   const qc = join(dir, "pilot-qc.png");
   const plot = join(dir, "bland-altman-mean_diff.png");
   writeFileSync(qc, PNG);
@@ -166,7 +166,7 @@ describe("databook", () => {
   });
 
   it("collects every session of a project folder", () => {
-    const project = mkdtempSync(join(tmpdir(), "ga-db-proj-"));
+    const project = mkdtempSync(join(tmpdir(), "cuvette-db-proj-"));
     session({ dir: join(project, "cuvette", "2026-10-08-sleep", ".record") });
     const lines = readFileSync(FIXTURE, "utf8").replace(/20261008-192132-8dd2/g, "20261009-100000-aaaa");
     mkdirSync(join(project, "cuvette", "2026-10-09-sleep", ".record"), { recursive: true });

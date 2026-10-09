@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/desveaux2026-pcrv-ic50"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/desveaux2026-pcrv-ic50"
 mkdir -p "$D"
 cd "$D"
 curl -fsSL -o fig6-data1.xlsx "https://cdn.elifesciences.org/articles/105195/elife-105195-fig6-data1-v1.xlsx"

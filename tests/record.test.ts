@@ -6,7 +6,7 @@ import { AnalysisRecord } from "../src/core/record.ts";
 import type { NodeIn } from "../src/core/types.ts";
 
 function tmp(): string {
-  return mkdtempSync(join(tmpdir(), "ga-rec-"));
+  return mkdtempSync(join(tmpdir(), "cuvette-rec-"));
 }
 
 function nodeIn(over: Partial<NodeIn> = {}): NodeIn {

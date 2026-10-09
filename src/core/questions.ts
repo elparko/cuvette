@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Question } from "./types.ts";
 
 function indexPath(): string {
-  return join(gaHome(), "questions.json");
+  return join(cuvetteHome(), "questions.json");
 }
 
 function readIndex(): Question[] {
@@ -21,7 +21,7 @@ function upsert(q: Question): void {
   const i = all.findIndex((x) => x.session === q.session && x.qid === q.qid);
   if (i >= 0) all[i] = q;
   else all.push(q);
-  mkdirSync(gaHome(), { recursive: true });
+  mkdirSync(cuvetteHome(), { recursive: true });
   const tmp = `${indexPath()}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(all, null, 2));
   renameSync(tmp, indexPath());

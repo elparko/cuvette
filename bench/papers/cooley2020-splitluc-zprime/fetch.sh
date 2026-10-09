@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/cooley2020-splitluc-zprime"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/cooley2020-splitluc-zprime"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/cooley2020-splitluc-zprime"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/cooley2020-splitluc-zprime"
 mkdir -p "$D/raw" "$R"
 cd "$D/raw"
 get() { curl -fsSL -o "$1" "https://osf.io/download/$2/"; }

@@ -331,15 +331,15 @@ export function loadAdapter(path: string): LoadedAdapter {
   };
 }
 
-export function gaHome(): string {
-  return process.env.GA_HOME || join(homedir(), ".guided-analysis");
+export function cuvetteHome(): string {
+  return process.env.CUVETTE_HOME || join(homedir(), ".cuvette");
 }
 
 export const CATALOG_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../catalog");
 
 export function adapterDirs(cwd = process.cwd()): Record<string, string> {
   const found: Record<string, string> = {};
-  for (const base of [...(folderTrusted(cwd) ? projectAdapterDirs(cwd) : []), join(gaHome(), "adapters"), CATALOG_DIR]) {
+  for (const base of [...(folderTrusted(cwd) ? projectAdapterDirs(cwd) : []), join(cuvetteHome(), "adapters"), CATALOG_DIR]) {
     if (!existsSync(base)) continue;
     for (const d of readdirSync(base)) {
       const p = join(base, d);

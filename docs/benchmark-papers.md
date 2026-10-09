@@ -43,8 +43,8 @@ For each run the report gives:
 ## How to run it
 
 1. Fetch the data with `bench/papers/<id>/fetch.sh`. The benchmark skips a paper whose data is missing.
-2. Check the specs: `ga bench papers --models ollama:qwen3:8b --dry-run`
-3. Run it: `ga bench papers --papers student1908-sleep,white2021-flowkit --models ollama:qwen3:8b,claude --runs 3`
+2. Check the specs: `cuvette bench papers --models ollama:qwen3:8b --dry-run`
+3. Run it: `cuvette bench papers --papers student1908-sleep,white2021-flowkit --models ollama:qwen3:8b,claude --runs 3`
 
 Options:
 
@@ -54,11 +54,11 @@ Options:
 - `--out file` sets the report name. The benchmark writes `<file>.md` and `<file>.json`. The default is `bench/results/papers-<date>-<models>.md`.
 - `--dry-run` checks the model specs, the adapters, and the data paths. It runs no model.
 
-Runs are sequential. Each run uses a new `GA_HOME` under `/Volumes/T7/guided-analysis/tools/bench-runs/<date>/`. If that disk is absent, the folder is in the system temporary folder. The session record of each run stays there. The report names its path. The benchmark copies `credentials.json` from the real `GA_HOME` so that Claude runs find the key.
+Runs are sequential. Each run uses a new `CUVETTE_HOME` under `/Volumes/T7/guided-analysis/tools/bench-runs/<date>/`. If that disk is absent, the folder is in the system temporary folder. The session record of each run stays there. The report names its path. The benchmark copies `credentials.json` from the real `CUVETTE_HOME` so that Claude runs find the key.
 
-The benchmark uses the code of the headless mode (`ga -p`). It answers the questions of the harness from `answers`, applies `setup`, and allows the tools in `allow`. A run stops when it reaches `timeout_s`.
+The benchmark uses the code of the headless mode (`cuvette -p`). It answers the questions of the harness from `answers`, applies `setup`, and allows the tools in `allow`. A run stops when it reaches `timeout_s`.
 
-Environment variable `GA_BENCH_DATA` sets the data root. The default is `/Volumes/T7/guided-analysis/data`.
+Environment variable `CUVETTE_BENCH_DATA` sets the data root. The default is `/Volumes/T7/guided-analysis/data`.
 
 ## Limits
 

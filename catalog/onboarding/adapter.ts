@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { FindingIn } from "../../src/core/types.ts";
 import { checkAdapter } from "../../src/onboarding/checker.ts";
 
-export async function draftLint(dir = process.env.GA_DRAFT_DIR): Promise<FindingIn[]> {
+export async function draftLint(dir = process.env.CUVETTE_DRAFT_DIR): Promise<FindingIn[]> {
   if (!dir || !existsSync(join(dir, "adapter.yaml"))) return [];
   const report = await checkAdapter(dir);
   if (!report.errors.length) return [];

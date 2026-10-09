@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/manders1993-coloc"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/manders1993-coloc"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/manders1993-coloc"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/manders1993-coloc"
 mkdir -p "$D" "$R"
 # The Fiji Coloc 2 test images that copy the object pairs of Manders et al. 1993 (GPL-3), at a fixed commit.
 # The two Coloc 2 test classes that hold the expected values go to the reference folder.

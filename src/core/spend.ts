@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 import type { Usage } from "./types.ts";
 
 const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
@@ -17,7 +17,7 @@ export function modelPrice(model: string): { input: number; output: number } | u
 }
 
 export function spendFile(): string {
-  return process.env.GA_SPEND_FILE || join(homedir(), ".guided-analysis", "spend.jsonl");
+  return process.env.CUVETTE_SPEND_FILE || join(homedir(), ".cuvette", "spend.jsonl");
 }
 
 export function costUsd(model: string, u: Usage): number {
@@ -55,22 +55,22 @@ export function monthStart(now = new Date()): string {
 
 function userBudget(): number | undefined {
   try {
-    return Number(JSON.parse(readFileSync(join(gaHome(), "settings.json"), "utf8")).budgetUsd);
+    return Number(JSON.parse(readFileSync(join(cuvetteHome(), "settings.json"), "utf8")).budgetUsd);
   } catch {
     return undefined;
   }
 }
 
 export function budgetUsd(env: Record<string, string | undefined> = process.env): number | undefined {
-  for (const v of [Number(env.GA_BUDGET_USD), userBudget()]) if (v !== undefined && Number.isFinite(v) && v > 0) return v;
+  for (const v of [Number(env.CUVETTE_BUDGET_USD), userBudget()]) if (v !== undefined && Number.isFinite(v) && v > 0) return v;
   return undefined;
 }
 
 export function budgetProblem(): string | undefined {
   const budget = budgetUsd();
   if (budget === undefined) return undefined;
-  const spent = totalSpend(process.env.GA_BUDGET_SINCE || monthStart());
-  return spent >= budget ? `The Claude budget of $${budget.toFixed(2)} for this month is used up ($${spent.toFixed(2)} spent). Raise GA_BUDGET_USD or the budgetUsd setting to continue.` : undefined;
+  const spent = totalSpend(process.env.CUVETTE_BUDGET_SINCE || monthStart());
+  return spent >= budget ? `The Claude budget of $${budget.toFixed(2)} for this month is used up ($${spent.toFixed(2)} spent). Raise CUVETTE_BUDGET_USD or the budgetUsd setting to continue.` : undefined;
 }
 
 export function promptTokens(d: Record<string, unknown>): number {

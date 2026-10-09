@@ -228,7 +228,7 @@ export function renderGraph(session: SessionLike): string {
   return out.join("\n");
 }
 
-export const noOpen = () => !!(process.env.VITEST || process.env.GA_NO_OPEN);
+export const noOpen = () => !!(process.env.VITEST || process.env.CUVETTE_NO_OPEN);
 
 export function openWithOs(path: string): void {
   if (noOpen()) return;
@@ -527,7 +527,7 @@ export const commands: Command[] = [
       const q = ctx.session.questions.open().find((x) => x.qid === qid);
       if (!q) {
         const other = (await allOpen())?.find((x) => x.qid === qid);
-        return ctx.error(other ? `${qid} belongs to session ${other.session}. Run: ga --resume ${other.session}` : `No open question ${qid}.`);
+        return ctx.error(other ? `${qid} belongs to session ${other.session}. Run: cuvette --resume ${other.session}` : `No open question ${qid}.`);
       }
       const hit = matchOption(q, raw);
       await ctx.session.answer(qid, hit.ok ? hit.value : raw);
@@ -602,7 +602,7 @@ export const commands: Command[] = [
       if (!name) return ctx.error("Use: /branch <name> or /branch <name> at <n>");
       try {
         const r = s.branch(name, at);
-        ctx.print(`The branch ${name} is in ${r.folder}.\nThis session does not change. Both records link to each other.\nTo work in the branch, open it: ga open "${r.folder}"`, "Branch");
+        ctx.print(`The branch ${name} is in ${r.folder}.\nThis session does not change. Both records link to each other.\nTo work in the branch, open it: cuvette open "${r.folder}"`, "Branch");
       } catch (e) {
         ctx.error((e as Error).message);
       }
@@ -907,7 +907,7 @@ export const commands: Command[] = [
     run(_, ctx) {
       const list = listSessions().slice(0, 10);
       const text = list.length ? list.map((s) => sessionLine(s)).join("\n") : "No past sessions.";
-      ctx.print(`${text}\n\nTo continue one, quit and run: ga resume`, "Sessions");
+      ctx.print(`${text}\n\nTo continue one, quit and run: cuvette resume`, "Sessions");
     },
   },
   {

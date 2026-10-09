@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/love2014-deseq2-airway"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/love2014-deseq2-airway"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$D"
 cd "$D"

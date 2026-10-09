@@ -22,7 +22,7 @@ Warning: the check is a help, not a guarantee. It finds patterns. It does not fi
 | --- | --- |
 | `phi_check` | on (the default) or off. Off needs a second confirmation. A project settings file cannot set it. |
 | `local_model` | The local model that the card offers, for example `ollama:qwen3:8b`. |
-| `no_patient_data` ("No patient data here") | yes or no, for the project folder. Yes needs a second confirmation. Cuvette keeps the answer in `~/.guided-analysis/settings.json`, key `no_patient_data_folders`, next to the folder trust list. |
+| `no_patient_data` ("No patient data here") | yes or no, for the project folder. Yes needs a second confirmation. Cuvette keeps the answer in `~/.cuvette/settings.json`, key `no_patient_data_folders`, next to the folder trust list. |
 
 ## Reference: the HIPAA Safe Harbor list
 

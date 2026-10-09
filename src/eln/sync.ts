@@ -101,7 +101,7 @@ export async function runPush(plan: PushPlan, client: Elabftw): Promise<{ experi
   } else await client.appendBody(id, plan.section);
   const attachments: Record<string, string> = {};
   for (const a of plan.attachments) {
-    await client.upload(id, a.name, a.data, a.mime, `guided-analysis version ${plan.version}`);
+    await client.upload(id, a.name, a.data, a.mime, `Cuvette version ${plan.version}`);
     attachments[a.name] = a.sha256;
   }
   return { experiment: id, created, attachments };

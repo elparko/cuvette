@@ -49,7 +49,7 @@ test("mode hook", () => {
 
 let session: Session | undefined;
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-perm-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-perm-"));
 });
 afterEach(async () => {
   await session?.close();
@@ -63,7 +63,7 @@ function results(p: FakeProvider): { text: string; isError?: boolean }[] {
 }
 
 async function bypassSession(provider: FakeProvider, settings: Record<string, unknown> = {}, mode?: Mode) {
-  const s = await Session.create({ adapters: [lab], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), mode, settings: { permissionMode: "bypass", ...settings } });
+  const s = await Session.create({ adapters: [lab], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), mode, settings: { permissionMode: "bypass", ...settings } });
   s.decisions.applySetup({});
   s.decisions.change("method", "Default");
   return s;
@@ -82,7 +82,7 @@ test("bypass allows an ask rule without a card and logs the reason", async () =>
 });
 
 test("bypass allows the disk search card and logs the folder", async () => {
-  const cwd = mkdtempSync(join(tmpdir(), "ga-perm-cwd-"));
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-perm-cwd-"));
   const provider = new FakeProvider([{ calls: [{ name: "run_command", args: { argv: ["find", "/Volumes", "-maxdepth", "0"], purpose: "find the data", does: "lists /Volumes" } }] }, { text: "ok" }]);
   session = await Session.create({ adapters: [], provider, cwd, generic: true, settings: { permissionMode: "bypass", guidance: false } });
   const cards: string[] = [];
@@ -102,7 +102,7 @@ test("bypass keeps deny rules", async () => {
 
 test("bypass does not answer decision questions", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "x", method: "Otsu" } }] }, { text: "ok" }, { text: "ok" }]);
-  session = await Session.create({ adapters: [lab], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { permissionMode: "bypass", askWaits: false, autoResume: false } });
+  session = await Session.create({ adapters: [lab], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { permissionMode: "bypass", askWaits: false, autoResume: false } });
   session.decisions.applySetup({ question: "How many?" });
   const questions: string[] = [];
   session.bus.on((e) => e.type === "question" && questions.push(e.question.decisionKey ?? ""));
@@ -121,7 +121,7 @@ test.each(["plan", "teach"] as Mode[])("bypass does not change %s mode", async (
 
 test("/permissions turns bypass on and off and the record shows each change", async () => {
   const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "x", method: "Default" } }] }, { text: "ok" }]);
-  session = await Session.create({ adapters: [lab], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { permissions: { count: "ask" } } });
+  session = await Session.create({ adapters: [lab], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { permissions: { count: "ask" } } });
   session.decisions.applySetup({});
   session.decisions.change("method", "Default");
   expect(session.permissionMode).toBe("ask");
@@ -137,14 +137,14 @@ test("/permissions turns bypass on and off and the record shows each change", as
 });
 
 test('the settings file can say "permissions": "bypass"', () => {
-  const cwd = mkdtempSync(join(tmpdir(), "ga-perm-cwd-"));
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-perm-cwd-"));
   mkdirSync(join(cwd, ".ga"));
-  writeFileSync(join(cwd, ".ga", "settings.json"), JSON.stringify({ permissions: "bypass" }));
-  writeFileSync(join(cwd, ".ga", "settings.local.json"), JSON.stringify({ permissions: { "run_command:rm *": "deny" } }));
+  writeFileSync(join(cwd, ".cuvette", "settings.json"), JSON.stringify({ permissions: "bypass" }));
+  writeFileSync(join(cwd, ".cuvette", "settings.local.json"), JSON.stringify({ permissions: { "run_command:rm *": "deny" } }));
   expect(loadSettings(cwd).permissionMode).toBe("ask");
   trustFolder(cwd);
   const s = loadSettings(cwd);
   expect(s.permissionMode).toBe("bypass");
   expect(s.permissions).toEqual({ "run_command:rm *": "deny" });
-  expect(loadSettings(mkdtempSync(join(tmpdir(), "ga-perm-cwd-"))).permissionMode).toBe("ask");
+  expect(loadSettings(mkdtempSync(join(tmpdir(), "cuvette-perm-cwd-"))).permissionMode).toBe("ask");
 });

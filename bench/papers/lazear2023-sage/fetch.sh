@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/lazear2023-sage"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/lazear2023-sage"
 U=https://raw.githubusercontent.com/OpenMS/OpenMS/develop/share/OpenMS/examples
 mkdir -p "$D"
 cd "$D"

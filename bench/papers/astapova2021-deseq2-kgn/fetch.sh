@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/astapova2021-deseq2-kgn"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/astapova2021-deseq2-kgn"
 mkdir -p "$D"
 cd "$D"
 curl -L -C - -o GSE158218_experiment1_deSeq2_counts.txt.gz \

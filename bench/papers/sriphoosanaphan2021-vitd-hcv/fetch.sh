@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/sriphoosanaphan2021-vitd-hcv"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/sriphoosanaphan2021-vitd-hcv"
 mkdir -p "$D"
 cd "$D"
 curl -fsSL -o vitd_raw.xlsx https://zenodo.org/api/records/4404285/files/Data_set.xlsx/content

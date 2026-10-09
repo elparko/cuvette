@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/mahbod2024-nuinsseg"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/mahbod2024-nuinsseg"
 mkdir -p "$D"
 cd "$D"
 curl -L -C - -o NuInsSeg.zip "https://zenodo.org/records/10518968/files/NuInsSeg.zip?download=1"

@@ -21,9 +21,9 @@ The harness does not send your input data files. Output files that a step made a
 
 The export works with any ELN that reads the ELN Consortium format. It sends nothing.
 
-- Terminal: `ga export <session> --format eln`
+- Terminal: `cuvette export <session> --format eln`
 - In the app: `/export eln`
-- MCP: `ga_export` with `format: "eln"`
+- MCP: `cuvette_export` with `format: "eln"`
 
 The file is `exports/<session>.eln` in the session folder. It is a ZIP file with one top folder.
 The folder holds `ro-crate-metadata.json` and an `analysis/` folder with the files.
@@ -44,18 +44,18 @@ The specification has no `version` property. The harness does not add one.
 ## Set up eLabFTW
 
 1. In eLabFTW, open your user panel and make an API key with write access.
-2. Run `ga eln setup`. In the app, type `/eln setup`.
+2. Run `cuvette eln setup`. In the app, type `/eln setup`.
 3. Type the address and the key. The screen hides the key.
 
-The harness saves both in `~/.guided-analysis/credentials.json` (`elabftw_url`, `elabftw_api_key`). Only your user can read that file (mode 600).
+The harness saves both in `~/.cuvette/credentials.json` (`elabftw_url`, `elabftw_api_key`). Only your user can read that file (mode 600).
 The harness never prints the key. It shows the key masked.
 The address must start with `https://`. Plain `http://` works only for localhost.
 
-Other commands: `ga eln status`, `ga eln remove` (in the app: `/eln status`, `/eln remove`).
+Other commands: `cuvette eln status`, `cuvette eln remove` (in the app: `/eln status`, `/eln remove`).
 
 ## Push a session
 
-Run `ga eln push <session>`. In the app, type `/eln push`.
+Run `cuvette eln push <session>`. In the app, type `/eln push`.
 
 Before the harness sends anything, it shows a permission card. The card lists:
 
@@ -83,7 +83,7 @@ The card says so.
 
 ## Link an experiment
 
-Run `ga eln link <session> <id>`. In the app, type `/eln link <id>`.
+Run `cuvette eln link <session> <id>`. In the app, type `/eln link <id>`.
 
 The harness reads the experiment and the items that it links to. It shows the title, the tags, the start of the text and the linked items.
 Then it compares each custom field (`metadata.extra_fields`) with the decisions.
@@ -99,8 +99,8 @@ The harness stores the link in the log as an `eln_link` entry.
 
 ## MCP
 
-The tool `ga_eln_push` exists. It needs the approval of the scientist.
-An MCP client cannot approve, so the call refuses. Run `ga eln push <session>` in a terminal instead.
+The tool `cuvette_eln_push` exists. It needs the approval of the scientist.
+An MCP client cannot approve, so the call refuses. Run `cuvette eln push <session>` in a terminal instead.
 
 ## eLabFTW API v2 endpoints used
 

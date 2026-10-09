@@ -63,5 +63,5 @@ export function keyStream(real: Tty, logPath?: string, waitMs = ESC_WAIT_MS): No
 export function terminalStdin(env: Record<string, string | undefined> = process.env): NodeJS.ReadStream {
   const stdin = process.stdin as Tty;
   if (!stdin.isTTY) return stdin;
-  return keyStream(stdin, env.CUVETTE_KEYLOG || env.GA_KEYLOG);
+  return keyStream(stdin, env.CUVETTE_KEYLOG);
 }

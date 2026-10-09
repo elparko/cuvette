@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/palmer2017-metaspace-fdr"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/palmer2017-metaspace-fdr"
 E=https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/palmer2017-metaspace-fdr"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/palmer2017-metaspace-fdr"
 mkdir -p "$D" "$R"
 cd "$D"
 for f in MBa2s1.zip MBa2s2.zip MBa2s3.zip; do curl -L -C - -O "$E/MTBLS313/FILES/$f"; done

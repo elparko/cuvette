@@ -6,8 +6,8 @@ import { applyOverlay, approve, labText, pending, propose, reject } from "../src
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "ga-lab-"));
-  process.env.GA_HOME = home;
+  home = mkdtempSync(join(tmpdir(), "cuvette-lab-"));
+  process.env.CUVETTE_HOME = home;
 });
 
 function adapter() {
@@ -68,7 +68,7 @@ describe("lab memory", () => {
   });
 
   test("labText reads home and project LAB.md", () => {
-    const cwd = mkdtempSync(join(tmpdir(), "ga-cwd-"));
+    const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
     expect(labText(cwd)).toBe("");
     writeFileSync(join(home, "LAB.md"), "Home rule.\n");
     writeFileSync(join(cwd, "LAB.md"), "Project rule.\n");

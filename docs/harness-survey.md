@@ -2,7 +2,7 @@
 
 2026-10-07
 
-This survey records how two agent harnesses work. It lists what `guided-analysis` takes from them and what it leaves.
+This survey records how two agent harnesses work. It lists what Cuvette takes from them and what it leaves.
 The goals are in `docs/design.md`.
 
 ## Sources and limits
@@ -753,7 +753,7 @@ Useful ideas:
 - Hook runs are lines in the same log, with exit code and duration.
 - The tool result line links back to the assistant line that asked for it.
 
-## 3. What guided-analysis takes
+## 3. What Cuvette takes
 
 ### 3.1 Mapping table
 

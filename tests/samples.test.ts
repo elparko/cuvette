@@ -48,7 +48,7 @@ describe("sample sheet", () => {
   });
 
   test("samples.csv: write, read again, and quote a comma", () => {
-    const dir = mkdtempSync(join(tmpdir(), "ga-samples-"));
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-samples-"));
     const p = join(dir, "out", "samples.csv");
     const rows = [row("a, 1", "Ctrl", "Set 1"), row("b", "KO", "Set 2", "Day 1")];
     writeSheet(p, rows);

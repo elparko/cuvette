@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/kasurinen2018-mmp14-gastric"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/kasurinen2018-mmp14-gastric"
 mkdir -p "$D"
 cd "$D"
 curl -fsSL -o mmp14_raw.xlsx "https://zenodo.org/api/records/4945997/files/High%20serum%20MMP-14%20predicts%20worse%20survival%20in%20gastric%20cancer%20data.xlsx/content"

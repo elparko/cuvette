@@ -3,7 +3,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { platform, release, tmpdir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
+import { cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import { labelMap, loadAdapters, sha256File, sizeText } from "../bench/papers-cases.ts";
 import { citationStyle, cuvetteRef, Markers, nodeCitations, programCitations, referencesHtml, sessionCitations, type CitationStyle, type Ref, type SessionCitations } from "./citations.ts";
 import { extractNumbers } from "./claims.ts";
@@ -899,7 +899,7 @@ export function projectSessions(project: string, ids?: string[]): Found[] {
   if (existsSync(root))
     for (const d of readdirSync(root)) if (!d.startsWith(".new-") && !lstatSync(join(root, d)).isSymbolicLink()) add(join(root, d, ".record"));
   for (const r of readIndex()) if (real(r.project) === me) add(join(r.folder, ".record"));
-  const home = join(gaHome(), "sessions");
+  const home = join(cuvetteHome(), "sessions");
   if (existsSync(home)) for (const d of readdirSync(home)) add(join(home, d));
   const pickIds = ids?.filter((x) => x && x !== "all");
   return [...out.entries()]
@@ -918,7 +918,7 @@ export interface BookTarget {
 
 export function resolveTarget(target: string | undefined, cwd: string, ids?: string[]): BookTarget {
   const p = resolve(cwd, (target ?? ".").replace(/^~(?=\/|$)/, process.env.HOME ?? "~"));
-  const byId = target && !target.includes("/") ? (readIndex().find((r) => r.id === target)?.folder ?? (existsSync(join(gaHome(), "sessions", target)) ? join(gaHome(), "sessions", target) : undefined)) : undefined;
+  const byId = target && !target.includes("/") ? (readIndex().find((r) => r.id === target)?.folder ?? (existsSync(join(cuvetteHome(), "sessions", target)) ? join(cuvetteHome(), "sessions", target) : undefined)) : undefined;
   const one = foundAt(p) ?? foundAt(join(p, ".record")) ?? (byId ? (foundAt(byId) ?? foundAt(join(byId, ".record"))) : undefined);
   if (one) return { project: one.project, found: [one], outDir: one.outDir, base: "databook", projectLevel: false };
   if (!existsSync(p) || !statSync(p).isDirectory()) throw new Error(`${p} is not a session folder or a project folder.`);
@@ -1004,7 +1004,7 @@ function run(cmd: string, args: string[], cwd: string, timeoutMs: number, doneWh
 export async function printPdf(html: string, pdf: string): Promise<string | undefined> {
   const chrome = findChrome();
   if (!chrome) return "No PDF: Google Chrome or Chromium is not installed. Open the HTML file and print it from a browser.";
-  const tmp = mkdtempSync(join(tmpdir(), "ga-databook-"));
+  const tmp = mkdtempSync(join(tmpdir(), "cuvette-databook-"));
   try {
     rmSync(pdf, { force: true });
     for (let attempt = 1; attempt <= 2; attempt++) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/belenky2003-sleepstudy"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/belenky2003-sleepstudy"
 mkdir -p "$D"
 cd "$D"
 curl -L -C - -o sleepstudy.csv https://vincentarelbundock.github.io/Rdatasets/csv/lme4/sleepstudy.csv

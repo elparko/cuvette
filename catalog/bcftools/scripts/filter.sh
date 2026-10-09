@@ -13,7 +13,7 @@ case $depth in 0) depth=;; esac
 [ "$types" = all ] && types=
 [ "$status" = any ] && status=
 if [ -n "$region" ]; then
-  prepare "$bcf" "$in" "$GA_CALL_DIR" || { echo "cannot index the input file" >&2; exit 1; }
+  prepare "$bcf" "$in" "$CUVETTE_CALL_DIR" || { echo "cannot index the input file" >&2; exit 1; }
   in=$prepared
 fi
 e=

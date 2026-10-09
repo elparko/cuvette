@@ -25,9 +25,9 @@ program:
     - https://lifelines.readthedocs.io/en/latest/Survival%20Regression.html
     - https://lifelines.readthedocs.io/en/latest/Survival%20analysis%20with%20lifelines.html
   install: >
-    The adapter uses a Python environment in ~/.guided-analysis/envs/biostats. Make it and install the packages
+    The adapter uses a Python environment in ~/.cuvette/envs/biostats. Make it and install the packages
     that ga_biostats.py imports:
-    uv venv ~/.guided-analysis/envs/biostats && uv pip install --python ~/.guided-analysis/envs/biostats/bin/python
+    uv venv ~/.cuvette/envs/biostats && uv pip install --python ~/.cuvette/envs/biostats/bin/python
     statsmodels pingouin lifelines scipy pandas matplotlib scikit-posthocs
   citation:
     - text: "Seabold, S., & Perktold, J. (2010). Statsmodels: Econometric and Statistical Modeling with Python. In Proceedings of the 9th Python in Science Conference (pp. 92–96). https://doi.org/10.25080/Majora-92bf1922-011"
@@ -75,10 +75,10 @@ connection:
   call_timeout_s: 600
 
 locate:
-  env: GA_BIOSTATS_PYTHON
+  env: CUVETTE_BIOSTATS_PYTHON
   paths:
-    - ~/.guided-analysis/envs/biostats/bin/python
-    - ~/.guided-analysis/envs/biostats/Scripts/python.exe
+    - ~/.cuvette/envs/biostats/bin/python
+    - ~/.cuvette/envs/biostats/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('lifelines', m.version('lifelines'), 'scikit-posthocs', m.version('scikit-posthocs'))"]
   version_pattern: 'lifelines (\S+)'

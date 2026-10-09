@@ -120,7 +120,7 @@ describe("resize", () => {
       const lines = await resize(h, c, r);
       once(lines, "> compare endo and epi");
       once(lines, "Step 1");
-      once(lines, "guided-analysis");
+      once(lines, "cuvette");
       once(lines, "Your decision: Which AUC cutoff");
       expect(h.term.view()).toContain("Enter accepts");
     }
@@ -134,8 +134,8 @@ describe("resize", () => {
 
 describe("resume", () => {
   test("an open question from the last run shows as a card again and takes its answer", async () => {
-    process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-fit-"));
-    const cwd = mkdtempSync(join(tmpdir(), "ga-proj-"));
+    process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-fit-"));
+    const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
     const adapters = [join(__dirname, "fixtures/lab")];
     const first = await Session.create({
       adapters,

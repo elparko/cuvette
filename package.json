@@ -1,11 +1,16 @@
 {
-  "name": "guided-analysis",
+  "name": "@elparko/cuvette",
   "version": "0.1.0",
   "description": "A terminal agent that analyzes data in existing science software while the scientist owns the method decisions.",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://cuvette.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elparko/cuvette.git"
+  },
   "type": "module",
   "bin": {
-    "ga": "bin/ga.js",
-    "cuvette": "bin/ga.js"
+    "cuvette": "bin/cuvette.js"
   },
   "files": [
     "bin/",
@@ -20,9 +25,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "ga": "tsx src/cli.ts",
+    "cuvette": "tsx src/cli.ts",
     "test": "vitest run",
-    "test:live": "GA_LIVE=1 vitest run",
+    "test:live": "CUVETTE_LIVE=1 vitest run",
     "typecheck": "tsc --noEmit",
     "lint:text": "tsx src/lint-text.ts",
     "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/cli.js",

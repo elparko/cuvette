@@ -1,6 +1,6 @@
 local({
   home <- Sys.getenv("HOME")
-  cand <- c(Sys.getenv("GA_R_LIBS"), Sys.getenv("R_LIBS_USER"), "/Volumes/T7/guided-analysis/tools/R-library", file.path(home, ".guided-analysis", "R-library"))
+  cand <- c(Sys.getenv("CUVETTE_R_LIBS"), Sys.getenv("R_LIBS_USER"), "/Volumes/T7/guided-analysis/tools/R-library", file.path(home, ".cuvette", "R-library"))
   cand <- unique(cand[nzchar(cand) & dir.exists(cand)])
   if (length(cand)) {
     Sys.setenv(R_LIBS_USER = cand[1])
@@ -39,7 +39,7 @@ run_tool <- function(body) {
   })
 }
 
-out_path <- function(key) Sys.getenv(paste0("GA_OUTPUT_", toupper(key)))
+out_path <- function(key) Sys.getenv(paste0("CUVETTE_OUTPUT_", toupper(key)))
 
 table_of <- function(df, path = NULL, max_rows = 12) {
   rows <- lapply(seq_len(min(nrow(df), max_rows)), function(i) unname(lapply(df[i, , drop = FALSE], function(v) if (is.factor(v)) as.character(v) else v)))

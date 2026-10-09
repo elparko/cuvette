@@ -40,7 +40,7 @@ test("the sanitizer removes local paths, keys, addresses and host names", () => 
   const text = [
     "/Volumes/T7/guided-analysis/data/p/a.csv",
     "/Volumes/T7/guided-analysis/tools/bench-runs/d/claude/p/run1/home/sessions/s1/work/x.csv",
-    "/Volumes/T5/guided-analysis/data/p/a.csv",
+    "/Volumes/T5/cuvette/data/p/a.csv",
     "/Users/someone/Code/guided-analysis/catalog/biostats",
     "/Users/someone/notes.txt",
     "key sk-ant-api03-abcdefghijklmnop",
@@ -70,10 +70,10 @@ let root: string;
 let oldData: string | undefined;
 
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), "ga-cases-test-"));
-  oldData = process.env.GA_BENCH_DATA;
+  root = mkdtempSync(join(tmpdir(), "cuvette-cases-test-"));
+  oldData = process.env.CUVETTE_BENCH_DATA;
   const data = join(root, "data");
-  process.env.GA_BENCH_DATA = data;
+  process.env.CUVETTE_BENCH_DATA = data;
   mkdirSync(join(data, "toy"), { recursive: true });
   const csv = "id,group,extra\n1,1,0.5\n";
   writeFileSync(join(data, "toy", "toy.csv"), csv);
@@ -81,7 +81,7 @@ beforeAll(() => {
   const paper = join(root, "papers", "toy");
   mkdirSync(paper, { recursive: true });
   writeFileSync(join(paper, "paper.md"), "# Toy 2020: a toy paper\n");
-  writeFileSync(join(paper, "fetch.sh"), `D="\${GA_DATA:-x}/toy"\necho "${sha}  toy.csv" | shasum -a 256 -c -\n`);
+  writeFileSync(join(paper, "fetch.sh"), `D="\${CUVETTE_DATA:-x}/toy"\necho "${sha}  toy.csv" | shasum -a 256 -c -\n`);
   writeFileSync(
     join(paper, "bench.yaml"),
     `adapters: [biostats]\nprompt: "Compare the two groups in {data}/toy/toy.csv please."\nanswers:\n  paired: true\ndata: [toy/toy.csv]\nitems:\n  - {key: diff, description: "Mean difference", value: 1.5, tolerance: 0.01}\n  - {key: wrong_p, description: "Unpaired p", value: 0.4, tolerance: 0.01, in_answer: false, trap: true}\n`,
@@ -121,8 +121,8 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  if (oldData === undefined) delete process.env.GA_BENCH_DATA;
-  else process.env.GA_BENCH_DATA = oldData;
+  if (oldData === undefined) delete process.env.CUVETTE_BENCH_DATA;
+  else process.env.CUVETTE_BENCH_DATA = oldData;
 });
 
 test("buildCases writes an index, a case page and a sanitized session record", () => {

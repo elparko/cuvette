@@ -8,8 +8,8 @@ export async function runArgv(c: KindContext, def: ToolDef, args: Args, call: Ca
   const conn = c.adapter.manifest.connection;
   const cwd = conn.cwd ? expand(conn.cwd, c.ph) : call.dir;
   const outEnv: Record<string, string> = {};
-  for (const [k, p] of Object.entries(call.outputs)) outEnv[`GA_OUTPUT_${k.toUpperCase().replace(/\W/g, "_")}`] = p;
-  const r = await runProcess(argv, { cwd, env: childEnv(c, { ...outEnv, GA_CALL_DIR: call.dir, ...extraEnv }), signal, timeoutMs: conn.call_timeout_s * 1000 });
+  for (const [k, p] of Object.entries(call.outputs)) outEnv[`CUVETTE_OUTPUT_${k.toUpperCase().replace(/\W/g, "_")}`] = p;
+  const r = await runProcess(argv, { cwd, env: childEnv(c, { ...outEnv, CUVETTE_CALL_DIR: call.dir, ...extraEnv }), signal, timeoutMs: conn.call_timeout_s * 1000 });
   const failure = processFailure(r, basename(argv[0] ?? "the program"), conn.call_timeout_s);
   if (failure) return { ok: false, error: failure, text: r.stdout.slice(0, 4000), manualRoute: route };
   return buildOutput({ adapter: c.adapter, def, args, call, stdout: r.stdout, route });

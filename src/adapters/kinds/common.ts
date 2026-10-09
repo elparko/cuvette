@@ -72,12 +72,12 @@ export function childEnv(c: KindContext, extra: Record<string, string> = {}): Re
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
   for (const [k, v] of Object.entries(c.adapter.manifest.connection.env)) env[k] = expand(v, c.ph);
-  env.GA_WORK_DIR = c.dirs.workDir;
-  env.GA_SESSION_DIR = c.dirs.sessionDir;
-  env.GA_ADAPTER_DIR = c.adapter.root;
-  env.GA_PROGRAM_PATH = c.programPath ?? "";
+  env.CUVETTE_WORK_DIR = c.dirs.workDir;
+  env.CUVETTE_SESSION_DIR = c.dirs.sessionDir;
+  env.CUVETTE_ADAPTER_DIR = c.adapter.root;
+  env.CUVETTE_PROGRAM_PATH = c.programPath ?? "";
   if (c.dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = c.dirs.figureFormats;
-  if (c.dirs.outputDir) env.GA_OUTPUT_DIR = c.dirs.outputDir;
+  if (c.dirs.outputDir) env.CUVETTE_OUTPUT_DIR = c.dirs.outputDir;
   return { ...env, ...extra };
 }
 

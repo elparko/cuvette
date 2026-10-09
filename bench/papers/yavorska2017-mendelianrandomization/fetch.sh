@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/yavorska2017-mendelianrandomization"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/yavorska2017-mendelianrandomization"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$D"
 # The 28 variants of the MendelianRandomization data (ldlc, chdlodds). make_fixtures.R in the adapter writes the CSV.

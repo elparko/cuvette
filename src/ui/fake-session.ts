@@ -85,7 +85,7 @@ export class FakeSession implements SessionLike {
   private delay: number;
 
   constructor(opts: FakeOptions = {}) {
-    this.dir = opts.dir ?? mkdtempSync(join(tmpdir(), "ga-fake-"));
+    this.dir = opts.dir ?? mkdtempSync(join(tmpdir(), "cuvette-fake-"));
     this.cwd = this.dir;
     this.workDir = join(this.dir, "work");
     this.mode = opts.mode ?? "watch";

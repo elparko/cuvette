@@ -17,7 +17,7 @@ Read `docs/adapter-spec.md` for the exact fields. This guide gives the order of 
 
 ## Adapter checklist
 
-Each rule comes from a fault that a benchmark run found. `ga adapter check` tests the rules
+Each rule comes from a fault that a benchmark run found. `cuvette adapter check` tests the rules
 that have a rule id in brackets. An `error` stops the adapter. A `warning` does not. Small
 models (qwen3:8b) are the strict reader: write each text for them.
 
@@ -112,7 +112,7 @@ The drive test shows how a small model reads the adapter. Run it before a releas
 GPU is free:
 
 ```
-ga adapter check <name> --drive --model ollama:qwen3:8b
+cuvette adapter check <name> --drive --model ollama:qwen3:8b
 ```
 
 For each tool it writes one plain request from the description and a test input. It runs a
@@ -320,7 +320,7 @@ Show each part to the scientist in this order. Wait for a clear yes on each one.
 6. The standards text and the checks.
 7. The tests and the checker result.
 
-Then tell the scientist to run `ga adapter approve <name>`. The command sets the status to
+Then tell the scientist to run `cuvette adapter approve <name>`. The command sets the status to
 `approved`, writes the name and the date, and adds the installed program version to
 `tested_versions`. Do not edit those fields yourself.
 
@@ -406,6 +406,6 @@ tests:
 Call `check_adapter` again. All tests pass.
 
 **Step 11.** Show each part. The scientist says yes to each. Tell the scientist to run
-`ga adapter approve seqkit`.
+`cuvette adapter approve seqkit`.
 
 The numbers in this example are illustrative. Read the real numbers from the program.

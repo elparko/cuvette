@@ -10,7 +10,7 @@ import { loadScenario, scenarioIds } from "../src/bench/scenario.ts";
 import { renderReport } from "../src/bench/run.ts";
 import { score, scoreText } from "../src/bench/score.ts";
 
-const tmp = () => mkdtempSync(join(tmpdir(), "ga-bench-"));
+const tmp = () => mkdtempSync(join(tmpdir(), "cuvette-bench-"));
 
 describe("datasets", () => {
   for (const name of Object.keys(GENERATORS)) {

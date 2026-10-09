@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/alexandrov2019-metaspace"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/alexandrov2019-metaspace"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/alexandrov2019-metaspace"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/alexandrov2019-metaspace"
 mkdir -p "$D" "$R"
 cd "$D"
 cat > /tmp/ga_metaspace_fetch.py <<'P'

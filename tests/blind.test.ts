@@ -7,7 +7,7 @@ import { runProcess } from "../src/adapters/kinds/common.ts";
 import type { Entry, ToolContext } from "../src/core/types.ts";
 import { runScriptTool } from "../src/tools/run_script.ts";
 
-const root = canonical(mkdtempSync(join(tmpdir(), "ga-blind-")));
+const root = canonical(mkdtempSync(join(tmpdir(), "cuvette-blind-")));
 const data = join(root, "data");
 const secret = join(root, "repo", "bench");
 const adapter = join(root, "repo", "catalog", "x");

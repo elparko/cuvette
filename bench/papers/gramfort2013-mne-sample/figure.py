@@ -254,7 +254,7 @@ def read_evoked(path):
     try:
         import mne  # noqa: F401
     except ImportError:
-        env_py = Path.home() / ".guided-analysis" / "envs" / "mne" / "bin" / "python"
+        env_py = Path.home() / ".cuvette" / "envs" / "mne" / "bin" / "python"
         if not env_py.exists():
             raise NoOutput("the evoked file needs the mne package, which is not installed")
         py = [str(env_py)]

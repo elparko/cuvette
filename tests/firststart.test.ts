@@ -6,15 +6,15 @@ import { savedClaudeKey } from "../src/core/credentials.ts";
 import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, ollamaState, SAMPLE_DIR, savedModel } from "../src/core/firststart.ts";
 import { settingsPath } from "../src/core/settings.ts";
 
-const oldHome = process.env.GA_HOME;
+const oldHome = process.env.CUVETTE_HOME;
 let cwd = "";
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-first-"));
-  cwd = mkdtempSync(join(tmpdir(), "ga-first-proj-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-first-"));
+  cwd = mkdtempSync(join(tmpdir(), "cuvette-first-proj-"));
 });
 afterEach(() => {
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
 });
 
 const KEY = "sk-ant-api03-abcdefghijklmnop-WXYZ";
@@ -71,7 +71,7 @@ test("Ollama state lists models with tools and recommends qwen3:8b", async () =>
 });
 
 test("the sample copies only the CSV, and the data are the Student 1908 values", () => {
-  const dest = join(mkdtempSync(join(tmpdir(), "ga-sample-")), "Cuvette sample");
+  const dest = join(mkdtempSync(join(tmpdir(), "cuvette-sample-")), "Cuvette sample");
   const s = copySample(dest);
   expect(s.folder).toBe(dest);
   expect(readdirSync(dest)).toEqual(["sleep.csv"]);

@@ -24,9 +24,9 @@ program:
     - https://doi.org/10.1038/nmeth.3959
   install: >
     The OpenMS TOPP tools have no Homebrew formula. Install the bioconda package openms with micromamba into
-    /Volumes/T7/guided-analysis/tools/openms/env or ~/.guided-analysis/openms/env. The adapter finds FileInfo in env/bin
+    /Volumes/T7/guided-analysis/tools/openms/env or ~/.cuvette/openms/env. The adapter finds FileInfo in env/bin
     and runs the other TOPP tools from the same folder. Set OPENMS_FILEINFO to the FileInfo path for another location.
-    micromamba create -y -p ~/.guided-analysis/openms/env -c conda-forge -c bioconda openms
+    micromamba create -y -p ~/.cuvette/openms/env -c conda-forge -c bioconda openms
   citation:
     - text: Pfeuffer, J., Bielow, C., Wein, S., Jeong, K., Netz, E., Walter, A., Alka, O., Nilse, L., Colaianni, P. D., McCloskey, D., et al. (2024). OpenMS 3 enables reproducible analysis of large-scale mass spectrometry data. Nature Methods, 21(3), 365–367. https://doi.org/10.1038/s41592-024-02197-7
       doi: 10.1038/s41592-024-02197-7
@@ -63,7 +63,7 @@ locate:
   env: OPENMS_FILEINFO
   paths:
     - /Volumes/T7/guided-analysis/tools/openms/env/bin/FileInfo
-    - ~/.guided-analysis/openms/env/bin/FileInfo
+    - ~/.cuvette/openms/env/bin/FileInfo
     - /opt/homebrew/bin/FileInfo
     - /usr/local/bin/FileInfo
     - /usr/bin/FileInfo

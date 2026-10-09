@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/thaqi2026-bovine-corpus-luteum"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/thaqi2026-bovine-corpus-luteum"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/thaqi2026-bovine-corpus-luteum"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/thaqi2026-bovine-corpus-luteum"
 mkdir -p "$D" "$R"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT

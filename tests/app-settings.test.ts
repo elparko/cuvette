@@ -12,19 +12,19 @@ import { FakeSession } from "../src/ui/fake-session.ts";
 import { CHROME, openChrome, type Page } from "./chrome.ts";
 
 const KEY = "sk-ant-api03-viewsecretview-LMNO";
-const oldHome = process.env.GA_HOME;
+const oldHome = process.env.CUVETTE_HOME;
 let cwd = "";
 let app: AppHandle | undefined;
 
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-home-"));
-  cwd = mkdtempSync(join(tmpdir(), "ga-proj-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-home-"));
+  cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
 });
 afterEach(async () => {
   await app?.close();
   app = undefined;
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
 });
 
 function writeJson(path: string, data: object) {
@@ -96,7 +96,7 @@ test("a local model is free, on this Mac", () => {
 
 test("the source badges name the scope, and a project value names its file", async () => {
   writeJson(settingsPath("user", cwd), { referee: "none" });
-  writeJson(join(cwd, ".ga", "settings.local.json"), { openImages: "off" });
+  writeJson(join(cwd, ".cuvette", "settings.local.json"), { openImages: "off" });
   writeJson(settingsPath("project", cwd), { export_xlsx: "off" });
   trustFolder(cwd);
   const c = await serve();
@@ -133,13 +133,13 @@ test("a change saves for this session, for me or for this project, and goes in t
 });
 
 test("reset to default removes the value from its file and goes in the record", async () => {
-  writeJson(join(cwd, ".ga", "settings.local.json"), { openImages: "off", pilot: "off" });
+  writeJson(join(cwd, ".cuvette", "settings.local.json"), { openImages: "off", pilot: "off" });
   const c = await serve();
   expect(row(await c.html(), "openImages")).toContain("Reset to default");
   expect(row(await c.html(), "animations")).not.toContain("Reset to default");
   const r = await c.post("api/setting/reset", { name: "openImages" });
   expect(r.body.text).toBe("Reset to default. Open QC images is now on.");
-  expect(JSON.parse(readFileSync(join(cwd, ".ga", "settings.local.json"), "utf8"))).toEqual({ pilot: "off" });
+  expect(JSON.parse(readFileSync(join(cwd, ".cuvette", "settings.local.json"), "utf8"))).toEqual({ pilot: "off" });
   expect(c.s.record.entries(["setting"]).at(-1)!.data).toEqual({ name: "openImages", old: "off", new: "on", scope: "project" });
   expect((await c.post("api/setting/reset", { name: "openImages" })).status).toBe(400);
   await c.post("api/setting", { name: "mode", value: "plan", scope: "session" });
@@ -171,7 +171,7 @@ test("a secret shows only its state, and Remove deletes it", async () => {
 });
 
 test("the spend this month shows as a bar against the budget", () => {
-  appendFileSync(process.env.GA_SPEND_FILE!, JSON.stringify({ t: new Date().toISOString(), model: "claude-opus-5-5", usd: 12.5 }) + "\n");
+  appendFileSync(process.env.CUVETTE_SPEND_FILE!, JSON.stringify({ t: new Date().toISOString(), model: "claude-opus-5-5", usd: 12.5 }) + "\n");
   writeJson(settingsPath("user", cwd), { budgetUsd: 50 });
   const html = settingsHtml({ settings: { cwd, env: {} } });
   const spent = row(html, "spend_month");
@@ -187,22 +187,22 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
   let page: Page;
   let proj = "";
   let home = "";
-  const shots = process.env.GA_SHOTS || mkdtempSync(join(tmpdir(), "ga-settings-shots-"));
+  const shots = process.env.CUVETTE_SHOTS || mkdtempSync(join(tmpdir(), "cuvette-settings-shots-"));
 
   beforeAll(async () => {
-    home = mkdtempSync(join(tmpdir(), "ga-home-"));
-    proj = mkdtempSync(join(tmpdir(), "ga-proj-"));
+    home = mkdtempSync(join(tmpdir(), "cuvette-home-"));
+    proj = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
     writeJson(join(home, "settings.json"), { model: "claude:claude-sonnet-5-5", budgetUsd: 50 });
     writeJson(join(proj, ".ga", "settings.local.json"), { mode: "plan" });
-    const before = process.env.GA_HOME;
-    process.env.GA_HOME = home;
+    const before = process.env.CUVETTE_HOME;
+    process.env.CUVETTE_HOME = home;
     trustFolder(proj);
-    if (before === undefined) delete process.env.GA_HOME;
-    else process.env.GA_HOME = before;
+    if (before === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = before;
     const spend = join(home, "spend.jsonl");
     writeFileSync(spend, JSON.stringify({ t: new Date().toISOString(), model: "claude-sonnet-5-5", usd: 12.4 }) + "\n");
-    const env = { ...process.env, GA_HOME: home, GA_SPEND_FILE: spend, ANTHROPIC_API_KEY: "sk-ant-api03-" + "x".repeat(90), GA_NO_OPEN: "1" };
-    proc = spawn(process.execPath, [join(__dirname, "..", "bin", "ga.js"), "app", "--no-open"], { cwd: proj, env, stdio: ["ignore", "pipe", "pipe"] });
+    const env = { ...process.env, CUVETTE_HOME: home, CUVETTE_SPEND_FILE: spend, ANTHROPIC_API_KEY: "sk-ant-api03-" + "x".repeat(90), CUVETTE_NO_OPEN: "1" };
+    proc = spawn(process.execPath, [join(__dirname, "..", "bin", "cuvette.js"), "app", "--no-open"], { cwd: proj, env, stdio: ["ignore", "pipe", "pipe"] });
     url = await new Promise<string>((done, fail) => {
       let out = "";
       proc.stdout!.on("data", (b) => {
@@ -210,7 +210,7 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
         const m = /Cuvette app: (\S+)/.exec(out);
         if (m) done(m[1]!);
       });
-      proc.on("exit", (code) => fail(new Error(`ga app stopped: ${code}`)));
+      proc.on("exit", (code) => fail(new Error(`cuvette app stopped: ${code}`)));
     });
     page = await openChrome();
     await page.size(1280, 900);

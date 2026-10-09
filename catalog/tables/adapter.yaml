@@ -22,7 +22,7 @@ program:
     - https://matplotlib.org/stable/
   install: >
     The adapter uses the biostats Python environment. Add openpyxl to it:
-    uv pip install --python ~/.guided-analysis/envs/biostats/bin/python openpyxl
+    uv pip install --python ~/.cuvette/envs/biostats/bin/python openpyxl
   citation:
     - text: McKinney, W. (2010). Data Structures for Statistical Computing in Python. In Proceedings of the 9th Python in Science Conference (pp. 56–61). https://doi.org/10.25080/Majora-92bf1922-00a
       doi: 10.25080/Majora-92bf1922-00a
@@ -56,10 +56,10 @@ connection:
   call_timeout_s: 300
 
 locate:
-  env: GA_TABLES_PYTHON
+  env: CUVETTE_TABLES_PYTHON
   paths:
-    - ~/.guided-analysis/envs/biostats/bin/python
-    - ~/.guided-analysis/envs/biostats/Scripts/python.exe
+    - ~/.cuvette/envs/biostats/bin/python
+    - ~/.cuvette/envs/biostats/Scripts/python.exe
   version_command: ["{program_path}", "-W", "ignore", "-c", "import openpyxl; print('openpyxl', openpyxl.__version__)"]
   version_pattern: 'openpyxl (\S+)'
   identity: 'openpyxl \d'

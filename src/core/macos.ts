@@ -9,18 +9,18 @@ import { which } from "../adapters/locate.ts";
 export const ACTION_NAME = "Analyze with Cuvette";
 export const LAUNCHER_ID = "local.cuvette.launcher";
 
-export interface GaPaths {
+export interface CuvettePaths {
   node: string;
-  ga: string;
+  cuvette: string;
   path: string;
 }
 
-export function gaPaths(env: Record<string, string | undefined> = process.env): GaPaths {
-  const linked = which("ga", env.PATH ?? "");
-  const own = resolve(dirname(fileURLToPath(import.meta.url)), "../../bin/ga.js");
-  const ga = linked ? realpathSync(linked) : own;
+export function cuvettePaths(env: Record<string, string | undefined> = process.env): CuvettePaths {
+  const linked = which("cuvette", env.PATH ?? "");
+  const own = resolve(dirname(fileURLToPath(import.meta.url)), "../../bin/cuvette.js");
+  const cuvette = linked ? realpathSync(linked) : own;
   const path = [...new Set((env.PATH ?? "").split(":").filter((d) => d.startsWith("/") && existsSync(d)))].join(":");
-  return { node: which("node", env.PATH ?? "") ?? process.execPath, ga, path };
+  return { node: which("node", env.PATH ?? "") ?? process.execPath, cuvette, path };
 }
 
 export function servicesDir(home = homedir()): string {
@@ -38,30 +38,30 @@ export function launcherPath(home = homedir()): string {
 const sq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-export function openScript(p: GaPaths): string {
+export function openScript(p: CuvettePaths): string {
   return [
     `NODE=${sq(p.node)}`,
-    `GA=${sq(p.ga)}`,
+    `CUVETTE_JS=${sq(p.cuvette)}`,
     `export PATH="$PATH:"${sq([p.path, "/opt/homebrew/bin", "/usr/local/bin"].filter(Boolean).join(":"))}`,
-    `LOGDIR="$HOME/.guided-analysis/logs"`,
+    `LOGDIR="$HOME/.cuvette/logs"`,
     `mkdir -p "$LOGDIR"`,
     `cuvette_folder() {`,
     `  if [ -d "$1" ]; then printf '%s\\n' "$1"; else dirname "$1"; fi`,
     `}`,
     `cuvette_run() {`,
     `  dir="$1"`,
-    `  if [ ! -x "$NODE" ] || [ ! -f "$GA" ]; then`,
-    `    osascript -e 'display alert "Cuvette cannot start" message "Node or ga moved since the install. Run ga install-finder-action and ga install-launcher again in Terminal."'`,
+    `  if [ ! -x "$NODE" ] || [ ! -f "$CUVETTE_JS" ]; then`,
+    `    osascript -e 'display alert "Cuvette cannot start" message "Node or cuvette moved since the install. Run cuvette install-finder-action and cuvette install-launcher again in Terminal."'`,
     `    return 1`,
     `  fi`,
-    `  if "$NODE" "$GA" help 2>/dev/null | grep -q '^  ga app'; then`,
-    `    echo "$(date '+%F %T') ga app $dir" >> "$LOGDIR/launcher.log"`,
-    `    cd "$dir" && nohup "$NODE" "$GA" app "$dir" >> "$LOGDIR/app.log" 2>&1 < /dev/null &`,
+    `  if "$NODE" "$CUVETTE_JS" help 2>/dev/null | grep -q '^  cuvette app'; then`,
+    `    echo "$(date '+%F %T') cuvette app $dir" >> "$LOGDIR/launcher.log"`,
+    `    cd "$dir" && nohup "$NODE" "$CUVETTE_JS" app "$dir" >> "$LOGDIR/app.log" 2>&1 < /dev/null &`,
     `    disown 2>/dev/null`,
     `  else`,
-    `    echo "$(date '+%F %T') Terminal ga $dir" >> "$LOGDIR/launcher.log"`,
+    `    echo "$(date '+%F %T') Terminal cuvette $dir" >> "$LOGDIR/launcher.log"`,
     `    cmd="\${TMPDIR:-/tmp}/cuvette-$$.command"`,
-    `    printf '#!/bin/bash\\nrm -f "$0"\\ncd %q && exec %q %q\\n' "$dir" "$NODE" "$GA" > "$cmd"`,
+    `    printf '#!/bin/bash\\nrm -f "$0"\\ncd %q && exec %q %q\\n' "$dir" "$NODE" "$CUVETTE_JS" > "$cmd"`,
     `    chmod +x "$cmd"`,
     `    open -a Terminal "$cmd"`,
     `  fi`,
@@ -69,7 +69,7 @@ export function openScript(p: GaPaths): string {
   ].join("\n");
 }
 
-export function actionScript(p: GaPaths): string {
+export function actionScript(p: CuvettePaths): string {
   return [
     openScript(p),
     `dir=$(cuvette_folder "$1")`,
@@ -84,7 +84,7 @@ export function actionScript(p: GaPaths): string {
   ].join("\n");
 }
 
-export function launcherScript(p: GaPaths): string {
+export function launcherScript(p: CuvettePaths): string {
   return [
     "#!/bin/bash",
     openScript(p),
@@ -339,11 +339,11 @@ export function launcherInfoPlist(): string {
 `;
 }
 
-export function actionFiles(p: GaPaths): Record<string, string> {
+export function actionFiles(p: CuvettePaths): Record<string, string> {
   return { "Contents/Info.plist": actionInfoPlist(), "Contents/document.wflow": actionDocument(actionScript(p)) };
 }
 
-export function launcherFiles(p: GaPaths): Record<string, string> {
+export function launcherFiles(p: CuvettePaths): Record<string, string> {
   return { "Contents/Info.plist": launcherInfoPlist(), "Contents/MacOS/Cuvette": launcherScript(p) };
 }
 
@@ -364,9 +364,9 @@ function quiet(cmd: string, args: string[]): void {
   if (existsSync(cmd)) spawnSync(cmd, args, { stdio: "ignore", timeout: 30_000 });
 }
 
-export function installFinderAction(opts: { home?: string; paths?: GaPaths } = {}): string {
+export function installFinderAction(opts: { home?: string; paths?: CuvettePaths } = {}): string {
   const dir = actionPath(opts.home);
-  writeBundle(dir, actionFiles(opts.paths ?? gaPaths()));
+  writeBundle(dir, actionFiles(opts.paths ?? cuvettePaths()));
   if (!opts.home) quiet(PBS, ["-update"]);
   return dir;
 }
@@ -379,9 +379,9 @@ export function uninstallFinderAction(opts: { home?: string } = {}): boolean {
   return true;
 }
 
-export function installLauncher(opts: { home?: string; paths?: GaPaths } = {}): string {
+export function installLauncher(opts: { home?: string; paths?: CuvettePaths } = {}): string {
   const dir = launcherPath(opts.home);
-  writeBundle(dir, launcherFiles(opts.paths ?? gaPaths()));
+  writeBundle(dir, launcherFiles(opts.paths ?? cuvettePaths()));
   if (!opts.home) quiet(LSREGISTER, ["-f", dir]);
   return dir;
 }

@@ -6,7 +6,7 @@ import { expect, test } from "vitest";
 import { ageText, defaultSession, listSessions, sessionLine } from "../src/core/sessions.ts";
 
 function home(): string {
-  const h = mkdtempSync(join(tmpdir(), "ga-sessions-"));
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-"));
   const add = (id: string, cwd: string, ask: string | undefined, minutesAgo: number) => {
     const dir = join(h, "sessions", id);
     mkdirSync(dir, { recursive: true });
@@ -42,16 +42,16 @@ test("each line has the id, the age, the folder and the first request, shortened
   expect([ageText(20000), ageText(3 * 3600000), ageText(86400000)]).toEqual(["just now", "3 h ago", "1 day ago"]);
 });
 
-test("ga sessions prints the newest first", () => {
-  const r = spawnSync("node", [join(__dirname, "..", "bin/ga.js"), "sessions"], { env: { ...process.env, GA_HOME: home() }, encoding: "utf8" });
+test("cuvette sessions prints the newest first", () => {
+  const r = spawnSync("node", [join(__dirname, "..", "bin/cuvette.js"), "sessions"], { env: { ...process.env, CUVETTE_HOME: home() }, encoding: "utf8" });
   const lines = r.stdout.trim().split("\n").filter((l) => /^\d{8}-/.test(l));
   expect(lines.map((l) => l.slice(0, 20))).toEqual(["20261008-100000-bbbb", "20261007-100000-cccc", "20261001-090000-aaaa"]);
   expect(lines[0]).toContain("12 min ago");
 });
 
 test("sessions in project folders come from the home index; a missing folder is moved", () => {
-  const h = mkdtempSync(join(tmpdir(), "ga-sessions-index-"));
-  const project = mkdtempSync(join(tmpdir(), "ga-sessions-proj-"));
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-index-"));
+  const project = mkdtempSync(join(tmpdir(), "cuvette-sessions-proj-"));
   const folder = join(project, "cuvette", "2026-10-08-count-cells");
   mkdirSync(join(folder, ".record"), { recursive: true });
   writeFileSync(join(folder, ".record", "log.jsonl"), [{ id: 1, kind: "session", data: { cwd: "{project}" } }, { id: 2, kind: "user", data: { text: "Count the cells" } }].map((l) => JSON.stringify(l)).join("\n") + "\n");
@@ -65,13 +65,13 @@ test("sessions in project folders come from the home index; a missing folder is 
     ["20261008-100000-dddd", project, "Count the cells", false],
     ["20261008-090000-eeee", "/gone", "Old request", true],
   ]);
-  expect(sessionLine(list[1]!)).toContain("moved: run ga open <new folder>");
+  expect(sessionLine(list[1]!)).toContain("moved: run cuvette open <new folder>");
   expect(defaultSession(list, join(folder, "figures"))?.info.id).toBe("20261008-100000-dddd");
   expect(defaultSession(list, project)).toMatchObject({ here: true, info: { id: "20261008-100000-dddd" } });
 });
 
 test("a session shows its title, its sentence and its status", () => {
-  const h = mkdtempSync(join(tmpdir(), "ga-sessions-"));
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-"));
   const dir = join(h, "sessions", "20261009-090000-dddd");
   mkdirSync(dir, { recursive: true });
   const lines = [

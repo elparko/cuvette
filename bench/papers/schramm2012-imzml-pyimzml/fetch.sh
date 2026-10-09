@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/schramm2012-imzml-pyimzml"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/schramm2012-imzml-pyimzml"
 U=https://raw.githubusercontent.com/alexandrovteam/pyimzML/master
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/schramm2012-imzml-pyimzml"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/schramm2012-imzml-pyimzml"
 mkdir -p "$D" "$R"
 cd "$D"
 for f in Example_Continuous.ibd Example_Continuous.imzML Example_Processed.ibd Example_Processed.imzML; do

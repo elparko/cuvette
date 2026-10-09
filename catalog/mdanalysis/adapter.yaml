@@ -23,9 +23,9 @@ program:
     - https://docs.mdanalysis.org/stable/documentation_pages/analysis/hydrogenbonds.html
     - https://biopython.org/docs/latest/api/Bio.PDB.html
   install: >
-    The adapter uses its own Python environment at ~/.guided-analysis/envs/mdanalysis, or the Python in GA_MDANALYSIS_PYTHON.
+    The adapter uses its own Python environment at ~/.cuvette/envs/mdanalysis, or the Python in CUVETTE_MDANALYSIS_PYTHON.
     Make the environment and install MDAnalysis, Biopython and the libraries that the adapter imports:
-    uv venv ~/.guided-analysis/envs/mdanalysis && uv pip install --python ~/.guided-analysis/envs/mdanalysis/bin/python MDAnalysis biopython pandas matplotlib
+    uv venv ~/.cuvette/envs/mdanalysis && uv pip install --python ~/.cuvette/envs/mdanalysis/bin/python MDAnalysis biopython pandas matplotlib
   citation:
     - text: "Michaud-Agrawal, N., Denning, E. J., Woolf, T. B., & Beckstein, O. (2011). MDAnalysis: A toolkit for the analysis of molecular dynamics simulations. Journal of Computational Chemistry, 32(10), 2319–2327. https://doi.org/10.1002/jcc.21787"
       doi: 10.1002/jcc.21787
@@ -59,10 +59,10 @@ connection:
   call_timeout_s: 900
 
 locate:
-  env: GA_MDANALYSIS_PYTHON
+  env: CUVETTE_MDANALYSIS_PYTHON
   paths:
-    - ~/.guided-analysis/envs/mdanalysis/bin/python
-    - ~/.guided-analysis/envs/mdanalysis/Scripts/python.exe
+    - ~/.cuvette/envs/mdanalysis/bin/python
+    - ~/.cuvette/envs/mdanalysis/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-W", "ignore", "-c", "import MDAnalysis; print('MDAnalysis', MDAnalysis.__version__)"]
   version_pattern: 'MDAnalysis (\S+)'

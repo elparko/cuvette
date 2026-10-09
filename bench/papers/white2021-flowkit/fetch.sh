@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/white2021-flowkit"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/white2021-flowkit"
 COMMIT=f2159043b6a56e527d4baacf97490caf8354618e
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/white2021-flowkit"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/white2021-flowkit"
 mkdir -p "$D/src/data" "$R"
 if [ ! -f "$D/src/data/8_color_data_set/8_color_ICS.wsp" ]; then
   curl -L -o "$R/flowkit.tar.gz" "https://github.com/whitews/FlowKit/archive/$COMMIT.tar.gz"

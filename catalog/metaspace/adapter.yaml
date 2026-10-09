@@ -18,9 +18,9 @@ program:
     - https://metaspace2.readthedocs.io/en/latest/content/examples/fetch-dataset-annotations.html
     - https://github.com/metaspace2020/metaspace/tree/master/metaspace/python-client
   install: >
-    The adapter uses the Python environment at ~/.guided-analysis/envs/metaspace, or the python that GA_METASPACE_PYTHON names.
+    The adapter uses the Python environment at ~/.cuvette/envs/metaspace, or the python that CUVETTE_METASPACE_PYTHON names.
     Make it and add the METASPACE client. The tools need network access and no API key:
-    uv venv ~/.guided-analysis/envs/metaspace && uv pip install --python ~/.guided-analysis/envs/metaspace/bin/python metaspace2020
+    uv venv ~/.cuvette/envs/metaspace && uv pip install --python ~/.cuvette/envs/metaspace/bin/python metaspace2020
   citation:
     - text: Palmer, A., Phapale, P., Chernyavsky, I., Lavigne, R., Fay, D., Tarasov, A., Kovalev, V., Fuchser, J., Nikolenko, S., Pineau, C., Becker, M., & Alexandrov, T. (2017). FDR-controlled metabolite annotation for high-resolution imaging mass spectrometry. Nature Methods, 14(1), 57–60. https://doi.org/10.1038/nmeth.4072
       doi: 10.1038/nmeth.4072
@@ -52,8 +52,8 @@ connection:
   call_timeout_s: 180
 
 locate:
-  env: GA_METASPACE_PYTHON
-  paths: ["~/.guided-analysis/envs/metaspace/bin/python"]
+  env: CUVETTE_METASPACE_PYTHON
+  paths: ["~/.cuvette/envs/metaspace/bin/python"]
   version_command: ["{program_path}", "-c", "import importlib.metadata as m; print('metaspace2020', m.version('metaspace2020'))"]
   version_pattern: 'metaspace2020 (\S+)'
   identity: 'metaspace2020 \d'

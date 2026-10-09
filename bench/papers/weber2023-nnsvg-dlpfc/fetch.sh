@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/weber2023-nnsvg-dlpfc/151673"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/weber2023-nnsvg-dlpfc/151673"
 mkdir -p "$D"
 cd "$D"
 # Sample 151673 of the spatialLIBD human dorsolateral prefrontal cortex data (Maynard 2021).

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/schindelin2012-fiji-blobs"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/schindelin2012-fiji-blobs"
 mkdir -p "$D"
 cd "$D"
 curl -L -C - -o blobs.gif https://imagej.net/ij/images/blobs.gif

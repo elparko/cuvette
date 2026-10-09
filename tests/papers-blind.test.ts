@@ -12,14 +12,14 @@ import { FakeProvider } from "../src/providers/fake.ts";
 const LAB = join(__dirname, "fixtures/lab");
 let root: string;
 let papersDir: string;
-const oldHome = process.env.GA_HOME;
-const oldData = process.env.GA_BENCH_DATA;
+const oldHome = process.env.CUVETTE_HOME;
+const oldData = process.env.CUVETTE_BENCH_DATA;
 
 beforeEach(() => {
-  root = canonical(mkdtempSync(join(tmpdir(), "ga-blindbench-")));
+  root = canonical(mkdtempSync(join(tmpdir(), "cuvette-blindbench-")));
   papersDir = join(root, "papers");
-  process.env.GA_HOME = join(root, "home");
-  process.env.GA_BENCH_DATA = join(root, "data");
+  process.env.CUVETTE_HOME = join(root, "home");
+  process.env.CUVETTE_BENCH_DATA = join(root, "data");
   mkdirSync(join(root, "data/lab"), { recursive: true });
   writeFileSync(join(root, "data/lab/a.tif"), "x");
   mkdirSync(join(papersDir, "lab-count"), { recursive: true });
@@ -35,10 +35,10 @@ beforeEach(() => {
   writeFileSync(join(papersDir, "lab-count", "expected.yaml"), "count: 66\n");
 });
 afterEach(() => {
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
-  if (oldData === undefined) delete process.env.GA_BENCH_DATA;
-  else process.env.GA_BENCH_DATA = oldData;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
+  if (oldData === undefined) delete process.env.CUVETTE_BENCH_DATA;
+  else process.env.CUVETTE_BENCH_DATA = oldData;
 });
 
 const options = () => ({ papersDir, scratch: join(root, "scratch"), resultsDir: join(root, "results"), log: () => {} });
@@ -56,9 +56,9 @@ test("the policy allows the data folder and the run folder and denies the specs,
   const paper = loadPaper("lab-count", papersDir);
   expect(dataFolders(paper)).toEqual([join(root, "data", "lab-count"), join(root, "data", "lab")]);
   const runDir = join(root, "scratch", "m", "lab-count", "run1");
-  const p = blindPolicyFor({ paper, runDir, scratch: join(root, "scratch"), home: join(homedir(), ".guided-analysis"), adapterRoots: [LAB], programs: [], papersDir, resultsDir: join(root, "results") });
+  const p = blindPolicyFor({ paper, runDir, scratch: join(root, "scratch"), home: join(homedir(), ".cuvette"), adapterRoots: [LAB], programs: [], papersDir, resultsDir: join(root, "results") });
   expect(p.allow).toEqual(expect.arrayContaining([join(root, "data", "lab"), runDir, LAB, tmpdir()]));
-  expect(p.deny).toEqual(expect.arrayContaining([REPO_DIR, papersDir, join(root, "results"), join(root, "scratch"), join(homedir(), ".guided-analysis"), join(homedir(), ".claude")]));
+  expect(p.deny).toEqual(expect.arrayContaining([REPO_DIR, papersDir, join(root, "results"), join(root, "scratch"), join(homedir(), ".cuvette"), join(homedir(), ".claude")]));
 });
 
 test("a blind run blocks reads of the expected values, logs them, sets cwd to the work folder, and reports the leak check", async () => {

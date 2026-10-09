@@ -41,7 +41,7 @@ function collect(out: NodeJS.ReadStream) {
 
 describe("keyStream", () => {
   test("joins a key sequence split across chunks, and logs each chunk", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ga-keylog-"));
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-keylog-"));
     const real = fakeTty();
     const out = keyStream(real, join(dir, "keys.log"));
     const got = collect(out);
@@ -112,10 +112,10 @@ os.kill(pid, 9)
 `;
 
 function startApp(answer: string) {
-  const home = mkdtempSync(join(tmpdir(), "ga-pty-"));
-  const p = spawn("python3", ["-I", "-c", RELAY, answer, process.execPath, join(ROOT, "bin/ga.js"), "--model", "fake:"], {
+  const home = mkdtempSync(join(tmpdir(), "cuvette-pty-"));
+  const p = spawn("python3", ["-I", "-c", RELAY, answer, process.execPath, join(ROOT, "bin/cuvette.js"), "--model", "fake:"], {
     cwd: home,
-    env: { ...process.env, GA_HOME: join(home, "home"), TERM: "xterm-256color", NO_COLOR: "1", CUVETTE_KEYLOG: "", GA_KEYLOG: "" },
+    env: { ...process.env, CUVETTE_HOME: join(home, "home"), TERM: "xterm-256color", NO_COLOR: "1", CUVETTE_KEYLOG: "" },
   });
   const term = new Term(100, 50);
   let raw = "";

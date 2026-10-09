@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 
 export type SessionStatus = "answered" | "waiting for you" | "running" | "not started";
 
@@ -103,7 +103,7 @@ function indexed(home: string): SessionInfo[] {
   });
 }
 
-export function listSessions(home = gaHome()): SessionInfo[] {
+export function listSessions(home = cuvetteHome()): SessionInfo[] {
   const dir = join(home, "sessions");
   const out: SessionInfo[] = indexed(home);
   for (const id of existsSync(dir) ? readdirSync(dir) : []) {
@@ -148,7 +148,7 @@ export function folderText(cwd: string, home = process.env.HOME ?? ""): string {
 }
 
 export function sessionLine(s: SessionInfo, now = Date.now()): string {
-  const head = `${s.id}  ${ageText(now - s.used).padEnd(11)} ${(s.moved ? "moved: run ga open <new folder>" : clipStart(folderText(s.cwd), 40)).padEnd(40)}  ${s.name ? clip(s.name, 70) : s.ask ? clip(s.ask, 60) : "(no request)"}`;
+  const head = `${s.id}  ${ageText(now - s.used).padEnd(11)} ${(s.moved ? "moved: run cuvette open <new folder>" : clipStart(folderText(s.cwd), 40)).padEnd(40)}  ${s.name ? clip(s.name, 70) : s.ask ? clip(s.ask, 60) : "(no request)"}`;
   const more = [s.status && !s.moved ? s.status : "", s.description ? clip(s.description, 110) : ""].filter(Boolean).join(" · ");
   return more ? `${head}\n${" ".repeat(22)}${more}` : head;
 }

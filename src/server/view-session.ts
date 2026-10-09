@@ -17,14 +17,14 @@ if (!id) {
 }
 const port = Number(args[args.indexOf("--port") + 1]) || 0;
 const place = findPlace(id);
-const source = place?.recordDir ?? join(process.env.GA_HOME || join(homedir(), ".guided-analysis"), "sessions", id);
+const source = place?.recordDir ?? join(process.env.CUVETTE_HOME || join(homedir(), ".cuvette"), "sessions", id);
 if (!existsSync(join(source, "log.jsonl"))) {
   console.error(`No session ${id}.`);
   process.exit(1);
 }
 
-const home = mkdtempSync(join(tmpdir(), "ga-view-"));
-process.env.GA_HOME = home;
+const home = mkdtempSync(join(tmpdir(), "cuvette-view-"));
+process.env.CUVETTE_HOME = home;
 const dir = join(home, "sessions", id);
 mkdirSync(dir, { recursive: true });
 cpSync(join(source, "log.jsonl"), join(dir, "log.jsonl"));

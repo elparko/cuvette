@@ -47,8 +47,8 @@ let home: string;
 let rec: FakeRecord;
 let dr: DecisionRecord;
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "ga-"));
-  process.env.GA_HOME = home;
+  home = mkdtempSync(join(tmpdir(), "cuvette-"));
+  process.env.CUVETTE_HOME = home;
   rec = new FakeRecord();
   dr = new DecisionRecord([adapter("x", defs)], rec as any);
 });

@@ -12,7 +12,7 @@ import { folderLines, scanFolder, trustFolder } from "../src/core/trust.ts";
 const LAB = join(__dirname, "fixtures/lab");
 const open: Session[] = [];
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-method-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-method-"));
 });
 afterEach(async () => {
   for (const s of open.splice(0)) await s.close();
@@ -34,7 +34,7 @@ async function finished(): Promise<Session> {
     { calls: [{ name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 8 } }] },
     { text: "The count is done." },
   ]);
-  const s = await Session.create({ adapters: [LAB], provider: p, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), interactive: true });
+  const s = await Session.create({ adapters: [LAB], provider: p, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true });
   open.push(s);
   s.decisions.applySetup({});
   s.bus.on((e) => {
@@ -70,7 +70,7 @@ test("/save-method saves the confirmed analysis as one file in the home folder, 
 
   expect(listMethods().map((m) => m.name)).toEqual(["particles"]);
   expect(loadMethod("particles").questions).toEqual(file.questions);
-  const shared = exportMethod("particles", mkdtempSync(join(tmpdir(), "ga-share-")));
+  const shared = exportMethod("particles", mkdtempSync(join(tmpdir(), "cuvette-share-")));
   expect(shared).toMatch(/particles\.cuvette-method\.json$/);
   expect(() => importMethod(shared)).toThrow(/A method named particles exists/);
   importMethod(shared, "particles-lab");
@@ -84,7 +84,7 @@ test("/save-method saves the confirmed analysis as one file in the home folder, 
 test("a new session from a method shows the questions pre-answered and still demands the demonstration before the batch", async () => {
   const first = await finished();
   first.saveMethod("particles");
-  const data = mkdtempSync(join(tmpdir(), "ga-new-data-"));
+  const data = mkdtempSync(join(tmpdir(), "cuvette-new-data-"));
   const p = new FakeProvider([
     { calls: [{ name: "inspect_data", args: { path: join(__dirname, "fixtures/lab") } }, { name: "clarify", args: { found: "I see 12 images." } }] },
     { calls: [{ name: "plan", args: { restatement: "You want: the number of particles in each image.", steps: [{ step: "Count the particles", tool: "count", settings: [{ key: "min_size", label: "Smallest particle" }] }] } }] },
@@ -132,7 +132,7 @@ test("a method in the project folder loads only after the scientist trusts the f
   const { path } = first.saveMethod("lab-way", "project");
   expect(path).toBe(join(first.cwd, ".cuvette", "methods", "lab-way.json"));
   expect(listMethods(first.cwd).map((m) => [m.name, m.where, m.trusted])).toEqual([["lab-way", "project", true]]);
-  const colleague = mkdtempSync(join(tmpdir(), "ga-colleague-"));
+  const colleague = mkdtempSync(join(tmpdir(), "cuvette-colleague-"));
   mkdirSync(join(colleague, ".cuvette", "methods"), { recursive: true });
   copyFileSync(path, join(colleague, ".cuvette", "methods", "lab-way.json"));
   expect(listMethods(colleague).map((m) => [m.name, m.where, m.trusted])).toEqual([["lab-way", "project", false]]);

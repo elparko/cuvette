@@ -38,7 +38,7 @@ function parseMods(text, variable) {
 
 function search() {
   const sage = flags.sage;
-  const dir = process.env.GA_CALL_DIR;
+  const dir = process.env.CUVETTE_CALL_DIR;
   if (!files.length) fail("give at least one mzML file");
   for (const f of files) if (!existsSync(f)) fail(`cannot read ${f}`);
   if (!existsSync(flags.fasta)) fail(`cannot read the FASTA file ${flags.fasta}`);

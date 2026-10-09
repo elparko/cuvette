@@ -38,7 +38,7 @@ export function renderBatch(p) {
 }
 
 export function programPath() {
-  const p = process.env.GA_PROGRAM_PATH;
+  const p = process.env.CUVETTE_PROGRAM_PATH;
   if (!p) fail("mzmine was not found. Set MZMINE_PATH to the mzmine executable.");
   return p;
 }

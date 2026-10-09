@@ -8,7 +8,7 @@ import { loadAdapter } from "../src/adapters/manifest.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
 import { parseCsv, parseKeyValue, renderArgv, solidPng, tablePreview, validateArgs } from "../src/adapters/kinds/common.ts";
 
-const root = mkdtempSync(join(tmpdir(), "ga-kinds-"));
+const root = mkdtempSync(join(tmpdir(), "cuvette-kinds-"));
 const started: AdapterRuntime[] = [];
 let counter = 0;
 
@@ -105,14 +105,14 @@ map:
 test("cli: safe argv, route, summary, validation", async () => {
   const { run, tools } = await start(adapter(cliYaml));
   expect(tools.argv.permission).toBeUndefined();
-  const nasty = "a b; $(touch /tmp/ga-pwned) `x`";
+  const nasty = "a b; $(touch /tmp/cuvette-pwned) `x`";
   const r = await run("argv", { text: nasty, n: 4 });
   expect(r.ok).toBe(true);
   expect(r.data).toEqual([nasty, "--n=4"]);
   expect(r.summary).toBe(`Got ${nasty} with n=4.`);
   expect(r.manualRoute).toContain("--n=4");
   expect(r.fidelity).toBe("exact");
-  expect(existsSync("/tmp/ga-pwned")).toBe(false);
+  expect(existsSync("/tmp/cuvette-pwned")).toBe(false);
   expect((await run("argv", { text: "q", mode: "b" })).data).toEqual(["q", "--n=1", "--mode", "b"]);
   expect(await run("argv", { text: "q", mode: "c" })).toMatchObject({ ok: false, error: expect.stringMatching(/one of/) });
   expect(await run("argv", { text: "q", n: 99 })).toMatchObject({ ok: false, error: expect.stringMatching(/at most 9/) });
@@ -219,7 +219,7 @@ test("python: numpy arrays are saved as .npy with metrics", async () => {
   expect((await run("back", { a: { handle: d.handle } })).data).toBe(15);
 });
 
-test("script: params file and GA_PARAMS", async () => {
+test("script: params file and CUVETTE_PARAMS", async () => {
   const dir = adapter(
     `${head("script", '  interpreter: ["{node}"]\n')}tools:
   - name: sq
@@ -229,7 +229,7 @@ test("script: params file and GA_PARAMS", async () => {
     required: [x]
     parse: json
 `,
-    { "sq.js": "const p = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));\nconst same = process.env.GA_PARAMS === process.argv[2];\nconsole.log(JSON.stringify({ square: p.x * p.x, same }));\n" },
+    { "sq.js": "const p = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));\nconst same = process.env.CUVETTE_PARAMS === process.argv[2];\nconsole.log(JSON.stringify({ square: p.x * p.x, same }));\n" },
   );
   const { run } = await start(dir);
   const r = await run("sq", { x: 7 });
@@ -259,8 +259,8 @@ test("http: refuses without network, then calls a local server", async () => {
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const port = (server.address() as { port: number }).port;
-  process.env.GA_TEST_TOKEN = "tok";
-  const yaml = (network: boolean) => `${head("http", `  base_url: http://127.0.0.1:${port}/api\n  network: ${network}\n  headers: { authorization: "Bearer {env:GA_TEST_TOKEN}" }\n`)}tools:
+  process.env.CUVETTE_TEST_TOKEN = "tok";
+  const yaml = (network: boolean) => `${head("http", `  base_url: http://127.0.0.1:${port}/api\n  network: ${network}\n  headers: { authorization: "Bearer {env:CUVETTE_TEST_TOKEN}" }\n`)}tools:
   - name: get_item
     description: d
     params: { id: { type: string }, limit: { type: integer } }
@@ -349,7 +349,7 @@ test("files: list_files, read_table, image_info, wait_for_file", async () => {
 });
 
 test("screen: dry run records actions and gives routes", async () => {
-  process.env.GA_SCREEN_DRY_RUN = "1";
+  process.env.CUVETTE_SCREEN_DRY_RUN = "1";
   try {
     const { run, tools, dirs } = await start(adapter(head("screen")));
     expect(Object.keys(tools).sort()).toEqual(["click", "focus_app", "key", "screenshot", "type_text"]);
@@ -366,7 +366,7 @@ test("screen: dry run records actions and gives routes", async () => {
     expect(log.map((l) => l.action)).toEqual(["click", "type_text", "key", "focus_app", "screenshot"]);
     expect(log[0]).toMatchObject({ x: 10, y: 20, app: "Preview" });
   } finally {
-    delete process.env.GA_SCREEN_DRY_RUN;
+    delete process.env.CUVETTE_SCREEN_DRY_RUN;
   }
 });
 

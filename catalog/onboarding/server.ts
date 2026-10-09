@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { gaHome } from "../../src/adapters/manifest.ts";
+import { cuvetteHome } from "../../src/adapters/manifest.ts";
 import { checkAdapter } from "../../src/onboarding/checker.ts";
 
 const CAP = 200_000;
@@ -143,8 +143,8 @@ function stripHtml(html: string): string {
 }
 
 function draftBase(name?: string): string | undefined {
-  if (process.env.GA_DRAFT_DIR) return resolve(process.env.GA_DRAFT_DIR);
-  if (name && /^[a-z0-9][a-z0-9-]*$/.test(name)) return join(gaHome(), "adapters", name);
+  if (process.env.CUVETTE_DRAFT_DIR) return resolve(process.env.CUVETTE_DRAFT_DIR);
+  if (name && /^[a-z0-9][a-z0-9-]*$/.test(name)) return join(cuvetteHome(), "adapters", name);
   return undefined;
 }
 
@@ -274,7 +274,7 @@ server.registerTool(
     if (!/^https?:\/\//i.test(url)) return fail("only http and https addresses are allowed");
     let res: Response;
     try {
-      res = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { "user-agent": "guided-analysis-onboarding" }, redirect: "follow" });
+      res = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { "user-agent": "cuvette-onboarding" }, redirect: "follow" });
     } catch (err) {
       return fail(`the request failed: ${(err as Error).message}`);
     }
@@ -363,7 +363,7 @@ server.registerTool(
     inputSchema: { name: z.string().optional().describe("Adapter name or folder. Leave it out to check the draft folder.") },
   },
   async ({ name }) => {
-    const draft = process.env.GA_DRAFT_DIR;
+    const draft = process.env.CUVETTE_DRAFT_DIR;
     const useDraft = draft && existsSync(join(draft, "adapter.yaml")) && (!name || name === basename(draft));
     const target = useDraft ? draft : name;
     if (!target) return fail("give an adapter name, or write adapter.yaml in the draft folder first");

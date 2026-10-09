@@ -7,7 +7,7 @@ export interface TaskDeps {
   maxSteps?: number;
 }
 
-const SYSTEM = `You are a helper agent inside a guided analysis session. You have read-only tools. Do the task you get, then answer with a short report: what you looked at, what you found, with the numbers from tool results. Do not guess values.`;
+const SYSTEM = `You are a helper agent inside a Cuvette session. You have read-only tools. Do the task you get, then answer with a short report: what you looked at, what you found, with the numbers from tool results. Do not guess values.`;
 
 export function taskTool(d: TaskDeps): Tool {
   return {

@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 import { folderKey } from "./trust.ts";
 import type { Message, ModelInfo, Part } from "./types.ts";
 
@@ -372,7 +372,7 @@ export function localUrl(url: string): boolean {
 export const NO_PHI_KEY = "no_patient_data_folders";
 
 function userFile(): string {
-  return join(gaHome(), "settings.json");
+  return join(cuvetteHome(), "settings.json");
 }
 
 function readUser(): Record<string, unknown> {

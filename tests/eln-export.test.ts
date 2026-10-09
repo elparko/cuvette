@@ -9,7 +9,7 @@ import { unzip } from "./fixtures/unzip.ts";
 
 let s: Session;
 beforeEach(async () => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-eln-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-eln-"));
   s = await analysedSession();
 });
 afterEach(() => s.close());
@@ -85,7 +85,7 @@ test("the content covers the question, answer, decisions, steps, findings, figur
   const logNode = graph.find((n) => n["@id"] === "./analysis/log.jsonl")!;
   expect(logNode.sha256).toBe(createHash("sha256").update(files.get(`${top}analysis/log.jsonl`)!).digest("hex"));
   const exp = graph.find((n) => n["@id"] === "./analysis/")!;
-  expect(exp.keywords).toBe("guided-analysis, lab");
+  expect(exp.keywords).toBe("cuvette, lab");
   expect(exp.variableMeasured.length).toBeGreaterThan(0);
 });
 

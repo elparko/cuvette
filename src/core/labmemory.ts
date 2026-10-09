@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { KnownAnswerTest, gaHome } from "../adapters/manifest.ts";
+import { KnownAnswerTest, cuvetteHome } from "../adapters/manifest.ts";
 import type { LoadedAdapter, Manifest } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
 
@@ -17,7 +17,7 @@ export interface LabChange {
   rejectReason?: string;
 }
 
-const dirOf = (adapter: string) => join(gaHome(), "labmemory", adapter);
+const dirOf = (adapter: string) => join(cuvetteHome(), "labmemory", adapter);
 const fileOf = (adapter: string) => join(dirOf(adapter), "changes.jsonl");
 
 function readAdapter(adapter: string): LabChange[] {
@@ -33,7 +33,7 @@ function readAdapter(adapter: string): LabChange[] {
 }
 
 function adapterNames(): string[] {
-  const base = join(gaHome(), "labmemory");
+  const base = join(cuvetteHome(), "labmemory");
   return existsSync(base) ? readdirSync(base) : [];
 }
 
@@ -137,7 +137,7 @@ export function applyOverlay(adapter: LoadedAdapter): LoadedAdapter {
 }
 
 export function labText(cwd: string): string {
-  const files = [join(gaHome(), "LAB.md"), join(cwd, "LAB.md")];
+  const files = [join(cuvetteHome(), "LAB.md"), join(cwd, "LAB.md")];
   return files
     .filter((f) => existsSync(f))
     .map((f) => readFileSync(f, "utf8").trim())

@@ -111,7 +111,7 @@ let byName: Record<string, Tool>;
 const ctx = (signal = new AbortController().signal) => ({ signal }) as unknown as ToolContext;
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ga-macro-"));
+  dir = mkdtempSync(join(tmpdir(), "cuvette-macro-"));
   const root = join(dir, "adapter");
   mkdirSync(root);
   writeFileSync(join(root, "adapter.yaml"), YAML);

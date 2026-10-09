@@ -11,7 +11,7 @@ import { startMock, type Mock } from "./fixtures/elabftw-mock.ts";
 let s: Session;
 let mock: Mock;
 beforeEach(async () => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-eln-sync-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-eln-sync-"));
   mock = await startMock();
   saveElabftw(mock.url, mock.key);
   s = await analysedSession();
@@ -66,7 +66,7 @@ test("a push creates an experiment, tags it, uploads the files and records the p
   expect(exp.title).toMatch(/How many particles/);
   expect(exp.body).toMatch(/<h1>Version 1, /);
   expect(exp.body).toMatch(/Threshold method/);
-  expect(exp.tags).toEqual(["guided-analysis", "lab"]);
+  expect(exp.tags).toEqual(["cuvette", "lab"]);
   expect(exp.uploads.map((u) => u.name).sort()).toEqual([`${s.id}.eln`, "log.jsonl", "protocol.md", "trail.html"]);
   expect(mock.requests.every((q) => q.auth === mock.key)).toBe(true);
   const e = s.record.entries(["eln_push"]).at(-1)!;
@@ -99,7 +99,7 @@ test("a wrong key fails and records no push", async () => {
 });
 
 test("push without setup says how to set up", async () => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-eln-none-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-eln-none-"));
   await expect(s.elnPush()).rejects.toThrow(/not set up/);
 });
 
@@ -135,10 +135,10 @@ test("the log and the key never appear in the card or the record", async () => {
   expect(readFileSync(join(s.dir, "log.jsonl"), "utf8")).not.toContain(mock.key);
 });
 
-const ga = join(__dirname, "..", "bin/ga.js");
+const cuvette = join(__dirname, "..", "bin/cuvette.js");
 const cli = (args: string[], input: string) =>
   new Promise<{ stdout: string; stderr: string; status: number | null }>((resolve) => {
-    const child = spawn("node", [ga, ...args], { env: { ...process.env, GA_HOME: process.env.GA_HOME } });
+    const child = spawn("node", [cuvette, ...args], { env: { ...process.env, CUVETTE_HOME: process.env.CUVETTE_HOME } });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => (stdout += d));
@@ -147,7 +147,7 @@ const cli = (args: string[], input: string) =>
     child.stdin.end(input);
   });
 
-test("ga eln push asks in the terminal and sends nothing on n", async () => {
+test("cuvette eln push asks in the terminal and sends nothing on n", async () => {
   await s.close();
   const no = await cli(["eln", "push", s.id], "n\n");
   expect(no.stdout).toMatch(/This will be sent/);
@@ -161,7 +161,7 @@ test("ga eln push asks in the terminal and sends nothing on n", async () => {
   expect(mock.experiments.size).toBe(1);
 });
 
-test("ga eln link applies the proposed values only after y", async () => {
+test("cuvette eln link applies the proposed values only after y", async () => {
   mock.experiments.set(5, { id: 5, title: "Plan", body: "", tags: [], uploads: [], revisions: [], items: [], metadata: { extra_fields: { min_size: { value: "12" } } } });
   await s.close();
   const no = await cli(["eln", "link", s.id, "5"], "n\n");
@@ -173,8 +173,8 @@ test("ga eln link applies the proposed values only after y", async () => {
   expect(log).toMatch(/"key":"min_size"/);
 });
 
-test("ga eln setup reads the address and key from the terminal and rejects plain http", async () => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-eln-cli-"));
+test("cuvette eln setup reads the address and key from the terminal and rejects plain http", async () => {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-eln-cli-"));
   const bad = await cli(["eln", "setup", "--url", "http://elab.example.org"], "abc\n");
   expect(bad.status).toBe(1);
   expect(elabftwConfig()).toBeUndefined();

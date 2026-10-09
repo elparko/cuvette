@@ -6,7 +6,7 @@ import { createInterface } from "node:readline";
 import { accessAll, accessFile, codeTools, networkControl, saveAccess, type Access } from "../adapters/access.ts";
 import { T7_ROOT } from "../adapters/blind.ts";
 import { CUSTOM_HOW, findProgram, locate, type Located } from "../adapters/locate.ts";
-import { adapterDirs, gaHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
+import { adapterDirs, cuvetteHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
 import { defaultFind, defaultRun, ENVS, envNameIn, importCheck, older, PROGRAM_INSTALL, q, R_PACKAGES, rInstallCommand, rLibrary, uvCommand, versionParts, type Run } from "./doctor.ts";
 import { ageText } from "./sessions.ts";
 import { howToCite } from "./citations.ts";
@@ -127,7 +127,7 @@ function installPlaces(all: Manifest[], home: string): string[] {
   const out = new Set<string>();
   for (const m of all)
     for (const p of m.locate.paths) {
-      const a = /^~\/\.guided-analysis\/([^/*]+)\//.exec(p)?.[1];
+      const a = /^~\/\.cuvette\/([^/*]+)\//.exec(p)?.[1];
       if (a && a !== "envs") out.add(join(home, a));
       const b = new RegExp(`^${T7_ROOT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/tools/([^/*]+)/`).exec(p)?.[1];
       if (b && b !== "R-library") out.add(join(T7_ROOT, "tools", b));
@@ -153,7 +153,7 @@ async function duSize(paths: string[]): Promise<number | undefined> {
   return kb.length ? kb.reduce((a, b) => a + b, 0) * 1024 : undefined;
 }
 
-export function lastUsedMap(home = gaHome()): Map<string, number> {
+export function lastUsedMap(home = cuvetteHome()): Map<string, number> {
   const logs = new Set<string>();
   try {
     for (const r of JSON.parse(readFileSync(join(home, "sessions-index.json"), "utf8")) as { folder: string }[]) logs.add(join(r.folder, ".record", "log.jsonl"));
@@ -223,7 +223,7 @@ async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Prom
 }
 
 export async function listPrograms(opts: ProgramsOpts = {}): Promise<ProgramRow[]> {
-  const home = opts.home ?? gaHome();
+  const home = opts.home ?? cuvetteHome();
   const env = opts.env ?? process.env;
   const run = opts.run ?? defaultRun;
   const find = opts.find ?? defaultFind(env);
@@ -470,11 +470,11 @@ function defaultExec(command: string, onLine: (line: string) => void): Promise<n
   });
 }
 
-export function logFile(home = gaHome()): string {
+export function logFile(home = cuvetteHome()): string {
   return join(home, "programs-log.jsonl");
 }
 
-export function readLog(home = gaHome()): Record<string, unknown>[] {
+export function readLog(home = cuvetteHome()): Record<string, unknown>[] {
   if (!existsSync(logFile(home))) return [];
   return readFileSync(logFile(home), "utf8").split("\n").filter(Boolean).map((l) => {
     try {
@@ -491,7 +491,7 @@ function writeLog(home: string, data: Record<string, unknown>): void {
 }
 
 export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolean; text: string; rows?: ProgramRow[] }> {
-  const home = opts.home ?? gaHome();
+  const home = opts.home ?? cuvetteHome();
   const say = opts.onLine ?? (() => {});
   if (plan.refused) return { ok: false, text: plan.refused };
   if (plan.action === "check") {

@@ -105,7 +105,7 @@ function node(over: Partial<NodeIn>): NodeIn {
 }
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), "ga-cite-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-cite-"));
   const record = new AnalysisRecord(join(dir, "session"), "s-cite");
   const biostats = findAdapter("biostats");
   const lme4 = findAdapter("lme4");
@@ -201,7 +201,7 @@ describe("outputs", () => {
   });
 
   test("a session with no program step writes no references.bib", () => {
-    const dir = mkdtempSync(join(tmpdir(), "ga-cite-"));
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-cite-"));
     const record = new AnalysisRecord(join(dir, "session"), "s-none");
     writeResults({ record, adapters: [], fields: [], programs: [], dir: join(dir, "out"), xlsx: false });
     expect(existsSync(join(dir, "out", "references.bib"))).toBe(false);
@@ -256,7 +256,7 @@ describe("outputs", () => {
   });
 
   test("the Programs page shows How to cite for each program", async () => {
-    const home = mkdtempSync(join(tmpdir(), "ga-cite-home-"));
+    const home = mkdtempSync(join(tmpdir(), "cuvette-cite-home-"));
     const m = Manifest.parse({ adapter: { name: "deseq2", field: "genomics" }, program: { name: "DESeq2", citation: findAdapter("deseq2").manifest.program.citation }, connection: { kind: "cli" }, locate: { which: ["Rscript"] } });
     const rows = await listPrograms({
       home, env: {}, adapters: { deseq2: { manifest: m, root: "/x/deseq2" } },

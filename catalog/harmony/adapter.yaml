@@ -22,7 +22,7 @@ program:
     - https://scanpy.readthedocs.io/en/stable/api/preprocessing.html
   install: >
     The adapter uses the Python environment of the scanpy adapter. Add harmonypy 2.1.0 or later:
-    uv pip install --python ~/.guided-analysis/envs/scanpy/bin/python "harmonypy>=2.1"
+    uv pip install --python ~/.cuvette/envs/scanpy/bin/python "harmonypy>=2.1"
   citation:
     - text: "Korsunsky, I., Millard, N., Fan, J., Slowikowski, K., Zhang, F., Wei, K., Baglaenko, Y., Brenner, M., Loh, P., & Raychaudhuri, S. (2019). Fast, sensitive and accurate integration of single-cell data with Harmony. Nature Methods, 16(12), 1289-1296. https://doi.org/10.1038/s41592-019-0619-0"
       doi: 10.1038/s41592-019-0619-0
@@ -61,10 +61,10 @@ connection:
   call_timeout_s: 900
 
 locate:
-  env: GA_HARMONY_PYTHON
+  env: CUVETTE_HARMONY_PYTHON
   paths:
-    - ~/.guided-analysis/envs/scanpy/bin/python
-    - ~/.guided-analysis/envs/scanpy/Scripts/python.exe
+    - ~/.cuvette/envs/scanpy/bin/python
+    - ~/.cuvette/envs/scanpy/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-W", "ignore", "-c", "import harmonypy; print('harmonypy', harmonypy.__version__)"]
   version_pattern: 'harmonypy (\S+)'

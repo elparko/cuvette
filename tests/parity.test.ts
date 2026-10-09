@@ -25,7 +25,7 @@ test("the browser app shows every card type", () => {
 });
 
 test("the browser settings page shows the registry rows and sections that the terminal panel shows", () => {
-  const ctx = { cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), env: {}, ui: { details: () => false, toggleDetails() {} } };
+  const ctx = { cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), env: {}, ui: { details: () => false, toggleDetails() {} } };
   const rows = settingRows(ctx, false);
   const html = settingsHtml({ settings: ctx });
   expect(sorted([...html.matchAll(/data-setting="([^"]+)"/g)].map((m) => m[1]!))).toEqual(sorted(rows.map((r) => r.def.name)));

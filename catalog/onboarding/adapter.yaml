@@ -29,7 +29,7 @@ connection:
   transport: stdio
   command: ["{node}", "{tsx}", "{adapter_dir}/server.ts"]
   env:
-    GA_DRAFT_DIR: "{env:GA_DRAFT_DIR}"
+    CUVETTE_DRAFT_DIR: "{env:CUVETTE_DRAFT_DIR}"
   startup_timeout_s: 30
   call_timeout_s: 180
 
@@ -37,7 +37,7 @@ module: adapter.ts
 
 checks:
   - id: draft_lint
-    description: The draft adapter must pass the adapter checklist (the lint of ga adapter check) before the agent finishes.
+    description: The draft adapter must pass the adapter checklist (the lint of cuvette adapter check) before the agent finishes.
     severity: error
 
 map:
@@ -48,7 +48,7 @@ map:
   - { tool: list_files, route: "Open the folder in the file manager", fidelity: code_only }
   - { tool: read_file, route: "Open the file in a text editor", fidelity: code_only }
   - { tool: write_adapter_file, route: "Write the file in the draft folder with a text editor", fidelity: code_only }
-  - { tool: check_adapter, route: "Run: ga adapter check <name> --run-tests", fidelity: code_only }
+  - { tool: check_adapter, route: "Run: cuvette adapter check <name> --run-tests", fidelity: code_only }
   - { tool: record_demonstration, route: "Save the scientist's notes as a text file in the draft folder", fidelity: code_only }
 
 text_tools: [read_file, list_files]

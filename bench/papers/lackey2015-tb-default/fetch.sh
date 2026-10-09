@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/lackey2015-tb-default"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/lackey2015-tb-default"
 mkdir -p "$D"
 cd "$D"
 curl -fsSL -o tb_raw.xls "https://zenodo.org/api/records/4992464/files/Lima%20TB%20Treatment%20Default%20Data.xls/content"

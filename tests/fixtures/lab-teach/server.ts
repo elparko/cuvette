@@ -9,7 +9,7 @@ const out = (o: unknown) => ({ content: [{ type: "text" as const, text: JSON.str
 const COUNTS: Record<string, number> = { Default: 64, Otsu: 41, Triangle: 66 };
 
 server.registerTool("blur", { description: "Blur an image.", inputSchema: { input: z.string(), sigma: z.number().optional() } }, async ({ input, sigma }) => {
-  const path = join(process.env.GA_WORK_DIR!, `blur-${Date.now()}.txt`);
+  const path = join(process.env.CUVETTE_WORK_DIR!, `blur-${Date.now()}.txt`);
   writeFileSync(path, `blurred ${input} ${sigma}`);
   return out({ ok: true, metrics: { sigma: sigma ?? 0 }, outputs: [{ path, kind: "file", name: "blurred" }] });
 });

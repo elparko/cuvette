@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/delaney2004-esol"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/delaney2004-esol"
 mkdir -p "$D"
 cd "$D"
 curl -L -C - -o delaney-processed.csv https://raw.githubusercontent.com/deepchem/deepchem/master/datasets/delaney-processed.csv

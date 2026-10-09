@@ -110,9 +110,9 @@ def body(p):
         "ok": True,
         "summary": "Beta scores for %d genes and %d sgRNAs, conditions %s, normalization %s. %s. The table shows the most negative beta of %s." % (len(genes), len(rows), ", ".join(conds), norm, per, show),
         "metrics": metrics,
-        "data": {"program_version": mageck_version(), "gene_summary_file": os.environ.get("GA_OUTPUT_GENE_SUMMARY", ""), "sgrna_summary_file": os.environ.get("GA_OUTPUT_SGRNA_SUMMARY", ""), "conditions": conds, "normalization": norm,
+        "data": {"program_version": mageck_version(), "gene_summary_file": os.environ.get("CUVETTE_OUTPUT_GENE_SUMMARY", ""), "sgrna_summary_file": os.environ.get("CUVETTE_OUTPUT_SGRNA_SUMMARY", ""), "conditions": conds, "normalization": norm,
                  "p_values_note": "The permutation p values and FDR change a little between runs. The beta and z values do not.", "warnings": warns},
-        "table": table_of(cols, shown, os.environ.get("GA_OUTPUT_GENE_SUMMARY", "")),
+        "table": table_of(cols, shown, os.environ.get("CUVETTE_OUTPUT_GENE_SUMMARY", "")),
         "manualRoute": "mageck mle -k counts.txt -d designmat.txt -n model --norm-method %s --permutation-round %d" % (norm, rounds),
     }
 

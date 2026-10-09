@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/bemis2015-cardinal"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/bemis2015-cardinal"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/bemis2015-cardinal"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/bemis2015-cardinal"
 mkdir -p "$D/x" "$R"
 cd "$R"
 curl -L -C - -O https://bioconductor.org/packages/release/data/experiment/src/contrib/CardinalWorkflows_1.44.0.tar.gz

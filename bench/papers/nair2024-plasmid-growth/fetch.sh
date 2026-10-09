@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/nair2024-plasmid-growth"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/nair2024-plasmid-growth"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/nair2024-plasmid-growth"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/nair2024-plasmid-growth"
 mkdir -p "$D" "$R"
 # Raw Bioscreen OD600 data. Figure_1_2.xlsx holds the published growth rates (the results), so it goes to the reference folder.
 curl -fsSL -o "$D/Bioscreen_data.xlsx" https://ndownloader.figshare.com/files/45013072

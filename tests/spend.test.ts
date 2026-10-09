@@ -13,7 +13,7 @@ import { FakeSession } from "../src/ui/fake-session.ts";
 import { usageFields } from "../src/ui/messages.ts";
 
 afterEach(() => {
-  delete process.env.GA_BUDGET_USD;
+  delete process.env.CUVETTE_BUDGET_USD;
 });
 
 test("cost uses the model's prices", () => {
@@ -23,12 +23,12 @@ test("cost uses the model's prices", () => {
 });
 
 test("the ledger adds up and the budget stops further requests", () => {
-  expect(spendFile()).not.toContain(".guided-analysis/spend.jsonl");
+  expect(spendFile()).not.toContain(".cuvette/spend.jsonl");
   const before = totalSpend();
   recordSpend("claude-opus-5-5", { inputTokens: 500_000, outputTokens: 0 });
   expect(totalSpend() - before).toBeCloseTo(2, 6);
   expect(readFileSync(spendFile(), "utf8")).toContain('"model":"claude-opus-5-5"');
-  process.env.GA_BUDGET_USD = String(before + 5);
+  process.env.CUVETTE_BUDGET_USD = String(before + 5);
   expect(budgetProblem()).toBeUndefined();
   recordSpend("claude-opus-5-5", { inputTokens: 1_000_000, outputTokens: 0 });
   expect(budgetProblem()).toMatch(/budget of \$.* is used up/);
@@ -36,17 +36,17 @@ test("the ledger adds up and the budget stops further requests", () => {
 
 test("the budget counts from the first day of this month", () => {
   expect(monthStart(new Date(2026, 9, 8, 15))).toBe(new Date(2026, 9, 1).toISOString());
-  const file = process.env.GA_SPEND_FILE;
-  process.env.GA_SPEND_FILE = join(mkdtempSync(join(tmpdir(), "ga-spend-")), "spend.jsonl");
+  const file = process.env.CUVETTE_SPEND_FILE;
+  process.env.CUVETTE_SPEND_FILE = join(mkdtempSync(join(tmpdir(), "cuvette-spend-")), "spend.jsonl");
   try {
     const lastMonth = new Date(new Date(monthStart()).getTime() - 86400000).toISOString();
     writeFileSync(spendFile(), JSON.stringify({ t: lastMonth, model: "claude-opus-5-5", usd: 500 }) + "\n");
     recordSpend("claude-opus-5-5", { inputTokens: 1_000_000, outputTokens: 0 });
-    process.env.GA_BUDGET_USD = "10";
+    process.env.CUVETTE_BUDGET_USD = "10";
     expect(totalSpend(monthStart())).toBeCloseTo(4, 6);
     expect(budgetProblem()).toBeUndefined();
   } finally {
-    process.env.GA_SPEND_FILE = file;
+    process.env.CUVETTE_SPEND_FILE = file;
   }
 });
 
@@ -99,10 +99,10 @@ test("/usage prints a row for each turn and the total", async () => {
 });
 
 test("the session warns once at 80 percent context fill, and again only after a compaction", async () => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-ctx-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-ctx-"));
   const provider = new FakeProvider([{ text: "one" }, { text: "one" }, { text: "two" }, { text: "two" }]);
   provider.info.contextWindow = 60;
-  const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "ga-ctx-proj-")), settings: { guidance: false } });
+  const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-ctx-proj-")), settings: { guidance: false } });
   await session.send("hello");
   await session.send("again");
   const warnings = session.record.entries(["notice"]).filter((e) => e.data.warn);

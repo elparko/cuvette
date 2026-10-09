@@ -4,13 +4,13 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { claudeKey, credentialsPath, elabftwConfig, elabftwProblem, removeElabftw, saveElabftw, keyProblem, keyVersion, maskKey, removeClaudeKey, saveClaudeKey, savedClaudeKey } from "../src/core/credentials.ts";
 
-const old = process.env.GA_HOME;
+const old = process.env.CUVETTE_HOME;
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-cred-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-cred-"));
 });
 afterEach(() => {
-  if (old === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = old;
+  if (old === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = old;
 });
 
 const KEY = "sk-ant-api03-abcdefghijklmnop-WXYZ";

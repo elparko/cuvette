@@ -17,7 +17,7 @@ import type { Entry, FindingIn, Node, ToolContext } from "../src/core/types.ts";
 const ROOT = resolve(import.meta.dirname, "../catalog/imagej");
 const adapter = loadAdapter(ROOT);
 const JAR = "/Applications/ImageJ.app/Contents/Java/ij.jar";
-const live = !!process.env.GA_LIVE;
+const live = !!process.env.CUVETTE_LIVE;
 
 function macroFor(tool: string, args: Record<string, unknown>): string {
   const def = adapter.manifest.tools.find((t) => t.name === tool)!;
@@ -248,7 +248,7 @@ describe("hook", () => {
 
 describe.skipIf(!live)("live ImageJ", () => {
   const ctx = { signal: new AbortController().signal } as unknown as ToolContext;
-  const work = mkdtempSync(join(tmpdir(), "ga-imagej-"));
+  const work = mkdtempSync(join(tmpdir(), "cuvette-imagej-"));
 
   test("the known-answer tests of the adapter pass", async () => {
     const rt = await startMacro(adapter, { workDir: join(work, "kat"), sessionDir: work });
@@ -353,8 +353,8 @@ describe("recorded steps", () => {
 
 describe.skipIf(!live)("live teach review", () => {
   test("ImageJ runs the recorded macro, and teach mode compares its steps with the record", async () => {
-    const work = mkdtempSync(join(tmpdir(), "ga-teach-live-"));
-    process.env.GA_HOME = join(work, "home");
+    const work = mkdtempSync(join(tmpdir(), "cuvette-teach-live-"));
+    process.env.CUVETTE_HOME = join(work, "home");
     const file = join(work, "recording.ijm");
     const text = readFileSync(join(ROOT, "data/recording-blobs.ijm"), "utf8").replace("/Users/lab/data/blobs.gif", join(ROOT, "data/blobs.gif").replace(/\\/g, "/"));
     writeFileSync(file, text);

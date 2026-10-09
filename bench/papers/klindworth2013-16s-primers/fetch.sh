@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/klindworth2013-16s-primers"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/klindworth2013-16s-primers"
 mkdir -p "$D"
 cd "$D"
 # GenBank J01695.2, the Escherichia coli rrnB operon. The 16S numbering of Brosius et al. 1978 counts from

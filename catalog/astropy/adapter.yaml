@@ -24,9 +24,9 @@ program:
     - https://docs.astropy.org/en/stable/stats/robust.html
     - https://docs.astropy.org/en/stable/wcs/index.html
   install: >
-    The adapter uses its own Python environment at ~/.guided-analysis/envs/astropy, or the Python in GA_ASTROPY_PYTHON.
+    The adapter uses its own Python environment at ~/.cuvette/envs/astropy, or the Python in CUVETTE_ASTROPY_PYTHON.
     Make the environment and install astropy, photutils and the libraries that the adapter imports:
-    uv venv ~/.guided-analysis/envs/astropy && uv pip install --python ~/.guided-analysis/envs/astropy/bin/python astropy photutils scipy pandas matplotlib
+    uv venv ~/.cuvette/envs/astropy && uv pip install --python ~/.cuvette/envs/astropy/bin/python astropy photutils scipy pandas matplotlib
   citation:
     - text: "Astropy Collaboration, Price-Whelan, A. M., Lim, P. L., Earl, N., Starkman, N., Bradley, L., Shupe, D. L., Patil, A. A., et al. (2022). The Astropy Project: Sustaining and Growing a Community-oriented Open-source Project and the Latest Major Release (v5.0) of the Core Package. The Astrophysical Journal, 935(2), 167. https://doi.org/10.3847/1538-4357/ac7c74"
       doi: 10.3847/1538-4357/ac7c74
@@ -86,10 +86,10 @@ connection:
   call_timeout_s: 600
 
 locate:
-  env: GA_ASTROPY_PYTHON
+  env: CUVETTE_ASTROPY_PYTHON
   paths:
-    - ~/.guided-analysis/envs/astropy/bin/python
-    - ~/.guided-analysis/envs/astropy/Scripts/python.exe
+    - ~/.cuvette/envs/astropy/bin/python
+    - ~/.cuvette/envs/astropy/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-W", "ignore", "-c", "import astropy; print('astropy', astropy.__version__)"]
   version_pattern: 'astropy (\S+)'

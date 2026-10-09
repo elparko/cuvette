@@ -23,9 +23,9 @@ program:
     - https://doi.org/10.1074/mcp.TIR119.001646
   install: >
     Install R (brew install r on macOS). Then install the Bioconductor package limma and the CRAN packages svglite and jsonlite
-    into a library folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
-    ~/.guided-analysis/R-library.
-    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("BiocManager", "svglite", "jsonlite"), repos = "https://cloud.r-project.org"); BiocManager::install("limma")'
+    into a library folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.cuvette/R-library.
+    mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages(c("BiocManager", "svglite", "jsonlite"), repos = "https://cloud.r-project.org"); BiocManager::install("limma")'
   citation:
     - text: "Ritchie ME, Phipson B, Wu D, Hu Y, Law CW, Shi W, Smyth GK (2015). limma powers differential expression analyses for RNA-sequencing and microarray studies. Nucleic Acids Research 43(7): e47."
       doi: 10.1093/nar/gkv007
@@ -53,7 +53,7 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first folder that exists
-  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library. The
+  of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.cuvette/R-library. The
   program version in this adapter is the version of the R package limma, not of R.
 
 data_rules:

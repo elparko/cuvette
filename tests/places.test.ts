@@ -11,8 +11,8 @@ import { trustFolder } from "../src/core/trust.ts";
 let session: Session | undefined;
 let home = "";
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "ga-places-home-"));
-  process.env.GA_HOME = home;
+  home = mkdtempSync(join(tmpdir(), "cuvette-places-home-"));
+  process.env.CUVETTE_HOME = home;
 });
 afterEach(async () => {
   await session?.close();
@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 function project(git = false): string {
-  const p = realpathSync(mkdtempSync(join(tmpdir(), "ga-places-proj-")));
+  const p = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-places-proj-")));
   mkdirSync(join(p, "LDL", "Set 1"), { recursive: true });
   writeFileSync(join(p, "LDL", "Set 1", "20X_CH1.txt"), "cells");
   if (git) mkdirSync(join(p, ".git"));
@@ -51,7 +51,7 @@ test("the outputs and the record go to a titled folder in the project, and the h
   expect(s.workDir).toBe(folder);
   expect(s.dir).toBe(join(folder, ".record"));
   expect(existsSync(join(folder, ".record", "log.jsonl"))).toBe(true);
-  expect(readFileSync(join(folder, "README.txt"), "utf8")).toContain('run "ga open ." in this folder');
+  expect(readFileSync(join(folder, "README.txt"), "utf8")).toContain('run "cuvette open ." in this folder');
   expect(readFileSync(join(root, ".gitignore"), "utf8")).toBe(".record/\n");
   expect(readdirSync(root).filter((d) => d.startsWith(".new-"))).toEqual([]);
   expect(readIndex()).toEqual([{ id: s.id, project: cwd, folder, title: "Count the red cells in LDL", date: expect.any(String) }]);
@@ -98,7 +98,7 @@ test("paths in the project are relative in the record, so a moved project still 
   const cwd = project();
   const s = await analysed(cwd);
   const { id } = s;
-  const outsideFile = join(mkdtempSync(join(tmpdir(), "ga-outside-")), "x.txt");
+  const outsideFile = join(mkdtempSync(join(tmpdir(), "cuvette-outside-")), "x.txt");
   s.record.append("note", { path: outsideFile });
   await s.close();
   session = undefined;
@@ -121,7 +121,7 @@ test("paths in the project are relative in the record, so a moved project still 
 });
 
 test("a large input is recorded by path, size, time and hash, not copied", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ga-blobs-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-blobs-"));
   const work = join(dir, "out");
   const r = new AnalysisRecord(join(dir, "rec"), "s1", { workDir: work, exportDir: work, project: dir });
   const big = join(dir, "big.imzML");
@@ -149,7 +149,7 @@ test.skipIf(process.getuid?.() === 0)("a read-only project folder falls back to 
     expect(session.workDir.startsWith(join(home, "projects"))).toBe(true);
     expect(existsSync(join(cwd, "cuvette"))).toBe(false);
     const notice = session.record.entries(["notice"]).map((e) => e.data.text);
-    expect(notice).toEqual([`The folder ${join(cwd, "cuvette")} is read-only. The session files are in ${join(home, "projects", "ga-places-proj-" + cwd.split("ga-places-proj-")[1]!.toLowerCase())}.`]);
+    expect(notice).toEqual([`The folder ${join(cwd, "cuvette")} is read-only. The session files are in ${join(home, "projects", "cuvette-places-proj-" + cwd.split("cuvette-places-proj-")[1]!.toLowerCase())}.`]);
     await session.send("Count the cells");
     expect(findPlace(session.id)?.project).toBe(cwd);
   } finally {
@@ -172,7 +172,7 @@ test("old sessions in the home folder still open", async () => {
 
 test("an absolute output folder is used as given, and the session opens again from the project folder", async () => {
   const cwd = project();
-  const share = realpathSync(mkdtempSync(join(tmpdir(), "ga-labshare-")));
+  const share = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-labshare-")));
   const provider = new FakeProvider([listCall("LDL/Set 1"), { text: "There is one file." }]);
   session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, referee: "none", output_folder: share } });
   expect(session.folderLine).toBe(`Results go to ${share}/<date>-<title>/`);
@@ -198,13 +198,13 @@ test("a relative output folder is read from the project folder", async () => {
 
 test("a project setting for the output folder wins over a user setting", async () => {
   const cwd = project();
-  const user = realpathSync(mkdtempSync(join(tmpdir(), "ga-user-out-")));
+  const user = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-user-out-")));
   writeFileSync(join(home, "settings.json"), JSON.stringify({ output_folder: user }));
   session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.folderLine).toBe(`Results go to ${user}/<date>-<title>/`);
   await session.close();
   mkdirSync(join(cwd, ".ga"));
-  writeFileSync(join(cwd, ".ga", "settings.json"), JSON.stringify({ output_folder: "project-results" }));
+  writeFileSync(join(cwd, ".cuvette", "settings.json"), JSON.stringify({ output_folder: "project-results" }));
   trustFolder(cwd);
   session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.folderLine).toBe(`Results go to ${join(cwd, "project-results")}/<date>-<title>/`);

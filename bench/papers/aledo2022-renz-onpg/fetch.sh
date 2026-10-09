@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/aledo2022-renz-onpg"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/aledo2022-renz-onpg"
 mkdir -p "$D"
 cd "$D"
 curl -fsSL -o renz_0.2.1.tar.gz "https://cran.r-project.org/src/contrib/renz_0.2.1.tar.gz" || curl -fsSL -o renz_0.2.1.tar.gz "https://cran.r-project.org/src/contrib/Archive/renz/renz_0.2.1.tar.gz"

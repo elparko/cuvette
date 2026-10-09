@@ -196,7 +196,7 @@ import json, os, sys, tempfile
 sys.path.insert(0, ${JSON.stringify(DIR)})
 from smile_msi import runs, session
 import wrapper
-d = tempfile.mkdtemp(prefix="ga-smile-hist-")
+d = tempfile.mkdtemp(prefix="cuvette-smile-hist-")
 path = os.path.join(d, "slide__test.json")
 settings = {"ppm": 5.0, "norm": "rms", "reduce": "sum", "snr": 1.5,
             "profile_deviations": {"norm": ["tic", "rms"], "ppm": [10.0, 5.0], "snr": [3.0, 1.5]}}
@@ -231,13 +231,13 @@ describe.skipIf(!PYTHON)("smile-msi history on a temporary session", () => {
   });
 });
 
-describe.skipIf(!process.env.GA_LIVE || !PYTHON)("smile-msi live", () => {
-  const workDir = mkdtempSync(join(tmpdir(), "ga-smile-"));
-  const client = new Client({ name: "ga-test", version: "0" });
+describe.skipIf(!process.env.CUVETTE_LIVE || !PYTHON)("smile-msi live", () => {
+  const workDir = mkdtempSync(join(tmpdir(), "cuvette-smile-"));
+  const client = new Client({ name: "cuvette-test", version: "0" });
   const transport = new StdioClientTransport({
     command: PYTHON!,
     args: [join(DIR, "wrapper.py")],
-    env: { ...(process.env as Record<string, string>), GA_WORK_DIR: workDir },
+    env: { ...(process.env as Record<string, string>), CUVETTE_WORK_DIR: workDir },
   });
   let toolList: { name: string; inputSchema: { properties?: Record<string, unknown> } }[] = [];
 

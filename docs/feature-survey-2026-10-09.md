@@ -78,7 +78,7 @@ Why this order:
 - **Close in Cuvette today.** `compare_options` and the sensitivity check, both inside one decision. `/change` changes the main session itself.
 - **How it fits.**
   - A new session starts with a `fork` entry (parent session, entry ID) and copies the entries up to that point.
-  - `ga compare <a> <b>` writes the decision differences and the result differences as one sheet in `results.xlsx`, as `dvc exp show` does.
+  - `cuvette compare <a> <b>` writes the decision differences and the result differences as one sheet in `results.xlsx`, as `dvc exp show` does.
 - **Effort.** Medium, together with the compare command.
 - **Recommendation.** After launch. Build it together with 1.1, because both need a "cut at entry N" rule in the record.
 
@@ -92,7 +92,7 @@ Why this order:
 - **Problem it solves.** A scientist corrects a value in a CSV file and then resumes the session. The old results stay current, and nothing tells the scientist. The same thing happens after an adapter update.
 - **Close in Cuvette today.** Only a decision change marks steps out of date (`src/core/decisions.ts:342`). Each node already stores the input hashes, the adapter version and the program version.
 - **How it fits.**
-  - On resume, before `/rerun` and before `ga replay`, check each node.
+  - On resume, before `/rerun` and before `cuvette replay`, check each node.
   - For each input file, compare size and modification time first. Compute the SHA-256 only when one of them changed. This is Nextflow's standard cache mode, so large images stay fast.
   - Mark the node with a reason kind: `input`, `adapter`, `program`, `environment` or `decision`.
   - `/status` lists the out-of-date steps with the reason, for example: "Step 3 is out of date: counts.csv changed on 9 October."
@@ -141,7 +141,7 @@ Why this order:
   - Snakemake cache across workflows, with a Merkle-tree hash: <https://snakemake.readthedocs.io/en/stable/executing/caching.html>.
   - Galaxy job cache, which is opt-in for each user and each tool: <https://training.galaxyproject.org/training-material/faqs/galaxy/re_use_equivalent_jobs.html>.
   - DVC run cache: <https://doc.dvc.org/user-guide/pipelines/run-cache>.
-- **Problem it solves.** `/rerun` and `ga replay` run every step again, including a 20-minute segmentation whose inputs did not change.
+- **Problem it solves.** `/rerun` and `cuvette replay` run every step again, including a 20-minute segmentation whose inputs did not change.
 - **Close in Cuvette today.** All the parts of the key are in the record. No cache exists.
 - **How it fits.**
   - The node gets a `cachedFrom` field.
@@ -177,7 +177,7 @@ Why this order:
 
 - **What it is.** The session keeps a copy of each input file below a size limit, stored by its hash.
 - **Where it comes from.** DVC data versioning (<https://doc.dvc.org/start/data-management/data-versioning>). The CWLProv `data/<sha1>` folder (<https://cwltool.readthedocs.io/en/latest/CWLProv.html>).
-- **Problem it solves.** The scientist moves or edits the source file. `ga replay` and a reviewer then cannot find the original input.
+- **Problem it solves.** The scientist moves or edits the source file. `cuvette replay` and a reviewer then cannot find the original input.
 - **Close in Cuvette today.** Each node stores the input hashes, and outputs are blobs. `docs/eln.md` states that the export does not send input data. That choice is deliberate.
 - **How it fits.** Make it opt-in with a size limit, for example 50 MB. Do not copy a file that 4.1 flagged.
 - **Effort.** Small.
@@ -222,7 +222,7 @@ Why this order:
 
 - **What it is.** The first cell of the `.ipynb` export holds the input paths and the decision values, with the `parameters` tag. Papermill or `quarto render -P` can then run the notebook on new values.
 - **Where it comes from.** Quarto parameters: <https://quarto.org/docs/computations/parameters.html>.
-- **Close in Cuvette today.** The notebook export has Python cells that call `ga run-step`. `ga replay` runs a flow on new data.
+- **Close in Cuvette today.** The notebook export has Python cells that call `cuvette run-step`. `cuvette replay` runs a flow on new data.
 - **Effort.** Small.
 - **Recommendation.** After launch, low priority. It helps the programmer in the lab, not the scientist who does not program.
 
@@ -259,7 +259,7 @@ Why this order:
   - The Finder action ("Analyze with Cuvette") makes it easy to start Cuvette in any folder.
 - **Close in Cuvette today.** Permission cards, deny rules, and the draft notice for adapters. Nothing checks where the settings came from.
 - **How it fits.**
-  - Keep a list of trusted folders in `GA_HOME`, with the SHA-256 of the folder's settings files. A changed file needs trust again, as in Codex.
+  - Keep a list of trusted folders in `CUVETTE_HOME`, with the SHA-256 of the folder's settings files. A changed file needs trust again, as in Codex.
   - The card lists what the folder sets: the hook commands in full, the permission changes, and the adapters that replace catalog adapters.
   - Record the answer in the log.
   - With no answer, or with "no", load only the user settings and the catalog.
@@ -327,7 +327,7 @@ Why this order:
   - An independent study of Elicit found the same extracted value about 90% of the time, but the same quote only about 46% [unverified, secondary report].
   - BixBench adds a refusal option to its multiple-choice form: <https://arxiv.org/abs/2503.00096>.
 - **Problem it solves.** The status report already says that small-model runs vary a lot. A stability score shows how much.
-- **Close in Cuvette today.** `ga bench papers --runs N`.
+- **Close in Cuvette today.** `cuvette bench papers --runs N`.
 - **Effort.** Small.
 - **Recommendation.** After launch.
 
@@ -394,7 +394,7 @@ Why this order:
 - **Problem it solves.** A lab repeats the same analysis each week. A new lab member must use the method that the lab agreed on.
 - **Close in Cuvette today.**
   - Decision profiles (`saveProfile`).
-  - The flow export with `ga replay`, which runs with no agent.
+  - The flow export with `cuvette replay`, which runs with no agent.
   - Lab memory and `LAB.md`.
 
   Replay stops at the first data difference. A method session keeps the guidance: the cards, the pilot and the review.
@@ -403,20 +403,20 @@ Why this order:
 
 ### 5.2 Adapter install from a URL, with tests on this computer
 
-- **What it is.** `ga adapter add <git URL>@<commit>` fetches an adapter at a fixed commit, runs `ga adapter check --run-tests` on this computer, shows the result on a card, and records the commit in each session that uses the adapter.
+- **What it is.** `cuvette adapter add <git URL>@<commit>` fetches an adapter at a fixed commit, runs `cuvette adapter check --run-tests` on this computer, shows the result on a card, and records the commit in each session that uses the adapter.
 - **Where it comes from.**
   - Claude Code plugin marketplaces: <https://code.claude.com/docs/en/plugin-marketplaces>.
   - Galaxy IWC (Intergalactic Workflow Commission) review of workflows: <https://github.com/galaxyproject/iwc>.
   - nf-core `modules.json`, which pins each module to a git commit (link in 2.1).
   - Gemini CLI extensions declare secret settings, and the CLI keeps those in the keychain: <https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md>.
 - **Problem it solves.** After the launch, people will write adapters. A second lab needs a safe way to use one. `docs/design.md` proposes that "the second lab runs the known-answer tests on its own computer before the first use". This item builds that.
-- **Close in Cuvette today.** The catalog, `ga adapter check`, `ga adapter approve`, `~/.guided-analysis/adapters/`, and `ga onboard`.
+- **Close in Cuvette today.** The catalog, `cuvette adapter check`, `cuvette adapter approve`, `~/.cuvette/adapters/`, and `cuvette onboard`.
 - **Effort.** Medium.
 - **Recommendation.** After launch. Build it when the first outside adapter arrives. It depends on 3.1 for the trust rules.
 
 ### 5.3 Tutorials in follow mode
 
-- **What it is.** `ga learn <adapter>` picks a known-answer test and starts follow mode on its data. The scientist does each step in the program. The harness checks the numbers against the expected values.
+- **What it is.** `cuvette learn <adapter>` picks a known-answer test and starts follow mode on its data. The scientist does each step in the program. The harness checks the numbers against the expected values.
 - **Where it comes from.**
   - Galaxy Training Network, with learning pathways and training data on Zenodo: <https://training.galaxyproject.org>.
   - Claude Code "Learning" output style: <https://code.claude.com/docs/en/output-styles>.

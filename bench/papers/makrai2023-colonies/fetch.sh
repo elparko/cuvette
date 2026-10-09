@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/makrai2023-colonies/plates"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/makrai2023-colonies"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/makrai2023-colonies/plates"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/makrai2023-colonies"
 mkdir -p "$D" "$R"
 # The six photos of species 14 (three plates, each on a black and on a white background) go to the data folder.
 # The metadata sheet with the printed counts and the bounding box table go to the reference folder.

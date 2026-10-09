@@ -1,4 +1,4 @@
-# guided-analysis
+# Cuvette
 
 A terminal agent that analyzes data in existing science programs. The scientist owns the
 method decisions. The agent does the work, logs each step, and shows how to repeat each step by
@@ -12,7 +12,7 @@ record, a manual route for each step, and a record of every number.
 
 There are two installs with one core:
 
-- Terminal: the npm package gives the `cuvette` command (and `ga`). `cuvette app` opens the app in
+- Terminal: the npm package gives the `cuvette` command (and `cuvette`). `cuvette app` opens the app in
   the browser. From this repository: `npm install`, then `npm link`.
 - Desktop (Mac): open the .dmg and drag Cuvette to Applications. To get `cuvette` in Terminal
   too, choose Cuvette > Install Command Line Tool. It runs the core inside the app.
@@ -26,53 +26,53 @@ Cuvette needs Node 22 or later. Only ImageJ needs Java.
 
 ```bash
 npm install
-node bin/ga.js --help
-node bin/ga.js adapters
+node bin/cuvette.js --help
+node bin/cuvette.js adapters
 ```
 
 ### First start and check
 
-Start `ga` for the first time with no Claude API key and no local model. Then `ga` asks one
+Start `cuvette` for the first time with no Claude API key and no local model. Then `cuvette` asks one
 question with two answers. The answers are "Use Claude (needs an API key)" and "Use a local
 model (Ollama, free, runs on this Mac)". It saves the choice, checks this Mac, and offers a 2-minute sample analysis. The sample
 is the Student (1908) sleep data in `samples/sleep/` (public domain).
 
 ```bash
-node bin/ga.js doctor          # ok, missing or old for Node, the model, Python, R, Java and each program
-node bin/ga.js doctor --fix    # asks once, then installs the missing Python environments and R packages
+node bin/cuvette.js doctor          # ok, missing or old for Node, the model, Python, R, Java and each program
+node bin/cuvette.js doctor --fix    # asks once, then installs the missing Python environments and R packages
 ```
 
-For each item that is missing or old, `ga doctor` shows the install command or a download link.
+For each item that is missing or old, `cuvette doctor` shows the install command or a download link.
 `--fix` runs only the uv and R commands. It does not run Homebrew or download programs.
 
 ### Programs
 
-`ga programs`, `/programs` in the terminal and the Programs page of the browser app show the
+`cuvette programs`, `/programs` in the terminal and the Programs page of the browser app show the
 same list: each adapter, its program, the status, the version, the size of its environment, the
 last use and the access settings, grouped by field.
 
 ```bash
-ga programs                              # the list
-ga programs install|update|remove|check <adapter>
-ga programs path <adapter> <path|none>   # a program in a custom place, for example a Fiji in ~/Applications
-ga programs enable|disable|approve <adapter>
-ga programs network|code <adapter> on|off
+cuvette programs                         # the list
+cuvette programs install|update|remove|check <adapter>
+cuvette programs path <adapter> <path|none>   # a program in a custom place, for example a Fiji in ~/Applications
+cuvette programs enable|disable|approve <adapter>
+cuvette programs network|code <adapter> on|off
 ```
 
 Each change shows what it does and asks first. Bypass permissions does not skip this question.
 Cuvette runs uv and R installs itself. It runs Homebrew only after you confirm. For a download it
 shows the link. Remove deletes only a folder that Cuvette installs into, such as
-`~/.guided-analysis/envs/<name>`. For any other program it shows "Installed outside Cuvette".
+`~/.cuvette/envs/<name>`. For any other program it shows "Installed outside Cuvette".
 A turned-off adapter is not in `list_adapters`, and no session can load it. Each change goes in
-`~/.guided-analysis/programs-log.jsonl` and in the record of the open session.
+`~/.cuvette/programs-log.jsonl` and in the record of the open session.
 
 ### Start without the terminal (macOS)
 
 Do these steps one time, in Terminal:
 
 1. Install Cuvette and link the command: `npm install`, then `npm link`.
-2. Add the Finder action: `ga install-finder-action`.
-3. Add the launcher app: `ga install-launcher`.
+2. Add the Finder action: `cuvette install-finder-action`.
+3. Add the launcher app: `cuvette install-launcher`.
 
 Then you do not need the terminal:
 
@@ -82,17 +82,17 @@ Then you do not need the terminal:
   your data.
 
 Cuvette saves the results in that folder, in `cuvette/`. The two commands save the full path of
-Node and of `ga`. If you move the repository or change the Node version, run the two commands
+Node and of `cuvette`. If you move the repository or change the Node version, run the two commands
 again. If the Quick Action is not in the menu, open System Settings > Keyboard > Keyboard
 Shortcuts > Services > Files and Folders, and turn on "Analyze with Cuvette".
 
-To remove them: `ga uninstall-finder-action` and `ga uninstall-launcher`.
+To remove them: `cuvette uninstall-finder-action` and `cuvette uninstall-launcher`.
 
 ### With no adapter
 
 ```bash
-node bin/ga.js --model claude
-node bin/ga.js -p "Is drug 2 better than drug 1? Paired data: /data/sleep.csv" --model claude --answers answers.json
+node bin/cuvette.js --model claude
+node bin/cuvette.js -p "Is drug 2 better than drug 1? Paired data: /data/sleep.csv" --model claude --answers answers.json
 ```
 
 With no `--adapter`, the agent reads the request, calls `list_adapters`, and asks to load the
@@ -109,23 +109,23 @@ histogram plots. Each step gives the manual route in Excel. The setting `default
 ### With Claude
 
 ```bash
-node bin/ga.js --adapter imagej --model claude   # asks for the key at start if none is set
-node bin/ga.js key                               # or save the key from the shell
-node bin/ga.js key status                        # shows which key is used (masked)
-node bin/ga.js --adapter imagej --model claude:claude-sonnet-5-5 --referee claude:claude-haiku-5-5
+node bin/cuvette.js --adapter imagej --model claude   # asks for the key at start if none is set
+node bin/cuvette.js key                               # or save the key from the shell
+node bin/cuvette.js key status                        # shows which key is used (masked)
+node bin/cuvette.js --adapter imagej --model claude:claude-sonnet-5-5 --referee claude:claude-haiku-5-5
 ```
 
-The harness checks the key with the API and saves it to `~/.guided-analysis/credentials.json`.
+The harness checks the key with the API and saves it to `~/.cuvette/credentials.json`.
 Only your user can read that file. Inside the app, type `/key` to change it, `/key status` to see
 it masked, and `/key remove` to delete it. `ANTHROPIC_API_KEY` in the shell wins over the saved
 key. `ant auth login` also works. A key that belongs to no workspace also needs
-`node bin/ga.js key workspace <id>` (or `ANTHROPIC_WORKSPACE_ID`); a key made inside a workspace does not.
+`node bin/cuvette.js key workspace <id>` (or `ANTHROPIC_WORKSPACE_ID`); a key made inside a workspace does not.
 
 ### With a small local model (Ollama)
 
 ```bash
 ollama pull qwen3:8b                         # already present on this computer
-node bin/ga.js --adapter imagej --model ollama:qwen3:8b
+node bin/cuvette.js --adapter imagej --model ollama:qwen3:8b
 ```
 
 The harness talks to Ollama's own API and sets the context window (32k by default). The
@@ -136,14 +136,14 @@ shortens tool results and summarizes old turns near the context limit.
 ### Things to try
 
 - ImageJ: `Count the cells in catalog/imagej/data/blobs.gif and give me their mean size.`
-- ImageJ trap scenario: `node bin/ga.js --adapter imagej` from `bench/pseudorep/data`, then
+- ImageJ trap scenario: `node bin/cuvette.js --adapter imagej` from `bench/pseudorep/data`, then
   `Are the cells in treated.png bigger than in control.png?`
-- SMILE MSI: `node bin/ga.js --adapter smile-msi`, then
+- SMILE MSI: `node bin/cuvette.js --adapter smile-msi`, then
   `Open the demo slide and find lipids that differ between the regions.`
 - Follow mode: press Shift+Tab until the status line says follow. The agent tells you each step
   in the program's own menus, waits, and checks your numbers.
 - A run without the terminal UI:
-  `node bin/ga.js -p "Count the cells in blobs.gif" --adapter imagej --model ollama:qwen3:8b`
+  `node bin/cuvette.js -p "Count the cells in blobs.gif" --adapter imagej --model ollama:qwen3:8b`
 
 ### Keys and commands
 
@@ -160,10 +160,10 @@ shortens tool results and summarizes old turns near the context limit.
 | `/graph`, `/window` | The analysis graph in the terminal, or in a browser window. |
 | `/rewind` | Return the conversation to an earlier message or confirmed stage. Later results stay in the folder and the record, marked rewound. Decisions return to their values at that point. |
 | `/branch <name>`, `/branches`, `/compare <a> <b>` | Copy the session into a linked folder next to it to try another method; list the branches with a one-line result; show the key numbers of two branches side by side. |
-| `/save-method <name>`, `/method <name>` | Save the confirmed analysis as a method in `~/.guided-analysis/methods/` (or, with `project`, in `.cuvette/methods/` of the project folder, which loads only in a trusted folder); start a new session from it. The questions come with the saved answers, and the demonstration still runs. Also `ga --method <name> <folder>` and `ga method list\|show\|delete\|export\|import`. |
+| `/save-method <name>`, `/method <name>` | Save the confirmed analysis as a method in `~/.cuvette/methods/` (or, with `project`, in `.cuvette/methods/` of the project folder, which loads only in a trusted folder); start a new session from it. The questions come with the saved answers, and the demonstration still runs. Also `cuvette --method <name> <folder>` and `cuvette method list\|show\|delete\|export\|import`. |
 | `/review`, `/findings` | Run the rule checks and the referee; accept, reject or fix each finding. |
 | `/export html` | The trail as one HTML file. Also `md`, `jsonl`, `pdf`, `protocol`, `script`, `notebook`, `flow`. |
-| `/databook` | A data book (PDF and HTML): question, data, methods, results, figures, checks and the manual route. `/databook project` covers all sessions of the project folder. `/databook docx` needs pandoc. On the command line: `ga databook [<session folder>\|<project folder>]`. |
+| `/databook` | A data book (PDF and HTML): question, data, methods, results, figures, checks and the manual route. `/databook project` covers all sessions of the project folder. `/databook docx` needs pandoc. On the command line: `cuvette databook [<session folder>\|<project folder>]`. |
 | `/cite` | The programs and methods to cite for this session. Only what ran is listed. A method that ran only in a comparison run is listed apart. `/cite vancouver` or `/cite apa` changes the style for one list; the setting `citation_style` changes it for all outputs. `/cite bibtex`, `/cite ris` and `/cite text` save the list in the output folder. `/cite programs` shows how to cite each program. In the app: the Cite section of the Results tab. |
 | `/lab` | Approve or reject lab rules that the agent proposed. |
 | `/usage` | The cost and the tokens of each turn, and how full the context is. The status line and the app header show the short form, for example `$0.42 · context 18%`. A local model shows `local, $0`. |
@@ -191,7 +191,7 @@ Shift+Tab, Ctrl+O, Ctrl+T, Ctrl+C twice, Tab and the `!` prefix work in each sty
 Ctrl+T cycles the setting `footer_hints` (group Display): `full`, `short` (mode and model only) or `off`.
 The text fields on the cards and in `/config` use the same keys as the input box, in one line.
 
-To record the raw key bytes for a bug report, start with `CUVETTE_KEYLOG=/tmp/keys.log ga` (or `GA_KEYLOG`).
+To record the raw key bytes for a bug report, start with `CUVETTE_KEYLOG=/tmp/keys.log cuvette`.
 
 ### Bypass permissions
 
@@ -202,12 +202,12 @@ searches the home folder or `/Volumes`.
 WARNING: In bypass, the agent can run commands and write files without asking.
 
 ```
-node bin/ga.js --adapter imagej --bypass-permissions
+node bin/cuvette.js --adapter imagej --bypass-permissions
 ```
 
 To start bypass in a session, type `/permissions bypass`. To stop it, type `/permissions ask`.
 To start each session in bypass, put `"permissions": "bypass"` in
-`~/.guided-analysis/settings.json` or in `.ga/settings.json` of the project. A project file
+`~/.cuvette/settings.json` or in `.ga/settings.json` of the project. A project file
 applies only after you trust the folder (see Folder trust). To keep rules in
 the same file, use `"permissionMode": "bypass"` and keep the rules in `"permissions"`.
 
@@ -249,27 +249,27 @@ When a session starts in a folder that is not trusted, a card shows:
 The card has three choices:
 
 1. Trust this folder. Cuvette saves the folder in `trusted_folders` in
-   `~/.guided-analysis/settings.json`, with a SHA-256 hash of each file.
+   `~/.cuvette/settings.json`, with a SHA-256 hash of each file.
 2. Trust once (this session). Nothing is saved.
 3. Do not trust. The session runs with your user settings only.
 
 If a trusted file changes, the card shows again with a list of the changes. A setting that you
 save with `/config` keeps the folder trusted.
 
-A run with `-p` and `ga mcp` show no card. They ignore the files and write one line about it.
+A run with `-p` and `cuvette mcp` show no card. They ignore the files and write one line about it.
 To use the files in a script, add `--trust-folder`. This trusts the folder for that run only.
 
 ```
-ga trust list                  # the trusted folders
-ga trust add <folder>          # trust a folder
-ga trust remove <folder>       # remove the trust
-ga trust show <folder>         # what the folder contains
+cuvette trust list             # the trusted folders
+cuvette trust add <folder>     # trust a folder
+cuvette trust remove <folder>  # remove the trust
+cuvette trust show <folder>    # what the folder contains
 ```
 
 In a session, `/trust` shows the folder and its files. `/trust on`, `/trust once` and
 `/trust off` change the trust. `/config` and the Settings page of the app have a "Folder trust" row.
 
-The benchmark (`ga bench papers`) trusts its own checkout. It passes the model options `think`,
+The benchmark (`cuvette bench papers`) trusts its own checkout. It passes the model options `think`,
 `numCtx` and `effort` from the `.ga` settings of the checkout to each run.
 
 ## What the harness enforces
@@ -281,7 +281,7 @@ The benchmark (`ga bench papers`) trusts its own checkout. It passes the model o
   sensitivity check). Then it asks the scientist.
 - **Manual routes.** Each step shows the menu path and the dialog values. `/export protocol`
   writes the steps as a protocol that a lab member can follow by hand.
-- **Records.** Each session has one append-only log, `~/.guided-analysis/sessions/<id>/log.jsonl`.
+- **Records.** Each session has one append-only log, `~/.cuvette/sessions/<id>/log.jsonl`.
   Each result is a node with its arguments, its decisions, and the hashes of its input and output
   files. A changed decision marks the results that used the old value as out of date.
 - **Claims.** The harness matches each number in the final answer to a logged result. A number with no
@@ -345,23 +345,23 @@ tool-to-UI map, checks, known-answer tests), `STANDARDS.md`, `skills/*.md`, and 
 | `mofa` | MOFA+ (mofapy2) | Python library | multi-omics factor analysis |
 | `chromatography` | hplc-py | Python library | chromatogram peaks |
 | `openbabel` | Open Babel | command line | chemistry |
-| `onboarding` | the onboarding tools | MCP; used by `ga onboard` | any |
+| `onboarding` | the onboarding tools | MCP; used by `cuvette onboard` | any |
 
 `examples/adapters/` holds three small worked examples (a command-line tool, a Python module,
 pandoc). Every catalog adapter has status `draft`: approve each one with
-`node bin/ga.js adapter approve <name>` after you read it. The Python adapters use virtual
-environments in `~/.guided-analysis/envs/`; large programs and paper data are on the T7 drive
+`node bin/cuvette.js adapter approve <name>` after you read it. The Python adapters use virtual
+environments in `~/.cuvette/envs/`; large programs and paper data are on the T7 drive
 (`/Volumes/T7/guided-analysis/`). See `docs/onboarding-queue.md`. The `run_script` tool uses
-`~/.guided-analysis/envs/science`. Its packages are in `src/tools/science-requirements.txt`.
+`~/.cuvette/envs/science`. Its packages are in `src/tools/science-requirements.txt`.
 
-New program: `node bin/ga.js onboard <program> --model claude`. The agent finds the program,
-reads its help and docs, writes a draft adapter in `~/.guided-analysis/drafts/`, and runs the
-checker. Check an adapter with `node bin/ga.js adapter check <dir> --run-tests`. Approve it with
-`node bin/ga.js adapter approve <dir>`.
+New program: `node bin/cuvette.js onboard <program> --model claude`. The agent finds the program,
+reads its help and docs, writes a draft adapter in `~/.cuvette/drafts/`, and runs the
+checker. Check an adapter with `node bin/cuvette.js adapter check <dir> --run-tests`. Approve it with
+`node bin/cuvette.js adapter approve <dir>`.
 
 ## Benchmark
 
-`node bin/ga.js bench all --model ollama:qwen3:8b --guidance both` runs the trap scenarios in
+`node bin/cuvette.js bench all --model ollama:qwen3:8b --guidance both` runs the trap scenarios in
 `bench/` with the guidance on and off. It writes six scores for each run to `bench/results/`:
 answer, traps, decisions, asking, claims and manual route.
 
@@ -369,7 +369,7 @@ answer, traps, decisions, asking, claims and manual route.
 
 ```bash
 npm test                 # unit tests; no network, Java or model needed
-GA_LIVE=1 npm test       # also the live tests: ImageJ, SMILE MSI, Ollama
+CUVETTE_LIVE=1 npm test  # also the live tests: ImageJ, SMILE MSI, Ollama
 npx tsc --noEmit
 npm run lint:text        # the text rules (ASD-STE100) for the README, docs and UI strings
 ```

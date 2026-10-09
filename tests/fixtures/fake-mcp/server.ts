@@ -7,7 +7,7 @@ import { solidPng } from "../../../src/adapters/kinds/common.ts";
 
 const server = new McpServer({ name: "fake-mcp", version: "1.0.0" }, { instructions: "Use echo to repeat text." });
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
-const workDir = () => process.env.GA_WORK_DIR ?? process.cwd();
+const workDir = () => process.env.CUVETTE_WORK_DIR ?? process.cwd();
 
 server.registerTool("echo", { description: "Repeat the text.", inputSchema: { text: z.string() }, annotations: { readOnlyHint: true, title: "Echo" } }, async ({ text: t }) => text(`echo: ${t}`));
 

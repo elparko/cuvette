@@ -7,7 +7,7 @@ import { loadAdapter, Manifest } from "../src/adapters/manifest.ts";
 import { locate } from "../src/adapters/locate.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
 
-const root = mkdtempSync(join(tmpdir(), "ga-runtime-"));
+const root = mkdtempSync(join(tmpdir(), "cuvette-runtime-"));
 const dirs = { workDir: join(root, "work"), sessionDir: join(root, "session") };
 
 export function ctx(signal: AbortSignal = new AbortController().signal): ToolContext {
@@ -140,14 +140,14 @@ test("locate: env var, paths with ~ and globs, then which", async () => {
   writeFileSync(exe, "#!/bin/sh\necho 'prog version 1.10.3'\n");
   chmodSync(exe, 0o755);
   writeFileSync(join(bin, "tool-1.2", "prog"), "x");
-  process.env.GA_TEST_PROG = exe;
-  process.env.GA_TEST_ROOT = bin;
+  process.env.CUVETTE_TEST_PROG = exe;
+  process.env.CUVETTE_TEST_ROOT = bin;
 
-  const a = await locate(manifest({ env: "GA_TEST_PROG", paths: ["/nonexistent"], version_command: ["{program_path}"], version_pattern: "version ([\\d.]+)" }, "0"));
+  const a = await locate(manifest({ env: "CUVETTE_TEST_PROG", paths: ["/nonexistent"], version_command: ["{program_path}"], version_pattern: "version ([\\d.]+)" }, "0"));
   expect(a).toMatchObject({ path: exe, version: process.platform === "win32" ? "0" : "1.10.3" });
-  expect(a.how).toContain("GA_TEST_PROG");
+  expect(a.how).toContain("CUVETTE_TEST_PROG");
 
-  const b = await locate(manifest({ env: "GA_UNSET_VAR", paths: ["/nonexistent/x", "{env:GA_TEST_ROOT}/tool-*/prog"] }, "9.9"));
+  const b = await locate(manifest({ env: "CUVETTE_UNSET_VAR", paths: ["/nonexistent/x", "{env:CUVETTE_TEST_ROOT}/tool-*/prog"] }, "9.9"));
   expect(b).toMatchObject({ path: exe, version: "9.9" });
 
   const home = await locate(manifest({ paths: ["~/definitely-not-here-*"] }));

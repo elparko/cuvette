@@ -2,7 +2,7 @@ fastqc=$1
 file=$2
 encoding=$3
 here=$(dirname "$0")
-dir=${GA_CALL_DIR:-.}
+dir=${CUVETTE_CALL_DIR:-.}
 mkdir -p "$dir/report"
 flags="--extract --quiet"
 [ "$encoding" = "phred64" ] && flags="$flags --phred64"

@@ -34,7 +34,7 @@ export function Header({ session }: { session: SessionLike }) {
   const adapters = session.adapterInfo.map((a) => `${a.name} ${a.version} (${a.title} ${a.programVersion})`).join(", ");
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Text bold>guided-analysis</Text>
+      <Text bold>Cuvette</Text>
       <Text>Adapters: {adapters || "none"}</Text>
       {session.folderLine ? <Text>{session.folderLine}</Text> : null}
       <Text>

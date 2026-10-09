@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 import { approvedPlan, currentPlan, planText, type AnalysisPlan } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
 import { afterProjectWrite, folderTrusted, trustStatus } from "./trust.ts";
@@ -22,7 +22,7 @@ export interface Method {
 }
 
 export function methodsDir(): string {
-  return join(gaHome(), "methods");
+  return join(cuvetteHome(), "methods");
 }
 
 function check(name: string): string {
@@ -151,7 +151,7 @@ export function exportMethod(name: string, to: string): string {
 export function importMethod(file: string, as?: string): string {
   const m = readMethod(readFileSync(file, "utf8"), basename(file));
   if (as) m.name = check(as);
-  if (existsSync(pathOf(m.name))) throw new Error(`A method named ${m.name} exists. Import it with another name: ga method import <file> <name>.`);
+  if (existsSync(pathOf(m.name))) throw new Error(`A method named ${m.name} exists. Import it with another name: cuvette method import <file> <name>.`);
   return saveMethod(m);
 }
 

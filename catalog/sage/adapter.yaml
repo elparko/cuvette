@@ -23,9 +23,9 @@ program:
   install: >
     Sage is a single binary on the T7 drive. Download the release archive for your platform from
     https://github.com/lazear/sage/releases and unpack it into /Volumes/T7/guided-analysis/tools/sage/ or
-    ~/.guided-analysis/sage/. The adapter finds sage-*/sage in these folders, or reads the SAGE variable,
+    ~/.cuvette/sage/. The adapter finds sage-*/sage in these folders, or reads the SAGE variable,
     ~/.cargo/bin, /opt/homebrew/bin, /usr/local/bin and the PATH.
-    mkdir -p ~/.guided-analysis/sage && tar -xzf <downloaded archive> -C ~/.guided-analysis/sage
+    mkdir -p ~/.cuvette/sage && tar -xzf <downloaded archive> -C ~/.cuvette/sage
   citation:
     - text: "Lazear, M. R. (2023). Sage: An Open-Source Tool for Fast Proteomics Searching and Quantification at Scale. Journal of Proteome Research, 22(11), 3652–3659. https://doi.org/10.1021/acs.jproteome.3c00486"
       doi: 10.1021/acs.jproteome.3c00486
@@ -49,7 +49,7 @@ locate:
   env: SAGE
   paths:
     - /Volumes/T7/guided-analysis/tools/sage/sage-*/sage
-    - ~/.guided-analysis/sage/sage-*/sage
+    - ~/.cuvette/sage/sage-*/sage
     - ~/.cargo/bin/sage
     - /opt/homebrew/bin/sage
     - /usr/local/bin/sage

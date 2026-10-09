@@ -15,8 +15,8 @@ program:
     - https://www.rdkit.org/docs/GettingStartedInPython.html
     - https://www.rdkit.org/docs/source/rdkit.Chem.Descriptors.html
   install: >
-    The adapter uses the Python environment at ~/.guided-analysis/envs/rdkit, or the python that GA_RDKIT_PYTHON names. Make it and add RDKit and numpy:
-    uv venv ~/.guided-analysis/envs/rdkit && uv pip install --python ~/.guided-analysis/envs/rdkit/bin/python rdkit numpy
+    The adapter uses the Python environment at ~/.cuvette/envs/rdkit, or the python that CUVETTE_RDKIT_PYTHON names. Make it and add RDKit and numpy:
+    uv venv ~/.cuvette/envs/rdkit && uv pip install --python ~/.cuvette/envs/rdkit/bin/python rdkit numpy
   citation:
     - text: "Landrum, G., et al. (2026). RDKit: Open-source cheminformatics (Version 2026.03.6) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.591637"
       doi: 10.5281/zenodo.591637
@@ -35,8 +35,8 @@ connection:
   kind: python
   interpreter: ["{program_path}"]
 locate:
-  env: GA_RDKIT_PYTHON
-  paths: ["~/.guided-analysis/envs/rdkit/bin/python"]
+  env: CUVETTE_RDKIT_PYTHON
+  paths: ["~/.cuvette/envs/rdkit/bin/python"]
   version_command: ["{program_path}", "-c", "import rdkit; print('rdkit', rdkit.__version__)"]
   version_pattern: 'rdkit (\S+)'
   identity: 'rdkit \d'

@@ -40,7 +40,7 @@ function nodeIn(over: Partial<NodeIn>): NodeIn {
 }
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), "ga-exp-"));
+  dir = mkdtempSync(join(tmpdir(), "cuvette-exp-"));
   mkdirSync(join(dir, "ad"));
   writeFileSync(join(dir, "ad", "adapter.yaml"), YAML);
   adapter = loadAdapter(join(dir, "ad"));
@@ -98,7 +98,7 @@ test("notebook has a markdown and a code cell per step", () => {
   expect(nb.nbformat).toBe(4);
   const code = nb.cells.filter((c: { cell_type: string }) => c.cell_type === "code");
   expect(code).toHaveLength(4);
-  expect(code[2].source.join("")).toBe(`!ga run-step fake blur '{{"path":"/w/a_out.tif","sigma":2}}'`);
+  expect(code[2].source.join("")).toBe(`!cuvette run-step fake blur '{{"path":"/w/a_out.tif","sigma":2}}'`);
   const md = nb.cells.filter((c: { cell_type: string }) => c.cell_type === "markdown");
   expect(md[3].source.join("")).toContain("Process > Filters > Gaussian Blur...");
 });
@@ -147,7 +147,7 @@ test("replay without a session dir reports no differences, and a missing input t
 });
 
 test("the protocol lists the programs that the agent loaded, with the reason, and the later decisions", () => {
-  const r = new AnalysisRecord(mkdtempSync(join(tmpdir(), "ga-exp-pick-")), "s2");
+  const r = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-exp-pick-")), "s2");
   r.append("setup", { values: { question: "q" } });
   r.append("decision", { key: "adapter", old: null, new: "biostats", by: "human", reason: "answer to q1" });
   r.append("adapter", { name: "biostats", version: "0.1.1", programVersion: "0.30.0", reason: "The request is a paired test on a CSV file." });

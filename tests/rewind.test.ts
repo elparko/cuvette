@@ -16,7 +16,7 @@ import { makeHarness, sleep, until } from "../src/tui/testing.ts";
 const LAB = join(__dirname, "fixtures/lab");
 let session: Session | undefined;
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-rewind-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-rewind-"));
 });
 afterEach(async () => {
   await session?.close();
@@ -30,7 +30,7 @@ async function twoTurns(): Promise<{ s: Session; p: FakeProvider }> {
     { calls: [{ name: "count", args: { input: "/data/a.tif", method: "Triangle", min_size: 5 } }] },
     { text: "The count with Triangle is done." },
   ]);
-  const s = await Session.create({ adapters: [LAB], provider: p, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
+  const s = await Session.create({ adapters: [LAB], provider: p, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
   s.decisions.applySetup({ question: "How many particles?", method: "Otsu" });
   await s.send("Count the particles in a.tif");
   s.setDecision("method", "Triangle", "try another method");

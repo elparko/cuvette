@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/bates2015-lme4-sleepstudy"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/bates2015-lme4-sleepstudy"
 mkdir -p "$D"
 export R_LIBS_USER="${R_LIBS_USER:-/Volumes/T7/guided-analysis/tools/R-library}"
 Rscript -e '

@@ -29,11 +29,11 @@ beforeAll(async () => {
     });
   });
   await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
-  topic = `http://127.0.0.1:${(server.address() as { port: number }).port}/ga-test-topic`;
+  topic = `http://127.0.0.1:${(server.address() as { port: number }).port}/cuvette-test-topic`;
 });
 afterAll(() => new Promise<void>((ok) => server.close(() => ok())));
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-notify-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-notify-"));
   posts = [];
   setWindowUrl(undefined);
 });
@@ -52,7 +52,7 @@ async function blockedSession() {
   session = await Session.create({
     adapters: [join(__dirname, "fixtures/lab")],
     provider,
-    cwd: mkdtempSync(join(tmpdir(), "ga-proj-")),
+    cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")),
     settings: { notify: { ntfy: topic }, askWaits: false, autoResume: false },
   });
   session.decisions.applySetup({ question: "How many particles?" });
@@ -68,7 +68,7 @@ test("a blocking scientist-owned decision posts the question to the ntfy topic",
   expect(posts).toHaveLength(1);
   const p = posts[0];
   expect(p.method).toBe("POST");
-  expect(p.url).toBe("/ga-test-topic");
+  expect(p.url).toBe("/cuvette-test-topic");
   expect(p.headers.title).toBe("A question waits for you");
   expect(p.headers.click).toBeUndefined();
   expect(p.body.split("\n")[0]).toBe(open[0].title);

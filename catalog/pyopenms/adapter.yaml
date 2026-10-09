@@ -14,7 +14,7 @@ program:
     - https://www.openms.de/documentation/
   install: >
     The adapter uses the pyopenms Python environment. Make the environment and add pyOpenMS to it:
-    uv venv ~/.guided-analysis/envs/pyopenms && uv pip install --python ~/.guided-analysis/envs/pyopenms/bin/python pyopenms
+    uv venv ~/.cuvette/envs/pyopenms && uv pip install --python ~/.cuvette/envs/pyopenms/bin/python pyopenms
   citation:
     - text: "Röst, H. L., Schmitt, U., Aebersold, R., & Malmström, L. (2014). pyOpenMS: A Python-based interface to the OpenMS mass-spectrometry algorithm library. Proteomics, 14(1), 74–77. https://doi.org/10.1002/pmic.201300246"
       doi: 10.1002/pmic.201300246
@@ -50,8 +50,8 @@ connection:
 locate:
   env: PYOPENMS_PYTHON
   paths:
-    - ~/.guided-analysis/envs/pyopenms/bin/python
-    - ~/.guided-analysis/envs/pyopenms/Scripts/python.exe
+    - ~/.cuvette/envs/pyopenms/bin/python
+    - ~/.cuvette/envs/pyopenms/Scripts/python.exe
   version_command: ["{program_path}", "-c", "import importlib.metadata as m; print('pyopenms', m.version('pyopenms'))"]
   version_pattern: 'pyopenms (\S+)'
   identity: 'pyopenms \d'

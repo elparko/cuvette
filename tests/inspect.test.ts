@@ -11,12 +11,12 @@ import { scriptPython } from "../src/tools/run_script.ts";
 let root = "";
 let session: Session | undefined;
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), "ga-inspect-"));
+  root = mkdtempSync(join(tmpdir(), "cuvette-inspect-"));
   execFileSync(scriptPython(), ["-I", join(__dirname, "fixtures/make_two_channel.py"), join(root, "images"), "2"]);
   writeFileSync(join(root, "counts.csv"), "group,set,positive,total\ncontrol,1,5,40\ncontrol,2,7,38\ntreated,1,20,41\ntreated,2,22,39\n");
 });
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-inspect-home-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-inspect-home-"));
 });
 afterEach(async () => {
   await session?.close();

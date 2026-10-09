@@ -8,9 +8,9 @@ import { trustFolder } from "../src/core/trust.ts";
 
 let cwd = "";
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-catalog-home-"));
-  cwd = mkdtempSync(join(tmpdir(), "ga-catalog-"));
-  const dir = join(cwd, ".ga", "adapters", "stats-here");
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-catalog-home-"));
+  cwd = mkdtempSync(join(tmpdir(), "cuvette-catalog-"));
+  const dir = join(cwd, ".cuvette", "adapters", "stats-here");
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, "adapter.yaml"),
@@ -18,7 +18,7 @@ beforeEach(() => {
       "adapter: { name: stats-here, field: statistics, file_types: ['.csv', '.tsv'], status: approved, description: 'Runs t tests on a CSV file. Second sentence.' }",
       "program: { name: Stats here }",
       "connection: { kind: cli }",
-      "locate: { env: GA_STATS_HERE, paths: ['/nowhere/stats-here'] }",
+      "locate: { env: CUVETTE_STATS_HERE, paths: ['/nowhere/stats-here'] }",
     ].join("\n"),
   );
   trustFolder(cwd);

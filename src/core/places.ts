@@ -1,7 +1,7 @@
 import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 
 export const COPY_LIMIT_BYTES = 20 * 1024 * 1024;
 export const PROJECT_MARK = "{project}";
@@ -36,10 +36,10 @@ export interface IndexRow {
   description?: string;
 }
 
-const README = "This folder holds one Cuvette analysis session: results, figures, scripts, exports, and the record in .record.\nTo continue the session, run \"ga open .\" in this folder.\nTo read it without Cuvette, open index.html in a browser.\n";
+const README = "This folder holds one Cuvette analysis session: results, figures, scripts, exports, and the record in .record.\nTo continue the session, run \"cuvette open .\" in this folder.\nTo read it without Cuvette, open index.html in a browser.\n";
 
 export function indexPath(): string {
-  return join(gaHome(), "sessions-index.json");
+  return join(cuvetteHome(), "sessions-index.json");
 }
 
 export function readIndex(): IndexRow[] {
@@ -55,7 +55,7 @@ export function saveIndexRow(p: Place, named?: { title: string; description: str
   const old = readIndex().find((r) => r.id === p.id);
   const row: IndexRow = { id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, description: named?.description ?? old?.description };
   const rows = readIndex().filter((r) => r.id !== p.id);
-  mkdirSync(gaHome(), { recursive: true });
+  mkdirSync(cuvetteHome(), { recursive: true });
   writeFileSync(indexPath(), JSON.stringify([...rows, row], null, 1));
 }
 
@@ -111,7 +111,7 @@ export function newPlace(project: string, outputFolder: string, id: string): Pla
     mkdirSync(root, { recursive: true });
   } catch {}
   if (!existsSync(root) || !writable(root)) {
-    root = join(gaHome(), "projects", slug(basename(project)) || "project");
+    root = join(cuvetteHome(), "projects", slug(basename(project)) || "project");
     fallback = true;
   }
   const outDir = join(root, `.new-${id}`);
@@ -124,7 +124,7 @@ export function newPlace(project: string, outputFolder: string, id: string): Pla
 }
 
 export function legacyPlace(id: string, project: string): Place {
-  const recordDir = join(gaHome(), "sessions", id);
+  const recordDir = join(cuvetteHome(), "sessions", id);
   return { id, recordDir, outDir: join(recordDir, "work"), project, title: "", created: "", legacy: true, fallback: false };
 }
 
@@ -214,7 +214,7 @@ export function findPlace(ref: string, opts: { cwd?: string; outputFolder?: stri
     const p = placeAt(join(row.folder, ".record"));
     if (p) return p;
   }
-  if (existsSync(join(gaHome(), "sessions", ref, "log.jsonl"))) return legacyPlace(ref, cwd);
+  if (existsSync(join(cuvetteHome(), "sessions", ref, "log.jsonl"))) return legacyPlace(ref, cwd);
   return undefined;
 }
 
@@ -225,7 +225,7 @@ export interface Listed extends IndexRow {
 
 export function listPlaces(): Listed[] {
   const rows: Listed[] = readIndex().map((r) => ({ ...r, moved: !existsSync(join(r.folder, ".record", "log.jsonl")) && !existsSync(join(r.folder, ".record", "meta.json")), legacy: false }));
-  const old = join(gaHome(), "sessions");
+  const old = join(cuvetteHome(), "sessions");
   if (existsSync(old)) {
     for (const id of readdirSync(old)) {
       if (rows.some((r) => r.id === id) || !existsSync(join(old, id, "log.jsonl"))) continue;

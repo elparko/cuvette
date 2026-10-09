@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/rouault-gdal-autotest"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/rouault-gdal-autotest"
 mkdir -p "$D"
 cd "$D"
 curl -sL -o byte.tif https://raw.githubusercontent.com/OSGeo/gdal/master/autotest/gcore/data/byte.tif

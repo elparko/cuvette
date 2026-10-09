@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/minh2020-iqtree2"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/minh2020-iqtree2"
 mkdir -p "$D"
 cd "$D"
 curl -L -C - -O https://raw.githubusercontent.com/iqtree/iqtree2/master/example/example.phy

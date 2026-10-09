@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/andreasson2019-endotoxin-health"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/andreasson2019-endotoxin-health"
 mkdir -p "$D"
 cd "$D"
 curl -fsSL -o endotoxin_raw.xlsx "https://zenodo.org/api/records/4987396/files/Endotoxin_self-rated%20health.xlsx/content"

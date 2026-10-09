@@ -14,7 +14,7 @@ program:
     - https://www.ms-imaging.org/imzml/
   install: >
     The adapter uses the pyimzml Python environment. Make the environment and add pyimzML to it:
-    uv venv ~/.guided-analysis/envs/pyimzml && uv pip install --python ~/.guided-analysis/envs/pyimzml/bin/python pyimzml
+    uv venv ~/.cuvette/envs/pyimzml && uv pip install --python ~/.cuvette/envs/pyimzml/bin/python pyimzml
   citation:
     - text: pyimzML [Computer software]. Alexandrov Team, EMBL. https://github.com/alexandrovteam/pyimzML
       url: https://github.com/alexandrovteam/pyimzML
@@ -40,8 +40,8 @@ connection:
 locate:
   env: PYIMZML_PYTHON
   paths:
-    - ~/.guided-analysis/envs/pyimzml/bin/python
-    - ~/.guided-analysis/envs/pyimzml/Scripts/python.exe
+    - ~/.cuvette/envs/pyimzml/bin/python
+    - ~/.cuvette/envs/pyimzml/Scripts/python.exe
   version_command: ["{program_path}", "-c", "import importlib.metadata as m; print('pyimzml', m.version('pyimzml'))"]
   version_pattern: 'pyimzml (\S+)'
   identity: 'pyimzml \d'

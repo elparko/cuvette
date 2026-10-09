@@ -18,7 +18,7 @@ export function startScript(c: KindContext): AdapterRuntime {
       writeFileSync(params, JSON.stringify(args));
       const argv = [...interpreter, script, params];
       const route = `${commandLine([...interpreter, script, "params.json"])}  # params.json: ${scalar(args)}`;
-      return live.track(ctx.signal, (signal) => runArgv(c, def, args, call, argv, signal, { GA_PARAMS: params }, route));
+      return live.track(ctx.signal, (signal) => runArgv(c, def, args, call, argv, signal, { CUVETTE_PARAMS: params }, route));
     }),
   );
   return makeRuntime(c, { tools: () => tools, cancel: () => live.cancel(), close: () => live.cancel() });

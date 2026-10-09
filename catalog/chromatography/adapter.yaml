@@ -21,8 +21,8 @@ program:
     - https://cremerlab.github.io/hplc-py/methodology/fitting.html
     - https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.trapezoid.html
   install: >
-    The adapter uses a Python environment in ~/.guided-analysis/envs/chromatography. Make it and install the packages:
-    uv venv ~/.guided-analysis/envs/chromatography && uv pip install --python ~/.guided-analysis/envs/chromatography/bin/python
+    The adapter uses a Python environment in ~/.cuvette/envs/chromatography. Make it and install the packages:
+    uv venv ~/.cuvette/envs/chromatography && uv pip install --python ~/.cuvette/envs/chromatography/bin/python
     hplc-py scipy pandas matplotlib
   citation:
     - text: "Chure, G., & Cremer, J. (2024). hplc-py: A Python Utility For Rapid Quantification of Complex Chemical Chromatograms. Journal of Open Source Software, 9(94), 6270."
@@ -37,10 +37,10 @@ connection:
   call_timeout_s: 1200
 
 locate:
-  env: GA_CHROMATOGRAPHY_PYTHON
+  env: CUVETTE_CHROMATOGRAPHY_PYTHON
   paths:
-    - ~/.guided-analysis/envs/chromatography/bin/python
-    - ~/.guided-analysis/envs/chromatography/Scripts/python.exe
+    - ~/.cuvette/envs/chromatography/bin/python
+    - ~/.cuvette/envs/chromatography/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('hplc-py', m.version('hplc-py'))"]
   version_pattern: 'hplc-py (\S+)'

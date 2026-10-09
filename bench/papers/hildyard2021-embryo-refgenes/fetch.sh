@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/hildyard2021-embryo-refgenes"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/hildyard2021-embryo-refgenes"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/hildyard2021-embryo-refgenes"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/hildyard2021-embryo-refgenes"
 mkdir -p "$D" "$R"
 # All three workbooks go to the reference folder. The analysis workbook holds the published geNorm and NormFinder
 # values, and the efficiency workbook holds the published slopes. The data folder gets only the Cq values as CSV.

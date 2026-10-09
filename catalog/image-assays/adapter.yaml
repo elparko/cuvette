@@ -24,8 +24,8 @@ program:
     - https://scikit-image.org/docs/stable/api/skimage.segmentation.html
     - https://imagej.net/plugins/coloc-2
   install: >
-    The adapter uses its own Python environment at ~/.guided-analysis/envs/image-assays, or the Python in IMAGE_ASSAYS_PYTHON.
-    Make it with: uv venv ~/.guided-analysis/envs/image-assays && uv pip install --python ~/.guided-analysis/envs/image-assays/bin/python scikit-image scipy matplotlib tifffile imagecodecs pillow
+    The adapter uses its own Python environment at ~/.cuvette/envs/image-assays, or the Python in IMAGE_ASSAYS_PYTHON.
+    Make it with: uv venv ~/.cuvette/envs/image-assays && uv pip install --python ~/.cuvette/envs/image-assays/bin/python scikit-image scipy matplotlib tifffile imagecodecs pillow
   citation:
     - text: "van der Walt, S., Schönberger, J. L., Nunez-Iglesias, J., Boulogne, F., Warner, J. D., Yager, N., Gouillart, E., & Yu, T. (2014). scikit-image: image processing in Python. PeerJ, 2, e453."
       doi: 10.7717/peerj.453
@@ -40,8 +40,8 @@ connection:
 locate:
   env: IMAGE_ASSAYS_PYTHON
   paths:
-    - ~/.guided-analysis/envs/image-assays/bin/python
-    - ~/.guided-analysis/envs/image-assays/Scripts/python.exe
+    - ~/.cuvette/envs/image-assays/bin/python
+    - ~/.cuvette/envs/image-assays/Scripts/python.exe
   version_command: ["{program_path}", "-c", "import skimage, scipy, matplotlib, tifffile; print('skimage', skimage.__version__)"]
   version_pattern: 'skimage (\S+)'
   identity: 'skimage \d'

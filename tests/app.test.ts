@@ -13,13 +13,13 @@ import { until } from "../src/tui/testing.ts";
 import type { Question } from "../src/core/types.ts";
 import { claudeKey } from "../src/core/credentials.ts";
 
-const home = mkdtempSync(join(tmpdir(), "ga-app-home-"));
-const oldHome = process.env.GA_HOME;
+const home = mkdtempSync(join(tmpdir(), "cuvette-app-home-"));
+const oldHome = process.env.CUVETTE_HOME;
 beforeAll(() => {
-  process.env.GA_HOME = home;
+  process.env.CUVETTE_HOME = home;
 });
 afterAll(() => {
-  process.env.GA_HOME = oldHome;
+  process.env.CUVETTE_HOME = oldHome;
 });
 
 const env = { ANTHROPIC_API_KEY: "sk-ant-test-0000000000000000000000" };

@@ -5,7 +5,7 @@ import { beforeAll, expect, test } from "vitest";
 import type { Tool, ToolContext } from "../src/core/types.ts";
 import { genericTools } from "../src/tools/generic.ts";
 
-const root = mkdtempSync(join(tmpdir(), "ga-generic-"));
+const root = mkdtempSync(join(tmpdir(), "cuvette-generic-"));
 const dirs = { workDir: join(root, "work"), sessionDir: join(root, "session") };
 mkdirSync(dirs.workDir, { recursive: true });
 mkdirSync(dirs.sessionDir, { recursive: true });
@@ -52,7 +52,7 @@ test("read_file and list_dir", async () => {
 });
 
 test("write_file writes an absolute path in the project folder that the scientist names", async () => {
-  const project = mkdtempSync(join(tmpdir(), "ga-generic-proj-"));
+  const project = mkdtempSync(join(tmpdir(), "cuvette-generic-proj-"));
   const write = genericTools({ ...dirs, projectDir: project }).find((t) => t.name === "write_file")!;
   expect((await write.execute({ name: join(project, "results", "table.csv"), text: "a\n1\n" }, ctx())).ok).toBe(true);
   expect(readFileSync(join(project, "results", "table.csv"), "utf8")).toBe("a\n1\n");
@@ -66,7 +66,7 @@ test("write_file writes only inside the work folder", async () => {
   expect(ok.ok).toBe(true);
   expect(readFileSync(join(dirs.workDir, "sub", "out.txt"), "utf8")).toBe("hello");
   expect(ok.outputs?.[0].name).toBe("out.txt");
-  for (const name of ["../escape.txt", "/tmp/ga-abs.txt", "..", "sub/../../escape2.txt"]) {
+  for (const name of ["../escape.txt", "/tmp/cuvette-abs.txt", "..", "sub/../../escape2.txt"]) {
     const r = await tools.write_file.execute({ name, text: "x" }, ctx());
     expect(r).toMatchObject({ ok: false, error: expect.stringMatching(/^the path is outside the session folder /) });
   }
@@ -77,12 +77,12 @@ test("write_file writes only inside the work folder", async () => {
 });
 
 test("screenshot (dry run) returns a PNG", async () => {
-  process.env.GA_SCREEN_DRY_RUN = "1";
+  process.env.CUVETTE_SCREEN_DRY_RUN = "1";
   try {
     const r = await tools.screenshot.execute({}, ctx());
     expect(r).toMatchObject({ ok: true, fidelity: "none" });
     expect(readFileSync(r.images![0]).subarray(1, 4).toString()).toBe("PNG");
   } finally {
-    delete process.env.GA_SCREEN_DRY_RUN;
+    delete process.env.CUVETTE_SCREEN_DRY_RUN;
   }
 });

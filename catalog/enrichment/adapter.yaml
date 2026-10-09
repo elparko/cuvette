@@ -22,8 +22,8 @@ program:
     - https://gseapy.readthedocs.io/en/latest/gseapy_example.html
     - https://www.gsea-msigdb.org/gsea/doc/GSEAUserGuideFrame.html
   install: >
-    The adapter uses a Python environment in ~/.guided-analysis/envs/enrichment. Make it and install the packages:
-    uv venv ~/.guided-analysis/envs/enrichment && uv pip install --python ~/.guided-analysis/envs/enrichment/bin/python
+    The adapter uses a Python environment in ~/.cuvette/envs/enrichment. Make it and install the packages:
+    uv venv ~/.cuvette/envs/enrichment && uv pip install --python ~/.cuvette/envs/enrichment/bin/python
     gseapy pandas matplotlib scipy
   citation:
     - text: "Fang, Z., Liu, X., & Peltz, G. (2023). GSEApy: a comprehensive package for performing gene set enrichment analysis in Python. Bioinformatics, 39(1), btac757."
@@ -36,10 +36,10 @@ connection:
   call_timeout_s: 1200
 
 locate:
-  env: GA_ENRICHMENT_PYTHON
+  env: CUVETTE_ENRICHMENT_PYTHON
   paths:
-    - ~/.guided-analysis/envs/enrichment/bin/python
-    - ~/.guided-analysis/envs/enrichment/Scripts/python.exe
+    - ~/.cuvette/envs/enrichment/bin/python
+    - ~/.cuvette/envs/enrichment/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('gseapy', m.version('gseapy'))"]
   version_pattern: 'gseapy (\S+)'

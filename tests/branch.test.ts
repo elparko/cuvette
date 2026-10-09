@@ -11,7 +11,7 @@ import type { SessionLike } from "../src/ui/types.ts";
 const LAB = join(__dirname, "fixtures/lab");
 const open: Session[] = [];
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-branch-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-branch-"));
 });
 afterEach(async () => {
   for (const s of open.splice(0)) await s.close();
@@ -19,7 +19,7 @@ afterEach(async () => {
 
 async function counted(method: string): Promise<Session> {
   const p = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", method, min_size: 5 } }] }, { text: `The count with ${method} is done.` }]);
-  const s = await Session.create({ adapters: [LAB], provider: p, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
+  const s = await Session.create({ adapters: [LAB], provider: p, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
   open.push(s);
   s.decisions.applySetup({ question: "How many particles?", method });
   await s.send("Count the particles in a.tif");

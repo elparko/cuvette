@@ -7,7 +7,7 @@ This file lists planned work that is not built yet. Each item says what it is fo
 **Problem.** The main interface is a terminal app. Many scientists do not work in a terminal. The graph window and the SMILE MSI panel help, but a session still starts in a terminal.
 
 **Plan.** A browser app that is the whole session, not only a viewer.
-- `ga app` starts a local server and opens the browser. Later, a desktop wrapper (Tauri) starts it with a double-click.
+- `cuvette app` starts a local server and opens the browser. Later, a desktop wrapper (Tauri) starts it with a double-click.
 - Start page: pick a program, pick a folder or file, type the question. No commands to learn.
 - One screen: the conversation on the left; the analysis graph, the current step's images and the decision cards on the right.
 - Setup as a form, with the help text for each decision and the "agent decides" choices marked.
@@ -16,7 +16,7 @@ This file lists planned work that is not built yet. Each item says what it is fo
 - Model and API key settings in a settings page, with the spend shown.
 - The terminal UI and the browser app use the same session and the same event bus, so a session can move between them.
 
-**Status (2026-10-08).** `ga app` is built: the conversation, the cards, the Analysis, Results, Decisions and Record tabs, Settings, Sessions with titles, the first-start setup page and the sample analysis. See "Browser app" in `docs/architecture.md`. Next: the desktop wrapper, a facelift for the Settings page, and a live view of one session from two processes (now the second view runs in the same process).
+**Status (2026-10-08).** `cuvette app` is built: the conversation, the cards, the Analysis, Results, Decisions and Record tabs, Settings, Sessions with titles, the first-start setup page and the sample analysis. See "Browser app" in `docs/architecture.md`. Next: the desktop wrapper, a facelift for the Settings page, and a live view of one session from two processes (now the second view runs in the same process).
 
 ## A flow canvas: analyses as connected nodes, built from prompts
 
@@ -30,7 +30,7 @@ This file lists planned work that is not built yet. Each item says what it is fo
 - Branch from any node to try another method, and compare the branches side by side.
 - Save a flow as a method, share it as one file, and run it on new data with its human nodes still in place.
 
-**What exists.** The session record is already a graph of steps with inputs, outputs and decisions. The graph window draws it. `/branch`, `/compare`, `/rerun`, saved methods, the pilot gate and `ga replay` give most of the run logic. The canvas adds editing and the human nodes as first-class parts of a flow.
+**What exists.** The session record is already a graph of steps with inputs, outputs and decisions. The graph window draws it. `/branch`, `/compare`, `/rerun`, saved methods, the pilot gate and `cuvette replay` give most of the run logic. The canvas adds editing and the human nodes as first-class parts of a flow.
 
 **First step.** Turn the graph window into an editable canvas for one session: show human steps (questions, the demonstration) as nodes, let the scientist change a node's settings and rerun from there, and save the result as a method.
 

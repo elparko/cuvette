@@ -7,7 +7,7 @@ const PAGE = String.raw`<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Guided analysis</title>
+<title>Cuvette</title>
 <style>
 :root { --bg:#f7f7f5; --panel:#fff; --ink:#1c1c1e; --dim:#6b6b70; --line:#d8d8d4; --accent:#2f6fdb; --ok:#1f8a4c; --bad:#c0392b; }
 @media (prefers-color-scheme: dark) {

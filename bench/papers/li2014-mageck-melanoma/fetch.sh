@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/li2014-mageck-melanoma"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/li2014-mageck-melanoma"
 mkdir -p "$D"
 cd "$D"
 # Additional file 4 of Li et al. 2014, Genome Biology 15:554: raw sgRNA read counts of the leukemia, melanoma and ESC screens.

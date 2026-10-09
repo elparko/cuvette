@@ -11,13 +11,13 @@ import type { ProgramHooks } from "../src/ui/programs.ts";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 
 const DOWN = "\x1b[B";
-const old = process.env.GA_HOME;
+const old = process.env.CUVETTE_HOME;
 let home = "";
 let live: { h: Harness; done: Promise<void> } | undefined;
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "ga-home-"));
-  process.env.GA_HOME = home;
+  home = mkdtempSync(join(tmpdir(), "cuvette-home-"));
+  process.env.CUVETTE_HOME = home;
 });
 afterEach(async () => {
   if (live) {
@@ -27,8 +27,8 @@ afterEach(async () => {
     await Promise.race([live.done, sleep(500)]);
     live = undefined;
   }
-  if (old === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = old;
+  if (old === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = old;
 });
 
 function hooks(exec: ProgramHooks["exec"]): ProgramHooks {
@@ -40,8 +40,8 @@ function hooks(exec: ProgramHooks["exec"]): ProgramHooks {
     home,
     env: {},
     adapters: {
-      alpha: { manifest: m("alpha", "statistics", ["~/.guided-analysis/envs/biostats/bin/python"]), root: "/x/alpha" },
-      zeta: { manifest: m("zeta", "microscopy", ["~/.guided-analysis/envs/cellpose/bin/python"]), root: "/x/zeta" },
+      alpha: { manifest: m("alpha", "statistics", ["~/.cuvette/envs/biostats/bin/python"]), root: "/x/alpha" },
+      zeta: { manifest: m("zeta", "microscopy", ["~/.cuvette/envs/cellpose/bin/python"]), root: "/x/zeta" },
     },
     locate: async (mm) => (mm.adapter.name === "alpha" ? { path: py, version: "1.0", how: "path" } : { version: "", how: "not found" }),
     run: async () => ({ code: 0, stdout: "", stderr: "" }),

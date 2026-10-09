@@ -33,7 +33,7 @@ export function referenceRoot(): string {
 }
 
 export function harnessHomes(current: string): string[] {
-  return [...new Set([current, join(homedir(), ".guided-analysis"), join(homedir(), ".cuvette")])];
+  return [...new Set([current, join(homedir(), ".cuvette"), join(homedir(), ".cuvette")])];
 }
 
 function mainCheckout(repo: string): string[] {

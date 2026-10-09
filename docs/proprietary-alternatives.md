@@ -132,7 +132,7 @@ The status of each one is in "Results" below. A second work added `limma-proteom
 
 ## Results
 
-This work finished all four parts. `ga adapter check <name> --run-tests` passes with no error for each one.
+This work finished all four parts. `cuvette adapter check <name> --run-tests` passes with no error for each one.
 
 | Part | Adapter | Tools | Known-answer tests | Benchmark paper |
 | --- | --- | --- | --- | --- |
@@ -170,7 +170,7 @@ What stays open:
 
 ## Single-cell integration and spatial analysis
 
-Added on 9 October 2026. `ga adapter check <name> --run-tests` passes with no error for both adapters.
+Added on 9 October 2026. `cuvette adapter check <name> --run-tests` passes with no error for both adapters.
 
 | Part | Adapter | Tools | Known-answer tests | Benchmark paper |
 | --- | --- | --- | --- | --- |
@@ -205,7 +205,7 @@ What stays open:
 
 ## Proteomics statistics and multi-omics
 
-Two adapters from the work of 9 October 2026. Each passes `ga adapter check <name> --run-tests`.
+Two adapters from the work of 9 October 2026. Each passes `cuvette adapter check <name> --run-tests`.
 
 | Adapter | Engine | Tools | Known-answer tests | Benchmark papers |
 | --- | --- | --- | --- | --- |

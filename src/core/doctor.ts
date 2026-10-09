@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { locate, which } from "../adapters/locate.ts";
-import { adapterDirs, gaHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
+import { adapterDirs, cuvetteHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
 import { runProcess } from "../adapters/kinds/common.ts";
 import { howToCite } from "./citations.ts";
 import { claudeKey, credentialsPath } from "./credentials.ts";
@@ -127,8 +127,8 @@ export function uvCommand(home: string, name: string): string {
 }
 
 export function rLibrary(env: Record<string, string | undefined>, home = homedir()): string {
-  const cand = [env.GA_R_LIBS, env.R_LIBS_USER, "/Volumes/T7/guided-analysis/tools/R-library", join(home, ".guided-analysis", "R-library")].filter((x): x is string => !!x);
-  return cand.find((c) => existsSync(c)) ?? join(home, ".guided-analysis", "R-library");
+  const cand = [env.CUVETTE_R_LIBS, env.R_LIBS_USER, "/Volumes/T7/guided-analysis/tools/R-library", join(home, ".cuvette", "R-library")].filter((x): x is string => !!x);
+  return cand.find((c) => existsSync(c)) ?? join(home, ".cuvette", "R-library");
 }
 
 export function rInstallCommand(lib: string, p: { cran?: string[]; bioc?: string[] }): string {
@@ -181,7 +181,7 @@ function envOf(path: string | undefined, home: string): string | undefined {
 
 export function envNameIn(m: Manifest): string | undefined {
   for (const p of m.locate.paths) {
-    const hit = /\.guided-analysis\/envs\/([^/]+)\/bin\/python$/.exec(p);
+    const hit = /\.cuvette\/envs\/([^/]+)\/bin\/python$/.exec(p);
     if (hit) return hit[1];
   }
   return undefined;
@@ -189,7 +189,7 @@ export function envNameIn(m: Manifest): string | undefined {
 
 export async function runDoctor(opts: DoctorOpts = {}): Promise<Check[]> {
   const env = opts.env ?? process.env;
-  const home = opts.home ?? gaHome();
+  const home = opts.home ?? cuvetteHome();
   const run = opts.run ?? defaultRun;
   const find = opts.find ?? defaultFind(env);
   const progress = opts.onProgress ?? (() => {});
@@ -206,7 +206,7 @@ export async function runDoctor(opts: DoctorOpts = {}): Promise<Check[]> {
   const key = claudeKey(env);
   checks.push(
     key.from === "none"
-      ? { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "missing", detail: "no key is saved. You need a key or a local model.", fix: { command: "ga key", link: "https://platform.claude.com/settings/keys" } }
+      ? { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "missing", detail: "no key is saved. You need a key or a local model.", fix: { command: "cuvette key", link: "https://platform.claude.com/settings/keys" } }
       : { id: "claude-key", group: "Needed to start", name: "Claude API key", status: "ok", detail: key.from === "env" ? "set in ANTHROPIC_API_KEY" : `saved in ${tilde(credentialsPath())}` },
   );
 
@@ -352,6 +352,6 @@ export function doctorText(checks: Check[], opts: { only?: Status[] } = {}): str
   lines.push("", `${n("ok")} ok, ${n("missing")} missing, ${n("old")} old.`);
   lines.push(canStart(checks) ? "Cuvette can start: Node is new enough and a model is ready." : "Cuvette cannot start yet. It needs Node 22 or later, and a Claude API key or an Ollama model.");
   const fixes = safeFixes(checks);
-  if (fixes.length) lines.push(`ga doctor --fix installs ${fixes.length} missing Python environment${fixes.length === 1 ? "" : "s"} or R package set${fixes.length === 1 ? "" : "s"}. It asks before it starts.`);
+  if (fixes.length) lines.push(`cuvette doctor --fix installs ${fixes.length} missing Python environment${fixes.length === 1 ? "" : "s"} or R package set${fixes.length === 1 ? "" : "s"}. It asks before it starts.`);
   return lines.join("\n");
 }

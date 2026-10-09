@@ -69,7 +69,7 @@ export function javaHome() {
 }
 
 export function programPath() {
-  const p = process.env.GA_PROGRAM_PATH;
+  const p = process.env.CUVETTE_PROGRAM_PATH;
   if (!p) fail("CellProfiler was not found. Set CELLPROFILER_PATH to the cp executable.");
   return p;
 }

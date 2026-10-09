@@ -4,7 +4,7 @@ import type { Args, Tool, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
 import { childEnv, decorate, inflight, makeRuntime, outputFile, runProcess, solidPng, tail, uniqueFile, validateArgs, type Dirs, type KindContext } from "./common.ts";
 
-const dry = () => process.env.GA_SCREEN_DRY_RUN === "1";
+const dry = () => process.env.CUVETTE_SCREEN_DRY_RUN === "1";
 
 const MAC_KEYS: Record<string, number> = { return: 36, enter: 76, tab: 48, space: 49, delete: 51, escape: 53, left: 123, right: 124, down: 125, up: 126, home: 115, end: 119, pageup: 116, pagedown: 121 };
 const WIN_KEYS: Record<string, string> = { return: "{ENTER}", enter: "{ENTER}", tab: "{TAB}", space: " ", delete: "{BACKSPACE}", escape: "{ESC}", left: "{LEFT}", right: "{RIGHT}", down: "{DOWN}", up: "{UP}", home: "{HOME}", end: "{END}", pageup: "{PGUP}", pagedown: "{PGDN}" };
@@ -38,7 +38,7 @@ export async function takeScreenshot(dirs: Dirs, env: Record<string, string>, si
     let err: string | undefined;
     if (process.platform === "darwin") err = await sh(["/usr/sbin/screencapture", "-x", path], env, signal);
     else if (process.platform === "win32") {
-      err = await sh([...PS, `${PS_HEAD}$b=[System.Windows.Forms.SystemInformation]::VirtualScreen;$bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height;$g=[System.Drawing.Graphics]::FromImage($bmp);$g.CopyFromScreen($b.Left,$b.Top,0,0,$bmp.Size);$bmp.Save($env:GA_ARG1,[System.Drawing.Imaging.ImageFormat]::Png)`], { ...env, GA_ARG1: path }, signal);
+      err = await sh([...PS, `${PS_HEAD}$b=[System.Windows.Forms.SystemInformation]::VirtualScreen;$bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height;$g=[System.Drawing.Graphics]::FromImage($bmp);$g.CopyFromScreen($b.Left,$b.Top,0,0,$bmp.Size);$bmp.Save($env:CUVETTE_ARG1,[System.Drawing.Imaging.ImageFormat]::Png)`], { ...env, CUVETTE_ARG1: path }, signal);
     } else err = await sh(["import", "-window", "root", path], env, signal);
     if (err) return { ok: false, error: err, manualRoute: route };
   }
@@ -50,7 +50,7 @@ type Act = (a: Args, env: Record<string, string>, signal: AbortSignal) => Promis
 const focusApp: Act = async (a, env, signal) => {
   const app = String(a.app);
   if (process.platform === "darwin") return sh(["osascript", "-e", "on run argv", "-e", "tell application (item 1 of argv) to activate", "-e", "end run", app], env, signal);
-  if (process.platform === "win32") return sh([...PS, "$ok=(New-Object -ComObject WScript.Shell).AppActivate($env:GA_APP); if(-not $ok){exit 3}"], { ...env, GA_APP: app }, signal);
+  if (process.platform === "win32") return sh([...PS, "$ok=(New-Object -ComObject WScript.Shell).AppActivate($env:CUVETTE_APP); if(-not $ok){exit 3}"], { ...env, CUVETTE_APP: app }, signal);
   return sh(["xdotool", "search", "--name", app, "windowactivate"], env, signal);
 };
 
@@ -63,8 +63,8 @@ const click: Act = async (a, env, signal) => {
     return sh(["osascript", "-l", "JavaScript", "-e", jxa, x, y, String(times)], env, signal);
   }
   if (process.platform === "win32") {
-    const script = `${PS_HEAD}Add-Type 'using System;using System.Runtime.InteropServices;public class M{[DllImport("user32.dll")]public static extern void mouse_event(uint f,uint x,uint y,uint d,UIntPtr e);}';[System.Windows.Forms.Cursor]::Position=New-Object System.Drawing.Point([int]$env:GA_X,[int]$env:GA_Y);for($i=0;$i -lt [int]$env:GA_TIMES;$i++){[M]::mouse_event(2,0,0,0,[UIntPtr]::Zero);[M]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}`;
-    return sh([...PS, script], { ...env, GA_X: x, GA_Y: y, GA_TIMES: String(times) }, signal);
+    const script = `${PS_HEAD}Add-Type 'using System;using System.Runtime.InteropServices;public class M{[DllImport("user32.dll")]public static extern void mouse_event(uint f,uint x,uint y,uint d,UIntPtr e);}';[System.Windows.Forms.Cursor]::Position=New-Object System.Drawing.Point([int]$env:CUVETTE_X,[int]$env:CUVETTE_Y);for($i=0;$i -lt [int]$env:CUVETTE_TIMES;$i++){[M]::mouse_event(2,0,0,0,[UIntPtr]::Zero);[M]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}`;
+    return sh([...PS, script], { ...env, CUVETTE_X: x, CUVETTE_Y: y, CUVETTE_TIMES: String(times) }, signal);
   }
   return sh(["xdotool", "mousemove", x, y, "click", "--repeat", String(times), "1"], env, signal);
 };
@@ -72,7 +72,7 @@ const click: Act = async (a, env, signal) => {
 const typeText: Act = async (a, env, signal) => {
   const text = String(a.text);
   if (process.platform === "darwin") return sh(["osascript", "-e", "on run argv", "-e", 'tell application "System Events" to keystroke (item 1 of argv)', "-e", "end run", text], env, signal);
-  if (process.platform === "win32") return sh([...PS, `${PS_HEAD}[System.Windows.Forms.SendKeys]::SendWait($env:GA_TEXT)`], { ...env, GA_TEXT: sendKeysEscape(text) }, signal);
+  if (process.platform === "win32") return sh([...PS, `${PS_HEAD}[System.Windows.Forms.SendKeys]::SendWait($env:CUVETTE_TEXT)`], { ...env, CUVETTE_TEXT: sendKeysEscape(text) }, signal);
   return sh(["xdotool", "type", "--", text], env, signal);
 };
 
@@ -87,7 +87,7 @@ const pressKey: Act = async (a, env, signal) => {
   if (process.platform === "win32") {
     const prefix = mods.map((m) => ({ control: "^", command: "^", shift: "+", option: "%" })[m]).join("");
     const code = WIN_KEYS[key] ?? (key.length === 1 ? sendKeysEscape(key) : `{${key.toUpperCase()}}`);
-    return sh([...PS, `${PS_HEAD}[System.Windows.Forms.SendKeys]::SendWait($env:GA_KEYS)`], { ...env, GA_KEYS: prefix + code }, signal);
+    return sh([...PS, `${PS_HEAD}[System.Windows.Forms.SendKeys]::SendWait($env:CUVETTE_KEYS)`], { ...env, CUVETTE_KEYS: prefix + code }, signal);
   }
   const prefix = mods.map((m) => ({ control: "ctrl", command: "super", shift: "shift", option: "alt" })[m]).join("+");
   return sh(["xdotool", "key", (prefix ? `${prefix}+` : "") + (LINUX_KEYS[key] ?? key)], env, signal);

@@ -9,11 +9,11 @@ import { startAdapter } from "../src/adapters/runtime.ts";
 import type { ToolContext } from "../src/core/types.ts";
 import { unzip } from "./fixtures/unzip.ts";
 
-const PY = process.env.GA_TABLES_PYTHON || join(homedir(), ".guided-analysis/envs/biostats/bin/python");
+const PY = process.env.CUVETTE_TABLES_PYTHON || join(homedir(), ".cuvette/envs/biostats/bin/python");
 const OPENPYXL = existsSync(PY) && spawnSync(PY, ["-c", "import openpyxl"]).status === 0;
 
 test("write_xlsx uses the harness writer: one sheet per CSV, numbers as numbers, a frozen header, a new name for each file", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ga-tables-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-tables-"));
   writeFileSync(join(dir, "long.csv"), "Sample,Group,Red dots\nSlice 1,Control,10\nSlice 2,Control,12\n");
   writeFileSync(join(dir, "stats.csv"), "Group,n,mean\nControl,2,11\n");
   const args = { tables: [{ path: join(dir, "long.csv"), sheet: "counts" }, { path: join(dir, "stats.csv") }], file_name: "lab" };
@@ -30,7 +30,7 @@ test("write_xlsx uses the harness writer: one sheet per CSV, numbers as numbers,
 });
 
 test.skipIf(!OPENPYXL)("make_plot saves its figures in the output folder that the session gives the adapter", async () => {
-  const root = mkdtempSync(join(tmpdir(), "ga-tables-out-"));
+  const root = mkdtempSync(join(tmpdir(), "cuvette-tables-out-"));
   const dirs = { workDir: join(root, "work"), sessionDir: root, outputDir: join(root, "out"), figureFormats: "png,svg" };
   mkdirSync(dirs.outputDir, { recursive: true });
   writeFileSync(join(root, "t.csv"), "Group,Value\nA,1\nA,2\nB,3\nB,5\n");

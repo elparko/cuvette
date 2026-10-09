@@ -7,12 +7,12 @@ import { AnalysisRecord } from "../src/core/record.ts";
 import { buildWorkbook, writeResults } from "../src/core/results.ts";
 
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-env-home-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-env-home-"));
   clearEnvCache();
 });
 
 function fakePython(packages: [string, string][]) {
-  const dir = mkdtempSync(join(tmpdir(), "ga-fake-py-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-fake-py-"));
   const site = join(dir, "lib", "site-packages");
   mkdirSync(site, { recursive: true });
   const py = join(dir, "python");
@@ -56,7 +56,7 @@ test("the cache keeps the lock until the environment folder changes", async () =
 });
 
 test("the lock of an R library comes from installed.packages, and renv.lock has each package", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "ga-fake-r-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-fake-r-"));
   const r = join(dir, "Rscript");
   writeFileSync(r, `#!/bin/sh\nprintf 'LANG\\tR 4.4.1\\nLIB\\t${dir}\\nPKG\\tDESeq2\\t1.44.0\\nPKG\\tBiocGenerics\\t0.50.0\\n'\n`);
   chmodSync(r, 0o755);
@@ -79,7 +79,7 @@ test("a command-line program has a lock with its version only, and runs no proce
 
 test("the record keeps each lock once, and results write environment.lock.json, requirements.txt and the Packages sheet", async () => {
   const f = fakePython([["numpy", "1.26.4"], ["scipy", "1.13.1"]]);
-  const dir = mkdtempSync(join(tmpdir(), "ga-env-rec-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-env-rec-"));
   const record = new AnalysisRecord(dir, "s1");
   const lock = (await captureEnv({ kind: "python", path: f.py }))!;
   const hash = record.addEnvironment(lock, "biostats");

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/andrews-fastqc"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/andrews-fastqc"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/andrews-fastqc"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/andrews-fastqc"
 mkdir -p "$D" "$R"
 cd "$D"
 curl -L -C - -O https://www.bioinformatics.babraham.ac.uk/projects/fastqc/good_sequence_short.txt

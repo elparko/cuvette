@@ -11,7 +11,7 @@ const TX = join(ADAPTER, "data/tx");
 let session: Session | undefined;
 
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-deseq2-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-deseq2-"));
 });
 afterEach(async () => {
   await session?.close();
@@ -44,7 +44,7 @@ test("the input type card shows the type that the harness detects from the files
     { calls: [{ name: "run_deseq", args: { counts: join(TX, "salmon"), coldata: join(TX, "coldata.csv"), tx2gene: join(TX, "tx2gene.csv"), input_type: "count matrix" } }] },
     { text: "Stopped at the question." },
   ]);
-  session = await Session.create({ adapters: [ADAPTER], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { askWaits: false, autoResume: false } });
+  session = await Session.create({ adapters: [ADAPTER], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { askWaits: false, autoResume: false } });
   session.decisions.applySetup({ question: "Which genes change?", min_samples: 3, alpha: 0.1, min_count: 10, lfc_threshold: 0 });
   await session.send("Run DESeq2 on the Salmon files");
   const q = session.questions.open().find((x) => x.decisionKey === "input_type");

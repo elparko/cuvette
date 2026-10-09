@@ -52,7 +52,7 @@ test("sheet names keep the Excel limits: 31 characters, no special characters, u
 
 test("CSV columns keep their types: numbers, missing values and text IDs", () => {
   expect(parseCsv('a,b\n1,"x, ""y"""\r\n2,z')).toEqual([["a", "b"], ["1", 'x, "y"'], ["2", "z"]]);
-  const dir = mkdtempSync(join(tmpdir(), "ga-res-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-res-"));
   writeFileSync(join(dir, "t.csv"), "id,value,flag,note\nA01,1.25,True,x\nA02,NA,False,\nA03,3e2,True,7\n");
   const t = readTable(join(dir, "t.csv"))!;
   expect(t.columns).toEqual(["id", "value", "flag", "note"]);
@@ -60,7 +60,7 @@ test("CSV columns keep their types: numbers, missing values and text IDs", () =>
 });
 
 function sampleRecord() {
-  const dir = mkdtempSync(join(tmpdir(), "ga-res-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-res-"));
   const record = new AnalysisRecord(join(dir, "session"), "s1");
   const out = record.workDir;
   const data = join(dir, "data.csv");
@@ -159,7 +159,7 @@ function pngDpi(buf: Buffer): number {
 }
 
 test.skipIf(!scriptPython().includes("science"))("a matplotlib figure from run_script gets a 300 dpi PNG and an SVG copy", async () => {
-  const root = mkdtempSync(join(tmpdir(), "ga-res-mpl-"));
+  const root = mkdtempSync(join(tmpdir(), "cuvette-res-mpl-"));
   const dirs = { workDir: join(root, "work"), sessionDir: root, outputDir: join(root, "work"), figureFormats: "png,svg" };
   mkdirSync(dirs.workDir, { recursive: true });
   const tool = runScriptTool(dirs, { network: false });

@@ -11,7 +11,7 @@ run_tool(function() {
   need_column(des, "group", "design (the column group)")
   samples <- intersect(des$sample, names(dat))
   if (length(samples) < nrow(des)) fail(sprintf("design lists samples that are not columns of the data: %s", paste(head(setdiff(des$sample, names(dat)), 6), collapse = ", ")))
-  ga <- pick(p, "group_a", NULL); gb <- pick(p, "group_b", NULL)
+  cuvette <- pick(p, "group_a", NULL); gb <- pick(p, "group_b", NULL)
   levels_found <- unique(des$group)
   if (is.null(ga) || is.null(gb)) fail(sprintf("give group_a and group_b. The log2 fold change is group_a minus group_b. Groups in the design: %s", paste(levels_found, collapse = ", ")))
   for (g in c(ga, gb)) if (!g %in% levels_found) fail(sprintf("group '%s' is not in the design. Groups: %s", g, paste(levels_found, collapse = ", ")))

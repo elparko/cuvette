@@ -99,7 +99,7 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
       const env: Record<string, string> = {};
       for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
       for (const [k, v] of Object.entries(conn.env)) env[k] = expand(v, c.ph);
-      Object.assign(env, { GA_WORK_DIR: c.dirs.workDir, GA_SESSION_DIR: c.dirs.sessionDir, GA_ADAPTER_DIR: c.adapter.root, GA_PROGRAM_PATH: c.programPath ?? "" });
+      Object.assign(env, { CUVETTE_WORK_DIR: c.dirs.workDir, CUVETTE_SESSION_DIR: c.dirs.sessionDir, CUVETTE_ADAPTER_DIR: c.adapter.root, CUVETTE_PROGRAM_PATH: c.programPath ?? "" });
       t = new StdioClientTransport({ command: argv[0], args: argv.slice(1), env, cwd: conn.cwd ? expand(conn.cwd, c.ph) : c.adapter.root, stderr: "pipe" });
       log ??= createWriteStream(logPath, { flags: "a" });
       t.stderr?.on("data", (d: Buffer) => {
@@ -107,7 +107,7 @@ export async function startMcp(c: KindContext): Promise<AdapterRuntime> {
         stderrTail = tail(stderrTail + d.toString("utf8"), 2000);
       });
     }
-    const cl = new Client({ name: "guided-analysis", version: "0.1.0" });
+    const cl = new Client({ name: "cuvette", version: "0.1.0" });
     cl.onclose = () => {
       if (client === cl) {
         client = undefined;

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/argelaguet2018-mofa-cll"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/argelaguet2018-mofa-cll"
 mkdir -p "$D"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT

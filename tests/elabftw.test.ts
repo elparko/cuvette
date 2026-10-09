@@ -33,8 +33,8 @@ test("create sends title and HTML body and reads the id from Location", async ()
 test("tags go to the tags endpoint", async () => {
   const c = client();
   const id = await c.createExperiment({ title: "T", body: "" });
-  await c.addTags(id, ["guided-analysis", "imagej"]);
-  expect(mock.experiments.get(id)!.tags).toEqual(["guided-analysis", "imagej"]);
+  await c.addTags(id, ["cuvette", "imagej"]);
+  expect(mock.experiments.get(id)!.tags).toEqual(["cuvette", "imagej"]);
 });
 
 test("append adds a section and eLabFTW keeps a revision for each change", async () => {

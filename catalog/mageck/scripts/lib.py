@@ -51,7 +51,7 @@ def as_list(v):
 
 
 def out_path(key):
-    return os.environ.get("GA_OUTPUT_" + key.upper(), "")
+    return os.environ.get("CUVETTE_OUTPUT_" + key.upper(), "")
 
 
 def number(x):
@@ -142,7 +142,7 @@ def run_mageck(args, work, log_name):
 
 
 def work_dir():
-    base = os.environ.get("GA_WORK_DIR") or tempfile.gettempdir()
+    base = os.environ.get("CUVETTE_WORK_DIR") or tempfile.gettempdir()
     d = tempfile.mkdtemp(prefix="mageck-", dir=base)
     return d
 

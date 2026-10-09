@@ -187,7 +187,7 @@ def inspect_table(path, out_dir):
     import pandas as pd
 
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "catalog", "tables"))
-    os.environ.setdefault("GA_OUTPUT_DIR", out_dir)
+    os.environ.setdefault("CUVETTE_OUTPUT_DIR", out_dir)
     try:
         from ga_tables import read_table
 

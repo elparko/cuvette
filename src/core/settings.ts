@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { accessAll } from "../adapters/access.ts";
-import { CATALOG_DIR, gaHome } from "../adapters/manifest.ts";
+import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 import { CLAUDE_MODELS } from "../providers/index.ts";
 import { DEFAULTS } from "./config.ts";
 import { claudeKey, elabftwConfig } from "./credentials.ts";
@@ -142,7 +142,7 @@ export const SETTINGS: SettingDef[] = [
     name: "openImages",
     group: "Session",
     label: "Open QC images",
-    help: "on: the demonstration on a sample opens its QC images on screen. off: it only saves them in figures/. GA_NO_OPEN=1 also turns it off.",
+    help: "on: the demonstration on a sample opens its QC images on screen. off: it only saves them in figures/. CUVETTE_NO_OPEN=1 also turns it off.",
     brief: "The demonstration on a sample opens its QC images on screen.",
     scopes: ALL,
     choices: () => ["on", "off"],
@@ -314,7 +314,7 @@ export const SETTINGS: SettingDef[] = [
     name: "programs",
     group: "Adapters",
     label: "Programs",
-    help: "Install, update, remove, turn on or off each adapter and its program, and set a custom program path. Enter opens the Programs panel. On the command line: ga programs.",
+    help: "Install, update, remove, turn on or off each adapter and its program, and set a custom program path. Enter opens the Programs panel. On the command line: cuvette programs.",
     scopes: [],
     edit: "programs",
     read: (ctx) => {
@@ -392,7 +392,7 @@ export const SETTINGS: SettingDef[] = [
     name: "claude_key",
     group: "Account and spend",
     label: "Claude API key",
-    help: "The key for the Claude API. The screen never shows it. ANTHROPIC_API_KEY in the shell wins over the saved key. Enter opens the key card. On the command line: ga key.",
+    help: "The key for the Claude API. The screen never shows it. ANTHROPIC_API_KEY in the shell wins over the saved key. Enter opens the key card. On the command line: cuvette key.",
     brief: "The key for the Claude API. The screen never shows it.",
     scopes: [],
     secret: true,
@@ -406,7 +406,7 @@ export const SETTINGS: SettingDef[] = [
     name: "budgetUsd",
     group: "Account and spend",
     label: "Budget per month",
-    help: "The harness stops Claude requests when the spend this month reaches this limit, in US dollars. GA_BUDGET_USD wins over the setting. Type off to remove it.",
+    help: "The harness stops Claude requests when the spend this month reaches this limit, in US dollars. CUVETTE_BUDGET_USD wins over the setting. Type off to remove it.",
     brief: "Claude requests stop when the spend this month reaches this limit.",
     scopes: ["user"],
     number: true,
@@ -416,14 +416,14 @@ export const SETTINGS: SettingDef[] = [
       const env = ctx.env ?? process.env;
       const b = budgetUsd(env);
       if (b === undefined) return { value: "no limit", source: "" };
-      return { value: `$${b.toFixed(2)}`, source: Number(env.GA_BUDGET_USD) > 0 ? "env" : "user" };
+      return { value: `$${b.toFixed(2)}`, source: Number(env.CUVETTE_BUDGET_USD) > 0 ? "env" : "user" };
     },
   },
   {
     name: "spend_month",
     group: "Account and spend",
     label: "Spent this month",
-    help: "Claude spend since the first day of this month, at list prices. ga spend shows each day.",
+    help: "Claude spend since the first day of this month, at list prices. cuvette spend shows each day.",
     scopes: [],
     read: () => ({ value: `$${totalSpend(monthStart()).toFixed(2)}`, source: "" }),
   },
@@ -431,7 +431,7 @@ export const SETTINGS: SettingDef[] = [
     name: "elabftw_url",
     group: "Lab notebook",
     label: "eLabFTW address",
-    help: "The address of your eLabFTW server. Enter opens the eLabFTW card. On the command line: ga eln setup.",
+    help: "The address of your eLabFTW server. Enter opens the eLabFTW card. On the command line: cuvette eln setup.",
     brief: "The address of your eLabFTW server.",
     scopes: [],
     edit: "eln",
@@ -455,7 +455,7 @@ export function find(name: string): SettingDef | undefined {
 }
 
 export function settingsPath(scope: "user" | "project", cwd: string): string {
-  return scope === "user" ? join(gaHome(), "settings.json") : join(cwd, ".ga", "settings.json");
+  return scope === "user" ? join(cuvetteHome(), "settings.json") : join(cwd, ".cuvette", "settings.json");
 }
 
 function readJson(path: string): Record<string, unknown> {
@@ -476,7 +476,7 @@ function layers(cwd: string): [Source, Record<string, unknown>, string][] {
 }
 
 export function adapterFolders(cwd: string): string[] {
-  return [...projectAdapterDirs(cwd), join(gaHome(), "adapters"), CATALOG_DIR];
+  return [...projectAdapterDirs(cwd), join(cuvetteHome(), "adapters"), CATALOG_DIR];
 }
 
 const TRUST_CHOICES = ["trusted", "trust once", "not trusted"] as const;
@@ -579,7 +579,7 @@ export function recordSetting(session: SettingSession | undefined, d: SettingDef
 
 export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown, scope: Scope): Promise<{ old: unknown; value: unknown; note?: string }> {
   const d = find(name);
-  if (!d) throw new Error(`No setting named ${name}. Type ga config to see the names.`);
+  if (!d) throw new Error(`No setting named ${name}. Type cuvette config to see the names.`);
   if (name === "folder_trust") return changeTrust(ctx, raw);
   if (d.secret || !d.scopes.length) throw new Error(`${d.label} cannot change here. ${d.help}`);
   if (!d.scopes.includes(scope)) throw new Error(`${d.label} can be saved only in: ${d.scopes.map(scopeLabel).join(", ")}.`);
@@ -598,9 +598,9 @@ export async function changeSetting(ctx: SettingCtx, name: string, raw: unknown,
   } else if (scope !== "session") writeSetting(settingsPath(scope, ctx.cwd), name, value);
   recordSetting(s, d, old, value, scope);
   const after = d.read ? undefined : fileValue(d, ctx.cwd);
-  const env = name === "budgetUsd" && Number((ctx.env ?? process.env).GA_BUDGET_USD) > 0;
+  const env = name === "budgetUsd" && Number((ctx.env ?? process.env).CUVETTE_BUDGET_USD) > 0;
   const note = env
-    ? "GA_BUDGET_USD in this shell still wins."
+    ? "CUVETTE_BUDGET_USD in this shell still wins."
     : scope === "project" && !folderTrusted(ctx.cwd) && !SAFE_KEYS.has(name)
       ? "This folder is not trusted, so Cuvette ignores its project settings. /trust shows the folder."
       : scope !== "session" && after && !same(after.value, value)

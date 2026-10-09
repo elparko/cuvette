@@ -11,7 +11,7 @@ import { FakeProvider } from "../src/providers/fake.ts";
 const DIR = resolve("tests/fixtures/drive");
 
 beforeAll(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-drive-home-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-drive-home-"));
 });
 
 function lastResult(messages: Message[]): string | undefined {

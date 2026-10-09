@@ -17,6 +17,6 @@ Checked on macOS arm64, 2026-10-08, mzmine 4.10.90 (Temurin 26.0.1), no user fil
 - The adapter reads `MZMINE_USER_FILE` and passes it as `-user`. This path is not tested.
 - The batch XML for the steps after the chromatogram builder was checked only until the login message. The program loaded each step with no parameter warning. The exported CSV was not read from a real run. The `read_feature_table` test uses a hand-made file.
 
-To remove the blocker: create a free mzmine user (mzmine window, Users tab, or `mzmine --login`), then set `MZMINE_USER_FILE` to the user file. Run `ga adapter check catalog/mzmine --run-tests` again. Then add a known-answer test with the full batch on the mzML files of rost2016-openms.
+To remove the blocker: create a free mzmine user (mzmine window, Users tab, or `mzmine --login`), then set `MZMINE_USER_FILE` to the user file. Run `cuvette adapter check catalog/mzmine --run-tests` again. Then add a known-answer test with the full batch on the mzML files of rost2016-openms.
 
 Data note: the cut mzML file in `data/` comes from the OpenMS tutorial data (2012_02_03_PStd_050_1.mzML). The archive states no license. Check before the harness redistributes the file.

@@ -23,9 +23,9 @@ program:
     - https://doi.org/10.1186/s13059-020-02015-1
     - https://doi.org/10.15252/msb.20178124
   install: >
-    The adapter uses the Python environment at ~/.guided-analysis/envs/mofa. Make it and add mofapy2, h5py, pandas, scipy
+    The adapter uses the Python environment at ~/.cuvette/envs/mofa. Make it and add mofapy2, h5py, pandas, scipy
     and matplotlib:
-    uv venv ~/.guided-analysis/envs/mofa && uv pip install --python ~/.guided-analysis/envs/mofa/bin/python mofapy2 h5py pandas scipy matplotlib
+    uv venv ~/.cuvette/envs/mofa && uv pip install --python ~/.cuvette/envs/mofa/bin/python mofapy2 h5py pandas scipy matplotlib
   citation:
     - text: "Argelaguet R, Arnol D, Bredikhin D, Deloro Y, Velten B, Marioni JC, Stegle O (2020). MOFA+: a statistical framework for comprehensive integration of multi-modal single-cell data. Genome Biology 21: 111."
       doi: 10.1186/s13059-020-02015-1
@@ -39,10 +39,10 @@ connection:
   call_timeout_s: 1800
 
 locate:
-  env: GA_MOFA_PYTHON
+  env: CUVETTE_MOFA_PYTHON
   paths:
-    - ~/.guided-analysis/envs/mofa/bin/python
-    - ~/.guided-analysis/envs/mofa/Scripts/python.exe
+    - ~/.cuvette/envs/mofa/bin/python
+    - ~/.cuvette/envs/mofa/Scripts/python.exe
     - /Volumes/ga-envs/mofa/bin/python
   which: []
   version_command: ["{program_path}", "-I", "-W", "ignore", "-c", "import importlib.metadata as m; print('mofapy2', m.version('mofapy2'))"]

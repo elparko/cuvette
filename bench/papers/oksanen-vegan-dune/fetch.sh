@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/oksanen-vegan-dune"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/oksanen-vegan-dune"
 mkdir -p "$D"
 export R_LIBS_USER="${R_LIBS_USER:-/Volumes/T7/guided-analysis/tools/R-library}"
 Rscript -e '

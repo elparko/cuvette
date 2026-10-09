@@ -12,7 +12,7 @@ OpenCode, which this design copies.
 A terminal agent, built like Claude Code and OpenCode, for science programs instead of code.
 
 - **Language:** TypeScript on Node 22+. `tsx` runs the source directly (no build step), so
-  adapter modules written in TypeScript load at run time. `bin/ga.js` is the entry.
+  adapter modules written in TypeScript load at run time. `bin/cuvette.js` is the entry.
 - **Terminal UI:** Ink (React for the terminal), like Claude Code.
 - **Core is a library with an event bus**, like OpenCode's server: the terminal UI, the headless
   mode, the MCP server mode and the later graph window are all clients of one `Session`.
@@ -35,8 +35,8 @@ A terminal agent, built like Claude Code and OpenCode, for science programs inst
 ## Folders
 
 ```
-bin/ga.js                    entry: registers tsx, imports src/cli.ts
-src/cli.ts                   ga (terminal UI), ga -p (headless), subcommands          [lead]
+bin/cuvette.js               entry: registers tsx, imports src/cli.ts
+src/cli.ts                   cuvette (terminal UI), cuvette -p (headless), subcommands  [lead]
 src/core/
   types.ts                   shared types                                             [lead]
   bus.ts                     Bus                                                      [lead]
@@ -96,18 +96,18 @@ docs/adapter-spec.md docs/onboarding-guide.md                                   
   before you add one.
 - Windows, macOS and Linux. `node:path`. `spawn` with an argument array, never a shell string.
 - Tests: `tests/<module>.test.ts`, vitest. Tests must not need the network, an API key, Java or
-  Ollama, unless they check `process.env.GA_LIVE` (`test.skipIf(!process.env.GA_LIVE)`).
+  Ollama, unless they check `process.env.CUVETTE_LIVE` (`test.skipIf(!process.env.CUVETTE_LIVE)`).
   Run `npx vitest run tests/<file>` and `npx tsc --noEmit`.
 - Style: no doc comments, few comments, error handling only at process, file and network
   boundaries. Small functions. No classes where a function does.
 - Text in docs, comments and UI: Simplified Technical English. Short sentences. Active voice.
   No marketing words. No invented codenames.
-- `GA_HOME` (default `~/.guided-analysis`) holds `sessions/`, `adapters/`, `profiles/`,
-  `labmemory/`, `questions.json`, `settings.json`, `LAB.md`. Tests set `GA_HOME` to a temp folder.
+- `CUVETTE_HOME` (default `~/.cuvette`) holds `sessions/`, `adapters/`, `profiles/`,
+  `labmemory/`, `questions.json`, `settings.json`, `LAB.md`. Tests set `CUVETTE_HOME` to a temp folder.
 
 ## Session folder
 
-`GA_HOME/sessions/<id>/`: `log.jsonl` (the record), `blobs/<sha256><ext>`, `work/` (the
+`CUVETTE_HOME/sessions/<id>/`: `log.jsonl` (the record), `blobs/<sha256><ext>`, `work/` (the
 adapters write here), `exports/`. A session id is `YYYYMMDD-HHMMSS-<4 hex>`.
 
 ## AnalysisRecord (`core/record.ts`)
@@ -182,8 +182,8 @@ function exportMarkdown(record, adapters, path): string
 function exportJsonl(record, path): string
 function exportPdf(record, adapters, path): string     // pandoc if a PDF engine works, else throws
 function exportProtocol(record, adapters, path): string
-function exportScript(record, adapters, path): string  // a .ts file that calls ga's ToolRunner
-function exportNotebook(record, adapters, path): string // .ipynb, Python cells that call `ga run-step`
+function exportScript(record, adapters, path): string  // a .ts file that calls the Cuvette ToolRunner
+function exportNotebook(record, adapters, path): string // .ipynb, Python cells that call `cuvette run-step`
 function exportFlow(record, adapters, path): string    // JSON with input placeholders
 ```
 
@@ -217,7 +217,7 @@ function startAdapter(adapter: LoadedAdapter, dirs: { workDir: string; sessionDi
 Placeholders in `connection.command`, `env`, `cwd`, `interpreter` and tool templates:
 `{node}` (process.execPath), `{tsx}` (path to the tsx cli), `{adapter_dir}`, `{work_dir}`,
 `{session_dir}`, `{program_path}` (from `locate.ts`), `{env:NAME}`. The child gets
-`GA_WORK_DIR`, `GA_SESSION_DIR`, `GA_ADAPTER_DIR`, `GA_PROGRAM_PATH`. Adapter tools return the
+`CUVETTE_WORK_DIR`, `CUVETTE_SESSION_DIR`, `CUVETTE_ADAPTER_DIR`, `CUVETTE_PROGRAM_PATH`. Adapter tools return the
 `ToolOutput` shape. An MCP tool result is read as: `structuredContent`, else JSON text, else
 plain text; `ok`, `summary`, `metrics`, `outputs`, `table`, `manualRoute`, `fidelity` are read
 from the JSON when present; image content is saved in `workDir`.
@@ -248,7 +248,7 @@ class QuestionQueue {
   expire(now?: number): Question[]
   wait(qid: string, timeoutMs?: number): Promise<Question>
 }
-function allOpenQuestions(): Question[]       // every session, oldest first, from GA_HOME/questions.json
+function allOpenQuestions(): Question[]       // every session, oldest first, from CUVETTE_HOME/questions.json
 function runSensitivity(decision: Decision, tool: string, baseArgs: Args, linkedArg: string,
   call: (tool: string, args: Args, meta: { sensitivityOf: string }) => Promise<{ output: ToolOutput; node?: string }>,
   record: AnalysisRecord): Promise<SensitivityResult>
@@ -285,7 +285,7 @@ WARNING: Project files in `.ga/` or `.cuvette/` can run programs. A change here 
 function scanFolder(folder: string): FolderScan   // files with SHA-256, keys, hook lines, adapters, bypass
 function trustStatus(folder: string): { state: "none" | "trusted" | "once" | "new" | "changed"; scan; changes: string[] }
 function folderTrusted(folder: string): boolean   // "trusted" or "once"
-function trustFolder(folder: string): TrustEntry  // saves trusted_folders in GA_HOME/settings.json
+function trustFolder(folder: string): TrustEntry  // saves trusted_folders in CUVETTE_HOME/settings.json
 function untrustFolder(folder: string): boolean
 function trustOnce(folder: string): void          // in this process; Session.close ends it
 function checkoutModelOptions(checkout: string): Record<string, unknown>   // think, numCtx, effort
@@ -379,15 +379,15 @@ Follow-mode instruction.
 ## Command line (`src/cli.ts`, lead)
 
 ```
-ga [--adapter imagej] [--model ollama:qwen3:8b] [--referee claude] [--mode watch] [--resume <id>]
-ga -p "<prompt>" --adapter imagej --model ... [--answers answers.json] [--setup setup.json] [--output text|json|stream-json]
-ga adapters | ga adapter check <dir|name> [--run-tests] | ga adapter approve <name>
-ga onboard <program> --model ... [--docs <url> ...] [--kind cli]
-ga export <session> --format <fmt>
-ga replay <session> --input <old>=<new> ...
-ga questions
-ga bench [scenario|all] --model ... [--guidance on|off|both]
-ga mcp
+cuvette [--adapter imagej] [--model ollama:qwen3:8b] [--referee claude] [--mode watch] [--resume <id>]
+cuvette -p "<prompt>" --adapter imagej --model ... [--answers answers.json] [--setup setup.json] [--output text|json|stream-json]
+cuvette adapters | cuvette adapter check <dir|name> [--run-tests] | cuvette adapter approve <name>
+cuvette onboard <program> --model ... [--docs <url> ...] [--kind cli]
+cuvette export <session> --format <fmt>
+cuvette replay <session> --input <old>=<new> ...
+cuvette questions
+cuvette bench [scenario|all] --model ... [--guidance on|off|both]
+cuvette mcp
 ```
 
 ## Changes made during the build (2026-10-08)
@@ -429,7 +429,7 @@ ga mcp
 
 ## Browser app (`src/server/app.ts`, 2026-10-08)
 
-`ga app [folder] [--resume <id|folder>] [--no-open]` starts `startApp(opts)`: an HTTP server on
+`cuvette app [folder] [--resume <id|folder>] [--no-open]` starts `startApp(opts)`: an HTTP server on
 127.0.0.1 with a random port and a random token. Every request needs the token (`?t=` or the
 `x-token` header), the Host header must be 127.0.0.1 or localhost with the port, a POST with an
 Origin header must come from the same origin, and the server sends no CORS headers. The page
@@ -448,13 +448,13 @@ can start and stop it without the command line.
   browser the fallbacks are the in-page folder field, `/api/reveal`, the Notification API and a
   download link.
 - **One session, two views.** In the terminal, `/app` starts the app on the running session.
-  `ga app --resume <id>` on a session that a terminal holds sends SIGUSR2 to that process,
+  `cuvette app --resume <id>` on a session that a terminal holds sends SIGUSR2 to that process,
   which starts the app on its session and writes the URL to `.record/open.json`. A session that
-  the app holds refuses `ga --resume` and prints the app URL. `open.json` (pid, app URL, mode
+  the app holds refuses `cuvette --resume` and prints the app URL. `open.json` (pid, app URL, mode
   0600) is removed when the session closes.
 - **Session titles.** After a turn that changes the analysis, the session makes one short
   model call (Claude Haiku for Claude models, the session model otherwise) for a title and a
   one-sentence description. The record gets a `title` entry and the home index gets `name` and
-  `description`. `ga sessions`, the terminal picker and the app's Sessions page show them.
+  `description`. `cuvette sessions`, the terminal picker and the app's Sessions page show them.
 - **Tests and windows.** `openWithOs`, the reveal action and the pilot image viewer do nothing
-  under vitest or with `GA_NO_OPEN=1` (`--no-open` sets it).
+  under vitest or with `CUVETTE_NO_OPEN=1` (`--no-open` sets it).

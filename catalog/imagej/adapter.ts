@@ -116,7 +116,7 @@ export function menuIndex(): Promise<string[]> {
 async function buildMenu(): Promise<string[]> {
   const jar = await programJar();
   if (!jar) return menuFromProps("");
-  const cacheFile = join(tmpdir(), `ga-imagej-menu-${Buffer.from(jar + statSync(jar).mtimeMs).toString("base64url").slice(-40)}.txt`);
+  const cacheFile = join(tmpdir(), `cuvette-imagej-menu-${Buffer.from(jar + statSync(jar).mtimeMs).toString("base64url").slice(-40)}.txt`);
   if (existsSync(cacheFile)) return readFileSync(cacheFile, "utf8").split("\n").filter(Boolean);
   const r = await runProcess(["java", "-Dapple.awt.UIElement=true", "-cp", jar, join(HERE, "MenuDump.java")], { timeoutMs: 60_000 });
   const lines = r.stdout.split(/\r?\n/).filter((l) => / > /.test(l) && !l.startsWith("Exception"));

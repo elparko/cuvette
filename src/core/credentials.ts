@@ -1,11 +1,11 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 
 let version = 0;
 
 export function credentialsPath(): string {
-  return join(gaHome(), "credentials.json");
+  return join(cuvetteHome(), "credentials.json");
 }
 
 function readFile(): Record<string, string> {
@@ -27,7 +27,7 @@ export function claudeKey(env: Record<string, string | undefined> = process.env)
 }
 
 function write(values: Record<string, string>): string {
-  mkdirSync(gaHome(), { recursive: true });
+  mkdirSync(cuvetteHome(), { recursive: true });
   const path = credentialsPath();
   writeFileSync(path, JSON.stringify(values, null, 1) + "\n", { mode: 0o600 });
   chmodSync(path, 0o600);
@@ -51,7 +51,7 @@ export function saveClaudeWorkspace(id: string): string {
 }
 
 export const WORKSPACE_HELP =
-  "This key belongs to no workspace, so the API needs a workspace ID with each request. Create a key inside a workspace at platform.claude.com, or save the workspace ID with `ga key workspace <id>` (in the app: /key workspace <id>).";
+  "This key belongs to no workspace, so the API needs a workspace ID with each request. Create a key inside a workspace at platform.claude.com, or save the workspace ID with `cuvette key workspace <id>` (in the app: /key workspace <id>).";
 
 export function removeClaudeKey(): boolean {
   const path = credentialsPath();

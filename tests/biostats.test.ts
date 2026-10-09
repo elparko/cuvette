@@ -4,7 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 
-const PY = process.env.GA_BIOSTATS_PYTHON || join(homedir(), ".guided-analysis/envs/biostats/bin/python");
+const PY = process.env.CUVETTE_BIOSTATS_PYTHON || join(homedir(), ".cuvette/envs/biostats/bin/python");
 const DIR = resolve("catalog/biostats");
 const ROSSI = join(DIR, "data/rossi.csv");
 

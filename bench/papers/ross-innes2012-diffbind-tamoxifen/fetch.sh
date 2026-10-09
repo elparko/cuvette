@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/ross-innes2012-diffbind-tamoxifen"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/ross-innes2012-diffbind-tamoxifen"
 mkdir -p "$D"
 cd "$D"
 # The DiffBind vignette data: chromosome 18 BAM files, peak files and the sample sheet of 11 ER ChIP-seq samples (561 MB).

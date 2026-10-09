@@ -13,8 +13,8 @@ while [ $# -gt 0 ]; do
 done
 set -- -in "$in" -fasta "$fasta" -out "$out"
 [ "$il" = yes ] && set -- "$@" -IL_equivalent
-"$bin/PeptideIndexer" "$@" $args >"$GA_CALL_DIR/pi.log" 2>&1 || { grep -iE 'error|fatal|decoy|unmatched' "$GA_CALL_DIR/pi.log" | tail -5 >&2; exit 1; }
+"$bin/PeptideIndexer" "$@" $args >"$CUVETTE_CALL_DIR/pi.log" 2>&1 || { grep -iE 'error|fatal|decoy|unmatched' "$CUVETTE_CALL_DIR/pi.log" | tail -5 >&2; exit 1; }
 echo "idxml=$out"
 file_kv "$out"
 echo "n_decoy_psm=$(decoy_psm_count "$out")"
-awk '/unmatched +:/ { print "n_unmatched=" $3 }' "$GA_CALL_DIR/pi.log"
+awk '/unmatched +:/ { print "n_unmatched=" $3 }' "$CUVETTE_CALL_DIR/pi.log"

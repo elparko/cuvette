@@ -13,7 +13,7 @@ import { summarize, type Cell } from "./papers-report.ts";
 import type { PapersResult, PaperRun } from "./papers.ts";
 
 const FALLBACK = resolve(dirname(fileURLToPath(import.meta.url)), "fallback_figure.py");
-const SCIENCE_PYTHON = join(homedir(), ".guided-analysis/envs/science/bin/python");
+const SCIENCE_PYTHON = join(homedir(), ".cuvette/envs/science/bin/python");
 const MAX_WIDTH = 1600;
 
 const FIELDS: [string, string[]][] = [
@@ -79,7 +79,7 @@ export function figureFor(run: PaperRun, paperDir: string, imgDir: string, pytho
   const name = `${run.paper}-${slug(run.model)}-run${run.run}-${key}.png`;
   const out = join(imgDir, name);
   if (existsSync(out)) return name;
-  const tmp = mkdtempSync(join(tmpdir(), "ga-site-"));
+  const tmp = mkdtempSync(join(tmpdir(), "cuvette-site-"));
   const runFile = join(tmp, "run.json");
   writeFileSync(runFile, JSON.stringify(run));
   const script = join(paperDir, "figure.py");

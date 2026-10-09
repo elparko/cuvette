@@ -10,7 +10,7 @@ import type { PaperItem } from "../src/bench/papers-spec.ts";
 
 let record: AnalysisRecord;
 beforeEach(() => {
-  record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "ga-score-")), "s1");
+  record = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-score-")), "s1");
 });
 
 const item = (o: Partial<PaperItem> & { key: string; value: number }): PaperItem => ({ description: "", abs: false, in_answer: true, ...o }) as PaperItem;

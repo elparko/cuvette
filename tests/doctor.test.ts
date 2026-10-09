@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { adapterDirs, loadAdapter, type Manifest } from "../src/adapters/manifest.ts";
 import { canStart, doctorText, older, rInstallCommand, runDoctor, safeFixes, uvCommand, type Check, type DoctorOpts } from "../src/core/doctor.ts";
 
-const oldHome = process.env.GA_HOME;
+const oldHome = process.env.CUVETTE_HOME;
 const oldPath = process.env.PATH;
 let root = "";
 let home = "";
@@ -13,16 +13,16 @@ let home = "";
 const IMAGEJ_JAVA = `for a in "$@"; do case "$a" in *.jar) n=$(basename "$a" .jar); v=\${n#ij-}; [ "$v" = "ij" ] && v=1.53k; echo "ImageJ version=$v"; exit 0 ;; esac; done; echo 'openjdk version "17.0.18"' >&2`;
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), "ga-doctor-"));
-  home = join(root, ".guided-analysis");
+  root = mkdtempSync(join(tmpdir(), "cuvette-doctor-"));
+  home = join(root, ".cuvette");
   mkdirSync(home, { recursive: true });
-  process.env.GA_HOME = home;
+  process.env.CUVETTE_HOME = home;
   exe(join(root, "pathbin/java"), IMAGEJ_JAVA);
   process.env.PATH = `${join(root, "pathbin")}:${oldPath}`;
 });
 afterEach(() => {
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
   process.env.PATH = oldPath;
 });
 
@@ -74,7 +74,7 @@ test("found: every item is ok, ImageJ.app is found, and the text says Cuvette ca
   const bin = { java, Rscript: r, uv, ollama: undefined } as Record<string, string | undefined>;
   const checks = await runDoctor(base({
     find: (n) => bin[n],
-    adapters: { imagej: moved("imagej", intoRoot), lme4: moved("lme4", () => r), biostats: moved("biostats", (p) => p.replace("~/.guided-analysis", home)) },
+    adapters: { imagej: moved("imagej", intoRoot), lme4: moved("lme4", () => r), biostats: moved("biostats", (p) => p.replace("~/.cuvette", home)) },
   }));
   for (const c of checks) expect(c.status, `${c.id}: ${c.detail}`).toBe("ok");
   expect(byId(checks, "java").detail).toBe("version 17.0.18");
@@ -104,7 +104,7 @@ test("missing: each item gives the exact install command or a download link", as
     env: {},
     fetch: ollamaDown,
     find: (n) => (n === "java" ? java : undefined),
-    adapters: { samtools: moved("samtools", intoRoot), sage: moved("sage", intoRoot), lme4: moved("lme4", intoRoot), biostats: moved("biostats", (p) => p.replace("~/.guided-analysis", home)) },
+    adapters: { samtools: moved("samtools", intoRoot), sage: moved("sage", intoRoot), lme4: moved("lme4", intoRoot), biostats: moved("biostats", (p) => p.replace("~/.cuvette", home)) },
   }));
   const st = (id: string) => byId(checks, id).status;
   for (const id of ["claude-key", "ollama", "uv", "java", "r", "env:science", "program:samtools", "program:sage", "program:biostats", "program:lme4"]) expect(st(id), id).toBe("missing");
@@ -117,7 +117,7 @@ test("missing: each item gives the exact install command or a download link", as
   expect(text).toContain("Install: brew install samtools");
   expect(text).toContain("Download: https://github.com/lazear/sage/releases");
   expect(text).toContain("Install: brew install ollama && ollama pull qwen3:8b");
-  expect(text).toContain("Install: ga key");
+  expect(text).toContain("Install: cuvette key");
   expect(text).toContain(`Install: ${uvCommand(home, "science")}`);
   expect(text).toContain(`Install: ${uvCommand(home, "biostats")}`);
   expect(text).toContain("Cuvette cannot start yet");
@@ -152,7 +152,7 @@ test("missing R packages and Python packages: --fix runs only uv and R commands"
   python("science", "numpy True\\npandas False\\n", "");
   const bin = { Rscript: r, uv } as Record<string, string | undefined>;
   mkdirSync(join(root, "rlib"));
-  const checks = await runDoctor(base({ env: { ANTHROPIC_API_KEY: "sk-ant-x", GA_R_LIBS: join(root, "rlib") }, find: (n) => bin[n], adapters: { deseq2: moved("deseq2", () => r), vegan: moved("vegan", () => r), samtools: moved("samtools", intoRoot) } }));
+  const checks = await runDoctor(base({ env: { ANTHROPIC_API_KEY: "sk-ant-x", CUVETTE_R_LIBS: join(root, "rlib") }, find: (n) => bin[n], adapters: { deseq2: moved("deseq2", () => r), vegan: moved("vegan", () => r), samtools: moved("samtools", intoRoot) } }));
   expect(byId(checks, "env:science").detail).toContain("these packages are missing: pandas");
   const d = byId(checks, "r:deseq2");
   expect(d.status).toBe("missing");
@@ -164,7 +164,7 @@ test("missing R packages and Python packages: --fix runs only uv and R commands"
   expect(fixes[0]).toBe(uvCommand(home, "science"));
   expect(fixes.some((f) => f.includes("brew"))).toBe(false);
   expect(d.fix?.command).toContain(`lib = "${join(root, "rlib")}"`);
-  expect(doctorText(checks)).toContain("ga doctor --fix installs 3");
+  expect(doctorText(checks)).toContain("cuvette doctor --fix installs 3");
 });
 
 test("the short list hides the unused model when Cuvette can start", async () => {
@@ -176,10 +176,10 @@ test("the short list hides the unused model when Cuvette can start", async () =>
 });
 
 test("the install commands are exact", () => {
-  expect(uvCommand("/Users/a/.guided-analysis", "biostats")).toBe(
-    "uv venv --python 3.12 /Users/a/.guided-analysis/envs/biostats && uv pip install --python /Users/a/.guided-analysis/envs/biostats/bin/python statsmodels pingouin lifelines matplotlib openpyxl 'pandas<3' scipy",
+  expect(uvCommand("/Users/a/.cuvette", "biostats")).toBe(
+    "uv venv --python 3.12 /Users/a/.cuvette/envs/biostats && uv pip install --python /Users/a/.cuvette/envs/biostats/bin/python statsmodels pingouin lifelines matplotlib openpyxl 'pandas<3' scipy",
   );
-  expect(uvCommand("/Users/a/.guided-analysis", "science")).toMatch(/uv pip install --python \/Users\/a\/\.guided-analysis\/envs\/science\/bin\/python -r \S+science-requirements\.txt$/);
+  expect(uvCommand("/Users/a/.cuvette", "science")).toMatch(/uv pip install --python \/Users\/a\/\.cuvette\/envs\/science\/bin\/python -r \S+science-requirements\.txt$/);
   expect(rInstallCommand("/Users/a/R-library", { cran: ["lme4", "lmerTest"] })).toBe(
     `mkdir -p /Users/a/R-library && Rscript -e '.libPaths(c("/Users/a/R-library", .libPaths())); install.packages(c("lme4", "lmerTest"), lib = "/Users/a/R-library", repos = "https://cloud.r-project.org")'`,
   );

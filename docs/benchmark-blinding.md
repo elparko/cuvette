@@ -29,7 +29,7 @@ The allow list for `read_file`, `list_dir` and `run_command`:
 | --- | --- |
 | `<data root>/<paper id>/` and each data folder that `bench.yaml` names | The data of the paper |
 | The run folder (`bench-runs/<date>/<model>/<paper>/run<N>/`) | The session record and the work folder |
-| Program folders: the folder of the program that each adapter found, `~/.guided-analysis/envs/`, `~/.guided-analysis/adapters/`, the R library on the T7 disk | The programs that the adapters run |
+| Program folders: the folder of the program that each adapter found, `~/.cuvette/envs/`, `~/.cuvette/adapters/`, the R library on the T7 disk | The programs that the adapters run |
 | `/usr`, `/bin`, `/sbin`, `/opt`, `/Library`, `/System`, `/Applications`, `/etc`, `/dev` | System files |
 | The temporary folder of the user (`$TMPDIR`) | Temporary files |
 | `src/adapters/`, `node_modules/`, `package.json`, `tsconfig.json` of the repository | The adapter worker scripts and the Node.js packages that child processes load |
@@ -46,7 +46,7 @@ The deny list applies to every tool and to every child process:
 - the folder of the paper specs and the results folder of the run;
 - the past benchmark runs (`/Volumes/T7/guided-analysis/tools/bench-runs/`) and the other folders in `/Volumes/T7/guided-analysis/tools/`, except the program folders;
 - the reference folder (`/Volumes/T7/guided-analysis/reference/`). It holds the result files from the downloads, for example the vignettes and the reports;
-- the real home folder of the harness (`~/.guided-analysis`, `~/.cuvette`): past sessions, questions, spend. The program environments stay readable;
+- the real home folder of the harness (`~/.cuvette`, `~/.cuvette`): past sessions, questions, spend. The program environments stay readable;
 - `~/.claude` and `/private/tmp/claude-<uid>` (the notes and the transcripts of the coding agents).
 
 If two rules match a path, the longer rule wins. Thus the adapter processes of rdkit can read `catalog/rdkit/`, but not the rest of the repository.
@@ -72,7 +72,7 @@ For each run, the report and the JSON file show:
 
 A clean run has zero paths outside the allow list. The JSON field is `runs[].leaks`. The policy of each run is in `runs[].blind` (cwd, allow list, deny list, sandbox).
 
-`ga bench rescore` computes the leak check again from the session record.
+`cuvette bench rescore` computes the leak check again from the session record.
 
 ## Leaks found and fixed
 
@@ -84,7 +84,7 @@ The audit on 2026-10-08 searched for each expected value of each paper. It searc
 | --- | --- | --- |
 | `read_file` and `list_dir` accepted any path under the session cwd, and the cwd was the repository root | The agent could read `bench/papers/<id>/expected.yaml`, `paper.md`, `triage.md`, `runs-*.md`, `bench/results/`, `docs/` | Blind mode: the cwd is the work folder of the run, and the file tools use the allow list |
 | `run_script` and the adapter processes could read any file | The macOS sandbox limited only writes | Blind mode: the sandbox denies reads on the deny list |
-| Past runs and notes were readable | `/Volumes/T7/guided-analysis/tools/bench-runs/`, the rerun folders and logs in `tools/`, `~/.guided-analysis/sessions/`, `~/.claude/` | On the deny list |
+| Past runs and notes were readable | `/Volumes/T7/guided-analysis/tools/bench-runs/`, the rerun folders and logs in `tools/`, `~/.cuvette/sessions/`, `~/.claude/` | On the deny list |
 | The description of the `calculate` tool (sent in every run) | `ratio(4696, 5007)` is the ratio item of ljosa2012 (0.9379, true total 5007) | New example numbers |
 
 ### The data folders
@@ -101,7 +101,7 @@ The audit on 2026-10-08 searched for each expected value of each paper. It searc
 | palmer2017 | `MTBLS313_..._maf.tsv`, `MTBLS317_m_maf.tsv` | The published annotation table, the source of 51, 66, 103 | Moved; removed from `data:` |
 | schramm2012 | `test_basic.py`, `Example_Continuous.parse.npz` | `assert len(parser.coordinates) == 9` | Moved |
 
-The `fetch.sh` of each paper now writes these files to `/Volumes/T7/guided-analysis/reference/<id>/` (or `$GA_REFERENCE`). The `expected.yaml` files name the new source paths. No expected value changed.
+The `fetch.sh` of each paper now writes these files to `/Volumes/T7/guided-analysis/reference/<id>/` (or `$CUVETTE_REFERENCE`). The `expected.yaml` files name the new source paths. No expected value changed.
 
 ### The adapters
 
@@ -128,7 +128,7 @@ These checks ran on 2026-10-08.
 
 - Unit tests: `tests/blind.test.ts` and `tests/papers-blind.test.ts`. A fake agent tries to read `expected.yaml` with an absolute path and with a relative path. Both reads stop. The record has two `blocked` entries. No tool result holds the expected value. A script that builds the path at run time gets "Operation not permitted". With `--no-blind`, the old behavior stays.
 - Adapter programs under the sandbox: the known-answer tests of all 24 paper adapters and ImageJ (Fiji) pass with the blind policy active. This includes R (lme4, deseq2, vegan, cardinal), Python (astropy, scanpy, mne and others), Java (ImageJ, CellProfiler) and command-line programs (bcftools, samtools, sage, iqtree).
-- A fake agent on the real astropy adapter (bradley-photutils): reads of `expected.yaml`, of `catalog/astropy/data/isolated_truth.csv`, of the reference folder, and of `~/.guided-analysis/sessions` from `run_script` all stop. The leak check shows 5 blocked reads and the 4 paths outside the allow list.
+- A fake agent on the real astropy adapter (bradley-photutils): reads of `expected.yaml`, of `catalog/astropy/data/isolated_truth.csv`, of the reference folder, and of `~/.cuvette/sessions` from `run_script` all stop. The leak check shows 5 blocked reads and the 4 paths outside the allow list.
 - A real local model: `ollama:qwen3:8b` on bradley-photutils-100gaussians in blind mode (`bench/results/papers-2026-10-08-qwen3-blind-bradley.md`). The sandbox was on. The agent read 2 paths: the data file and a file in its work folder. 0 paths were outside the allow list. The sandbox blocked 0 reads. The answer had 0 unsourced and 0 literature claims. The score was 6 of 6 computed and 6 of 6 reported. The leak check found no source for the numbers other than the steps of the run.
 
 ## Limits

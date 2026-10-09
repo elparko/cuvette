@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/rees2019-uptake/fields"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/rees2019-uptake"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/rees2019-uptake/fields"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/rees2019-uptake"
 mkdir -p "$D" "$R"
 # BioImage Archive S-BSST249. The first three fields of BEAS-2B, 0.5 nM, 1 h go to the data folder.
 # The CellProfiler result file of that experiment holds the counts of each field; it goes to the reference folder.

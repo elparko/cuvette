@@ -230,7 +230,7 @@ describe("claude", () => {
 let imgPath = "";
 function dirImg() {
   if (imgPath) return;
-  const d = mkdtempSync(join(tmpdir(), "ga-img-"));
+  const d = mkdtempSync(join(tmpdir(), "cuvette-img-"));
   imgPath = join(d, "a.png");
   writeFileSync(imgPath, PNG);
 }
@@ -507,7 +507,7 @@ describe("fake", () => {
   test("function script and file spec", async () => {
     const p = new FakeProvider((messages) => ({ text: `n=${messages.length}` }));
     expect((await p.step(req([user("x")]))).message.parts).toEqual([{ type: "text", text: "n=1" }]);
-    const f = join(mkdtempSync(join(tmpdir(), "ga-fake-")), "s.json");
+    const f = join(mkdtempSync(join(tmpdir(), "cuvette-fake-")), "s.json");
     writeFileSync(f, JSON.stringify({ steps: [{ text: "from file" }], complete: "custom" }));
     const q = await makeProvider(`fake:${f}`);
     expect((await q.step(req([user("x")]))).message.parts).toEqual([{ type: "text", text: "from file" }]);
@@ -531,7 +531,7 @@ describe("text helpers", () => {
   });
 });
 
-describe.skipIf(!process.env.GA_LIVE)("live ollama", () => {
+describe.skipIf(!process.env.CUVETTE_LIVE)("live ollama", () => {
   const addTool: ToolSchema = {
     name: "add",
     description: "Add two integers and return the sum",

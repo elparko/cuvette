@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/kanetis2022-iqtree-sporocadaceae"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/kanetis2022-iqtree-sporocadaceae"
 mkdir -p "$D"
 cd "$D"
 # figshare item 10.6084/m9.figshare.20530188 (CC BY 4.0): the concatenated alignment and the four locus alignments.

@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -30,13 +30,13 @@ export function slug(program: string): string {
 
 export function onboardCommand(program: string, opts: OnboardOptions): OnboardSession {
   const name = slug(program);
-  const draftDir = join(gaHome(), "drafts", name);
+  const draftDir = join(cuvetteHome(), "drafts", name);
   mkdirSync(draftDir, { recursive: true });
   const lines = [
     `Onboard this program: ${program}.`,
     `Draft adapter name: ${name}.`,
     `Draft folder: ${draftDir}. Write every file there with write_adapter_file.`,
-    `Procedure: read ${GUIDE_PATH} first, and follow it. Its section "Adapter checklist" lists the rules that ga adapter check enforces.`,
+    `Procedure: read ${GUIDE_PATH} first, and follow it. Its section "Adapter checklist" lists the rules that cuvette adapter check enforces.`,
     `Adapter spec: ${SPEC_PATH}.`,
   ];
   if (opts.kind) lines.push(`Connection kind hint from the scientist: ${opts.kind}. Check that it fits before you use it.`);
@@ -50,6 +50,6 @@ export function onboardCommand(program: string, opts: OnboardOptions): OnboardSe
     cwd: process.cwd(),
     firstMessage: lines.join("\n"),
     draftDir,
-    env: { GA_DRAFT_DIR: draftDir },
+    env: { CUVETTE_DRAFT_DIR: draftDir },
   };
 }

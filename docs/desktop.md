@@ -1,13 +1,13 @@
 # Cuvette for Mac
 
-The Mac app is a small window around the browser app (`ga app`). The window is a Tauri 2 shell
+The Mac app is a small window around the browser app (`cuvette app`). The window is a Tauri 2 shell
 in Rust. The core is the same Node code as the terminal tool. It runs in the app as a sidecar.
 
 ## Install: terminal or desktop
 
 There are two installs. Both use the same core.
 
-- Terminal: install the npm package. You get `cuvette` (and the old name `ga`). `cuvette app`
+- Terminal: install the npm package. You get `cuvette` (and the old name `cuvette`). `cuvette app`
   opens the browser app. Until the package is on npm, run `npm install`, then `npm link`, in this
   repository. The npm package does not contain `desktop/` or the build output.
 - Desktop: open `Cuvette-<version>-arm64.dmg` and drag Cuvette to Applications.
@@ -30,7 +30,7 @@ If you moved Cuvette.app after the install, the command tells you to install it 
 
 1. The shell starts `Contents/MacOS/node Contents/Resources/core/dist/sidecar.mjs [folder]`.
 2. The sidecar gets the PATH of your login shell, so that the check finds uv, R, Java and the
-   programs. It keeps the PATH in `~/.guided-analysis/desktop-path.txt` and makes it new at each
+   programs. It keeps the PATH in `~/.cuvette/desktop-path.txt` and makes it new at each
    start.
 3. The sidecar starts the app server on 127.0.0.1 with a random port and a random token. It
    writes one line to stdout: `{"port":…, "token":…, "url":…}`. Only the shell reads this pipe.
@@ -39,7 +39,7 @@ If you moved Cuvette.app after the install, the command tells you to install it 
 5. When you quit, the shell closes the stdin of the sidecar. The sidecar closes the session and
    stops. If the shell stops in an unusual way, the closed pipe also stops the sidecar.
 
-The log of the last start is `~/.guided-analysis/logs/desktop.log`.
+The log of the last start is `~/.cuvette/logs/desktop.log`.
 
 The page keeps its browser fallbacks. In the window, it uses these Mac functions:
 
@@ -58,7 +58,7 @@ Links to other sites, and links that open a new tab, open in your default browse
 - Drag a folder onto the Cuvette icon in the Dock.
 - In Terminal: `open -a Cuvette /path/to/folder`. The form `open -a Cuvette --args <folder>` works
   only when Cuvette is not open.
-- In Finder: the Quick Action "Analyze with Cuvette" (`ga install-finder-action`). It opens
+- In Finder: the Quick Action "Analyze with Cuvette" (`cuvette install-finder-action`). It opens
   Cuvette.app with the folder.
 
 If the first start is not complete, Cuvette shows the first start first. Then open the folder
@@ -186,10 +186,10 @@ you have it:
 
 ## Limits
 
-- The onboarding adapter (`ga onboard`) needs tsx. It does not run in the app. Use the terminal
+- The onboarding adapter (`cuvette onboard`) needs tsx. It does not run in the app. Use the terminal
   install for it.
 - The app does not contain the known-answer test data of the adapters (`catalog/*/data`, 12 MB).
-  `ga adapter check --run-tests` needs the repository.
-- `ga install-launcher` makes a different `~/Applications/Cuvette.app` (a small script). If you
-  use the desktop app, remove it with `ga uninstall-launcher`.
+  `cuvette adapter check --run-tests` needs the repository.
+- `cuvette install-launcher` makes a different `~/Applications/Cuvette.app` (a small script). If you
+  use the desktop app, remove it with `cuvette uninstall-launcher`.
 - File > Recent Sessions shows the Sessions page. It is not a list in the menu.

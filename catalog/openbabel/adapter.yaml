@@ -15,7 +15,7 @@ program:
     - https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html
     - https://open-babel.readthedocs.io/en/latest/Descriptors/descriptors.html
   install: >
-    Install Open Babel with Homebrew. The adapter reads the GA_OBABEL variable, then obabel on the PATH,
+    Install Open Babel with Homebrew. The adapter reads the CUVETTE_OBABEL variable, then obabel on the PATH,
     /opt/homebrew/bin, /usr/local/bin and /usr/bin.
     brew install open-babel
   citation:
@@ -34,7 +34,7 @@ program:
 connection:
   kind: cli
 locate:
-  env: GA_OBABEL
+  env: CUVETTE_OBABEL
   which: [obabel]
   paths: ["/opt/homebrew/bin/obabel", "/usr/local/bin/obabel", "/usr/bin/obabel"]
   version_command: ["{program_path}", "-V"]

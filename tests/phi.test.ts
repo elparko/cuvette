@@ -13,7 +13,7 @@ import { cardFromEvent, closesCard, phiView, type Card } from "../src/ui/cards.t
 import { FakeSession } from "../src/ui/fake-session.ts";
 
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-phi-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-phi-"));
 });
 
 const kinds = (text: string) => scanContent(text, "x").map((h) => h.kind).sort();
@@ -131,17 +131,17 @@ test("cloud and local models", () => {
 });
 
 test("the folder answer is kept in the user settings", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ga-folder-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-folder-"));
   expect(folderHasNoPatientData(dir)).toBe(false);
   setFolderNoPatientData(dir, true);
   expect(folderHasNoPatientData(dir)).toBe(true);
-  expect(JSON.parse(readFileSync(join(process.env.GA_HOME!, "settings.json"), "utf8")).no_patient_data_folders).toHaveLength(1);
+  expect(JSON.parse(readFileSync(join(process.env.CUVETTE_HOME!, "settings.json"), "utf8")).no_patient_data_folders).toHaveLength(1);
   setFolderNoPatientData(dir, false);
   expect(folderHasNoPatientData(dir)).toBe(false);
 });
 
 async function clinicSession(opts: { local?: boolean; settings?: Record<string, unknown>; action?: PhiAction } = {}) {
-  const cwd = mkdtempSync(join(tmpdir(), "ga-phi-proj-"));
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-phi-proj-"));
   const file = join(cwd, "visits.csv");
   writeFileSync(file, CLINIC_CSV);
   const provider = new FakeProvider([{ calls: [{ name: "read_file", args: { path: file } }] }, { text: "Three visits." }, { text: "Three visits." }]);

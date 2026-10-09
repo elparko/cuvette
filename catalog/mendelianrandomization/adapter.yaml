@@ -24,9 +24,9 @@ program:
     - https://doi.org/10.1093/ije/dyx034
   install: >
     Install R (brew install r on macOS). Then install the R packages MendelianRandomization and jsonlite into a library
-    folder that the adapter reads: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
-    ~/.guided-analysis/R-library.
-    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("MendelianRandomization", "jsonlite"), repos = "https://cloud.r-project.org")'
+    folder that the adapter reads: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or
+    ~/.cuvette/R-library.
+    mkdir -p ~/.cuvette/R-library && R_LIBS_USER=$HOME/.cuvette/R-library Rscript -e 'install.packages(c("MendelianRandomization", "jsonlite"), repos = "https://cloud.r-project.org")'
   citation:
     - text: "Yavorska, O. O., & Burgess, S. (2017). MendelianRandomization: an R package for performing Mendelian randomization analyses using summarized data. International Journal of Epidemiology, 46(6), 1734-1739. https://doi.org/10.1093/ije/dyx034"
       doi: 10.1093/ije/dyx034
@@ -75,8 +75,8 @@ locate:
 
 standards: >
   Every script puts the R package library in front of the library path. The library is the first
-  folder that exists of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
-  ~/.guided-analysis/R-library. The program version in this adapter is the version of the R package
+  folder that exists of these: CUVETTE_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library,
+  ~/.cuvette/R-library. The program version in this adapter is the version of the R package
   MendelianRandomization, not of R. The package does not align alleles. The tools refuse to run until the
   scientist confirms that the exposure and the outcome effects use the same effect allele for every variant.
 

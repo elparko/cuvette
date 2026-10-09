@@ -22,9 +22,9 @@ program:
     - https://scikit-image.org/docs/stable/api/skimage.measure.html
     - https://scikit-image.org/docs/stable/auto_examples/applications/plot_thresholding_guide.html
   install: >
-    The adapter uses its own Python environment at ~/.guided-analysis/envs/skimage, or the Python in SKIMAGE_PYTHON.
+    The adapter uses its own Python environment at ~/.cuvette/envs/skimage, or the Python in SKIMAGE_PYTHON.
     Make the environment and install scikit-image:
-    uv venv ~/.guided-analysis/envs/skimage && uv pip install --python ~/.guided-analysis/envs/skimage/bin/python scikit-image
+    uv venv ~/.cuvette/envs/skimage && uv pip install --python ~/.cuvette/envs/skimage/bin/python scikit-image
   citation:
     - text: "van der Walt, S., Schönberger, J. L., Nunez-Iglesias, J., Boulogne, F., Warner, J. D., Yager, N., Gouillart, E., & Yu, T. (2014). scikit-image: image processing in Python. PeerJ, 2, e453. https://doi.org/10.7717/peerj.453"
       doi: 10.7717/peerj.453
@@ -47,8 +47,8 @@ connection:
 locate:
   env: SKIMAGE_PYTHON
   paths:
-    - ~/.guided-analysis/envs/skimage/bin/python
-    - ~/.guided-analysis/envs/skimage/Scripts/python.exe
+    - ~/.cuvette/envs/skimage/bin/python
+    - ~/.cuvette/envs/skimage/Scripts/python.exe
   version_command: ["{program_path}", "-c", "import skimage; print('skimage', skimage.__version__)"]
   version_pattern: 'skimage (\S+)'
   identity: 'skimage \d'

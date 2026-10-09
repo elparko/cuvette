@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/wang2023-cuproptosis-oa"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/wang2023-cuproptosis-oa"
 mkdir -p "$D"
 cd "$D"
 # The four hub genes are named in the abstract and in the Results of the paper.

@@ -25,9 +25,9 @@ program:
     - https://pythonhosted.org/rasterstats/manual.html
   install: >
     Install GDAL with its command line programs (brew install gdal on macOS). The tools run
-    scripts/ga_gdal.py in a Python environment in ~/.guided-analysis/envs/gdal. Make it and install the
+    scripts/ga_gdal.py in a Python environment in ~/.cuvette/envs/gdal. Make it and install the
     packages that the script imports:
-    uv venv ~/.guided-analysis/envs/gdal && uv pip install --python ~/.guided-analysis/envs/gdal/bin/python
+    uv venv ~/.cuvette/envs/gdal && uv pip install --python ~/.cuvette/envs/gdal/bin/python
     rasterstats geopandas rasterio matplotlib numpy
   citation:
     - text: GDAL/OGR contributors. (2026). GDAL/OGR Geospatial Data Abstraction software Library (Version 3.13.3) [Computer software]. Open Source Geospatial Foundation. https://doi.org/10.5281/zenodo.5884351
@@ -50,7 +50,7 @@ connection:
   call_timeout_s: 900
 
 locate:
-  env: GA_GDAL
+  env: CUVETTE_GDAL
   paths: ["/opt/homebrew/bin/gdalinfo", "/usr/local/bin/gdalinfo", "/usr/bin/gdalinfo"]
   which: [gdalinfo]
   version_command: ["{program_path}", "--version"]
@@ -166,7 +166,7 @@ tools:
       path: { type: string, minLength: 1, description: Absolute path of the raster file. }
       band: { type: integer, minimum: 1, description: "Band number (index, starting at 1). Default 1." }
     required: [path]
-    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "raster_info", "{path}", "--band", "{band}"]
+    command: ["{env:HOME}/.cuvette/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "raster_info", "{path}", "--band", "{band}"]
     parse: json
 
   - name: vector_info
@@ -179,7 +179,7 @@ tools:
       path: { type: string, minLength: 1, description: Absolute path of the vector file. }
       layer: { type: string, description: Layer name. Leave out for the first layer. }
     required: [path]
-    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "vector_info", "{path}", "--layer", "{layer}"]
+    command: ["{env:HOME}/.cuvette/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "vector_info", "{path}", "--layer", "{layer}"]
     parse: json
 
   - name: reproject_raster
@@ -197,7 +197,7 @@ tools:
     required: [path, target_crs]
     outputs:
       result: { kind: file, ext: .tif, description: The reprojected GeoTIFF. }
-    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "reproject_raster", "{path}", "--target-crs", "{target_crs}", "--resampling", "{resampling}", "--pixel-size", "{pixel_size}", "--src-nodata", "{src_nodata}", "--dst-nodata", "{dst_nodata}"]
+    command: ["{env:HOME}/.cuvette/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "reproject_raster", "{path}", "--target-crs", "{target_crs}", "--resampling", "{resampling}", "--pixel-size", "{pixel_size}", "--src-nodata", "{src_nodata}", "--dst-nodata", "{dst_nodata}"]
     parse: json
 
   - name: calc_raster
@@ -214,7 +214,7 @@ tools:
     required: [path, expression]
     outputs:
       result: { kind: file, ext: .tif, description: The new GeoTIFF. }
-    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "calc_raster", "{path}", "--expression", "{expression}", "--nodata", "{nodata}", "--type", "{type}"]
+    command: ["{env:HOME}/.cuvette/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "calc_raster", "{path}", "--expression", "{expression}", "--nodata", "{nodata}", "--type", "{type}"]
     parse: json
 
   - name: reproject_vector
@@ -228,7 +228,7 @@ tools:
     required: [path, target_crs]
     outputs:
       result: { kind: file, ext: .gpkg, description: The reprojected GeoPackage. }
-    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "reproject_vector", "{path}", "--target-crs", "{target_crs}"]
+    command: ["{env:HOME}/.cuvette/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "reproject_vector", "{path}", "--target-crs", "{target_crs}"]
     parse: json
 
   - name: zonal_stats
@@ -245,7 +245,7 @@ tools:
       band: { type: integer, minimum: 1, description: "Band number (index, starting at 1). Default 1." }
       id_field: { type: string, description: Polygon field that names each row. Leave out to number the rows from 1. }
     required: [raster, zones]
-    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "zonal_stats", "{raster}", "{zones}", "--pixels", "{pixels}", "--nodata", "{nodata}", "--band", "{band}", "--id-field", "{id_field}"]
+    command: ["{env:HOME}/.cuvette/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "zonal_stats", "{raster}", "{zones}", "--pixels", "{pixels}", "--nodata", "{nodata}", "--band", "{band}", "--id-field", "{id_field}"]
     parse: json
 
   - name: plot_map
@@ -263,7 +263,7 @@ tools:
     required: [raster]
     outputs:
       result: { kind: image, ext: .png, description: The map. }
-    command: ["{env:HOME}/.guided-analysis/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "plot_map", "{raster}", "--zones", "{zones}", "--band", "{band}", "--colormap", "{colormap}", "--title", "{title}"]
+    command: ["{env:HOME}/.cuvette/envs/gdal/bin/python", "{adapter_dir}/scripts/ga_gdal.py", "plot_map", "{raster}", "--zones", "{zones}", "--band", "{band}", "--colormap", "{colormap}", "--title", "{title}"]
     parse: json
 
 map:

@@ -257,7 +257,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   let tests: TestOutcome[] | undefined;
   let toolsKnown = (tools.size > 0 && m.connection.kind !== "mcp") || m.connection.kind === "files";
   if (opts.runTests) {
-    const work = mkdtempSync(join(tmpdir(), "ga-check-"));
+    const work = mkdtempSync(join(tmpdir(), "cuvette-check-"));
     let runtime: Awaited<ReturnType<typeof import("../adapters/runtime.ts").startAdapter>> | undefined;
     try {
       const { startAdapter } = await import("../adapters/runtime.ts");

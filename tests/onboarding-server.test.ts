@@ -17,12 +17,12 @@ async function call(name: string, args: Record<string, unknown>) {
 }
 
 beforeAll(async () => {
-  tmp = mkdtempSync(join(tmpdir(), "ga-onbsrv-"));
+  tmp = mkdtempSync(join(tmpdir(), "cuvette-onbsrv-"));
   draft = join(tmp, "draft");
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [resolve("node_modules/tsx/dist/cli.mjs"), resolve("catalog/onboarding/server.ts")],
-    env: { ...(process.env as Record<string, string>), GA_DRAFT_DIR: draft, GA_HOME: join(tmp, "home") },
+    env: { ...(process.env as Record<string, string>), CUVETTE_DRAFT_DIR: draft, CUVETTE_HOME: join(tmp, "home") },
   });
   client = new Client({ name: "test", version: "0" });
   await client.connect(transport);

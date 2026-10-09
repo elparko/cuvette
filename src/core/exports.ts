@@ -258,7 +258,7 @@ export function exportNotebook(record: AnalysisRecord, adapters: LoadedAdapter[]
       execution_count: null,
       metadata: {},
       outputs: [],
-      source: cellSource(`!ga run-step ${n.adapter} ${n.tool} ${shellQuote(json)}`),
+      source: cellSource(`!cuvette run-step ${n.adapter} ${n.tool} ${shellQuote(json)}`),
     });
   });
   const nb = {

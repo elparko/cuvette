@@ -41,7 +41,7 @@ function nodeIn(over: Partial<NodeIn>): NodeIn {
 }
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), "ga-trail-"));
+  dir = mkdtempSync(join(tmpdir(), "cuvette-trail-"));
   mkdirSync(join(dir, "ad"));
   writeFileSync(join(dir, "ad", "adapter.yaml"), YAML);
   adapter = loadAdapter(join(dir, "ad"));
@@ -211,7 +211,7 @@ test("the trail leaves out housekeeping calls and numbers only the analysis step
 });
 
 test("the html and md exports put the approved plan at the top, with its changes", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ga-trail-plan-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-trail-plan-"));
   const r = new AnalysisRecord(join(dir, "s"), "20260101-000000-plan");
   r.append("session", { adapters: [{ name: "fake", version: "0.1.0", programVersion: "1.0" }], model: "m" });
   r.append("plan_approved", { version: 1, text: "Question: Does drug 2 help?\n\nSteps\n1. Paired t test", plan: { steps: [{ step: "Paired t test", status: "todo" }] } });
@@ -227,7 +227,7 @@ test("the html and md exports put the approved plan at the top, with its changes
 });
 
 test("the html report shows the confirmed analysis with its pilot and the validation as one unit", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ga-trail-pilot-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-trail-pilot-"));
   const r = new AnalysisRecord(join(dir, "s"), "20260101-000000-pilt");
   r.append("session", { adapters: [], model: "m" });
   const pilot = { sample: "Set 1", values: { "positive cell": 296 }, images: [], check: "Clumps are left out.", comparison: ['positive cell: the agent got 296; the reference "Red dots" says 530 (56% of the reference).'], definitions: [{ measure: "positive cell", definition: "At least 1 red pixel." }] };

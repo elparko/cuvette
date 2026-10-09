@@ -11,7 +11,7 @@ test("the sidecar prints the port and the token, serves the page, and stops when
   const home = mkdtempSync(join(tmpdir(), "cuvette-sidecar-"));
   const child = spawn(process.execPath, ["--import", "tsx", "desktop/sidecar/main.ts"], {
     cwd: ROOT,
-    env: { HOME: home, PATH: "/usr/bin:/bin", SHELL: "/bin/sh", GA_NO_OPEN: "1" },
+    env: { HOME: home, PATH: "/usr/bin:/bin", SHELL: "/bin/sh", CUVETTE_NO_OPEN: "1" },
     stdio: ["pipe", "pipe", "inherit"],
   });
   const line = await new Promise<string>((done) => createInterface({ input: child.stdout }).once("line", done));
@@ -25,7 +25,7 @@ test("the sidecar prints the port and the token, serves the page, and stops when
   const state = (await (await fetch(`http://127.0.0.1:${s.port}/api/state?t=${s.token}`)).json()) as { session: unknown; home: string };
   expect(state.session).toBeNull();
   expect(state.home).toBe(home);
-  expect(readFileSync(join(home, ".guided-analysis", "desktop-path.txt"), "utf8")).toContain("/usr/bin");
+  expect(readFileSync(join(home, ".cuvette", "desktop-path.txt"), "utf8")).toContain("/usr/bin");
   const code = await new Promise<number | null>((done) => {
     child.on("exit", done);
     child.stdin.end();

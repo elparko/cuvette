@@ -20,7 +20,7 @@ test("files and folders round trip, with deflate and store", () => {
 });
 
 test("the system unzip tool accepts the archive", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ga-zip-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-zip-"));
   const file = join(dir, "a.zip");
   writeFileSync(file, zip([{ name: "t/", data: Buffer.alloc(0) }, { name: "t/a.txt", data: Buffer.from("hello ".repeat(100)) }]));
   try {

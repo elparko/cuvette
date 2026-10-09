@@ -488,7 +488,7 @@ async function python(spec: object, dir: string): Promise<void> {
     await run(scriptPython(), [DECK_PY, p], { timeout: 300000, maxBuffer: 16 << 20 });
   } catch (e) {
     const err = String((e as { stderr?: string }).stderr ?? (e as Error).message);
-    if (/No module named 'pptx'/.test(err)) throw new Error(`python-pptx is not installed in the science environment (${scriptPython()}). Run: ga doctor --fix`);
+    if (/No module named 'pptx'/.test(err)) throw new Error(`python-pptx is not installed in the science environment (${scriptPython()}). Run: cuvette doctor --fix`);
     throw new Error(err.trim().split("\n").at(-1) || "the Python step stopped with an error");
   }
 }
@@ -508,7 +508,7 @@ export async function writeImageDeck(w: DeckInput): Promise<DeckWritten> {
   if (!images.length) throw new Error(`no images match "${o.images}"`);
   const info = deckInfo(w.record, w.adapters, w.dir);
   const out: DeckWritten = { images: images.length, slides: 0, bytes: {}, notes: [] };
-  const tmp = mkdtempSync(join(tmpdir(), "ga-deck-"));
+  const tmp = mkdtempSync(join(tmpdir(), "cuvette-deck-"));
   try {
     const convert = images.filter((i) => CONVERT.test(i.path)).map((i, k) => ({ src: i.path, dst: join(tmp, `image-${k + 1}.png`) }));
     if (convert.length) {

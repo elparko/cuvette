@@ -191,7 +191,7 @@ export async function runDrive(nameOrDir: string, opts: DriveOptions = {}): Prom
   const cases = driveCases(a, undefined, extra).filter((c) => !opts.only?.length || opts.only.includes(c.tool));
   const out: DriveResult[] = [];
   for (const c of cases) {
-    const cwd = mkdtempSync(join(tmpdir(), "ga-drive-"));
+    const cwd = mkdtempSync(join(tmpdir(), "cuvette-drive-"));
     let s: SessionT | undefined;
     try {
       s = await Session.create({

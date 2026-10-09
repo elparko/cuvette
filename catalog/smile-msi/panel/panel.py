@@ -44,7 +44,7 @@ class Job(QtCore.QRunnable):
 
 class Panel(QtWidgets.QDockWidget):
     def __init__(self, url, parent):
-        super().__init__("Guided analysis", parent)
+        super().__init__("Cuvette", parent)
         parts = urlsplit(url)
         self.base = f"{parts.scheme}://{parts.netloc}"
         self.token = dict(p.split("=", 1) for p in parts.query.split("&") if "=" in p).get("t", "")
@@ -243,9 +243,9 @@ def main():
         original(self, *a, **kw)
         self._ga_panel = Panel(url, self)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self._ga_panel)
-        snap = os.environ.get("GA_PANEL_SNAPSHOT")
+        snap = os.environ.get("CUVETTE_PANEL_SNAPSHOT")
         if snap:
-            QtCore.QTimer.singleShot(int(os.environ.get("GA_PANEL_SNAPSHOT_MS", "12000")), lambda: (self.grab().save(snap), QtWidgets.QApplication.quit()))
+            QtCore.QTimer.singleShot(int(os.environ.get("CUVETTE_PANEL_SNAPSHOT_MS", "12000")), lambda: (self.grab().save(snap), QtWidgets.QApplication.quit()))
 
     gui.MainWindow.__init__ = init
     sys.exit(gui.run(argv=[sys.argv[0]], open_path=open_path))

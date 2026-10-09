@@ -2,21 +2,21 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { adapterDirs, gaHome, loadAdapter } from "./adapters/manifest.ts";
+import { adapterDirs, cuvetteHome, loadAdapter } from "./adapters/manifest.ts";
 import { applyHeadlessSetup, attachHeadless } from "./core/headless.ts";
 import type { Mode } from "./core/types.ts";
 
-const HELP = `ga - a guided analysis agent for science programs
+const HELP = `cuvette - a guided analysis agent for science programs
 
 Usage
-  ga [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume [<id>|<folder>]] [--output <folder>]
-  ga resume [<id>]                     pick one of the last 10 sessions and continue it [--bypass-permissions]
-  ga open [<folder>]                   continue a session from its folder or from the project folder (default: this folder)
-  ga app [<folder>] [--resume [<id>|<folder>]] [--model <model>] [--no-open (no browser or other window; for tests)]
+  cuvette [--adapter imagej] [--model claude|ollama:qwen3:8b] [--referee <model>] [--mode watch|follow|teach|plan] [--resume [<id>|<folder>]] [--output <folder>]
+  cuvette resume [<id>]                pick one of the last 10 sessions and continue it [--bypass-permissions]
+  cuvette open [<folder>]              continue a session from its folder or from the project folder (default: this folder)
+  cuvette app [<folder>] [--resume [<id>|<folder>]] [--model <model>] [--no-open (no browser or other window; for tests)]
                                        the browser app: a full session in a browser window on this computer only.
                                        With a folder it starts a session there; with no folder it shows a folder chooser.
-                                       ga --resume in the terminal continues a session that the app started, and back.
-  ga -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json]
+                                       cuvette --resume in the terminal continues a session that the app started, and back.
+  cuvette -p "<request>" [--adapter imagej] --model <model> [--setup setup.json] [--answers answers.json] [--allow tool,tool|all] [--output text|json|stream-json]
 
   With no --adapter, the agent calls list_adapters and asks to load the adapter that fits
   the request with use_adapter. The program is your decision: accept or change it on the
@@ -27,98 +27,98 @@ Usage
   WARNING: In bypass, the agent can run commands and write files without asking.
   The harness allows each tool call that has a permission card and logs it with the reason
   "bypass permissions". The status line shows "bypass permissions". Also /permissions bypass,
-  or "permissions": "bypass" in ~/.guided-analysis/settings.json or .ga/settings.json.
+  or "permissions": "bypass" in ~/.cuvette/settings.json or .ga/settings.json.
   Bypass does not change these: method decisions stay with you (/decisions agent gives them
   to the agent); plan and teach mode still block steps; blind benchmark rules and the macOS
   sandbox still apply; a push to eLabFTW still asks; "deny" rules in settings still deny.
 
-  ga adapters                        list the adapters (name, kind, status, field, program)
-  ga adapter check <name|dir> [--run-tests] [--gui]
+  cuvette adapters                   list the adapters (name, kind, status, field, program)
+  cuvette adapter check <name|dir> [--run-tests] [--gui]
                                      --gui also runs the tests marked gui: true (they open a window)
-  ga adapter check <name|dir> --drive [--model ollama:qwen3:8b] [--tool <name>]
+  cuvette adapter check <name|dir> --drive [--model ollama:qwen3:8b] [--tool <name>]
                                      drive test: one plain request for each tool, run by the
                                      model with this adapter only; reports the tool choice, the
                                      arguments and the answer
-  ga adapter approve <name|dir> --by <name>
-  ga onboard <program> --model <model> [--docs <url>] [--kind cli]
-  Each session saves its work in the folder where you start ga, in cuvette/<date>-<title>/:
+  cuvette adapter approve <name|dir> --by <name>
+  cuvette onboard <program> --model <model> [--docs <url>] [--kind cli]
+  Each session saves its work in the folder where you start cuvette, in cuvette/<date>-<title>/:
   tables, figures, scripts, exports and index.html (open it in a browser). The record is in
-  .record/ in that folder. To continue later, run "ga open <that folder>", or run
-  "ga --resume" with no value in the session folder or the project folder.
+  .record/ in that folder. To continue later, run "cuvette open <that folder>", or run
+  "cuvette --resume" with no value in the session folder or the project folder.
   --output <folder> or the setting output_folder changes "cuvette": a name is a folder in the
   project folder, an absolute path (a lab share, a results drive) is used as given. A project
   setting wins over a user setting. If the folder is read-only, the session folder goes to
-  ~/.guided-analysis/projects/.
+  ~/.cuvette/projects/.
 
-  ga doctor [--fix]                    check Node, the model, the Python environments, R, Java and each adapter's program;
+  cuvette doctor [--fix]               check Node, the model, the Python environments, R, Java and each adapter's program;
                                        --fix installs the missing Python environments and R packages after it asks
-  ga programs                          list each adapter with its program: status, version, size, last use, access
-  ga programs install|update|remove|check <adapter>
-  ga programs path <adapter> <path|none>   use a program in a custom place (none: forget the path)
-  ga programs enable|disable|approve <adapter>
-  ga programs network|code <adapter> on|off   let the adapter use the network, or run code that the agent writes
-                                       Each change shows what it does and asks first. The log: ~/.guided-analysis/programs-log.jsonl
-  ga install-finder-action             add "Analyze with Cuvette" to the Quick Actions of folders and files in Finder (macOS)
-  ga uninstall-finder-action           remove it
-  ga install-launcher                  add Cuvette.app to ~/Applications: double-click it, choose a folder (macOS)
-  ga uninstall-launcher                remove it
+  cuvette programs                     list each adapter with its program: status, version, size, last use, access
+  cuvette programs install|update|remove|check <adapter>
+  cuvette programs path <adapter> <path|none>   use a program in a custom place (none: forget the path)
+  cuvette programs enable|disable|approve <adapter>
+  cuvette programs network|code <adapter> on|off   let the adapter use the network, or run code that the agent writes
+                                       Each change shows what it does and asks first. The log: ~/.cuvette/programs-log.jsonl
+  cuvette install-finder-action        add "Analyze with Cuvette" to the Quick Actions of folders and files in Finder (macOS)
+  cuvette uninstall-finder-action      remove it
+  cuvette install-launcher             add Cuvette.app to ~/Applications: double-click it, choose a folder (macOS)
+  cuvette uninstall-launcher           remove it
 
-  On the first start with no Claude API key and no local model, ga asks which model to use,
+  On the first start with no Claude API key and no local model, cuvette asks which model to use,
   checks this Mac, and offers a 2-minute sample analysis.
 
-  ga trust list                        list the trusted folders
-  ga trust add|remove|show <folder>    trust a folder, remove the trust, or show what the folder contains
+  cuvette trust list                   list the trusted folders
+  cuvette trust add|remove|show <folder>    trust a folder, remove the trust, or show what the folder contains
   --trust-folder                       trust the project folder for this run only (for scripts and -p)
 
   WARNING: The settings, hooks and adapters in <folder>/.ga or <folder>/.cuvette can run programs.
   Cuvette ignores them until you trust the folder. A session shows a card with what the folder
   contains. If a trusted file changes, the card shows again.
 
-  ga models                            list the models
-  ga config                            show each setting, its value and where it comes from
-  ga config get <name>                 show one setting
-  ga config set <name> <value> [--user|--project]   save a setting (default: user settings)
-  ga spend                             Claude spend by day and model (set GA_BUDGET_USD to stop at a limit)
-  ga key [status|remove|workspace <id>] save, show or remove your Claude API key
-  ga eln setup [--url <address>]       save your eLabFTW address and API key
-  ga eln status|remove                 show or remove the saved eLabFTW key
-  ga eln push <session>                send a session to eLabFTW after you approve the list
-  ga eln link <session> <id>           read an eLabFTW experiment and propose setup values
-  ga sessions                          list the sessions, newest first: folder, age, first request ("moved" if a folder is gone)
-  ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx
-  ga export <session> --format pptx|pdf --images figures|qc|pilot|all|<glob> [--order step|group|name]
+  cuvette models                       list the models
+  cuvette config                       show each setting, its value and where it comes from
+  cuvette config get <name>            show one setting
+  cuvette config set <name> <value> [--user|--project]   save a setting (default: user settings)
+  cuvette spend                        Claude spend by day and model (set CUVETTE_BUDGET_USD to stop at a limit)
+  cuvette key [status|remove|workspace <id>] save, show or remove your Claude API key
+  cuvette eln setup [--url <address>]  save your eLabFTW address and API key
+  cuvette eln status|remove            show or remove the saved eLabFTW key
+  cuvette eln push <session>           send a session to eLabFTW after you approve the list
+  cuvette eln link <session> <id>      read an eLabFTW experiment and propose setup values
+  cuvette sessions                     list the sessions, newest first: folder, age, first request ("moved" if a folder is gone)
+  cuvette export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx
+  cuvette export <session> --format pptx|pdf --images figures|qc|pilot|all|<glob> [--order step|group|name]
             [--per-page 1|2|4|6|9] [--size 16:9|a4|letter]
                                        put the session images in images.pptx or images.pdf in the session
                                        folder: a title slide, the images with captions from the record, and
                                        a last slide with the methods and the record hash. pptx needs
-                                       python-pptx in the science environment (ga doctor --fix)
-  ga databook [<session folder>|<project folder>] [--format pdf|docx|html] [--sessions all|<id,...>]
+                                       python-pptx in the science environment (cuvette doctor --fix)
+  cuvette databook [<session folder>|<project folder>] [--format pdf|docx|html] [--sessions all|<id,...>]
                                        write a data book: the data, methods, results and figures of a session,
                                        or of all sessions of a project folder (default: the current folder)
-  ga method list|show <name>|delete <name>
-  ga method export <name> [<file or folder>]   write the method as one file to share with the lab
-  ga method import <file> [<name>]     save a method file from a colleague
-  ga --method <name> [<folder>]        start a session on new data with a saved method: the questions come with the
+  cuvette method list|show <name>|delete <name>
+  cuvette method export <name> [<file or folder>]   write the method as one file to share with the lab
+  cuvette method import <file> [<name>]     save a method file from a colleague
+  cuvette --method <name> [<folder>]   start a session on new data with a saved method: the questions come with the
                                        saved answers for you to confirm, the metrics come filled in, and the
                                        demonstration on one sample still runs before the batch
                                        (in a session: /save-method <name>, /method <name>)
-  ga replay <flow.json> [--input name=path ...] [--session <id>]
-  ga run-step <adapter> <tool> '<json args>'
-  ga questions                         open questions in every session
-  ga status [session]                  list each step as up to date or out of date, with the reason
+  cuvette replay <flow.json> [--input name=path ...] [--session <id>]
+  cuvette run-step <adapter> <tool> '<json args>'
+  cuvette questions                    open questions in every session
+  cuvette status [session]             list each step as up to date or out of date, with the reason
                                        (a changed decision, input file, adapter, program or package version)
-  ga bench [scenario|all] --model <model> [--guidance on|off|both]
-  ga bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run] [--no-blind]
-  ga bench site --results a.json[,b.json] --out <folder>
-  ga bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]
-  ga mcp [--adapter <name>]            run the harness as an MCP server on stdio (no --adapter: the client loads adapters with use_adapter)
+  cuvette bench [scenario|all] --model <model> [--guidance on|off|both]
+  cuvette bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run] [--no-blind]
+  cuvette bench site --results a.json[,b.json] --out <folder>
+  cuvette bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]
+  cuvette mcp [--adapter <name>]       run the harness as an MCP server on stdio (no --adapter: the client loads adapters with use_adapter)
 
 Proposed analysis: in an interactive session the agent goes through four stages before the batch runs:
   Questions (what counts as one n, what counts as positive), Proposed metrics (each with its settings, which you
   can change), Demonstration on a sample (numbers and a QC image), and Confirmed.
   --no-plan, /plan off, or "planFirst": "off" in settings.json skips it. --plan turns it on for a -p run.
   A step that processes many files waits for a confirmed demonstration. /pilot off skips that.
-  GA_NO_OPEN=1 or "openImages": "off" keeps the QC images from opening on screen.
+  CUVETTE_NO_OPEN=1 or "openImages": "off" keeps the QC images from opening on screen.
 
 Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
 
@@ -244,7 +244,7 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
       const r = await fs.chooseClaude(await readSecret("Paste your Claude API key (it starts with sk-ant-): "));
       console.log(r.text);
       if (r.ok) break;
-      if (i === 3) fail("No key was saved. Run ga key when you have a key, or run ga again and choose the local model.");
+      if (i === 3) fail("No key was saved. Run cuvette key when you have a key, or run cuvette again and choose the local model.");
     }
   } else {
     const st = await fs.ollamaState();
@@ -265,7 +265,7 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   console.log("\nChecking this Mac for the programs that Cuvette uses (about 15 seconds)...");
   const dr = await import("./core/doctor.ts");
   const checks = await dr.runDoctor();
-  console.log(dr.doctorText(checks, { only: ["missing", "old"] }) + "\nThe full list: ga doctor\n");
+  console.log(dr.doctorText(checks, { only: ["missing", "old"] }) + "\nThe full list: cuvette doctor\n");
   const yes = (await ask("Try a 2-minute sample analysis? It uses a small public data set: extra sleep of 10 patients with two drugs (Student, 1908). [Y/n] ")).trim();
   if (/^n/i.test(yes)) return undefined;
   const s = fs.copySample();
@@ -284,9 +284,9 @@ async function interactive(resumeId?: string, folder?: string) {
     const lock = await liveLock(resumeId);
     if (lock) fail(lock.app ? `This session is open in the app: ${lock.app}\nUse it there, or close the session there (Sessions, or /quit) and run this again.` : "This session is open in another terminal. Close it there first.");
   }
-  if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `ga adapters`.");
+  if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `cuvette adapters`.");
   const s = resumeId
-    ? await Session.resume(resumeId, { model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See ga sessions.`))
+    ? await Session.resume(resumeId, { model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See cuvette sessions.`))
     : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, trustFolder, cwd: sample?.cwd ?? folder, method: str(o.method), settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(e.message));
   await runTui(s as never, { firstMessage: sample?.message });
   await s.close();
@@ -315,7 +315,7 @@ async function sharedApp(ref: string): Promise<string | undefined> {
 }
 
 async function app(folder?: string) {
-  if (o["no-open"]) process.env.GA_NO_OPEN = "1";
+  if (o["no-open"]) process.env.CUVETTE_NO_OPEN = "1";
   const { startApp } = await import("./server/app.ts");
   const { openWithOs } = await import("./ui/commands.ts");
   let resume: string | undefined;
@@ -397,14 +397,14 @@ async function main() {
         await checker.approveAdapter(dir, str(o.by) ?? process.env.USER ?? "scientist");
         return console.log(`Approved ${a2}.`);
       }
-      return fail("usage: ga adapter check|approve <name|dir>");
+      return fail("usage: cuvette adapter check|approve <name|dir>");
     }
     case "onboard": {
       const { onboardCommand } = await import("./onboarding/agent.ts");
       const { Session } = await import("./core/session.ts");
       const { runTui } = await import("./tui/app.tsx");
       const plan = await onboardCommand(a1, { model: str(o.model) ?? "claude", docs: (o.docs as string[]) ?? [], kind: str(o.kind) });
-      process.env.GA_DRAFT_DIR = plan.draftDir;
+      process.env.CUVETTE_DRAFT_DIR = plan.draftDir;
       Object.assign(process.env, plan.env ?? {});
       const s = await Session.create({ adapters: plan.adapters, model: plan.model, mode: plan.mode as Mode, cwd: plan.cwd });
       await runTui(s as never, { firstMessage: plan.firstMessage });
@@ -422,7 +422,7 @@ async function main() {
         cred.saveClaudeWorkspace(a2 ?? "");
         return console.log(a2 ? `Saved the workspace ID ${a2}. Each request now sends it.` : "Removed the workspace ID.");
       }
-      if (a1) return fail("usage: ga key [status|remove|workspace <id>]");
+      if (a1) return fail("usage: cuvette key [status|remove|workspace <id>]");
       const key = (await readSecret("Claude API key: ")).trim();
       const problem = cred.keyProblem(key);
       if (problem) return fail(problem);
@@ -446,9 +446,9 @@ async function main() {
         if (problem) return fail(problem);
         return console.log(`Saved the address and key ${cred.maskKey(key)} to ${cred.saveElabftw(url, key)}.`);
       }
-      if (a1 !== "push" && a1 !== "link") return fail("usage: ga eln setup|status|remove|push <session>|link <session> <id>");
-      if (!a2) return fail(`usage: ga eln ${a1} <session>${a1 === "link" ? " <id>" : ""}`);
-      if (a1 === "link" && !/^\d+$/.test(a3 ?? "")) return fail("usage: ga eln link <session> <experiment id>");
+      if (a1 !== "push" && a1 !== "link") return fail("usage: cuvette eln setup|status|remove|push <session>|link <session> <id>");
+      if (!a2) return fail(`usage: cuvette eln ${a1} <session>${a1 === "link" ? " <id>" : ""}`);
+      if (a1 === "link" && !/^\d+$/.test(a3 ?? "")) return fail("usage: cuvette eln link <session> <experiment id>");
       const { Session } = await import("./core/session.ts");
       const s = await Session.resume(a2, { model: "fake:" });
       try {
@@ -483,7 +483,7 @@ async function main() {
       for (const [k, v] of [...by].sort()) console.log(`${k.padEnd(36)} $${v.toFixed(2)}`);
       const total = rows.reduce((s, r) => s + (Number(r.usd) || 0), 0);
       const b = budgetUsd();
-      console.log(`Total: $${total.toFixed(2)} (list prices, from ${spendFile()})${b ? `. Budget: $${b.toFixed(2)} (GA_BUDGET_USD).` : ""}`);
+      console.log(`Total: $${total.toFixed(2)} (list prices, from ${spendFile()})${b ? `. Budget: $${b.toFixed(2)} (CUVETTE_BUDGET_USD).` : ""}`);
       return;
     }
     case "config": {
@@ -501,11 +501,11 @@ async function main() {
       }
       if (a1 === "get") {
         const r = rows.find((x) => x.def.name === a2);
-        if (!r) return fail(`No setting named ${a2}. Type ga config to see the names.`);
+        if (!r) return fail(`No setting named ${a2}. Type cuvette config to see the names.`);
         return console.log([line(r), r.def.help, ...(r.def.details?.(ctx) ?? []).map((d) => `  ${d}`)].join("\n"));
       }
       if (a1 === "set") {
-        if (!a2 || a3 === undefined) return fail("usage: ga config set <name> <value> [--user|--project]");
+        if (!a2 || a3 === undefined) return fail("usage: cuvette config set <name> <value> [--user|--project]");
         const scope = o.project ? "project" : "user";
         try {
           const r = await st.changeSetting(ctx, a2, a3, scope);
@@ -515,13 +515,13 @@ async function main() {
         }
         return;
       }
-      return fail("usage: ga config [get <name> | set <name> <value> [--user|--project]]");
+      return fail("usage: cuvette config [get <name> | set <name> <value> [--user|--project]]");
     }
     case "trust": {
       const tr = await import("./core/trust.ts");
       if (!a1 || a1 === "list") {
         const list = tr.trustedFolders();
-        if (!list.length) return console.log("No folder is trusted. ga trust add <folder> trusts one.");
+        if (!list.length) return console.log("No folder is trusted. cuvette trust add <folder> trusts one.");
         for (const e of list) {
           const t = existsSync(e.path) ? tr.trustStatus(e.path) : undefined;
           console.log(`${e.path}  ${!t ? "missing" : t.state === "trusted" ? "trusted" : t.state === "changed" ? "files changed: asks again" : tr.stateLabel(t)}  ${e.trusted.slice(0, 10)}`);
@@ -541,7 +541,7 @@ async function main() {
         const t = tr.trustStatus(folder);
         return console.log([`${t.scan.folder}: ${tr.stateLabel(t)}`, ...(t.state === "none" ? [] : tr.folderLines(t.scan)), ...t.changes.map((c) => `  ${c}`)].join("\n"));
       }
-      return fail("usage: ga trust [list | add <folder> | remove <folder> | show <folder>]");
+      return fail("usage: cuvette trust [list | add <folder> | remove <folder> | show <folder>]");
     }
     case "doctor": {
       const dr = await import("./core/doctor.ts");
@@ -580,17 +580,17 @@ async function main() {
         const rows = await pr.listPrograms({ cwd: process.cwd() });
         if (tty) process.stderr.write("\r".padEnd(30) + "\r");
         console.log(pr.programsTable(rows));
-        return console.log(`\nLog: ${pr.logFile()}\nChange one: ga programs install|update|remove|path|enable|disable|check <adapter>`);
+        return console.log(`\nLog: ${pr.logFile()}\nChange one: cuvette programs install|update|remove|path|enable|disable|check <adapter>`);
       }
       const verbs: Record<string, string> = { network: a3 === "off" ? "network-off" : "network-on", code: a3 === "off" ? "code-off" : "code-on" };
       const action = verbs[a1] ?? a1;
-      if (!pr.isProgramAction(action) || ((a1 === "network" || a1 === "code") && a3 !== "on" && a3 !== "off")) return fail("usage: ga programs [install|update|remove|path|enable|disable|check|approve <adapter>] [network|code <adapter> on|off]");
+      if (!pr.isProgramAction(action) || ((a1 === "network" || a1 === "code") && a3 !== "on" && a3 !== "off")) return fail("usage: cuvette programs [install|update|remove|path|enable|disable|check|approve <adapter>] [network|code <adapter> on|off]");
       if (!a2 && action === "check") {
         const rows = await pr.listPrograms({ cwd: process.cwd() });
         return console.log(pr.programsTable(rows));
       }
-      if (!a2) return fail(`usage: ga programs ${a1} <adapter>${a1 === "path" ? " <path|none>" : ""}`);
-      if (action === "path" && !a3) return fail("usage: ga programs path <adapter> <path|none>");
+      if (!a2) return fail(`usage: cuvette programs ${a1} <adapter>${a1 === "path" ? " <path|none>" : ""}`);
+      if (action === "path" && !a3) return fail("usage: cuvette programs path <adapter> <path|none>");
       const by = str(o.by) ?? process.env.USER ?? "scientist";
       const r = await planFor(a2, action, { cwd: process.cwd(), path: action === "path" && a3 !== "none" ? a3 : undefined, by });
       if (!r.plan) return fail(r.error ?? "no plan");
@@ -615,15 +615,15 @@ async function main() {
       if (process.platform !== "darwin") return fail("This command works only on macOS.");
       const mac = await import("./core/macos.ts");
       if (cmd === "install-finder-action") {
-        const p = mac.gaPaths();
+        const p = mac.cuvettePaths();
         const dir = mac.installFinderAction({ paths: p });
-        return console.log(`Installed the Quick Action "${mac.ACTION_NAME}" in ${dir}.\nIt runs ${p.node} ${p.ga}.\nIn Finder, Control-click a folder or a file, then choose Quick Actions > ${mac.ACTION_NAME}.\nIf it is not in the menu, open System Settings > Keyboard > Keyboard Shortcuts > Services > Files and Folders and turn it on.\nTo remove it: ga uninstall-finder-action`);
+        return console.log(`Installed the Quick Action "${mac.ACTION_NAME}" in ${dir}.\nIt runs ${p.node} ${p.cuvette}.\nIn Finder, Control-click a folder or a file, then choose Quick Actions > ${mac.ACTION_NAME}.\nIf it is not in the menu, open System Settings > Keyboard > Keyboard Shortcuts > Services > Files and Folders and turn it on.\nTo remove it: cuvette uninstall-finder-action`);
       }
       if (cmd === "uninstall-finder-action") return console.log(mac.uninstallFinderAction() ? `Removed ${mac.actionPath()}.` : "The Quick Action is not installed.");
       if (cmd === "install-launcher") {
-        const p = mac.gaPaths();
+        const p = mac.cuvettePaths();
         const dir = mac.installLauncher({ paths: p });
-        return console.log(`Installed ${dir}.\nIt runs ${p.node} ${p.ga}.\nDouble-click Cuvette in Applications in your home folder (or find it with Spotlight). It asks for a folder, then starts Cuvette in that folder.\nTo remove it: ga uninstall-launcher`);
+        return console.log(`Installed ${dir}.\nIt runs ${p.node} ${p.cuvette}.\nDouble-click Cuvette in Applications in your home folder (or find it with Spotlight). It asks for a folder, then starts Cuvette in that folder.\nTo remove it: cuvette uninstall-launcher`);
       }
       return console.log(mac.uninstallLauncher() ? `Removed ${mac.launcherPath()}.` : "The launcher is not installed.");
     }
@@ -648,7 +648,7 @@ async function main() {
       if (fmt === "pptx" || (fmt === "pdf" && (o.images || o.order || o["per-page"] || o.size))) {
         const deck = await import("./core/imagedeck.ts");
         const opts = deck.parseDeckArgs([fmt, ...[o.images, o.order, o["per-page"], o.size].map(str).filter((v): v is string => !!v)]);
-        if (typeof opts === "string") fail(opts.replace("Use: /export images", "Use: ga export <session> --format"));
+        if (typeof opts === "string") fail(opts.replace("Use: /export images", "Use: cuvette export <session> --format"));
         console.log(deck.deckLine(await s.exportImages(opts)));
         return s.close();
       }
@@ -688,7 +688,7 @@ async function main() {
       } catch (e) {
         fail((e as Error).message);
       }
-      return fail("Use: ga method list | show <name> | delete <name> | export <name> [<file or folder>] | import <file> [<name>]");
+      return fail("Use: cuvette method list | show <name> | delete <name> | export <name> [<file or folder>] | import <file> [<name>]");
     }
     case "replay": {
       const { replayFlow } = await import("./core/replay.ts");
@@ -712,14 +712,14 @@ async function main() {
       const { findPlace, inProject } = await import("./core/places.ts");
       const st = await import("./core/status.ts");
       const cwd = process.cwd();
-      const ref = a1 ?? defaultSession(listSessions(), cwd)?.info.id ?? fail("There is no session here. Give a session id or a session folder. See ga sessions.");
-      const place = findPlace(ref, { cwd }) ?? fail(`No session ${ref}. See ga sessions.`);
-      if (!existsSync(join(place.recordDir, "log.jsonl"))) fail(`No session ${ref}. See ga sessions.`);
+      const ref = a1 ?? defaultSession(listSessions(), cwd)?.info.id ?? fail("There is no session here. Give a session id or a session folder. See cuvette sessions.");
+      const place = findPlace(ref, { cwd }) ?? fail(`No session ${ref}. See cuvette sessions.`);
+      if (!existsSync(join(place.recordDir, "log.jsonl"))) fail(`No session ${ref}. See cuvette sessions.`);
       const record = new AnalysisRecord(place.recordDir, place.id, place.legacy ? {} : { workDir: place.outDir, exportDir: place.outDir, project: inProject(place) ? place.project : undefined });
       const { current, labels } = await st.currentFromDisk(record, place.legacy ? cwd : place.project);
       const live = await st.liveReasons(record, current);
       console.log(`Session ${place.id}\n`);
-      console.log(st.statusText(st.stepStatus(record, { live, labels }), `To run the out-of-date steps again, type ga resume ${place.id}, then type /rerun.`));
+      console.log(st.statusText(st.stepStatus(record, { live, labels }), `To run the out-of-date steps again, type cuvette resume ${place.id}, then type /rerun.`));
       return;
     }
     case "questions": {
@@ -731,7 +731,7 @@ async function main() {
       if (a1 === "papers") {
         const { runPapers } = await import("./bench/papers.ts");
         const models = (str(o.models) ?? str(o.model) ?? "").split(",").filter(Boolean);
-        if (!models.length) return fail("usage: ga bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run]");
+        if (!models.length) return fail("usage: cuvette bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run]");
         const papers = str(o.papers);
         const r = await runPapers({ papers: !papers || papers === "all" ? "all" : papers.split(","), models, runs: str(o.runs) ? Number(str(o.runs)) : 1, out: str(o.out), dryRun: !!o["dry-run"], blind: !o["no-blind"] });
         if (r.problems.length) process.exitCode = 1;
@@ -740,7 +740,7 @@ async function main() {
       }
       if (a1 === "rescore") {
         const results = (str(o.results) ?? "").split(",").filter(Boolean);
-        if (!results.length) return fail("usage: ga bench rescore --results a.json[,b.json]");
+        if (!results.length) return fail("usage: cuvette bench rescore --results a.json[,b.json]");
         const { rescoreResults } = await import("./bench/papers.ts");
         for (const f of results) {
           const r = rescoreResults(f);
@@ -751,7 +751,7 @@ async function main() {
       if (a1 === "site") {
         const results = (str(o.results) ?? "").split(",").filter(Boolean);
         const out = str(o.out);
-        if (!results.length || !out) return fail("usage: ga bench site --results a.json[,b.json] --out <folder>");
+        if (!results.length || !out) return fail("usage: cuvette bench site --results a.json[,b.json] --out <folder>");
         const { buildSite } = await import("./bench/papers-site.ts");
         const info = buildSite({ results, out, log: (l) => console.error(l) });
         console.log(`${info.index}\n${info.images.length} images, ${info.papers} papers, ${info.runs} runs`);
@@ -760,7 +760,7 @@ async function main() {
       if (a1 === "cases") {
         const results = (str(o.results) ?? "").split(",").filter(Boolean);
         const out = str(o.out);
-        if (!results.length || !out) return fail("usage: ga bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]");
+        if (!results.length || !out) return fail("usage: cuvette bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]");
         const { buildCases } = await import("./bench/papers-cases.ts");
         const info = buildCases({ results, out, style: str(o.style), log: (l) => console.error(l) });
         for (const p of info.problems) console.error(`problem: ${p}`);
@@ -782,7 +782,7 @@ async function main() {
   }
 }
 
-main().catch((e) => fail(`ga: ${(e as Error).message}`));
+main().catch((e) => fail(`cuvette: ${(e as Error).message}`));
 
 let lines: string[] | undefined;
 

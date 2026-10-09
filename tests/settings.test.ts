@@ -11,16 +11,16 @@ import { folderHasNoPatientData } from "../src/core/phi.ts";
 import { saveSetting } from "../src/ui/config.ts";
 
 const KEY = "sk-ant-api03-secretsecretsecret-WXYZ";
-const old = process.env.GA_HOME;
+const old = process.env.CUVETTE_HOME;
 let cwd = "";
 
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-home-"));
-  cwd = mkdtempSync(join(tmpdir(), "ga-proj-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-home-"));
+  cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
 });
 afterEach(() => {
-  if (old === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = old;
+  if (old === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = old;
 });
 
 function writeJson(path: string, data: object) {
@@ -49,7 +49,7 @@ const row = (rows: ReturnType<typeof describe>, name: string) => rows.find((r) =
 test("the merged settings show each value and its source", () => {
   writeJson(settingsPath("user", cwd), { model: "claude:claude-haiku-5-5", permissions: { "run_script": "deny" } });
   writeJson(settingsPath("project", cwd), { referee: "none", permissions: { "imagej_*": "allow" } });
-  writeJson(join(cwd, ".ga", "settings.local.json"), { mode: "plan" });
+  writeJson(join(cwd, ".cuvette", "settings.local.json"), { mode: "plan" });
   trustFolder(cwd);
   const rows = describe({ cwd, env: {} });
   expect(row(rows, "model")).toMatchObject({ value: "claude:claude-haiku-5-5", source: "user" });
@@ -85,7 +85,7 @@ test("export_xlsx and figure_formats are in the registry, on and png,svg by defa
   const s = loadSettings(cwd);
   expect(xlsxOn(s)).toBe(false);
   expect(s.figure_formats).toBe("png,pdf");
-  expect(xlsxOn(loadSettings(mkdtempSync(join(tmpdir(), "ga-proj-"))))).toBe(true);
+  expect(xlsxOn(loadSettings(mkdtempSync(join(tmpdir(), "cuvette-proj-"))))).toBe(true);
 });
 
 test("effort shows only for a Claude model", () => {
@@ -138,13 +138,13 @@ test("bad values, read-only rows, scopes and locked rows are refused", async () 
   expect(events).toHaveLength(1);
 });
 
-test("the budget setting is read by the spend check, and GA_BUDGET_USD wins", async () => {
+test("the budget setting is read by the spend check, and CUVETTE_BUDGET_USD wins", async () => {
   await changeSetting({ cwd, env: {} }, "budgetUsd", "150", "user");
   expect(budgetUsd({})).toBe(150);
   expect(row(describe({ cwd, env: {} }), "budgetUsd")).toMatchObject({ value: "$150.00", source: "user" });
-  expect(row(describe({ cwd, env: { GA_BUDGET_USD: "200" } }), "budgetUsd")).toMatchObject({ value: "$200.00", source: "env" });
-  const r = await changeSetting({ cwd, env: { GA_BUDGET_USD: "200" } }, "budgetUsd", "100", "user");
-  expect(r.note).toMatch(/GA_BUDGET_USD in this shell still wins/);
+  expect(row(describe({ cwd, env: { CUVETTE_BUDGET_USD: "200" } }), "budgetUsd")).toMatchObject({ value: "$200.00", source: "env" });
+  const r = await changeSetting({ cwd, env: { CUVETTE_BUDGET_USD: "200" } }, "budgetUsd", "100", "user");
+  expect(r.note).toMatch(/CUVETTE_BUDGET_USD in this shell still wins/);
   await changeSetting({ cwd, env: {} }, "budgetUsd", "off", "user");
   expect(budgetUsd({})).toBeUndefined();
   await expect(changeSetting({ cwd, env: {} }, "budgetUsd", "-3", "user")).rejects.toThrow(/above 0/);

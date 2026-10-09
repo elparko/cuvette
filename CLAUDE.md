@@ -41,5 +41,5 @@ files with a date in the name) stay as they were written.
 
 - Run `npm run lint:text` for the README, docs and UI strings.
   Add `-- --verbose` to see each issue.
-- `ga adapter check <name>` shows `[text-style]` warnings for adapter text.
+- `cuvette adapter check <name>` shows `[text-style]` warnings for adapter text.
 - The rules are in `src/core/ste.ts`. The checker cannot see a missing article.

@@ -8,7 +8,7 @@ import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidat
 
 
 function project() {
-  const root = mkdtempSync(join(tmpdir(), "ga-ref-"));
+  const root = mkdtempSync(join(tmpdir(), "cuvette-ref-"));
   const proj = join(root, "oxldl");
   mkdirSync(join(proj, "images"), { recursive: true });
   for (const s of ["Set 1", "Set 2", "Set 3"]) writeFileSync(join(proj, "images", `${s}.tif`), "x");
@@ -53,7 +53,7 @@ test("agreement gives the mean difference, the percent and the correlation, and 
   expect(a.meanPercent).toBeCloseTo(-7.778, 3);
   expect(a.r).toBeCloseTo(0.99834, 4);
   expect(agreementText("All samples", a)).toBe("All samples: 3 samples. Mean difference (agent minus reference) -13.33 (-7.778%). Correlation r = 0.9983.");
-  const png = blandAltmanPng(pairs, join(mkdtempSync(join(tmpdir(), "ga-ba-")), "ba.png"));
+  const png = blandAltmanPng(pairs, join(mkdtempSync(join(tmpdir(), "cuvette-ba-")), "ba.png"));
   const img = decodePng(readFileSync(png));
   expect([img.width, img.height]).toEqual([480, 360]);
   expect(img.pixels.some((v) => v === 0)).toBe(true);

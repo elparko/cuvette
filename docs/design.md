@@ -1,4 +1,4 @@
-# Guided Analysis Agent Design
+# Cuvette Design
 
 2026-10-07 · Parker Smith
 

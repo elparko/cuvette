@@ -6,26 +6,26 @@ import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import type { Args, OutputFile, Tool, ToolContext, ToolOutput } from "../core/types.ts";
-import { gaHome } from "../adapters/manifest.ts";
+import { cuvetteHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
 import { cap, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, type Dirs } from "../adapters/kinds/common.ts";
 
 export function scriptPython(): string {
-  if (process.env.GA_PYTHON) return process.env.GA_PYTHON;
+  if (process.env.CUVETTE_PYTHON) return process.env.CUVETTE_PYTHON;
   const rel = process.platform === "win32" ? ["envs", "science", "Scripts", "python.exe"] : ["envs", "science", "bin", "python"];
-  for (const home of [gaHome(), join(homedir(), ".guided-analysis")]) if (existsSync(join(home, ...rel))) return join(home, ...rel);
+  for (const home of [cuvetteHome(), join(homedir(), ".cuvette")]) if (existsSync(join(home, ...rel))) return join(home, ...rel);
   return process.platform === "win32" ? "python" : "python3";
 }
 
-const GA_API = `import csv
+const CUVETTE_API = `import csv
 import json
 import os
 
 _to_parent = os.fdopen(3, "w", buffering=1, encoding="utf-8")
 _from_parent = os.fdopen(4, "r", encoding="utf-8")
-_work = os.environ.get("WORK_DIR") or os.environ.get("GA_WORK_DIR") or os.getcwd()
+_work = os.environ.get("WORK_DIR") or os.environ.get("CUVETTE_WORK_DIR") or os.getcwd()
 _out = os.environ.get("OUTPUT_DIR") or _work
 
 try:
@@ -196,9 +196,9 @@ function scriptEnv(dirs: Dirs, project: string): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !SECRET.test(k)) env[k] = v;
   const folders = { PROJECT_DIR: project, WORK_DIR: dirs.workDir, SESSION_DIR: dirs.sessionDir, OUTPUT_DIR: dirs.outputDir ?? dirs.workDir };
-  for (const [k, v] of Object.entries(folders)) env[k] = env[`GA_${k}`] = env[`CUVETTE_${k}`] = v;
+  for (const [k, v] of Object.entries(folders)) env[k] = env[`CUVETTE_${k}`] = v;
   if (dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = dirs.figureFormats;
-  return { ...env, MPLBACKEND: "Agg", MPLCONFIGDIR: join(tmpdir(), "ga-mpl"), PYTHONIOENCODING: "utf-8" };
+  return { ...env, MPLBACKEND: "Agg", MPLCONFIGDIR: join(tmpdir(), "cuvette-mpl"), PYTHONIOENCODING: "utf-8" };
 }
 
 export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
@@ -242,7 +242,7 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
       const scriptDir = uniqueDir(dirs.workDir, "script");
       const script = join(scriptDir, "script.py");
       writeFileSync(script, String(v.args.code));
-      writeFileSync(join(scriptDir, "ga_api.py"), GA_API);
+      writeFileSync(join(scriptDir, "ga_api.py"), CUVETTE_API);
       writeFileSync(join(scriptDir, "ga_figures.py"), FIGURES_PY);
       const before = snapshot(dirs.workDir, scriptDir);
       const python = scriptPython();

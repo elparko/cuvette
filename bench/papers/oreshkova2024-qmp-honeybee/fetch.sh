@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/oreshkova2024-qmp-honeybee"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/oreshkova2024-qmp-honeybee"
 mkdir -p "$D"
 cd "$D"
 # figshare 10.6084/m9.figshare.24164316 (abdominal metrics) and 10.6084/m9.figshare.24164265 (acini area), both CC BY 4.0.

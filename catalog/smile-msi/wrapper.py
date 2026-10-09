@@ -4,8 +4,8 @@ import os
 
 import numpy as np
 
-if os.environ.get("GA_WORK_DIR"):
-    os.environ["SMILE_MSI_MCP_OUT"] = os.environ["GA_WORK_DIR"]
+if os.environ.get("CUVETTE_WORK_DIR"):
+    os.environ["SMILE_MSI_MCP_OUT"] = os.environ["CUVETTE_WORK_DIR"]
 
 from smile_msi import headless, mcpserver, profiles, registry
 

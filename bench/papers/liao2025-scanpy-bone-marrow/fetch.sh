@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/liao2025-scanpy-bone-marrow"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/liao2025-scanpy-bone-marrow"
 mkdir -p "$D"
 cd "$D"
 # GEO series GSE253262: Cell Ranger filtered matrices of the pulse (GSM8017442) and chase (GSM8017443) samples.

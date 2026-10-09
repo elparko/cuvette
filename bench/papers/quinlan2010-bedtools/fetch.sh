@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/quinlan2010-bedtools"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/quinlan2010-bedtools"
 mkdir -p "$D"
 cd "$D"
 B=https://raw.githubusercontent.com/arq5x/bedtools2/master/data

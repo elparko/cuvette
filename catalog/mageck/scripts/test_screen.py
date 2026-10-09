@@ -116,9 +116,9 @@ def body(p):
         "ok": True,
         "summary": summary,
         "metrics": metrics,
-        "data": {"program_version": mageck_version(), "gene_summary_file": os.environ.get("GA_OUTPUT_GENE_SUMMARY", ""), "sgrna_summary_file": os.environ.get("GA_OUTPUT_SGRNA_SUMMARY", ""), "normalization": norm, "direction": direction,
+        "data": {"program_version": mageck_version(), "gene_summary_file": os.environ.get("CUVETTE_OUTPUT_GENE_SUMMARY", ""), "sgrna_summary_file": os.environ.get("CUVETTE_OUTPUT_SGRNA_SUMMARY", ""), "normalization": norm, "direction": direction,
                  "treatment": treatment, "control": control, "p_values_note": "The RRA p values come from a permutation test. They change a little between runs.", "warnings": warns},
-        "table": table_of(cols, shown, os.environ.get("GA_OUTPUT_GENE_SUMMARY", "")),
+        "table": table_of(cols, shown, os.environ.get("CUVETTE_OUTPUT_GENE_SUMMARY", "")),
         "manualRoute": "mageck test -k counts.txt -t %s -c %s -n screen --norm-method %s" % (",".join(treatment), ",".join(control), norm),
     }
 

@@ -3,10 +3,10 @@ import { readParams, renderBatch, fail, readLog, runMzmine, summarizeTable, exis
 
 const p = readParams();
 const { text, values, stop } = renderBatch(p);
-const batch = process.env.GA_OUTPUT_BATCH;
-const features = process.env.GA_OUTPUT_FEATURES;
+const batch = process.env.CUVETTE_OUTPUT_BATCH;
+const features = process.env.CUVETTE_OUTPUT_FEATURES;
 writeFileSync(batch, text.replace(/<current_file>[^<]*<\/current_file>/, `<current_file>${features}</current_file>`));
-const r = runMzmine(batch, p.input, (Number(process.env.GA_CALL_TIMEOUT_S) || 900) * 1000);
+const r = runMzmine(batch, p.input, (Number(process.env.CUVETTE_CALL_TIMEOUT_S) || 900) * 1000);
 const info = readLog(r.log);
 const route = `mzmine -b <batch.mzbatch> -i "${p.input}"`;
 if (r.spawnError) fail(`cannot start mzmine: ${r.spawnError}`, { manualRoute: route });

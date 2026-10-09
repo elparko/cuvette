@@ -13,7 +13,7 @@ test("the title reply is read from JSON, with or without text around it", () => 
 });
 
 test("one short call names the session from the request, the steps and the answer", async () => {
-  const r = new AnalysisRecord(mkdtempSync(join(tmpdir(), "ga-title-")), "s1");
+  const r = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-title-")), "s1");
   r.append("user", { text: "Did drug 2 give more sleep?" });
   r.append("assistant", { text: "Yes, 1.58 h more (p = 0.003).", final: true });
   let seen = "";

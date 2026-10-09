@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/yun2026-lasv-elisa"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/yun2026-lasv-elisa"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/yun2026-lasv-elisa"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/yun2026-lasv-elisa"
 mkdir -p "$D" "$R"
 # The workbook holds the Gen5 concentrations (the published results). It goes to the reference folder.
 curl -fsSL -o "$R/S1_Data.xlsx" "https://journals.plos.org/plosone/article/file?type=supplementary&id=10.1371/journal.pone.0340568.s010"

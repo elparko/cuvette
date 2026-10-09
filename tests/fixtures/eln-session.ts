@@ -9,7 +9,7 @@ export async function analysedSession(): Promise<Session> {
     { calls: [{ name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 10 } }] },
     { text: "There are 41 particles (step 1)." },
   ]);
-  const s = await Session.create({ adapters: [join(__dirname, "lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
+  const s = await Session.create({ adapters: [join(__dirname, "lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
   s.decisions.applySetup({ question: "How many particles?", method: "Otsu" });
   await s.send("Count the particles in a.tif");
   const sha = s.record.putBlob(Buffer.from("PNGDATA"), ".png");

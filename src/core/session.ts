@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
-import { findAdapter, gaHome, type LoadedAdapter } from "../adapters/manifest.ts";
+import { findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import type { AdapterRuntime } from "../adapters/runtime.ts";
 import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
@@ -1599,7 +1599,7 @@ export class Session {
     const paths = ["path", "folder", "cwd"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && v.length > 0).map((v) => resolve(this.cwd, v));
     if (!paths.length) return true;
     const named = this.record.entries(["user", "setup"]).flatMap((e) => stringsIn(e.data)).flatMap((t) => t.match(/(?:~|\/|[A-Za-z]:\\)[^\s"'`,;]+/g) ?? []).map((t) => resolve(this.cwd, t.replace(/^~(?=\/)/, process.env.HOME ?? "~").replace(/[.)\]]+$/, "")));
-    const roots = [this.cwd, this.dir, gaHome(), ...this.adapters.map((a) => a.root), ...named, ...named.map((n) => join(n, ".."))];
+    const roots = [this.cwd, this.dir, cuvetteHome(), ...this.adapters.map((a) => a.root), ...named, ...named.map((n) => join(n, ".."))];
     const nodeFiles = this.record.nodes().flatMap((n) => n.outputs.map((o) => join(o.path, "..")));
     roots.push(...nodeFiles);
     return paths.every((p) => roots.some((r) => {
@@ -2236,7 +2236,7 @@ export class Session {
   }
 
   private showImages(paths: string[]) {
-    if (this.settings.headless || !this.interactive || process.platform !== "darwin" || process.env.VITEST || process.env.GA_NO_OPEN === "1" || this.settings.openImages === "off") return;
+    if (this.settings.headless || !this.interactive || process.platform !== "darwin" || process.env.VITEST || process.env.CUVETTE_NO_OPEN === "1" || this.settings.openImages === "off") return;
     for (const p of paths) {
       const child = spawn("open", [p], { stdio: "ignore", detached: true });
       child.on("error", () => {});
@@ -2881,7 +2881,7 @@ export class Session {
 
   private checkData(name: string, args: Args, output: ToolOutput): string {
     const given = ["path", "folder", "input", "dir", "directory", "input_dir", "data_dir"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && isAbsolute(v));
-    const own = (p: string) => [this.dir, this.outputDir, gaHome()].some((d) => p === d || p.startsWith(`${d}/`));
+    const own = (p: string) => [this.dir, this.outputDir, cuvetteHome()].some((d) => p === d || p.startsWith(`${d}/`));
     const found: { path: string; label: string; kind: "table" | "files" }[] = [];
     const saved = /^(read|load|import|open|inspect)/.test(name) ? (output.table?.path ?? output.outputs?.find((o) => o.kind === "table")?.path) : undefined;
     if (saved && existsTable(saved)) found.push({ path: saved, label: given[0] ?? saved, kind: "table" });
@@ -3195,7 +3195,7 @@ export class Session {
   async elnPush(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }> {
     const { elabftwConfig } = await import("./credentials.ts");
     const cfg = elabftwConfig();
-    if (!cfg) throw new Error("eLabFTW is not set up. Run `ga eln setup` or /eln setup.");
+    if (!cfg) throw new Error("eLabFTW is not set up. Run `cuvette eln setup` or /eln setup.");
     const { elabftw } = await import("../eln/elabftw.ts");
     const sync = await import("../eln/sync.ts");
     const plan = sync.planPush(this, cfg.url);
@@ -3217,7 +3217,7 @@ export class Session {
   async elnLink(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }> {
     const { elabftwConfig } = await import("./credentials.ts");
     const cfg = elabftwConfig();
-    if (!cfg) throw new Error("eLabFTW is not set up. Run `ga eln setup` or /eln setup.");
+    if (!cfg) throw new Error("eLabFTW is not set up. Run `cuvette eln setup` or /eln setup.");
     const { elabftw, baseUrl } = await import("../eln/elabftw.ts");
     const sync = await import("../eln/sync.ts");
     const client = elabftw(cfg);

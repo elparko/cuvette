@@ -30,7 +30,7 @@ function control(r: SettingRow, ctx: SettingCtx, id: string): string {
       const m = /^\$?([\d.]+)$/.exec(r.value);
       const num = m ? String(Number(m[1])) : "";
       const off = num && !env ? `<button type="button" class="btn quiet" data-sv-set="off"${dis}>No limit</button>` : "";
-      return `<span class="snum"><input type="number" inputmode="decimal" step="any" min="${d.min ?? 0}" value="${h(num)}" placeholder="No limit" data-sv-input ${lab}${env ? " disabled" : dis}><span class="unit">${h(d.unit ?? "")}</span></span>${off}${env ? `<span class="small dim">GA_BUDGET_USD in the shell sets this limit.</span>` : ""}`;
+      return `<span class="snum"><input type="number" inputmode="decimal" step="any" min="${d.min ?? 0}" value="${h(num)}" placeholder="No limit" data-sv-input ${lab}${env ? " disabled" : dis}><span class="unit">${h(d.unit ?? "")}</span></span>${off}${env ? `<span class="small dim">CUVETTE_BUDGET_USD in the shell sets this limit.</span>` : ""}`;
     }
     case "path":
       return `<span class="spath"><input type="text" value="${h(r.value === "not set" ? "" : r.value)}" data-sv-input ${lab} spellcheck="false"${dis}><button type="button" class="btn" data-sv-choose${dis}>Choose…</button></span>`;

@@ -22,8 +22,8 @@ program:
     - https://scanpy.readthedocs.io/en/stable/api/preprocessing.html
     - https://scanpy.readthedocs.io/en/stable/api/tools.html
   install: >
-    The adapter uses the Python environment at ~/.guided-analysis/envs/scanpy. Make it and add scanpy and igraph:
-    uv venv ~/.guided-analysis/envs/scanpy && uv pip install --python ~/.guided-analysis/envs/scanpy/bin/python scanpy igraph
+    The adapter uses the Python environment at ~/.cuvette/envs/scanpy. Make it and add scanpy and igraph:
+    uv venv ~/.cuvette/envs/scanpy && uv pip install --python ~/.cuvette/envs/scanpy/bin/python scanpy igraph
   citation:
     - text: "Wolf, F. A., Angerer, P., & Theis, F. J. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biology, 19(1), 15. https://doi.org/10.1186/s13059-017-1382-0"
       doi: 10.1186/s13059-017-1382-0
@@ -59,10 +59,10 @@ connection:
   call_timeout_s: 900
 
 locate:
-  env: GA_SCANPY_PYTHON
+  env: CUVETTE_SCANPY_PYTHON
   paths:
-    - ~/.guided-analysis/envs/scanpy/bin/python
-    - ~/.guided-analysis/envs/scanpy/Scripts/python.exe
+    - ~/.cuvette/envs/scanpy/bin/python
+    - ~/.cuvette/envs/scanpy/Scripts/python.exe
   which: []
   version_command: ["{program_path}", "-W", "ignore", "-c", "import scanpy; print('scanpy', scanpy.__version__)"]
   version_pattern: 'scanpy (\S+)'

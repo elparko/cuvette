@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/chure2024-hplc-py"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/chure2024-hplc-py"
 mkdir -p "$D"
 cd "$D"
 # Zenodo record 10642439, the archive of hplc-py 0.2.5 that the JOSS paper cites. License GPL-3.0.

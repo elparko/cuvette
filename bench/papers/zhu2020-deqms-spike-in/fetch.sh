@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/zhu2020-deqms-spike-in"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/zhu2020-deqms-spike-in"
 mkdir -p "$D"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT

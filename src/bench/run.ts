@@ -29,8 +29,8 @@ export async function runScenario(id: string, opts: RunOptions): Promise<RunResu
   const prompt = sc.prompt.replaceAll("{data}", cwd);
   const home = join(BENCH_DIR, "results", "home");
   mkdirSync(home, { recursive: true });
-  const oldHome = process.env.GA_HOME;
-  process.env.GA_HOME = home;
+  const oldHome = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
   try {
     const { Session } = await import("../core/session.ts");
     const session = await Session.create({
@@ -64,8 +64,8 @@ export async function runScenario(id: string, opts: RunOptions): Promise<RunResu
     await session.close();
     return { sessionDir: session.dir, scores: score(session.dir, sc) };
   } finally {
-    if (oldHome === undefined) delete process.env.GA_HOME;
-    else process.env.GA_HOME = oldHome;
+    if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = oldHome;
   }
 }
 

@@ -6,14 +6,14 @@ import sqlite3
 import subprocess
 import sys
 
-QP = os.environ.get("GA_PROGRAM_PATH", "qgis_process")
-CALL_DIR = os.environ.get("GA_CALL_DIR", ".")
+QP = os.environ.get("CUVETTE_PROGRAM_PATH", "qgis_process")
+CALL_DIR = os.environ.get("CUVETTE_CALL_DIR", ".")
 RESAMPLING = ["near", "bilinear", "cubic", "cubicspline", "lanczos", "average", "mode", "max", "min", "med", "q1", "q3"]
 ZSTATS = ["count", "sum", "mean", "median", "stdev", "min", "max", "range", "minority", "majority", "variety", "variance"]
 
 
 def out_path(ext):
-    return os.environ.get("GA_OUTPUT_RESULT") or os.path.join(CALL_DIR, "result" + ext)
+    return os.environ.get("CUVETTE_OUTPUT_RESULT") or os.path.join(CALL_DIR, "result" + ext)
 
 
 def quote(a):

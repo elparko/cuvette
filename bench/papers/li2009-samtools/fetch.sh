@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/li2009-samtools"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/li2009-samtools"
 mkdir -p "$D"
 cd "$D"
 curl -L -C - -O https://raw.githubusercontent.com/samtools/samtools/develop/examples/ex1.fa

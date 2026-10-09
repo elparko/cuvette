@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { folderTrusted, projectSettingFiles } from "../core/trust.ts";
-import { gaHome, type LoadedAdapter, type Manifest } from "./manifest.ts";
+import { cuvetteHome, type LoadedAdapter, type Manifest } from "./manifest.ts";
 
 export interface Access {
   off?: boolean;
@@ -10,7 +10,7 @@ export interface Access {
   code?: boolean;
 }
 
-export const accessFile = () => join(gaHome(), "settings.json");
+export const accessFile = () => join(cuvetteHome(), "settings.json");
 
 function readJson(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
@@ -70,7 +70,7 @@ export const networkControl = (m: Manifest) => m.connection.kind === "http";
 
 export function usable(a: LoadedAdapter, cwd = process.cwd()): LoadedAdapter {
   const acc = accessOf(a.name, cwd);
-  if (acc.off) throw new Error(`the adapter ${a.name} is turned off in Programs. Turn it on with /programs or ga programs enable ${a.name}`);
+  if (acc.off) throw new Error(`the adapter ${a.name} is turned off in Programs. Turn it on with /programs or cuvette programs enable ${a.name}`);
   if (acc.network === undefined) return a;
   return { ...a, manifest: { ...a.manifest, connection: { ...a.manifest.connection, network: acc.network } } };
 }

@@ -90,7 +90,7 @@ async def run_wrapper():
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
-    env = {**os.environ, "GA_WORK_DIR": B_DIR}
+    env = {**os.environ, "CUVETTE_WORK_DIR": B_DIR}
     env.pop("SMILE_MSI_MCP_OUT", None)
     params = StdioServerParameters(command=sys.executable, args=[os.path.join(HERE, "wrapper.py")], env=env)
     rows = []

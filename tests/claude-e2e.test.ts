@@ -110,7 +110,7 @@ afterAll(() => new Promise<void>((ok) => server.close(() => ok())));
 const saved = { key: process.env.ANTHROPIC_API_KEY, url: process.env.ANTHROPIC_BASE_URL, token: process.env.ANTHROPIC_AUTH_TOKEN };
 let session: Session | undefined;
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-claude-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-claude-"));
   process.env.ANTHROPIC_API_KEY = "test";
   process.env.ANTHROPIC_BASE_URL = base;
   delete process.env.ANTHROPIC_AUTH_TOKEN;
@@ -130,7 +130,7 @@ const lab = join(__dirname, "fixtures/lab");
 const SIG = "EqQBCkYIBxgCKkDsignature+/==";
 
 async function labSession(extra: Record<string, unknown> = {}) {
-  session = await Session.create({ adapters: [lab], model: "claude", referee: "none", cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), ...extra });
+  session = await Session.create({ adapters: [lab], model: "claude", referee: "none", cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), ...extra });
   session.bus.on((e) => {
     if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "Triangle"), 0);
   });
@@ -232,7 +232,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     const { FakeProvider } = await import("../src/providers/fake.ts");
     replies = [{ blocks: [{ type: "text", text: "[]" }] }];
     const referee = new ClaudeProvider("claude-sonnet-5-5");
-    session = await Session.create({ adapters: [lab], provider: new FakeProvider([{ text: "Nothing to count." }]), refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")) });
+    session = await Session.create({ adapters: [lab], provider: new FakeProvider([{ text: "Nothing to count." }]), refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
     session.decisions.applySetup({});
     await session.send("hello");
     expect(captured.at(-1)!.body.model).toBe("claude-sonnet-5-5");
@@ -379,7 +379,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
 
   test("a tool result with images sends image blocks inside the tool_result", () => {
     const p = new ClaudeProvider("claude-opus-5-5", { apiKey: "test" });
-    const png = join(tmpdir(), `ga-e2e-${Date.now()}.png`);
+    const png = join(tmpdir(), `cuvette-e2e-${Date.now()}.png`);
     const px = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
     require("node:fs").writeFileSync(png, px);
     const out = p.toNative([

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/gramfort2013-mne-sample"
-R="${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}/gramfort2013-mne-sample"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/gramfort2013-mne-sample"
+R="${CUVETTE_REFERENCE:-${GA_REFERENCE:-/Volumes/T7/guided-analysis/reference}}/gramfort2013-mne-sample"
 mkdir -p "$D" "$R"
-MNE_DATA="$D" "${GA_MNE_PYTHON:-$HOME/.guided-analysis/envs/mne/bin/python}" -c "
+MNE_DATA="$D" "${CUVETTE_MNE_PYTHON:-${GA_MNE_PYTHON:-$HOME/.cuvette/envs/mne/bin/python}}" -c "
 import mne
 print(mne.datasets.sample.data_path(path='$D', download=True))
 "

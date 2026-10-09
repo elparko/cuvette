@@ -58,7 +58,7 @@ def _save(frame, stem):
 
 
 def _out_dir(sub=""):
-    base = os.environ.get("GA_OUTPUT_DIR") or os.environ.get("GA_WORK_DIR") or os.getcwd()
+    base = os.environ.get("CUVETTE_OUTPUT_DIR") or os.environ.get("CUVETTE_WORK_DIR") or os.getcwd()
     d = os.path.join(base, sub) if sub else base
     os.makedirs(d, exist_ok=True)
     return d

@@ -368,13 +368,13 @@ ul.dirs li button .dim { margin-left: 6px; }
 
 <main class="page wide hidden" id="p-settings">
   <div class="panel"><h2>Settings</h2><p class="dim small">The same settings as /config in the terminal. Each change goes in the record.</p><div id="settingsbody"></div></div>
-  <div class="panel"><h3>Programs on this computer</h3><p class="dim small">The same check as ga doctor in the terminal.</p><div id="doctorbody2"></div><div class="row"><button type="button" class="btn" data-doctor="doctorbody2">Check this computer</button><button type="button" class="btn quiet" data-doctor="doctorbody2" data-doctor-all="1">Show the full list</button></div></div>
+  <div class="panel"><h3>Programs on this computer</h3><p class="dim small">The same check as cuvette doctor in the terminal.</p><div id="doctorbody2"></div><div class="row"><button type="button" class="btn" data-doctor="doctorbody2">Check this computer</button><button type="button" class="btn quiet" data-doctor="doctorbody2" data-doctor-all="1">Show the full list</button></div></div>
 </main>
 
 <main class="page hidden" id="p-programs">
   <div class="panel">
     <div class="row" style="justify-content: space-between"><h2 style="margin:0">Programs</h2><button type="button" class="btn" id="progcheck">Check all again</button></div>
-    <p class="dim small">The programs that the adapters use, grouped by field. The same list as /programs in the terminal and ga programs. Each change asks first and shows what it does. It goes in the programs log and in the session record.</p>
+    <p class="dim small">The programs that the adapters use, grouped by field. The same list as /programs in the terminal and cuvette programs. Each change asks first and shows what it does. It goes in the programs log and in the session record.</p>
     <div id="programsbody"><p class="dim">Looking for the programs...</p></div>
   </div>
 </main>
@@ -394,7 +394,7 @@ ul.dirs li button .dim { margin-left: 6px; }
 <main class="page hidden" id="p-sessions">
   <div class="panel">
     <div class="row" style="justify-content: space-between"><h2 style="margin:0">Sessions</h2><button type="button" class="btn primary" id="openfolder">Open a folder</button></div>
-    <p class="dim small">Newest first. Choose one to continue it. A session that you start here also opens in the terminal with ga --resume, and the other way.</p>
+    <p class="dim small">Newest first. Choose one to continue it. A session that you start here also opens in the terminal with cuvette --resume, and the other way.</p>
     <div id="sessionsbody"></div>
   </div>
 </main>

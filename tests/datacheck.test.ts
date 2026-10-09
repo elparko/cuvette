@@ -80,7 +80,7 @@ describe("table checks", () => {
   });
 
   test("a semicolon CSV with decimal commas reads as a table", () => {
-    const dir = mkdtempSync(join(tmpdir(), "ga-dc-"));
+    const dir = mkdtempSync(join(tmpdir(), "cuvette-dc-"));
     const p = join(dir, "eu.csv");
     writeFileSync(p, "Sample;Group;Weight (g)\nS1;A;20,5\nS2;A;21,1\nS3;B;19,8\n");
     const table = readCsvTable(p);
@@ -173,7 +173,7 @@ describe("file set checks", () => {
   });
 
   test("bit depth and size come from the TIFF and PNG headers on disk", () => {
-    const root = mkdtempSync(join(tmpdir(), "ga-dc-files-"));
+    const root = mkdtempSync(join(tmpdir(), "cuvette-dc-files-"));
     tiff(join(root, "A/a_01.tif"), 16, 512, 256);
     tiff(join(root, "A/a_02.tif"), 8, 512, 256);
     const png = Buffer.alloc(33);

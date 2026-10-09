@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-D="${GA_DATA:-/Volumes/T7/guided-analysis/data}/hackshaw1997-ets-lung-cancer"
+D="${CUVETTE_DATA:-${GA_DATA:-/Volumes/T7/guided-analysis/data}}/hackshaw1997-ets-lung-cancer"
 mkdir -p "$D"
 cd "$D"
 curl -fsSL -o dat.hackshaw1998.rda https://raw.githubusercontent.com/wviechtb/metadat/b19c23b4c09e16d0c14a31af94fca190c7dd0357/data/dat.hackshaw1998.rda

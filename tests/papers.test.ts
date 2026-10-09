@@ -9,8 +9,8 @@ import { FakeProvider } from "../src/providers/fake.ts";
 const LAB = join(__dirname, "fixtures/lab");
 let root: string;
 let papersDir: string;
-const oldHome = process.env.GA_HOME;
-const oldData = process.env.GA_BENCH_DATA;
+const oldHome = process.env.CUVETTE_HOME;
+const oldData = process.env.CUVETTE_BENCH_DATA;
 
 function paper(id: string, extra: Record<string, unknown> = {}) {
   mkdirSync(join(papersDir, id), { recursive: true });
@@ -31,18 +31,18 @@ function paper(id: string, extra: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), "ga-papers-"));
+  root = mkdtempSync(join(tmpdir(), "cuvette-papers-"));
   papersDir = join(root, "papers");
-  process.env.GA_HOME = join(root, "home");
-  process.env.GA_BENCH_DATA = join(root, "data");
+  process.env.CUVETTE_HOME = join(root, "home");
+  process.env.CUVETTE_BENCH_DATA = join(root, "data");
   mkdirSync(join(root, "data/lab"), { recursive: true });
   writeFileSync(join(root, "data/lab/a.tif"), "x");
 });
 afterEach(() => {
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
-  if (oldData === undefined) delete process.env.GA_BENCH_DATA;
-  else process.env.GA_BENCH_DATA = oldData;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
+  if (oldData === undefined) delete process.env.CUVETTE_BENCH_DATA;
+  else process.env.CUVETTE_BENCH_DATA = oldData;
 });
 
 const options = () => ({ papersDir, scratch: join(root, "scratch"), resultsDir: join(root, "results"), log: () => {} });
@@ -74,7 +74,7 @@ test("an end-to-end run with the fake model scores computed and reported and wri
   expect(run.metrics!.requests).toBeGreaterThanOrEqual(2);
   expect(run.dir!.startsWith(join(root, "scratch"))).toBe(true);
   expect(run.dir!.startsWith(join(root, "scratch", "fake_script", "lab-count", "run1", "home"))).toBe(true);
-  expect(process.env.GA_HOME).toBe(join(root, "home"));
+  expect(process.env.CUVETTE_HOME).toBe(join(root, "home"));
 
   const json = JSON.parse(readFileSync(result.paths!.json, "utf8"));
   expect(json.summary.totals["fake:script"]).toMatchObject({ computed: 2, computedOf: 3, reported: 1, reportedOf: 2 });

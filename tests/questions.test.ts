@@ -28,8 +28,8 @@ const spec = (extra: object = {}) => ({
 
 let rec: FakeRecord;
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-"));
-  rec = new FakeRecord(join(process.env.GA_HOME, "sessions", "s1"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-"));
+  rec = new FakeRecord(join(process.env.CUVETTE_HOME, "sessions", "s1"));
 });
 
 test("ask, answer by label, closed throws, restore", async () => {

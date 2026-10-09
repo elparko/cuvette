@@ -12,7 +12,7 @@ import { startWindow } from "../src/server/window.ts";
 let session: Session | undefined;
 const closers: (() => void)[] = [];
 beforeEach(() => {
-  process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-panel-"));
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-panel-"));
 });
 afterEach(async () => {
   while (closers.length) closers.pop()!();
@@ -21,7 +21,7 @@ afterEach(async () => {
 });
 
 async function open(provider: FakeProvider, extra: Record<string, unknown> = {}) {
-  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "ga-proj-")), settings: { guidance: false }, ...extra });
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false }, ...extra });
   session.decisions.applySetup({});
   session.decisions.change("method", "Default");
   const w = await startWindow(session, { port: 0 });
@@ -129,7 +129,7 @@ describe("panel routes", () => {
 const smilePython = [process.env.SMILE_MSI_PYTHON, join(homedir(), "Code/SMILE-MSI/.venv/bin/python")].find((x) => x && existsSync(x));
 
 describe("panel.py", () => {
-  test.skipIf(!process.env.GA_LIVE || !smilePython)("starts in SMILE MSI and polls the feed", async () => {
+  test.skipIf(!process.env.CUVETTE_LIVE || !smilePython)("starts in SMILE MSI and polls the feed", async () => {
     const p = await open(new FakeProvider([{ text: "x" }]));
     const hits: string[] = [];
     const proxy = createServer(async (req, res) => {

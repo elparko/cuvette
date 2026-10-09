@@ -5,7 +5,7 @@ and how to check the results. This file is the published spec. A person or a mod
 an adapter from it.
 
 The schema in `src/adapters/manifest.ts` is the source of truth. The tables below follow that
-schema. The checker (`ga adapter check <dir>`) rejects any field that this spec does not list.
+schema. The checker (`cuvette adapter check <dir>`) rejects any field that this spec does not list.
 
 ## Folder layout
 
@@ -180,7 +180,7 @@ Placeholders work in `command`, `env`, `cwd`, `interpreter` and in tool template
 | `{program_path}` | The program path from `locate`. |
 | `{env:NAME}` | The value of an environment variable. |
 
-The child process gets `GA_WORK_DIR`, `GA_SESSION_DIR`, `GA_ADAPTER_DIR` and `GA_PROGRAM_PATH`.
+The child process gets `CUVETTE_WORK_DIR`, `CUVETTE_SESSION_DIR`, `CUVETTE_ADAPTER_DIR` and `CUVETTE_PROGRAM_PATH`.
 Do not put a secret in `adapter.yaml`. Use `{env:NAME}`.
 
 ### `tools`
@@ -346,7 +346,7 @@ numbers.
 | `expect` | list of expectations | `[]` | What the result must be. |
 | `data` | list of text | `[]` | Files in the adapter folder that the test needs. They must exist. |
 | `manual_route_checked` | true or false | `false` | `true` if a person ran the manual route and got the same numbers. |
-| `gui` | true or false | none | `true` if the test opens a program window or takes the focus. `ga adapter check --run-tests` skips it; `--gui` runs it. Each test of a `macro` or `screen` adapter must state it. |
+| `gui` | true or false | none | `true` if the test opens a program window or takes the focus. `cuvette adapter check --run-tests` skips it; `--gui` runs it. Each test of a `macro` or `screen` adapter must state it. |
 
 A call has `tool`, `args` (default `{}`) and `save_as` (default empty). The tool can be a program tool
 or a tool of the module.
@@ -434,7 +434,7 @@ The setting `defaultAdapters` names adapters that each session loads at the star
 is `["tables"]`: read CSV and Excel sheets, summarize, reshape, write xlsx and make plots. Its
 five tools take about 2,000 tokens, and its standards take about 240 tokens.
 
-- `ga`, `ga -p` and `ga mcp` load the default adapters next to the `--adapter` adapters. They
+- `cuvette`, `cuvette -p` and `cuvette mcp` load the default adapters next to the `--adapter` adapters. They
   open no card.
 - The default adapters do not close the adapter choice. With no `--adapter`, `list_adapters` and
   `use_adapter` stay, and the agent can load a program adapter later.
@@ -443,7 +443,7 @@ five tools take about 2,000 tokens, and its standards take about 240 tokens.
 - The session record lists them under `defaults` in the `session` entry.
 - The benchmark does not use this setting. It loads only the adapters in each `bench.yaml`.
 
-Change it with `ga config set defaultAdapters tables,biostats`. Type `none` for no adapter.
+Change it with `cuvette config set defaultAdapters tables,biostats`. Type `none` for no adapter.
 
 ## Tool results
 
@@ -630,7 +630,7 @@ English. It gives a warning, not an error.
 | A checklist rule with level error fails: `field`, `file-types`, `install-hint`, `locate-identity`, `tool-description`, `arg-description` (required argument), `arg-schema`, `batch-flag`, `manual-route`, `approval-code`, `blinding-number`, `decision-type`, `decision-default`, `decision-help`, `sensitivity-compare`, `kat-present`, `kat-data-license`, `kat-gui`. | error |
 | A checklist rule with level warning fails: `tool-description-length` (over 600 characters), `tool-description-plain`, `advice-limits`, `arg-description` (optional argument), `arg-units`, `array-min-items`, `summary-template`, `error-text`, `fail-without-error`, `kat-coverage`, `kat-exact`, `kat-failure-path`, `text-style`, a license that is not confirmed. | warning |
 
-`ga adapter check <name> --drive [--model ollama:qwen3:8b] [--tool <name>]` is the drive test.
+`cuvette adapter check <name> --drive [--model ollama:qwen3:8b] [--tool <name>]` is the drive test.
 For each tool, it makes one plain request from the tool description and the input of a
 known-answer test. Then it runs a short headless session with only this adapter. It reports whether
 the model called the right tool, whether the arguments were valid, and whether the result and
@@ -638,6 +638,6 @@ the answer reached the known value. Each confusion names its record entry. The d
 `ollama:qwen3:8b`.
 
 The pull request workflow `.github/workflows/adapter-check.yml` (on the license branch, not yet on
-main) runs `ga adapter check` on each changed adapter folder. The checklist rules run inside that
+main) runs `cuvette adapter check` on each changed adapter folder. The checklist rules run inside that
 command, so the workflow needs no new step. The ImageJ job in `.github/workflows/test.yml` passes
 `--gui`.

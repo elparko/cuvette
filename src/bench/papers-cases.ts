@@ -16,7 +16,7 @@ import { figureFor, mergeResults } from "./papers-site.ts";
 import { dataRoot, loadPaper, paperIds, PAPERS_DIR, resolveData, type Paper, type PaperItem } from "./papers-spec.ts";
 import type { PaperRun } from "./papers.ts";
 
-const SCIENCE_PYTHON = join(homedir(), ".guided-analysis/envs/science/bin/python");
+const SCIENCE_PYTHON = join(homedir(), ".cuvette/envs/science/bin/python");
 const FIELD_ORDER = ["Imaging", "Flow cytometry", "Mass spectrometry and proteomics", "Genomics and transcriptomics", "Phylogenetics", "Neuroscience", "Structural biology", "Chemistry", "Statistics", "Ecology", "Astronomy", "Geospatial"];
 const MAX_OUTPUT = 3000;
 const SHORT_THINKING = 300;
@@ -71,11 +71,11 @@ export function makeSanitizer(run?: { dir?: string }): (s: string) => string {
   rules.push(
     [dataRoot(), "{data}"],
     ["/Volumes/T7/guided-analysis/data", "{data}"],
-    [/\/Volumes\/[^/\s"'`]+\/guided-analysis\/tools\/bench-runs/g, "{runs}"],
-    [/\/Volumes\/[^/\s"'`]+(\/guided-analysis)?/g, "{other volume}"],
-    [join(h, ".guided-analysis"), "{cuvette home}"],
-    [new RegExp(`${reEsc(h)}/code/guided-analysis(/\\.claude/worktrees/[^/\\s"'\`]+)?`, "gi"), "{repo}"],
-    [/\/(Users|home)\/[^/\s"'`]+\/code\/guided-analysis(\/\.claude\/worktrees\/[^/\s"'`]+)?/gi, "{repo}"],
+    [/\/Volumes\/[^/\s"'`]+\/cuvette\/tools\/bench-runs/g, "{runs}"],
+    [/\/Volumes\/[^/\s"'`]+(\/cuvette)?/g, "{other volume}"],
+    [join(h, ".cuvette"), "{cuvette home}"],
+    [new RegExp(`${reEsc(h)}/code/cuvette(/\\.claude/worktrees/[^/\\s"'\`]+)?`, "gi"), "{repo}"],
+    [/\/(Users|home)\/[^/\s"'`]+\/code\/cuvette(\/\.claude\/worktrees\/[^/\s"'`]+)?/gi, "{repo}"],
     [h, "{home}"],
     [/\/(Users|home)\/[^/\s"'`]+/g, "{home}"],
     [/\/(private\/)?(tmp|var\/folders)\/[^\s"'`]*/g, "{tmp}"],

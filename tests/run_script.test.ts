@@ -10,7 +10,7 @@ import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
 
-const root = mkdtempSync(join(tmpdir(), "ga-script-"));
+const root = mkdtempSync(join(tmpdir(), "cuvette-script-"));
 let n = 0;
 
 function setup(callTool: (name: string, args: Args) => Promise<ToolOutput> = async () => ({ ok: true }), network = false) {
@@ -116,7 +116,7 @@ test.skipIf(!sandboxed)("macOS sandbox: blocks a write outside the work folder",
   expect(existsSync(outside)).toBe(false);
   expect(r.ok).toBe(false);
   expect(r.error).toMatch(/PermissionError|Operation not permitted/);
-  const inside = await run("open('inside.txt', 'w').write('x')\nimport tempfile\nopen(tempfile.gettempdir() + '/ga-ok.txt', 'w').write('x')");
+  const inside = await run("open('inside.txt', 'w').write('x')\nimport tempfile\nopen(tempfile.gettempdir() + '/cuvette-ok.txt', 'w').write('x')");
   expect(inside.ok).toBe(true);
 });
 
@@ -143,7 +143,7 @@ const hasScience = science.includes(join("envs", "science"));
 test.skipIf(!hasScience || !sandboxed)("the script environment has the statistics packages and works in blind mode", async () => {
   const { run, dirs } = setup();
   const paper = loadPaper(paperIds().find((id) => id.startsWith("kasurinen"))!);
-  setBlindPolicy(blindPolicyFor({ paper, runDir: join(dirs.workDir, ".."), scratch: join(root, "scratch"), home: join(homedir(), ".guided-analysis"), adapterRoots: [], programs: [] }));
+  setBlindPolicy(blindPolicyFor({ paper, runDir: join(dirs.workDir, ".."), scratch: join(root, "scratch"), home: join(homedir(), ".cuvette"), adapterRoots: [], programs: [] }));
   try {
     const r = await run([
       "import numpy, pandas, scipy, statsmodels, lifelines",
@@ -160,7 +160,7 @@ test.skipIf(!hasScience || !sandboxed)("the script environment has the statistic
 }, 120000);
 
 test("a relative path means the same file in list_dir, read_file, run_script and run_command", async () => {
-  const project = mkdtempSync(join(tmpdir(), "ga-project-"));
+  const project = mkdtempSync(join(tmpdir(), "cuvette-project-"));
   mkdirSync(join(project, "LDL", "Set 1"), { recursive: true });
   writeFileSync(join(project, "LDL", "Set 1", "20X_CH1.txt"), "red cells");
   const workDir = join(root, `work${++n}`);

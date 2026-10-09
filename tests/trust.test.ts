@@ -19,22 +19,22 @@ vi.mock("../src/providers/index.ts", async (orig) => {
   return { ...m, makeProvider: async (spec: string, opts: Record<string, unknown> = {}) => (seen.push({ spec, opts }), m.makeProvider(spec, opts as never)) };
 });
 
-const oldHome = process.env.GA_HOME;
+const oldHome = process.env.CUVETTE_HOME;
 let home = "";
 let cwd = "";
 let session: Session | undefined;
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "ga-trust-home-"));
-  process.env.GA_HOME = home;
+  home = mkdtempSync(join(tmpdir(), "cuvette-trust-home-"));
+  process.env.CUVETTE_HOME = home;
   writeFileSync(join(home, "settings.json"), JSON.stringify({ defaultAdapters: [] }));
-  cwd = mkdtempSync(join(tmpdir(), "ga-trust-"));
+  cwd = mkdtempSync(join(tmpdir(), "cuvette-trust-"));
 });
 afterEach(async () => {
   await session?.close();
   session = undefined;
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
 });
 
 function project(dir: string, settings: Record<string, unknown>, file = "settings.json", root = cwd) {
@@ -59,11 +59,11 @@ test("an untrusted folder: the hook does not run, bypass is not applied, the sha
   shadowAdapter();
   expect(loadSettings(cwd)).toMatchObject({ permissionMode: "ask", model: "claude", animations: "off", hooks: {} });
   expect(findAdapter("biostats", cwd).root).toBe(join(CATALOG_DIR, "biostats"));
-  expect(findAdapter(join(cwd, ".ga", "adapters", "biostats"), cwd).root).toBe(join(CATALOG_DIR, "biostats"));
+  expect(findAdapter(join(cwd, ".cuvette", "adapters", "biostats"), cwd).root).toBe(join(CATALOG_DIR, "biostats"));
   session = await start();
   expect(existsSync(join(cwd, "ran"))).toBe(false);
   expect(session.permissionMode).toBe("ask");
-  expect(session.trustNotice).toMatch(/^Cuvette ignored the settings, hooks and adapters in .*: the folder is not trusted\. Use --trust-folder, or ga trust add /);
+  expect(session.trustNotice).toMatch(/^Cuvette ignored the settings, hooks and adapters in .*: the folder is not trusted\. Use --trust-folder, or cuvette trust add /);
   expect(session.record.entries(["notice"]).map((e) => e.data.text)).toContain(session.trustNotice);
   const scan = scanFolder(cwd);
   expect(scan.adapters).toEqual([{ name: "biostats", replaces: "the catalog adapter biostats" }]);
@@ -197,10 +197,10 @@ test("the Folder trust row and /trust", async () => {
   expect(trustStatus(cwd).state).toBe("trusted");
 });
 
-const ga = join(__dirname, "..", "bin/ga.js");
+const cuvette = join(__dirname, "..", "bin/cuvette.js");
 const cli = (args: string[]) =>
   new Promise<{ stdout: string; stderr: string }>((resolve) => {
-    const child = spawn("node", [ga, ...args], { cwd, env: { ...process.env, GA_HOME: home, GA_NO_OPEN: "1" } });
+    const child = spawn("node", [cuvette, ...args], { cwd, env: { ...process.env, CUVETTE_HOME: home, CUVETTE_NO_OPEN: "1" } });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => (stdout += d));
@@ -223,7 +223,7 @@ test("headless: an untrusted folder is ignored with a one-line notice; --trust-f
 }, 120000);
 
 test("the benchmark runner trusts its own checkout and passes think=true to the model", async () => {
-  const root = mkdtempSync(join(tmpdir(), "ga-trust-bench-"));
+  const root = mkdtempSync(join(tmpdir(), "cuvette-trust-bench-"));
   const checkout = join(root, "checkout");
   project(".ga", { think: true }, "settings.local.json", checkout);
   const papersDir = join(root, "papers");
@@ -234,8 +234,8 @@ test("the benchmark runner trusts its own checkout and passes think=true to the 
     join(papersDir, "lab-count", "bench.yaml"),
     JSON.stringify({ adapters: [join(__dirname, "fixtures/lab")], prompt: "Count {data}/lab/a.tif.", data: ["lab/a.tif"], timeout_s: 60, items: [{ key: "count", description: "n", value: 66, exact: true }] }),
   );
-  const oldData = process.env.GA_BENCH_DATA;
-  process.env.GA_BENCH_DATA = join(root, "data");
+  const oldData = process.env.CUVETTE_BENCH_DATA;
+  process.env.CUVETTE_BENCH_DATA = join(root, "data");
   const lines: string[] = [];
   seen.length = 0;
   try {
@@ -243,8 +243,8 @@ test("the benchmark runner trusts its own checkout and passes think=true to the 
     expect(r.modelOptions).toEqual({ think: true });
     expect(r.runs[0]!.error ?? "").not.toMatch(/think/);
   } finally {
-    if (oldData === undefined) delete process.env.GA_BENCH_DATA;
-    else process.env.GA_BENCH_DATA = oldData;
+    if (oldData === undefined) delete process.env.CUVETTE_BENCH_DATA;
+    else process.env.CUVETTE_BENCH_DATA = oldData;
   }
   expect(seen.find((s) => s.spec === "fake:")?.opts.think).toBe(true);
   expect(lines[0]).toContain("think=true");

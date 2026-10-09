@@ -816,7 +816,7 @@ export function findChrome(): string | undefined {
 export function exportPdf(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
   const pandoc = findPandoc();
   if (!pandoc) throw new Error("PDF export needs pandoc. Install pandoc, then try again.");
-  const tmp = mkdtempSync(join(tmpdir(), "ga-pdf-"));
+  const tmp = mkdtempSync(join(tmpdir(), "cuvette-pdf-"));
   try {
     const md = join(tmp, "trail.md");
     writeFileSync(md, markdownText(record, adapters, style));

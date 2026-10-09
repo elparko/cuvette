@@ -12,8 +12,8 @@ const GOOD = "tests/fixtures/onboard/good";
 let tmp: string;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "ga-onb-"));
-  process.env.GA_HOME = join(tmp, "home");
+  tmp = mkdtempSync(join(tmpdir(), "cuvette-onb-"));
+  process.env.CUVETTE_HOME = join(tmp, "home");
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
@@ -215,7 +215,7 @@ describe("onboard command", () => {
     expect(o.firstMessage).toContain("Pandoc 3");
     expect(o.firstMessage).toContain("https://pandoc.org/MANUAL.html");
     expect(o.firstMessage).toContain("onboarding-guide.md");
-    expect(o.env.GA_DRAFT_DIR).toBe(o.draftDir);
+    expect(o.env.CUVETTE_DRAFT_DIR).toBe(o.draftDir);
     expect(o.draftDir).toMatch(/pandoc-3$/);
   });
 

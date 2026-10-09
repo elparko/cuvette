@@ -47,7 +47,7 @@ export type PaperItem = PaperSpec["items"][number];
 export type Paper = PaperSpec & { id: string; dir: string };
 
 export function dataRoot(): string {
-  return process.env.GA_BENCH_DATA || DEFAULT_DATA_ROOT;
+  return process.env.CUVETTE_BENCH_DATA || DEFAULT_DATA_ROOT;
 }
 
 export function resolveData(p: string): string {

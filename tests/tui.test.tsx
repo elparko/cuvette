@@ -420,8 +420,8 @@ describe("API key", () => {
     const { mkdtempSync } = await import("node:fs");
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
-    const old = process.env.GA_HOME;
-    process.env.GA_HOME = mkdtempSync(join(tmpdir(), "ga-tui-key-"));
+    const old = process.env.CUVETTE_HOME;
+    process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-tui-key-"));
     try {
       const h = makeHarness();
       const s = new FakeSession({ delayMs: 0 });
@@ -436,8 +436,8 @@ describe("API key", () => {
       await type(h, "\x1b");
       await until(() => h.last().includes("Ask for an analysis step"));
     } finally {
-      if (old === undefined) delete process.env.GA_HOME;
-      else process.env.GA_HOME = old;
+      if (old === undefined) delete process.env.CUVETTE_HOME;
+      else process.env.CUVETTE_HOME = old;
     }
   });
 

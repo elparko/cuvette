@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Decision, gaHome } from "../adapters/manifest.ts";
+import { Decision, cuvetteHome } from "../adapters/manifest.ts";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Args, Deviation, Enforcement, Hook, Owner, PreToolUseInput, PreToolUseResult } from "./types.ts";
@@ -124,7 +124,7 @@ function coerce(def: Decision, raw: unknown): unknown {
 }
 
 function profilesDir(): string {
-  return join(gaHome(), "profiles");
+  return join(cuvetteHome(), "profiles");
 }
 
 function profileVersions(name: string): number[] {

@@ -5,10 +5,10 @@ import { expect, test } from "vitest";
 import { batchReason, pilotRows, pilotState, pilotText, validationRows } from "../src/core/pilot.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 
-const record = () => new AnalysisRecord(mkdtempSync(join(tmpdir(), "ga-pilot-")), "s1");
+const record = () => new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-pilot-")), "s1");
 
 test("a batch step is a declared batch tool, a list of files, a folder, or a script that loops over files", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ga-batch-"));
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-batch-"));
   mkdirSync(join(dir, "images"));
   expect(batchReason("count_all", {}, true)).toBe("count_all is a batch tool in its adapter.");
   expect(batchReason("count", { inputs: ["/d/a.tif", "/d/b.tif", "/d/c.tif"] })).toBe("count gets 3 input files in inputs.");

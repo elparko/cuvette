@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { buildSite } from "../src/bench/papers-site.ts";
 
-const SCIENCE = join(homedir(), ".guided-analysis/envs/science/bin/python");
+const SCIENCE = join(homedir(), ".cuvette/envs/science/bin/python");
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 let root: string;
@@ -27,7 +27,7 @@ function run(paper: string, model: string, pass: boolean) {
 }
 
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), "ga-site-test-"));
+  root = mkdtempSync(join(tmpdir(), "cuvette-site-test-"));
   papers = join(root, "papers");
   for (const id of ["with-fig", "no-fig", "unrun"]) {
     mkdirSync(join(papers, id), { recursive: true });

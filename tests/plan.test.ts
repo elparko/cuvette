@@ -27,7 +27,7 @@ export const SLEEP_PLAN = {
 };
 
 function record() {
-  return new AnalysisRecord(mkdtempSync(join(tmpdir(), "ga-plan-")), "s1");
+  return new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-plan-")), "s1");
 }
 
 test("the plan text has every section in plain words", () => {

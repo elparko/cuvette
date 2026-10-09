@@ -16,7 +16,7 @@ import { programsHtml } from "../src/server/app-html.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { planFor } from "../src/ui/programs.ts";
 
-const oldHome = process.env.GA_HOME;
+const oldHome = process.env.CUVETTE_HOME;
 let home = "";
 let cwd = "";
 let custom = "";
@@ -24,9 +24,9 @@ let session: Session | undefined;
 let app: AppHandle | undefined;
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "ga-programs-"));
-  cwd = mkdtempSync(join(tmpdir(), "ga-programs-cwd-"));
-  process.env.GA_HOME = home;
+  home = mkdtempSync(join(tmpdir(), "cuvette-programs-"));
+  cwd = mkdtempSync(join(tmpdir(), "cuvette-programs-cwd-"));
+  process.env.CUVETTE_HOME = home;
   custom = touch(join(cwd, "tools", "delta-good", "delta"));
   touch(join(home, "envs", "biostats", "bin", "python"));
 });
@@ -35,8 +35,8 @@ afterEach(async () => {
   session = undefined;
   await app?.close();
   app = undefined;
-  if (oldHome === undefined) delete process.env.GA_HOME;
-  else process.env.GA_HOME = oldHome;
+  if (oldHome === undefined) delete process.env.CUVETTE_HOME;
+  else process.env.CUVETTE_HOME = oldHome;
 });
 
 function touch(path: string): string {
@@ -58,13 +58,13 @@ function man(name: string, o: { field?: string; program?: string; tested?: strin
 function fakes(extra: Partial<ProgramsOpts> = {}): ProgramsOpts {
   const env = join(home, "envs", "biostats", "bin", "python");
   const adapters: Record<string, { manifest: Manifest; root: string }> = {
-    alpha: { manifest: man("alpha", { field: "statistics", program: "Alpha stats", paths: ["~/.guided-analysis/envs/biostats/bin/python"] }), root: join(cwd, "a/alpha") },
-    tables: { manifest: man("tables", { field: "statistics", paths: ["~/.guided-analysis/envs/biostats/bin/python"] }), root: join(cwd, "a/tables") },
+    alpha: { manifest: man("alpha", { field: "statistics", program: "Alpha stats", paths: ["~/.cuvette/envs/biostats/bin/python"] }), root: join(cwd, "a/alpha") },
+    tables: { manifest: man("tables", { field: "statistics", paths: ["~/.cuvette/envs/biostats/bin/python"] }), root: join(cwd, "a/tables") },
     beta: { manifest: man("beta", { install: "Download BETA from the lab share." }), root: join(cwd, "a/beta") },
     gamma: { manifest: man("gamma", { tested: ["2.0"] }), root: join(cwd, "a/gamma") },
     delta: { manifest: man("delta", { field: "microscopy" }), root: join(cwd, "a/delta") },
     epsilon: { manifest: man("epsilon", { field: "microscopy", program: "Epsilon", tools: [{ name: "run_macro", description: "Run macro code.", params: { code: { type: "string" } } }] }), root: join(cwd, "a/epsilon") },
-    zeta: { manifest: man("zeta", { field: "microscopy", paths: ["~/.guided-analysis/envs/cellpose/bin/python"] }), root: join(cwd, "a/zeta") },
+    zeta: { manifest: man("zeta", { field: "microscopy", paths: ["~/.cuvette/envs/cellpose/bin/python"] }), root: join(cwd, "a/zeta") },
     samtools: { manifest: man("samtools", { field: "genomics" }), root: join(cwd, "a/samtools") },
     qupath: { manifest: man("qupath", { field: "pathology" }), root: join(cwd, "a/qupath") },
   };
@@ -260,12 +260,12 @@ describe("the actions", () => {
 });
 
 function labCwd(): string {
-  const dir = join(cwd, ".ga", "adapters", "lab");
+  const dir = join(cwd, ".cuvette", "adapters", "lab");
   mkdirSync(dir, { recursive: true });
   const yaml = readFileSync(join(__dirname, "fixtures/lab/adapter.yaml"), "utf8");
   writeFileSync(join(dir, "adapter.yaml"), yaml.replace('adapter: { name: lab, title: Lab counter, version: "0.2.0" }', 'adapter: { name: lab, title: Lab counter, version: "0.2.0", field: microscopy, file_types: [".lab"] }'));
   symlinkSync(join(__dirname, "fixtures/lab/server.ts"), join(dir, "server.ts"));
-  const coder = join(cwd, ".ga", "adapters", "coder");
+  const coder = join(cwd, ".cuvette", "adapters", "coder");
   mkdirSync(coder, { recursive: true });
   writeFileSync(
     join(coder, "adapter.yaml"),
