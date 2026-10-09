@@ -533,7 +533,7 @@ export async function runAction(plan: Plan, opts: RunOpts): Promise<{ ok: boolea
     case "disable": {
       saveAccess(plan.name, { off: plan.action === "disable" ? true : undefined });
       const still = !!accessAll(opts.cwd)[plan.name]?.off !== (plan.action === "disable");
-      return done(true, `${plan.name} is now ${plan.action === "disable" ? "off" : "on"}.${still ? " A project setting in .ga/settings.json still wins in this folder." : ""}`, { off: plan.action === "disable" });
+      return done(true, `${plan.name} is now ${plan.action === "disable" ? "off" : "on"}.${still ? " A project setting in .cuvette/settings.json still wins in this folder." : ""}`, { off: plan.action === "disable" });
     }
     case "network-on":
     case "network-off":

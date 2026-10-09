@@ -34,7 +34,7 @@ Usage
   WARNING: In bypass, the agent can run commands and write files without asking.
   The harness allows each tool call that has a permission card and logs it with the reason
   "bypass permissions". The status line shows "bypass permissions". Also /permissions bypass,
-  or "permissions": "bypass" in ~/.cuvette/settings.json or .ga/settings.json.
+  or "permissions": "bypass" in ~/.cuvette/settings.json or .cuvette/settings.json.
   Bypass does not change these: method decisions stay with you (/decisions agent gives them
   to the agent); plan and teach mode still block steps; blind benchmark rules and the macOS
   sandbox still apply; a push to eLabFTW still asks; "deny" rules in settings still deny.

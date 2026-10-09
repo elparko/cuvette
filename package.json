@@ -14,6 +14,7 @@
   },
   "files": [
     "bin/",
+    "!bin/ga.js",
     "src/",
     "catalog/",
     "samples/",

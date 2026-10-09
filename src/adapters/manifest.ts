@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { homeFolder } from "../core/old-names.ts";
 import { folderKey, folderTrusted, projectAdapterDirs } from "../core/trust.ts";
 import type { Hook, Tool } from "../core/types.ts";
 
@@ -332,7 +332,7 @@ export function loadAdapter(path: string): LoadedAdapter {
 }
 
 export function cuvetteHome(): string {
-  return process.env.CUVETTE_HOME || join(homedir(), ".cuvette");
+  return process.env.CUVETTE_HOME || homeFolder();
 }
 
 export const CATALOG_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../catalog");

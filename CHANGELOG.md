@@ -10,6 +10,10 @@ These items are being built and are not on main yet:
 
 ## 9 October 2026
 
+### Rename
+- The project is now Cuvette (was guided-analysis), and the command `ga` is now `cuvette`. Run `npm link` again so that `cuvette` is the global command.
+- The environment variables start with `CUVETTE_`. Cuvette still reads the old `GA_*` names and gives each adapter process both names.
+- The first start moves `~/.guided-analysis` to `~/.cuvette` and leaves a link at the old path. The `.ga/` folder of a project still works, and folder trust covers `.ga/` and `.cuvette/`.
 ### Desktop app
 - Cuvette for macOS: a Tauri app of 68 MB (a 17 MB .dmg), with the Cuvette core and its own Node inside. Open a folder from the File menu, drag a folder onto the Dock icon, or use the Finder action. Cuvette > Install Command Line Tool adds the `cuvette` command for Terminal. The app is not signed yet.
 

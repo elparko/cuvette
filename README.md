@@ -274,13 +274,12 @@ The benchmark (`cuvette bench papers`) trusts its own checkout. It passes the mo
 
 ### Old names
 
-The old name of Cuvette is guided-analysis, and the old command is `ga`. Cuvette still reads the old names:
+The old name of Cuvette is guided-analysis. Cuvette still reads the old names:
 
 - At start, Cuvette moves `~/.guided-analysis` to `~/.cuvette` if only the old folder exists. It prints one line. The old path becomes a link to the new folder, so old sessions still open.
 - If a `CUVETTE_*` environment variable is not set, Cuvette reads the old `GA_*` variable. For example, `GA_HOME` works if `CUVETTE_HOME` is not set.
 - Cuvette gives each adapter process both names, for example `CUVETTE_WORK_DIR` and `GA_WORK_DIR`.
-- In a project folder, Cuvette also reads `.ga/adapters` and `.ga/settings.json`. If `.cuvette/` has the same adapter or setting, the `.cuvette/` one wins.
-- `node bin/ga.js` still works. It prints one line and runs `bin/cuvette.js`.
+- In a project folder, Cuvette also reads the old `.ga/` folder. If `.cuvette/` has the same adapter or setting, the `.cuvette/` one wins. Folder trust covers both folders.
 
 ## What the harness enforces
 

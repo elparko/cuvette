@@ -1,5 +1,5 @@
-# Packages of the Python environment that run_script uses (~/.guided-analysis/envs/science).
-# Install: uv pip install --python ~/.guided-analysis/envs/science/bin/python -r src/tools/science-requirements.txt
+# Packages of the Python environment that run_script uses (~/.cuvette/envs/science).
+# Install: uv pip install --python ~/.cuvette/envs/science/bin/python -r src/tools/science-requirements.txt
 # lifelines 0.30.3 needs pandas below 3.
 numpy==2.5.3
 pandas==2.3.3

@@ -3,7 +3,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, writeFileS
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { addOldEnv, moveOldHome, readOldEnv } from "../src/core/old-names.ts";
+import { addOldEnv, homeFolder, moveOldHome, oldHomePath, readOldEnv } from "../src/core/old-names.ts";
 
 const ROOT = join(__dirname, "..");
 const home = () => mkdtempSync(join(tmpdir(), "cuvette-oldnames-"));
@@ -46,6 +46,28 @@ test("moveOldHome moves ~/.guided-analysis to ~/.cuvette once and old sessions s
   expect(moveOldHome(h)).toBeUndefined();
 });
 
+test("after the move the old envs path still resolves through the link", () => {
+  const h = home();
+  const py = join("envs", "science", "bin", "python");
+  mkdirSync(join(h, ".guided-analysis", "envs", "science", "bin"), { recursive: true });
+  writeFileSync(join(h, ".guided-analysis", py), "#!/bin/sh\n");
+  moveOldHome(h);
+  expect(readFileSync(join(h, ".guided-analysis", py), "utf8")).toBe("#!/bin/sh\n");
+  expect(readFileSync(join(h, ".cuvette", py), "utf8")).toBe("#!/bin/sh\n");
+  expect(homeFolder(h)).toBe(join(h, ".cuvette"));
+});
+
+test("before the move, homeFolder and oldHomePath point to the old folder", () => {
+  const h = home();
+  mkdirSync(join(h, ".guided-analysis", "envs"), { recursive: true });
+  expect(homeFolder(h)).toBe(join(h, ".guided-analysis"));
+  expect(oldHomePath(join(h, ".cuvette", "envs"), h)).toBe(join(h, ".guided-analysis", "envs"));
+  expect(oldHomePath(join(h, ".cuvette", "missing"), h)).toBe(join(h, ".cuvette", "missing"));
+  expect(oldHomePath("/usr/bin/python3", h)).toBe("/usr/bin/python3");
+  mkdirSync(join(h, ".cuvette"));
+  expect(homeFolder(h)).toBe(join(h, ".cuvette"));
+});
+
 test("moveOldHome uses ~/.cuvette and does nothing when both folders exist", () => {
   const h = home();
   mkdirSync(join(h, ".guided-analysis", "sessions"), { recursive: true });
@@ -74,7 +96,7 @@ test("the CLI moves the old home folder at start, and bin/ga.js prints one notic
   writeFileSync(join(h, ".guided-analysis", "sessions", "s1", "log.jsonl"), SESSION);
   const r = cli("ga.js", ["sessions"], { HOME: h, USERPROFILE: h });
   expect(r.status).toBe(0);
-  expect(r.stderr.trim().split("\n")).toEqual(["ga is now cuvette. Use cuvette or node bin/cuvette.js.", expect.stringMatching(/^Moved .*\.guided-analysis to .*\.cuvette\./)]);
+  expect(r.stderr.trim().split("\n")).toEqual(["The command ga is now cuvette.", expect.stringMatching(/^Moved .*\.guided-analysis to .*\.cuvette\./)]);
   expect(r.stdout).toContain("s1");
   expect(existsSync(join(h, ".cuvette", "sessions", "s1", "log.jsonl"))).toBe(true);
 

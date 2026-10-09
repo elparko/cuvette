@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, delimiter, dirname, join, sep } from "node:path";
+import { oldHomePath } from "../core/old-names.ts";
 import { accessOf } from "./access.ts";
 import { adapterDirs, type Manifest } from "./manifest.ts";
 import { runProcess } from "./kinds/common.ts";
@@ -14,7 +15,7 @@ export interface Located {
 function expandPath(p: string): string {
   let out = p.replace(/\{env:([^{}]+)\}/g, (_, n: string) => process.env[n] ?? "");
   if (out === "~" || out.startsWith("~/") || out.startsWith("~\\")) out = homedir() + out.slice(1);
-  return out;
+  return oldHomePath(out);
 }
 
 function globMatches(pattern: string): string[] {

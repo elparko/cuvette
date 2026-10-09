@@ -1,6 +1,6 @@
 import { existsSync, renameSync, symlinkSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 
 const OLD = "GA_";
 const NEW = "CUVETTE_";
@@ -28,4 +28,17 @@ export function moveOldHome(home = homedir()): string | undefined {
   } catch {
     return `Moved ${old} to ${now}.`;
   }
+}
+
+export function homeFolder(home = homedir()): string {
+  const now = join(home, ".cuvette");
+  const old = join(home, ".guided-analysis");
+  return !existsSync(now) && existsSync(old) ? old : now;
+}
+
+export function oldHomePath(p: string, home = homedir()): string {
+  const now = join(home, ".cuvette");
+  if (p !== now && !p.startsWith(now + sep)) return p;
+  const old = join(home, ".guided-analysis") + p.slice(now.length);
+  return !existsSync(p) && existsSync(old) ? old : p;
 }

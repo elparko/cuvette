@@ -169,7 +169,7 @@ const next = {
   repository: { type: "git", url: "git+https://github.com/elparko/cuvette.git" },
   type,
   bin: { cuvette: "bin/cuvette.js" },
-  files: ["bin/", "src/", "catalog/", "samples/", "README.md", "!**/__pycache__/", "!**/*.pyc"],
+  files: ["bin/", "!bin/ga.js", "src/", "catalog/", "samples/", "README.md", "!**/__pycache__/", "!**/*.pyc"],
   engines,
   scripts,
   ...rest,

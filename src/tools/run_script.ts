@@ -16,7 +16,7 @@ import { cap, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, valida
 export function scriptPython(): string {
   if (process.env.CUVETTE_PYTHON) return process.env.CUVETTE_PYTHON;
   const rel = process.platform === "win32" ? ["envs", "science", "Scripts", "python.exe"] : ["envs", "science", "bin", "python"];
-  for (const home of [cuvetteHome(), join(homedir(), ".cuvette")]) if (existsSync(join(home, ...rel))) return join(home, ...rel);
+  for (const home of [cuvetteHome(), join(homedir(), ".cuvette"), join(homedir(), ".cuvette")]) if (existsSync(join(home, ...rel))) return join(home, ...rel);
   return process.platform === "win32" ? "python" : "python3";
 }
 
