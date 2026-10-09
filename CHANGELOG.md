@@ -7,7 +7,6 @@ The project is in early development. Version numbers start at the first public r
 
 These items are being built and are not on main yet:
 - New analyses: dose-response, qPCR, growth curves and enzyme kinetics; blot and gel densitometry, colony counts, wound healing and colocalization.
-- A map of proprietary lab software and the open-source alternatives that Cuvette supports.
 
 ## 9 October 2026
 
@@ -22,6 +21,14 @@ These items are being built and are not on main yet:
 - Settings that you confirm in the proposed metrics count as answered when the steps run, so no card asks again.
 
 ### New analyses
+- qPCR (qpcr): reference gene stability (geNorm and NormFinder), primer efficiencies, ΔΔCt and Pfaffl, with the Hildyard 2021 paper as the benchmark case.
+- Growth curves (growthcurver): logistic growth rate, lag time, carrying capacity and group comparison, with the Nair 2024 paper.
+- Image assays (image-assays): colony counts and clonogenic survival, colocalization (Pearson and Manders with the Costes threshold), and cell uptake indices, with three benchmark papers.
+- Statistics in the style of Prism and SPSS (biostats): two-way and three-way ANOVA, repeated measures, Kruskal-Wallis with Dunn's test, Friedman, and exact rank tests.
+- Pathway and gene set enrichment (enrichment), to replace Ingenuity Pathway Analysis for common work.
+- Cloning and primers (cloning): primer design with melting temperatures and in-silico PCR, to replace basic SnapGene and Geneious work.
+- Chromatography (chromatography): peak integration and calibration for exported HPLC traces.
+- `docs/proprietary-alternatives.md` maps common proprietary lab and clinical programs to open-source alternatives and shows which ones Cuvette supports.
 - Clinical statistics: logistic regression with odds ratios, chi-square, Fisher's exact and McNemar tests, and Cox models with categorical covariates and row subsets (biostats). Meta-analysis with forest and funnel plots and Egger's test (metafor). ROC curves, AUC with DeLong intervals and best thresholds (pROC). Power and sample size (pwr). Manual routes give the menu paths in SPSS, Stata, SAS, Prism, RevMan, MedCalc and G*Power. Four new benchmark papers: TB treatment default, HCC biomarkers, passive smoking and lung cancer, and a trial sample size.
 - ELISA and other immunoassays (R drc): standard curves with 4PL and 5PL fits, in the Prism and SoftMax Pro forms, back-calculated concentrations with the dilution factor, replicate CV, LOD, LLOQ and ULOQ, and samples outside the curve flagged. A published Lassa ELISA paper is the benchmark case.
 
