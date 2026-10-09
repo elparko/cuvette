@@ -467,10 +467,23 @@ export const commands: Command[] = [
   },
   {
     name: "export",
-    args: `<${FORMATS.join("|")}>`,
-    help: "Write the record in a file format.",
-    async run([fmt], ctx) {
-      if (!FORMATS.includes(fmt ?? "")) return ctx.error(`Use: /export <${FORMATS.join("|")}>`);
+    args: `<${FORMATS.join("|")}> | images [pptx|pdf|both] [figures|qc|pilot|all|<glob>] [step|group|name] [1|2|4|6|9] [16:9|a4|letter]`,
+    help: "Write the record in a file format. images: put the session images in images.pptx or images.pdf, one per slide or 2, 4, 6 or 9 per page.",
+    async run([fmt, ...rest], ctx) {
+      if (fmt === "images") {
+        if (!ctx.session.exportImages) return unavailable(ctx);
+        const deck = await import("../core/imagedeck.ts");
+        const o = deck.parseDeckArgs(rest);
+        if (typeof o === "string") return ctx.error(o);
+        ctx.notice("Making the image deck...");
+        try {
+          ctx.notice(deck.deckLine(await ctx.session.exportImages(o)));
+        } catch (e) {
+          ctx.error(`Image deck failed: ${(e as Error).message}`);
+        }
+        return;
+      }
+      if (!FORMATS.includes(fmt ?? "")) return ctx.error(`Use: /export <${FORMATS.join("|")}>, or /export images`);
       try {
         ctx.notice(`Exported: ${await ctx.session.exportAs(fmt)}`);
       } catch (e) {

@@ -1,5 +1,6 @@
 import type { Bus } from "../core/bus.ts";
 import type { AnalysisRecord } from "../core/record.ts";
+import type { DeckOptions, DeckWritten } from "../core/imagedeck.ts";
 import type { BusEvent, Entry, Finding, Mode, ModelInfo, Owner, PlanResponse, Question } from "../core/types.ts";
 import type { SampleRow } from "../core/samples.ts";
 
@@ -64,6 +65,7 @@ export interface SessionLike {
   review(): Promise<Finding[]>;
   compact(): Promise<void>;
   exportAs(fmt: any): Promise<string>;
+  exportImages?(options: DeckOptions): Promise<DeckWritten>;
   elnPush?(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }>;
   elnLink?(id: number): Promise<{ text: string; proposals: { key: string; label: string; value: unknown }[] }>;
   openEvents?(): BusEvent[];

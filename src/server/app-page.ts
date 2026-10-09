@@ -660,6 +660,8 @@ document.addEventListener("click", async (e) => {
   if (t.closest("[data-rerun]")) { send("/rerun", false); return; }
   const dc = t.closest("[data-command]");
   if (dc) { send(dc.dataset.command, false); return; }
+  const dg = t.closest("[data-deck-go]");
+  if (dg) { const row = dg.closest("[data-deck-row]"); send("/export images " + [...row.querySelectorAll("[data-deck]")].map((x) => x.value).filter(Boolean).join(" "), false); return; }
   if (t.closest("[data-export-go]")) { send("/export " + document.querySelector("[data-export]").value, false); return; }
 });
 

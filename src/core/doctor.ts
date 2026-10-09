@@ -47,7 +47,7 @@ const PYTHON = "3.12";
 export const SCIENCE_REQUIREMENTS = resolve(dirname(fileURLToPath(import.meta.url)), "../tools/science-requirements.txt");
 
 export const ENVS: Record<string, { modules: string[]; packages: string[] }> = {
-  science: { modules: ["numpy", "pandas", "scipy", "statsmodels", "lifelines", "matplotlib", "openpyxl", "tifffile", "skimage"], packages: ["-r", SCIENCE_REQUIREMENTS] },
+  science: { modules: ["numpy", "pandas", "scipy", "statsmodels", "lifelines", "matplotlib", "openpyxl", "tifffile", "skimage", "pptx"], packages: ["-r", SCIENCE_REQUIREMENTS] },
   biostats: { modules: ["statsmodels", "pingouin", "lifelines", "matplotlib", "openpyxl", "pandas", "scipy"], packages: ["statsmodels", "pingouin", "lifelines", "matplotlib", "openpyxl", "pandas<3", "scipy"] },
   astropy: { modules: ["astropy", "photutils", "matplotlib", "pandas", "scipy"], packages: ["astropy", "photutils", "matplotlib", "pandas", "scipy"] },
   cellpose: { modules: ["cellpose", "tifffile", "PIL", "scipy"], packages: ["cellpose", "packaging", "tifffile", "pillow", "scipy"] },

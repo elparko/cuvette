@@ -10,3 +10,5 @@ matplotlib==3.11.2
 openpyxl==3.1.5
 tifffile==2026.9.20
 scikit-image==0.26.0
+# python-pptx (MIT license) writes the image deck: /export images pptx.
+python-pptx==1.0.2

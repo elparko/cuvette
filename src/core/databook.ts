@@ -297,7 +297,7 @@ function setupValue(r: AnalysisRecord, re: RegExp): [string, unknown] | undefine
   return hit;
 }
 
-function sizes(n: Node): [string, unknown][] {
+export function sizes(n: Node): [string, unknown][] {
   return Object.entries(rec(rec(n.result).metrics)).filter(([k, v]) => SIZE_KEYS.test(k) && !NOT_SIZES.has(k) && typeof v === "number");
 }
 
@@ -468,7 +468,7 @@ function sectionPilot(w: Writer, p: Part, level: number): void {
   }
 }
 
-function errorBars(n: Node): string {
+export function errorBars(n: Node): string {
   for (const [k, v] of Object.entries(n.args)) if (/err|error_?bar|^ci$|interval/i.test(k) && v !== undefined && v !== "" && typeof v !== "boolean") return show(v);
   const m = rec(rec(n.result).data);
   const eb = pick(m, "error_bars", "error_bar", "errorbar");

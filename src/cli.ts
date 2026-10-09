@@ -72,6 +72,12 @@ Usage
   ga eln link <session> <id>           read an eLabFTW experiment and propose setup values
   ga sessions                          list the sessions, newest first: folder, age, first request ("moved" if a folder is gone)
   ga export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx
+  ga export <session> --format pptx|pdf --images figures|qc|pilot|all|<glob> [--order step|group|name]
+            [--per-page 1|2|4|6|9] [--size 16:9|a4|letter]
+                                       put the session images in images.pptx or images.pdf in the session
+                                       folder: a title slide, the images with captions from the record, and
+                                       a last slide with the methods and the record hash. pptx needs
+                                       python-pptx in the science environment (ga doctor --fix)
   ga databook [<session folder>|<project folder>] [--format pdf|docx|html] [--sessions all|<id,...>]
                                        write a data book: the data, methods, results and figures of a session,
                                        or of all sessions of a project folder (default: the current folder)
@@ -110,6 +116,10 @@ const { values: o, positionals: pos } = parseArgs({
     allow: { type: "string" },
     output: { type: "string" },
     format: { type: "string" },
+    images: { type: "string" },
+    order: { type: "string" },
+    "per-page": { type: "string" },
+    size: { type: "string" },
     input: { type: "string", multiple: true },
     session: { type: "string" },
     sessions: { type: "string" },
@@ -540,7 +550,15 @@ async function main() {
     case "export": {
       const { Session } = await import("./core/session.ts");
       const s = await Session.resume(a1, { model: "fake:" });
-      console.log(await s.exportAs((str(o.format) ?? "html") as never));
+      const fmt = str(o.format) ?? "html";
+      if (fmt === "pptx" || (fmt === "pdf" && (o.images || o.order || o["per-page"] || o.size))) {
+        const deck = await import("./core/imagedeck.ts");
+        const opts = deck.parseDeckArgs([fmt, ...[o.images, o.order, o["per-page"], o.size].map(str).filter((v): v is string => !!v)]);
+        if (typeof opts === "string") fail(opts.replace("Use: /export images", "Use: ga export <session> --format"));
+        console.log(deck.deckLine(await s.exportImages(opts)));
+        return s.close();
+      }
+      console.log(await s.exportAs(fmt as never));
       return s.close();
     }
     case "databook": {

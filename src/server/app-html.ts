@@ -462,6 +462,16 @@ export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; colu
   const files = listFiles(outDir, (n) => n !== "results.xlsx" && !/^index\.html$/.test(n));
   const parts: string[] = [];
   parts.push(`<div class="row">${btn("Write the data book", `data-command="/databook pdf html"`, "primary")}<select data-export aria-label="Export format">${["html", "pdf", "md", "protocol", "notebook", "script", "flow", "eln", "jsonl"].map((f) => `<option>${f}</option>`).join("")}</select>${btn("Export", `data-export-go="1"`)}</div>`);
+  const sel = (name: string, label: string, opts: [string, string][]) => `<select data-deck="${name}" aria-label="${esc(label)}">${opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("")}</select>`;
+  parts.push(
+    `<div class="row" data-deck-row>${btn("Make an image deck", `data-deck-go="1"`)}` +
+      sel("format", "File type", [["pptx", "PowerPoint (.pptx)"], ["pdf", "PDF"], ["both", "PowerPoint and PDF"]]) +
+      sel("images", "Images", [["all", "All images"], ["figures", "Result figures"], ["qc", "QC images"], ["pilot", "Demonstration images"]]) +
+      sel("order", "Order", [["step", "By step"], ["group", "By group or sample"], ["name", "By file name"]]) +
+      sel("per", "Images on each page", [["1", "1 on each page"], ["2", "2 on each page"], ["4", "4 on each page"], ["6", "6 on each page"], ["9", "9 on each page"]]) +
+      sel("size", "Page size", [["", "Size: default"], ["16:9", "16:9 slides"], ["a4", "A4"], ["letter", "Letter"]]) +
+      `</div>`,
+  );
   if (existsSync(xlsx)) parts.push(`<p>${fileLink(c, xlsx)}</p>`);
   if (sheets?.length) {
     for (const s of sheets) {

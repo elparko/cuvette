@@ -24,7 +24,10 @@ export interface Saved {
   xlsx?: string;
   sheets: number;
   figures: number;
+  decks?: string[];
 }
+
+export const DECKS = ["images.pptx", "images.pdf"];
 
 const MAX_ROWS = 1_048_575;
 const MAX_TABLE_BYTES = 50_000_000;
@@ -494,6 +497,8 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     }
   }
 
+  for (const d of DECKS) if (!listed.has(join(dir, d)) && existsSync(join(dir, d))) fileRows.push(["", "image deck", d, ""]);
+
   const pilot = pilotRows(record);
   const validation = validationRows(record);
   return [
@@ -512,17 +517,19 @@ export function writeResults(w: Omit<WorkbookInput, "figures"> & { xlsx: boolean
   mkdirSync(w.dir, { recursive: true });
   const figures = copyFigures(w.record, w.dir);
   const shown = figures.filter((f) => !/\.(svg|pdf|eps)$/i.test(f.path) || !figures.some((g) => g !== f && g.path.replace(/\.[^.]+$/, "") === f.path.replace(/\.[^.]+$/, "")));
-  if (!w.xlsx) return { dir: w.dir, sheets: 0, figures: shown.length };
+  const decks = DECKS.filter((d) => existsSync(join(w.dir, d)));
+  if (!w.xlsx) return { dir: w.dir, sheets: 0, figures: shown.length, decks };
   const sheets = buildWorkbook({ ...w, figures });
   const path = join(w.dir, "results.xlsx");
   writeFileSync(path, xlsx(sheets));
-  return { dir: w.dir, xlsx: path, sheets: sheets.length, figures: shown.length };
+  return { dir: w.dir, xlsx: path, sheets: sheets.length, figures: shown.length, decks };
 }
 
 export function savedLine(s: Saved, home = process.env.HOME ?? ""): string {
   const parts: string[] = [];
   if (s.xlsx) parts.push(`results.xlsx (${s.sheets} ${s.sheets === 1 ? "sheet" : "sheets"})`);
   if (s.figures) parts.push(`${s.figures} ${s.figures === 1 ? "figure" : "figures"} in figures/`);
+  if (s.decks?.length) parts.push(s.decks.join(" and "));
   const dir = home && (s.dir === home || s.dir.startsWith(home + "/")) ? "~" + s.dir.slice(home.length) : s.dir;
   return `Saved: ${parts.join(", ") || "nothing new"}. Folder: ${dir}`;
 }

@@ -944,7 +944,7 @@ export class Session {
         xlsx: force || xlsxOn(this.settings),
         toolText: Object.fromEntries([...this.tools.values()].map((t) => [t.remoteName ?? t.name, t.description.split(/(?<=\.)\s/)[0]!.trim()])),
       });
-      if (saved.xlsx || saved.figures) this.record.append("notice", { text: savedLine(saved), saved: { ...saved } });
+      if (saved.xlsx || saved.figures || saved.decks?.length) this.record.append("notice", { text: savedLine(saved), saved: { ...saved } });
       return saved;
     } catch (e) {
       this.record.append("notice", { text: `The harness could not save results.xlsx and the figures: ${(e as Error).message}` });
@@ -2640,6 +2640,14 @@ export class Session {
         return eln.exportEln(this, join(out, `${this.id}.eln`));
       }
     }
+  }
+
+  async exportImages(options: import("./imagedeck.ts").DeckOptions): Promise<import("./imagedeck.ts").DeckWritten> {
+    const deck = await import("./imagedeck.ts");
+    const { bookSettings } = await import("./databook.ts");
+    const w = await deck.writeImageDeck({ record: this.record, adapters: this.adapters, dir: this.outputDir, options, paper: bookSettings(this.cwd).paper });
+    this.saveResults(0);
+    return w;
   }
 
   async elnPush(): Promise<{ experiment: number; url: string; version: number; hash: string; created: boolean }> {

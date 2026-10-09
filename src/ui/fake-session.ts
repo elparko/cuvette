@@ -429,5 +429,9 @@ export class FakeSession implements SessionLike {
     return join(this.dir, "exports", `trail.${fmt}`);
   }
 
+  async exportImages(o: { formats: string[] }): Promise<{ images: number; slides: number; bytes: Record<string, number>; notes: string[]; pptx?: string; pdf?: string }> {
+    return { images: 0, slides: 2, bytes: {}, notes: [], ...(o.formats.includes("pptx") ? { pptx: join(this.dir, "images.pptx") } : {}), ...(o.formats.includes("pdf") ? { pdf: join(this.dir, "images.pdf") } : {}) };
+  }
+
   async close(): Promise<void> {}
 }
