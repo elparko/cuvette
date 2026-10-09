@@ -1,0 +1,17 @@
+adapters: [pwr]
+prompt: |
+  I am planning a randomized, placebo-controlled trial of vitamin D for 6 weeks in patients with chronic hepatitis C after antiviral cure. The primary outcome is the change in serum TGF-beta1 from baseline to week 6, compared between the two arms with an independent t-test. Our earlier study gives a mean difference in the change of 81 pg/mL between the arms, with a pooled standard deviation of 110 pg/mL. How many patients do I need in each arm, and in total, for 80% power at a two-sided significance level of 5%? Write every number in your final answer text.
+answers:
+  alpha: 0.05
+  power: 0.8
+  sidedness: two.sided
+  effect_source: "Our previous study of patients with chronic hepatitis C: difference in the TGF-beta1 change 81 pg/mL, pooled SD 110"
+  dropout: 0
+allow: all
+timeout_s: 900
+data: []
+items:
+  - {key: n_exact, description: "Sample size per arm before rounding", value: 29.94, tolerance: 0.01, in_answer: false}
+  - {key: n_per_arm, description: "Patients per arm, rounded up", value: 30, exact: true}
+  - {key: n_total, description: "Patients in total", value: 60, exact: true}
+  - {key: n_one_sided_trap, description: "Patients per arm for a one-sided test (trap result)", value: 23.51, tolerance: 0.01, in_answer: false, trap: true}

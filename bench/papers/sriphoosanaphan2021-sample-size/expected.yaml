@@ -1,0 +1,19 @@
+tool: pwr (R), pwr.t.test
+adapter_kind: script
+data: []
+decisions:
+  test: "two-sample t-test of the change from baseline"
+  alpha: 0.05
+  power: 0.8
+  sidedness: two.sided
+  effect: "difference 81, pooled SD 110, d = 0.736"
+expected:
+  - {description: "n per arm before rounding", value: 29.94, tolerance: 0.01, source: "computed, pwr.t.test and statsmodels TTestIndPower"}
+  - {description: "patients per arm", value: 30, tolerance: 0, source: "paper, Sample size calculation: 30 patients per group"}
+  - {description: "patients in total", value: 60, tolerance: 0, source: "paper: 30 per group, 2 groups"}
+  - {description: "one-sided n per arm (trap)", value: 23.51, tolerance: 0.01, source: "computed, pwr.t.test alternative greater"}
+notes: |
+  pwr 1.3.0 pwr.t.test(d = 81/110, power = 0.8) gives n = 29.94 per group. R power.t.test(delta = 81, sd = 110, power = 0.8) gives 29.94. statsmodels TTestIndPower gives 29.94 (check.py, check.out). With 30 per group the power is 0.8008.
+  The paper inflates the sample size to 37 per arm for dropout. It does not state the dropout rate. 37 matches a rate of about 19% (30 / 0.81 = 37.04). It is not an item.
+  The paper writes the difference as 81 pg/mL. Its tables give TGF-beta1 in ng/mL. d does not depend on the unit.
+  Trap: a one-sided test gives 23.51, that is 24 per arm.

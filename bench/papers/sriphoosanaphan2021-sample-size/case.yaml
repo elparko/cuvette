@@ -1,0 +1,73 @@
+kind: research paper
+short: Sriphoosanaphan 2021 sample size
+field: Statistics
+program: pwr (R), through the pwr adapter
+citation:
+  authors: Sriphoosanaphan S, Thanapirom K, Kerr SJ, Suksawatamnuay S, Thaimai P, Sittisomwong S, Sonsiri K, Srisoonthorn N, Teeratorn N, Tanpowpong N, Chaopathomkul B, Treeprasertsuk S, Poovorawan Y, Komolmit P
+  title: >-
+    Effect of vitamin D supplementation in patients with chronic hepatitis C after direct-acting antiviral
+    treatment: a randomized, double-blind, placebo-controlled trial
+  venue: PeerJ 9:e10709
+  year: 2021
+  doi: 10.7717/peerj.10709
+related:
+  - text: "The same trial in the benchmark for the analysis of the outcomes: bench/papers/sriphoosanaphan2021-vitd-hcv."
+  - text: "Thai Clinical Trials Registry TCTR20171206003."
+measured: >-
+  The sample size calculation of a randomized trial of vitamin D against placebo. The primary outcome is the change
+  in serum TGF-beta1 from baseline to week 6. The calculation uses the difference in the change and the pooled SD
+  from an earlier study of the same group, 80% power and a two-sided significance level of 5%.
+instruction: >-
+  How many patients are needed in each arm, and in total, for 80% power at a two-sided significance level of 5%?
+instruction_basis: >-
+  The Sample size calculation section: "enrolling 30 patients per group would give 80% power to detect a difference
+  in TGF-beta1 change from baseline between treatment groups of this size or more, at a 2-sided significance level
+  of 5%."
+answers:
+  alpha:
+    decision: Significance level
+    value: 0.05
+    source: Sample size calculation section, "a 2-sided significance level of 5%".
+  power:
+    decision: Power
+    value: 0.8
+    source: Sample size calculation section, "80% power".
+  sidedness:
+    decision: Sidedness
+    value: two.sided
+    source: Sample size calculation section, "2-sided".
+  effect_source:
+    decision: Source of the effect size
+    value: The previous study of the authors, difference 81 and pooled SD 110
+    source: Sample size calculation section, "based on data from our previous study on patients with CHC".
+  dropout:
+    decision: Expected dropout
+    value: 0
+    source: The paper does not state the dropout rate. The request asks for the n before the dropout allowance.
+items:
+  n_exact:
+    source: computed
+    tool: pwr.t.test (R pwr 1.3.0)
+    where: Not printed. The paper prints the rounded value 30.
+    independence: independent
+    check: statsmodels TTestIndPower gives 29.94 (check.py, check.out). R power.t.test gives 29.94.
+  n_per_arm:
+    source: published
+    where: Sample size calculation section, "enrolling 30 patients per group".
+    check: statsmodels gives 29.94, rounded up to 30 (check.out).
+  n_total:
+    source: published
+    where: Sample size calculation section, 30 per group in 2 groups.
+    check: 2 times 30 (check.out).
+  n_one_sided_trap:
+    source: computed
+    tool: statsmodels TTestIndPower, alternative larger
+    where: Not in the paper. A one-sided test is the wrong method for this calculation.
+    independence: independent
+    check: pwr.t.test(alternative = "greater") gives 23.51.
+data:
+  source: >-
+    No data file. The inputs are in the Sample size calculation section of the paper (PMC7879942), and the request
+    gives them.
+  url: https://doi.org/10.7717/peerj.10709
+  license: The paper is CC BY 4.0.

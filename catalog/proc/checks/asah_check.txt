@@ -1,0 +1,12 @@
+patients 113 Poor 41 Good 72
+s100b AUC 0.7314 DeLong 95% CI 0.6301 to 0.8326
+wfns AUC 0.8237 DeLong 95% CI 0.7485 to 0.8988
+ndka AUC 0.6120 DeLong 95% CI 0.5012 to 0.7227
+paired DeLong s100b against wfns: difference -0.0923 Z -2.2090 p 0.02718 CI -0.1742 to -0.0104
+s100b >= 0.205: TP 26 FP 14 TN 58 FN 15 sensitivity 0.6341 (0.4694 to 0.7788) specificity 0.8056 (0.6953 to 0.8894) PPV 0.6500 NPV 0.7945 Youden 0.4397 topleft distance 0.1717
+  at prevalence 0.1: PPV 0.2660 NPV 0.9520
+wfns >= 3.5: TP 26 FP 12 TN 60 FN 15 sensitivity 0.6341 (0.4694 to 0.7788) specificity 0.8333 (0.7270 to 0.9108) PPV 0.6842 NPV 0.8000 Youden 0.4675 topleft distance 0.1616
+  at prevalence 0.1: PPV 0.2971 NPV 0.9535
+wfns >= 2.5: TP 27 FP 15 TN 57 FN 14 sensitivity 0.6585 (0.4941 to 0.7992) specificity 0.7917 (0.6798 to 0.8784) PPV 0.6429 NPV 0.8028 Youden 0.4502 topleft distance 0.1600
+  at prevalence 0.1: PPV 0.2599 NPV 0.9543
+wfns threshold with the largest Youden index: a positive test is wfns >= 4 (Youden 0.4675)

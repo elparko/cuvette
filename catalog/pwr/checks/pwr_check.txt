@@ -1,0 +1,8 @@
+t two-sample d 0.5 power 0.8: n per group 63.7656
+t two-sample d 0.5 n 64: power 0.8014596
+t two-sample d 0.2 power 0.8: n per group 393.4057
+correlation r 0.3, Fisher z formula: n 84.9278
+ANOVA k 4 f 0.25: total 178.3971, per group 44.5993
+chi-square w 0.3 df 1: N 87.2096
+proportions h 0.5: n per group 62.7909
+proportions 0.65 against 0.45, pooled normal: n per group 95.9424; Fleiss continuity correction: 105.7059

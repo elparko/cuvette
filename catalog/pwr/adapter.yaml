@@ -1,0 +1,494 @@
+adapter:
+  name: pwr
+  field: statistics
+  file_types: []
+  title: pwr (power and sample size)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Computes the sample size, the power or the detectable effect size of a planned study with pwr in R. It covers
+    t-tests, two proportions, chi-square tests, correlations and one-way ANOVA. The scientist states alpha, power, sidedness
+    and the source of the effect size. It replaces the same calculations in G*Power, the SPSS Power Analysis menu and
+    Stata power.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: pwr
+  version: "1.3.0"
+  tested_versions: []
+  homepage: https://CRAN.R-project.org/package=pwr
+  docs:
+    - https://cran.r-project.org/web/packages/pwr/pwr.pdf
+    - https://cran.r-project.org/web/packages/pwr/vignettes/pwr-vignette.html
+  install: >
+    Install R (brew install r on macOS). Then install pwr and jsonlite into a library folder that the adapter reads:
+    GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("pwr", "jsonlite"), repos = "https://cloud.r-project.org")'
+  citation:
+    - text: "Champely S. pwr: Basic Functions for Power Analysis. R package version 1.3-0 (2020)."
+      doi: 10.32614/CRAN.package.pwr
+    - text: "Cohen J. Statistical Power Analysis for the Behavioral Sciences, 2nd edition. Lawrence Erlbaum Associates, Hillsdale NJ (1988)."
+      doi: 10.4324/9780203771587
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 300
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that exists
+  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library. The
+  program version in this adapter is the version of the R package pwr, not of R. Each tool solves for the one value in
+  solve_for and rounds a sample size up to the next whole number.
+
+data_rules:
+  cloud_visibility: all
+  note: The tools read no data. They take the planned values of the study.
+
+decisions:
+  - key: alpha
+    label: Significance level (alpha)
+    kind: float
+    default: 0.05
+    lo: 0.0001
+    hi: 0.4
+    group: Design
+    help: The chance of a false positive result that the study accepts. Most trials use 0.05 two-sided.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: power_t_test, arg: alpha }
+      - { tool: power_proportions, arg: alpha }
+      - { tool: power_chisq, arg: alpha }
+      - { tool: power_correlation, arg: alpha }
+      - { tool: power_anova, arg: alpha }
+
+  - key: power
+    label: Power
+    kind: float
+    default: 0.8
+    lo: 0.5
+    hi: 0.99
+    group: Design
+    help: The chance to detect the effect if it is real. 0.8 is common; 0.9 needs about a third more patients. The tool ignores it when it solves for power.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: power_t_test, arg: power }
+      - { tool: power_proportions, arg: power }
+      - { tool: power_chisq, arg: power }
+      - { tool: power_correlation, arg: power }
+      - { tool: power_anova, arg: power }
+
+  - key: sidedness
+    label: Sidedness of the test
+    kind: choice
+    choices: [two.sided, greater, less]
+    default: two.sided
+    group: Design
+    help: >
+      two.sided tests for an effect in either direction. A one-sided test needs fewer patients but needs a reason given
+      before the study, such as a non-inferiority design. Chi-square and ANOVA tests have no sidedness.
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: power_t_test, arg: alternative }
+      - { tool: power_proportions, arg: alternative }
+      - { tool: power_correlation, arg: alternative }
+
+  - key: effect_source
+    label: Source of the effect size
+    kind: text
+    group: Effect size
+    help: >
+      Where the effect size comes from: the minimal clinically important difference, a pilot study, or a published
+      study (name it). Cohen's small, medium and large values are a last resort. Never use the effect of the study
+      itself (post hoc power).
+    essential: true
+    owner: human
+    stage: setup
+    links:
+      - { tool: power_t_test, arg: effect_source }
+      - { tool: power_proportions, arg: effect_source }
+      - { tool: power_chisq, arg: effect_source }
+      - { tool: power_correlation, arg: effect_source }
+      - { tool: power_anova, arg: effect_source }
+
+  - key: proportion_method
+    label: Method for two proportions
+    kind: choice
+    choices: [arcsine, normal, normal_cc]
+    group: Effect size
+    help: >
+      arcsine uses Cohen's h (pwr and Cohen's tables). normal is the pooled normal approximation (R power.prop.test,
+      Stata power twoproportions). normal_cc adds the Fleiss continuity correction and gives a larger n. Use the method
+      of the analysis that the trial plans.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: power_proportions, arg: method }
+
+  - key: dropout
+    label: Expected dropout (fraction)
+    kind: float
+    default: 0
+    lo: 0
+    hi: 0.9
+    group: Design
+    help: The share of patients that you expect to leave the study or to have no outcome. The tool divides n by 1 minus dropout.
+    owner: human
+    stage: setup
+    links:
+      - { tool: power_t_test, arg: dropout }
+      - { tool: power_proportions, arg: dropout }
+      - { tool: power_chisq, arg: dropout }
+      - { tool: power_correlation, arg: dropout }
+      - { tool: power_anova, arg: dropout }
+
+checks:
+  - id: post_hoc_power
+    severity: error
+    description: The answer computes power from the effect that the same study observed.
+    text: >
+      If the effect size comes from the result of the study whose power the answer reports (observed or post hoc
+      power), flag it. Post hoc power follows from the p-value and adds no information.
+  - id: effect_source_missing
+    severity: warning
+    description: The answer gives a sample size without the source of the effect size.
+    text: >
+      If the answer gives a sample size or a power, it must say where the effect size comes from. Flag the answer if
+      the source is missing or is only "medium effect" with no reason.
+  - id: one_sided_without_reason
+    severity: warning
+    description: A one-sided test is planned with no reason.
+    rule:
+      tool: power_t_test
+      arg: alternative
+      op: "!="
+      value: two.sided
+      message: A one-sided test needs a reason that the scientist gave before the study. Say the reason in the answer.
+  - id: settings_not_reported
+    severity: warning
+    description: The answer gives n without alpha, power, sidedness, the effect size and the test.
+    text: >
+      If the answer gives a sample size, it must give the test, alpha, sidedness, power, the effect size in its own
+      units (difference and SD, or the two proportions) and the standardized effect, n per group and in total, and
+      the dropout allowance. Flag the answer if one is missing.
+
+map:
+  - tool: power_t_test
+    route: "pwr.t.test(d = 0.5, power = 0.8, sig.level = 0.05, type = \"two.sample\", alternative = \"two.sided\")"
+    steps:
+      - "Compute d as the difference of the means divided by the SD (for paired data, the SD of the differences)."
+      - "Run pwr.t.test() with n = NULL to solve for n, or with power = NULL to solve for power. Use pwr.t2n.test() for unequal groups."
+      - "Round n up to a whole number. Divide by 1 minus the dropout."
+      - "In G*Power: Test family t tests > Statistical test Means: Difference between two independent means (two groups) > Type of power analysis A priori. Enter Tail(s), Effect size d, alpha and Power. Allocation ratio N2/N1 = 1."
+      - "In SPSS 27 and later: Analyze > Power Analysis > Means > Independent-Samples T Test. In Stata: power twomeans m1 m2, sd(s)."
+    params:
+      - { arg: d, label: "Effect size d (G*Power)" }
+      - { arg: alpha, label: "α err prob (G*Power)", ui_default: 0.05 }
+      - { arg: power, label: "Power (1-β err prob) (G*Power)", ui_default: 0.95, note: "G*Power starts with power 0.95. Set the power that the scientist chose." }
+      - { arg: alternative, label: "Tail(s) (G*Power)", ui_default: "Two" }
+    fidelity: exact
+    difference: G*Power and pwr both use the noncentral t distribution and give the same n.
+    evidence: { source: docs, test: t-two-sample-medium }
+
+  - tool: power_proportions
+    route: "pwr.2p.test(h = ES.h(0.65, 0.45), power = 0.8, sig.level = 0.05)"
+    steps:
+      - "Choose the method. arcsine: compute h = 2 asin(sqrt(p1)) - 2 asin(sqrt(p2)) and run pwr.2p.test()."
+      - "normal: n = (z_alpha sqrt(2 pbar qbar) + z_beta sqrt(p1 q1 + p2 q2))^2 / (p1 - p2)^2 per group, as in power.prop.test()."
+      - "normal_cc: apply the Fleiss continuity correction to n."
+      - "In G*Power: Test family z tests > Proportions: Difference between two independent proportions > A priori. Or Exact > Proportions: Inequality, two independent groups (Fisher's exact test)."
+      - "In SPSS 27 and later: Analyze > Power Analysis > Proportions > Independent-Samples Binomial Test. In Stata: power twoproportions p1 p2 (add continuity for the correction)."
+    params:
+      - { arg: method, label: "method", ui_default: "pooled normal (Stata, G*Power z test)", note: "Each program has its own default. The three methods give different n for the same proportions." }
+    fidelity: close
+    difference: >
+      G*Power's z test uses the normal approximation with unpooled or pooled variance by option. Its Fisher exact test
+      option gives a larger n. The arcsine method follows Cohen's tables.
+    evidence: { source: docs, test: proportions-cohen-h }
+
+  - tool: power_chisq
+    route: "pwr.chisq.test(w = 0.3, df = 1, power = 0.8, sig.level = 0.05)"
+    steps:
+      - "Compute w from the cell proportions under the null and the alternative: w = sqrt(sum((p1 - p0)^2 / p0)), ES.w1() or ES.w2()."
+      - "Run pwr.chisq.test() with df = (rows - 1) * (columns - 1) and N = NULL."
+      - "In G*Power: Test family χ² tests > Goodness-of-fit tests: Contingency tables > A priori. Enter Effect size w, alpha, Power and Df."
+    params:
+      - { arg: w, label: "Effect size w (G*Power)" }
+      - { arg: df, label: "Df (G*Power)" }
+    fidelity: exact
+    evidence: { source: docs, test: chisq-cohen-w }
+
+  - tool: power_correlation
+    route: "pwr.r.test(r = 0.3, power = 0.8, sig.level = 0.05)"
+    steps:
+      - "Run pwr.r.test() with the expected correlation r and n = NULL."
+      - "In G*Power: Test family Exact > Correlation: Bivariate normal model > A priori, or t tests > Correlation: Point biserial model."
+      - "In SPSS 27 and later: Analyze > Power Analysis > Correlations > Pearson Product-Moment."
+    params:
+      - { arg: r, label: "Correlation ρ H1 (G*Power)" }
+    fidelity: close
+    difference: pwr uses the Fisher z approximation. The exact bivariate normal model of G*Power can give an n that differs by 1 or 2.
+    evidence: { source: docs, test: correlation-cohen }
+
+  - tool: power_anova
+    route: "pwr.anova.test(k = 4, f = 0.25, power = 0.8, sig.level = 0.05)"
+    steps:
+      - "Compute f as the SD of the group means divided by the SD inside the groups."
+      - "Run pwr.anova.test() with k groups and n = NULL. n is per group."
+      - "In G*Power: Test family F tests > ANOVA: Fixed effects, omnibus, one-way > A priori. Enter Effect size f, alpha, Power and Number of groups. G*Power gives the total N."
+      - "In SPSS 27 and later: Analyze > Power Analysis > Means > One-Way ANOVA."
+    params:
+      - { arg: f, label: "Effect size f (G*Power)" }
+      - { arg: k, label: "Number of groups (G*Power)" }
+    fidelity: exact
+    difference: G*Power reports the total N. The tool reports n per group and the total.
+    evidence: { source: docs, test: anova-cohen-f }
+
+tests:
+  - id: t-two-sample-medium
+    description: >
+      Two-sample t-test, d = 0.5, alpha 0.05 two-sided, power 0.80. Cohen (1988), Table 2.4.1, and Cohen (1992, A power
+      primer, Psychological Bulletin 112:155, Table 2) give n = 64 per group. G*Power 3 gives 64 per group (total 128),
+      actual power 0.8014596. pwr gives n = 63.77. statsmodels TTestIndPower gives 63.77 (checks/pwr_check.txt).
+    calls:
+      - tool: power_t_test
+        args: { solve_for: power, type: two.sample, d: 0.5, n: 64, alpha: 0.05, power: 0.8, alternative: two.sided }
+        save_as: actual
+      - tool: power_t_test
+        args: { solve_for: n, type: two.sample, d: 0.5, alpha: 0.05, power: 0.8, alternative: two.sided, dropout: 0.2 }
+    expect:
+      - { path: metrics.n, equals: 64 }
+      - { path: metrics.n_total, equals: 128 }
+      - { path: metrics.n_exact, approx: 63.766, abs: 0.001 }
+      - { path: metrics.n_with_dropout, equals: 80 }
+      - { path: saved.actual.metrics.power, approx: 0.8014596, abs: 0.0000001 }
+      - { path: "outputs[0].path", contains: ".png" }
+
+  - id: t-two-sample-small
+    description: >
+      d = 0.2, the same settings. Cohen (1988), Table 2.4.1, and Cohen (1992), Table 2, give n = 393 per group (the table
+      uses an approximation). pwr gives 393.41; statsmodels gives 393.41 (checks/pwr_check.txt).
+    calls:
+      - tool: power_t_test
+        args: { solve_for: n, type: two.sample, d: 0.2, alpha: 0.05, power: 0.8, alternative: two.sided }
+    expect:
+      - { path: metrics.n_exact, approx: 393, abs: 1 }
+      - { path: metrics.n, equals: 394 }
+
+  - id: correlation-cohen
+    description: >
+      Correlation r = 0.3, alpha 0.05 two-sided, power 0.80. Cohen (1988), Table 3.4.1, and Cohen (1992), Table 2, give
+      n = 85. pwr gives 84.07 (Fisher z approximation with a bias term), rounded up to 85. The plain Fisher z formula in
+      Python gives 84.93, also 85 when rounded up (checks/pwr_check.txt).
+    calls:
+      - tool: power_correlation
+        args: { solve_for: n, r: 0.3, alpha: 0.05, power: 0.8, alternative: two.sided }
+    expect:
+      - { path: metrics.n, equals: 85 }
+      - { path: metrics.n_exact, approx: 84.07, abs: 0.01 }
+
+  - id: anova-cohen-f
+    description: >
+      One-way ANOVA with 4 groups, f = 0.25, alpha 0.05, power 0.80. Cohen (1988), Table 8.4.4, and Cohen (1992), Table 2
+      (ANOVA, 4 groups, medium effect) give n = 45 per group. pwr gives 44.60; statsmodels FTestAnovaPower gives a total
+      of 178.4, that is 44.60 per group (checks/pwr_check.txt). G*Power gives a total N of 180.
+    calls:
+      - tool: power_anova
+        args: { solve_for: n, k: 4, f: 0.25, alpha: 0.05, power: 0.8 }
+    expect:
+      - { path: metrics.n, equals: 45 }
+      - { path: metrics.n_total, equals: 180 }
+      - { path: metrics.n_exact, approx: 44.599, abs: 0.001 }
+
+  - id: chisq-cohen-w
+    description: >
+      Chi-square test with 1 df, w = 0.3, alpha 0.05, power 0.80. Cohen (1988), Table 7.4.6, and Cohen (1992), Table 2,
+      give N = 87. pwr gives 87.21; statsmodels GofChisquarePower gives 87.21 (checks/pwr_check.txt).
+    calls:
+      - tool: power_chisq
+        args: { solve_for: n, w: 0.3, df: 1, alpha: 0.05, power: 0.8 }
+    expect:
+      - { path: metrics.n_exact, approx: 87, abs: 0.5 }
+      - { path: metrics.n, equals: 88 }
+
+  - id: proportions-cohen-h
+    description: >
+      Two proportions with Cohen's h = 0.5, alpha 0.05 two-sided, power 0.80. Cohen (1992), Table 2 (difference between
+      proportions, medium effect) gives n = 63 per group. pwr gives 62.79; statsmodels NormalIndPower gives 62.79
+      (checks/pwr_check.txt). The normal method with p1 0.65 and p2 0.45 gives 95.9 per group, the same as R
+      power.prop.test (95.94; the closed form ignores a negligible second tail), and the Fleiss correction gives 105.7
+      (the formula of Fleiss, Levin and Paik 2003, section 4.2, computed in Python in checks/pwr_check.txt).
+    calls:
+      - tool: power_proportions
+        args: { solve_for: n, h: 0.5, method: arcsine, alpha: 0.05, power: 0.8, alternative: two.sided }
+        save_as: cohen
+      - tool: power_proportions
+        args: { solve_for: n, p1: 0.65, p2: 0.45, method: normal, alpha: 0.05, power: 0.8, alternative: two.sided }
+        save_as: normal
+      - tool: power_proportions
+        args: { solve_for: n, p1: 0.65, p2: 0.45, method: normal_cc, alpha: 0.05, power: 0.8, alternative: two.sided }
+    expect:
+      - { path: saved.cohen.metrics.n, equals: 63 }
+      - { path: saved.normal.metrics.n_exact, approx: 95.94, abs: 0.05 }
+      - { path: metrics.n_exact, approx: 105.7, abs: 0.1 }
+
+  - id: solve-for-missing-value
+    description: Solving for n without an effect size fails, and the error names the missing argument.
+    calls:
+      - tool: power_t_test
+        args: { solve_for: n, type: two.sample, alpha: 0.05, power: 0.8, alternative: two.sided }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "give d" }
+
+  - id: power-out-of-range
+    description: A power above 1 fails, and the error names the argument.
+    calls:
+      - tool: power_correlation
+        args: { solve_for: n, r: 0.3, alpha: 0.05, power: 1.5, alternative: two.sided }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "power" }
+      - { path: error, contains: "0.999" }
+
+tools:
+  - name: power_t_test
+    title: Power of a t-test
+    description: >
+      Compute the sample size, the power or the detectable effect size (Cohen's d) of a two-sample, paired or one-sample
+      t-test. Give the effect as d, or as the difference of means and the SD. Unequal groups take n1 and n2.
+    params:
+      solve_for: { type: string, enum: [n, power, d], description: "The value that the tool computes. It ignores any value given for it." }
+      type: { type: string, enum: [two.sample, paired, one.sample], default: two.sample, description: "two.sample for independent groups, paired for two measurements on each subject." }
+      d: { type: number, description: "Cohen's d (unitless): the difference of means divided by the SD." }
+      mean_diff: { type: number, description: "Expected difference of means, in the unit of the outcome. Use with sd in place of d." }
+      sd: { type: number, minimum: 0, description: "Standard deviation in the unit of the outcome (for paired, the SD of the differences)." }
+      n: { type: number, minimum: 2, description: "Number of subjects per group (pairs for paired; a count)." }
+      n1: { type: number, minimum: 2, description: "Size of group 1 (a count) for unequal groups. Give n2 too." }
+      n2: { type: number, minimum: 2, description: "Size of group 2 (a count) for unequal groups." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.4, description: "Leave out. The harness sets it from the decision record. Significance level." }
+      power: { type: number, minimum: 0.05, maximum: 0.999, description: "Leave out. The harness sets it from the decision record. Power (a fraction)." }
+      alternative: { type: string, enum: [two.sided, greater, less], description: "Leave out. The harness sets it from the decision record. Sidedness." }
+      dropout: { type: number, minimum: 0, maximum: 0.9, description: "Leave out. The harness sets it from the decision record. Expected dropout (a fraction)." }
+      effect_source: { type: string, description: "Leave out. The harness sets it from the decision record. Source of the effect size." }
+    required: [solve_for]
+    read_only: true
+    outputs:
+      curve: { kind: image, ext: .png, description: Power by sample size. }
+    script: scripts/power_t_test.R
+    parse: json
+
+  - name: power_proportions
+    title: Power for two proportions
+    description: >
+      Compute the sample size or the power to compare two proportions, such as the event rates of two arms. The
+      arcsine method uses Cohen's h. The normal methods use the pooled normal approximation, with or without the
+      Fleiss continuity correction.
+    params:
+      solve_for: { type: string, enum: [n, power, h], description: "The value that the tool computes. h only for the arcsine method." }
+      p1: { type: number, minimum: 0, maximum: 1, description: "Expected proportion with the event in group 1 (a fraction)." }
+      p2: { type: number, minimum: 0, maximum: 1, description: "Expected proportion with the event in group 2 (a fraction)." }
+      h: { type: number, description: "Cohen's h (unitless). Use in place of p1 and p2 for the arcsine method." }
+      n: { type: number, minimum: 2, description: "Number of subjects per group (a count)." }
+      method: { type: string, enum: [arcsine, normal, normal_cc], description: "Leave out. The harness sets it from the decision record. Calculation method." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.4, description: "Leave out. The harness sets it from the decision record. Significance level." }
+      power: { type: number, minimum: 0.05, maximum: 0.999, description: "Leave out. The harness sets it from the decision record. Power (a fraction)." }
+      alternative: { type: string, enum: [two.sided, greater, less], description: "Leave out. The harness sets it from the decision record. Sidedness." }
+      dropout: { type: number, minimum: 0, maximum: 0.9, description: "Leave out. The harness sets it from the decision record. Expected dropout (a fraction)." }
+      effect_source: { type: string, description: "Leave out. The harness sets it from the decision record. Source of the effect size." }
+    required: [solve_for]
+    read_only: true
+    outputs:
+      curve: { kind: image, ext: .png, description: Power by sample size. }
+    citations:
+      - { text: "Fleiss JL, Tytun A, Ury HK. A simple approximation for calculating sample sizes for comparing independent proportions. Biometrics 36(2), 343-346 (1980).", doi: 10.2307/2529990, when: { method: normal_cc } }
+    script: scripts/power_proportions.R
+    parse: json
+
+  - name: power_chisq
+    title: Power of a chi-square test
+    description: >
+      Compute the total sample size, the power or the detectable effect size (Cohen's w) of a chi-square test. The
+      test can be of a contingency table or of goodness of fit. Give w, or the cell proportions under the null and the alternative.
+    params:
+      solve_for: { type: string, enum: [n, power, w], description: "The value that the tool computes." }
+      w: { type: number, minimum: 0, description: "Cohen's w (unitless)." }
+      p0: { type: array, items: { type: number }, description: "Cell proportions under the null hypothesis (fractions that add to 1). Use with p1 in place of w." }
+      p1: { type: array, items: { type: number }, description: "Cell proportions under the alternative (fractions that add to 1)." }
+      df: { type: integer, minimum: 1, description: "Degrees of freedom (a count): (rows - 1) * (columns - 1)." }
+      n: { type: number, minimum: 2, description: "Total number of subjects (a count)." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.4, description: "Leave out. The harness sets it from the decision record. Significance level." }
+      power: { type: number, minimum: 0.05, maximum: 0.999, description: "Leave out. The harness sets it from the decision record. Power (a fraction)." }
+      dropout: { type: number, minimum: 0, maximum: 0.9, description: "Leave out. The harness sets it from the decision record. Expected dropout (a fraction)." }
+      effect_source: { type: string, description: "Leave out. The harness sets it from the decision record. Source of the effect size." }
+    required: [solve_for, df]
+    read_only: true
+    outputs:
+      curve: { kind: image, ext: .png, description: Power by sample size. }
+    script: scripts/power_chisq.R
+    parse: json
+
+  - name: power_correlation
+    title: Power of a correlation test
+    description: >
+      Compute the sample size, the power or the detectable correlation of a test that a Pearson correlation is not
+      zero.
+    params:
+      solve_for: { type: string, enum: [n, power, r], description: "The value that the tool computes." }
+      r: { type: number, minimum: -0.999, maximum: 0.999, description: "Expected correlation (unitless)." }
+      n: { type: number, minimum: 4, description: "Number of subjects (a count)." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.4, description: "Leave out. The harness sets it from the decision record. Significance level." }
+      power: { type: number, minimum: 0.05, maximum: 0.999, description: "Leave out. The harness sets it from the decision record. Power (a fraction)." }
+      alternative: { type: string, enum: [two.sided, greater, less], description: "Leave out. The harness sets it from the decision record. Sidedness." }
+      dropout: { type: number, minimum: 0, maximum: 0.9, description: "Leave out. The harness sets it from the decision record. Expected dropout (a fraction)." }
+      effect_source: { type: string, description: "Leave out. The harness sets it from the decision record. Source of the effect size." }
+    required: [solve_for]
+    read_only: true
+    outputs:
+      curve: { kind: image, ext: .png, description: Power by sample size. }
+    script: scripts/power_correlation.R
+    parse: json
+
+  - name: power_anova
+    title: Power of a one-way ANOVA
+    description: >
+      Compute the sample size per group, the power or the detectable effect size (Cohen's f) of a one-way ANOVA with k
+      groups. Give f, or the expected group means and the SD inside the groups.
+    params:
+      solve_for: { type: string, enum: [n, power, f], description: "The value that the tool computes." }
+      k: { type: integer, minimum: 2, description: "Number of groups (a count)." }
+      f: { type: number, minimum: 0, description: "Cohen's f (unitless): the SD of the group means divided by the SD inside the groups." }
+      group_means: { type: array, items: { type: number }, description: "Expected mean of each group, in the unit of the outcome. Use with sd in place of f." }
+      sd: { type: number, minimum: 0, description: "Common SD inside the groups, in the unit of the outcome." }
+      n: { type: number, minimum: 2, description: "Number of subjects per group (a count)." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.4, description: "Leave out. The harness sets it from the decision record. Significance level." }
+      power: { type: number, minimum: 0.05, maximum: 0.999, description: "Leave out. The harness sets it from the decision record. Power (a fraction)." }
+      dropout: { type: number, minimum: 0, maximum: 0.9, description: "Leave out. The harness sets it from the decision record. Expected dropout (a fraction)." }
+      effect_source: { type: string, description: "Leave out. The harness sets it from the decision record. Source of the effect size." }
+    required: [solve_for]
+    read_only: true
+    outputs:
+      curve: { kind: image, ext: .png, description: Power by sample size. }
+    script: scripts/power_anova.R
+    parse: json

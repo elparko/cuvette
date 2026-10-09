@@ -1,0 +1,470 @@
+adapter:
+  name: proc
+  field: statistics
+  file_types: [".csv"]
+  title: pROC (diagnostic accuracy and ROC curves)
+  version: 0.1.0
+  spec: "1"
+  description: >
+    Measures how well a test or a marker finds a disease, with pROC in R. The adapter reads a CSV file with one row
+    for each patient. It draws the ROC curve and gives the AUC with a DeLong interval. It finds a threshold by a stated
+    rule and gives sensitivity, specificity, PPV and NPV with exact intervals. It compares two AUCs with the DeLong
+    test. It replaces the same analyses in MedCalc and in the ROC Curve dialog of SPSS.
+  authors: [Parker Smith]
+  status: draft
+
+program:
+  name: pROC
+  version: "1.19.1"
+  tested_versions: []
+  homepage: https://xrobin.github.io/pROC/
+  docs:
+    - https://xrobin.github.io/pROC/
+    - https://cran.r-project.org/web/packages/pROC/pROC.pdf
+  install: >
+    Install R (brew install r on macOS). Then install pROC and jsonlite into a library folder that the adapter reads:
+    GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library or ~/.guided-analysis/R-library.
+    mkdir -p ~/.guided-analysis/R-library && R_LIBS_USER=$HOME/.guided-analysis/R-library Rscript -e 'install.packages(c("pROC", "jsonlite"), repos = "https://cloud.r-project.org")'
+  citation:
+    - text: "Robin X, Turck N, Hainard A, Tiberti N, Lisacek F, Sanchez J-C, Müller M. pROC: an open-source package for R and S+ to analyze and compare ROC curves. BMC Bioinformatics 12, 77 (2011)."
+      doi: 10.1186/1471-2105-12-77
+
+connection:
+  kind: script
+  interpreter: ["{program_path}"]
+  startup_timeout_s: 120
+  call_timeout_s: 900
+
+locate:
+  env: RSCRIPT_PATH
+  paths:
+    - /opt/homebrew/bin/Rscript
+    - /usr/local/bin/Rscript
+    - /usr/bin/Rscript
+    - /Library/Frameworks/R.framework/Resources/bin/Rscript
+    - C:\Program Files\R\R-*\bin\Rscript.exe
+  which: [Rscript]
+  version_command: ["{program_path}", "--version"]
+  version_pattern: "version (\\d+\\.\\d+\\.\\d+)"
+  identity: 'Rscript \(R\) version'
+
+standards: >
+  Every script puts the R package library in front of the library path. The library is the first folder that exists
+  of these: GA_R_LIBS, R_LIBS_USER, /Volumes/T7/guided-analysis/tools/R-library, ~/.guided-analysis/R-library. The
+  program version in this adapter is the version of the R package pROC, not of R. Each tool states the positive class
+  and the direction. A test is positive when the predictor is at or above the threshold (direction higher) or at or
+  below it (direction lower).
+
+data_rules:
+  cloud_visibility: summaries
+  note: A cloud model sees the AUC, the counts and the plot. It never sees the rows of the CSV file.
+
+decisions:
+  - key: positive_class
+    label: Outcome value of the patients with the disease
+    kind: text
+    group: Design
+    help: >
+      The value of the outcome column that marks a case, such as Poor, dead or 1. Sensitivity and PPV are about this
+      group. The other value is the control group.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: roc_curve, arg: positive }
+      - { tool: best_threshold, arg: positive }
+      - { tool: accuracy_at_threshold, arg: positive }
+      - { tool: compare_aucs, arg: positive }
+
+  - key: direction
+    label: Do higher or lower values of the marker mean disease?
+    kind: choice
+    choices: [higher, lower]
+    group: Design
+    help: >
+      Say it from the biology before you see the curve. pROC can choose the direction from the data. That choice makes
+      an AUC near 0.5 look better than it is.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: roc_curve, arg: direction }
+      - { tool: best_threshold, arg: direction }
+      - { tool: accuracy_at_threshold, arg: direction }
+      - { tool: compare_aucs, arg: direction }
+
+  - key: threshold_rule
+    label: Rule for the best threshold
+    kind: choice
+    choices: [youden, closest.topleft]
+    group: Threshold
+    help: >
+      youden takes the threshold with the largest sensitivity + specificity - 1. closest.topleft takes the point
+      nearest to perfect sensitivity and specificity. The two rules can give different thresholds. A threshold from a
+      guideline or from other patients is better than one from these data; use accuracy_at_threshold for it.
+    essential: true
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: best_threshold, arg: rule }
+    sensitivity:
+      options: [youden, closest.topleft]
+      tool: best_threshold
+      compare: [metrics.threshold, metrics.sensitivity, metrics.specificity]
+      max_runs: 2
+
+  - key: auc_ci_method
+    label: Confidence interval of the AUC
+    kind: choice
+    choices: [delong, bootstrap]
+    default: delong
+    group: Inference
+    help: DeLong is the standard method and the MedCalc default. The bootstrap method resamples the patients and needs a seed.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: roc_curve, arg: ci_method }
+      - { tool: compare_aucs, arg: method }
+
+  - key: prevalence
+    label: Prevalence for PPV and NPV
+    kind: text
+    default: sample
+    group: Threshold
+    help: >
+      PPV and NPV depend on the prevalence. Write sample to use the share of cases in the file. Or write a fraction,
+      such as 0.1, for the population that will get the test. In a case-control sample the sample prevalence is wrong.
+    owner: human
+    stage: when_needed
+    links:
+      - { tool: best_threshold, arg: prevalence }
+      - { tool: accuracy_at_threshold, arg: prevalence }
+
+  - key: alpha
+    label: Significance level (alpha)
+    kind: float
+    default: 0.05
+    lo: 0.0001
+    hi: 0.5
+    group: Inference
+    help: The confidence level of each interval is 1 minus alpha.
+    owner: human
+    stage: setup
+    links:
+      - { tool: roc_curve, arg: alpha }
+      - { tool: best_threshold, arg: alpha }
+      - { tool: accuracy_at_threshold, arg: alpha }
+      - { tool: compare_aucs, arg: alpha }
+
+checks:
+  - id: optimistic_threshold
+    severity: warning
+    description: The answer reports the accuracy at a threshold chosen on the same data as if it would hold in new patients.
+    text: >
+      If the answer reports sensitivity and specificity from best_threshold, it must say that the threshold was chosen
+      on the same data and that the values are optimistic. Flag the answer if it does not.
+  - id: ppv_case_control
+    severity: warning
+    description: The answer reports PPV or NPV at the sample prevalence without a word on prevalence.
+    text: >
+      If the answer gives a PPV or an NPV, it must give the prevalence it uses. Flag the answer if the prevalence is
+      the sample prevalence and the answer does not say that PPV and NPV change with the prevalence.
+  - id: unpaired_auc_comparison
+    severity: error
+    description: Two AUCs from the same patients are compared by their separate intervals or by an unpaired test.
+    text: >
+      If the answer compares the AUCs of two markers measured in the same patients, it must use compare_aucs (the
+      paired DeLong test). Flag the answer if it compares overlapping intervals instead.
+  - id: accuracy_settings_not_reported
+    severity: warning
+    description: The answer gives an AUC or accuracy without the positive class, the direction, the threshold and the interval method.
+    text: >
+      If the answer gives an AUC, it must give the number of cases and controls and the interval method. If it gives
+      sensitivity or specificity, it must give the threshold, the side of the threshold that is positive, and the
+      exact intervals. Flag the answer if one is missing.
+
+map:
+  - tool: inspect_diagnostic_data
+    route: "df <- read.csv(\"patients.csv\"); summary(df); table(df$outcome)"
+    steps:
+      - "Read the CSV file with read.csv()."
+      - "Run summary() and table() of the outcome column."
+      - "In SPSS: Analyze > Descriptive Statistics > Frequencies on the outcome. In MedCalc: Statistics > Summary statistics."
+    fidelity: code_only
+    difference: pROC has no menu. The route is the R call.
+    evidence: { source: docs, test: inspect-asah }
+
+  - tool: roc_curve
+    route: "r <- roc(df$outcome, df$s100b, levels = c(\"Good\", \"Poor\"), direction = \"<\"); ci.auc(r, method = \"delong\"); plot(r)"
+    steps:
+      - "Run roc() with the outcome, the predictor, the levels (control first, then case) and the direction."
+      - "Run ci.auc(r) for the DeLong interval of the AUC."
+      - "In MedCalc: Statistics > ROC curves > ROC curve analysis. Variable is the marker, Classification variable the outcome coded 0 and 1. MedCalc gives the AUC with the DeLong standard error by default."
+      - "In SPSS: Analyze > Classify > ROC Curve. Put the marker in Test Variable and the outcome in State Variable, type the Value of State Variable (the case value). Select With diagonal reference line, Standard error and confidence interval. In Options, choose Larger test result indicates more positive test."
+    params:
+      - { arg: positive, label: "Value of State Variable (SPSS) / case level (pROC levels)" }
+      - { arg: direction, label: "Test Direction (SPSS Options) / direction of roc()", ui_default: "Larger test result indicates more positive test (SPSS); auto (pROC)" }
+      - { arg: ci_method, label: "method of ci.auc()", ui_default: "delong" }
+    fidelity: exact
+    difference: >
+      SPSS computes the standard error of the AUC under a nonparametric assumption that differs from DeLong, so its
+      interval can differ in the third digit. MedCalc uses DeLong by default and gives the same interval.
+    evidence: { source: docs, test: roc-s100b-delong, note: "The pROC documentation prints the AUC and the DeLong interval of s100b." }
+
+  - tool: best_threshold
+    route: "coords(r, \"best\", best.method = \"youden\", ret = c(\"threshold\", \"sensitivity\", \"specificity\", \"ppv\", \"npv\"))"
+    steps:
+      - "Make the ROC curve as roc_curve does."
+      - "Run coords(r, \"best\", best.method = \"youden\") or best.method = \"closest.topleft\"."
+      - "Count TP, FP, TN and FN at the threshold. Run binom.test() for the exact interval of sensitivity and specificity."
+      - "In MedCalc: ROC curve analysis, select Criterion values and coordinates. MedCalc marks the criterion with the largest Youden index J and gives sensitivity and specificity with exact intervals."
+      - "In SPSS: ROC Curve, select Coordinate points of the ROC curve, then find the largest sensitivity + specificity - 1 by hand. SPSS has no rule for the best point."
+    params:
+      - { arg: rule, label: "best.method of coords()", ui_default: "youden" }
+    fidelity: close
+    difference: >
+      The tool reports the first threshold when several thresholds tie. The threshold is the midpoint between two
+      observed values, as in pROC. MedCalc reports an observed value with the sign > or >=, which classifies the same
+      patients. A person has not compared the numbers with MedCalc.
+    evidence: { source: docs, test: threshold-wfns-rules }
+
+  - tool: accuracy_at_threshold
+    route: "tab <- table(test = df$s100b >= 0.3, disease = df$outcome == \"Poor\"); binom.test(TP, TP + FN)"
+    steps:
+      - "Classify each patient: positive if the marker is at or above the threshold (direction higher)."
+      - "Count TP, FP, TN and FN. Sensitivity is TP / (TP + FN), specificity TN / (TN + FP)."
+      - "Run binom.test() for each exact interval. For a stated prevalence, compute PPV and NPV with Bayes' theorem."
+      - "In MedCalc: Statistics > ROC curves > ROC curve analysis > Criterion values, or the Diagnostic test evaluation calculator with the 2x2 counts and a prevalence."
+      - "In SPSS: Transform > Compute Variable for the positive test, then Analyze > Descriptive Statistics > Crosstabs."
+    params:
+      - { arg: prevalence, label: "Disease prevalence (MedCalc calculator)", ui_default: "sample" }
+    fidelity: exact
+    evidence: { source: docs, test: accuracy-s100b }
+
+  - tool: compare_aucs
+    route: "roc.test(roc(df$outcome, df$wfns), roc(df$outcome, df$s100b), method = \"delong\", paired = TRUE)"
+    steps:
+      - "Make both ROC curves on the same patients."
+      - "Run roc.test(r1, r2, method = \"delong\", paired = TRUE)."
+      - "In MedCalc: Statistics > ROC curves > Comparison of ROC curves. Select the two variables and the classification variable. MedCalc uses DeLong."
+      - "SPSS 25 and later: Analyze > Classify > ROC Analysis with two test variables and Paired-sample design."
+    params:
+      - { arg: method, label: "method of roc.test()", ui_default: "delong" }
+    fidelity: exact
+    evidence: { source: docs, test: compare-wfns-s100b, note: "The pROC documentation prints Z and p for this comparison." }
+
+tests:
+  - id: roc-s100b-delong
+    description: >
+      aSAH data of pROC (Turck et al. 2010; 113 patients, 41 Poor, 72 Good). The pROC documentation (help of roc and
+      ci.auc, and the pROC home page) prints for roc(aSAH$outcome, aSAH$s100b): Area under the curve 0.7314, 95% CI
+      0.6301-0.8326 (DeLong). The Python check (checks/asah_check.py, own DeLong code with NumPy, output
+      checks/asah_check.txt) gives the same values.
+    data: [data/asah.csv]
+    calls:
+      - tool: roc_curve
+        args: { path: "{adapter_dir}/data/asah.csv", outcome: outcome, predictor: s100b, positive: Poor, direction: higher, ci_method: delong }
+    expect:
+      - { path: metrics.auc, approx: 0.7314, abs: 0.0001 }
+      - { path: metrics.auc_ci_lo, approx: 0.6301, abs: 0.0001 }
+      - { path: metrics.auc_ci_hi, approx: 0.8326, abs: 0.0001 }
+      - { path: metrics.n_cases, equals: 41 }
+      - { path: metrics.n_controls, equals: 72 }
+
+  - id: compare-wfns-s100b
+    description: >
+      The pROC documentation (help of roc.test) prints the paired DeLong test of the WFNS score against s100b on the
+      aSAH data: Z = -2.209, p-value = 0.02718 (s100b first). The AUC of wfns is 0.8237. The Python check
+      (checks/asah_check.txt) gives Z -2.2090, p 0.02718 and the interval -0.1742 to -0.0104.
+    data: [data/asah.csv]
+    calls:
+      - tool: compare_aucs
+        args: { path: "{adapter_dir}/data/asah.csv", outcome: outcome, predictor1: s100b, predictor2: wfns, positive: Poor, direction: higher, method: delong }
+    expect:
+      - { path: metrics.statistic, approx: -2.209, abs: 0.001 }
+      - { path: metrics.p, approx: 0.02718, abs: 0.00001 }
+      - { path: metrics.auc2, approx: 0.8237, abs: 0.0001 }
+      - { path: metrics.diff_ci_lo, approx: -0.1742, abs: 0.0001 }
+
+  - id: threshold-wfns-rules
+    description: >
+      The two rules give different thresholds for the WFNS score. pROC coords "best" gives 3.5 by Youden (sensitivity
+      0.6341, specificity 0.8333) and 2.5 by closest.topleft (0.6585, 0.7917). The Python check
+      (checks/asah_check.txt) counts the patients at each threshold, finds the largest Youden index at wfns >= 4 (the
+      same patients as >= 3.5) and the smaller distance to the top-left corner at 2.5.
+    data: [data/asah.csv]
+    calls:
+      - tool: best_threshold
+        args: { path: "{adapter_dir}/data/asah.csv", outcome: outcome, predictor: wfns, positive: Poor, direction: higher, rule: closest.topleft }
+        save_as: topleft
+      - tool: best_threshold
+        args: { path: "{adapter_dir}/data/asah.csv", outcome: outcome, predictor: wfns, positive: Poor, direction: higher, rule: youden }
+    expect:
+      - { path: metrics.threshold, approx: 3.5, abs: 0.000001 }
+      - { path: metrics.sensitivity, approx: 0.6341, abs: 0.0001 }
+      - { path: metrics.specificity, approx: 0.8333, abs: 0.0001 }
+      - { path: saved.topleft.metrics.threshold, approx: 2.5, abs: 0.000001 }
+      - { path: saved.topleft.metrics.sensitivity, approx: 0.6585, abs: 0.0001 }
+      - { path: summary, contains: "optimistic" }
+
+  - id: accuracy-s100b
+    description: >
+      s100b at the threshold 0.205 (the Youden threshold that the pROC documentation prints for s100b). pROC coords
+      gives TP 26, FP 14, TN 58, FN 15, sensitivity 0.6341, specificity 0.8056, PPV 0.65, NPV 0.7945. The Python check
+      (scipy binomtest, Clopper-Pearson) gives the sensitivity interval 0.4694 to 0.7788 and, at a prevalence of 0.1,
+      PPV 0.2660 (checks/asah_check.txt).
+    data: [data/asah.csv]
+    calls:
+      - tool: accuracy_at_threshold
+        args: { path: "{adapter_dir}/data/asah.csv", outcome: outcome, predictor: s100b, positive: Poor, direction: higher, threshold: 0.205 }
+        save_as: sample
+      - tool: accuracy_at_threshold
+        args: { path: "{adapter_dir}/data/asah.csv", outcome: outcome, predictor: s100b, positive: Poor, direction: higher, threshold: 0.205, prevalence: "0.1" }
+    expect:
+      - { path: saved.sample.metrics.tp, equals: 26 }
+      - { path: saved.sample.metrics.fp, equals: 14 }
+      - { path: saved.sample.metrics.tn, equals: 58 }
+      - { path: saved.sample.metrics.fn, equals: 15 }
+      - { path: saved.sample.metrics.specificity, approx: 0.8056, abs: 0.0001 }
+      - { path: saved.sample.metrics.ppv, approx: 0.65, abs: 0.0001 }
+      - { path: saved.sample.metrics.npv, approx: 0.7945, abs: 0.0001 }
+      - { path: saved.sample.metrics.sensitivity_ci_lo, approx: 0.4694, abs: 0.0001 }
+      - { path: saved.sample.metrics.sensitivity_ci_hi, approx: 0.7788, abs: 0.0001 }
+      - { path: metrics.ppv, approx: 0.2660, abs: 0.0001 }
+
+  - id: inspect-asah
+    description: The aSAH data have 113 rows and 7 columns (the help of aSAH in pROC); outcome has 72 Good and 41 Poor.
+    data: [data/asah.csv]
+    calls:
+      - tool: inspect_diagnostic_data
+        args: { path: "{adapter_dir}/data/asah.csv" }
+    expect:
+      - { path: metrics.n_rows, equals: 113 }
+      - { path: metrics.n_columns, equals: 7 }
+      - { path: data.binary_columns.outcome.Poor, equals: 41 }
+
+  - id: unknown-positive-class
+    description: A positive class that is not a value of the outcome fails, and the error names the value and the valid values.
+    data: [data/asah.csv]
+    calls:
+      - tool: roc_curve
+        args: { path: "{adapter_dir}/data/asah.csv", outcome: outcome, predictor: s100b, positive: Dead, direction: higher }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "Dead" }
+      - { path: error, contains: "Good, Poor" }
+
+  - id: unknown-column
+    description: A predictor column that is not in the file fails, and the error names the column.
+    data: [data/asah.csv]
+    calls:
+      - tool: roc_curve
+        args: { path: "{adapter_dir}/data/asah.csv", outcome: outcome, predictor: no_such_marker, positive: Poor, direction: higher }
+    expect:
+      - { path: ok, equals: false }
+      - { path: error, contains: "no_such_marker" }
+
+tools:
+  - name: inspect_diagnostic_data
+    title: Inspect the patient table
+    description: >
+      Read a CSV file with one row for each patient. Returns each column with its type, missing values, distinct
+      values and range, and the counts of each column with exactly 2 values (possible outcomes).
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each patient." }
+    required: [path]
+    read_only: true
+    script: scripts/inspect_diagnostic_data.R
+    parse: json
+
+  - name: roc_curve
+    title: ROC curve and AUC
+    description: >
+      Draw the ROC curve of one marker against a binary outcome and give the AUC with its confidence interval (DeLong
+      or bootstrap). Returns the number of cases and controls and the plot.
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each patient." }
+      outcome: { type: string, description: Column of the binary outcome (disease or no disease). }
+      predictor: { type: string, description: Column of the marker or the test score. }
+      positive: { type: string, description: "Leave out. The harness sets it from the decision record. Outcome value of the cases." }
+      direction: { type: string, enum: [higher, lower], description: "Leave out. The harness sets it from the decision record. higher means higher values mean disease." }
+      ci_method: { type: string, enum: [delong, bootstrap], description: "Leave out. The harness sets it from the decision record. Method of the AUC interval." }
+      boot_n: { type: integer, minimum: 100, maximum: 100000, default: 2000, description: "Number of bootstrap samples (a count). Only the bootstrap method uses it." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, default: 1, description: "Random seed (an integer) of the bootstrap. The DeLong method does not use it." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: "Significance level. The interval is 1 minus alpha." }
+    required: [path, outcome, predictor]
+    read_only: true
+    outputs:
+      plot: { kind: image, ext: .png, description: The ROC curve. }
+    citations:
+      - { text: "DeLong ER, DeLong DM, Clarke-Pearson DL. Comparing the areas under two or more correlated receiver operating characteristic curves: a nonparametric approach. Biometrics 44(3), 837-845 (1988).", doi: 10.2307/2531595, when: { ci_method: delong } }
+    script: scripts/roc_curve.R
+    parse: json
+
+  - name: best_threshold
+    title: Best threshold by a rule
+    description: >
+      Find the threshold of a marker by a stated rule: Youden or closest to the top-left corner. Give sensitivity,
+      specificity, PPV and NPV at it with exact intervals and the 2x2 counts. The result is optimistic because the
+      same data choose the threshold.
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each patient." }
+      outcome: { type: string, description: Column of the binary outcome. }
+      predictor: { type: string, description: Column of the marker or the test score. }
+      positive: { type: string, description: "Leave out. The harness sets it from the decision record. Outcome value of the cases." }
+      direction: { type: string, enum: [higher, lower], description: "Leave out. The harness sets it from the decision record. higher means higher values mean disease." }
+      rule: { type: string, enum: [youden, closest.topleft], description: "Leave out. The harness sets it from the decision record. The rule that picks the threshold." }
+      prevalence: { type: string, description: "Leave out. The harness sets it from the decision record. sample, or a fraction between 0 and 1 for PPV and NPV." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: "Significance level. Each interval is 1 minus alpha." }
+    required: [path, outcome, predictor]
+    read_only: true
+    citations:
+      - { text: "Youden WJ. Index for rating diagnostic tests. Cancer 3(1), 32-35 (1950).", doi: "10.1002/1097-0142(1950)3:1<32::AID-CNCR2820030106>3.0.CO;2-3", when: { rule: youden } }
+      - { text: "Clopper CJ, Pearson ES. The use of confidence or fiducial limits illustrated in the case of the binomial. Biometrika 26(4), 404-413 (1934).", doi: 10.1093/biomet/26.4.404 }
+    script: scripts/best_threshold.R
+    parse: json
+
+  - name: accuracy_at_threshold
+    title: Accuracy at a given threshold
+    description: >
+      Give sensitivity, specificity, PPV, NPV and the likelihood ratios of a marker at a threshold that you give. The
+      tool gives exact (Clopper-Pearson) intervals and the 2x2 counts. It fits a threshold from a guideline or another study; best_threshold finds one from these data.
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each patient." }
+      outcome: { type: string, description: Column of the binary outcome. }
+      predictor: { type: string, description: Column of the marker or the test score. }
+      threshold: { type: number, description: "The cut-off, in the unit of the predictor column. A value at the threshold counts as positive." }
+      positive: { type: string, description: "Leave out. The harness sets it from the decision record. Outcome value of the cases." }
+      direction: { type: string, enum: [higher, lower], description: "Leave out. The harness sets it from the decision record. higher means values at or above the threshold are positive." }
+      prevalence: { type: string, description: "Leave out. The harness sets it from the decision record. sample, or a fraction between 0 and 1 for PPV and NPV." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: "Significance level. Each interval is 1 minus alpha." }
+    required: [path, outcome, predictor, threshold]
+    read_only: true
+    citations:
+      - { text: "Clopper CJ, Pearson ES. The use of confidence or fiducial limits illustrated in the case of the binomial. Biometrika 26(4), 404-413 (1934).", doi: 10.1093/biomet/26.4.404 }
+    script: scripts/accuracy_at_threshold.R
+    parse: json
+
+  - name: compare_aucs
+    title: Compare two AUCs (DeLong)
+    description: >
+      Compare the AUCs of two markers measured in the same patients with the paired DeLong test. Returns
+      both AUCs, the difference with its interval, Z and p. Both markers must be columns of the same file.
+    params:
+      path: { type: string, description: "Absolute path of the CSV file. One row for each patient." }
+      outcome: { type: string, description: Column of the binary outcome. }
+      predictor1: { type: string, description: Column of the first marker. }
+      predictor2: { type: string, description: Column of the second marker. }
+      positive: { type: string, description: "Leave out. The harness sets it from the decision record. Outcome value of the cases." }
+      direction: { type: string, enum: [higher, lower], description: "Leave out. The harness sets it from the decision record. Direction of the first marker." }
+      direction2: { type: string, enum: [higher, lower], description: "Direction of the second marker if it differs from the first." }
+      method: { type: string, enum: [delong, bootstrap], description: "Leave out. The harness sets it from the decision record. Method of the test." }
+      boot_n: { type: integer, minimum: 100, maximum: 100000, default: 2000, description: "Number of bootstrap samples (a count). Only the bootstrap method uses it." }
+      seed: { type: integer, minimum: 0, maximum: 1000000, default: 1, description: "Random seed (an integer) of the bootstrap." }
+      alpha: { type: number, minimum: 0.0001, maximum: 0.5, default: 0.05, description: "Significance level of the interval of the difference." }
+    required: [path, outcome, predictor1, predictor2]
+    read_only: true
+    citations:
+      - { text: "DeLong ER, DeLong DM, Clarke-Pearson DL. Comparing the areas under two or more correlated receiver operating characteristic curves: a nonparametric approach. Biometrics 44(3), 837-845 (1988).", doi: 10.2307/2531595, when: { method: delong } }
+    script: scripts/compare_aucs.R
+    parse: json

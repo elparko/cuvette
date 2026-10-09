@@ -1,0 +1,8 @@
+d 0.7364
+two-sided: n per arm 29.9416, rounded up 30, total 60
+power with 30 per arm 0.8008
+one-sided (wrong for the paper): n per arm 23.5109
+dropout 0.15: 30 / (1 - dropout) = 35.29
+dropout 0.18: 30 / (1 - dropout) = 36.59
+dropout 0.19: 30 / (1 - dropout) = 37.04
+dropout 0.20: 30 / (1 - dropout) = 37.50
