@@ -21,11 +21,16 @@ async function openFolder(folder: string) {
 export function FolderChooser({ start, onOpened, big }: { start: string; onOpened: () => void; big?: boolean }) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [recent, setRecent] = useState<string[]>([]);
+
+  useEffect(() => {
+    call<Dirs>("api/dirs?p=" + encodeURIComponent(start || ""))
+      .then((d) => setRecent(d.recent))
+      .catch(() => {});
+  }, [start]);
 
   if (bridge.chooseFolder) {
-    const pick = async () => {
-      const f = await bridge.chooseFolder!(start);
-      if (!f) return;
+    const open = async (f: string) => {
       setBusy(true);
       try {
         await openFolder(f);
@@ -36,12 +41,37 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
         setMsg((e as Error).message);
       }
     };
+    const pick = async () => {
+      setMsg("");
+      try {
+        const f = await bridge.chooseFolder!(start);
+        if (f) await open(f);
+      } catch (e) {
+        setMsg((e as Error).message);
+      }
+    };
     return (
-      <div className="flex flex-col items-start gap-2">
+      <div className="flex flex-col items-start gap-3">
         <Button size={big ? "lg" : "default"} onClick={pick} disabled={busy}>
-          <FolderOpenIcon /> Choose a folder…
+          <FolderOpenIcon /> Choose a folder in Finder…
         </Button>
         {msg && <p className="text-sm text-bad">{msg}</p>}
+        {recent.length > 0 && (
+          <div className="w-full">
+            <div className="pb-1 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">Recent project folders</div>
+            <ul className="rounded-xl border bg-card p-1">
+              {recent.slice(0, 6).map((r) => (
+                <li key={r}>
+                  <button type="button" disabled={busy} onClick={() => open(r)} title={r} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
+                    <ClockIcon className="size-4 text-muted-foreground" />
+                    <span className="min-w-0 truncate">{r.split("/").filter(Boolean).pop() || r}</span>
+                    <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground">{midText(r, 40)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     );
   }

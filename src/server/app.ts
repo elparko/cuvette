@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -137,6 +137,18 @@ function reveal(path: string) {
     child.on("error", () => {});
     child.unref();
   } else openWithOs(statSync(path).isDirectory() ? path : dirname(path));
+}
+
+export function chooseFolder(start: string): Promise<string> {
+  const at = existsSync(start) ? `default location (POSIX file ${JSON.stringify(start)})` : "";
+  const script = [`tell me to activate`, `POSIX path of (choose folder with prompt "Choose the folder with your data" ${at})`];
+  return new Promise((done, fail) =>
+    execFile("osascript", script.flatMap((l) => ["-e", l]), { encoding: "utf8" }, (err, out, errOut) => {
+      if (err && /-128/.test(String(errOut))) return done("");
+      if (err) return fail(new Error(String(errOut).trim() || err.message));
+      done(out.trim().replace(/(.)\/$/, "$1"));
+    }),
+  );
 }
 
 export function needsFirstSetup(model: string, env: Record<string, string | undefined>): boolean {
@@ -295,6 +307,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         folder: opts.folder ? resolve(opts.folder) : "",
         start: resolve(opts.folder ?? opts.start ?? homedir()),
         home: homedir(),
+        finder: process.platform === "darwin" && !noOpen(),
         owned: c ? c.owned : true,
       });
     }
@@ -438,6 +451,10 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         job.subs.clear();
       });
       return send(res, 200, { job: id });
+    }
+    if (p === "/api/choose-folder") {
+      if (process.platform !== "darwin" || noOpen()) return send(res, 501, { error: "The Finder dialog works only on a Mac." });
+      return send(res, 200, { path: await chooseFolder(resolve(String(body.start || opts.folder || homedir()))) });
     }
     if (p === "/api/reveal") {
       const f = resolve(String(body.path ?? ""));

@@ -94,6 +94,8 @@ test("the server gives the JSON routes, the new page and the old page", async ()
   expect(doc).toMatchObject({ counts: { ok: 1, missing: 0 } });
   expect(doc.checks.map((c: { id: string }) => c.id)).toEqual(["node"]);
   expect((await fetch(`${base}/api/settings.json`)).status).toBe(401);
+  expect((await (await fetch(`${base}/api/state?t=${t}`)).json()).finder).toBe(false);
+  expect((await fetch(`${base}/api/choose-folder`, { method: "POST", headers: { "content-type": "application/json", "x-token": t }, body: "{}" })).status).toBe(501);
   const old = await (await fetch(`${base}/?ui=old&t=${t}`)).text();
   expect(old).toContain("window.cuvetteDesktop");
   const page = await (await fetch(`${base}/?t=${t}`)).text();

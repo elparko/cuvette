@@ -4,7 +4,7 @@ import { toast, Toaster } from "sonner";
 import { FolderDialog } from "./components/folder-chooser.tsx";
 import { Button } from "./components/ui/button.tsx";
 import { TooltipProvider } from "./components/ui/tooltip.tsx";
-import { call, type AppState } from "./lib/api.ts";
+import { call, enableFinder, type AppState } from "./lib/api.ts";
 import { useStream } from "./lib/stream.ts";
 import { cn } from "./lib/utils.ts";
 import { AnalysisPage } from "./pages/analysis.tsx";
@@ -69,6 +69,7 @@ export function App() {
       toast.error((e as Error).message);
       return;
     }
+    if (s.finder) enableFinder();
     setState(s);
     if (s.session || !s.opening) toast.dismiss("opening");
     if (s.error) toast.error(s.error, { id: "opening" });

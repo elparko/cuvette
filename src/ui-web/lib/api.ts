@@ -29,7 +29,7 @@ interface Desktop {
 
 const desktop = (window as unknown as { cuvetteDesktop?: Desktop }).cuvetteDesktop;
 
-export const bridge = {
+export const bridge: { chooseFolder?: (start?: string) => Promise<string | null>; reveal: (path: string) => Promise<unknown>; notify: (title: string, body: string) => void; saveFile?: (url: string, name: string) => Promise<unknown> } = {
   chooseFolder: desktop?.chooseFolder ? (start?: string) => desktop.chooseFolder!(start) : undefined,
   reveal: (path: string) => (desktop?.reveal ? desktop.reveal(path) : call("api/reveal", { path })),
   notify: (title: string, body: string) => {
@@ -42,6 +42,11 @@ export const bridge = {
   },
   saveFile: desktop?.saveFile ? (url: string, name: string) => desktop.saveFile!(new URL(url, location.href).href, name) : undefined,
 };
+
+export function enableFinder() {
+  if (bridge.chooseFolder) return;
+  bridge.chooseFolder = async (start?: string) => (await call<{ path: string }>("api/choose-folder", { start })).path || null;
+}
 
 export function askNotify() {
   if (!desktop && "Notification" in window && Notification.permission === "default") {
@@ -90,6 +95,7 @@ export interface AppState {
   start: string;
   home: string;
   owned: boolean;
+  finder?: boolean;
 }
 
 export interface Status {
