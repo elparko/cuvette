@@ -38,7 +38,7 @@ test("sessionsJson gives a title, a clipped text, the folder name, the age and a
   expect(list[0]).toMatchObject({ id: "a", title: "Drug 2 vs drug 1", folderName: "exp-12", status: "answered", moved: false, thumb: "api/thumb?id=a&t=tok" });
   expect(list[0]!.text.length).toBe(220);
   expect(list[0]!.text.endsWith("…")).toBe(true);
-  expect(list[1]).toMatchObject({ title: "No request yet", status: "moved", moved: true, thumb: "" });
+  expect(list[1]).toMatchObject({ title: "old", text: "No request yet.", status: "moved", moved: true, thumb: "" });
 });
 
 test("programsJson groups the rows by field and splits each row into state, tags and actions", () => {

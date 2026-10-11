@@ -126,11 +126,16 @@ export function md(src: string, opts: { code?: boolean } = {}): string {
 
 const SECTIONS = new Set(["Metrics", "Demonstration on a sample", "Settings", "Data", "What I will count", "What I will leave out, and what it does", "Programs", "Steps", "Pilot", "Reference", "Outputs", "Checks", "Out of scope", "Numbers", "Check", "Comparison with the reference", "Images", "Definitions"]);
 
+function stepMark(html: string, numbered: boolean): string {
+  const body = html.replace(/ \[(done|skipped)\]$/, (_m, st: string) => ` <span class="tag ${st === "done" ? "ok" : ""}">${st}</span>`);
+  return `<li${numbered ? ` class="num"` : ""}>${body}</li>`;
+}
+
 export function planTextHtml(text: string): string {
   const out: string[] = [];
   let list: string[] = [];
   const close = () => {
-    if (list.length) out.push(`<ul>${list.map((x) => `<li>${x}</li>`).join("")}</ul>`);
+    if (list.length) out.push(`<ul>${list.join("")}</ul>`);
     list = [];
   };
   for (const raw of text.split("\n")) {
@@ -142,8 +147,8 @@ export function planTextHtml(text: string): string {
     if (SECTIONS.has(line.trim())) {
       close();
       out.push(`<h4>${esc(line.trim())}</h4>`);
-    } else if (/^\s*(- |\d+[.)] )/.test(line) && !/^\s{2,}/.test(line)) list.push(inline(line.replace(/^\s*- /, "")));
-    else if (/^\s{2,}/.test(line) && list.length) list[list.length - 1] += `<br><span class="dim">${inline(line.trim().replace(/^- /, ""))}</span>`;
+    } else if (/^\s*(- |\d+[.)] )/.test(line) && !/^\s{2,}/.test(line)) list.push(stepMark(inline(line.replace(/^\s*- /, "")), /^\s*\d+[.)] /.test(line)));
+    else if (/^\s{2,}/.test(line) && list.length) list[list.length - 1] = list[list.length - 1]!.replace(/<\/li>$/, `<br><span class="dim">${inline(line.trim().replace(/^- /, ""))}</span></li>`);
     else {
       close();
       out.push(`<p>${inline(line)}</p>`);
@@ -572,10 +577,10 @@ export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; colu
   const figures = listFiles(join(outDir, "figures"));
   const files = listFiles(outDir, (n) => n !== "results.xlsx" && !/^index\.html$/.test(n));
   const parts: string[] = [];
-  parts.push(`<div class="row">${btn("Write the data book", `data-command="/databook pdf html"`, "primary")}<select data-export aria-label="Export format">${["html", "pdf", "md", "protocol", "notebook", "script", "flow", "eln", "jsonl"].map((f) => `<option>${f}</option>`).join("")}</select>${btn("Export", `data-export-go="1"`)}</div>`);
+  parts.push(`<h4>Export</h4><div class="row">${btn("Write the data book", `data-command="/databook pdf html"`, "primary")}<select data-export aria-label="Export format">${["html", "pdf", "md", "protocol", "notebook", "script", "flow", "eln", "jsonl"].map((f) => `<option>${f}</option>`).join("")}</select>${btn("Export", `data-export-go="1"`)}</div>`);
   const sel = (name: string, label: string, opts: [string, string][]) => `<select data-deck="${name}" aria-label="${esc(label)}">${opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("")}</select>`;
   parts.push(
-    `<div class="row" data-deck-row>${btn("Make an image deck", `data-deck-go="1"`)}` +
+    `<h4>Image deck</h4><div class="row" data-deck-row>${btn("Make an image deck", `data-deck-go="1"`)}` +
       sel("format", "File type", [["pptx", "PowerPoint (.pptx)"], ["pdf", "PDF"], ["both", "PowerPoint and PDF"]]) +
       sel("images", "Images", [["all", "All images"], ["figures", "Result figures"], ["qc", "QC images"], ["pilot", "Demonstration images"]]) +
       sel("order", "Order", [["step", "By step"], ["group", "By group or sample"], ["name", "By file name"]]) +
@@ -583,7 +588,7 @@ export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; colu
       sel("size", "Page size", [["", "Size: default"], ["16:9", "16:9 slides"], ["a4", "A4"], ["letter", "Letter"]]) +
       `</div>`,
   );
-  if (existsSync(xlsx)) parts.push(`<p>${fileLink(c, xlsx)}</p>`);
+  if (existsSync(xlsx)) parts.push(`<h4>Tables</h4><p>${fileLink(c, xlsx)}</p>`);
   if (sheets?.length) {
     for (const s of sheets) {
       const rows = s.rows.slice(0, 200);

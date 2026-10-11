@@ -157,7 +157,7 @@ export function App() {
                 >
                   <span className="truncate text-[13px]">{s.title}</span>
                   <span className="truncate text-[11.5px] text-muted-foreground">
-                    {s.folderName} · {s.age}
+                    {s.title === s.folderName ? `No request yet · ${s.age}` : `${s.folderName} · ${s.age}`}
                   </span>
                 </button>
               ))}

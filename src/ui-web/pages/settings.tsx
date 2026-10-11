@@ -272,7 +272,7 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
             disabled={dis}
             onClick={async () => {
               if (bridge.chooseFolder) {
-                const f = await bridge.chooseFolder(draft);
+                const f = await bridge.chooseFolder(draft).catch((e: Error) => (toast.error(e.message), null));
                 if (f) {
                   setDraft(f);
                   ask(f);

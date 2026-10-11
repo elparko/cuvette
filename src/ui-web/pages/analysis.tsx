@@ -123,6 +123,10 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     }
   }, [stream.cards]);
 
+  useEffect(() => {
+    if (document.activeElement === document.body) inputRef.current?.focus({ preventScroll: true });
+  }, [session.id]);
+
   // Side panel tab.
   const loadTab = useCallback(
     async (quiet: boolean) => {

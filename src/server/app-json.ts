@@ -12,8 +12,8 @@ const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1).trimEnd
 export function sessionsJson(list: SessionInfo[], token: string, now = Date.now()) {
   return list.map((s) => ({
     id: s.id,
-    title: s.name || (s.ask ? clip(s.ask, 80) : "No request yet"),
-    text: clip(s.description || (s.name ? s.ask : ""), 220),
+    title: s.name || (s.ask ? clip(s.ask, 80) : basename(s.cwd) || "No request yet"),
+    text: s.name || s.ask ? clip(s.description || (s.name ? s.ask : ""), 220) : "No request yet.",
     folder: s.cwd,
     folderName: basename(s.cwd) || s.cwd || "unknown folder",
     age: ageText(now - s.used),
