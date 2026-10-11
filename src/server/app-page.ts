@@ -223,6 +223,18 @@ ul.checks code { font: 12.5px ui-monospace, Menlo, monospace; background: var(--
 li.ok .cstat, .okline { color: var(--ok); }
 li.missing .cstat { color: var(--bad); }
 li.old .cstat { color: var(--warn); }
+.modemenu { position: relative; }
+.modebtn { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; }
+.modebtn:hover, .modebtn[aria-expanded="true"] { background: var(--panel2); }
+.modebtn svg { color: var(--dim); }
+.modelist { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; list-style: none; margin: 0; padding: 6px; min-width: 240px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.18); }
+.modelist li { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.modelist li:hover { background: var(--panel2); }
+.modelist li span { color: var(--dim); font-size: 12.5px; }
+.modelist li[aria-selected="true"] { background: var(--accent-bg); }
+.modelist li[aria-selected="true"] b { color: var(--accent); }
+select:not(.hidden) { appearance: none; -webkit-appearance: none; padding-right: 28px; background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center; }
+.btn.big { font-size: 16px; padding: 12px 22px; min-height: 48px; }
 .pathrow { display: flex; gap: 6px; flex-wrap: wrap; }
 .pgroup h3 { margin: 14px 0 6px; font-size: 15px; }
 ul.plist { list-style: none; margin: 0; padding: 0; }
@@ -286,12 +298,11 @@ ul.dirs li button .dim { margin-left: 6px; }
     <button type="button" data-page="programs">Programs</button>
     <button type="button" data-page="settings">Settings</button>
   </nav>
-  <label class="inline small" id="modewrap">Mode <select id="mode" aria-label="Mode">
-    <option value="watch">Watch: the agent runs the steps</option>
-    <option value="follow">Follow: you run the steps</option>
-    <option value="teach">Teach: you work, the agent checks</option>
-    <option value="plan">Plan: the agent plans only</option>
-  </select></label>
+  <div class="modemenu hidden" id="modewrap">
+    <button type="button" class="modebtn" id="modebtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Mode"><span class="dim small">Mode</span> <b id="modelabel">Watch</b><svg width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <ul class="modelist hidden" id="modelist" role="listbox" aria-label="Mode"></ul>
+    <select id="mode" class="hidden" aria-hidden="true" tabindex="-1"><option value="watch"></option><option value="follow"></option><option value="teach"></option><option value="plan"></option></select>
+  </div>
   <span class="tag hidden" id="bypass">bypass permissions</span>
   <span class="tag hidden" id="usage"></span>
 </header>
@@ -329,14 +340,14 @@ ul.dirs li button .dim { margin-left: 6px; }
 
 <main class="page hidden" id="p-start">
   <div class="panel">
-    <h2>Analyze a folder</h2>
-    <p>Choose the folder with your data. The results go in a new folder inside it.</p>
+    <h2>Analyze your data</h2>
+    <p>Choose the folder that holds your data. Cuvette does not change your files. It writes the results to a new folder inside it.</p>
     <div id="chooser"></div>
     <p class="cardmsg" id="starterr" role="alert"></p>
   </div>
   <div class="panel">
-    <h3>Try it first</h3>
-    <p>The sample analysis uses a small sleep study: 10 patients, two drugs, hours of extra sleep.</p>
+    <h3>No data ready? Try the sample</h3>
+    <p>The sample is a sleep study: 10 patients, two drugs, hours of extra sleep. It takes about 2 minutes.</p>
     <button type="button" class="btn" data-sample="1">Run the sample analysis</button>
   </div>
   <div class="panel"><h3>Recent sessions</h3><div id="startsessions"></div></div>
@@ -345,6 +356,7 @@ ul.dirs li button .dim { margin-left: 6px; }
 <main class="page hidden" id="p-setup">
   <div class="panel">
     <h2>Welcome to Cuvette</h2>
+    <p>Cuvette analyzes your data in the programs you already use. You make each method decision. Cuvette records each step and each number.</p>
     <h3>1. Choose the model that does the analysis</h3>
     <div id="choices"></div>
     <div id="claudebox" class="hidden">
@@ -361,8 +373,8 @@ ul.dirs li button .dim { margin-left: 6px; }
     <div class="row"><button type="button" class="btn quiet" data-doctor-all="1">Show the full list</button></div>
   </div>
   <div class="panel hidden" id="samplepanel">
-    <h3>3. Try a 2-minute sample analysis</h3>
-    <p>The sample is a small public data set: extra sleep of 10 patients with two drugs (Student, 1908). The app copies it to <span id="samplefolder"></span>.</p>
+    <h3>3. Run the sample analysis</h3>
+    <p>The sample is a public data set: extra sleep of 10 patients with two drugs (Student, 1908). It takes about 2 minutes. The app copies it to <span id="samplefolder"></span>.</p>
     <div class="row"><button type="button" class="btn primary" data-sample="1">Run the sample analysis</button><button type="button" class="btn" data-page-go="start">Open my own folder</button></div>
   </div>
 </main>
@@ -452,7 +464,9 @@ let sugg = [];
 let suggSel = 0;
 
 function show(p) {
+  const changed = p !== page;
   page = p;
+  if (changed) window.scrollTo(0, 0);
   document.body.classList.toggle("fixed", p === "session");
   for (const id of ["session", "start", "setup", "settings", "sessions", "programs"]) $("p-" + id).classList.toggle("hidden", id !== p);
   for (const b of document.querySelectorAll("nav.pages button")) b.setAttribute("aria-current", b.dataset.page === p || (!OWN_PAGES.includes(p) && b.dataset.page === "session") ? "page" : "false");
@@ -588,7 +602,7 @@ function drawStatus() {
 function setStatus(m) {
   status = m;
   if (m.where) setWhere(m.where);
-  $("mode").value = m.mode;
+  setMode(m.mode);
   $("bypass").classList.toggle("hidden", !m.bypass);
   $("usage").classList.toggle("hidden", !m.usage);
   $("usage").textContent = m.usage || "";
@@ -623,7 +637,28 @@ $("sendnow").addEventListener("click", () => { const v = $("msg").value; $("msg"
 $("stop").addEventListener("click", () => post("api/stop", {}));
 $("showq").addEventListener("click", () => send("/questions", false));
 $("openfolder").addEventListener("click", () => { chooser($("chooser2")); $("folderdlg").showModal(); });
-$("mode").addEventListener("change", () => post("api/mode", { mode: $("mode").value }));
+const MODES = [["watch", "Watch", "The agent runs the steps."], ["follow", "Follow", "You run the steps."], ["teach", "Teach", "You work. The agent checks."], ["plan", "Plan", "The agent plans only."]];
+function setMode(v) {
+  $("mode").value = v;
+  $("modelabel").textContent = (MODES.find((m) => m[0] === v) || MODES[0])[1];
+  for (const li of $("modelist").children) li.setAttribute("aria-selected", li.dataset.mode === v ? "true" : "false");
+}
+function toggleModes(open) {
+  $("modelist").classList.toggle("hidden", !open);
+  $("modebtn").setAttribute("aria-expanded", open ? "true" : "false");
+}
+for (const [v, name, help] of MODES) {
+  const li = document.createElement("li");
+  li.dataset.mode = v; li.setAttribute("role", "option");
+  li.innerHTML = "<b></b><span></span>";
+  li.firstChild.textContent = name; li.lastChild.textContent = help;
+  li.addEventListener("click", () => { setMode(v); toggleModes(false); post("api/mode", { mode: v }); });
+  $("modelist").append(li);
+}
+setMode("watch");
+$("modebtn").addEventListener("click", (e) => { e.stopPropagation(); toggleModes($("modelist").classList.contains("hidden")); });
+document.addEventListener("click", () => toggleModes(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") toggleModes(false); });
 $("msg").addEventListener("keydown", (e) => {
   if (sugg.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) { e.preventDefault(); suggSel = (suggSel + (e.key === "ArrowDown" ? 1 : sugg.length - 1)) % sugg.length; drawSuggest(); return; }
   if (sugg.length && e.key === "Tab") { e.preventDefault(); pickSuggest(suggSel); return; }
@@ -785,6 +820,22 @@ async function loadSessions(box) {
 async function chooser(box) {
   const start = state ? state.folder || state.start : "";
   box.innerHTML = "";
+  if (bridge.chooseFolder) {
+    const pick = document.createElement("button");
+    pick.type = "button"; pick.className = "btn primary big"; pick.textContent = "Choose a folder...";
+    const note = document.createElement("p");
+    note.className = "cardmsg";
+    pick.addEventListener("click", async () => {
+      const f = await bridge.chooseFolder(start);
+      if (!f) return;
+      askNotify();
+      pick.disabled = true;
+      try { await call("api/open", { folder: f }); const d = box.closest("dialog"); if (d) d.close(); page = "session"; note.textContent = "Opening..."; setTimeout(boot, 300); }
+      catch (err) { pick.disabled = false; note.textContent = err.message; }
+    });
+    box.append(pick, note);
+    return;
+  }
   const row = document.createElement("div");
   row.className = "pathrow";
   const input = document.createElement("input");
