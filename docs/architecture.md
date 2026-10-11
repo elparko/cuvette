@@ -78,7 +78,14 @@ src/server/                  graph window (HTTP + SSE), ntfy push, and the brows
                              app: app.ts (startApp: server, token, sessions),
                              app-view.ts (one session's view and card state),
                              app-html.ts (server-side HTML of items, cards, tabs),
-                             app-page.ts (the page shell, plain HTML, CSS and JS)
+                             app-json.ts (JSON for the sessions, programs,
+                             settings and doctor pages), app-page.ts (the old
+                             page in one string; the server sends it at /?ui=old
+                             and if ui-dist/ is missing)
+src/ui-web/                  the browser app: React, Vite, Tailwind and Radix     [F]
+                             (shadcn/ui pattern). npm run ui:build writes ui-dist/.
+                             The server sends ui-dist/ at /. npm run ui:dev starts
+                             Vite with a proxy to a server on port 4317.
 src/mcp-server.ts            the harness as an MCP server                             [lead]
 src/onboarding/              checker, known-answer runner, onboarding agent           [I]
 src/bench/                   trap datasets, scenarios, six scores                     [J]
@@ -92,8 +99,9 @@ docs/adapter-spec.md docs/onboarding-guide.md                                   
 
 - TypeScript, ES modules, `import ... from "./x.ts"` with the `.ts` extension. Node built-ins as
   `node:fs` and so on. Use only the installed packages: `@anthropic-ai/sdk`,
-  `@modelcontextprotocol/sdk`, `zod` (v4), `yaml`, `ink`, `react`, `ink-text-input`. Ask the lead
-  before you add one.
+  `@modelcontextprotocol/sdk`, `zod` (v4), `yaml`, `ink`, `react`, `ink-text-input`. The browser
+  app in `src/ui-web/` also uses `react-dom`, `radix-ui`, `tailwindcss`, `lucide-react` and
+  `sonner`. Ask the lead before you add one.
 - Windows, macOS and Linux. `node:path`. `spawn` with an argument array, never a shell string.
 - Tests: `tests/<module>.test.ts`, vitest. Tests must not need the network, an API key, Java or
   Ollama, unless they check `process.env.CUVETTE_LIVE` (`test.skipIf(!process.env.CUVETTE_LIVE)`).

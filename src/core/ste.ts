@@ -190,7 +190,7 @@ Write every message, question, plan, metric definition, answer, summary, purpose
 export const STE_PROMPT_SMALL = `- Write short sentences: 20 words or fewer. Use the active voice and simple words.
 - Use "must" for a requirement. Do not write "should", "may", "e.g." or "etc.".`;
 
-const UI_DIRS = ["src/ui", "src/tui", "src/server"];
+const UI_DIRS = ["src/ui", "src/tui", "src/server", "src/ui-web"];
 const DATED = /^(handoff|status|release)-|\d{4}-\d{2}-\d{2}/;
 
 export interface TextIssue extends SteIssue {

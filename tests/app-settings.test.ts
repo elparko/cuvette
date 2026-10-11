@@ -214,7 +214,7 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
     });
     page = await openChrome();
     await page.size(1280, 900);
-    await page.go(url);
+    await page.go(url + "&ui=old");
     await page.eval(`(async () => { for (let i = 0; i < 50 && !state; i++) await new Promise((r) => setTimeout(r, 100)); document.querySelector('nav.pages [data-page="settings"]').click(); for (let i = 0; i < 50 && !document.querySelector("#settingsbody .cfg"); i++) await new Promise((r) => setTimeout(r, 100)); })()`);
   }, 60000);
   afterAll(async () => {

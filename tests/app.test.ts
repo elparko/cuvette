@@ -266,7 +266,7 @@ describe("question sequence and /change in the app", () => {
 
   test("the app page sends the arrow keys to Back and Next and Change buttons to /change", async () => {
     app = await startApp({ session: new FakeSession(), env });
-    const html = await (await client(app).get("")).text();
+    const html = await (await client(app).get("?ui=old")).text();
     expect(html).toContain('e.key === "ArrowLeft" && nav("back")');
     expect(html).toContain('e.key === "ArrowRight" && nav("next")');
     expect(html).toContain('send("/change " + chg.dataset.change');

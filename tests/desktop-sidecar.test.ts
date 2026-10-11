@@ -20,7 +20,7 @@ test("the sidecar prints the port and the token, serves the page, and stops when
   expect(s.token.length).toBeGreaterThanOrEqual(32);
   const page = await fetch(s.url);
   expect(page.status).toBe(200);
-  expect(await page.text()).toContain("window.cuvetteDesktop");
+  expect(await page.text()).toContain("<title>Cuvette</title>");
   expect((await fetch(`http://127.0.0.1:${s.port}/api/state`)).status).toBe(401);
   const state = (await (await fetch(`http://127.0.0.1:${s.port}/api/state?t=${s.token}`)).json()) as { session: unknown; home: string };
   expect(state.session).toBeNull();

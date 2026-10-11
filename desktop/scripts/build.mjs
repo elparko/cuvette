@@ -36,6 +36,7 @@ const metaUrl = {
 
 async function core() {
   rmSync(CORE, { recursive: true, force: true });
+  run("npx", ["vite", "build", "--config", join(ROOT, "src", "ui-web", "vite.config.ts"), "--logLevel", "warn"], ROOT);
   await build({
     entryPoints: { sidecar: join(DESKTOP, "sidecar", "main.ts"), cli: join(ROOT, "src", "cli.ts") },
     outdir: join(CORE, "dist"),
@@ -63,6 +64,7 @@ async function core() {
   const skip = (p) => /[\\/](data|__pycache__|node_modules)$/.test(p) || p.endsWith(".pyc") || basename(p) === ".DS_Store";
   cpSync(join(ROOT, "catalog"), join(CORE, "catalog"), { recursive: true, filter: (p) => !skip(p) });
   cpSync(join(ROOT, "samples"), join(CORE, "samples"), { recursive: true, filter: (p) => !skip(p) });
+  cpSync(join(ROOT, "ui-dist"), join(CORE, "ui-dist"), { recursive: true });
   for (const f of ["src/adapters/kinds/ga_figures.py", "src/adapters/kinds/python_worker.py", "src/adapters/kinds/cuvette.mplstyle", "src/tools/science-requirements.txt", "package.json"]) {
     mkdirSync(dirname(join(CORE, f)), { recursive: true });
     copyFileSync(join(ROOT, f), join(CORE, f));

@@ -1,0 +1,534 @@
+import { ArrowUpIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import type { AppCtx } from "../App.tsx";
+import { ModeMenu } from "../components/mode-menu.tsx";
+import { Badge } from "../components/ui/badge.tsx";
+import { Button } from "../components/ui/button.tsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.tsx";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu.tsx";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.tsx";
+import { Tooltip } from "../components/ui/tooltip.tsx";
+import { askNotify, bridge, call, midText, post, withT } from "../lib/api.ts";
+import type { StreamState } from "../lib/stream.ts";
+import { cn } from "../lib/utils.ts";
+import { SettingsPanel } from "./settings.tsx";
+
+interface Command {
+  name: string;
+  args: string;
+  help: string;
+}
+
+const TABS = [
+  { id: "analysis", label: "Analysis" },
+  { id: "results", label: "Results" },
+  { id: "decisions", label: "Decisions" },
+  { id: "record", label: "Record" },
+];
+
+function elapsed(s: number) {
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;
+}
+
+function fields(root: Element) {
+  const out: Record<string, unknown> = {};
+  for (const el of root.querySelectorAll<HTMLInputElement>("input[name], select[name], textarea[name]")) out[el.name] = el.type === "checkbox" ? el.checked : el.value;
+  return out;
+}
+
+function activeCard(box: HTMLElement | null) {
+  if (!box) return null;
+  const cs = [...box.querySelectorAll<HTMLElement>("[data-card]")];
+  return cs.find((c) => c.querySelector(".opts .btn")) ?? cs[0] ?? null;
+}
+
+function optionButtons(card: HTMLElement) {
+  const sub = card.querySelector(".sub-q") ?? card;
+  const opts = [...sub.querySelectorAll<HTMLButtonElement>(".opts .btn")];
+  return opts.length ? opts : [...card.querySelectorAll<HTMLButtonElement>(".row .btn")].filter((b) => !b.classList.contains("quiet"));
+}
+
+function markSel(card: HTMLElement, i: number) {
+  optionButtons(card).forEach((b, j) => b.classList.toggle("sel", j === i));
+  card.dataset.sel = String(i);
+}
+
+const typing = (a: Element | null) => !!a && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA");
+
+export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState }) {
+  const session = ctx.state.session!;
+  const status = stream.status;
+  const busy = !!status.state && status.state !== "idle";
+  const [tab, setTab] = useState("analysis");
+  const [tabHtml, setTabHtml] = useState("");
+  const [side, setSide] = useState(true);
+  const [text, setText] = useState("");
+  const [commands, setCommands] = useState<Command[]>([]);
+  const [sugg, setSugg] = useState<Command[]>([]);
+  const [sel, setSel] = useState(0);
+  const [, setTick] = useState(0);
+  const [light, setLight] = useState<{ src: string; alt: string } | null>(null);
+  const [wide, setWide] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
+  const tabRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const follow = useRef(true);
+  const autoScroll = useRef(0);
+
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
+
+  const send = useCallback(async (value: string, now = false) => {
+    if (!value.trim()) return;
+    askNotify();
+    await post("api/send", { text: value, now });
+  }, []);
+
+  // Scroll: follow the end of the conversation unless the user scrolled up.
+  useLayoutEffect(() => {
+    if (!follow.current) return;
+    const sc = scrollRef.current;
+    if (!sc) return;
+    autoScroll.current = Date.now();
+    sc.scrollTop = sc.scrollHeight;
+  }, [stream.items, stream.pending, stream.live, stream.cards]);
+
+  useEffect(() => {
+    follow.current = true;
+  }, [stream.resets]);
+
+  // Cards: put the keyboard focus on the card that waits for an answer.
+  useLayoutEffect(() => {
+    const box = cardsRef.current;
+    if (!box) return;
+    for (const s of box.querySelectorAll('[data-type="config"] .settings')) {
+      s.innerHTML = '<p class="dim small">The settings are on their own page.</p><div class="row"><button type="button" class="btn primary" data-open-settings="1">Open the settings</button></div>';
+    }
+    const card = activeCard(box);
+    for (const c of box.querySelectorAll("[data-card]")) c.classList.toggle("active", c === card);
+    if (!card) return;
+    const bs = optionButtons(card);
+    markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
+    const a = document.activeElement;
+    const writing = typing(a) && !(a?.tagName === "TEXTAREA" && !(a as HTMLTextAreaElement).value.trim());
+    if (!writing && !document.querySelector("[role=dialog]")) {
+      card.tabIndex = -1;
+      card.focus({ preventScroll: true });
+    }
+  }, [stream.cards]);
+
+  // Side panel tab.
+  const loadTab = useCallback(
+    async (quiet: boolean) => {
+      const box = tabRef.current;
+      if (quiet && box && box.contains(document.activeElement) && document.activeElement !== box) return;
+      try {
+        setTabHtml(await call<string>("api/tab?name=" + tab));
+      } catch {}
+    },
+    [tab],
+  );
+  useEffect(() => {
+    void loadTab(false);
+  }, [loadTab, session.id]);
+  useEffect(() => {
+    if (stream.changed) void loadTab(true);
+  }, [stream.changed]);
+
+  // Keys for the open card: numbers choose, arrows move, Enter confirms, Escape answers later.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (typing(document.activeElement) || document.querySelector("[role=dialog], [role=menu]")) return;
+      const card = activeCard(cardsRef.current);
+      if (!card) return;
+      const bs = optionButtons(card);
+      const i = Number(card.dataset.sel || 0);
+      if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) {
+        const chip = [...card.querySelectorAll<HTMLButtonElement>("button.num")].find((b) => b.textContent === e.key);
+        if (chip) {
+          e.preventDefault();
+          chip.click();
+        }
+        return;
+      }
+      if (/^[1-9]$/.test(e.key)) {
+        const b = bs[Number(e.key) - 1];
+        if (b) {
+          e.preventDefault();
+          markSel(card, Number(e.key) - 1);
+          b.click();
+        }
+        return;
+      }
+      const nav = (act: string) => card.querySelector<HTMLButtonElement>(`[data-act="${act}"]`);
+      if (e.key === "ArrowLeft" && nav("back")) return (e.preventDefault(), nav("back")!.click());
+      if (e.key === "ArrowRight" && nav("next")) return (e.preventDefault(), nav("next")!.click());
+      if (!bs.length) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") return (e.preventDefault(), markSel(card, (i + 1) % bs.length));
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") return (e.preventDefault(), markSel(card, (i + bs.length - 1) % bs.length));
+      if (e.key === "Enter" && bs[i]) return (e.preventDefault(), bs[i]!.click());
+      if (e.key === "Escape") {
+        const back = card.querySelector<HTMLButtonElement>('[data-act="later"], [data-act="skip"], [data-plan*="back"], [data-plan*="later"]');
+        if (back) {
+          e.preventDefault();
+          back.click();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Clicks inside the server HTML.
+  const onClick = async (e: React.MouseEvent) => {
+    const t = e.target instanceof Element ? e.target : null;
+    if (!t) return;
+    const wideBtn = t.closest("[data-wide]");
+    if (wideBtn) {
+      const tb = wideBtn.closest("details")?.querySelector("table");
+      if (tb) setWide(tb.outerHTML);
+      return;
+    }
+    const thumb = t.closest<HTMLElement>(".thumb");
+    if (thumb) return setLight({ src: thumb.dataset.full ?? "", alt: thumb.title });
+    const rev = t.closest<HTMLElement>("[data-reveal]");
+    if (rev) {
+      try {
+        await bridge.reveal(rev.dataset.reveal!);
+      } catch (err) {
+        toast.error((err as Error).message);
+      }
+      return;
+    }
+    const dl = t.closest("a[download]");
+    if (dl && bridge.saveFile) {
+      e.preventDefault();
+      void bridge.saveFile(dl.getAttribute("href")!, dl.getAttribute("download")!);
+      return;
+    }
+    if (t.closest("[data-open-settings]")) return setSettingsOpen(true);
+    const accept = t.closest("[data-act=accept-def]");
+    if (accept) return accept.setAttribute("aria-pressed", "true");
+    const a = t.closest<HTMLElement>("[data-act]");
+    const card = a?.closest<HTMLElement>("[data-card]");
+    if (a && card) {
+      const body: Record<string, unknown> = { id: Number(card.dataset.card), act: a.dataset.act, value: a.dataset.value, qid: a.dataset.qid, fid: a.dataset.fid, fields: fields(card) };
+      if (a.dataset.plan) body.plan = JSON.parse(a.dataset.plan);
+      const buttons = [...card.querySelectorAll("button")];
+      for (const b of buttons) b.disabled = true;
+      await post("api/act", body);
+      for (const b of buttons) b.disabled = false;
+      return;
+    }
+    const pg = t.closest<HTMLElement>("[data-page-go]");
+    if (pg) {
+      if (pg.dataset.progStart) ctx.setProgramStart(pg.dataset.progStart);
+      return ctx.go(pg.dataset.pageGo as never);
+    }
+    const se = t.closest<HTMLElement>("[data-setting-edit]");
+    if (se) {
+      if (se.dataset.settingEdit === "programs") return ctx.go("programs");
+      return send(se.dataset.settingEdit === "key" ? "/key" : "/eln setup");
+    }
+    const chg = t.closest<HTMLElement>("[data-change]");
+    if (chg) return send("/change " + chg.dataset.change);
+    const ds = t.closest<HTMLElement>("[data-decision-save]");
+    if (ds) {
+      const el = ds.closest("[data-decision]")!.querySelector<HTMLInputElement>("[name=value]")!;
+      const v = el.type === "checkbox" ? String(el.checked) : el.tagName === "SELECT" ? String(Number(el.value) + 1) : el.value;
+      return send(`/change ${ds.dataset.decisionSave} ${v}`);
+    }
+    if (t.closest("[data-rerun]")) return send("/rerun");
+    const dc = t.closest<HTMLElement>("[data-command]");
+    if (dc) return send(dc.dataset.command!);
+    const dg = t.closest("[data-deck-go]");
+    if (dg) {
+      const row = dg.closest("[data-deck-row]")!;
+      return send("/export images " + [...row.querySelectorAll<HTMLSelectElement>("[data-deck]")].map((x) => x.value).filter(Boolean).join(" "));
+    }
+    if (t.closest("[data-export-go]")) return send("/export " + (tabRef.current?.querySelector<HTMLSelectElement>("[data-export]")?.value ?? "html"));
+  };
+
+  const onChange = (e: React.FormEvent) => {
+    const t = e.target as HTMLSelectElement;
+    if (t.matches?.("[data-plan-mode]")) {
+      const card = t.closest<HTMLElement>("[data-card]")!;
+      void post("api/act", { id: Number(card.dataset.card), act: "plan", plan: { a: "mode", mode: t.value } });
+    } else if (t.matches?.("[data-owner]")) void send(`/owner ${t.dataset.owner} ${t.value}`);
+  };
+
+  // Composer.
+  const onInput = async (v: string) => {
+    setText(v);
+    if (!v.startsWith("/") || v.includes(" ")) return setSugg([]);
+    let list = commands;
+    if (!list.length) {
+      try {
+        list = await call<Command[]>("api/commands");
+        setCommands(list);
+      } catch {}
+    }
+    setSugg(list.filter((c) => c.name.startsWith(v.slice(1).toLowerCase())).slice(0, 8));
+    setSel(0);
+  };
+
+  const pick = (c?: Command) => {
+    if (!c) return;
+    setSugg([]);
+    if (c.args) {
+      setText(`/${c.name} `);
+      inputRef.current?.focus();
+    } else {
+      setText("");
+      void send("/" + c.name);
+    }
+  };
+
+  const submit = (now = false) => {
+    if (sugg.length && text.startsWith("/") && !text.includes(" ")) return pick(sugg[sel]);
+    const v = text;
+    setText("");
+    setSugg([]);
+    void send(v, now);
+  };
+
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, window.innerHeight * 0.4) + "px";
+  }, [text]);
+
+  const waitText = (n: number) => `${n} ${n === 1 ? "decision waits" : "decisions wait"} for you`;
+  let line = busy ? (status.text ?? "Working") : status.openQuestions ? waitText(status.openQuestions) + "." : "Ready.";
+  if (busy && status.since) line += " · " + elapsed(Math.max(0, Math.floor((Date.now() - status.since) / 1000)));
+  if (busy && status.openQuestions) line += " · " + waitText(status.openQuestions);
+  const showQ = !!status.openQuestions && !/data-type="(question|plan|clarify)"/.test(stream.cards);
+  const folderName = session.folder.split("/").filter(Boolean).pop() || session.folder;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background/80 px-5 py-2.5 backdrop-blur">
+        <div className="flex min-w-0 basis-full items-center gap-2.5 sm:basis-0 sm:flex-1">
+          <FolderOpenIcon className="size-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0">
+            <div className="truncate font-semibold tracking-tight" title={session.folder}>
+              {folderName}
+            </div>
+            <div className="truncate text-xs text-muted-foreground" title={status.where ?? session.folderLine}>
+              {midText(session.folderLine || session.folder, 90)}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {session.programs.slice(0, 3).map((p) => (
+            <Badge key={p} className="hidden lg:inline-flex">
+              {p}
+            </Badge>
+          ))}
+          {status.bypass && (
+            <Badge tone="warn">
+              <ShieldAlertIcon /> bypass permissions
+            </Badge>
+          )}
+          {status.usage && (
+            <Tooltip content={status.usageLong}>
+              <Badge className="tabular-nums">{status.usage}</Badge>
+            </Tooltip>
+          )}
+          <ModeMenu mode={status.mode ?? "watch"} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" aria-label="More">
+                <EllipsisIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => send("/details")}>{session.details ? "Hide the housekeeping steps" : "Show every step (/details)"}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => window.open(withT("graph/"), "_blank", "noopener")}>
+                <NetworkIcon /> Open the step graph
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => bridge.reveal(session.folder)}>
+                <FolderOpenIcon /> Show the folder
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSide(!side)}>
+                {side ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />} {side ? "Hide the side panel" : "Show the side panel"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
+
+      <div className={cn("grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:overflow-hidden", side && "lg:grid-cols-[minmax(0,1fr)_minmax(360px,40%)]")}>
+        <section aria-label="Conversation" className="flex h-[calc(100dvh-150px)] min-h-[420px] min-w-0 flex-col lg:h-auto lg:min-h-0">
+          <div
+            ref={scrollRef}
+            onScroll={() => {
+              if (Date.now() - autoScroll.current < 150) return;
+              const sc = scrollRef.current!;
+              follow.current = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 80;
+            }}
+            className="min-h-0 flex-1 overflow-y-auto"
+            aria-live="polite"
+          >
+            <div className="srv stacked-wrap mx-auto w-full max-w-3xl px-5 py-4" onClick={onClick} onChange={onChange}>
+              {stream.items.map((h, i) => (
+                <div key={i} dangerouslySetInnerHTML={{ __html: h }} />
+              ))}
+              <div dangerouslySetInnerHTML={{ __html: stream.pending }} />
+              {stream.live && <div className="msg agent whitespace-pre-wrap">{stream.live}</div>}
+              <div ref={cardsRef} dangerouslySetInnerHTML={{ __html: stream.cards }} />
+            </div>
+          </div>
+
+          <div className="mx-auto w-full max-w-3xl px-5 pb-4">
+            <div role="status" className="flex min-h-8 flex-wrap items-center gap-2 px-1 pb-1.5 text-[13px] text-muted-foreground">
+              <span className={cn("size-2 shrink-0 rounded-full", busy ? "pulse-dot bg-accent-brand" : status.openQuestions ? "bg-mag" : "bg-ok")} aria-hidden="true" />
+              <span className={cn("min-w-0 flex-1 truncate", busy && "text-foreground")}>{line}</span>
+              {showQ && (
+                <Button variant="link" size="sm" onClick={() => send("/questions")}>
+                  Show the open decisions
+                </Button>
+              )}
+              {busy && (
+                <Button variant="outline" size="sm" onClick={() => post("api/stop", {})} className="h-7 text-destructive">
+                  <SquareIcon className="size-3 fill-current" /> Stop
+                </Button>
+              )}
+            </div>
+            <form
+              className="relative rounded-2xl border bg-card shadow-card transition-[border-color,box-shadow] focus-within:border-ring/60 focus-within:ring-[3px] focus-within:ring-ring/20"
+              onSubmit={(e) => {
+                e.preventDefault();
+                submit();
+              }}
+            >
+              {sugg.length > 0 && (
+                <ul role="listbox" aria-label="Commands" className="absolute right-0 bottom-full left-0 z-20 mb-2 max-h-72 overflow-y-auto rounded-xl border bg-popover p-1 shadow-xl">
+                  {sugg.map((c, i) => (
+                    <li key={c.name} role="option" aria-selected={i === sel}>
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)} className={cn("flex w-full items-baseline gap-3 rounded-lg px-2.5 py-1.5 text-left text-sm", i === sel && "bg-muted")}>
+                        <span className="shrink-0 font-mono text-[13px] font-medium whitespace-nowrap">
+                          /{c.name}
+                          {c.args && <span className="text-muted-foreground"> {c.args}</span>}
+                        </span>
+                        <span className="min-w-0 truncate text-xs text-muted-foreground">{c.help}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <label htmlFor="msg" className="sr-only">
+                Your message
+              </label>
+              <textarea
+                id="msg"
+                ref={inputRef}
+                rows={1}
+                value={text}
+                placeholder={status.placeholder || "Ask for an analysis, or type / for commands"}
+                onChange={(e) => onInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (sugg.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                    e.preventDefault();
+                    setSel((s) => (s + (e.key === "ArrowDown" ? 1 : sugg.length - 1)) % sugg.length);
+                    return;
+                  }
+                  if (sugg.length && e.key === "Tab") {
+                    e.preventDefault();
+                    pick(sugg[sel]);
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    if (sugg.length) setSugg([]);
+                    else if (busy) void post("api/stop", {});
+                    return;
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
+                className="block max-h-[40vh] min-h-[52px] w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[14.5px] outline-none placeholder:text-muted-foreground"
+              />
+              <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
+                <span className="truncate pl-1.5 text-xs text-muted-foreground">{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
+                <div className="flex shrink-0 gap-1.5">
+                  {busy && !status.queueMode && (
+                    <Tooltip content="Stops the current step and sends your message now. The same as starting a message with ! in the terminal.">
+                      <Button variant="outline" size="sm" onClick={() => submit(true)} disabled={!text.trim()}>
+                        Stop and send now
+                      </Button>
+                    </Tooltip>
+                  )}
+                  <Button type="submit" size="sm" variant="accent" disabled={!text.trim()} aria-label={busy ? "Send after this step" : "Send"}>
+                    {busy ? "Send after this step" : "Send"}
+                    {!busy && <ArrowUpIcon />}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        {side && (
+          <aside aria-label="Analysis details" className="flex min-h-[50vh] min-w-0 flex-col border-t bg-sidebar/60 lg:min-h-0 lg:border-t-0 lg:border-l">
+            <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+              <Tabs value={tab} onValueChange={setTab} className="min-w-0 flex-1">
+                <TabsList className="w-full">
+                  {TABS.map((t) => (
+                    <TabsTrigger key={t.id} value={t.id}>
+                      {t.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+              <Tooltip content="Hide the side panel">
+                <Button variant="ghost" size="icon-sm" className="hidden lg:inline-flex" onClick={() => setSide(false)} aria-label="Hide the side panel">
+                  <PanelRightCloseIcon />
+                </Button>
+              </Tooltip>
+            </div>
+            <div ref={tabRef} role="tabpanel" className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} dangerouslySetInnerHTML={{ __html: tabHtml }} />
+          </aside>
+        )}
+        {!side && (
+          <Button variant="outline" size="icon-sm" className="fixed top-16 right-4 z-10 hidden shadow-md lg:inline-flex" onClick={() => setSide(true)} aria-label="Show the side panel">
+            <PanelRightOpenIcon />
+          </Button>
+        )}
+      </div>
+
+      <Dialog open={!!light} onOpenChange={(o) => !o && setLight(null)}>
+        <DialogContent wide className="items-center p-4">
+          <DialogTitle className="sr-only">{light?.alt || "Image"}</DialogTitle>
+          {light && <img src={light.src} alt={light.alt} className="max-h-[82vh] max-w-full rounded-lg object-contain" />}
+          {light?.alt && <p className="text-xs text-muted-foreground">{light.alt}</p>}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!wide} onOpenChange={(o) => !o && setWide("")}>
+        <DialogContent wide>
+          <DialogTitle className="sr-only">Table</DialogTitle>
+          <div className="srv max-h-[80vh] overflow-auto" dangerouslySetInnerHTML={{ __html: wide }} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent wide className="bg-background">
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto pr-1">
+            <SettingsPanel ctx={ctx} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

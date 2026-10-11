@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadSettings } from "../core/config.ts";
 import { claudeKey } from "../core/credentials.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
@@ -24,6 +25,7 @@ import { isProgramAction, listPrograms, planByInstall } from "../core/programs.t
 import { dropInstall } from "../ui/programs.ts";
 import { addFor, planFor, reviewFor, runFor, type ProgramHooks } from "../ui/programs.ts";
 import { appPageHtml } from "./app-page.ts";
+import { doctorJson, programsJson, sessionsJson, settingsJson } from "./app-json.ts";
 import { WebView } from "./app-view.ts";
 import { hostAllowed, windowRoutes, type WindowSession } from "./window.ts";
 
@@ -69,7 +71,31 @@ const TYPES: Record<string, string> = {
   ".json": "application/json", ".jsonl": "application/json", ".pdf": "application/pdf", ".html": "text/html; charset=utf-8",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ".tif": "image/tiff", ".tiff": "image/tiff",
+  ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2",
 };
+
+export const UI_DIST = fileURLToPath(new URL("../../ui-dist/", import.meta.url));
+
+function newUiPage(): string | undefined {
+  try {
+    return readFileSync(join(UI_DIST, "index.html"), "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function sendAsset(res: ServerResponse, p: string): boolean {
+  let f: string;
+  try {
+    f = resolve(UI_DIST, "." + decodeURIComponent(p));
+  } catch {
+    return false;
+  }
+  if (!f.startsWith(resolve(UI_DIST, "assets") + sep) || !existsSync(f) || !statSync(f).isFile()) return false;
+  res.writeHead(200, { "content-type": TYPES[extname(f).toLowerCase()] ?? "application/octet-stream", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" });
+  createReadStream(f).pipe(res);
+  return true;
+}
 
 function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((done, fail) => {
@@ -242,7 +268,10 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     const get = req.method === "GET";
     const post = req.method === "POST";
     const c = current;
-    if (get && p === "/") return send(res, 200, appPageHtml(token), "text/html; charset=utf-8");
+    if (get && p === "/") {
+      const page = url.searchParams.get("ui") === "old" ? undefined : newUiPage();
+      return send(res, 200, page ?? appPageHtml(token), "text/html; charset=utf-8");
+    }
     if (p.startsWith("/graph/")) {
       if (!c) return send(res, 404, { error: "no session" });
       url.pathname = p.slice("/graph".length);
@@ -271,6 +300,12 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     }
     if (get && p === "/api/commands") return send(res, 200, commands.map((x) => ({ name: x.name, args: x.args ?? "", help: x.help })));
     if (get && p === "/api/sessions") return send(res, 200, sessionsHtml(listSessions().slice(0, 200), token), "text/html; charset=utf-8");
+    if (get && p === "/api/sessions.json") return send(res, 200, sessionsJson(listSessions().slice(0, 200), token));
+    if (get && p === "/api/settings.json") return send(res, 200, settingsJson(settingCtx(), !!current?.view.busy));
+    if (get && p === "/api/programs.json") {
+      const quick = url.searchParams.get("quick") === "1";
+      return send(res, 200, programsJson(await listPrograms({ ...progHooks(), quick }), { checking: quick }));
+    }
     if (get && p === "/api/thumb") {
       const f = listSessions().find((s) => s.id === url.searchParams.get("id"))?.figure;
       if (!f || !existsSync(f)) return send(res, 404, { error: "no figure" });
@@ -349,6 +384,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       const checks = await (opts.doctor ?? (() => runDoctor({ env })))();
       const ready = canStart(checks);
       const shown = body.all ? checks : checks.filter((x) => x.status !== "ok" && !(ready && HIDE_WHEN_READY.has(x.id)));
+      if (body.json) return send(res, 200, { ...doctorJson(shown, ready), counts: doctorJson(checks, ready).counts });
       return send(res, 200, doctorHtml(shown, ready, checks), "text/html; charset=utf-8");
     }
     if (p === "/api/setting") {
@@ -441,6 +477,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     if (origin && origin !== `http://${host}`) return send(res, 403, { error: "bad origin" });
     const url = new URL(req.url ?? "/", `http://${host}`);
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
+    if (req.method === "GET" && url.pathname.startsWith("/assets/") && sendAsset(res, url.pathname)) return;
     const given = url.searchParams.get("t") ?? req.headers["x-token"];
     if (given !== token) return send(res, 401, { error: "missing or wrong token" });
     try {

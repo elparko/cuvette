@@ -27,15 +27,16 @@
         if (s.setup) return say("Finish the first start. Then open " + folder + ".");
         const r = await fetch(withT("api/open"), { method: "POST", headers: { "content-type": "application/json", "x-token": token() }, body: JSON.stringify({ folder }) });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "HTTP " + r.status);
-        try { page = "session"; } catch (e) {}
-        if (typeof boot === "function") setTimeout(boot, 300);
+        if (window.cuvetteApp) window.cuvetteApp.refresh();
+        else if (typeof boot === "function") { try { page = "session"; } catch (e) {} setTimeout(boot, 300); }
         else location.reload();
       } catch (e) {
         say(e.message || String(e));
       }
     },
     page: (name) => {
-      if (typeof show === "function") show(name);
+      if (window.cuvetteApp) window.cuvetteApp.show(name);
+      else if (typeof show === "function") show(name);
     },
   };
 })();
