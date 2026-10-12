@@ -97,7 +97,7 @@ run_tool(function() {
     tt <- if (lfc > 0) glmTreat(fit, coef = coef, lfc = lfc) else glmQLFTest(fit, coef = coef)
     top <- topTags(tt, n = Inf, sort.by = "none")$table
     pcol <- grep("^PValue", names(top), value = TRUE)[1]
-    out <- data.frame(peak_id = rownames(top), base_mean = 2^top$logCPM, log2_fold_change = top$logFC, std_error = NA_real_, p_value = top[[pcol]], fdr = top$FDR, stringsAsFactors = FALSE)
+    out <- data.frame(peak_id = rownames(top), base_mean = 2^top$logCPM * mean(y$samples$lib.size * y$samples$norm.factors) / 1e6, log2_fold_change = top$logFC, std_error = NA_real_, p_value = top[[pcol]], fdr = top$FDR, stringsAsFactors = FALSE)
     factors <- y$samples$norm.factors * y$samples$lib.size / mean(y$samples$norm.factors * y$samples$lib.size)
   }
   coords <- cnt[match(out$peak_id, id), intersect(c("chr", "start", "end"), names(cnt)), drop = FALSE]
