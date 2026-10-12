@@ -3,6 +3,16 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
+## 11 October 2026
+
+### Known-answer self-test
+
+- An adapter can ship one self-test: a small data set, one tool call and expected values from a published source. The test has `self_test: true` and a `source` in the `tests:` block of `adapter.yaml`. An expectation can have a `label`. See [docs/adapter-spec.md](docs/adapter-spec.md).
+- Ten adapters ship a self-test: astropy, biostats, lme4, metafor, openbabel, proc, pwr, rdkit, scikit-image and vegan.
+- `cuvette doctor` runs the self-test of each installed adapter and shows "Passes" or, for example, "Fails by 0.003 on the t statistic". `--adapter <name>` runs one adapter. `--no-self-test` skips the tests. An adapter whose program is not installed is skipped with a note.
+- The first session with an adapter, and the first one after a change of the adapter version or the package lock, runs the test before the adapter loads. The result goes to the record. Cuvette keeps the result in `cache/self-tests.json`, so the test does not run again.
+- A failed test shows a card before the analysis starts: continue or stop. `CUVETTE_SELF_TEST=0` turns the session test off.
+
 ## 9 October 2026
 
 ### Benchmark

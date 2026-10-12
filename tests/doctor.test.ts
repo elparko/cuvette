@@ -2,8 +2,8 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { adapterDirs, loadAdapter, type Manifest } from "../src/adapters/manifest.ts";
-import { canStart, doctorText, older, rInstallCommand, runDoctor, safeFixes, uvCommand, type Check, type DoctorOpts } from "../src/core/doctor.ts";
+import { adapterDirs, loadAdapter, Manifest as ManifestSchema, type LoadedAdapter, type Manifest } from "../src/adapters/manifest.ts";
+import { canStart, doctorText, older, rInstallCommand, runDoctor, runSelfTests, safeFixes, selfTestText, uvCommand, type Check, type DoctorOpts } from "../src/core/doctor.ts";
 
 const oldHome = process.env.CUVETTE_HOME;
 const oldPath = process.env.PATH;
@@ -204,4 +204,44 @@ test("missing: a program with the same file name is not the adapter's program (l
   expect(byId(await runDoctor(base({ adapters: only })), "program:openms").status).toBe("missing");
   exe(file, "echo 'FileInfo -- Shows basic information about the file.'; echo 'Version: 3.5.0'");
   expect(byId(await runDoctor(base({ adapters: only })), "program:openms")).toMatchObject({ status: "ok", detail: expect.stringContaining("3.5.0") });
+});
+
+function selfTestAdapter(name: string, got: number): LoadedAdapter {
+  const manifest = ManifestSchema.parse({
+    adapter: { name },
+    program: { name },
+    connection: { kind: "cli" },
+    tests: [{ id: "known", self_test: true, source: "Student 1908", calls: [{ tool: "t_test" }], expect: [{ path: "metrics.statistic", label: "the t statistic", approx: -4.0621, abs: 0.0001 }] }],
+  });
+  const tools = async () => [{ name: "t_test", description: "", inputSchema: {}, source: "adapter" as const, execute: async () => ({ ok: true, metrics: { statistic: got } }) }];
+  const a: LoadedAdapter = { manifest, root: "/nowhere", name, standardsText: () => "", skills: () => [], mapEntry: () => undefined, linksFor: () => ({}), module: async () => ({}) };
+  Object.assign(a, { tools });
+  return a;
+}
+
+test("self-tests: pass, fail with the distance, and skip an adapter whose program is missing", async () => {
+  const adapters = [selfTestAdapter("good", -4.0621), selfTestAdapter("drifted", -4.0651), selfTestAdapter("absent", -4.0621)];
+  const checks: Check[] = [{ id: "program:absent", group: "Programs", name: "absent", status: "missing", detail: "absent was not found." }];
+  const started: string[] = [];
+  const start = async (a: LoadedAdapter) => {
+    started.push(a.name);
+    return { programVersion: "1", tools: (a as unknown as { tools: () => Promise<never[]> }).tools, close: async () => {} };
+  };
+  const rows = await runSelfTests(checks, { adapters, start });
+  expect(started.sort()).toEqual(["drifted", "good"]);
+  expect(rows.map((r) => [r.name, r.status, r.detail])).toEqual([
+    ["absent", "skipped", "Skipped. absent was not found."],
+    ["drifted", "fail", "Fails by 0.003 on the t statistic"],
+    ["good", "pass", "Passes"],
+  ]);
+  const text = selfTestText(rows);
+  expect(text).toContain("fail     drifted: Fails by 0.003 on the t statistic");
+  expect(text).toContain("Source: Student 1908");
+  expect(text).toContain("1 pass, 1 fail, 0 could not run, 1 skipped.");
+});
+
+test("self-tests: one adapter only, and a runtime that does not start", async () => {
+  const adapters = [selfTestAdapter("a", -4.0621), selfTestAdapter("b", -4.0621)];
+  const only = await runSelfTests([], { adapters, only: "b", start: async () => { throw new Error("no interpreter"); } });
+  expect(only).toMatchObject([{ name: "b", status: "error", detail: "Could not run: no interpreter" }]);
 });

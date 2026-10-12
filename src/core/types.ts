@@ -13,7 +13,7 @@ export type EntryKind =
   | "finding" | "finding_resolution" | "claim_check"
   | "mode" | "follow_step" | "lab_memory" | "plan" | "plan_approved" | "clarify"
   | "pilot_run" | "pilot_approved" | "pilot_rejected" | "reference" | "validation"
-  | "data_check" | "samples" | "eln_push" | "eln_link" | "setting" | "note" | "notice" | "error" | "usage" | "compaction" | "correction" | "adapter" | "title" | "program" | "trust"
+  | "data_check" | "samples" | "eln_push" | "eln_link" | "setting" | "note" | "notice" | "error" | "usage" | "compaction" | "correction" | "adapter" | "title" | "program" | "trust" | "self_test"
   | "rewind" | "fork" | "branch" | "method" | "phi" | "inspection";
 
 export interface Entry {

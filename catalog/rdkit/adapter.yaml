@@ -315,6 +315,8 @@ checks:
     text: "If n_multi_fragment is above 0, the answer must say how salts were handled."
 tests:
   - id: mini-load
+    self_test: true
+    source: "RDKit Getting Started guide: aspirin molecular weight 180.159."
     description: "Five rows. One SMILES is invalid and one is a salt. Aspirin molecular weight 180.159 is from the RDKit Getting Started guide. The counts are read from the file."
     data: [data/mini.csv]
     calls:
@@ -328,7 +330,7 @@ tests:
       - { path: saved.mols.metrics.n_parsed, equals: 4 }
       - { path: saved.mols.metrics.n_invalid, equals: 1 }
       - { path: saved.mols.metrics.n_multi_fragment, equals: 1 }
-      - { path: "table.rows[0][2]", approx: 180.159, abs: 0.001 }
+      - { path: "table.rows[0][2]", label: "the molecular weight of aspirin", approx: 180.159, abs: 0.001 }
   - id: mini-invalid-stops
     description: With invalid = stop the load fails on the invalid SMILES.
     data: [data/mini.csv]

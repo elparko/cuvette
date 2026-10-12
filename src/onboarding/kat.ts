@@ -12,6 +12,7 @@ export interface TestOutcome {
   durationMs: number;
   outputs: OutputFile[];
   skipped?: string;
+  values?: { expect: KnownAnswerTest["expect"][number]; got: unknown }[];
 }
 
 export interface RuntimeLike {
@@ -185,10 +186,15 @@ async function runOne(
       break;
     }
   }
+  const values: NonNullable<TestOutcome["values"]> = [];
   if (!failures.length) {
-    for (const e of test.expect) failures.push(...judge(e, resolveTarget(e.path, last, saved)));
+    for (const e of test.expect) {
+      const got = resolveTarget(e.path, last, saved);
+      values.push({ expect: e, got });
+      failures.push(...judge(e, got));
+    }
   }
-  return { id: test.id, ok: failures.length === 0, failures, durationMs: Date.now() - started, outputs };
+  return { id: test.id, ok: failures.length === 0, failures, durationMs: Date.now() - started, outputs, values };
 }
 
 export async function runTests(adapter: LoadedAdapter, runtime: RuntimeLike, opts: RunOptions = {}): Promise<TestOutcome[]> {

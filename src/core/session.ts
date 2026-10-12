@@ -49,6 +49,7 @@ import { branchesOf, branchSession, compareRows, findBranch, openRecord, type Br
 import { Findings, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
+import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
 import { changeRows, fileSha, liveReasons, recordReasons, replacedNode, stepStatus, type Current, type Reason, type RerunData, type StepState } from "./status.ts";
 import { scriptPython } from "../tools/run_script.ts";
 import {
@@ -218,6 +219,7 @@ export class Session {
   runtimes: AdapterRuntime[] = [];
   adapterInfo: { name: string; title: string; version: string; programVersion: string; trust?: string }[] = [];
   private codeAsks = new Map<string, string>();
+  private selfTestAsks = new Map<string, string>();
   pick = false;
   setupPreset: Record<string, unknown> = {};
   history: Message[] = [];
@@ -685,6 +687,42 @@ export class Session {
     return { ok: true, text: `The program is now ${a.manifest.program.name} through ${a.name}. The agent uses it from the next step.` };
   }
 
+  private async selfTestGate(a: LoadedAdapter, names: string[]): Promise<string | undefined> {
+    if (!selfTestEnabled()) return undefined;
+    const done = await selfTestFor(a, this.runtimes.at(-1)!).catch(() => undefined);
+    if (!done) return undefined;
+    const { result, cached } = done;
+    this.record.append("self_test", { adapter: a.name, cached, ...result });
+    if (result.status === "error") this.record.append("notice", { text: `The self-test of the adapter ${a.name} did not run. ${result.message}.` });
+    if (result.status !== "fail") return undefined;
+    let q = this.selfTestAsks.has(a.name) ? this.questions.get(this.selfTestAsks.get(a.name)!) : undefined;
+    if (!q) {
+      q = await this.questions.ask(warningCard(a.name, result));
+      this.selfTestAsks.set(a.name, q.qid);
+      this.bus.emit({ type: "question", question: q });
+      this.record.append("blocked", { tool: "use_adapter", reason: `waiting for the scientist: self-test of ${a.name}`, qid: q.qid });
+    }
+    if (q.status === "open" && this.settings.askWaits) {
+      this.waitedQids.add(q.qid);
+      this.bus.emit({ type: "status", state: "waiting", tool: "use_adapter" });
+      try {
+        await abortable(this.questions.wait(q.qid), this.abort?.signal);
+      } catch {}
+      q = this.questions.get(q.qid) ?? q;
+    }
+    if (q.answer === "continue") {
+      this.record.append("notice", { text: `The scientist continued with the adapter ${a.name} after the self-test failed: ${result.message}.` });
+      return undefined;
+    }
+    const rt = this.runtimes.pop();
+    await rt?.close().catch(() => {});
+    this.runtimeInfo.pop();
+    this.adapterInfo.pop();
+    this.envTargets.delete(a.name);
+    for (const n of names) this.tools.delete(n);
+    return q.status === "open" ? `BLOCKED: the self-test of ${a.name} failed (${result.message}). Question ${q.qid} waits for the scientist: continue or stop.` : `The adapter ${a.name} is not loaded. Its self-test failed (${result.message}) and the scientist stopped it.`;
+  }
+
   private async confirmUnlistedCode(a: LoadedAdapter): Promise<string | undefined> {
     const t = adapterTrust(a.root);
     if (t.codeConfirmed) return undefined;
@@ -739,6 +777,8 @@ export class Session {
       this.record.append("notice", { text: msg });
       return { ok: false, error: msg };
     }
+    const stopped = await this.selfTestGate(a, names);
+    if (stopped) return { ok: false, error: stopped };
     this.adapters.push(a);
     const added = this.decisions.addAdapter(a, this.setupPreset);
     const planned = this.activePlan();

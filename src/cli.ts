@@ -71,7 +71,10 @@ Usage
   setting wins over a user setting. If the folder is read-only, the session folder goes to
   ~/.cuvette/projects/.
 
-  cuvette doctor [--fix]               check Node, the model, the Python environments, R, Java and each adapter's program;
+  cuvette doctor [--fix] [--adapter <name>] [--no-self-test]
+                                       check Node, the model, the Python environments, R, Java and each adapter's program;
+                                       then run the known-answer test of each adapter, for example "Fails by 0.003 on the t statistic";
+                                       --adapter checks and tests one adapter only; --no-self-test skips the tests;
                                        --fix installs the missing Python environments and R packages after it asks
   cuvette programs                     list each adapter with its program: status, version, size, last use, access
   cuvette programs install|update|remove|check <adapter>
@@ -197,6 +200,7 @@ const { values: o, positionals: pos } = parseArgs({
     plan: { type: "boolean" },
     "no-plan": { type: "boolean" },
     fix: { type: "boolean" },
+    "no-self-test": { type: "boolean" },
     "no-open": { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
@@ -579,9 +583,20 @@ async function main() {
       const dr = await import("./core/doctor.ts");
       const tty = process.stderr.isTTY;
       const progress = (t: string) => tty && process.stderr.write(`\rChecking ${t}...`.padEnd(40));
-      let checks = await dr.runDoctor({ onProgress: progress });
+      const only = (o.adapter as string[] | undefined)?.[0];
+      const { adapterDirs, loadAdapter } = await import("./adapters/manifest.ts");
+      if (only && !adapterDirs()[only]) return fail(`no adapter named ${only}. cuvette adapters lists the names.`);
+      const scope = only ? { adapters: { [only]: loadAdapter(adapterDirs()[only]!).manifest } } : {};
+      let checks = await dr.runDoctor({ onProgress: progress, ...scope });
       if (tty) process.stderr.write("\r".padEnd(41) + "\r");
       console.log(dr.doctorText(checks));
+      let selfTestFailed = false;
+      if (!o["no-self-test"]) {
+        const rows = await dr.runSelfTests(checks, { only, onProgress: (t) => tty && process.stderr.write(`\rTesting ${t}...`.padEnd(40)) });
+        if (tty) process.stderr.write("\r".padEnd(41) + "\r");
+        console.log(`\n${dr.selfTestText(rows)}`);
+        selfTestFailed = rows.some((r) => r.status === "fail");
+      }
       if (o.fix) {
         const cmds = dr.safeFixes(checks);
         if (!cmds.length) console.log("\nNothing to install: no Python environment or R package set is missing that --fix can install.");
@@ -600,7 +615,7 @@ async function main() {
           console.log(`\nAfter the install:\n${dr.doctorText(checks, { only: ["missing", "old"] })}`);
         }
       }
-      process.exitCode = dr.canStart(checks) ? 0 : 1;
+      process.exitCode = dr.canStart(checks) && !selfTestFailed ? 0 : 1;
       return;
     }
     case "programs": {

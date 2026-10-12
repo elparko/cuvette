@@ -48,6 +48,7 @@ is the Student (1908) sleep data in `samples/sleep/` (public domain).
 ```bash
 node bin/cuvette.js doctor          # ok, missing or old for Node, the model, Python, R, Java and each program
 node bin/cuvette.js doctor --fix    # asks once, then installs the missing Python environments and R packages
+node bin/cuvette.js doctor --adapter pwr   # checks one adapter and runs its known-answer self-test
 ```
 
 For each item that is missing or old, `cuvette doctor` shows the install command or a download link.
