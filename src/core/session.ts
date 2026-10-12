@@ -898,6 +898,8 @@ export class Session {
     let repeats = 0;
     let forceAnswer = false;
     const turnStart = this.record.entries().length;
+    let results: Part[] = [];
+    this.summaryFailed = false;
     try {
       await this.nameFolder(text);
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
@@ -934,6 +936,12 @@ export class Session {
         if (!calls.length && this.steered.length) {
           if (said) this.record.append("assistant", { text: said, final: false });
           this.push({ role: "user", parts: [{ type: "text", text: this.takeSteer() }] });
+          continue;
+        }
+        if (!calls.length && res.stopReason === "max_tokens" && nudges < 2 && !forceAnswer) {
+          nudges++;
+          if (said) this.record.append("assistant", { text: said, final: false });
+          this.push({ role: "user", parts: [{ type: "text", text: "[Notes from the harness]\n- The output limit stopped your last reply before its end. If it had a tool call, that call did not run. Do the step again, shorter: one tool call with short inputs, or the complete answer in fewer words." }] });
           continue;
         }
         if (!calls.length && nudges < 2 && !forceAnswer && (this.pilotStage || this.needsValidation())) {
@@ -993,7 +1001,7 @@ export class Session {
         }
         if (said) this.record.append("assistant", { text: said, final: false });
         nudges = 0;
-        const results: Part[] = [];
+        results = [];
         for (const call of calls) {
           if (signal.aborted) {
             results.push({ type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist stopped the turn.", isError: true });
@@ -1018,6 +1026,7 @@ export class Session {
         if (pending) results.push({ type: "text", text: pending } as Part);
         if (this.steered.length) results.push({ type: "text", text: this.takeSteer() } as Part);
         this.push({ role: "user", parts: results });
+        results = [];
         if (this.stopTurn) {
           this.stopTurn = false;
           this.record.append("notice", { text: "You cancelled the plan. No analysis step ran." });
@@ -1038,7 +1047,7 @@ export class Session {
     } catch (e) {
       const msg = e instanceof ProviderError ? e.message : signal.aborted ? "Stopped." : `${(e as Error).name}: ${(e as Error).message}`;
       this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg } : { message: msg });
-      this.closeOpenCalls();
+      this.closeOpenCalls(results);
       if (this.draft) {
         const { answer } = this.draft;
         this.draft = undefined;
@@ -1066,13 +1075,15 @@ export class Session {
 
   private async stepWithRecovery(noTools: boolean, signal: AbortSignal): Promise<StepResult> {
     let rounds = 0;
+    let compacted = false;
     for (;;) {
       let retried = false;
       try {
         const res = await this.provider.step({
           system: this.system,
           messages: this.history,
-          tools: noTools ? [] : this.activeSchemas(),
+          tools: this.activeSchemas(),
+          noToolCalls: noTools,
           signal,
           onDelta: (d) => this.bus.emit({ type: "delta", kind: d.type, text: d.text }),
           onRetry: (r) => {
@@ -1085,6 +1096,13 @@ export class Session {
         if (retried) this.bus.emit({ type: "status", state: "thinking" });
         return res;
       } catch (e) {
+        if (e instanceof ProviderError && e.overflow && !compacted && !signal.aborted) {
+          compacted = true;
+          if (await this.maybeCompact(signal, true)) {
+            this.record.append("notice", { text: "The context was too long for the model. The harness summarized the older messages and tries again." });
+            continue;
+          }
+        }
         if (!(e instanceof ProviderError) || !e.transient || signal.aborted) throw e;
         this.record.append("notice", { text: "The model did not answer after three tries. The conversation is saved up to the last finished step." });
         if (this.settings.headless) {
@@ -1181,12 +1199,13 @@ export class Session {
     }
   }
 
-  private closeOpenCalls() {
+  private closeOpenCalls(done: Part[] = []) {
     const last = this.history[this.history.length - 1];
     if (last?.role !== "assistant") return;
     const calls = last.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
+    const ran = (id: string) => done.find((p) => p.type === "tool_result" && p.callId === id);
     if (calls.length)
-      this.push({ role: "user", parts: calls.map((c) => ({ type: "tool_result", callId: c.id, name: c.name, text: "ERROR: not run. The turn stopped.", isError: true })) });
+      this.push({ role: "user", parts: calls.map((c) => ran(c.id) ?? { type: "tool_result", callId: c.id, name: c.name, text: "ERROR: not run. The turn stopped.", isError: true }) });
   }
 
   private push(m: Message) {
@@ -1209,21 +1228,30 @@ export class Session {
   // is shortened in the live history only. Above SUMMARIZE_AT, the older messages are summarized.
   // The latest request and the recent messages stay as they are, also inside one long turn.
   private request?: Message;
+  private summaryFailed = false;
 
-  private async maybeCompact(signal: AbortSignal, force = false) {
+  private async maybeCompact(signal: AbortSignal, force = false): Promise<boolean> {
     const win = this.provider.info.contextWindow;
     const size = () => estimateTokens(this.history, this.system, this.activeSchemas());
-    if (!force && size() <= win * ELIDE_AT) return;
+    if (!force && size() <= win * ELIDE_AT) return false;
     if (!force) {
       const { messages, elided } = elideOld(this.history, win);
       if (elided) {
         this.history = messages;
         this.record.append("notice", { text: `The harness shortened ${elided} older tool output(s) in the context. The record keeps the full output.`, elided });
       }
-      if (size() <= win * SUMMARIZE_AT) return;
+      if (this.summaryFailed || size() <= win * SUMMARIZE_AT) return false;
     }
-    const res = await summarizeOld(this.history, this.provider, win, signal, this.request);
-    if (!res) return;
+    let res: Awaited<ReturnType<typeof summarizeOld>>;
+    try {
+      res = await summarizeOld(this.history, this.provider, win, signal, this.request);
+    } catch (e) {
+      if (signal.aborted) throw e;
+      this.summaryFailed = true;
+      this.record.append("notice", { text: `The harness could not summarize the older messages: ${(e as Error).message} The turn continues with the full context.` });
+      return false;
+    }
+    if (!res) return false;
     const steps = this.plan?.steps.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`) ?? [];
     const summary = summaryMessage(steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary);
     const upTo = this.record.entries(["message"]).at(-1)?.id ?? 0;
@@ -1233,6 +1261,7 @@ export class Session {
     for (const m of rest) this.record.append("message", { message: m as unknown as Record<string, unknown> });
     this.phiFrom = this.history.length;
     this.contextWarned = false;
+    return true;
   }
 
   // ------------------------------------------------------------- patient identifiers
@@ -1597,7 +1626,7 @@ export class Session {
     this.record.append("tool_call", { callId: call.id, tool: call.name, adapter: tool?.adapter, args: call.args as Record<string, unknown> });
     this.bus.emit({ type: "status", state: "running", tool: call.name, purpose: activity(call.name, (call.args ?? {}) as Args, tool?.source === "adapter" ? tool.title : undefined), since: Date.now() });
     if (call.parseError) return this.fail(call.id, call.name, `the arguments are not valid JSON: ${call.parseError}`);
-    if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use find_tools to search.`);
+    if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use only these tools: ${this.activeSchemas().map((t) => t.name).join(", ")}.${this.active.has("find_tools") ? " To find more tools, call find_tools." : ""}`);
     if (!this.active.has(tool.name)) this.active.add(tool.name);
     const args = dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema);
     if (!ownPurpose(tool)) delete args.purpose;
@@ -1841,7 +1870,8 @@ export class Session {
     const vis = cloud ? (adapter?.manifest.data_rules.cloud_visibility ?? "all") : "all";
     const small = this.provider.info.small;
     const limit = small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;
-    if (o.text && !o.metrics && !o.table && !o.outputs?.length && vis === "all") return { text: o.text.slice(0, limit) };
+    if (o.text && !o.metrics && !o.table && !o.outputs?.length && vis === "all")
+      return { text: o.text.length > limit ? `${o.text.slice(0, limit)}\n[The harness cut ${o.text.length - limit} characters. Write long output to a file and read it in parts.]` : o.text };
     const obj: Record<string, unknown> = { ok: o.ok };
     if (o.error) obj.error = o.error;
     if (o.summary) obj.summary = o.summary;

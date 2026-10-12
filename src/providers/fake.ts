@@ -5,6 +5,7 @@ export interface FakeStep {
   text?: string;
   thinking?: string;
   calls?: { name: string; args: unknown }[];
+  stop?: "max_tokens";
 }
 
 export type FakeStepFn = (messages: Message[], tools: ToolSchema[]) => FakeStep;
@@ -35,7 +36,7 @@ export class FakeProvider implements Provider {
   }
 
   async step(req: StepRequest): Promise<StepResult> {
-    this.requests.push({ system: req.system, tools: req.tools, messages: [...req.messages] });
+    this.requests.push({ system: req.system, tools: req.noToolCalls ? [] : req.tools, messages: [...req.messages] });
     const i = this.index++;
     const s: FakeStep = typeof this.steps === "function" ? this.steps(req.messages, req.tools) : (this.steps[i] ?? { text: "done" });
     const parts: Message["parts"] = [];
@@ -52,7 +53,7 @@ export class FakeProvider implements Provider {
     return {
       message: { role: "assistant", parts, provider: "fake", model: "fake" },
       usage: { inputTokens: Math.ceil(chars / 4), outputTokens: Math.ceil(JSON.stringify(parts).length / 4) },
-      stopReason: s.calls?.length ? "tool_use" : "end",
+      stopReason: s.stop ?? (s.calls?.length ? "tool_use" : "end"),
     };
   }
 

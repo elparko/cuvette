@@ -121,6 +121,7 @@ export interface StepRequest {
   system: string;
   messages: Message[];
   tools: ToolSchema[];
+  noToolCalls?: boolean;
   signal?: AbortSignal;
   onDelta?: (d: { type: "text" | "thinking"; text: string }) => void;
   onRetry?: (r: { attempt: number; of: number; waitMs: number; reason: string }) => void;
@@ -141,10 +142,12 @@ export interface Provider {
 }
 
 export class ProviderError extends Error {
-  constructor(message: string, readonly transient = false) {
+  constructor(message: string, readonly transient = false, readonly overflow = false) {
     super(message);
   }
 }
+
+export const CONTEXT_OVERFLOW = /prompt is too long|too many (?:input )?tokens|context (?:window|length)|maximum context/i;
 
 // ---------------------------------------------------------------- tools
 

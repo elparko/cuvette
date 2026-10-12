@@ -192,6 +192,25 @@ describe("claude", () => {
     expect(calls[2].api).toBe("stream");
   });
 
+  test("marks a prompt that is too long, so that the session can summarize and try again", async () => {
+    const long = new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "prompt is too long: 1200000 tokens > 1000000 maximum" } } as any, undefined, new Headers());
+    const other = new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "messages.0: bad field" } } as any, undefined, new Headers());
+    const flags: boolean[] = [];
+    for (const e of [long, other]) {
+      const { client } = fakeClient([e]);
+      await new ClaudeProvider("claude-opus-5-5", { client, retries: 0 }).step(req([user("x")])).catch((err) => flags.push(err.overflow));
+    }
+    expect(flags).toEqual([true, false]);
+  });
+
+  test("a forced answer keeps the tools, so the history with tool calls stays valid and cached, and sets tool_choice none", async () => {
+    const { client, calls } = fakeClient([claudeMsg([{ type: "text", text: "ok" }])]);
+    const tools = [{ name: "add", description: "Add.", inputSchema: { type: "object", properties: {} } }];
+    await new ClaudeProvider("claude-opus-5-5", { client }).step({ ...req([user("x")]), tools, noToolCalls: true });
+    expect(calls[0].params.tools).toHaveLength(1);
+    expect(calls[0].params.tool_choice).toEqual({ type: "none" });
+  });
+
   test("maps SDK errors to ProviderError", async () => {
     const auth = new Anthropic.AuthenticationError(401, {} as any, "nope", new Headers());
     const rate = new Anthropic.RateLimitError(429, {} as any, "slow", new Headers());

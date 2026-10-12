@@ -1,5 +1,5 @@
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
-import { ProviderError } from "../core/types.ts";
+import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
 import { RETRIES, withRetry, type Sleep } from "./retry.ts";
@@ -85,12 +85,13 @@ export class OpenAIProvider implements Provider {
         msg = j.error?.message ?? j.error ?? txt;
       } catch {}
       if (res.status === 401 || res.status === 403) throw new ProviderError("The model server rejected the credentials. Set OPENAI_API_KEY.");
-      throw new ProviderError(`Model server error ${res.status}: ${String(msg).slice(0, 300)}`);
+      throw new ProviderError(`Model server error ${res.status}: ${String(msg).slice(0, 300)}`, false, res.status === 400 && CONTEXT_OVERFLOW.test(String(msg)));
     }
     return res.json();
   }
 
-  async step(req: StepRequest): Promise<StepResult> {
+  async step(input: StepRequest): Promise<StepResult> {
+    const req = input.noToolCalls ? { ...input, tools: [] } : input;
     const body: Record<string, unknown> = { model: this.model, messages: this.toNative(req.system, req.messages), stream: false };
     if (req.tools.length)
       body.tools = req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));

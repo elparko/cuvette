@@ -1580,3 +1580,76 @@ test("the plan card carries the cost estimate for the model, and a local model s
   expect(estimates[0]).toMatch(/^About \$\d+\.\d{2} to \$\d+\.\d{2} with Sonnet\./);
   expect(estimates[1]).toBe("Free: runs on this computer.");
 });
+
+test("a reply cut at the output limit gets a note to continue, not a final answer", async () => {
+  const provider = new FakeProvider([{ text: "The counts are", stop: "max_tokens" }, { text: "All done." }]);
+  session = await recoverySession(provider, { guidance: false });
+  const answer = await session.send("go");
+  expect(answer).toBe("All done.");
+  const sent = provider.requests[1]!.messages.at(-1)!.parts[0] as { text: string };
+  expect(sent.text).toMatch(/output limit stopped your last reply/);
+});
+
+test("a context that is too long is summarized once and the step runs again", async () => {
+  const provider = new FakeProvider([{ text: "All done." }]);
+  const step = provider.step.bind(provider);
+  let n = 0;
+  provider.step = async (req) => {
+    if (n++ === 0) throw new ProviderError("Claude rejected the request: prompt is too long", false, true);
+    return step(req);
+  };
+  session = await recoverySession(provider, { guidance: false });
+  const forced: boolean[] = [];
+  session["maybeCompact"] = async (_s: AbortSignal, force = false) => (forced.push(force), force);
+  expect(await session.send("go")).toBe("All done.");
+  expect(forced.filter(Boolean)).toHaveLength(1);
+  expect(session.record.entries(["notice"]).some((e) => /too long for the model/.test(String(e.data.text)))).toBe(true);
+});
+
+test("a context that stays too long stops the turn with the error and no loop", async () => {
+  const provider = new FakeProvider([{ text: "never" }]);
+  let n = 0;
+  provider.step = async () => {
+    n++;
+    throw new ProviderError("Claude rejected the request: prompt is too long", false, true);
+  };
+  session = await recoverySession(provider, { guidance: false });
+  session["maybeCompact"] = async (_s: AbortSignal, force = false) => force;
+  await session.send("go");
+  expect(n).toBe(2);
+  expect(session.record.entries(["error"]).map((e) => String(e.data.message))).toEqual(["Claude rejected the request: prompt is too long"]);
+});
+
+test("if the turn fails after one of two calls, the call that ran keeps its result", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }, { name: "note", args: { text: "x" } }] }, { text: "All done." }]);
+  session = await recoverySession(provider, { guidance: false });
+  const run = session["runCall"].bind(session);
+  let n = 0;
+  session["runCall"] = async (call: never, signal: AbortSignal) => {
+    if (n++ === 1) throw new Error("hook failed");
+    return run(call, signal);
+  };
+  await session.send("go");
+  const last = session["history"].at(-1)!.parts as { text: string; isError?: boolean }[];
+  expect(last).toHaveLength(2);
+  expect(last[0]!.isError).toBeFalsy();
+  expect(last[0]!.text).not.toMatch(/not run/);
+  expect(last[1]!.text).toMatch(/not run/);
+});
+
+test("a long plain text result says that the harness cut it", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  writeFileSync(join(cwd, "long.txt"), "x".repeat(500));
+  const provider = new FakeProvider([{ calls: [{ name: "read_file", args: { path: join(cwd, "long.txt") } }] }, { text: "All done." }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, maxResultChars: 100, phi_check: false } as never });
+  session.decisions.applySetup({});
+  await session.send("read long.txt");
+  expect(lastToolText(provider)).toMatch(/The harness cut \d+ characters/);
+});
+
+test("a call to an unknown tool names the tools that exist", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "nope", args: {} }] }, { text: "All done." }]);
+  session = await recoverySession(provider, { guidance: false });
+  await session.send("go");
+  expect(lastToolText(provider)).toMatch(/no tool named nope\. Use only these tools: .*\bstate\b/);
+});
