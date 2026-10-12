@@ -436,6 +436,7 @@ export class WebView {
             this.seq = SEQ_START;
             return this.keep(slot);
           }
+          if (!act) s.answerLater?.([q.qid]);
           break;
         }
         const value = a === "sheet" ? { rows: sheetRows(f, q) } : a === "answer" ? q.options[Number(body.value)]?.value : a === "recommend" ? q.recommendation?.value : str("other");

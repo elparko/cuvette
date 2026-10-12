@@ -67,7 +67,7 @@ export function closesCard(en: Entry, c: Card): boolean {
   if (en.kind === "permission") return c.t === "permission" && c.rid === en.data.rid;
   if (en.kind === "phi") return c.t === "phi" && c.rid === en.data.rid;
   if (en.kind === "follow_step") return c.t === "instruction" && c.step === en.data.step;
-  if (en.kind === "clarify" && en.data.action === "answered") return c.t === "clarify";
+  if (en.kind === "clarify" && (en.data.action === "answered" || en.data.action === "stopped")) return c.t === "clarify";
   if (en.kind === "plan_approved" || en.kind === "pilot_approved" || en.kind === "pilot_rejected" || (en.kind === "plan" && PLAN_ENDS.includes(String(en.data.action)))) return c.t === "plan";
   return false;
 }
@@ -305,7 +305,7 @@ export function changeRows(session: SessionLike): ChangeRow[] {
   const asked = new Map<string, Question>();
   for (const e of session.record.entries(["question"])) asked.set(String(e.data.qid), e.data as unknown as Question);
   const last = new Map<string, { value: unknown; id: number }>();
-  for (const e of session.record.entries(["answer"])) last.set(String(e.data.qid), { value: e.data.value, id: e.id });
+  for (const e of session.record.entries(["answer"])) if (!e.data.withdrawn) last.set(String(e.data.qid), { value: e.data.value, id: e.id });
   const rows: (ChangeRow & { at: number })[] = [];
   const keys = new Set<string>();
   for (const [qid, a] of last) {

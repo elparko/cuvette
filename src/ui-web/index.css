@@ -744,21 +744,11 @@
   position: relative;
 }
 .srv .step::before {
-  content: "";
-  position: absolute;
-  left: -1px;
-  top: 10px;
-  bottom: 10px;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--ok);
+  content: none;
 }
 .srv .step.bad {
   background: var(--warn-bg);
-  border-color: transparent;
-}
-.srv .step.bad::before {
-  background: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
 }
 .srv .step.minor {
   padding: 6px 12px;
@@ -932,7 +922,8 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--card);
-  box-shadow: inset 0 3px 0 var(--tone), 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
+  border-color: color-mix(in srgb, var(--tone) 28%, var(--border));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
   --tone: var(--info);
   --tone-bg: var(--info-bg);
 }

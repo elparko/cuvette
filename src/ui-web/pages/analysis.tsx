@@ -571,8 +571,9 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               const sc = scrollRef.current!;
               const up = sc.scrollTop < lastTop.current;
               lastTop.current = sc.scrollTop;
-              if (sc.scrollHeight - sc.scrollTop - sc.clientHeight < 80) follow.current = true;
-              else if (up) follow.current = false;
+              const gap = sc.scrollHeight - sc.scrollTop - sc.clientHeight;
+              if (up && gap >= 2) follow.current = false;
+              else if (gap < 80) follow.current = true;
             }}
             onWheel={(e) => {
               if (e.deltaY < 0) follow.current = false;

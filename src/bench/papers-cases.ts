@@ -340,7 +340,7 @@ function answerDraftIds(entries: Entry[]): Set<number> {
 
 export function transcriptHtml(ctx: RunCtx, c: CaseSpec | undefined, finalText: string): string {
   const { entries, san } = ctx;
-  const answers = new Map(entries.filter((e) => e.kind === "answer").map((e) => [String(e.data.qid), e]));
+  const answers = new Map(entries.filter((e) => e.kind === "answer" && !e.data.withdrawn).map((e) => [String(e.data.qid), e]));
   const results = new Map(entries.filter((e) => e.kind === "tool_result").map((e) => [e.id, e]));
   const nodeByEntry = new Map(ctx.nodes.map((n) => [n.entry, n]));
   const drafts = answerDraftIds(entries);

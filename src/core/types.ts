@@ -228,7 +228,7 @@ export interface Question {
   default?: unknown;
   timeoutS?: number;
   useDefaultOnTimeout?: boolean;
-  status: "open" | "answered" | "timed_out" | "defaulted";
+  status: "open" | "answered" | "timed_out" | "defaulted" | "withdrawn";
   answer?: unknown;
   created: string;
   answered?: string;

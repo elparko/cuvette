@@ -141,6 +141,7 @@ export class Mapper {
       case "answer": {
         const qid = String(d.qid);
         const q = { qid, title: this.titles.get(qid) ?? `Answer to ${qid}`, options: this.options.get(qid) ?? [] };
+        if (d.withdrawn) return line("▸", `Closed with no answer: ${q.title}. ${d.note ?? ""}`.trim(), "cyan");
         if (d.changed) return line("✎", `Changed ${q.title.replace(/[?:]$/, "")}: ${optionLabel(q, d.old)} → ${optionLabel(q, d.value)} · /change ${qid}`, "cyan");
         return [{ key, t: "line", sym: "✓", color: "green", text: answerLine(q, d.value), change: qid }];
       }

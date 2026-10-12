@@ -30,7 +30,6 @@ export function ModeMenu({ mode }: { mode: string }) {
               <span className="flex flex-1 flex-col">
                 <span className="font-medium">
                   {x.name}
-                  <span className="sr-only">.</span>
                 </span>
                 <span className="text-xs text-muted-foreground">{x.help}</span>
               </span>

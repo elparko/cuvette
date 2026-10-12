@@ -56,6 +56,11 @@ describe("md", () => {
 });
 
 describe("liveHtml", () => {
+  test("the cursor goes inside the last table cell, not on a line of its own", () => {
+    const html = liveHtml("a\n\n| g | n |\n|---|---|\n| c | 12 |");
+    expect(html).toMatch(/12<span class="caret" aria-hidden="true"><\/span><\/td><\/tr><\/tbody><\/table>$/);
+  });
+
   test("the caret sits inside the last paragraph", () => {
     expect(liveHtml("Hello **wor")).toBe('<p>Hello **wor<span class="caret" aria-hidden="true"></span></p>');
   });
