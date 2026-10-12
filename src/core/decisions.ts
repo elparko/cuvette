@@ -79,6 +79,19 @@ export const TEST_DECISIONS: Decision[] = [
   }),
 ];
 
+export const REPORTING_DECISION: Decision = Decision.parse({
+  key: "reporting_guideline",
+  label: "Reporting guideline",
+  kind: "choice",
+  choices: ["arrive", "consort", "strobe", "miqe"],
+  owner: "human",
+  group: "Report",
+  stage: "when_needed",
+  help: "The guideline for the reporting checklist. arrive: animal studies. consort: randomized trials. strobe: observational studies. miqe: qPCR. Set it with /checklist.",
+});
+
+const HIDDEN_FROM_AGENT = new Set([ADAPTER_DECISION.key, REPORTING_DECISION.key]);
+
 export function getPath(obj: unknown, path: string): unknown {
   let cur: any = obj;
   for (const part of path.split(".")) {
@@ -467,7 +480,7 @@ export class DecisionRecord {
   }
 
   brief(keys?: string[]): string {
-    const fields = this.fields().filter((f) => (!keys || keys.includes(f.key)) && f.key !== ADAPTER_DECISION.key);
+    const fields = this.fields().filter((f) => (!keys || keys.includes(f.key)) && !HIDDEN_FROM_AGENT.has(f.key));
     const lines: string[] = [];
     const groups = new Map<string, DecisionField[]>();
     for (const f of fields.filter((f) => f.set)) groups.set(f.group, [...(groups.get(f.group) ?? []), f]);

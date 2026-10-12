@@ -1,3 +1,4 @@
+import { CHECKLIST_COLUMNS, checklistRows, recordChecklist } from "./checklist.ts";
 import { pilotRows, validationRows } from "./pilot.ts";
 import { AFTER_RESULT, NO_DEVIATIONS, deviations, frozenPlan } from "./freeze.ts";
 import { approvedPlan, definitionsOf } from "./plan.ts";
@@ -538,6 +539,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const pilot = pilotRows(record);
   const validation = validationRows(record);
   const tests = testsTable(record);
+  const checklist = recordChecklist(record);
   return [
     { name: "Summary", columns: ["Section", "Item", "Value", "Source", "Definition"], rows: summary },
     ...(pilot.rows.length ? [{ name: "Pilot", columns: pilot.columns, rows: pilot.rows }] : []),
@@ -550,6 +552,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     ...(metricRows.length ? [{ name: "Metrics", columns: ["Step", "Metric", "Value"], rows: metricRows }] : []),
     { name: "Files", columns: ["Step", "Kind", "Path", "Copied from"], rows: fileRows },
     ...(changeRowsOut.length ? [{ name: "Changes", columns: ["Step", "Repeats step", "Tool", "Number", "Before", "After", "Change", "Change shown", "Why it ran again"], rows: changeRowsOut }] : []),
+    ...(checklist ? [{ name: "Checklist", columns: CHECKLIST_COLUMNS, rows: checklistRows(checklist) }] : []),
     ...(packageRows.length ? [{ name: "Packages", columns: ["Environment", "Language", "Package", "Version", "Path", "Lock"], rows: packageRows }] : []),
     referenceSheet(record, adapters, w.citationStyle),
   ];

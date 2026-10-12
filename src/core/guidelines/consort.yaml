@@ -1,0 +1,168 @@
+id: consort
+name: "CONSORT 2010"
+full: "Consolidated Standards of Reporting Trials, 2010"
+reference: "Schulz KF, et al. BMJ 340:c332 (2010)"
+guess:
+  adapters: [trial-endpoints]
+  words: "\\b(randomi[sz]ed|trial|arms?|placebo|intention.to.treat|participants?|allocation)\\b"
+items:
+  - id: 2b
+    section: "Introduction"
+    text: "Give the specific objectives or hypotheses."
+    from:
+      - { plan: question }
+      - { decision: [question] }
+  - id: 3a
+    section: "Trial design"
+    text: "Describe the trial design, with the allocation ratio."
+    from:
+      - { plan: restatement }
+    ask: "The record has no description of the trial design. Add it?"
+  - id: 3b
+    section: "Trial design"
+    text: "Report each change to the design after the trial began, with the reason."
+    from:
+      - { plan_changes: true }
+    ask: "The record does not say if the design changed. Add it?"
+  - id: 4a
+    section: "Participants"
+    text: "Give the eligibility criteria of the participants."
+    hand: "The record holds the analysis, not the enrolment. Add the criteria by hand."
+  - id: "5"
+    section: "Interventions"
+    text: "Describe the intervention of each group, with enough detail to repeat it."
+    hand: "The record holds the analysis, not the intervention. Add the details by hand."
+  - id: 6a
+    section: "Outcomes"
+    text: "Define the primary and secondary outcome measures, with the time of each."
+    from:
+      - { decision: [endpoint_definition, outcome, primary_outcome, time_horizon] }
+      - { plan: definitions }
+    ask: "The record has no outcome definition. Add it?"
+  - id: 6b
+    section: "Outcomes"
+    text: "Report each change to the outcomes after the trial began, with the reason."
+    from:
+      - { plan_changes: true }
+    ask: "The record does not say if the outcomes changed. Add it?"
+  - id: 7a
+    section: "Sample size"
+    text: "Say how you decided the sample size."
+    from:
+      - { decision: [power, sample_size, effect_source, ni_margin] }
+    ask: "The record has no sample size calculation. Add it?"
+  - id: 7b
+    section: "Sample size"
+    text: "If it applies, describe the interim analyses and the rules to stop the trial."
+    from:
+      - { decision: [interim_analysis, stopping_rule] }
+    ask: "The record has no interim analysis. Add it, or answer not applicable?"
+  - id: 8a
+    section: "Randomisation"
+    text: "Describe the method that made the random allocation sequence."
+    from:
+      - { decision: [randomization, randomisation, randomization_method, allocation_method] }
+    ask: "The record has no randomization method. Add it?"
+  - id: 8b
+    section: "Randomisation"
+    text: "Give the type of randomization, with the details, such as blocks and their size."
+    from:
+      - { decision: [randomization_type, block_size, stratum_column, cox_strata] }
+    ask: "The record has no type of randomization. Add it?"
+  - id: "9"
+    section: "Randomisation"
+    text: "Describe the method that kept the allocation sequence hidden until the groups were set."
+    from:
+      - { decision: [allocation_concealment, concealment] }
+    ask: "The record has no allocation concealment. Add it?"
+  - id: "10"
+    section: "Randomisation"
+    text: "Say who made the sequence, who enrolled the participants and who assigned them to groups."
+    hand: "The record holds the analysis, not the enrolment. Add this by hand."
+  - id: 11a
+    section: "Blinding"
+    text: "Say who was blind after the assignment, and how."
+    from:
+      - { decision: [blinding, blinded, blinding_method, masking] }
+    ask: "The record has no blinding. Add it?"
+  - id: 11b
+    section: "Blinding"
+    text: "If it applies, describe how the interventions looked alike."
+    hand: "The record holds the analysis, not the intervention. Add this by hand."
+  - id: 12a
+    section: "Statistical methods"
+    text: "Give the statistical methods for the primary and the secondary outcomes."
+    from:
+      - { decision: [binary_test, two_group_test, group_test, test, model_formula, cox_covariates, cox_ties, rd_ci_method, ci_method] }
+      - { steps: "test|anova|regress|model|cox|logrank|survival|kaplan|rmst" }
+    ask: "The record has no statistical method. Add it?"
+  - id: 12b
+    section: "Statistical methods"
+    text: "Give the methods for the extra analyses, such as subgroup and adjusted analyses."
+    from:
+      - { decision: [cox_covariates, logistic_covariates, cox_strata, stratum_column, fixed_effects] }
+      - { steps: "subgroup|adjust|sensitivity|interaction" }
+    ask: "The record has no extra analysis. Add it, or answer not applicable?"
+  - id: 13a
+    section: "Participant flow"
+    text: "For each group, give the number of participants that were assigned, treated and analyzed."
+    from:
+      - { sheet: size }
+      - { plan: data.n }
+      - { metric: ["^n($|_)", "^n_"] }
+    ask: "The record has no count of participants for each group. Add it?"
+  - id: 13b
+    section: "Participant flow"
+    text: "For each group, give the losses and the exclusions after the assignment, with the reasons."
+    from:
+      - { decision: [exclusions, exclude_samples, missing_outcome] }
+      - { plan: exclusions }
+      - { data_check: [missing, empty_group, duplicate_rows], clear: "The data check found no missing value, empty group or repeated row." }
+    ask: "The record does not say who left the trial or the analysis. Add it?"
+  - id: 14a
+    section: "Recruitment"
+    text: "Give the dates of recruitment and follow-up."
+    hand: "The record has no recruitment dates. Add them by hand."
+  - id: "15"
+    section: "Baseline data"
+    text: "Show the baseline characteristics of each group."
+    from:
+      - { steps: "baseline|table1|characteristics|descriptive" }
+    ask: "The record has no table of the baseline data. Add it?"
+  - id: "16"
+    section: "Numbers analyzed"
+    text: "For each group, give the number of participants in each analysis, and say if the analysis is by the original groups."
+    from:
+      - { decision: [analysis_population] }
+      - { sheet: size }
+    ask: "The record has no analysis population. Add it?"
+  - id: 17a
+    section: "Outcomes and estimation"
+    text: "For each outcome, give the result for each group, the effect size and its precision, such as a 95% confidence interval."
+    from:
+      - { metric: ["lower", "upper", "ci_", "_ci", "conf", "^hr", "ratio", "diff"] }
+    ask: "The record has no effect size with an interval. Add it?"
+  - id: 17b
+    section: "Outcomes and estimation"
+    text: "For a binary outcome, give both the absolute and the relative effect size."
+    from:
+      - { metric: ["risk_diff", "^rd_", "absolute", "^arr", "nnt"] }
+    ask: "The record has no absolute effect size. Add it, or answer not applicable?"
+  - id: "18"
+    section: "Ancillary analyses"
+    text: "Report other analyses, such as subgroup and adjusted analyses, and say which ones you planned."
+    from:
+      - { steps: "subgroup|adjust|sensitivity|interaction" }
+    ask: "The record has no ancillary analysis. Add it, or answer not applicable?"
+  - id: "23"
+    section: "Other information"
+    text: "Give the registration number and the name of the trial register."
+    hand: "The record has no trial registration. Add it by hand."
+  - id: "24"
+    section: "Other information"
+    text: "Say where the full trial protocol is available."
+    hand: "The record has no link to the trial protocol. Add it by hand."
+  - id: "25"
+    section: "Other information"
+    text: "Name the sources of funding and other support, and the role of the funders."
+    hand: "The record has no funding. Add it by hand."

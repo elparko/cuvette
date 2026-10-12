@@ -22,7 +22,8 @@ import { estimateText, modelName } from "./estimate.ts";
 import { loadSettings, xlsxOn, type Settings } from "./config.ts";
 import { outputDir, savedLine, writeResults, type Saved } from "./results.ts";
 import { outputFile, type Dirs } from "../adapters/kinds/common.ts";
-import { ADAPTER_DECISION, decisionHook, DecisionRecord, TEST_DECISIONS } from "./decisions.ts";
+import { ADAPTER_DECISION, decisionHook, DecisionRecord, REPORTING_DECISION, TEST_DECISIONS } from "./decisions.ts";
+import { buildChecklist, checklistText, GUIDELINE_IDS, GUIDELINE_QUESTION_TITLE, guessGuideline, guidelineId, isChecklistQuestion, itemTitle, loadGuideline, offerText, REPORTING_KEY, setGuideline } from "./checklist.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
 import { accessOf, blocksCode, isCodeTool, usable } from "../adapters/access.ts";
@@ -390,7 +391,7 @@ export class Session {
         this.notes.push(`The default adapter ${a.name} did not start: ${(e as Error).message}`);
       }
 
-    this.decisions = new DecisionRecord(this.adapters, this.record, [...(this.pick ? [ADAPTER_DECISION] : []), ...TEST_DECISIONS]);
+    this.decisions = new DecisionRecord(this.adapters, this.record, [...(this.pick ? [ADAPTER_DECISION] : []), ...TEST_DECISIONS, REPORTING_DECISION]);
     this.interactive = !!opts.interactive;
     this.decisions.onDeviation = (e) => this.askMissingReason(e);
     const pf = this.settings.planFirst;
@@ -1421,7 +1422,51 @@ export class Session {
     const annotated = annotate(finalAnswer, finalClaims) + (tail ? `\n\n${tail}` : "");
     this.record.append("assistant", { text: shown, annotated, final: true, findings: fids, settings, results: missing || undefined });
     this.lastAnswer = finalAnswer;
+    this.offerChecklist();
     return { text: annotated };
+  }
+
+  private offerChecklist(): void {
+    const id = setGuideline(this.record);
+    if (!id || this.record.entries(["notice"]).some((e) => e.data.checklist === "offer")) return;
+    const turnStart = this.lastRequest()?.id ?? 0;
+    if (!this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf)) return;
+    if (this.plan?.steps.some((s) => s.tool && s.status !== "done" && s.status !== "skipped")) return;
+    this.record.append("notice", { text: offerText(buildChecklist(this.record, id)), checklist: "offer" });
+  }
+
+  async checklist(arg = ""): Promise<{ text: string; asked: number }> {
+    const want = arg.trim().toLowerCase();
+    if (want && !guidelineId(want)) throw new Error("Use: /checklist or /checklist arrive, consort, strobe or miqe.");
+    if (want) this.decisions.change(REPORTING_KEY, want, { by: "human", reason: "set with /checklist" });
+    const id = setGuideline(this.record);
+    if (!id) {
+      if (!this.questions.open().some((q) => q.title === GUIDELINE_QUESTION_TITLE)) {
+        const guess = guessGuideline(this.record, this.adapters.map((a) => a.name));
+        const q = await this.questions.ask({
+          decisionKey: REPORTING_KEY,
+          title: GUIDELINE_QUESTION_TITLE,
+          text: guess ? `Which reporting guideline does the journal ask for? ${loadGuideline(guess.id).name} fits, because ${guess.why}.` : "Which reporting guideline does the journal ask for?",
+          options: GUIDELINE_IDS.map((g) => ({ value: g, label: loadGuideline(g).name })),
+          recommendation: guess ? { value: guess.id, reason: guess.why } : undefined,
+          evidence: "",
+        });
+        this.bus.emit({ type: "question", question: q });
+      }
+      return { text: "Choose the reporting guideline in the question card. Then type /checklist again.", asked: 1 };
+    }
+    const list = buildChecklist(this.record, id);
+    const open = new Set(this.questions.open().map((q) => q.title));
+    let asked = 0;
+    for (const item of list.items) {
+      const title = itemTitle(list.guideline, item);
+      if (item.status !== "missing" || !item.ask || open.has(title)) continue;
+      const q = await this.questions.ask({ decisionKey: "", title, text: item.ask, options: [{ value: "not applicable", label: "Not applicable" }], evidence: "" });
+      this.bus.emit({ type: "question", question: q });
+      asked++;
+    }
+    const tail = asked ? `\n\n${asked} question ${asked === 1 ? "card asks" : "cards ask"} for items that are not in the record. Each answer goes into the record. Type /checklist again to see the result.` : "";
+    return { text: checklistText(list) + tail, asked };
   }
 
   private resultsNotIn(answer: string): string {
@@ -2214,8 +2259,9 @@ export class Session {
     const q = this.questions.answer(qid, value, note);
     if (q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by: "human", reason: `answer to ${qid}` });
     if (waited) return;
+    const quiet = isChecklistQuestion(q);
     this.notes.push(`The scientist answered ${qid} (${q.title}): ${String(q.answer)}${note ? ` - ${note}` : ""}.`);
-    if (!this.busy && this.settings.autoResume && this.history.length) void this.send("Continue the analysis with this answer.", { internal: true }).catch(() => {});
+    if (!quiet && !this.busy && this.settings.autoResume && this.history.length) void this.send("Continue the analysis with this answer.", { internal: true }).catch(() => {});
   }
 
   async changeAnswer(qid: string, value: unknown, note = ""): Promise<string[]> {

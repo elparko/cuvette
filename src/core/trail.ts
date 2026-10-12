@@ -1,3 +1,4 @@
+import { checklistHtml, checklistMarkdown, recordChecklist } from "./checklist.ts";
 import { pilotText, validationRows } from "./pilot.ts";
 import { deviationHtml } from "./freeze.ts";
 import { approvedPlan, planMarkdown, questionsOf } from "./plan.ts";
@@ -679,6 +680,11 @@ function testsHtml(record: AnalysisRecord): string {
   return `<h3>Tests in this session</h3><div class="scroll"><table><thead><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
 
+function checklistSection(record: AnalysisRecord): string {
+  const c = recordChecklist(record);
+  return c ? `<section id="checklist">${checklistHtml(c, esc)}</section>` : "";
+}
+
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
   const m = meta(record);
   const labels = new Map<string, string>();
@@ -711,6 +717,7 @@ ${planHtml(record)}
 ${settingRowsHtml ? `<h3>Settings</h3><div class="scroll"><table><thead><tr><th>Decision</th><th>Value</th><th>Set by</th></tr></thead><tbody>${settingRowsHtml}</tbody></table></div>` : ""}
 ${testsHtml(record)}
 ${sections.join("\n")}
+${checklistSection(record)}
 <section id="cite">${referencesHtml(sessionCitations(record, adapters, stepNumbers(record.nodes())), style)}</section>
 </main></body></html>
 `;
@@ -781,6 +788,8 @@ function markdownText(record: AnalysisRecord, adapters: LoadedAdapter[], style: 
     lines.push(`${t.n}. ${t.line.replace(/\n/g, " ")}${t.badges.map((b) => ` [${b}]`).join("")}`);
     if (t.details) lines.push(...mdDetails(record, t.details));
   }
+  const checklist = recordChecklist(record);
+  if (checklist) lines.push("", ...checklistMarkdown(checklist));
   lines.push("", ...referencesMarkdown(sessionCitations(record, adapters, stepNumbers(record.nodes())), style));
   return lines.join("\n") + "\n";
 }

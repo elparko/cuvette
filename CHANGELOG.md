@@ -32,6 +32,13 @@ The project is in early development. Version numbers start at the first public r
 - In headless mode, a likely unit change stops the run. Add `data-change` to `--allow` to continue.
 - A method saved before this change has no summary. It still runs, and Cuvette shows one note. The next save stores the summary.
 
+### Reporting checklist
+- `/checklist [arrive|consort|strobe|miqe]` fills a reporting checklist from the record: ARRIVE 2.0 Essential 10 (22 items), CONSORT 2010 (28 items), STROBE (26 items) and MIQE (18 items). Each item is "Covered" (with the value and the source), "Not in the record" or "Not applicable". The items are data files in `src/core/guidelines/`.
+- The guideline is the decision `reporting_guideline`. If it is not set, a card asks for it and recommends one from the program or the request.
+- A missing item that you can answer becomes a question card, such as "The record has no randomization method. Add it?". The answer goes into the record and the item becomes Covered. An item that needs facts from outside the analysis (ethics approval, housing) says to add it by hand.
+- After the last step of an analysis, Cuvette offers the checklist once if a guideline is set.
+- The checklist is in the trail (`trail.md`, `trail.html`), in the `Checklist` sheet of `results.xlsx` and in the `.eln` file (`checklist.md` and `checklist.csv`).
+
 ## 9 October 2026
 
 ### Benchmark

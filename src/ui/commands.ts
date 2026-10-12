@@ -581,6 +581,20 @@ export const commands: Command[] = [
     },
   },
   {
+    name: "checklist",
+    args: "[arrive|consort|strobe|miqe]",
+    help: "Fill the reporting checklist from the record. Cards ask for each item that is not in the record.",
+    async run([which], ctx) {
+      if (!ctx.session.checklist) return unavailable(ctx);
+      try {
+        const r = await ctx.session.checklist(which ?? "");
+        ctx.print(r.text, "Reporting checklist");
+      } catch (e) {
+        ctx.error((e as Error).message);
+      }
+    },
+  },
+  {
     name: "rewind",
     args: "[n]",
     help: "Return the conversation to an earlier message or confirmed stage. Later results stay in the folder, marked rewound.",
