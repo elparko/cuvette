@@ -211,7 +211,7 @@ function frame(slot: Slot, title: string, color: string, body: string): string {
   return `<section class="card ${color}" data-card="${slot.id}" data-type="${slot.card.t}" aria-label="${esc(title)}"><h3>${esc(title)}</h3>${body}${slot.msg ? `<p class="cardmsg" role="alert">${esc(slot.msg)}</p>` : ""}</section>`;
 }
 
-function questionBody(q: Question, answer: (i: number, value: unknown) => string, other: string | undefined, later: string | undefined, recommend?: string, opts: { current?: unknown; laterLabel?: string } = {}): string {
+function questionBody(q: Question, answer: (i: number, value: unknown) => string, other: string | undefined, later: string | undefined, recommend?: string, opts: { current?: unknown; laterLabel?: string; nav?: string } = {}): string {
   const rec = recommendedIndex(q);
   const pre = opts.current !== undefined ? questionCursor(q, opts.current) : rec;
   const take = rec < 0 && q.recommendation && recommend ? btn(`${show(q.recommendation.value)} (recommended)`, recommend, "primary") : "";
@@ -219,7 +219,7 @@ function questionBody(q: Question, answer: (i: number, value: unknown) => string
 <div class="opts">${q.options.map((o, i) => btn(`${o.label}${i === rec ? " (recommended)" : ""}`, answer(i, o.value), i === pre ? "primary" : "")).join("")}${take}</div>
 ${q.recommendation?.reason ? `<p class="dim small">Recommended: ${esc(q.recommendation.reason)}</p>` : ""}
 ${other ? `<div class="row"><input type="text" name="other" placeholder="Other: type your own answer" aria-label="Your own answer">${btn("Answer", other)}</div>` : ""}
-${later ? `<div class="row end">${btn(opts.laterLabel ?? "Answer later", later, "quiet")}</div>` : ""}`;
+${later || opts.nav ? `<div class="row foot">${opts.nav ?? ""}${later ? btn(opts.laterLabel ?? "Answer later", later, "quiet") : ""}</div>` : ""}`;
 }
 
 function prompt(label: string, name: string, submit: string, back: string, value = ""): string {
@@ -276,9 +276,9 @@ function questionCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "question" }
     return frame(slot, title, "magenta", note + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: change ? qa.current : undefined, laterLabel: "Cancel" }));
   }
   const sq = slot.seq;
-  const nav = sq && (sq.back || sq.next) ? `<div class="row">${sq.back ? btn("Back", act("back"), "quiet") : ""}${sq.next ? btn("Next", act("next"), "quiet") : ""}</div>` : "";
+  const nav = sq && (sq.back || sq.next) ? `${sq.back ? btn("Back", act("back")) : ""}${sq.next ? btn("Next", act("next")) : ""}` : "";
   const progress = sq?.progress ? `<p class="dim small progress">${esc(sq.progress)}</p>` : "";
-  return frame(slot, `Your decision: ${card.q.title}`, "magenta", progress + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: sq?.current }) + nav);
+  return frame(slot, `Your decision: ${card.q.title}`, "magenta", progress + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: sq?.current, nav }));
 }
 
 function instructionCard(c: Ctx, slot: Slot, card: Extract<Card, { t: "instruction" }>): string {

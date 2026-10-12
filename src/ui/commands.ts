@@ -47,9 +47,9 @@ const MODES: Mode[] = ["watch", "follow", "teach", "plan"];
 const OWNERS: Owner[] = ["human", "agent", "fixed"];
 const FORMATS = ["html", "md", "jsonl", "pdf", "protocol", "script", "notebook", "flow", "eln", "xlsx"];
 
-async function lazy<T = any>(spec: string): Promise<T | undefined> {
+async function lazy<T = any>(load: () => Promise<unknown>): Promise<T | undefined> {
   try {
-    return (await import(spec)) as T;
+    return (await load()) as T;
   } catch {
     return undefined;
   }
@@ -262,7 +262,7 @@ export async function openPanels(session: SessionLike, url: string): Promise<{ o
 }
 
 async function loadProfiles(): Promise<{ name: string; version: number }[]> {
-  const mod = await lazy("../core/decisions.ts");
+  const mod = await lazy(() => import("../core/decisions.ts"));
   try {
     return mod?.DecisionRecord?.listProfiles?.() ?? [];
   } catch {
@@ -275,8 +275,8 @@ export async function openSetup(ctx: CommandCtx, proposed?: Record<string, unkno
 }
 
 async function allOpen(): Promise<Question[] | undefined> {
-  for (const f of ["../core/questions.ts", "../core/decisions.ts"]) {
-    const mod = await lazy(f);
+  for (const load of [() => import("../core/questions.ts"), () => import("../core/decisions.ts")]) {
+    const mod = await lazy(load);
     if (mod?.allOpenQuestions) return mod.allOpenQuestions();
   }
   return undefined;
@@ -542,7 +542,7 @@ export const commands: Command[] = [
     help: "Show the audit trail. 1 is short, 3 is the technical record.",
     async run([lv], ctx) {
       const level = lv === "2" ? 2 : lv === "3" ? 3 : 1;
-      const mod = await lazy("../core/trail.ts");
+      const mod = await lazy(() => import("../core/trail.ts"));
       if (!mod?.trail) return unavailable(ctx);
       ctx.print(renderTrail(mod.trail(ctx.session.record, level), level), `Audit trail, level ${level}`);
     },
@@ -887,7 +887,7 @@ export const commands: Command[] = [
     name: "skills",
     help: "List the skills the adapters offer.",
     async run(_, ctx) {
-      const mod = await lazy("../adapters/manifest.ts");
+      const mod = await lazy(() => import("../adapters/manifest.ts"));
       if (!mod?.findAdapter) return unavailable(ctx);
       const rows: string[][] = [];
       for (const a of ctx.session.adapterInfo) {
@@ -902,7 +902,7 @@ export const commands: Command[] = [
     name: "lab",
     help: "List lab memory changes that wait for approval.",
     async run(_, ctx) {
-      const mod = await lazy("../core/labmemory.ts");
+      const mod = await lazy(() => import("../core/labmemory.ts"));
       if (!mod?.pending) return unavailable(ctx);
       const list = mod.pending() as { pid: string; adapter: string; changeKind: string; reason?: string }[];
       ctx.print(

@@ -518,7 +518,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               {working && (
                 <div className="msg agent working" role="status">
                   <span className="caret working" aria-hidden="true" />
-                  <span>{busy ? (status.text ?? "Working") : "Sending"}</span>
+                  <span className="min-w-0 flex-1 truncate">{busy ? line : "Sending"}</span>
                 </div>
               )}
               <div ref={cardsRef} dangerouslySetInnerHTML={{ __html: stream.cards }} />
@@ -526,20 +526,26 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
           <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background from-75% to-transparent pt-8">
           <div className="mx-auto w-full max-w-3xl px-5 pb-4">
-            <div role="status" className="flex min-h-8 flex-wrap items-center gap-2 px-1 pb-1.5 text-[13px] text-muted-foreground">
-              <span className={cn("size-2 shrink-0 rounded-full", busy ? "pulse-dot bg-accent-brand" : status.openQuestions ? "bg-mag" : "bg-ok")} aria-hidden="true" />
-              <span className={cn("min-w-0 flex-1 truncate", busy && "text-foreground")}>{line}</span>
-              {showQ && (
-                <Button variant="link" size="sm" onClick={() => send("/questions")}>
-                  Show the open decisions
-                </Button>
-              )}
-              {busy && (
-                <Button variant="outline" size="sm" onClick={() => post("api/stop", {})} className="h-7 text-destructive">
-                  <SquareIcon className="size-3 fill-current" /> Stop
-                </Button>
-              )}
-            </div>
+            {(!working || busy) && (
+              <div role="status" className="flex min-h-8 flex-wrap items-center gap-2 px-1 pb-1.5 text-[13px] text-muted-foreground">
+                {!working && (
+                  <>
+                    <span className={cn("size-2 shrink-0 rounded-full", busy ? "pulse-dot bg-accent-brand" : status.openQuestions ? "bg-mag" : "bg-ok")} aria-hidden="true" />
+                    <span className={cn("min-w-0 flex-1 truncate", busy && "text-foreground")}>{line}</span>
+                  </>
+                )}
+                {showQ && (
+                  <Button variant="link" size="sm" onClick={() => send("/questions")}>
+                    Show the open decisions
+                  </Button>
+                )}
+                {busy && (
+                  <Button variant="outline" size="sm" onClick={() => post("api/stop", {})} className="ml-auto h-7 text-destructive">
+                    <SquareIcon className="size-3 fill-current" /> Stop
+                  </Button>
+                )}
+              </div>
+            )}
             <form
               className="relative rounded-2xl border bg-card shadow-card transition-[border-color,box-shadow] focus-within:border-ring/60 focus-within:ring-[3px] focus-within:ring-ring/20"
               onSubmit={(e) => {

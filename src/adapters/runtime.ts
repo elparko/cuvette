@@ -44,9 +44,8 @@ export async function startAdapter(adapter: LoadedAdapter, dirs: { workDir: stri
     case "files": return startFiles(c);
     case "screen": return startScreen(c);
     case "macro": {
-      const spec = "./kinds/macro.ts";
-      const mod = await import(spec);
-      return mod.startMacro(adapter, dirs);
+      const { startMacro } = await import("./kinds/macro.ts");
+      return startMacro(adapter, dirs);
     }
   }
 }
