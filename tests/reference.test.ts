@@ -58,3 +58,26 @@ test("agreement gives the mean difference, the percent and the correlation, and 
   expect([img.width, img.height]).toEqual([480, 360]);
   expect(img.pixels.some((v) => v === 0)).toBe(true);
 });
+
+test("referenceValues takes the exact sample name before a longer name that contains it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ga-ref-exact-"));
+  const p = join(dir, "ref.csv");
+  writeFileSync(p, "sample,count\nmouse10,99\nmouse1,5\n");
+  expect(referenceValues({ path: p, mode: "compare" }, "mouse1")).toEqual({ count: 5 });
+  writeFileSync(p, "sample,count\nmouse10,99\nmouse11,7\n");
+  expect(referenceValues({ path: p, mode: "compare" }, "mouse1")).toBeUndefined();
+  writeFileSync(p, "sample,count\nctrl,1\nctrl1,2\n");
+  expect(referenceValues({ path: p, mode: "compare" }, "ctrl1_rep2")).toEqual({ count: 2 });
+});
+
+test("readTable reads a semicolon file with decimal commas and a quoted comma", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ga-ref-semi-"));
+  const p = join(dir, "ref.csv");
+  writeFileSync(p, 'sample;note;area\nS1;"a, b";1,5\n');
+  expect(readTable(p)[0]).toMatchObject({ columns: ["sample", "note", "area"], rows: [["S1", "a, b", 1.5]] });
+});
+
+test("agreementText leaves out the percent if no reference value is above zero", () => {
+  const a = agreement([{ sample: "a", ours: 1, ref: 0, pilot: false }]);
+  expect(agreementText("Count", a)).not.toContain("%");
+});

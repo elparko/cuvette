@@ -130,3 +130,19 @@ describe("design checks", () => {
     expect(designChecks(sheet, { n: "One Set", test: "Welch t-test" }).some((i) => i.id === "too_few_rank")).toBe(false);
   });
 });
+
+describe("sample sheet edge cases", () => {
+  test("a row with no ID stays in the sheet with its row number", () => {
+    const s = sheetFromTable({ columns: ["mouse", "group"], rows: [["m1", "A"], ["", "A"], ["m3", "B"]] }, "x.csv")!;
+    expect(s.rows.map((r) => r.sample)).toEqual(["m1", "row 3", "m3"]);
+  });
+
+  test("readSheet reads tabs, a UTF-16 file and an exact column name before a prefix", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ga-sheet-"));
+    const p = join(dir, "samples.csv");
+    writeFileSync(p, "sample_type\tsample\tgroup\nfield\tS1\tA\n");
+    expect(readSheet(p)[0]).toMatchObject({ sample: "S1", group: "A" });
+    writeFileSync(p, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("sample,group\nS1,Ctrl\n", "utf16le")]));
+    expect(readSheet(p)[0]).toMatchObject({ sample: "S1", group: "Ctrl" });
+  });
+});

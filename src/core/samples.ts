@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { channelOf, isMissing, splitName, type Table } from "./datacheck.ts";
-import { parseCsv } from "./results.ts";
+import { decodeText, delimiterOf, parseCsv } from "./results.ts";
 
 export const SAMPLE_COLUMNS = ["sample", "group", "unit", "batch", "path"] as const;
 export type SampleColumn = (typeof SAMPLE_COLUMNS)[number];
@@ -98,9 +98,11 @@ export function sheetFromTable(t: Table, source: string): SampleSheet | undefine
   const key = id >= 0 ? id : unit;
   const by = new Map<string, number[]>();
   t.rows.forEach((r, i) => {
-    const k = key >= 0 ? (r[key] ?? "").trim() : `row ${i + 2}`;
-    if (isMissing(k)) return;
-    by.set(k, [...(by.get(k) ?? []), i]);
+    const v = key >= 0 ? (r[key] ?? "").trim() : "";
+    const k = v && !isMissing(v) ? v : `row ${i + 2}`;
+    const list = by.get(k);
+    if (list) list.push(i);
+    else by.set(k, [i]);
   });
   const rows: SampleRow[] = [...by.entries()].map(([k, idx]) => {
     const r = t.rows[idx[0]!]!;
@@ -125,9 +127,10 @@ export function writeSheet(path: string, rows: SampleRow[]): void {
 }
 
 export function readSheet(path: string): SampleRow[] {
-  const text = readFileSync(path, "utf8").replace(/^﻿/, "");
-  const [head = [], ...rest] = parseCsv(text.endsWith("\n") ? text : `${text}\n`, text.split("\n", 1)[0]!.includes(";") && !text.split("\n", 1)[0]!.includes(",") ? ";" : ",").filter((r) => r.some((c) => c.trim()));
-  const idx = SAMPLE_COLUMNS.map((c) => head.findIndex((h) => h.trim().toLowerCase().startsWith(c)));
+  const { text } = decodeText(readFileSync(path));
+  const [head = [], ...rest] = parseCsv(text.endsWith("\n") ? text : `${text}\n`, delimiterOf(text, path)).filter((r) => r.some((c) => c.trim()));
+  const names = head.map((h) => h.trim().toLowerCase());
+  const idx = SAMPLE_COLUMNS.map((c) => (names.includes(c) ? names.indexOf(c) : names.findIndex((h) => h.startsWith(c))));
   if (idx[0]! < 0) throw new Error("samples.csv has no column named sample.");
   return rest.map((r) => Object.fromEntries(SAMPLE_COLUMNS.map((c, i) => [c, idx[i]! >= 0 ? (r[idx[i]!] ?? "").trim() : ""])) as SampleRow);
 }

@@ -57,7 +57,7 @@ export function summarizeTable(t: Table, source: string): DataSummary {
     if (c.numeric) {
       const values = raw.filter((v) => !isMissing(v)).flatMap((v) => toNumber(v) ?? []);
       if (!values.length) return { ...base, type: "number" };
-      return { ...base, type: "number", median: median(values), min: Math.min(...values), max: Math.max(...values) };
+      return { ...base, type: "number", median: median(values), min: values.reduce((a, b) => (b < a ? b : a)), max: values.reduce((a, b) => (b > a ? b : a)) };
     }
     const counts = new Map<string, [string, number]>();
     for (const v of raw.filter((x) => !isMissing(x))) {

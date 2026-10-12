@@ -85,3 +85,9 @@ test("matchSummary picks the table with the same file name, then the table with 
   expect(matchSummary([other, mine], summarizeTable(table(kg, half), "/q/new.csv"))).toBe(mine);
   expect(matchSummary([other], summarizeTable(table(kg, half), "/q/new.csv"))).toBeUndefined();
 });
+
+test("a number column with many rows does not overflow the stack", () => {
+  const rows = Array.from({ length: 200000 }, (_, i) => [String(i)]);
+  const s = summarizeTable({ columns: ["value"], rows }, "big.csv");
+  expect(s.columns[0]).toMatchObject({ min: 0, max: 199999 });
+});
