@@ -295,16 +295,14 @@ test("the effect size with the interval is read from the columns of the result t
   expect(item(buildChecklist(noInterval, "arrive"), "10b").status).toBe("missing");
 });
 
-test("the outcome measures are read from the features of the comparison", () => {
-  const i = item(buildChecklist(pilotRecord(), "arrive"), "6a");
-  expect(i.status).toBe("covered");
-  expect(i.value).toBe("features = event_frequency_hz,event_amplitude_pa");
+test("a list of outcome names is not a definition of the outcome measures", () => {
+  expect(item(buildChecklist(pilotRecord(), "arrive"), "6a").status).toBe("missing");
   expect(item(buildChecklist(recordWith({}), "arrive"), "6a").status).toBe("missing");
 });
 
-test("a sweeps decision and the failed count fill the inclusion items, and an empty column does not", () => {
+test("a sweeps decision is not an inclusion criterion, but it and the failed count fill the excluded data points", () => {
   const c = buildChecklist(pilotRecord(), "arrive");
-  expect(item(c, "3a").value).toBe("sweeps = all");
+  expect(item(c, "3a").status).toBe("missing");
   expect(item(c, "3b").value).toBe("sweeps = all; n_failed = 0");
   const r = recordWith({});
   r.append("data_check", { source: "t.csv", kind: "table", size: "10 rows", items: [{ id: "empty:label", check: "empty_column", level: "note", column: "label", text: "Column 'label' is empty." }], text: "" });
@@ -318,10 +316,8 @@ test("the statistical method shows the test, the alpha, the step and the softwar
   expect(v).toContain("patch-clamp program 2.3.8");
 });
 
-test("the assumption item shows the intraclass correlation and ignores the word variance in a summary", () => {
-  const i = item(buildChecklist(pilotRecord(), "arrive"), "7b");
-  expect(i.status).toBe("covered");
-  expect(i.value).toBe("max_icc_animal = 0.2718");
+test("an intraclass correlation alone is not a check of the assumptions, and the word variance in a summary is not either", () => {
+  expect(item(buildChecklist(pilotRecord(), "arrive"), "7b").status).toBe("missing");
   const r = recordWith({});
   r.addNode(node({ summary: "Welch t-test for groups with unequal variance." }));
   expect(item(buildChecklist(r, "arrive"), "7b").status).toBe("missing");
@@ -336,4 +332,13 @@ test("the items about the animals and the procedure quote the request and stay N
   expect(item(c, "8b").hand).toContain("Dag1 conditional knockout");
   expect(item(c, "9a").hand).toContain("held at -70 mV");
   expect(item(c, "9c").hand).not.toContain("The request says");
+});
+
+test("an exclusion decision fills 3a, an outcome decision fills 6a, and a normality step fills 7b", () => {
+  const r = recordWith({ exclusion_criteria: "cells with series resistance above 25 MOhm", outcome_variable: "mIPSC frequency: events per second over 60 s" });
+  r.addNode(node({ tool: "shapiro_test", summary: "Shapiro-Wilk normality test of each group." }));
+  const c = buildChecklist(r, "arrive");
+  expect(item(c, "3a").status).toBe("covered");
+  expect(item(c, "6a").status).toBe("covered");
+  expect(item(c, "7b").status).toBe("covered");
 });

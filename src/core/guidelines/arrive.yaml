@@ -39,7 +39,7 @@ items:
     section: "Inclusion and exclusion criteria"
     text: "Give the criteria for the inclusion and the exclusion of animals and data points. Say if you set them before the study."
     from:
-      - { decision: [exclusions, exclude_samples, exclude_wells, exclude_flags, exclusion_criteria, sweeps] }
+      - { decision: [exclusions, exclude_samples, exclude_wells, exclude_flags, exclusion_criteria] }
       - { plan: exclusions }
     ask: "The record has no inclusion or exclusion criteria. Add them?"
   - id: 3b
@@ -85,7 +85,6 @@ items:
     from:
       - { plan: definitions }
       - { decision: [outcome, outcome_variable, endpoint_definition, response] }
-      - { args: [outcome, features] }
     ask: "The record has no outcome measure. Add it?"
   - id: 6b
     section: "Outcome measures"
@@ -108,7 +107,6 @@ items:
     from:
       - { steps: "normality|shapiro|levene|\\bequal.variance|homogeneity|heteroscedast|assumption|residual|diagnostic" }
       - { decision: [equal_variance, variance_model, transform] }
-      - { metric: ["icc"] }
     ask: "The record has no check of the assumptions. Add it?"
   - id: 8a
     section: "Experimental animals"
