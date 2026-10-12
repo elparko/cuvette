@@ -333,7 +333,7 @@ export interface FileInfo {
   height?: number;
 }
 
-export function listDataFiles(root: string, max = 5000, depth = 5): string[] {
+export function listDataFiles(root: string, max = 5000, depth = 5, skip: string[] = []): string[] {
   const out: string[] = [];
   let seen = 0;
   const walk = (dir: string, d: number) => {
@@ -354,7 +354,9 @@ export function listDataFiles(root: string, max = 5000, depth = 5): string[] {
       } catch {
         continue;
       }
-      if (st.isDirectory()) walk(p, d + 1);
+      if (st.isDirectory()) {
+        if (!skip.includes(p)) walk(p, d + 1);
+      }
       else if (DATA_EXT.has(extname(name).toLowerCase())) out.push(relative(root, p).split(sep).join("/"));
       if (out.length >= max) return;
     }

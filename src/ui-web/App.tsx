@@ -112,7 +112,7 @@ export function App() {
   }, [boot]);
 
   const stream = useStream(boot, !!state?.session);
-  const sessions = useSessions(page, boots);
+  const sessions = useSessions(page, boots, stream.status.state === "idle");
 
   useEffect(() => {
     const w = window as unknown as { cuvetteApp?: unknown; toast?: (t: string) => void };
@@ -223,8 +223,8 @@ export function App() {
           )}
           {!rail && (
             <div className="mt-auto border-t px-4 py-3 text-xs text-muted-foreground">
-              <div className="truncate" title={state.session?.model ?? state.model}>
-                Model: <span className="text-foreground">{state.session?.model ?? state.model}</span>
+              <div className="truncate" title={(state.session && stream.status.model) || state.session?.model || state.model}>
+                Model: <span className="text-foreground">{(state.session && stream.status.model) || state.session?.model || state.model}</span>
               </div>
               {stream.status.usage && (
                 <div className="truncate" title={stream.status.usageLong}>

@@ -135,6 +135,7 @@ export class WebView {
       queueMode: s.settings?.messages === "queue" || !s.steer,
       details: this.details,
       where: `${s.folderLine || s.cwd || ""} · ${s.model.model}`,
+      model: s.model.model,
       ...usageFields(s),
     };
   }

@@ -109,6 +109,7 @@ export interface Status {
   placeholder?: string;
   queueMode?: boolean;
   where?: string;
+  model?: string;
   details?: boolean;
   usage?: string;
   usageLong?: string;

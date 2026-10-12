@@ -270,6 +270,9 @@ export function reopenQuestions(cards: Card[], open: Question[]): Card[] {
 }
 
 export function optionLabel(q: Pick<Question, "options">, value: unknown): string {
+  const grid = value && typeof value === "object" && !Array.isArray(value) ? (value as { changes?: unknown; rows?: unknown }) : undefined;
+  if (grid && Array.isArray(grid.changes)) return grid.changes.length ? `saved with ${grid.changes.length} ${grid.changes.length === 1 ? "change" : "changes"}` : "saved with no change";
+  if (grid && Array.isArray(grid.rows)) return `saved with ${grid.rows.length} rows`;
   return q.options.find((o) => sameValue(o.value, value))?.label ?? show(value);
 }
 

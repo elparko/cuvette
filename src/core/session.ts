@@ -1139,16 +1139,16 @@ export class Session {
           return "";
         }
         if (signal.aborted) {
-          this.record.append("notice", { text: "Stopped. The results so far are kept." });
+          this.record.append("notice", { text: "Stopped. The results so far are kept.", warn: true });
           return "";
         }
       }
-      this.record.append("notice", { text: `Paused after ${this.settings.maxSteps} steps. Type "continue" to go on.` });
+      this.record.append("notice", { text: `Paused after ${this.settings.maxSteps} steps. Type "continue" to go on.`, warn: true });
       this.endedBy = "max_steps";
       return "";
     } catch (e) {
       const msg = e instanceof ProviderError ? e.message : signal.aborted ? "Stopped." : `${(e as Error).name}: ${(e as Error).message}`;
-      this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg } : { message: msg });
+      this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg, warn: true } : { message: msg });
       if (!signal.aborted) this.endedBy = "error";
       this.closeOpenCalls(results);
       if (this.draft) {
@@ -1957,7 +1957,7 @@ export class Session {
     const entry = adapter?.mapEntry(remote, args);
     const mod = adapter ? await adapter.module() : {};
     const manualRoute = output.manualRoute ?? mod.manualRoute?.(remote, args) ?? entry?.route ?? "";
-    const fidelity = output.fidelity ?? entry?.fidelity ?? (tool.source === "adapter" ? (manualRoute ? "close" : "none") : "none");
+    const fidelity = output.fidelity ?? entry?.fidelity ?? (tool.source === "adapter" ? (manualRoute ? "close" : "none") : tool.source === "harness" ? undefined : "none");
     const fileList = [...(output.outputs ?? [])];
     for (const img of output.images ?? []) if (!fileList.some((o) => o.path === img)) fileList.push({ path: img, kind: "image" });
     const outputs = fileList
@@ -2024,7 +2024,7 @@ export class Session {
         summary,
         model: this.provider.info.model,
         manualRoute,
-        fidelity,
+        fidelity: fidelity ?? "none",
         sensitivityOf: sensitivityOf ?? "",
       });
       node = n.id;
@@ -3582,6 +3582,7 @@ export class Session {
 
   private async waitAnswer(qid: string): Promise<{ value: unknown; note: string; by: string } | undefined> {
     this.waitedQids.add(qid);
+    if (this.questions.open().some((q) => q.qid === qid)) this.bus.emit({ type: "status", state: "waiting" });
     try {
       await abortable(this.questions.wait(qid), this.abort?.signal);
     } catch {
@@ -3645,7 +3646,7 @@ export class Session {
       let summaryOf: DataSummary | undefined;
       try {
         if (f.kind === "files") {
-          const rels = listDataFiles(f.path);
+          const rels = listDataFiles(f.path, 5000, 5, [outputRoot(this.cwd, this.settings.output_folder), dirname(this.outputDir), this.outputDir, this.workDir]);
           if (rels.length < 2) continue;
           check = checkFiles(await fileInfos(f.path, rels), f.path);
           const inside = (p: string) => (p.startsWith(`${this.cwd}/`) ? relative(this.cwd, p) : p);
@@ -3786,6 +3787,7 @@ export class Session {
       if (!x.tool || x.status === "done" || x.status === "skipped" || this.planWarned.has(`skip:${x.step}`)) continue;
       this.planWarned.add(`skip:${x.step}`);
       this.record.append("notice", { text: `Not done from the approved plan: ${x.step}. Reason: none given.`, plan: "skipped" });
+      recordDeviation(this.record, { kind: "step", what: `Not done: ${x.step}`, from: x.status ?? "todo" }, "not_done");
     }
   }
 
