@@ -176,3 +176,16 @@ test("each Claude model has the next cheaper model, and Haiku has none", () => {
   expect(cheaperModel("claude-sonnet-5-5")).toBe("claude-haiku-5-5");
   expect(cheaperModel("claude-haiku-5-5")).toBeUndefined();
 });
+
+test("a session with a priced model and a model with no price keeps the known part of the cost", () => {
+  const entries = [
+    { kind: "user", data: { text: "a" } },
+    { kind: "usage", data: { inputTokens: 1_000_000, outputTokens: 0, model: "claude-haiku-5-5", provider: "claude", local: false } },
+    { kind: "user", data: { text: "b" } },
+    { kind: "usage", data: { inputTokens: 5, outputTokens: 5, model: "gpt-x", provider: "openai", local: false } },
+  ];
+  const u = usageSummary(entries, { model: "gpt-x", provider: "openai", contextWindow: 1000, local: false }, 10);
+  expect(u.usd).toBeCloseTo(0.1, 9);
+  expect(u.turns[1]!.usd).toBeUndefined();
+  expect(usageShort(u)).toBe("$0.10 and steps with no price · context 1%");
+});

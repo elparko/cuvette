@@ -1,10 +1,12 @@
-import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
+import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, Usage } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
-import { extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
+import { estimateTokens } from "../core/compaction.ts";
+import { ThinkSplitter, extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
-import { RETRIES, withRetry, type Sleep } from "./retry.ts";
+import { RETRIES, errorBody, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 
 const TIMEOUT_MS = 600_000;
+const NO_STREAM = /cannot use tools with stream|stream(?:ing)? (?:is )?not supported|does not support stream/i;
 
 export interface OpenAIOpts {
   numCtx?: number;
@@ -12,21 +14,55 @@ export interface OpenAIOpts {
   retries?: number;
 }
 
+interface CallDraft {
+  id: string;
+  name: string;
+  args: string;
+  obj?: unknown;
+}
+
+interface Reply {
+  content: string;
+  text?: string;
+  thinking: string;
+  calls: CallDraft[];
+  finish: string;
+  usage?: any;
+}
+
+function partial(message: string): Error {
+  return Object.assign(new Error(message), { partial: true });
+}
+
+export function parseArgs(c: CallDraft, cut: boolean): { args: unknown; parseError?: string } {
+  if (c.obj !== undefined && !c.args.trim()) return { args: c.obj };
+  const raw = c.args.trim();
+  if (!raw) return { args: {} };
+  try {
+    let v: unknown = JSON.parse(raw);
+    if (typeof v === "string" && /^\s*\{/.test(v)) v = JSON.parse(v);
+    if (!v || typeof v !== "object" || Array.isArray(v)) return { args: {}, parseError: `Arguments must be one JSON object: ${raw.slice(0, 200)}` };
+    return { args: v };
+  } catch (e) {
+    const why = cut ? "The output limit cut the arguments before their end" : `Arguments are not valid JSON (${(e as Error).message})`;
+    return { args: {}, parseError: `${why}: ${raw.slice(0, 200)}` };
+  }
+}
+
 export class OpenAIProvider implements Provider {
   info: ModelInfo;
   private base: string;
   private sleep?: Sleep;
   private retries: number;
+  private stream = true;
+  private usageOption = true;
+  private noUsageNoted = false;
 
   constructor(baseUrl: string, readonly model: string, opts: OpenAIOpts = {}) {
     this.base = baseUrl.replace(/\/+$/, "");
     this.info = { provider: "openai", model, contextWindow: opts.numCtx ?? 32768, vision: false, small: true, local: localUrl(this.base) };
     this.sleep = opts.sleep;
     this.retries = opts.retries ?? RETRIES;
-  }
-
-  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
-    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
   }
 
   toNative(system: string, messages: Message[]): unknown[] {
@@ -45,7 +81,7 @@ export class OpenAIProvider implements Provider {
       for (const p of m.parts) {
         if (p.type === "tool_result") {
           const body = (p.text || "(no output)") + (p.images?.length ? "\n(image not shown to this model)" : "");
-          out.push({ role: "tool", tool_call_id: p.callId, content: p.isError ? `Error: ${body}` : body });
+          out.push({ role: "tool", tool_call_id: p.callId, content: p.isError ? errorBody(body) : body });
         } else if (p.type === "text") texts.push(p.text);
         else if (p.type === "image") texts.push("(image not shown to this model)");
       }
@@ -54,103 +90,256 @@ export class OpenAIProvider implements Provider {
     return out;
   }
 
-  private async attempt(body: Record<string, unknown>, signal: AbortSignal): Promise<Response> {
+  private async attempt(body: Record<string, unknown>, idle: IdleSignal): Promise<Response> {
+    idle.touch();
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (process.env.OPENAI_API_KEY) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
-    const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal });
-    if (res.status === 429 || res.status >= 500) {
+    const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: idle.signal });
+    if (res.status === 429 || res.status === 408 || res.status >= 500) {
       const txt = await res.text();
+      if (body.stream && NO_STREAM.test(txt)) return new Response(txt, { status: 400 });
       throw Object.assign(new Error(`Model server error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status, headers: res.headers });
     }
     return res;
   }
 
-  private async post(body: Record<string, unknown>, user?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<any> {
-    const t = AbortSignal.timeout(TIMEOUT_MS);
-    const signal = user ? AbortSignal.any([user, t]) : t;
-    let res: Response;
+  private async httpError(res: Response, body: Record<string, unknown>): Promise<ProviderError | "again"> {
+    const txt = await res.text();
+    let msg: unknown = txt;
     try {
-      res = await this.retry(() => this.attempt(body, signal), signal, onRetry);
-    } catch (e) {
-      if (user?.aborted) throw e;
-      if (typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
-      if ((e as Error).name === "TimeoutError") throw new ProviderError("The model server did not answer within 600 s.", true);
-      throw new ProviderError(`Cannot reach the model server at ${this.base}. Check that it is running.`, true);
+      const j = JSON.parse(txt);
+      msg = j.error?.message ?? j.error ?? j.detail ?? txt;
+    } catch {}
+    const text = typeof msg === "string" ? msg : JSON.stringify(msg);
+    if (res.status === 401 || res.status === 403) return new ProviderError("The model server rejected the credentials. Set OPENAI_API_KEY.");
+    if (res.status === 400 && body.stream_options && /stream_options|include_usage/i.test(text)) {
+      this.usageOption = false;
+      return "again";
     }
-    if (!res.ok) {
-      const txt = await res.text();
-      let msg = txt;
+    if (res.status === 400 && body.stream && NO_STREAM.test(text)) {
+      this.stream = false;
+      return "again";
+    }
+    return new ProviderError(`Model server error ${res.status}: ${text.slice(0, 300)}`, false, res.status === 413 || (res.status === 400 && CONTEXT_OVERFLOW.test(text)));
+  }
+
+  private failure(e: unknown, signal: AbortSignal): unknown {
+    if (e instanceof ProviderError) return e;
+    if (timedOut(signal)) return new ProviderError(`The model server sent no data for ${TIMEOUT_MS / 1000} s.`, true);
+    if (signal.aborted) return e;
+    if (typeof (e as any).status === "number") return new ProviderError((e as Error).message, true);
+    if ((e as any).partial) return new ProviderError(`The model server stopped during the reply: ${(e as Error).message}.`, true);
+    return new ProviderError(`Cannot reach the model server at ${this.base}. Check that it is running.`, true);
+  }
+
+  private body(messages: unknown[], tools: StepRequest["tools"]): Record<string, unknown> {
+    const body: Record<string, unknown> = { model: this.model, messages, stream: this.stream };
+    if (this.stream && this.usageOption) body.stream_options = { include_usage: true };
+    if (tools.length) body.tools = tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
+    return body;
+  }
+
+  // One try reads the whole reply, so that a reply that stops early is tried again.
+  private async exchange(make: () => Record<string, unknown>, user: AbortSignal | undefined, onRetry: StepRequest["onRetry"], onDelta: StepRequest["onDelta"]): Promise<Reply> {
+    const idle = idleSignal(TIMEOUT_MS, user);
+    try {
+      for (let again = 0; ; again++) {
+        const body = make();
+        const res = await this.retry(async () => {
+          const r = await this.attempt(body, idle);
+          return r.ok ? { r, reply: await this.read(r, idle, onDelta) } : { r };
+        }, idle.signal, onRetry);
+        if (res.reply) return res.reply;
+        const err = await this.httpError(res.r, body);
+        if (err !== "again") throw err;
+        if (again > 1) throw new ProviderError("The model server refused the request.");
+      }
+    } catch (e) {
+      throw this.failure(e, idle.signal);
+    } finally {
+      idle.stop();
+    }
+  }
+
+  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
+    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
+  }
+
+  private async read(res: Response, idle: IdleSignal, onDelta: StepRequest["onDelta"]): Promise<Reply> {
+    const reader = res.body?.getReader();
+    if (!reader) throw partial("the reply has no body");
+    const dec = new TextDecoder();
+    let buf = "";
+    let sse = /event-stream/i.test(res.headers.get("content-type") ?? "");
+    let decided = sse;
+    const reply: Reply = { content: "", thinking: "", calls: [], finish: "" };
+    const textOut: string[] = [];
+    const thinkOut: string[] = [];
+    const splitter = new ThinkSplitter((kind, s) => {
+      (kind === "text" ? textOut : thinkOut).push(s);
+      onDelta?.({ type: kind, text: s });
+    });
+    const slots = new Map<string, CallDraft>();
+    let ended = false;
+    const chunk = (j: any) => {
+      if (j.error) {
+        const msg = typeof j.error === "string" ? j.error : (j.error.message ?? JSON.stringify(j.error));
+        throw new ProviderError(`Model server error: ${String(msg).slice(0, 300)}`, false, CONTEXT_OVERFLOW.test(msg));
+      }
+      if (j.usage) reply.usage = j.usage;
+      const ch = j.choices?.[0];
+      if (!ch) return;
+      if (ch.finish_reason) reply.finish = ch.finish_reason;
+      const d = ch.delta ?? ch.message ?? {};
+      const think = d.reasoning_content ?? d.reasoning;
+      if (typeof think === "string" && think) {
+        reply.thinking += think;
+        if (sse) onDelta?.({ type: "thinking", text: think });
+      }
+      if (typeof d.content === "string" && d.content) {
+        reply.content += d.content;
+        if (sse) splitter.push(d.content);
+      }
+      for (const tc of d.tool_calls ?? []) {
+        const key = !sse ? "" : typeof tc.index === "number" ? `i${tc.index}` : tc.id ? `id${tc.id}` : "last";
+        let c = !key ? undefined : key === "last" ? reply.calls.at(-1) : slots.get(key);
+        if (!c || (tc.id && c.id && tc.id !== c.id)) {
+          c = { id: "", name: "", args: "" };
+          reply.calls.push(c);
+          if (key && key !== "last") slots.set(key, c);
+        }
+        if (tc.id && !c.id) c.id = tc.id;
+        if (tc.function?.name && !c.name) c.name = tc.function.name;
+        const a = tc.function?.arguments;
+        if (typeof a === "string") c.args += a;
+        else if (a && typeof a === "object") c.obj = a;
+      }
+    };
+    const line = (raw: string) => {
+      const s = raw.replace(/\r$/, "");
+      if (!s.startsWith("data:")) return;
+      const payload = s.slice(5).trim();
+      if (payload === "[DONE]") {
+        ended = true;
+        return;
+      }
+      let j: unknown;
       try {
-        const j = JSON.parse(txt);
-        msg = j.error?.message ?? j.error ?? txt;
-      } catch {}
-      if (res.status === 401 || res.status === 403) throw new ProviderError("The model server rejected the credentials. Set OPENAI_API_KEY.");
-      throw new ProviderError(`Model server error ${res.status}: ${String(msg).slice(0, 300)}`, false, res.status === 400 && CONTEXT_OVERFLOW.test(String(msg)));
-    }
+        j = JSON.parse(payload);
+      } catch {
+        return;
+      }
+      chunk(j);
+    };
     try {
-      return await res.json();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        idle.touch();
+        buf += dec.decode(value, { stream: true });
+        if (!decided && buf.trimStart()) {
+          sse = /^(data:|event:|:)/.test(buf.trimStart());
+          decided = true;
+        }
+        if (!sse) continue;
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          line(buf.slice(0, nl));
+          buf = buf.slice(nl + 1);
+        }
+      }
     } catch (e) {
-      if (user?.aborted) throw e;
-      throw new ProviderError(`The model server stopped during the reply, or the reply is not valid JSON: ${(e as Error).message}`, true);
+      await reader.cancel().catch(() => {});
+      throw e;
     }
+    buf += dec.decode();
+    if (sse) {
+      if (buf.trim()) line(buf);
+      splitter.end();
+      if (!ended && !reply.finish) throw partial("the reply ended without a finish reason");
+      reply.text = textOut.join("");
+      reply.thinking = [reply.thinking.trim(), thinkOut.join("").trim()].filter(Boolean).join("\n\n");
+      return reply;
+    }
+    let j: any;
+    try {
+      j = JSON.parse(buf);
+    } catch (e) {
+      throw partial(`the reply is not valid JSON (${(e as Error).message})`);
+    }
+    chunk(j);
+    if (!j.choices?.length) throw new ProviderError("The model server returned no choices.");
+    const split = splitThink(reply.content);
+    reply.text = split.text;
+    reply.thinking = [reply.thinking.trim(), split.thinking].filter(Boolean).join("\n\n");
+    if (reply.thinking) onDelta?.({ type: "thinking", text: reply.thinking });
+    return reply;
   }
 
   async step(input: StepRequest): Promise<StepResult> {
     const req = input.noToolCalls ? { ...input, tools: [] } : input;
-    const body: Record<string, unknown> = { model: this.model, messages: this.toNative(req.system, req.messages), stream: false };
-    if (req.tools.length)
-      body.tools = req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
-    const j = await this.post(body, req.signal, req.onRetry);
-    const choice = j.choices?.[0];
-    if (!choice) throw new ProviderError("The model server returned no choices.");
-    const m = choice.message ?? {};
-    const split = splitThink(m.content ?? "");
-    let text = split.text;
-    const thinking = [m.reasoning_content ?? m.reasoning ?? "", split.thinking].map((s: string) => s.trim()).filter(Boolean).join("\n\n");
+    const native = this.toNative(req.system, req.messages);
+    let streamed = "";
+    const reply = await this.exchange(() => this.body(native, req.tools), req.signal, req.onRetry, (d) => {
+      if (d.type === "text") streamed += d.text;
+      req.onDelta?.(d);
+    });
     let n = lastCallNumber(req.messages);
+    const used = new Set(req.messages.flatMap((m) => m.parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : []))));
+    const freshId = (id: string) => {
+      let out = id;
+      while (!out || used.has(out)) out = `call_${++n}`;
+      used.add(out);
+      return out;
+    };
     const parts: Part[] = [];
     let note: string | undefined;
-    if (thinking) {
-      parts.push({ type: "thinking", text: thinking });
-      req.onDelta?.({ type: "thinking", text: thinking });
-    }
-    const native: any[] = m.tool_calls ?? [];
-    const calls: Part[] = native.map((c) => {
-      const id = c.id || `call_${++n}`;
-      const raw = c.function?.arguments;
-      if (raw && typeof raw === "object") return { type: "tool_call", id, name: c.function.name, args: raw };
-      if (!raw) return { type: "tool_call", id, name: c.function?.name ?? "", args: {} };
-      try {
-        return { type: "tool_call", id, name: c.function.name, args: JSON.parse(raw) };
-      } catch (e) {
-        return { type: "tool_call", id, name: c.function.name, args: {}, parseError: `Arguments are not valid JSON (${(e as Error).message}): ${String(raw).slice(0, 200)}` };
-      }
+    if (reply.thinking) parts.push({ type: "thinking", text: reply.thinking });
+    const cut = reply.finish === "length";
+    const calls: Part[] = reply.calls.map((c) => {
+      const { args, parseError } = parseArgs(c, cut);
+      return { type: "tool_call", id: freshId(c.id), name: c.name, args, ...(parseError ? { parseError } : {}) };
     });
-    if (!calls.length && text) {
-      const hit = extractTextToolCall(text, req.tools.map((t) => t.name));
+    let said = (reply.text ?? "").trim();
+    if (!calls.length && said) {
+      const hit = extractTextToolCall(said, req.tools.map((t) => t.name));
       if (hit) {
-        calls.push({ type: "tool_call", id: `call_${++n}`, name: hit.name, args: hit.args });
-        text = hit.rest;
+        calls.push({ type: "tool_call", id: freshId(""), name: hit.name, args: hit.args });
+        said = hit.rest;
         note = "converted a tool call written as text";
       }
     }
-    if (text) {
-      parts.push({ type: "text", text });
-      req.onDelta?.({ type: "text", text });
+    if (said) {
+      parts.push({ type: "text", text: said });
+      if (!streamed) req.onDelta?.({ type: "text", text: said });
     }
     parts.push(...calls);
-    const u = j.usage ?? {};
     const result: StepResult = {
-      message: { role: "assistant", parts, provider: "openai", model: this.model, raw: m },
-      usage: { inputTokens: u.prompt_tokens ?? 0, outputTokens: u.completion_tokens ?? 0 },
-      stopReason: calls.length ? "tool_use" : choice.finish_reason === "length" ? "max_tokens" : "end",
+      message: { role: "assistant", parts, provider: "openai", model: this.model, raw: { content: reply.content, tool_calls: reply.calls } },
+      usage: this.usage(reply, req),
+      stopReason: calls.length ? "tool_use" : cut ? "max_tokens" : "end",
     };
+    if (!reply.usage && !this.noUsageNoted) {
+      this.noUsageNoted = true;
+      note = [note, "the server sent no token counts; the counts are estimates"].filter(Boolean).join("; ");
+    }
     if (note) result.note = note;
     return result;
   }
 
+  private usage(reply: Reply, req: StepRequest): Usage {
+    const u = reply.usage;
+    if (!u) return { inputTokens: estimateTokens(req.messages, req.system, req.tools), outputTokens: Math.ceil((reply.content.length + reply.thinking.length + reply.calls.reduce((s, c) => s + c.args.length, 0)) / 3.5) };
+    const prompt = Number(u.prompt_tokens) || 0;
+    const cached = Math.min(prompt, Number(u.prompt_tokens_details?.cached_tokens) || 0);
+    const out: Usage = { inputTokens: prompt - cached, outputTokens: Number(u.completion_tokens) || 0 };
+    if (cached) out.cacheRead = cached;
+    return out;
+  }
+
   async complete(system: string, text: string, signal?: AbortSignal): Promise<string> {
-    const j = await this.post({ model: this.model, messages: [{ role: "system", content: system }, { role: "user", content: text }], stream: false }, signal);
-    return splitThink(j.choices?.[0]?.message?.content ?? "").text;
+    const native = [{ role: "system", content: system }, { role: "user", content: text }];
+    const reply = await this.exchange(() => this.body(native, []), signal, undefined, undefined);
+    return (reply.text ?? splitThink(reply.content).text).trim();
   }
 }

@@ -276,9 +276,9 @@ class HookRunner {
 }
 ```
 
-Command hooks follow Claude Code: the command gets the input JSON on stdin; exit 0 with JSON on
-stdout is the result; exit 2 is a deny (PreToolUse) with stderr as the reason; other exit codes
-are logged and ignored.
+Command hooks follow Claude Code. The command gets the input JSON on stdin. Exit 0 with JSON on
+stdout gives the result. Exit 2 gives a deny (PreToolUse) or a block (Stop), with stderr as the
+reason. The harness logs and ignores other exit codes.
 
 Decision rules: a `setup` stage decision gets a value in `applySetup` (the default if the
 scientist gives none; the setup entry lists `defaultsAccepted`). A `when_needed` decision owned
@@ -379,8 +379,11 @@ class Session {
    the model to continue with work that does not depend on the answer; `instruct` (Follow mode)
    shows the manual route and waits for `followDone`; then `execute`; hash outputs; add the
    node; `PostToolUse`; append `tool_result`.
-4. No tool calls: `PreAnswer` hooks (claims, rule review, referee); append `assistant` with
-   `final: true`; `Stop` hooks.
+4. No tool calls: `Stop` hooks. As in Claude Code, a `Stop` hook can return
+   `{"decision": "block", "reason": "..."}` or exit with code 2. Then the agent continues, and the
+   reason is its next note. The input has `stop_hook_active`. After eight blocks in one turn, the
+   harness ignores the hook. Then `PreAnswer` hooks (claims, rule review, referee); append
+   `assistant` with `final: true`.
 5. `interrupt()` aborts the model call and the running tool; every open call gets an error
    result, so the history stays valid.
 
@@ -406,6 +409,9 @@ cuvette questions
 cuvette bench [scenario|all] --model ... [--guidance on|off|both]
 cuvette mcp
 ```
+
+With `--output json`, the output has `stop`: `answer`, `max_steps` (the step limit), `error` or
+`stopped`. After an `error`, the exit code is 1.
 
 ## Changes made during the build (2026-10-08)
 

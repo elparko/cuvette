@@ -41,7 +41,10 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
       const note = wanted === undefined ? "no answer in the answers file; the harness used the recommendation or the first option" : "answered from the answers file";
       setTimeout(() => void answerHeadless(s, q, v, note), 0);
     }
-    if (e.type === "permission") s.respondPermission(e.rid, allow.has("all") || allow.has(e.tool), allow.size ? "" : "headless mode denies by default; pass --allow");
+    if (e.type === "permission") {
+      const ok = allow.has("all") || (e.search ? allow.has("search") : allow.has(e.tool));
+      s.respondPermission(e.rid, ok, ok ? "" : e.search ? "a search outside the project needs --allow search" : allow.size ? "" : "headless mode denies by default; pass --allow");
+    }
     if (e.type === "instruction") s.followDone(e.step, "", true);
     if (e.type === "plan") {
       const c = e.reference?.candidates[0];

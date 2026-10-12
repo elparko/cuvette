@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { createHash } from "node:crypto";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
@@ -38,6 +39,15 @@ function mapError(e: unknown, model: string): unknown {
   if (retryReason(e)) return new ProviderError(`The Claude API had a server error: ${(e as Error).message}`, true);
   if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(`${NO_CREDENTIALS} Detail: ${e.message}`);
   return e;
+}
+
+// Other servers can make call IDs with characters that the Claude API refuses, for example "functions.read_file:0". A switch to Claude must still work.
+function toolId(id: string): string {
+  return /^[a-zA-Z0-9_-]{1,64}$/.test(id) ? id : `id_${createHash("sha256").update(id).digest("hex").slice(0, 24)}`;
+}
+
+function toolName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "unknown_tool";
 }
 
 function cacheLast(messages: any[], mark?: Record<string, unknown>): any[] {
@@ -112,7 +122,7 @@ export class ClaudeProvider implements Provider {
         const content: unknown[] = [];
         for (const p of m.parts) {
           if (p.type === "text" && p.text) content.push({ type: "text", text: p.text });
-          else if (p.type === "tool_call") content.push({ type: "tool_use", id: p.id, name: p.name, input: p.args && typeof p.args === "object" ? p.args : {} });
+          else if (p.type === "tool_call") content.push({ type: "tool_use", id: toolId(p.id), name: toolName(p.name), input: p.args && typeof p.args === "object" ? p.args : {} });
         }
         if (!content.length) content.push({ type: "text", text: "(no reply)" });
         out.push({ role: "assistant", content });
@@ -123,7 +133,7 @@ export class ClaudeProvider implements Provider {
       for (const p of m.parts) {
         if (p.type === "tool_result") {
           const { images, note } = p.isError ? { images: [], note: p.images?.length ? `${p.images.length} image(s) left out of an error result` : "" } : budget.pick(p.images ?? []);
-          const block: Record<string, unknown> = { type: "tool_result", tool_use_id: p.callId, content: toolResultContent(p.text, images, note) };
+          const block: Record<string, unknown> = { type: "tool_result", tool_use_id: toolId(p.callId), content: toolResultContent(p.text, images, note) };
           if (p.isError) block.is_error = true;
           results.push(block);
         } else if (p.type === "text") {

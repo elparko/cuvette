@@ -9,6 +9,8 @@ import { ClaudeProvider } from "../src/providers/claude.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.ts";
 import { ThinkSplitter, extractTextToolCall, splitThink } from "../src/providers/text.ts";
+import { parseArgs } from "../src/providers/openai.ts";
+import { retryReason } from "../src/providers/retry.ts";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 const tools: ToolSchema[] = [
@@ -559,7 +561,7 @@ describe("openai", () => {
 
   test("a reply body that stops early gives a transient error that the session can resume", async () => {
     vi.stubGlobal("fetch", async () => new Response("{\"choices\": [", { status: 200 }));
-    const err = await (await makeProvider("openai:http://localhost:1234/v1|m")).step(req([user("x")])).catch((e) => e);
+    const err = await (await makeProvider("openai:http://localhost:1234/v1|m", { sleep: async () => {} })).step(req([user("x")])).catch((e) => e);
     expect(err).toBeInstanceOf(ProviderError);
     expect(err.transient).toBe(true);
   });
@@ -718,5 +720,160 @@ describe.skipIf(!process.env.CUVETTE_LIVE)("live ollama", () => {
   test("listModels sees local models", async () => {
     const list = await listModels();
     expect(list.some((m) => m.spec === "ollama:qwen3:8b")).toBe(true);
+  });
+});
+
+function sse(chunks: unknown[], end = true, chunkSize = 23): Response {
+  const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join("") + (end ? "data: [DONE]\n\n" : "");
+  const enc = new TextEncoder().encode(body);
+  const stream = new ReadableStream({
+    start(c) {
+      for (let i = 0; i < enc.length; i += chunkSize) c.enqueue(enc.slice(i, i + chunkSize));
+      c.close();
+    },
+  });
+  return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
+}
+
+const delta = (d: unknown, finish: string | null = null) => ({ choices: [{ index: 0, delta: d, finish_reason: finish }] });
+
+describe("agent loop fixes, round three", () => {
+  test("Ollama: a stopped repeat still gives token counts, as estimates", async () => {
+    const para = "The mixed model accounts for individual differences in how people react to sleep loss, which matters for the reading of the results and for the slope. ";
+    stubOllama(() => ndjson([...Array.from({ length: 40 }, () => ({ message: { content: para } }))]));
+    const r = await (await makeProvider("ollama:qwen3:8b")).step(req([user("fit")]));
+    expect(r.usage.inputTokens).toBeGreaterThan(0);
+    expect(r.usage.outputTokens).toBeGreaterThan(0);
+    expect(r.note).toMatch(/token counts are estimates/);
+  });
+
+  test("Ollama: a reply after a prompt that fills the window carries the reply, so the session can keep it", async () => {
+    stubOllama(() => ndjson([{ message: { content: "ok" } }, { done: true, prompt_eval_count: 32000, eval_count: 2 }]));
+    const err = await (await makeProvider("ollama:qwen3:8b")).step(req([user("x")])).catch((e) => e);
+    expect(err.overflow).toBe(true);
+    expect(err.result.message.parts).toEqual([{ type: "text", text: "ok" }]);
+  });
+
+  test("Ollama: a server that ignores truncate and cuts the prompt is found from the token count", async () => {
+    stubOllama(() => ndjson([{ message: { content: "ok" } }, { done: true, prompt_eval_count: 9000, eval_count: 2 }]));
+    const big = user("x".repeat(160_000));
+    const err = await (await makeProvider("ollama:qwen3:8b")).step(req([big])).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.overflow).toBe(true);
+    expect(err.message).toMatch(/read only 9000/);
+    expect(err.result).toBeDefined();
+  });
+
+  test("Ollama: a stream that ends with no done line is a transient error", async () => {
+    stubOllama(() => ndjson([{ message: { content: "half" } }]));
+    const err = await (await makeProvider("ollama:qwen3:8b")).step(req([user("x")])).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.transient).toBe(true);
+  });
+
+  test("an error result is not marked twice", async () => {
+    const hist: Message[] = [user("q"), { role: "assistant", parts: [{ type: "tool_call", id: "c1", name: "add", args: {} }] }, { role: "user", parts: [{ type: "tool_result", callId: "c1", name: "add", text: "ERROR: no tool named add", isError: true }] }];
+    const o: any = await makeProvider("openai:http://localhost:1234/v1|m");
+    expect(o.toNative("S", hist)[3].content).toBe("ERROR: no tool named add");
+    stubOllama(() => json({}));
+    const l: any = await makeProvider("ollama:x");
+    expect(l.toNative("S", hist)[3].content).toBe("ERROR: no tool named add");
+  });
+
+  test("OpenAI: streams text, two parallel tool calls in pieces, and usage with cached tokens", async () => {
+    let seen: any;
+    vi.stubGlobal("fetch", async (_u: string, init: any) => {
+      seen = JSON.parse(init.body);
+      return sse([
+        delta({ role: "assistant", content: "<think>hm</think>Let me " }),
+        delta({ content: "look." }),
+        delta({ tool_calls: [{ index: 0, id: "call_a", type: "function", function: { name: "add", arguments: "" } }] }),
+        delta({ tool_calls: [{ index: 1, id: "call_b", type: "function", function: { name: "mul", arguments: "{}" } }] }),
+        delta({ tool_calls: [{ index: 0, function: { arguments: '{"a": 1, ' } }] }),
+        delta({ tool_calls: [{ index: 0, function: { arguments: '"b": 2}' } }] }),
+        delta({}, "tool_calls"),
+        { choices: [], usage: { prompt_tokens: 100, completion_tokens: 20, prompt_tokens_details: { cached_tokens: 60 } } },
+      ]);
+    });
+    const deltas: string[] = [];
+    const p = await makeProvider("openai:http://localhost:1234/v1|m");
+    const r = await p.step(req([user("q")], { onDelta: (d) => deltas.push(`${d.type}:${d.text}`) }));
+    expect(seen.stream).toBe(true);
+    expect(seen.stream_options).toEqual({ include_usage: true });
+    expect(r.message.parts).toEqual([
+      { type: "thinking", text: "hm" },
+      { type: "text", text: "Let me look." },
+      { type: "tool_call", id: "call_a", name: "add", args: { a: 1, b: 2 } },
+      { type: "tool_call", id: "call_b", name: "mul", args: {} },
+    ]);
+    expect(deltas.filter((d) => d.startsWith("text:")).map((d) => d.slice(5)).join("")).toBe("Let me look.");
+    expect(r.usage).toEqual({ inputTokens: 40, outputTokens: 20, cacheRead: 60 });
+    expect(r.stopReason).toBe("tool_use");
+  });
+
+  test("OpenAI: a call ID that is missing or used before gets a new one", async () => {
+    vi.stubGlobal("fetch", async () =>
+      sse([delta({ tool_calls: [{ index: 0, id: "call_0", function: { name: "add", arguments: "{}" } }, { index: 1, function: { name: "mul", arguments: "{}" } }] }, "tool_calls")]),
+    );
+    const hist: Message[] = [user("q"), { role: "assistant", parts: [{ type: "tool_call", id: "call_0", name: "add", args: {} }] }, { role: "user", parts: [{ type: "tool_result", callId: "call_0", name: "add", text: "1" }] }];
+    const r = await (await makeProvider("openai:http://localhost:1234/v1|m")).step(req(hist));
+    const ids = r.message.parts.filter((x) => x.type === "tool_call").map((x) => (x as { id: string }).id);
+    expect(ids).toHaveLength(2);
+    expect(new Set([...ids, "call_0"]).size).toBe(3);
+  });
+
+  test("OpenAI: a reply that is not streamed keeps each call, also with no ID and no index", async () => {
+    vi.stubGlobal("fetch", async () => json({ choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ function: { name: "add", arguments: '{"a":1}' } }, { function: { name: "mul", arguments: "{}" } }] } }] }));
+    const r = await (await makeProvider("openai:http://localhost:1234/v1|m")).step(req([user("q")]));
+    expect(r.message.parts.map((x) => (x as { name: string }).name)).toEqual(["add", "mul"]);
+  });
+
+  test("OpenAI: arguments cut by the output limit say so; a double-encoded object is read", () => {
+    expect(parseArgs({ id: "", name: "add", args: '{"a": 1, "b' }, true).parseError).toMatch(/output limit cut the arguments/);
+    expect(parseArgs({ id: "", name: "add", args: JSON.stringify('{"a": 1}') }, false).args).toEqual({ a: 1 });
+    expect(parseArgs({ id: "", name: "add", args: "[1]" }, false).parseError).toMatch(/one JSON object/);
+  });
+
+  test("OpenAI: a server that refuses stream_options gets the request again without it, and estimates stand in for missing usage", async () => {
+    const bodies: any[] = [];
+    vi.stubGlobal("fetch", async (_u: string, init: any) => {
+      const b = JSON.parse(init.body);
+      bodies.push(b);
+      if (b.stream_options) return json({ error: { message: "Unrecognized request argument supplied: stream_options" } }, 400);
+      return sse([delta({ content: "ok" }, "stop")]);
+    });
+    const r = await (await makeProvider("openai:http://localhost:1234/v1|m")).step(req([user("hello there")]));
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1].stream_options).toBeUndefined();
+    expect(r.message.parts).toEqual([{ type: "text", text: "ok" }]);
+    expect(r.usage.inputTokens).toBeGreaterThan(0);
+    expect(r.note).toMatch(/counts are estimates/);
+  });
+
+  test("OpenAI: a stream that stops before its end is tried again, and the retry notice comes first", async () => {
+    let n = 0;
+    vi.stubGlobal("fetch", async () => (n++ === 0 ? sse([delta({ content: "half a" })], false) : sse([delta({ content: "whole" }, "stop")])));
+    const events: string[] = [];
+    const r = await (await makeProvider("openai:http://localhost:1234/v1|m", { sleep: async () => {} })).step(
+      req([user("x")], { onDelta: (d) => events.push(d.text), onRetry: (e) => events.push(`retry:${e.reason}`) }),
+    );
+    expect(events).toEqual(["half a", "retry:the reply stopped early", "whole"]);
+    expect(r.message.parts).toEqual([{ type: "text", text: "whole" }]);
+  });
+
+  test("Claude: call IDs and names from other servers become valid", () => {
+    const p = new ClaudeProvider("claude-haiku-5-5", { client: fakeClient([]) });
+    const hist: Message[] = [user("q"), { role: "assistant", provider: "openai", parts: [{ type: "tool_call", id: "functions.read_file:0", name: "functions.read_file", args: {} }] }, { role: "user", parts: [{ type: "tool_result", callId: "functions.read_file:0", name: "read_file", text: "x" }] }];
+    const out: any[] = p.toNative(hist);
+    const id = out[1].content[0].id;
+    expect(id).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+    expect(out[2].content[0].tool_use_id).toBe(id);
+    expect(out[1].content[0].name).toBe("functions_read_file");
+  });
+
+  test("retry: 408 is tried again; x-should-retry false is not; a ProviderError is not", () => {
+    expect(retryReason({ status: 408 })).toBe("server error (408)");
+    expect(retryReason({ status: 503, headers: { "x-should-retry": "false" } })).toBeUndefined();
+    expect(retryReason(new ProviderError("Model server error 400: the request timed out", false))).toBeUndefined();
   });
 });
