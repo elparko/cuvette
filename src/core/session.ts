@@ -365,7 +365,7 @@ export class Session {
     const resumed = this.record.entries(["session"]).length > 0;
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
-    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think }));
+    this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache }));
     if (opts.refereeProvider) this.refereeProvider = opts.refereeProvider;
     else if (this.settings.referee === "same") this.refereeProvider = this.provider;
     else if (this.settings.referee && this.settings.referee !== "none") this.refereeProvider = await makeProvider(this.settings.referee, { effort: this.settings.effort });
@@ -2065,7 +2065,7 @@ export class Session {
     const project = projectSettings(this.cwd).reduce<Record<string, unknown>>((a, l) => Object.assign(a, l), {});
     const start = (project.hooks as Settings["hooks"] | undefined)?.SessionStart;
     if (start?.length) await new HookRunner([], { SessionStart: start }, this.cwd).event("SessionStart", { session: this.id });
-    const later = ["model", "referee", "mode", "effort", "numCtx", "think", "defaultAdapters", "output_folder"].filter((k) => k in project && JSON.stringify(project[k]) !== JSON.stringify((before as Record<string, unknown>)[k]));
+    const later = ["model", "referee", "mode", "effort", "promptCache", "numCtx", "think", "defaultAdapters", "output_folder"].filter((k) => k in project && JSON.stringify(project[k]) !== JSON.stringify((before as Record<string, unknown>)[k]));
     const shadowed = this.adapters.filter((a) => { try { return findAdapter(a.name, this.cwd).root !== a.root; } catch { return false; } }).map((a) => a.name);
     const parts = [choice === "trust" ? "This folder is trusted. Its settings, hooks and adapters apply now." : "This folder is trusted for this session. Its settings, hooks and adapters apply now."];
     if (later.length) parts.push(`These folder settings apply in the next session: ${later.join(", ")}.`);
@@ -2135,7 +2135,7 @@ export class Session {
     if (name === "planFirst") this.planFirst = value === true || value === "on";
     if (name === "pilot" && (value === true || value === "on")) this.addPilotTools();
     const next = { ...this.settings, [name]: value } as Settings;
-    const provider = name === "model" || name === "effort" ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think }) : this.provider;
+    const provider = name === "model" || name === "effort" || name === "promptCache" ? await makeProvider(next.model, { effort: next.effort, numCtx: next.numCtx, think: next.think, cache: next.promptCache }) : this.provider;
     const referee = ["model", "referee", "effort"].includes(name)
       ? next.referee === "same"
         ? provider

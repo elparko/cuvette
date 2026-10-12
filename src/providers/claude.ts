@@ -14,6 +14,7 @@ export interface ClaudeOpts {
   apiKey?: string;
   effort?: string;
   client?: any;
+  cache?: "off" | "5m" | "1h";
 }
 
 function mapError(e: unknown, model: string): unknown {
@@ -31,13 +32,14 @@ function mapError(e: unknown, model: string): unknown {
   return e;
 }
 
-function cacheLast(messages: any[]): any[] {
+function cacheLast(messages: any[], mark?: Record<string, unknown>): any[] {
   const last = messages.at(-1);
+  if (!mark) return messages;
   if (!last || last.role !== "user") return messages;
   const content = typeof last.content === "string" ? [{ type: "text", text: last.content }] : [...last.content];
   const end = content.length - 1;
   if (end < 0) return messages;
-  content[end] = { ...content[end], cache_control: { type: "ephemeral" } };
+  content[end] = { ...content[end], cache_control: mark };
   return [...messages.slice(0, -1), { ...last, content }];
 }
 
@@ -63,12 +65,14 @@ export class ClaudeProvider implements Provider {
   private made?: { client: any; version: number };
   private effort: string;
   private fallbacks = true;
+  private mark?: Record<string, unknown>;
 
   constructor(readonly model: string, opts: ClaudeOpts = {}) {
     this.info = { provider: "claude", model, contextWindow: 1_000_000, vision: true, small: false, local: false };
     this.effort = opts.effort || (model === "claude-haiku-5-5" ? "medium" : "high");
     this.fixedClient = opts.client;
     this.apiKey = opts.apiKey;
+    this.mark = opts.cache === "off" ? undefined : opts.cache === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
   }
 
   private get client(): any {
@@ -123,7 +127,7 @@ export class ClaudeProvider implements Provider {
 
   private toolsNative(tools: ToolSchema[]): unknown[] {
     const list: any[] = tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
-    if (list.length) list[list.length - 1].cache_control = { type: "ephemeral" };
+    if (list.length && this.mark) list[list.length - 1].cache_control = this.mark;
     return list;
   }
 
@@ -131,8 +135,8 @@ export class ClaudeProvider implements Provider {
     const p: Record<string, unknown> = {
       model: this.model,
       max_tokens: MAX_TOKENS,
-      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-      messages: cacheLast(this.toNative(messages)),
+      system: [{ type: "text", text: system, ...(this.mark ? { cache_control: this.mark } : {}) }],
+      messages: cacheLast(this.toNative(messages), this.mark),
       thinking: { type: "adaptive", display: "summarized" },
       output_config: { effort: this.effort },
     };

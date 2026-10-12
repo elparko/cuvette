@@ -14,6 +14,7 @@ export interface ProviderOpts {
   think?: boolean;
   apiKey?: string;
   client?: any;
+  cache?: "off" | "5m" | "1h";
 }
 
 export interface ModelListing {
