@@ -16,6 +16,8 @@ const Source = z.union([
   z.strictObject({ metric: z.array(z.string()) }),
   z.strictObject({ software: z.literal(true) }),
   z.strictObject({ plan_changes: z.literal(true) }),
+  z.strictObject({ table: z.array(z.string()), need: z.string().optional(), total: z.array(z.string()).optional() }),
+  z.strictObject({ args: z.array(z.string()) }),
 ]);
 
 const Item = z.strictObject({
@@ -25,6 +27,8 @@ const Item = z.strictObject({
   from: z.array(Source).default([]),
   ask: z.string().optional(),
   hand: z.string().optional(),
+  merge: z.boolean().optional(),
+  request: z.string().optional(),
 });
 
 const Guideline = z.strictObject({
@@ -97,7 +101,8 @@ const clip = (s: string, n = 220) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 function plain(v: unknown): string {
   if (v === undefined || v === null) return "";
   if (typeof v === "string") return v.trim();
-  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (typeof v === "number") return Number.isInteger(v) ? String(v) : String(Number(v.toPrecision(4)));
+  if (typeof v === "boolean") return String(v);
   if (Array.isArray(v)) return v.map(plain).filter(Boolean).join("; ");
   if (typeof v === "object") return Object.values(v).map(plain).filter(Boolean).join(": ");
   return String(v);
@@ -196,9 +201,12 @@ function fromDataCheck(c: Context, checks: string[], clear?: string): Found | un
 function fromSteps(c: Context, pattern: string): Found | undefined {
   const re = new RegExp(pattern, "i");
   const num = stepNumbers(c.nodes);
-  const hits = c.nodes.filter((n) => re.test(`${n.tool} ${n.summary}`));
+  const text = (n: Node) => (n.tool === "run_script" && typeof n.args?.purpose === "string" ? n.args.purpose : n.summary || n.tool).split(/\.\s/)[0]!.replace(/\.$/, "");
+  const hits = c.nodes.filter((n) => re.test(`${n.tool} ${text(n)}`));
   if (!hits.length) return undefined;
-  return { value: clip(hits.slice(0, 4).map((n) => `${n.summary || n.tool} (step ${num.get(n.id)})`).join("; ")), source: `Step ${hits.slice(0, 4).map((n) => num.get(n.id)).join(", ")}` };
+  const shown = new Map<string, number[]>();
+  for (const n of hits) shown.set(text(n), [...(shown.get(text(n)) ?? []), num.get(n.id)!]);
+  return { value: clip([...shown].slice(0, 4).map(([t, steps]) => `${t} (step ${steps.join(", ")})`).join("; "), 400), source: `Step ${hits.slice(0, 4).map((n) => num.get(n.id)).join(", ")}` };
 }
 
 function fromMetric(c: Context, patterns: string[]): Found | undefined {
@@ -210,7 +218,36 @@ function fromMetric(c: Context, patterns: string[]): Found | undefined {
     for (const [k, v] of Object.entries(metrics)) if (res.some((re) => re.test(k)) && has(v)) found.push({ text: `${k} = ${plain(v)}`, step: num.get(n.id) });
   }
   if (!found.length) return undefined;
-  return { value: clip(found.slice(0, 4).map((f) => f.text).join("; ")), source: `Result of step ${[...new Set(found.slice(0, 4).map((f) => f.step))].join(", ")}` };
+  const distinct = [...new Map(found.map((f) => [f.text, f])).values()].slice(0, 4);
+  return { value: clip(distinct.map((f) => f.text).join("; ")), source: `Result of step ${[...new Set(distinct.map((f) => f.step))].join(", ")}` };
+}
+
+function fromTable(c: Context, patterns: string[], need?: string, total?: string[]): Found | undefined {
+  const res = patterns.map((p) => new RegExp(p, "i"));
+  const needRe = need ? new RegExp(need, "i") : undefined;
+  const num = stepNumbers(c.nodes);
+  for (const n of [...c.nodes].reverse()) {
+    const t = (n.result as { table?: { columns?: string[]; rows?: unknown[][] } } | null)?.table;
+    if (!t?.columns || !t.rows?.length || t.rows.length > 20) continue;
+    const cols = t.columns;
+    const picked = cols.map((name, i) => i).filter((i) => i > 0 && res.some((re) => re.test(cols[i]!)));
+    if (!picked.length || (needRe && !cols.some((name, i) => i > 0 && needRe.test(name)))) continue;
+    const lines = t.rows.map((r) => picked.map((i) => `${cols[i]} = ${plain(r[i])}`).join(", "));
+    let value = new Set(lines).size === 1 ? lines[0]! : t.rows.map((r, i) => `${plain(r[0])}: ${lines[i]}`).join("; ");
+    const idx = (total ?? []).map((name) => cols.indexOf(name));
+    if (total?.length && idx.every((i) => i >= 0)) value += `; total = ${idx.reduce((sum, i) => sum + Number(t.rows![0]![i]), 0)}`;
+    return { value: clip(value, 700), source: `Result table of step ${num.get(n.id)}` };
+  }
+  return undefined;
+}
+
+function fromArgs(c: Context, keys: string[]): Found | undefined {
+  const num = stepNumbers(c.nodes);
+  for (const n of [...c.nodes].reverse()) {
+    const k = keys.find((key) => has(n.args?.[key]));
+    if (k) return { value: clip(`${k} = ${plain(n.args[k])}`), source: `Step ${num.get(n.id)}` };
+  }
+  return undefined;
 }
 
 function fromSoftware(c: Context): Found | undefined {
@@ -229,6 +266,7 @@ function fromPlanChanges(c: Context): Found | undefined {
 }
 
 function resolve(c: Context, item: GuidelineItem): Found | undefined {
+  const found: Found[] = [];
   for (const s of item.from) {
     const f =
       "decision" in s ? fromDecision(c, s.decision)
@@ -238,10 +276,13 @@ function resolve(c: Context, item: GuidelineItem): Found | undefined {
       : "steps" in s ? fromSteps(c, s.steps)
       : "metric" in s ? fromMetric(c, s.metric)
       : "software" in s ? fromSoftware(c)
+      : "table" in s ? fromTable(c, s.table, s.need, s.total)
+      : "args" in s ? fromArgs(c, s.args)
       : fromPlanChanges(c);
-    if (f) return f;
+    if (f && !item.merge) return f;
+    if (f) found.push(f);
   }
-  return undefined;
+  return found.length ? { value: clip(found.map((f) => f.value).join("; "), 500), source: found.map((f) => f.source).join("; ") } : undefined;
 }
 
 function answersOf(record: AnalysisRecord, g: Guideline): Map<string, { value: string; na: boolean; qid: string }> {
@@ -262,13 +303,22 @@ function answersOf(record: AnalysisRecord, g: Guideline): Map<string, { value: s
   return out;
 }
 
+function requestHint(record: AnalysisRecord, pattern: string | undefined): string {
+  const text = String(liveEntries(record, ["user"])[0]?.data.text ?? "");
+  if (!pattern || !text) return "";
+  const re = new RegExp(pattern, "i");
+  const hits = text.split(/(?<=[.!?])\s+/).filter((s) => re.test(s)).slice(0, 2).map((s) => s.replace(/\s+/g, " ").trim());
+  return hits.length ? ` The request says: "${clip(hits.join(" "), 300)}"` : "";
+}
+
 export function buildChecklist(record: AnalysisRecord, id: GuidelineId): Checklist {
   const guideline = loadGuideline(id);
   const { values } = decisionValues(record);
   const c: Context = { record, values, nodes: record.nodes().filter((n) => !n.sensitivityOf) };
   const answers = answersOf(record, guideline);
   const items = guideline.items.map((it): ChecklistItem => {
-    const base = { id: it.id, section: it.section, text: it.text, ask: it.ask, hand: it.hand };
+    const hint = it.hand ? requestHint(record, it.request) : "";
+    const base = { id: it.id, section: it.section, text: it.text, ask: it.ask, hand: it.hand ? `${it.hand}${hint}` : undefined };
     const a = answers.get(it.id);
     if (a?.na) return { ...base, status: "not_applicable", value: "", source: `Your answer to ${a.qid}` };
     if (a) return { ...base, status: "covered", value: clip(a.value), source: `Your answer to ${a.qid}` };

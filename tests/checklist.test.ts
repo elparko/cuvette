@@ -239,3 +239,101 @@ test("after the last step, the session offers the checklist once when a guidelin
   expect(offers()).toHaveLength(1);
   await t.close();
 });
+
+const compareNode = () =>
+  node({
+    adapter: "patch-clamp",
+    programVersion: "2.3.8",
+    tool: "compare_cell_groups",
+    args: { features: "event_frequency_hz,event_amplitude_pa", replicate_unit: "cells" },
+    summary: "Welch t-test on 2 feature(s), cKO minus Ctrl. Cells from the same animal are not independent, so the p values are too small if the animal explains part of the variance.",
+    result: {
+      metrics: { n_features: 2, max_icc_animal: 0.27178572701435655 },
+      table: {
+        columns: ["feature", "unit", "group_a", "group_b", "n_a", "n_b", "n_animals_a", "n_animals_b", "mean_a", "sd_a", "mean_b", "sd_b", "mean_diff_b_minus_a", "ci_lo", "ci_hi", "cohen_d"],
+        rows: [
+          ["event_frequency_hz", "cells", "Ctrl", "cKO", 16, 16, 6, 6, 2.5765350877, 1.1370418702, 1.6627192982, 1.06297057, -0.9138157894, -1.7086787084, -0.1189528704, -0.83026647],
+          ["event_amplitude_pa", "cells", "Ctrl", "cKO", 16, 16, 6, 6, 55.49043247, 18.104072267, 38.118343153, 11.978844141, -17.37208931, -28.52715047, -6.217028162, -1.13172603],
+        ],
+      },
+    },
+  });
+
+function pilotRecord(): AnalysisRecord {
+  const r = recordWith({ replicate_unit: "cells", group_test: "t", alpha: 0.05, sweeps: "all" });
+  r.append("samples", { action: "drafted", rows: [
+    { sample: "m1", group: "Ctrl", unit: "m1", batch: "", path: "" },
+    { sample: "m2", group: "cKO", unit: "m2", batch: "", path: "" },
+  ] });
+  r.addNode(node({ adapter: "patch-clamp", tool: "detect_events", summary: "1003 inward event(s). Frequency 3.519 Hz.", result: { metrics: { mean_amplitude_pa: 42.489, amplitude_sd_pa: 23.48, noise_sd_pa: 3.27 } } }));
+  r.addNode(node({ adapter: "patch-clamp", tool: "detect_events_for_cells", summary: "32 cell(s) from cells.", result: { metrics: { n_cells: 32, n_failed: 0 } } }));
+  r.addNode(compareNode());
+  return r;
+}
+
+test("the unit counts come from the result table of the comparison, with the total, not from the sample sheet", () => {
+  const c = buildChecklist(pilotRecord(), "arrive");
+  for (const id of ["2a", "3c"]) {
+    expect(item(c, id).status).toBe("covered");
+    expect(item(c, id).value).toBe("unit = cells, group_a = Ctrl, group_b = cKO, n_a = 16, n_b = 16, n_animals_a = 6, n_animals_b = 6; total = 32");
+    expect(item(c, id).source).toBe("Result table of step 3");
+  }
+});
+
+test("the summary statistics for each group come from the result table, not from a pilot step", () => {
+  const v = item(buildChecklist(pilotRecord(), "arrive"), "10a").value;
+  expect(v).toContain("event_amplitude_pa: group_a = Ctrl, group_b = cKO, mean_a = 55.49, sd_a = 18.1, mean_b = 38.12, sd_b = 11.98");
+  expect(v).not.toContain("noise_sd_pa");
+});
+
+test("the effect size with the interval is read from the columns of the result table", () => {
+  const i = item(buildChecklist(pilotRecord(), "arrive"), "10b");
+  expect(i.status).toBe("covered");
+  expect(i.value).toContain("event_frequency_hz: mean_diff_b_minus_a = -0.9138, ci_lo = -1.709, ci_hi = -0.119, cohen_d = -0.8303");
+  const noInterval = recordWith({});
+  noInterval.addNode(node({ result: { table: { columns: ["feature", "mean_diff", "cohen_d"], rows: [["a", 1.2, 0.4]] } } }));
+  expect(item(buildChecklist(noInterval, "arrive"), "10b").status).toBe("missing");
+});
+
+test("the outcome measures are read from the features of the comparison", () => {
+  const i = item(buildChecklist(pilotRecord(), "arrive"), "6a");
+  expect(i.status).toBe("covered");
+  expect(i.value).toBe("features = event_frequency_hz,event_amplitude_pa");
+  expect(item(buildChecklist(recordWith({}), "arrive"), "6a").status).toBe("missing");
+});
+
+test("a sweeps decision and the failed count fill the inclusion items, and an empty column does not", () => {
+  const c = buildChecklist(pilotRecord(), "arrive");
+  expect(item(c, "3a").value).toBe("sweeps = all");
+  expect(item(c, "3b").value).toBe("sweeps = all; n_failed = 0");
+  const r = recordWith({});
+  r.append("data_check", { source: "t.csv", kind: "table", size: "10 rows", items: [{ id: "empty:label", check: "empty_column", level: "note", column: "label", text: "Column 'label' is empty." }], text: "" });
+  expect(item(buildChecklist(r, "arrive"), "3b").status).toBe("missing");
+});
+
+test("the statistical method shows the test, the alpha, the step and the software", () => {
+  const v = item(buildChecklist(pilotRecord(), "arrive"), "7a").value;
+  expect(v).toContain("group_test = t; alpha = 0.05");
+  expect(v).toContain("Welch t-test on 2 feature(s), cKO minus Ctrl (step 3)");
+  expect(v).toContain("patch-clamp program 2.3.8");
+});
+
+test("the assumption item shows the intraclass correlation and ignores the word variance in a summary", () => {
+  const i = item(buildChecklist(pilotRecord(), "arrive"), "7b");
+  expect(i.status).toBe("covered");
+  expect(i.value).toBe("max_icc_animal = 0.2718");
+  const r = recordWith({});
+  r.addNode(node({ summary: "Welch t-test for groups with unequal variance." }));
+  expect(item(buildChecklist(r, "arrive"), "7b").status).toBe("missing");
+});
+
+test("the items about the animals and the procedure quote the request and stay Not in the record", () => {
+  const r = recordWith({});
+  r.append("user", { text: "I recorded cells in mice at postnatal day 30. The groups are Ctrl and cKO (Dag1 conditional knockout). The cells were held at -70 mV with NBQX in the bath." });
+  const c = buildChecklist(r, "arrive");
+  expect(item(c, "8a").status).toBe("missing");
+  expect(item(c, "8a").hand).toContain('The request says: "I recorded cells in mice at postnatal day 30."');
+  expect(item(c, "8b").hand).toContain("Dag1 conditional knockout");
+  expect(item(c, "9a").hand).toContain("held at -70 mV");
+  expect(item(c, "9c").hand).not.toContain("The request says");
+});

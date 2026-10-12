@@ -24,6 +24,7 @@ items:
     section: "Sample size"
     text: "Give the number of experimental units in each group and in total."
     from:
+      - { table: ["^unit$", "^group_[ab]$", "^n_(a|b)$", "^n_animals", "^n_units"], need: "^n_(a|b)$", total: [n_a, n_b] }
       - { sheet: size }
       - { plan: data.n }
       - { decision: [sample_size, n_per_group] }
@@ -38,21 +39,23 @@ items:
     section: "Inclusion and exclusion criteria"
     text: "Give the criteria for the inclusion and the exclusion of animals and data points. Say if you set them before the study."
     from:
-      - { decision: [exclusions, exclude_samples, exclude_wells, exclude_flags, exclusion_criteria] }
+      - { decision: [exclusions, exclude_samples, exclude_wells, exclude_flags, exclusion_criteria, sweeps] }
       - { plan: exclusions }
     ask: "The record has no inclusion or exclusion criteria. Add them?"
   - id: 3b
     section: "Inclusion and exclusion criteria"
     text: "For each group, report each animal or data point that you left out of the analysis, with the reason. If none, say so."
+    merge: true
     from:
-      - { decision: [exclusions, exclude_samples, exclude_wells, exclude_flags] }
+      - { decision: [exclusions, exclude_samples, exclude_wells, exclude_flags, sweeps] }
       - { plan: exclusions }
-      - { data_check: [empty_group, empty_column, missing, duplicate_rows], clear: "The data check found no empty group, empty column or missing value." }
+      - { metric: ["^n_failed"] }
     ask: "The record does not say which animals or data points you left out. Add it?"
   - id: 3c
     section: "Inclusion and exclusion criteria"
     text: "Report how many animals or units are in each analysis."
     from:
+      - { table: ["^unit$", "^group_[ab]$", "^n_(a|b)$", "^n_animals", "^n_units"], need: "^n_(a|b)$", total: [n_a, n_b] }
       - { sheet: size }
       - { plan: data.n }
       - { metric: ["^n($|_)", "^n_samples", "^n_units", "^n_animals", "^n_cells"] }
@@ -82,6 +85,7 @@ items:
     from:
       - { plan: definitions }
       - { decision: [outcome, outcome_variable, endpoint_definition, response] }
+      - { args: [outcome, features] }
     ask: "The record has no outcome measure. Add it?"
   - id: 6b
     section: "Outcome measures"
@@ -92,28 +96,34 @@ items:
   - id: 7a
     section: "Statistical methods"
     text: "Give the statistical method of each analysis, with the software."
+    merge: true
     from:
-      - { decision: [test, group_test, two_group_test, binary_test, model_formula, posthoc, p_adjust_method, alternative] }
+      - { decision: [test, group_test, two_group_test, binary_test, model_formula, posthoc, p_adjust_method, alternative, alpha] }
       - { steps: "test|anova|regress|model|ttest|t_test|wilcoxon|mann|kruskal|fisher|chi" }
+      - { software: true }
     ask: "The record has no statistical method. Add it?"
   - id: 7b
     section: "Statistical methods"
     text: "Describe how you checked the assumptions of the method, and what you did if the data did not meet them."
     from:
-      - { steps: "normality|shapiro|levene|variance|assumption|residual|diagnostic" }
+      - { steps: "normality|shapiro|levene|\\bequal.variance|homogeneity|heteroscedast|assumption|residual|diagnostic" }
       - { decision: [equal_variance, variance_model, transform] }
+      - { metric: ["icc"] }
     ask: "The record has no check of the assumptions. Add it?"
   - id: 8a
     section: "Experimental animals"
     text: "Give the species, strain, sex, developmental stage and weight."
+    request: "\\b(mice|mouse|rats?|zebrafish|P[0-9]{1,3}|postnatal|weeks? old|male|female|strain)\\b"
     hand: "This item is outside the analysis. Add the animal details by hand."
   - id: 8b
     section: "Experimental animals"
     text: "Give other relevant details, such as the source, the genetic changes, the genotype and the health state."
+    request: "knockout|\\bcKO\\b|transgenic|genotype|mutant|\\bCre\\b|wild.type|heterozygous|homozygous"
     hand: "This item is outside the analysis. Add the animal details by hand."
   - id: 9a
     section: "Experimental procedures"
     text: "Say what was done, how it was done and what was used, for each group."
+    request: "held at|\\bbath\\b|clamp|inject|\\bdose|treated|slices?\\b|anesthe|perfus|surgery|stimulat"
     hand: "The record holds the analysis, not the experiment. Add the procedure by hand."
   - id: 9b
     section: "Experimental procedures"
@@ -131,6 +141,7 @@ items:
     section: "Results"
     text: "For each experiment, give summary statistics for each group, with a measure of spread."
     from:
+      - { table: ["^group_[ab]$", "^mean_(a|b)$", "^median", "^sd_(a|b)$", "^sem", "^iqr"], need: "^(mean|median)" }
       - { metric: ["mean", "median", "^sd", "_sd", "sem", "std", "iqr"] }
       - { steps: "summary|descriptive" }
     ask: "The record has no summary statistics. Add them?"
@@ -138,5 +149,6 @@ items:
     section: "Results"
     text: "If it applies, give the effect size with a confidence interval."
     from:
+      - { table: ["diff", "^ci_", "_ci$", "lower", "upper", "cohen", "hedges"], need: "^ci_|_ci$|lower|upper" }
       - { metric: ["lower", "upper", "ci_", "_ci", "conf"] }
     ask: "The record has no effect size with an interval. Add it?"
