@@ -52,10 +52,14 @@ load_binary <- function(p) {
   if (mo == "count_as_event") y[miss] <- 1L
   if (mo == "count_as_no_event") y[miss] <- 0L
   use <- in_arm & !is.na(y)
-  if (!is.null(stratum)) use <- use & !is.na(stratum) & nzchar(stratum)
+  n_no_stratum <- 0L
+  if (!is.null(stratum)) {
+    n_no_stratum <- sum(use & (is.na(stratum) | !nzchar(stratum)))
+    use <- use & !is.na(stratum) & nzchar(stratum)
+  }
   arm <- arm[use]; y <- y[use]; stratum <- if (is.null(stratum)) NULL else stratum[use]
   isa <- arm == ga
-  list(x = c(sum(y[isa]), sum(y[!isa])), n = c(sum(isa), sum(!isa)), label_a = ga, label_b = gb, n_missing = n_missing,
+  list(x = c(sum(y[isa]), sum(y[!isa])), n = c(sum(isa), sum(!isa)), label_a = ga, label_b = gb, n_missing = n_missing, n_no_stratum = n_no_stratum,
        n_rows = sum(use), y = y, isa = isa, stratum = stratum, missing_outcome = mo)
 }
 
@@ -76,14 +80,14 @@ run_tool(function() {
   rd <- rd_ci(method, x1, n1, x0, n0, z)
   rr <- rr_ci(x1, n1, x0, n0, z)
   orr <- or_ci(x1, n1, x0, n0, z)
-  nnt <- nnt_text(rd)
+  nnt <- nnt_text(rd, pick(p, "outcome_direction", "event is bad"))
   tb <- matrix(c(x1, n1 - x1, x0, n0 - x0), 2, byrow = TRUE)
   pval <- switch(test,
     chi_square = suppressWarnings(chisq.test(tb, correct = FALSE)$p.value),
     chi_square_continuity = suppressWarnings(chisq.test(tb, correct = TRUE)$p.value),
     fisher = fisher.test(tb)$p.value)
 
-  m <- list(n_rows = d$n_rows, n_missing_outcome = d$n_missing, n_a = n1, n_b = n0, events_a = x1, events_b = x0,
+  m <- list(n_rows = d$n_rows, n_missing_outcome = d$n_missing, n_no_stratum = if (is.null(d$n_no_stratum)) 0L else d$n_no_stratum, n_a = n1, n_b = n0, events_a = x1, events_b = x0,
             risk_a = x1 / n1, risk_b = x0 / n0, rd = rd[1], rd_ci_low = rd[2], rd_ci_high = rd[3],
             rr = rr[1], rr_ci_low = rr[2], rr_ci_high = rr[3], or = orr[1], or_ci_low = orr[2], or_ci_high = orr[3],
             nnt = nnt$value, nnt_ci_low = nnt$low, nnt_ci_high = nnt$high, test_p = pval, alpha = alpha)
@@ -98,6 +102,7 @@ run_tool(function() {
       formatC(orr[1], format = "f", digits = 3), formatC(orr[2], format = "f", digits = 3), formatC(orr[3], format = "f", digits = 3),
       test, formatC(pval, format = "g", digits = 4)),
     sprintf("Number needed to treat: %s.", nnt$text))
+  if (isTRUE(d$n_no_stratum > 0)) lines <- c(lines, sprintf("%d rows with an outcome have no stratum and are left out.", d$n_no_stratum))
   if (d$n_missing > 0) lines <- c(lines, sprintf("%d rows had a missing outcome (missing_outcome = %s).", d$n_missing, pick(p, "missing_outcome", "exclude")))
   if (is.finite(rr[1]) == FALSE) lines <- c(lines, "The relative risk and odds ratio are not defined because a cell has zero patients.")
 

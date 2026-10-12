@@ -44,7 +44,16 @@ test.skipIf(!OPENPYXL)("make_plot saves its figures in the output folder that th
     expect(existsSync(join(dirs.outputDir, "figures", "bars.svg"))).toBe(true);
     expect(r.summary).toMatch(/A 1\.5 ± 0\.7071 \(n = 2\), B 4 ± 1\.414 \(n = 2\)/);
     expect(r.manualRoute).toMatch(/Clustered Column/);
+    writeFileSync(join(root, "one.csv"), "Group,Value\nA,1\nA,2\nB,5\n");
+    const one = await plot.execute({ path: join(root, "one.csv"), kind: "bar", x: "Group", y: "Value", y_label: "Value (AU)", error_bars: "SD", points: true, file_name: "one" }, ctx);
+    expect(one.summary).toMatch(/B 5 ± no error bar \(n = 1\)/);
   } finally {
     await rt.close();
   }
+});
+
+test.skipIf(!OPENPYXL)("table cells: an ID with a leading zero stays text; a decimal comma, a thousands comma and a trailing dot read as numbers", () => {
+  const code = `import sys, json\nsys.path.insert(0, ${JSON.stringify(resolve("catalog/tables"))})\nfrom ga_tables import _num\nprint(json.dumps([_num(v) for v in sys.argv[1:]]))`;
+  const out = spawnSync(PY, ["-c", code, "001", "1,5", "1,234", "1.", "-2.5e3", "abc", "0,5"], { encoding: "utf8" });
+  expect(JSON.parse(out.stdout)).toEqual(["001", 1.5, 1234, 1, -2500, "abc", 0.5]);
 });

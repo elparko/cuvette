@@ -20,7 +20,8 @@ run_tool(function() {
     need_column(df, well_col, "well_col")
     value_col <- need_column(df, pick(p, "value_col", if ("od" %in% names(df)) "od" else NULL), "value_col")
     wide <- reshape(df[, c(time_col, well_col, value_col)], idvar = time_col, timevar = well_col, direction = "wide")
-    names(wide) <- sub(paste0("^", value_col, "\\."), "", names(wide))
+    pre <- paste0(value_col, ".")
+    names(wide) <- ifelse(startsWith(names(wide), pre), substring(names(wide), nchar(pre) + 1), names(wide))
     df <- wide[order(wide[[time_col]]), ]
   }
   time <- suppressWarnings(as.numeric(df[[time_col]]))
@@ -54,7 +55,7 @@ run_tool(function() {
     v <- g$vals
     row <- data.frame(well = w, k = v$k, n0 = v$n0, r = v$r, t_mid = v$t_mid, t_gen = v$t_gen, auc_l = v$auc_l, auc_e = v$auc_e, sigma = v$sigma, note = v$note, stringsAsFactors = FALSE)
     if (do_lag) {
-      ly <- if (is.null(blank)) yy else yy - bl
+      ly <- if (bg == "blank") yy - bl else yy
       keep <- ly > 0 & (t_trim <= 0 | tt <= t_trim)
       el <- tryCatch(fit_easylinear(tt[keep], ly[keep], h = h), error = function(e) e)
       if (inherits(el, "error")) {

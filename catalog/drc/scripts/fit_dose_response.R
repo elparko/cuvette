@@ -58,7 +58,7 @@ run_tool(function() {
   ic50_type <- pick(p, "ic50_type", "relative")
   if (!ic50_type %in% c("relative", "absolute")) fail(paste("ic50_type must be relative or absolute, not", ic50_type))
   level <- as.numeric(pick(p, "response_level", 50))
-  ci <- pick(p, "ci", "log")
+  ci <- pick(p, "ci", "delta")
   if (!ci %in% c("log", "delta")) fail(paste("ci must be log or delta, not", ci))
   alpha <- 1 - as.numeric(pick(p, "ci_level", 0.95))
   weighting <- pick(p, "weighting", "none")

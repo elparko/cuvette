@@ -276,8 +276,11 @@ export function designChecks(rows: SampleRow[], opts: { n?: string; test?: strin
     const hi = Math.max(...ns);
     if (lo > 0 && (hi >= 2 * lo || hi - lo >= 3)) out.push({ id: "unbalanced", check: "unbalanced", level: "warn", text: `The groups are not balanced: ${counts.map((c) => `${c.g} n = ${c.units}`).join(", ")}. A test that assumes equal variances is less safe. Welch's test or a model is safer.` });
     const one = counts.filter((c) => c.units < 2);
+    const what = hasUnits ? word : "sample";
+    const lowNs = one.map((c) => `${c.g} n = ${c.units}`).join(", ");
+    const allOne = one.every((c) => c.units === 1);
     if (one.length)
-      out.push({ id: "too_few", check: "too_few", level: "ask", text: `${one.map((c) => c.g).join(", ")} ${one.length === 1 ? "has" : "have"} only one ${hasUnits ? word : "sample"}. No test can estimate the spread with n = 1.`, question: `${one.map((c) => c.g).join(", ")} ${one.length === 1 ? "has" : "have"} n = 1. No test can estimate the spread. Show the results without a test, or stop?`, options: [{ value: "descriptive", label: "Show the results without a test" }, { value: "stop", label: "Stop. I add data" }], recommendation: "descriptive" });
+      out.push({ id: "too_few", check: "too_few", level: "ask", text: allOne ? `${one.map((c) => c.g).join(", ")} ${one.length === 1 ? "has" : "have"} only one ${what}. No test can estimate the spread with n = 1.` : `Some groups have fewer than 2 ${what}s: ${lowNs}. No test can estimate the spread with n below 2.`, question: allOne ? `${one.map((c) => c.g).join(", ")} ${one.length === 1 ? "has" : "have"} n = 1. No test can estimate the spread. Show the results without a test, or stop?` : `Some groups have fewer than 2 ${what}s: ${lowNs}. No test can estimate the spread. Show the results without a test, or stop?`, options: [{ value: "descriptive", label: "Show the results without a test" }, { value: "stop", label: "Stop. I add data" }], recommendation: "descriptive" });
     else if (lo < 3) out.push({ id: "too_few", check: "too_few", level: "warn", text: `The smallest group has n = ${lo}. With fewer than 3 ${word}s in a group, a test has very little power. Report the values and the effect size.` });
     const rank = /mann|whitney|wilcoxon|rank/i.test(opts.test ?? "");
     if (rank && lo >= 2) {

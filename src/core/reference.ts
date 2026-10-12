@@ -63,11 +63,14 @@ function xlsxSheets(path: string): Sheet[] {
     const grid: unknown[][] = [];
     for (const row of xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
       const cells: unknown[] = [];
-      for (const c of row[1]!.matchAll(/<c r="([A-Z]+\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
-        const type = /t="(\w+)"/.exec(c[2]!)?.[1];
-        const v = /<v>([\s\S]*?)<\/v>/.exec(c[3] ?? "")?.[1];
-        const inline = /<t[^>]*>([\s\S]*?)<\/t>/.exec(c[3] ?? "")?.[1];
-        cells[colIndex(c[1]!)] = type === "s" ? shared[Number(v)] : type === "inlineStr" ? unxml(inline ?? "") : type === "str" ? unxml(v ?? "") : v === undefined ? null : Number(v);
+      let col = -1;
+      for (const c of row[1]!.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        const ref = /\br="([A-Z]+)\d*"/.exec(c[1]!)?.[1];
+        col = ref ? colIndex(ref) : col + 1;
+        const type = /\bt="(\w+)"/.exec(c[1]!)?.[1];
+        const v = /<v>([\s\S]*?)<\/v>/.exec(c[2] ?? "")?.[1];
+        const inline = /<t[^>]*>([\s\S]*?)<\/t>/.exec(c[2] ?? "")?.[1];
+        cells[col] = type === "s" ? shared[Number(v)] : type === "inlineStr" ? unxml(inline ?? "") : type === "str" ? unxml(v ?? "") : v === undefined || type === "e" ? null : Number(v);
       }
       grid.push(cells);
     }

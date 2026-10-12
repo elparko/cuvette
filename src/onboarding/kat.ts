@@ -121,7 +121,7 @@ function makeContext(workDir: string, sessionDir: string, signal: AbortSignal, b
 const OFFLINE_CODES = new Set([6, 7, 28, 35, 56]);
 
 export function fetchData(test: KnownAnswerTest, root: string, timeoutMs = 1_800_000): Promise<{ skip?: string; error?: string }> {
-  if (test.data.every((d) => existsSync(join(root, d)))) return Promise.resolve({});
+  if (test.data.length && test.data.every((d) => existsSync(join(root, d)))) return Promise.resolve({});
   const script = join(root, test.fetch);
   if (!existsSync(script)) return Promise.resolve({ error: `the fetch script ${test.fetch} does not exist` });
   return new Promise((done) => {

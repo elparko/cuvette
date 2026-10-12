@@ -41,6 +41,21 @@ test("a CSV: the rows, the columns and the values of the group column", async ()
   expect(insp.images_seen).toBe(false);
 });
 
+test("a 0-to-1 float image is floating point, not 10-bit", async () => {
+  const p = join(root, "float.tif");
+  execFileSync(scriptPython(), ["-I", "-c", "import sys, numpy, tifffile; tifffile.imwrite(sys.argv[1], numpy.linspace(0, 1, 64 * 64, dtype='float32').reshape(64, 64))", p]);
+  const insp = await inspectData(p, join(root, "out"));
+  expect(insp.summary).toContain("Size 64 x 64, 32-bit floating point.");
+});
+
+test("a CSV in Windows-1252 reads", async () => {
+  const p = join(root, "latin.csv");
+  writeFileSync(p, Buffer.from("group,dose\nµM low,1\ncafé,2\n", "latin1"));
+  const insp = await inspectData(p, join(root, "out"));
+  expect(insp.ok).toBe(true);
+  expect(insp.summary).toContain("latin.csv: 2 rows, 2 columns: group (text), dose (number).");
+});
+
 test("the rule check drops a question or an option that names a stain or a channel the data does not have", () => {
   const insp = { ok: true, kind: "folder", summary: "Each field has 3 images: CH1 is brightfield, CH3 is red fluorescence.", colors: ["red"], kinds: ["brightfield", "fluorescence"], images_seen: true, previews: [] } as Inspection;
   const g = groundQuestions(

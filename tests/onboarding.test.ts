@@ -92,6 +92,19 @@ describe("checker", () => {
     expect(r.errors.join("\n")).toMatch(/\[kat-present\]/);
   });
 
+  test("a decision default outside lo and hi, or of the wrong type, is an error", async () => {
+    const high = broken("defhigh", (y) => y.replace("default: 0.1\n", "default: 0.7\n"));
+    expect((await checkAdapter(high)).errors).toContain('decision "trim_fraction": the default 0.7 is above "hi" (0.5)');
+    const text = broken("deftext", (y) => y.replace("default: 0.1\n", "default: '0.1'\n"));
+    expect((await checkAdapter(text)).errors).toContain('decision "trim_fraction": kind is "float" but the default "0.1" is not a number');
+  });
+
+  test("a static check does not call a tool of the module unknown", async () => {
+    const dir = broken("static", (y) => y);
+    writeFileSync(join(dir, "adapter.yaml"), readFileSync(join(dir, "adapter.yaml"), "utf8").replace(/^tests:\n/m, "tests:\n  - id: module-tool\n    calls: [{ tool: from_module }]\n    expect: [{ path: ok, equals: true }]\n"));
+    expect((await checkAdapter(dir, { static: true })).errors.join("\n")).not.toMatch(/no tool named "from_module"/);
+  });
+
   test("an approved adapter with no tested versions warns", async () => {
     const dir = broken("status", (y) => y.replace("description: Computes", "status: approved\n  description: Computes"));
     expect((await checkAdapter(dir)).warnings.join("\n")).toMatch(/tested_versions/);

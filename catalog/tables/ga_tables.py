@@ -78,11 +78,25 @@ def _is_xlsx(path):
     return path.lower().endswith((".xlsx", ".xlsm"))
 
 
+def text_encoding(path):
+    with open(path, "rb") as f:
+        raw = f.read()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return "utf-16"
+    for enc in ("utf-8-sig", "cp1252"):
+        try:
+            raw.decode(enc)
+            return enc
+        except UnicodeDecodeError:
+            pass
+    return "latin-1"
+
+
 def load(path, sheet=None):
     path = os.path.expanduser(path)
     if _is_xlsx(path):
         return pd.read_excel(path, sheet_name=sheet or 0)
-    return pd.read_csv(path, sep="\t" if path.lower().endswith((".tsv", ".tab")) else ",")
+    return pd.read_csv(path, sep="\t" if path.lower().endswith((".tsv", ".tab")) else ",", encoding=text_encoding(path))
 
 
 def _need(frame, cols):
@@ -103,7 +117,7 @@ def _quote_names(expr, columns):
 
 def _compute(frame, formulas):
     for name, expr in (formulas or {}).items():
-        frame[name] = pd.to_numeric(frame.eval(_quote_names(expr, frame.columns)), errors="coerce")
+        frame[name] = pd.to_numeric(frame.eval(_quote_names(expr, frame.columns)), errors="coerce").replace([np.inf, -np.inf], np.nan)
     return frame
 
 
@@ -126,10 +140,15 @@ def _num(v):
         s = v.strip()
         if not s:
             return None
-        try:
-            return float(s.replace(",", "")) if re.fullmatch(r"[-+]?[\d,]*\.?\d+(e[-+]?\d+)?", s, re.I) else s
-        except ValueError:
+        if re.fullmatch(r"[-+]?0\d+", s):
             return s
+        if re.fullmatch(r"[-+]?\d{1,3}(,\d{3})+(\.\d+)?", s):
+            return float(s.replace(",", ""))
+        if re.fullmatch(r"[-+]?\d+,\d+", s):
+            return float(s.replace(",", "."))
+        if re.fullmatch(r"[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?", s, re.I):
+            return float(s)
+        return s
     return v
 
 
@@ -150,7 +169,7 @@ def _grid(path, sheet):
         sheets = [{"name": n, "range": wb[n].dimensions, "freeze": wb[n].freeze_panes} for n in names]
         return cells, merges, sheets, ws.title
     sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
-    raw = pd.read_csv(path, header=None, sep=sep, dtype=str, keep_default_na=False, skip_blank_lines=False)
+    raw = pd.read_csv(path, header=None, sep=sep, dtype=str, keep_default_na=False, skip_blank_lines=False, encoding=text_encoding(path))
     cells = {}
     for r, row in enumerate(raw.itertuples(index=False, name=None), 1):
         for c, v in enumerate(row, 1):
@@ -579,7 +598,7 @@ def _style():
 def _err(s, kind):
     n = s.count()
     if n < 2:
-        return 0.0
+        return float("nan")
     sd = s.std(ddof=1)
     return float(sd / np.sqrt(n) if kind == "SEM" else sd)
 
@@ -624,7 +643,7 @@ def make_plot(path, kind, y, y_label, x=None, x_label=None, group=None, error_ba
             ax.errorbar(pos, means, yerr=errs, fmt="none", ecolor="black", elinewidth=1.0, capsize=4, zorder=3)
             desc = "Bar plot of the mean %s by %s with %s error bars%s: %s" % (
                 y, x, error_bars, " and individual points" if points else "",
-                ", ".join("%s %s ± %s (n = %d)" % (c, _fmt(m), _fmt(e), len(d)) for c, m, e, d in zip(cats, means, errs, data)))
+                ", ".join("%s %s ± %s (n = %d)" % (c, _fmt(m), _fmt(e) if e == e else "no error bar", d.count()) for c, m, e, d in zip(cats, means, errs, data)))
             for c, m in zip(cats, means):
                 metrics["mean_" + c] = float(m)
         else:
@@ -681,7 +700,7 @@ def make_plot(path, kind, y, y_label, x=None, x_label=None, group=None, error_ba
                     parts.append("%sn = %d" % ("%s " % g if g else "", len(part)))
             else:
                 agg = part.groupby(x)[y].agg(["mean", "count", "std"]).reset_index()
-                errs = agg["std"].fillna(0) / (np.sqrt(agg["count"]) if error_bars == "SEM" else 1)
+                errs = agg["std"] / (np.sqrt(agg["count"]) if error_bars == "SEM" else 1)
                 reps = bool((agg["count"] > 1).any())
                 shows_err = shows_err or reps
                 ax.errorbar(agg[x], agg["mean"], yerr=errs if reps else None, color=col, marker="o", markersize=4, linewidth=1.2, capsize=3, label=lab)
@@ -817,7 +836,7 @@ def _plate_sheets(path, sheet=None):
         return out
     sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
     cells = {}
-    with open(path, encoding="utf-8-sig", errors="replace", newline="") as f:
+    with open(path, encoding=text_encoding(path), newline="") as f:
         for r, row in enumerate(csv.reader(f, delimiter=sep), 1):
             for c, v in enumerate(row, 1):
                 v = _raw(v)
@@ -896,7 +915,7 @@ def _read_map(map_path, map_sheet, well_column, map_name):
     if _is_xlsx(map_path) or map_path.lower().endswith(".xls"):
         frame = pd.read_excel(map_path, sheet_name=map_sheet or 0, dtype=str, keep_default_na=False)
     else:
-        frame = pd.read_csv(map_path, sep="\t" if map_path.lower().endswith((".tsv", ".tab")) else ",", dtype=str, keep_default_na=False)
+        frame = pd.read_csv(map_path, sep="\t" if map_path.lower().endswith((".tsv", ".tab")) else ",", dtype=str, keep_default_na=False, encoding=text_encoding(map_path))
     frame.columns = [str(c).strip() for c in frame.columns]
     col = well_column or next((c for c in frame.columns if c.lower() in WELL_COLUMNS), None)
     if col not in frame.columns:

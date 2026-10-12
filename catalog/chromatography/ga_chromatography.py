@@ -220,21 +220,22 @@ def calibration_curve(concentrations, areas, through_origin=None, weighting="non
         slope = float(np.sum(w * x * y) / np.sum(w * x * x))
         intercept = 0.0
         pred = slope * x
-        dof = len(x) - 1
+        dof = int(np.sum(w > 0)) - 1
     else:
         W = np.diag(w)
         X = np.column_stack([np.ones_like(x), x])
         beta = np.linalg.solve(X.T @ W @ X, X.T @ W @ y)
         intercept, slope = float(beta[0]), float(beta[1])
         pred = intercept + slope * x
-        dof = len(x) - 2
+        dof = int(np.sum(w > 0)) - 2
     resid = y - pred
     ss_res = float(np.sum(w * resid ** 2))
     ss_tot = float(np.sum(w * (y - np.average(y, weights=w)) ** 2))
     r2 = 1.0 - ss_res / ss_tot if ss_tot else float("nan")
     se_resid = float(np.sqrt(ss_res / dof)) if dof > 0 else float("nan")
-    lod = float(3.3 * se_resid / slope) if slope else float("nan")
-    loq = float(10.0 * se_resid / slope) if slope else float("nan")
+    se_area = float(np.sqrt(np.sum(resid[w > 0] ** 2) / dof)) if dof > 0 else float("nan")
+    lod = float(3.3 * se_area / slope) if slope else float("nan")
+    loq = float(10.0 * se_area / slope) if slope else float("nan")
     frame = pd.DataFrame({"concentration": x, "area": y, "fitted_area": pred, "residual": resid,
                           "residual_percent": 100.0 * resid / np.where(y == 0, np.nan, y)})
     _style()
@@ -269,8 +270,10 @@ def quantify_areas(areas, slope, intercept, unit="unit", labels=None, lowest_sta
     conc = (y - float(intercept)) / float(slope)
     frame = pd.DataFrame({"sample": names or ["sample %d" % (i + 1) for i in range(len(y))], "area": y, "concentration": conc})
     outside = []
-    if lowest_standard is not None and highest_standard is not None:
-        frame["in_calibration_range"] = (conc >= float(lowest_standard)) & (conc <= float(highest_standard))
+    if lowest_standard is not None or highest_standard is not None:
+        lo = float(lowest_standard) if lowest_standard is not None else -np.inf
+        hi = float(highest_standard) if highest_standard is not None else np.inf
+        frame["in_calibration_range"] = (conc >= lo) & (conc <= hi)
         outside = frame.loc[~frame["in_calibration_range"], "sample"].tolist()
     metrics = {"n_samples": len(y), "mean_concentration": float(np.mean(conc)), "n_outside_range": len(outside)}
     for i, r in frame.iterrows():

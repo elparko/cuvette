@@ -119,6 +119,12 @@ def _in_range(rec, ids, win, current_range_pa):
     return keep
 
 
+def _need_cmd(rec, ids):
+    missing = [i + 1 for i in ids if rec.sweeps[i]["cmd"] is None]
+    if missing:
+        raise ValueError("Sweep(s) %s have no command waveform, so the step current is not known. Use a file that records the command (an ABF or NWB file with the stimulus), not a text or Neo export of the voltage only." % ", ".join(map(str, missing[:10])))
+
+
 def _cell(path, cell_id):
     return str(cell_id) if cell_id else os.path.splitext(os.path.basename(path))[0]
 
@@ -200,6 +206,7 @@ def measure_spikes(path, spike_threshold_method=None, dvdt_cutoff_mv_per_ms=None
     ljp = _need_ljp(ljp_mv)
     rec, ids = _open(path, channel, sweeps, sweep_label, "current_clamp", signal_unit)
     win = _stim(rec, ids, stim_window)
+    _need_cmd(rec, ids)
     cutoff, minpk = float(dvdt_cutoff_mv_per_ms), float(min_peak_mv)
     rows, spikes = [], []
     for i in ids:
@@ -279,6 +286,7 @@ def measure_passive(path, baseline_window=None, input_resistance_measure=None, s
     ljp = _need_ljp(ljp_mv)
     rec, ids = _open(path, channel, sweeps, sweep_label, "current_clamp", signal_unit)
     win = _stim(rec, ids, stim_window)
+    _need_cmd(rec, ids)
     ids = _in_range(rec, ids, win, current_range_pa)
     neg = [i for i in ids if R.step_amplitude(rec, i, win) >= 0]
     if neg:
@@ -593,7 +601,7 @@ def detect_events(path, event_method=None, event_threshold=None, event_direction
     aw = R.parse_window(analysis_window, "analysis_window") if analysis_window else None
     T = _template(rec.rate, rise_ms, decay_ms, sign)
     sep = max(len(T), 2)
-    events, total, noise_all = [], 0.0, []
+    events, total, noise_all, unmeasured = [], 0.0, [], 0
     traces = []
     for i in ids:
         s = rec.sweeps[i]
@@ -639,6 +647,7 @@ def detect_events(path, event_method=None, event_threshold=None, event_direction
             nxt = int(onsets[n_ + 1]) if n_ + 1 < len(onsets) else len(y) - 1
             m = _measure_event(y, rec.rate, int(on), nxt, rise_ms, decay_ms, sign)
             if m is None:
+                unmeasured += 1
                 continue
             isolated = (nxt - on) >= int(7 * decay_ms * 1e-3 * rec.rate) and (n_ == 0 or (on - onsets[n_ - 1]) >= int(7 * decay_ms * 1e-3 * rec.rate))
             events.append({"sweep": i + 1, "time_s": float(t[on]), "amplitude_pa": m["amplitude"], "template_scale_pa": float(scale[n_]) if event_method == "template" else float("nan"),
@@ -648,7 +657,7 @@ def detect_events(path, event_method=None, event_threshold=None, event_direction
     frame = pd.DataFrame(events)
     n_ev = len(frame)
     noise_sd = float(np.mean(noise_all))
-    metrics = {"n_events": n_ev, "analysed_s": float(total), "noise_sd_pa": noise_sd, "event_threshold": thr}
+    metrics = {"n_events": n_ev, "analysed_s": float(total), "noise_sd_pa": noise_sd, "event_threshold": thr, "n_detected_not_measured": unmeasured}
     if n_ev == 0:
         summary = "No event found in %.1f s with %s detection at %g (noise SD %.3g pA). Lower event_threshold, check event_direction (%s), or check event_rise_ms and event_decay_ms." % (total, event_method, thr, noise_sd, event_direction)
         return {"ok": True, "summary": summary, "metrics": _metrics(metrics), "data": {"event_method": event_method}}
@@ -691,6 +700,8 @@ def detect_events(path, event_method=None, event_threshold=None, event_direction
                "time to half decay %.3g ms. Template kinetics: rise %g ms, decay %g ms; filter %s." % (
                    os.path.basename(path), n_ev, event_direction, total, crit_text, freq, metrics["mean_amplitude_pa"], metrics["median_amplitude_pa"], len(iso),
                    metrics["mean_rise_10_90_ms"], metrics["mean_decay_tau_ms"], metrics["mean_half_decay_ms"], rise_ms, decay_ms, "none" if not filter_hz else "%g Hz" % float(filter_hz)))
+    if unmeasured:
+        summary += " %d detected event(s) could not be measured and are not in the table." % unmeasured
     return {"ok": True, "summary": summary, "metrics": _metrics(metrics), "data": {"event_method": event_method, "event_direction": event_direction},
             "table": _table(frame, "events"), "tables": {"cell_features": _table(pd.DataFrame([cell]), "cell_features")}, "outputs": _save(fig, "events")}
 

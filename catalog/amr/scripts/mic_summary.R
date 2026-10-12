@@ -73,7 +73,7 @@ run_tool(function() {
     legend("bottomright", legend = c("MIC50", "MIC90"), pch = c(16, 17), col = c("#1f4e79", "#b03a2e"), cex = 0.7, bg = "white")
   })
 
-  metrics <- list(n_values = nrow(long), n_groups = nrow(summ))
+  metrics <- list(n_values = nrow(long), n_groups = nrow(summ), n_no_value = inp$n_no_value)
   for (i in seq_len(min(nrow(summ), 60))) {
     tag <- clean_name(paste(summ[i, keys], collapse = "_"))
     metrics[[paste0("n_", tag)]] <- summ$n[i]
@@ -83,7 +83,7 @@ run_tool(function() {
   }
   emit(list(
     ok = TRUE,
-    summary = sprintf("%d MIC values in %d groups. MIC50 and MIC90 are the lowest concentrations that inhibit at least 50%% and 90%% of the isolates. Off-scale values: %s.", nrow(long), nrow(summ), off_scale),
+    summary = sprintf("%d MIC values in %d groups. MIC50 and MIC90 are the lowest concentrations that inhibit at least 50%% and 90%% of the isolates. Off-scale values: %s.%s", nrow(long), nrow(summ), off_scale, if (inp$n_no_value > 0) sprintf(" %d cells have no MIC value (blank, NA, nd or -) and are left out.", inp$n_no_value) else ""),
     metrics = metrics,
     data = list(off_scale = off_scale, amr_version = pkg_version("AMR"), summary_file = out_path("summary")),
     table = table_of(summ, out_path("summary")),

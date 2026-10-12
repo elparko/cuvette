@@ -17,7 +17,11 @@ def _read(path):
     if not p.is_file():
         raise FileNotFoundError("file not found: %s" % path)
     if p.suffix.lower() in (".tif", ".tiff"):
-        img = tifffile.imread(str(p))
+        img = np.squeeze(tifffile.imread(str(p)))
+        if img.ndim == 3 and img.shape[0] <= 4 < img.shape[-1]:
+            img = np.moveaxis(img, 0, -1)
+        if img.ndim > 3 or (img.ndim == 3 and img.shape[-1] > 4):
+            raise ValueError("%s has shape %s. The tool segments one 2D image with up to 4 channels. Give one plane, or a projection of the stack" % (path, img.shape))
     else:
         with Image.open(p) as im:
             img = np.array(im if im.mode in ("L", "RGB", "I;16") else im.convert("RGB"))
@@ -60,7 +64,7 @@ def _score(pred, truth):
     inter = int((p & t).sum())
     dice = 2.0 * inter / max(int(p.sum()) + int(t.sum()), 1)
     iou = inter / max(int((p | t).sum()), 1)
-    npred, ntrue = len(np.unique(pred)) - 1, len(np.unique(truth)) - 1
+    npred, ntrue = int(np.unique(pred[pred > 0]).size), int(np.unique(truth[truth > 0]).size)
     out = {"dice": dice, "pixel_iou": iou, "n_pred": npred, "n_truth": ntrue}
     pairs = np.stack([pred.ravel(), truth.ravel()], axis=1)
     pairs = pairs[(pairs[:, 0] > 0) & (pairs[:, 1] > 0)]

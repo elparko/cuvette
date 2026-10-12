@@ -30,9 +30,10 @@ run_tool(function() {
   well <- if (is.null(well_col)) as.character(seq_len(nrow(df)) + 1) else as.character(df[[well_col]])
   keep <- rep(TRUE, nrow(df))
   if (length(exclude)) {
-    miss <- setdiff(exclude, well)
-    if (length(miss)) fail(sprintf("exclude names wells that are not in the column '%s': %s", if (is.null(well_col)) "(file row numbers)" else well_col, paste(miss, collapse = ", ")))
-    keep <- !well %in% exclude
+    plate_well <- paste(plate, well, sep = ":")
+    miss <- setdiff(exclude, c(well, plate_well))
+    if (length(miss)) fail(sprintf("exclude names wells that are not in the column '%s': %s. Write plate:well, such as P2:A1, for a well of one plate only.", if (is.null(well_col)) "(file row numbers)" else well_col, paste(miss, collapse = ", ")))
+    keep <- !(well %in% exclude | plate_well %in% exclude)
   }
   center <- if (stat == "mean_sd") mean else median
   spread <- if (stat == "mean_sd") sd else robust_sd

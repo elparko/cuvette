@@ -293,7 +293,10 @@ def get_tic_image(path, name="tic_image"):
     for i, (x, y, z) in enumerate(p.coordinates):
         if z == 1:
             img[y - 1, x - 1] = _read_ints(p, i).sum()
+    other_z = sum(1 for c in p.coordinates if c[2] != 1)
     vals = img[np.isfinite(img)]
+    if not vals.size:
+        raise ValueError("no pixel has z = 1, so the TIC image is empty. The file has %d pixels in other z planes." % other_z)
     vmax = float(vals.max())
     png, tif, csv = _out(name + ".png"), _out(name + ".tif"), _out(name + "_top_pixels.csv")
     _write_png(png, _colorize(img, 0.0, vmax))
@@ -309,10 +312,12 @@ def get_tic_image(path, name="tic_image"):
         "tic_max_x": rows[0][0],
         "tic_max_y": rows[0][1],
         "tic_cv": float(vals.std() / vals.mean()) if vals.mean() else 0.0,
+        "n_pixels_other_z": other_z,
     }
     return {
         "ok": True,
-        "summary": "Total ion current (sum of intensities per pixel): mean %.6g, max %.6g at pixel (%d, %d)" % (metrics["tic_mean"], vmax, rows[0][0], rows[0][1]),
+        "summary": "Total ion current (sum of intensities per pixel): mean %.6g, max %.6g at pixel (%d, %d)%s" % (metrics["tic_mean"], vmax, rows[0][0], rows[0][1],
+            ". The image shows the z = 1 plane only; %d pixels in other z planes are not in it" % other_z if other_z else ""),
         "metrics": metrics,
         "data": {"coordinates": "1-based, as in imzML"},
         "outputs": _files(png, tif, csv),

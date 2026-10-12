@@ -123,6 +123,8 @@ describe("design checks", () => {
     expect(one).toMatchObject({ level: "ask", recommendation: "descriptive" });
     const two = designChecks([row("a", "Ctrl", "M1"), row("b", "Ctrl", "M2"), row("c", "Drug", "M3"), row("d", "Drug", "M4")]).find((i) => i.id === "too_few")!;
     expect(two.level).toBe("warn");
+    const none = designChecks([row("a", "Ctrl", "Set 1"), row("b", "Ctrl", "Set 2"), row("c", "Drug", "")]).find((i) => i.id === "too_few")!;
+    expect(none.text).toBe("Some groups have fewer than 2 Sets: Drug n = 0. No test can estimate the spread with n below 2.");
     const rank = designChecks(sheet, { n: "One Set", test: "Mann-Whitney U test" }).find((i) => i.id === "too_few_rank")!;
     expect(rank.text).toBe("With n = 3 and n = 3, the smallest possible two-sided p of the Mann-Whitney test is 0.10. The test cannot reach p < 0.05.");
     expect(minPossibleP(3, 3)).toBeCloseTo(0.1);

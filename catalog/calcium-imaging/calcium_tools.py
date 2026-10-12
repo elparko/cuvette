@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 BLUE, ORANGE, VERMILION, GREEN, GREY = "#0072B2", "#E69F00", "#D55E00", "#009E73", "#999999"
-TIME_NAMES = {"time", "time_s", "time (s)", "time(s)", "t", "t_s", "seconds", "sec", "time_sec"}
+TIME_NAMES = {"time", "time_s", "time (s)", "time(s)", "t", "t_s", "seconds", "sec", "time_sec", "time_ms", "time (ms)", "time(ms)", "t_ms", "ms", "milliseconds"}
 INDEX_NAMES = {"", " ", "frame", "frames", "slice", "index", "#", "n", "label", "unnamed: 0"}
 MAD_TO_SD = 1.4826
 
@@ -133,7 +133,7 @@ def _load_traces(path, frame_rate=0.0, time_column="", rois="", kind="F", iscell
         t = None
         if tcol is not None:
             tt = np.array([float(r[tcol]) if r[tcol].strip() else np.nan for r in body])
-            if re.search(r"\bms\b|millisec", header[tcol].lower()):
+            if re.search(r"(?<![a-z])ms(?![a-z])|millisec", header[tcol].lower()):
                 tt = tt / 1000.0
             t = tt
     if rois and str(rois).lower() != "all":
@@ -149,7 +149,8 @@ def _load_traces(path, frame_rate=0.0, time_column="", rois="", kind="F", iscell
             fs_file = 1.0 / np.median(np.diff(t))
             if abs(fs_file - frame_rate) / frame_rate > 0.02:
                 warnings.append("The time column gives %.4g Hz but frame_rate is %.4g Hz. The tool uses frame_rate." % (fs_file, frame_rate))
-        t = np.arange(n) / float(frame_rate)
+        t0 = float(t[0]) if t is not None and np.isfinite(t[0]) else 0.0
+        t = t0 + np.arange(n) / float(frame_rate)
     elif t is not None and np.isfinite(t).all():
         d = np.diff(t)
         if (d <= 0).any():
@@ -253,7 +254,7 @@ def _roi_masks(roi_file, shape):
                 a, b = (r.right - r.left) / 2.0, (r.bottom - r.top) / 2.0
                 m = ((xx - cx) / a) ** 2 + ((yy - cy) / b) ** 2 <= 1.0
             elif kind in ("POLYGON", "FREEHAND", "TRACED", "FREEROI"):
-                m = MPath(r.coordinates()).contains_points(np.c_[xx.ravel(), yy.ravel()]).reshape(ny, nx)
+                m = MPath(r.coordinates()).contains_points(np.c_[xx.ravel() + 0.5, yy.ravel() + 0.5]).reshape(ny, nx)
             else:
                 _fail("the ROI %s in %s has type %s. The tool reads rectangle, oval, polygon and freehand ROIs" % (r.name or i, roi_file, kind))
             masks.append(m)

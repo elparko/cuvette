@@ -21,7 +21,13 @@ warnings.filterwarnings("ignore")
 
 
 def _read(path):
-    return pd.read_csv(os.path.expanduser(path))
+    path = os.path.expanduser(path)
+    for enc in ("utf-8-sig", "cp1252"):
+        try:
+            return pd.read_csv(path, encoding=enc)
+        except UnicodeDecodeError:
+            pass
+    return pd.read_csv(path, encoding="latin-1")
 
 
 def _fail(message):
@@ -402,9 +408,12 @@ def kaplan_meier(path, duration, event, group=None, alpha=0.05, time_points=None
     problem = _event_problem(frame[event], event)
     if problem:
         return _fail(problem)
+    used = [duration, event] + ([group] if group else [])
     before = len(frame)
-    frame = frame.dropna(subset=[duration, event] + ([group] if group else []))
+    frame = frame.dropna(subset=used)
     dropped = before - len(frame)
+    if frame.empty:
+        return _fail("No row has a value in all of %s." % ", ".join(used))
     times = [float(t) for t in (time_points or [])]
     fig, ax = plt.subplots(figsize=(6, 4))
     rows = []
@@ -627,25 +636,32 @@ def _contingency(path, row, column, counts, subset):
         try:
             table = np.asarray(counts, dtype=float)
         except (TypeError, ValueError):
-            return None, None, None, "counts must be a table of whole numbers, one list for each row, such as [[12, 5], [3, 9]]."
+            return None, None, None, None, "counts must be a table of whole numbers, one list for each row, such as [[12, 5], [3, 9]]."
         if table.ndim != 2 or min(table.shape) < 2:
-            return None, None, None, "counts must have 2 or more rows and 2 or more columns. It has shape %s." % (table.shape,)
+            return None, None, None, None, "counts must have 2 or more rows and 2 or more columns. It has shape %s." % (table.shape,)
         if (table < 0).any() or (table != np.round(table)).any():
-            return None, None, None, "counts must hold whole numbers of 0 or more."
-        return table.astype(int), ["row%d" % (i + 1) for i in range(table.shape[0])], ["col%d" % (j + 1) for j in range(table.shape[1])], ""
+            return None, None, None, None, "counts must hold whole numbers of 0 or more."
+        return table.astype(int), ["row%d" % (i + 1) for i in range(table.shape[0])], ["col%d" % (j + 1) for j in range(table.shape[1])], "", 0
     if not path or not row or not column:
-        return None, None, None, "Give counts, or give path with row and column, the two categorical columns of the CSV file."
+        return None, None, None, None, "Give counts, or give path with row and column, the two categorical columns of the CSV file."
     frame = _read(path)
     problem = _need(frame, [row, column])
     if problem:
-        return None, None, None, problem
+        return None, None, None, None, problem
     frame, problem = _subset(frame, subset)
     if problem:
-        return None, None, None, problem
+        return None, None, None, None, problem
+    dropped = int(frame[[row, column]].isna().any(axis=1).sum())
     tab = pd.crosstab(frame[row], frame[column])
     if min(tab.shape) < 2:
-        return None, None, None, "The cross-table of %s by %s has shape %s. Each column needs 2 or more values." % (row, column, tab.shape)
-    return tab.values.astype(int), [str(v) for v in tab.index], [str(v) for v in tab.columns], ""
+        return None, None, None, None, "The cross-table of %s by %s has shape %s. Each column needs 2 or more values." % (row, column, tab.shape)
+    return tab.values.astype(int), [str(v) for v in tab.index], [str(v) for v in tab.columns], "", dropped
+
+
+def _missing_note(n, columns):
+    if not n:
+        return ""
+    return " Dropped %d %s with a missing value in %s." % (n, "row" if n == 1 else "rows", ", ".join(map(str, columns)))
 
 
 def _table_frame(table, rows, cols, label="row"):
@@ -655,7 +671,7 @@ def _table_frame(table, rows, cols, label="row"):
 
 
 def chi_square_test(path=None, row=None, column=None, counts=None, correction=None, subset=None, alpha=0.05):
-    table, rows, cols, problem = _contingency(path, row, column, counts, subset)
+    table, rows, cols, problem, dropped = _contingency(path, row, column, counts, subset)
     if problem:
         return _fail(problem)
     is_2x2 = table.shape == (2, 2)
@@ -670,6 +686,7 @@ def chi_square_test(path=None, row=None, column=None, counts=None, correction=No
     name = "Pearson chi-square test" + (" with Yates continuity correction" if use else "")
     summary = "%s, %d x %d table, n = %d: chi-square %.4g on %d df, p = %.4g (alpha %g). Cramer's V %.3g." % (name, table.shape[0], table.shape[1], n, chi2, dof, p, alpha, cramers_v)
     warning = ""
+    summary += _missing_note(dropped, [row, column])
     if below:
         warning = "Warning: %d of %d cells (%.0f%%) have an expected count below 5 (smallest %.3g). The chi-square p-value can be wrong. Use fisher_exact." % (below, cells, 100.0 * below / cells, expected.min())
         summary += " " + warning
@@ -678,7 +695,7 @@ def chi_square_test(path=None, row=None, column=None, counts=None, correction=No
     exp_path = _table(exp_tab, "expected_counts")["path"]
     return {"ok": True, "summary": summary,
             "metrics": _metrics({"chi2": chi2, "df": dof, "p_value": p, "n": n, "cramers_v": cramers_v, "min_expected": float(expected.min()),
-                                 "n_cells_expected_below_5": below, "fraction_cells_expected_below_5": below / cells}),
+                                 "n_cells_expected_below_5": below, "fraction_cells_expected_below_5": below / cells, "n_dropped": dropped}),
             "data": {"test": name, "correction": use, "alpha": alpha, "significant": bool(p < alpha), "warning": warning,
                      "expected": [[float(v) for v in r] for r in expected], "rows": rows, "columns": cols},
             "table": _table(out_tab, "observed_counts"), "outputs": _files(exp_path)}
@@ -726,7 +743,7 @@ def _fisher_rxc_exact(table, cap):
 
 def fisher_exact(path=None, row=None, column=None, counts=None, alternative="two-sided", subset=None, alpha=0.05, seed=1):
     from scipy.stats.contingency import odds_ratio
-    table, rows, cols, problem = _contingency(path, row, column, counts, subset)
+    table, rows, cols, problem, dropped = _contingency(path, row, column, counts, subset)
     if problem:
         return _fail(problem)
     n = int(table.sum())
@@ -758,6 +775,8 @@ def fisher_exact(path=None, row=None, column=None, counts=None, alternative="two
         data["method"] = method
         summary = "Fisher exact test, %d x %d table, n = %d, two-sided: p = %.4g (alpha %g). Method: %s." % (table.shape[0], table.shape[1], n, p, alpha, method)
     data["significant"] = bool(metrics["p_value"] < alpha)
+    metrics["n_dropped"] = dropped
+    summary += _missing_note(dropped, [row, column])
     return {"ok": True, "summary": summary, "metrics": _metrics(metrics), "data": data, "table": _table(_table_frame(table, rows, cols, row or "row"), "fisher_counts")}
 
 
@@ -766,7 +785,7 @@ def mcnemar_test(path=None, first=None, second=None, counts=None, method=None, s
     if method not in ("exact", "chi-square", "chi-square-corrected"):
         return _fail("method must be exact, chi-square or chi-square-corrected. The decision mcnemar_method sets it.")
     if counts is not None:
-        table, rows, cols, problem = _contingency(None, None, None, counts, None)
+        table, rows, cols, problem, dropped = _contingency(None, None, None, counts, None)
         if problem:
             return _fail(problem)
         if table.shape != (2, 2):
@@ -781,11 +800,13 @@ def mcnemar_test(path=None, first=None, second=None, counts=None, method=None, s
         frame, problem = _subset(frame, subset)
         if problem:
             return _fail(problem)
-        frame = frame[[first, second]].dropna()
-        levels = sorted(set(frame[first].map(str)) | set(frame[second].map(str)))
+        dropped = int(frame[[first, second]].isna().any(axis=1).sum())
+        label = lambda v: str(int(v)) if isinstance(v, (float, np.floating)) and float(v).is_integer() else str(v)
+        frame = frame[[first, second]].dropna().apply(lambda s: s.map(label))
+        levels = sorted(set(frame[first]) | set(frame[second]))
         if len(levels) != 2:
             return _fail("The columns %s and %s must share exactly 2 values. They have: %s." % (first, second, ", ".join(levels)))
-        tab = pd.crosstab(frame[first].map(str), frame[second].map(str)).reindex(index=levels, columns=levels, fill_value=0)
+        tab = pd.crosstab(frame[first], frame[second]).reindex(index=levels, columns=levels, fill_value=0)
         table, rows, cols = tab.values.astype(int), levels, levels
     exact = method == "exact"
     res = mcnemar(table, exact=exact, correction=method == "chi-square-corrected")
@@ -804,10 +825,11 @@ def mcnemar_test(path=None, first=None, second=None, counts=None, method=None, s
     summary = "%s, %d pairs, discordant pairs %d and %d: %sp = %.4g (alpha %g). Proportion with %s: %.4g in %s, %.4g in %s, difference %.4g (%g%% Wald CI %.4g to %.4g)." % (
         name, n, b, c, "" if exact else "statistic %.4g, " % res.statistic, p, alpha, rows[0], p1, first_name, p2, second_name, diff,
         100 * (1 - alpha), diff - zc * se, diff + zc * se)
+    summary += _missing_note(dropped, [first, second])
     if b + c < 25 and not exact:
         summary += " Warning: only %d discordant pairs. The chi-square approximation is poor below 25. Use the exact method." % (b + c)
     metrics = {"n_pairs": n, "discordant_first_only": b, "discordant_second_only": c, "p_value": p, "proportion_first": p1, "proportion_second": p2,
-               "difference": diff, "diff_ci_lo": diff - zc * se, "diff_ci_hi": diff + zc * se}
+               "difference": diff, "diff_ci_lo": diff - zc * se, "diff_ci_hi": diff + zc * se, "n_dropped": dropped}
     if not exact:
         metrics["statistic"] = float(res.statistic)
     return {"ok": True, "summary": summary, "metrics": _metrics(metrics),
