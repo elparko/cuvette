@@ -41,6 +41,7 @@ import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
+import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyEdit, designChecks, groupSummary, readSheet, SAMPLE_COLUMNS, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet } from "./samples.ts";
 import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
@@ -119,7 +120,7 @@ const DATA_CHECK_NOTE = "When you first read a table or list a data folder, the 
 const PLAN_UPDATE_NOTE = "This is a new request in a session with an approved plan. If the request needs analysis steps that are not in the plan, call plan with only what changes: the new steps and the changed sections. The scientist approves the update before a new step runs. If the request needs no new step, answer directly.";
 const PILOT_NOTE = "Pilot: before the first step that changes or counts things, say in one sentence how you will check the method on one sample first. A step that processes many files does not run until the scientist approves a pilot: run the method on one sample, save QC images with outlines of what was counted and what was left out, and call pilot_result.";
 const TECHNICAL = /\b(threshold|otsu|triangle|segmentation model|cellpose model|stardist|cyto\d|diameter|size (filter|limit|cut-?off)|(minimum|maximum|min|max)\.? (cell |object |particle )?size|pixels? (size|area)|sigma|blur|error bars?|standard error|sem|sd bars|test family|t-?test|wilcoxon|mann-?whitney|anova|alpha|significance level|p-?value cut|one-?sided|two-?sided|sidedness|fdr|bonferroni|correction method|random seed|iterations|normali[sz]ation method)\b/i;
-const CHECK_TITLE: Record<string, string> = { missing: "missing values", mixed_type: "text in a number column", decimal_comma: "decimal comma", duplicate_rows: "copied rows", duplicate_ids: "repeated IDs", group_labels: "group names", mixed_units: "units", missing_channel: "missing images", bit_depth: "bit depth", pseudoreplication: "what is n", confounding: "group and batch", too_few: "too few n" };
+const CHECK_TITLE: Record<string, string> = { missing: "missing values", mixed_type: "text in a number column", decimal_comma: "decimal comma", duplicate_rows: "copied rows", duplicate_ids: "repeated IDs", group_labels: "group names", mixed_units: "units", missing_channel: "missing images", bit_depth: "bit depth", pseudoreplication: "what is n", confounding: "group and batch", too_few: "too few n", [METHOD_DATA_CHECK]: METHOD_DATA_TITLE };
 const CLARIFY_SKIP = "No answer. Use your judgment and say what you chose.";
 const SHEET_TITLE = "Sample sheet";
 const PROGRAM_REASON = "chosen by the scientist with /program";
@@ -267,6 +268,7 @@ export class Session {
   pilotStage = false;
   private clarified = false;
   private checked = new Set<string>();
+  private noCompareNoted = false;
   private sheet?: SampleSheet;
   private toolsHinted = false;
   private planStart = 0;
@@ -3091,6 +3093,29 @@ export class Session {
     return items.filter((i, k) => i.level === "ask" && !done.has(`data_check:${i.id}`) && items.findIndex((x) => x.id === i.id) === k).slice(0, 8);
   }
 
+  private compareWithMethod(now: DataSummary): CheckItem[] {
+    if (!this.method) return [];
+    if (!this.method.inputs?.length) {
+      if (!this.noCompareNoted) this.record.append("notice", { text: `The method ${this.method.name} has no stored summary of its data. Cuvette cannot compare the new data with the old data. The next save of a method stores the summary.` });
+      this.noCompareNoted = true;
+      return [];
+    }
+    const before = matchSummary(this.method.inputs, now);
+    if (!before) return [];
+    const found = compareChecks(before, now);
+    this.record.append("data_compare", { method: this.method.name, source: now.source, before: before.source, differences: found });
+    return found.slice(0, 8).map((d) => ({
+      id: `${METHOD_DATA_CHECK}:${now.source}:${d.id}`,
+      check: METHOD_DATA_CHECK,
+      level: "ask" as const,
+      column: d.column,
+      text: d.text,
+      question: `${d.text} The method ${this.method!.name} used the old data. Continue with the new data, or stop?`,
+      options: [{ value: "continue", label: "Continue. The new data is correct" }, { value: "stop", label: "Stop. I check the data" }],
+      recommendation: d.kind === "unit" ? "stop" : "continue",
+    }));
+  }
+
   private checkData(name: string, args: Args, output: ToolOutput): string {
     const given = ["path", "folder", "input", "dir", "directory", "input_dir", "data_dir"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && isAbsolute(v));
     const own = (p: string) => [this.dir, this.outputDir, cuvetteHome()].some((d) => p === d || p.startsWith(`${d}/`));
@@ -3108,6 +3133,7 @@ export class Session {
       this.checked.add(f.label);
       let check: DataCheck;
       let sheet: SampleSheet | undefined;
+      let summaryOf: DataSummary | undefined;
       try {
         if (f.kind === "files") {
           const rels = listDataFiles(f.path);
@@ -3119,13 +3145,16 @@ export class Session {
           const t = readCsvTable(f.path);
           if (!t.rows.length) continue;
           check = checkTable(t, f.label);
+          summaryOf = summarizeTable(t, f.label);
           if (!this.sheet) sheet = sheetFromTable(t, f.label);
         }
       } catch {
         continue;
       }
+      const summary = f.kind === "table" ? summaryOf : undefined;
+      if (summary) check.items.push(...this.compareWithMethod(summary));
       const text = dataCheckText(check);
-      this.record.append("data_check", { source: f.label, kind: check.kind, size: check.size, items: check.items, groups: check.groups ?? null, units: check.units ?? [], text });
+      this.record.append("data_check", { source: f.label, kind: check.kind, size: check.size, items: check.items, groups: check.groups ?? null, units: check.units ?? [], text, summary: summary ?? null });
       out.push(`Data check by the harness (code, not a model):\n${text}`);
       if (check.items.some((i) => i.level === "ask")) out.push(this.planning ? "The harness asks the scientist about each problem under Questions for you in the Questions stage. Do not ask about them again." : "Ask the scientist about each problem under Questions for you before a step uses the data.");
       if (sheet?.rows.length) {

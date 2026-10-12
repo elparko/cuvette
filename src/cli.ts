@@ -30,6 +30,9 @@ Usage
   card, or set "adapter": "<name>" in the answers file. The record keeps each load and its
   reason. With --adapter, the session has only the adapters that you name.
 
+  With --method, the harness compares the new data with the data that the method used.
+  A likely unit change stops the run. Add data-change to --allow to continue.
+
   --bypass-permissions
   WARNING: In bypass, the agent can run commands and write files without asking.
   The harness allows each tool call that has a permission card and logs it with the reason

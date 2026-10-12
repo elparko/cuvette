@@ -24,6 +24,14 @@ The project is in early development. Version numbers start at the first public r
 - At 80% of the spend limit, a card asks if the scientist wants to continue, switch to a cheaper model or stop. It appears once. A headless run logs a notice instead. At 100%, Claude requests still stop.
 - `scripts/fit-estimate.ts` fits the range again from benchmark results.
 
+### Methods
+
+- A saved method now stores a summary of its data: the column names and order, the types, the units, the median, the range, the missing count and the group sizes.
+- When you run a method on new data, Cuvette compares the new data with the summary. It shows one card for each difference before any step runs. The differences are a missing, new or renamed column, a changed column order, a type change, a likely unit change (a median that is 10, 60, 100, 1000, 3600 or 1,000,000 times different), a range far outside the old range, more missing values, new or missing groups, and very different group sizes.
+- You continue or stop on each card. The record keeps the comparison and the answers.
+- In headless mode, a likely unit change stops the run. Add `data-change` to `--allow` to continue.
+- A method saved before this change has no summary. It still runs, and Cuvette shows one note. The next save stores the summary.
+
 ## 9 October 2026
 
 ### Benchmark

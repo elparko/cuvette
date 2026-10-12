@@ -81,7 +81,7 @@ interface ColInfo {
   numeric: boolean;
 }
 
-function columnInfo(t: Table): ColInfo[] {
+export function columnInfo(t: Table): ColInfo[] {
   return t.columns.map((name, c) => {
     const kinds: Record<Kind, number[]> = { num: [], comma: [], astext: [], text: [], missing: [] };
     t.rows.forEach((r, i) => kinds[kindOf(r[c] ?? "")].push(i));
@@ -91,11 +91,11 @@ function columnInfo(t: Table): ColInfo[] {
   });
 }
 
-function idColumn(t: Table): number {
+export function idColumn(t: Table): number {
   return t.columns.findIndex((c) => ID_NAME.test(normName(c)));
 }
 
-function groupColumn(t: Table, cols: ColInfo[], skip: number): number {
+export function groupColumn(t: Table, cols: ColInfo[], skip: number): number {
   const fits = (c: number, share: number) => {
     if (c === skip || cols[c]!.numeric) return false;
     const vals = new Set(t.rows.map((r) => (r[c] ?? "").trim().toLowerCase()).filter((v) => !isMissing(v)));
@@ -112,7 +112,7 @@ export function unitOf(column: string): string | undefined {
 
 const fileRow = (i: number) => i + 2;
 
-function median(xs: number[]): number {
+export function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   const m = s.length >> 1;
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;

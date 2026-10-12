@@ -1,5 +1,6 @@
 import { fitAnswer } from "./answers.ts";
 import type { Session } from "./session.ts";
+import { METHOD_DATA_TITLE } from "./datacompare.ts";
 import type { Question } from "./types.ts";
 
 export async function answerHeadless(s: Session, q: Question, value: unknown, note: string): Promise<void> {
@@ -25,6 +26,13 @@ export function attachHeadless(s: Session, opts: { answers: Record<string, unkno
   s.bus.on((e) => {
     if (e.type === "question") {
       const q = e.question;
+      if (q.title === `Data check: ${METHOD_DATA_TITLE}`) {
+        const go = allow.has("all") || allow.has("data-change");
+        const stop = !go && q.recommendation?.value === "stop";
+        if (stop) s.record.append("notice", { text: `Headless mode stops at a likely unit change. ${q.text.split(" The method ")[0]} Pass --allow data-change to continue.` });
+        setTimeout(() => void answerHeadless(s, q, stop ? "stop" : "continue", stop ? "likely unit change; no --allow data-change" : "continued; the difference is in the record"), 0);
+        return;
+      }
       const catchAll = "*" in answers && !(q.decisionKey && !q.options.length && q.recommendation?.value !== undefined);
       const wanted = q.decisionKey && q.decisionKey in answers ? answers[q.decisionKey] : q.title in answers ? answers[q.title] : catchAll ? answers["*"] : q.recommendation?.value;
       const fallback = "The scientist is not available. Use your recommendation and state it as an assumption.";
