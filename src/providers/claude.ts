@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
-import { ProviderError } from "../core/types.ts";
+import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
@@ -28,8 +28,9 @@ function mapError(e: unknown, model: string): unknown {
   if (e instanceof Anthropic.PermissionDeniedError) return new ProviderError(`This key cannot use ${model}: ${e.message} ${keyApiProblem(403)}`);
   if (e instanceof Anthropic.NotFoundError) return new ProviderError(`Unknown Claude model ${model}: ${e.message}`);
   if (e instanceof Anthropic.RateLimitError) return new ProviderError("Claude rate limit reached. Wait a moment and retry.", true);
+  if (e instanceof Anthropic.APIError && e.status === 413) return new ProviderError(`The request is too large for the Claude API: ${e.message}`, false, true);
   if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return new ProviderError(WORKSPACE_HELP);
-  if (e instanceof Anthropic.BadRequestError) return new ProviderError(`Claude rejected the request: ${e.message}`);
+  if (e instanceof Anthropic.BadRequestError) return new ProviderError(`Claude rejected the request: ${e.message}`, false, CONTEXT_OVERFLOW.test(e.message));
   if (e instanceof Anthropic.APIConnectionError) return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (e instanceof Anthropic.APIError && typeof e.status === "number" && e.status >= 500)
     return new ProviderError(`The Claude API had a server error (${e.status}). Retry in a moment.`, true);
@@ -164,6 +165,7 @@ export class ClaudeProvider implements Provider {
     if (over) throw new ProviderError(over);
     await prepareImages(req.messages, req.signal);
     const base = this.params(req.system, req.messages, req.tools);
+    if (req.noToolCalls && req.tools.length) base.tool_choice = { type: "none" };
     const run = async (): Promise<any> => {
       const useFallback = this.fallbacks;
       const body = useFallback ? { ...base, betas: [FALLBACK_BETA], fallbacks: "default" } : base;
@@ -188,6 +190,7 @@ export class ClaudeProvider implements Provider {
     }
     const out = this.fromNative(msg);
     if (!this.fixedClient) recordSpend(this.model, out.usage);
+    if (msg.stop_reason === "model_context_window_exceeded") throw new ProviderError("The reply stopped because the context window of the model is full.", false, true);
     return out;
   }
 
@@ -213,7 +216,7 @@ export class ClaudeProvider implements Provider {
     if (u.cache_read_input_tokens != null) usage.cacheRead = u.cache_read_input_tokens;
     if (u.cache_creation_input_tokens != null) usage.cacheWrite = u.cache_creation_input_tokens;
     const stopReason: StepResult["stopReason"] =
-      stop === "tool_use" ? "tool_use" : stop === "refusal" ? "refusal" : stop === "max_tokens" || stop === "model_context_window_exceeded" ? "max_tokens" : "end";
+      stop === "tool_use" ? "tool_use" : stop === "refusal" ? "refusal" : stop === "max_tokens" ? "max_tokens" : "end";
     const result: StepResult = {
       message: { role: "assistant", parts, provider: "claude", model: this.model, raw: content },
       usage,

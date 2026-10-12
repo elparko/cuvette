@@ -1,9 +1,10 @@
-import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
+import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ScrollTextIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx } from "../App.tsx";
 import { ImageViewer } from "../components/image-viewer.tsx";
 import { ModeMenu } from "../components/mode-menu.tsx";
+import { ModelMenu } from "../components/model-menu.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.tsx";
@@ -59,16 +60,36 @@ function markSel(card: HTMLElement, i: number) {
 
 const typing = (a: Element | null) => !!a && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA");
 
-function Thinking({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const tail = text.replace(/\s+/g, " ").slice(-220);
+function Thinking({ text, done }: { text: string; done: boolean }) {
+  const [manual, setManual] = useState<boolean | null>(null);
+  const [seconds, setSeconds] = useState(0);
+  const box = useRef<HTMLParagraphElement>(null);
+  const open = manual ?? !done;
+  useEffect(() => {
+    if (done) return;
+    setSeconds(0);
+    const start = Date.now();
+    const t = setInterval(() => setSeconds(Math.round((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [done]);
+  useEffect(() => {
+    if (!done && box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [text, done, open]);
+  useEffect(() => {
+    if (done) setManual(null);
+  }, [done]);
   return (
-    <div className="my-3 rounded-xl border border-dashed bg-muted/50 px-3.5 py-2.5 text-[13px] text-muted-foreground">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-2 font-medium text-foreground">
-        <BrainIcon className="pulse-dot size-4 text-accent-brand" /> Thinking
-        <span className="text-xs font-normal text-muted-foreground">{open ? "Hide" : "Show all"}</span>
+    <div className="my-3 rounded-xl border border-dashed bg-muted/50 px-3.5 py-2.5 text-sm text-muted-foreground">
+      <button type="button" onClick={() => setManual(!open)} aria-expanded={open} className="flex w-full items-center gap-2 text-left font-medium text-foreground">
+        <BrainIcon className={cn("size-4 shrink-0 text-accent-brand", !done && "pulse-dot")} /> {done ? "Thought" : "Thinking"}
+        {seconds > 0 && ` · ${seconds}s`}
+        <span className="ml-auto text-xs font-normal text-muted-foreground">{open ? "Hide" : "Show"}</span>
       </button>
-      <p className={cn("mt-1 whitespace-pre-wrap", open ? "max-h-80 overflow-y-auto" : "line-clamp-2")}>{open ? text : "…" + tail}</p>
+      {open && (
+        <p ref={box} className="mt-1.5 max-h-72 overflow-y-auto whitespace-pre-wrap">
+          {text}
+        </p>
+      )}
     </div>
   );
 }
@@ -80,6 +101,37 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   const [tab, setTab] = useState("analysis");
   const [tabHtml, setTabHtml] = useState("");
   const [side, setSide] = useStored("cuvette.side", true);
+  const [notes, setNotes] = useStored("cuvette.notes", false);
+  const [sideWidth, setSideWidth] = useState(() => {
+    try {
+      return Number(localStorage.getItem("cuvette.sideWidth")) || 480;
+    } catch {
+      return 480;
+    }
+  });
+  const gridRef = useRef<HTMLDivElement>(null);
+  const dragSide = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const box = gridRef.current!.getBoundingClientRect();
+    let last = sideWidth;
+    const move = (m: PointerEvent) => {
+      const w = box.right - m.clientX;
+      if (w < 220) return setSide(false), up();
+      last = Math.round(Math.min(w, box.width * 0.75));
+      setSideWidth(Math.max(last, 300));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem("cuvette.sideWidth", String(Math.max(last, 300)));
+      } catch {}
+    };
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   const [text, setText] = useState("");
   const [commands, setCommands] = useState<Command[]>([]);
   const [sugg, setSugg] = useState<Command[]>([]);
@@ -104,18 +156,22 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     return () => clearInterval(t);
   }, [busy, stream.items.length]);
 
+  const itemCount = useRef(0);
+  itemCount.current = stream.items.length;
   const send = useCallback(async (value: string, now = false) => {
-    if (!value.trim()) return;
+    if (!value.trim()) return true;
     askNotify();
     if (!value.trim().startsWith("/") && (!busy || now)) {
-      sentAt.current = stream.items.length;
+      sentAt.current = itemCount.current;
       setSent(value.trim());
     }
     try {
-      await post("api/send", { text: value, now });
+      await call("api/send", { text: value, now });
+      return true;
     } catch (e) {
       setSent("");
-      throw e;
+      toast.error((e as Error).message);
+      return false;
     }
   }, [busy]);
 
@@ -172,8 +228,8 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     const bs = optionButtons(card);
     markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
     const a = document.activeElement;
-    const writing = typing(a) && !(a?.tagName === "TEXTAREA" && !(a as HTMLTextAreaElement).value.trim());
-    if (!writing && !document.querySelector("[role=dialog]")) {
+    const free = !a || a === document.body || box.contains(a) || (a === inputRef.current && !inputRef.current.value.trim());
+    if (free && !document.querySelector("[role=dialog]")) {
       card.tabIndex = -1;
       card.focus({ preventScroll: true });
     }
@@ -186,13 +242,14 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   // Side panel tab.
   const loadTab = useCallback(
     async (quiet: boolean) => {
+      if (!side) return;
       const box = tabRef.current;
       if (quiet && box && box.contains(document.activeElement) && document.activeElement !== box) return;
       try {
         setTabHtml(await call<string>("api/tab?name=" + tab));
       } catch {}
     },
-    [tab],
+    [tab, side],
   );
   useEffect(() => {
     void loadTab(false);
@@ -204,10 +261,26 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   // Keys for the open card: numbers choose, arrows move, Enter confirms, Escape answers later.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (typing(document.activeElement) || document.querySelector("[role=dialog], [role=menu]")) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      const a = document.activeElement;
+      const inCards = !!a && !!cardsRef.current?.contains(a);
+      if (typing(a)) {
+        if (inCards && e.key === "Enter" && !e.shiftKey) {
+          const f = a as HTMLInputElement;
+          const c = f.closest("[data-card]") ?? cardsRef.current!;
+          const go = f.name === "other" ? f.closest(".row")?.querySelector<HTMLButtonElement>(".btn") : f.tagName === "TEXTAREA" && f.name === "text" ? c.querySelector<HTMLButtonElement>(".row .btn.primary") : f.type === "password" || f.type === "url" ? c.querySelector<HTMLButtonElement>('[data-act="save"]') : null;
+          if (go && f.value.trim()) {
+            e.preventDefault();
+            go.click();
+          }
+        }
+        return;
+      }
+      if (document.querySelector("[role=dialog], [role=menu]")) return;
       const card = activeCard(cardsRef.current);
       if (!card) return;
+      if (a && a !== card && e.key === "Enter" && a.closest("button, a[href], summary, [role=tab], [role=button]")) return;
+      if (a && !inCards && a.closest("[role=tab]")) return;
       const bs = optionButtons(card);
       const i = Number(card.dataset.sel || 0);
       if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) {
@@ -231,8 +304,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
       if (e.key === "ArrowLeft" && nav("back")) return (e.preventDefault(), nav("back")!.click());
       if (e.key === "ArrowRight" && nav("next")) return (e.preventDefault(), nav("next")!.click());
       if (!bs.length) return;
-      if (e.key === "ArrowDown" || e.key === "ArrowRight") return (e.preventDefault(), markSel(card, (i + 1) % bs.length));
-      if (e.key === "ArrowUp" || e.key === "ArrowLeft") return (e.preventDefault(), markSel(card, (i + bs.length - 1) % bs.length));
+      const move = (n: number) => {
+        e.preventDefault();
+        markSel(card, n);
+        if (a === card || bs.includes(a as HTMLButtonElement)) bs[n]!.focus();
+      };
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") return move((i + 1) % bs.length);
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") return move((i + bs.length - 1) % bs.length);
       if (e.key === "Enter" && bs[i]) return (e.preventDefault(), bs[i]!.click());
       if (e.key === "Escape") {
         const back = card.querySelector<HTMLButtonElement>('[data-act="later"], [data-act="skip"], [data-plan*="back"], [data-plan*="later"]');
@@ -242,8 +320,18 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         }
       }
     };
+    const onFocus = (e: FocusEvent) => {
+      const card = activeCard(cardsRef.current);
+      const n = card ? optionButtons(card).indexOf(e.target as HTMLButtonElement) : -1;
+      if (n >= 0) markSel(card!, n);
+    };
+    const box = cardsRef.current;
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    box?.addEventListener("focusin", onFocus);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      box?.removeEventListener("focusin", onFocus);
+    };
   }, []);
 
   // Clicks inside the server HTML.
@@ -334,6 +422,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         list = await call<Command[]>("api/commands");
         setCommands(list);
       } catch {}
+      if (inputRef.current?.value !== v || document.activeElement !== inputRef.current) return;
     }
     setSugg(list.filter((c) => c.name.startsWith(v.slice(1).toLowerCase())).slice(0, 8));
     setSel(0);
@@ -356,7 +445,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     const v = text;
     setText("");
     setSugg([]);
-    void send(v, now);
+    void send(v, now).then((ok) => ok || setText((t) => t || v));
   };
 
   useLayoutEffect(() => {
@@ -398,9 +487,15 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               <Badge className="tabular-nums">{status.usage}</Badge>
             </Tooltip>
           )}
+          <Tooltip content={notes ? "Hide the status notes" : "Show the status notes"}>
+            <Button variant="ghost" size="icon-sm" className={cn("text-muted-foreground", notes && "bg-muted text-foreground")} onClick={() => setNotes(!notes)} aria-label={notes ? "Hide the status notes" : "Show the status notes"} aria-pressed={notes}>
+              <ScrollTextIcon />
+            </Button>
+          </Tooltip>
+          <ModelMenu model={session.model} busy={busy} openSettings={() => ctx.go("settings")} />
           <ModeMenu mode={status.mode ?? "watch"} />
           <Tooltip content={side ? "Hide the side panel" : "Show the side panel"}>
-            <Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground lg:inline-flex" onClick={() => setSide(!side)} aria-label={side ? "Hide the side panel" : "Show the side panel"} aria-expanded={side}>
+            <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => setSide(!side)} aria-label={side ? "Hide the side panel" : "Show the side panel"} aria-expanded={side}>
               {side ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
             </Button>
           </Tooltip>
@@ -422,7 +517,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onSelect={() => send("/details")}>{session.details ? "Hide the housekeeping steps" : "Show every step (/details)"}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => send("/details")}>{(status.details ?? session.details) ? "Hide the housekeeping steps" : "Show every step (/details)"}</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => window.open(withT("graph/"), "_blank", "noopener")}>
                 <NetworkIcon /> Open the step graph
               </DropdownMenuItem>
@@ -434,7 +529,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         </div>
       </header>
 
-      <div className={cn("grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:overflow-hidden", side && "lg:grid-cols-[minmax(0,1fr)_minmax(360px,40%)]")}>
+      <div ref={gridRef} style={{ "--side": `${sideWidth}px` } as React.CSSProperties} className={cn("grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:overflow-hidden", side && "lg:grid-cols-[minmax(0,1fr)_var(--side)]")}>
         <section aria-label="Conversation" className="flex h-[calc(100dvh-150px)] min-h-[420px] min-w-0 flex-col lg:h-auto lg:min-h-0">
           <div
             ref={scrollRef}
@@ -445,7 +540,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
             }}
             className="flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
-            <div aria-live="polite" className="srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4" onClick={onClick} onChange={onChange}>
+            <div role="log" aria-label="Messages" className={cn("srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4", !notes && "hide-notes")} onClick={onClick} onChange={onChange}>
               {itemsHtml}
               {sent && (
                 <div className="msg user">
@@ -453,12 +548,12 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 </div>
               )}
               <div dangerouslySetInnerHTML={{ __html: stream.pending }} />
-              {stream.think && !stream.live && <Thinking text={stream.think} />}
+              {stream.think && <Thinking text={stream.think} done={!!stream.live || !busy} />}
               {stream.live && (
-                <div className="msg agent" dangerouslySetInnerHTML={{ __html: liveHtml(stream.live) }} />
+                <div className="msg agent" aria-live="off" dangerouslySetInnerHTML={{ __html: liveHtml(stream.live) }} />
               )}
               {working && (
-                <div className="msg agent working" role="status">
+                <div className="msg agent working" aria-live="off">
                   <span className="caret working" aria-hidden="true" />
                   <span>{busy ? (status.text ?? "Working") : "Sending"}</span>
                 </div>
@@ -490,16 +585,14 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               }}
             >
               {sugg.length > 0 && (
-                <ul role="listbox" aria-label="Commands" className="absolute right-0 bottom-full left-0 z-20 mb-2 max-h-72 overflow-y-auto rounded-xl border bg-popover p-1 shadow-xl">
+                <ul id="cmd-list" role="listbox" aria-label="Commands" className="absolute right-0 bottom-full left-0 z-20 mb-2 max-h-72 overflow-y-auto rounded-xl border bg-popover p-1 shadow-xl">
                   {sugg.map((c, i) => (
-                    <li key={c.name} role="option" aria-selected={i === sel}>
-                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)} className={cn("flex w-full items-baseline gap-3 rounded-lg px-2.5 py-1.5 text-left text-sm", i === sel && "bg-muted")}>
-                        <span className="shrink-0 font-mono text-[13px] font-medium whitespace-nowrap">
-                          /{c.name}
-                          {c.args && <span className="text-muted-foreground"> {c.args}</span>}
-                        </span>
-                        <span className="min-w-0 truncate text-xs text-muted-foreground">{c.help}</span>
-                      </button>
+                    <li key={c.name} id={`cmd-${i}`} role="option" aria-selected={i === sel} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)} className={cn("flex w-full items-baseline gap-3 rounded-lg px-2.5 py-1.5 text-left text-sm", i === sel && "bg-muted")}>
+                      <span className="shrink-0 font-mono text-[13px] font-medium whitespace-nowrap">
+                        /{c.name}
+                        {c.args && <span className="text-muted-foreground"> {c.args}</span>}
+                      </span>
+                      <span className="min-w-0 truncate text-xs text-muted-foreground">{c.help}</span>
                     </li>
                   ))}
                 </ul>
@@ -511,9 +604,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 id="msg"
                 ref={inputRef}
                 rows={1}
+                aria-autocomplete="list"
+                aria-controls={sugg.length ? "cmd-list" : undefined}
+                aria-activedescendant={sugg.length ? `cmd-${sel}` : undefined}
                 value={text}
                 placeholder={status.placeholder || "Ask for an analysis, or type / for commands"}
                 onChange={(e) => onInput(e.target.value)}
+                onBlur={() => setSugg([])}
                 onKeyDown={(e) => {
                   if (sugg.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
                     e.preventDefault();
@@ -538,7 +635,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 className="block max-h-[40vh] min-h-[52px] w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[14.5px] outline-none placeholder:text-muted-foreground"
               />
               <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
-                <span className="truncate pl-1.5 text-xs text-muted-foreground">{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
+                <span className={cn("min-w-0 truncate pl-1.5 text-xs text-muted-foreground", busy && !status.queue?.length && "max-sm:hidden")}>{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
                 <div className="flex shrink-0 gap-1.5">
                   {busy && !status.queueMode && (
                     <Tooltip content="Stops the current step and sends your message now. The same as starting a message with ! in the terminal.">
@@ -560,7 +657,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         </section>
 
         {side && (
-          <aside aria-label="Analysis details" className="flex min-h-[50vh] min-w-0 flex-col border-t bg-sidebar/60 lg:min-h-0 lg:border-t-0 lg:border-l">
+          <aside aria-label="Analysis details" className="relative flex min-h-[50vh] min-w-0 flex-col border-t bg-sidebar/60 lg:min-h-0 lg:border-t-0 lg:border-l">
+            <div role="separator" aria-orientation="vertical" aria-label="Drag to resize the side panel" onPointerDown={dragSide} onDoubleClick={() => {
+              setSideWidth(480);
+              try {
+                localStorage.setItem("cuvette.sideWidth", "480");
+              } catch {}
+            }} className="absolute inset-y-0 -left-1 z-10 hidden w-2 cursor-col-resize transition-colors hover:bg-ring/40 active:bg-ring/60 lg:block" />
             <div className="flex items-center gap-2 px-4 pt-3 pb-2">
               <Tabs value={tab} onValueChange={setTab} className="min-w-0 flex-1">
                 <TabsList className="w-full">
@@ -572,7 +675,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 </TabsList>
               </Tabs>
             </div>
-            <div ref={tabRef} role="tabpanel" className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} dangerouslySetInnerHTML={{ __html: tabHtml }} />
+            <div ref={tabRef} role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label} className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} dangerouslySetInnerHTML={{ __html: tabHtml }} />
           </aside>
         )}
       </div>

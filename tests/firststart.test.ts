@@ -24,7 +24,7 @@ const down = (async () => {
 }) as unknown as typeof fetch;
 
 test("the two choices use plain words", () => {
-  expect(CHOICES.map((c) => c.label)).toEqual(["Use Claude (needs an API key)", "Use a local model (Ollama, free, runs on this Mac)"]);
+  expect(CHOICES.map((c) => c.label)).toEqual(["Use Claude (needs an API key)", "Use a local model (Ollama, free, runs on this computer)"]);
 });
 
 test("first start is needed with no key and no local model", async () => {

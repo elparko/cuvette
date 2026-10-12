@@ -13,6 +13,12 @@ function efferocytosis(): string[] {
 const row = (sample: string, group: string, unit: string, batch = ""): SampleRow => ({ sample, group, unit, batch, path: `${sample}.tif` });
 
 describe("sample sheet", () => {
+  test("folders of uneven depth leave no cell undefined, and the sheet table shows", () => {
+    const sh = sheetFromFiles(["Mouse 1/Ctrl/img_01.tif", "Mouse 2/Drug/img_01.tif", "Mouse 3/img_01.tif"], "/data");
+    for (const r of sh.rows) for (const v of Object.values(r)) expect(typeof v).toBe("string");
+    expect(() => sheetTable(sh.rows)).not.toThrow();
+  });
+
   test("from the efferocytosis folder tree: group Ceramide, unit Set 1, one row for each field", () => {
     const sh = sheetFromFiles(efferocytosis(), "/data/Ox-LDL");
     expect(sh.rows).toHaveLength(18);
@@ -134,5 +140,21 @@ describe("sheet changes", () => {
     expect(applyChanges(rows, changes)).toEqual(edited);
     expect(replaySheet([{ data: { action: "drafted", rows } }, { data: { action: "edited", changes } }, { data: { action: "accepted", rows: 3 } }])).toEqual(edited);
     expect(sheetChanges(rows, rows.slice(1))).toBeUndefined();
+  });
+});
+
+describe("sample sheet edge cases", () => {
+  test("a row with no ID stays in the sheet with its row number", () => {
+    const s = sheetFromTable({ columns: ["mouse", "group"], rows: [["m1", "A"], ["", "A"], ["m3", "B"]] }, "x.csv")!;
+    expect(s.rows.map((r) => r.sample)).toEqual(["m1", "row 3", "m3"]);
+  });
+
+  test("readSheet reads tabs, a UTF-16 file and an exact column name before a prefix", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ga-sheet-"));
+    const p = join(dir, "samples.csv");
+    writeFileSync(p, "sample_type\tsample\tgroup\nfield\tS1\tA\n");
+    expect(readSheet(p)[0]).toMatchObject({ sample: "S1", group: "A" });
+    writeFileSync(p, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("sample,group\nS1,Ctrl\n", "utf16le")]));
+    expect(readSheet(p)[0]).toMatchObject({ sample: "S1", group: "Ctrl" });
   });
 });

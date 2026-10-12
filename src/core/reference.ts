@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "
 import { basename, extname, join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { encodePng } from "../bench/png.ts";
+import { readCsvTable } from "./datacheck.ts";
 
 export interface Sheet {
   name: string;
@@ -76,27 +77,16 @@ function xlsxSheets(path: string): Sheet[] {
   return sheets;
 }
 
-function splitLine(line: string, sep: string): string[] {
-  const out: string[] = [];
-  let cur = "";
-  let q = false;
-  for (const ch of line) {
-    if (ch === '"') q = !q;
-    else if (ch === sep && !q) (out.push(cur), (cur = ""));
-    else cur += ch;
-  }
-  out.push(cur);
-  return out.map((x) => x.trim());
-}
-
 export function readTable(path: string): Sheet[] {
   const ext = extname(path).toLowerCase();
   if (ext === ".xlsx") return xlsxSheets(path);
-  const lines = readFileSync(path, "utf8").split(/\r?\n/).filter((l) => l.trim());
-  const sep = ext === ".tsv" ? "\t" : ",";
-  const [head = "", ...rest] = lines;
-  const num = (v: string) => (v !== "" && Number.isFinite(Number(v)) ? Number(v) : v);
-  return [{ name: basename(path), columns: splitLine(head, sep), rows: rest.map((l) => splitLine(l, sep).map(num)) }];
+  const t = readCsvTable(path);
+  const num = (raw: string) => {
+    const v = raw.trim();
+    if (v !== "" && Number.isFinite(Number(v))) return Number(v);
+    return /^[-+]?\d+,\d+$/.test(v) && !/,\d{3}$/.test(v) ? Number(v.replace(",", ".")) : v;
+  };
+  return [{ name: basename(path), columns: t.columns, rows: t.rows.map((r) => r.map(num)) }];
 }
 
 export const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -161,10 +151,16 @@ export function referenceValues(ref: Reference, sample: string): Record<string, 
   if (!s) return undefined;
   const key = ref.sample_column ? s.columns.indexOf(ref.sample_column) : 0;
   const want = norm(sample);
-  const row = s.rows.find((r) => {
-    const v = norm(r[Math.max(0, key)]);
-    return v && (v === want || want.includes(v) || v.includes(want));
+  if (!want) return undefined;
+  const at = (r: unknown[]) => norm(r[Math.max(0, key)]);
+  const near = s.rows.filter((r) => {
+    const v = at(r);
+    return v && (want.includes(v) || v.includes(want));
   });
+  const gap = (r: unknown[]) => Math.abs(at(r).length - want.length);
+  const best = Math.min(...near.map(gap));
+  const closest = near.filter((r) => gap(r) === best);
+  const row = s.rows.find((r) => at(r) === want) ?? (closest.length === 1 ? closest[0] : undefined);
   if (!row) return undefined;
   const cols = ref.columns?.length ? ref.columns : s.columns.filter((_, i) => i !== key);
   const out: Record<string, number> = {};
@@ -210,11 +206,12 @@ export function agreement(pairs: Pair[]): Agreement {
   const sxx = pairs.reduce((a, p) => a + (p.ours - mx) ** 2, 0);
   const syy = pairs.reduce((a, p) => a + (p.ref - my) ** 2, 0);
   const r = n > 2 && sxx > 0 && syy > 0 ? sxy / Math.sqrt(sxx * syy) : null;
-  return { n, meanDiff, meanPercent: mean(pcts), r, sdDiff };
+  return { n, meanDiff, meanPercent: pcts.length ? mean(pcts) : NaN, r, sdDiff };
 }
 
 export function agreementText(label: string, a: Agreement): string {
-  return `${label}: ${a.n} samples. Mean difference (agent minus reference) ${fmt(a.meanDiff)} (${fmt(a.meanPercent)}%). Correlation r = ${a.r === null ? "not defined" : fmt(a.r)}.`;
+  const pct = Number.isFinite(a.meanPercent) ? ` (${fmt(a.meanPercent)}%)` : "";
+  return `${label}: ${a.n} samples. Mean difference (agent minus reference) ${fmt(a.meanDiff)}${pct}. Correlation r = ${a.r === null ? "not defined" : fmt(a.r)}.`;
 }
 
 export function blandAltmanPng(pairs: Pair[], path: string): string {

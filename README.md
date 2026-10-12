@@ -30,7 +30,7 @@ build (`npm run desktop:build`).
 
 ## Start
 
-Cuvette needs Node 22 or later. Only ImageJ needs Java.
+Cuvette needs Node 22 or later. Only ImageJ, FastQC and Bio-Formats need Java.
 
 ```bash
 npm install
@@ -42,7 +42,7 @@ node bin/cuvette.js adapters
 
 Start `cuvette` for the first time with no Claude API key and no local model. Then `cuvette` asks one
 question with two answers. The answers are "Use Claude (needs an API key)" and "Use a local
-model (Ollama, free, runs on this Mac)". It saves the choice, checks this Mac, and offers a 2-minute sample analysis. The sample
+model (Ollama, free, runs on this computer)". It saves the choice, checks this computer, and offers a 2-minute sample analysis. The sample
 is the Student (1908) sleep data in `samples/sleep/` (public domain).
 
 You have no Claude API key? Type `?` at the key prompt, or run `cuvette key help`. [docs/api-key.md](docs/api-key.md) has the steps.
@@ -173,7 +173,7 @@ shortens tool results and summarizes old turns near the context limit.
 | `/branch <name>`, `/branches`, `/compare <a> <b>` | Copy the session into a linked folder next to it to try another method; list the branches with a one-line result; show the key numbers of two branches side by side. |
 | `/save-method <name>`, `/method <name>` | Save the confirmed analysis as a method in `~/.cuvette/methods/` (or, with `project`, in `.cuvette/methods/` of the project folder, which loads only in a trusted folder); start a new session from it. The questions come with the saved answers, and the demonstration still runs. Also `cuvette --method <name> <folder>` and `cuvette method list\|show\|delete\|export\|import`. |
 | `/review`, `/findings` | Run the rule checks and the referee; accept, reject or fix each finding. |
-| `/export html` | The trail as one HTML file. Also `md`, `jsonl`, `pdf`, `protocol`, `script`, `notebook`, `flow`. |
+| `/export html` | The trail as one HTML file. Also `md`, `jsonl`, `pdf`, `protocol`, `script`, `notebook`, `flow`, `eln`, `xlsx`. `/export images` puts the session images in a PPTX or PDF file. |
 | `/databook` | A data book (PDF and HTML): question, data, methods, results, figures, checks and the manual route. `/databook project` covers all sessions of the project folder. `/databook docx` needs pandoc. On the command line: `cuvette databook [<session folder>\|<project folder>]`. |
 | `/cite` | The programs and methods to cite for this session. Only what ran is listed. A method that ran only in a comparison run is listed apart. `/cite vancouver` or `/cite apa` changes the style for one list; the setting `citation_style` changes it for all outputs. `/cite bibtex`, `/cite ris` and `/cite text` save the list in the output folder. `/cite programs` shows how to cite each program. In the app: the Cite section of the Results tab. |
 | `/lab` | Approve or reject lab rules that the agent proposed. |

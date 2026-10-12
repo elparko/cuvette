@@ -88,10 +88,10 @@ test("each value gets a control that fits it", async () => {
   expect(row(html, "model")).toContain("$0.1 in, $0.5 out per million tokens");
 });
 
-test("a local model is free, on this Mac", () => {
+test("a local model is free, on this computer", () => {
   writeJson(settingsPath("user", cwd), { model: "ollama:qwen3:8b" });
   const html = settingsHtml({ settings: { cwd, env: {} } });
-  expect(row(html, "model")).toMatch(/ollama:qwen3:8b<\/span><span class="onote">free, on this Mac/);
+  expect(row(html, "model")).toMatch(/ollama:qwen3:8b<\/span><span class="onote">free, on this computer/);
 });
 
 test("the source badges name the scope, and a project value names its file", async () => {

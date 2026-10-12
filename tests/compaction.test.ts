@@ -127,3 +127,45 @@ test("after an edit, the thinking blocks after it go, so Claude does not refuse 
   expect(thinkingAt(res!.kept)).toEqual([]);
   expect(dropThinking(h, 5)[3]).toBe(h[3]);
 });
+
+test("the summary input fits the window of a small model and keeps the newest messages", async () => {
+  const provider = new FakeProvider({ steps: [], complete: "s" });
+  let input = "";
+  provider.complete = (async (_s: string, text: string) => ((input = text), "s")) as never;
+  const h = oneLongTurn(40, 4000);
+  h.push({ role: "assistant", parts: [{ type: "text", text: "last" }] }, request("next"), { role: "assistant", parts: [{ type: "text", text: "end" }] });
+  await summarizeOld(h, provider, 8000, undefined, h[0]);
+  expect(input.length).toBeLessThan(8000 * 3.5);
+  expect(input).toMatch(/left out the first \d+ characters/);
+  expect(input).toMatch(/file 3\d mean/);
+  expect(input).not.toMatch(/file 1 mean/);
+});
+
+test("a failed summary does not stop the turn", async () => {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-compact-"));
+  const provider = new FakeProvider([{ text: "one" }, { text: "two" }]);
+  provider.complete = async () => {
+    throw new Error("network down.");
+  };
+  const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-compact-proj-")), settings: { guidance: false, phi_check: false } as never });
+  await session.send("first");
+  await session.send("second");
+  await session.compact();
+  expect(session.record.entries(["notice"]).some((e) => /could not summarize the older messages: network down\./.test(String(e.data.text)))).toBe(true);
+  expect(session.record.entries(["compaction"])).toHaveLength(0);
+  await session.close();
+});
+
+test("an empty summary does not replace the older messages", async () => {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-compact-"));
+  const provider = new FakeProvider([{ text: "one" }, { text: "two" }]);
+  provider.complete = async () => "  ";
+  const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-compact-proj-")), settings: { guidance: false, phi_check: false } as never });
+  await session.send("first");
+  await session.send("second");
+  const before = session["history"].length;
+  expect(await session.compact()).toBe(false);
+  expect(session["history"]).toHaveLength(before);
+  expect(session.record.entries(["compaction"])).toHaveLength(0);
+  await session.close();
+});

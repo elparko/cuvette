@@ -169,7 +169,15 @@ def compare_two_groups(path, outcome, group, test="t", paired=False, id_column=N
     if paired:
         if not id_column:
             return _fail("A paired test needs id_column, the column that names the same subject in both groups.")
-        wide = frame.pivot_table(index=id_column, columns=group, values=outcome, aggfunc="mean").dropna()
+        used = frame.dropna(subset=[id_column, group, outcome])
+        repeats = int(used.loc[used.duplicated(subset=[id_column, group], keep=False), id_column].nunique())
+        full = used.pivot_table(index=id_column, columns=group, values=outcome, aggfunc="mean")
+        wide = full.dropna()
+        unpaired = len(full) - len(wide)
+        if unpaired:
+            note += " The test leaves out %d %s that %s a value in only one group." % (unpaired, "subject" if unpaired == 1 else "subjects", "has" if unpaired == 1 else "have")
+        if repeats:
+            note += " %d %s more than one row in one group. The test uses the mean of these rows." % (repeats, "subject has" if repeats == 1 else "subjects have")
         x, y = wide[second].values, wide[first].values
         n1 = n2 = len(wide)
         diff = x - y
@@ -191,10 +199,13 @@ def compare_two_groups(path, outcome, group, test="t", paired=False, id_column=N
         x = frame.loc[frame[group] == second, outcome].dropna().values
         y = frame.loc[frame[group] == first, outcome].dropna().values
         n1, n2 = len(y), len(x)
+        blank = int(frame.loc[frame[group].isin(levels), outcome].isna().sum())
+        if blank:
+            note += " The test leaves out %d %s that %s no value for %s." % (blank, "row" if blank == 1 else "rows", "has" if blank == 1 else "have", outcome)
         if id_column:
             shared = set(frame.loc[frame[group] == first, id_column]) & set(frame.loc[frame[group] == second, id_column])
             if shared:
-                note = " Warning: %d values of %s appear in both groups. The same subjects may be measured twice. An unpaired test then ignores the pairing." % (len(shared), id_column)
+                note += " Warning: %d values of %s appear in both groups. The same subjects may be measured twice. An unpaired test then ignores the pairing." % (len(shared), id_column)
         if test == "t":
             res = stats.ttest_ind(x, y, equal_var=equal_variance, alternative=alternative)
             name = "Student t-test (equal variances)" if equal_variance else "Welch t-test (unequal variances)"
@@ -256,7 +267,7 @@ def anova_oneway(path, outcome, group, variance="equal", posthoc="none", alpha=0
     result = {
         "ok": True,
         "summary": "%s: F(%g, %.4g) = %.4g, p = %.4g, partial eta squared %.3f. Levene test of equal variances p = %.3g." % (name, df1, df2, f, p, eta2, levene_p),
-        "metrics": _metrics({"F": f, "df_between": df1, "df_within": df2, "p_value": p, "eta_squared": eta2, "levene_p": levene_p, "n_groups": levels, "n": len(frame)}),
+        "metrics": _metrics({"F": f, "df_between": df1, "df_within": df2, "p_value": p, "eta_squared": eta2, "levene_p": levene_p, "n_groups": levels, "n": len(frame.dropna(subset=[outcome, group]))}),
         "data": {"test": name, "alpha": alpha, "significant": bool(p < alpha), "posthoc": posthoc},
         "outputs": _files(*outputs),
     }
@@ -264,6 +275,10 @@ def anova_oneway(path, outcome, group, variance="equal", posthoc="none", alpha=0
         if posthoc == "tukey":
             post = pg.pairwise_tukey(frame, dv=outcome, between=group).rename(columns={"p_tukey": "p_adjusted"})
         elif variance != "equal" or posthoc == "games-howell":
+            if posthoc != "games-howell":
+                result["summary"] += " The ANOVA does not assume equal variances, so the post-hoc test is Games-Howell, not %s." % {"bonf": "bonferroni"}.get(posthoc, posthoc)
+            posthoc = "games-howell"
+            result["data"]["posthoc"] = posthoc
             post = pg.pairwise_gameshowell(frame, dv=outcome, between=group).rename(columns={"pval": "p_adjusted"})
         else:
             post = pg.pairwise_tests(frame, dv=outcome, between=group, padjust=posthoc)
@@ -271,7 +286,7 @@ def anova_oneway(path, outcome, group, variance="equal", posthoc="none", alpha=0
         post["significant"] = post["p_adjusted"] < alpha
         keep = [c for c in ["A", "B", "mean_A", "mean_B", "diff", "p_adjusted", "significant"] if c in post.columns]
         if "diff" not in post.columns and "mean_A" in post.columns:
-            post["diff"] = post["mean_B"] - post["mean_A"]
+            post["diff"] = post["mean_A"] - post["mean_B"]
             keep.insert(4, "diff")
         post = post[keep]
         result["table"] = _table(post, "posthoc")
@@ -310,14 +325,17 @@ def fit_ols(path, formula, alpha=0.05, cov_type="nonrobust", cluster=None):
         kwargs = {"groups": frame[cluster]}
     res = smf.ols(formula, frame).fit(cov_type=cov_type, cov_kwds=kwargs)
     table = _coef_table(res, alpha)
-    metrics = {"n": res.nobs, "r_squared": res.rsquared, "aic": res.aic}
+    dropped = len(frame) - int(res.nobs)
+    metrics = {"n": res.nobs, "r_squared": res.rsquared, "aic": res.aic, "n_dropped": dropped}
     for _, r in table.iterrows():
         key = _key(r["term"])
         metrics["coef_" + key] = r["coef"]
         metrics["se_" + key] = r["se"]
-    return {"ok": True, "summary": "OLS %s, n = %d, R squared %.3f, standard errors: %s. %s" % (
-        formula, res.nobs, res.rsquared, cov_type, "; ".join("%s %.4g (se %.4g)" % (r.term, r.coef, r.se) for r in table.itertuples())),
-        "metrics": _metrics(metrics), "table": _table(table, "ols")}
+    summary = "OLS %s, n = %d, R squared %.3f, standard errors: %s. %s" % (
+        formula, res.nobs, res.rsquared, cov_type, "; ".join("%s %.4g (se %.4g)" % (r.term, r.coef, r.se) for r in table.itertuples()))
+    if dropped:
+        summary += ". Dropped %d of %d rows with a missing value." % (dropped, len(frame))
+    return {"ok": True, "summary": summary, "metrics": _metrics(metrics), "table": _table(table, "ols")}
 
 
 def fit_mixed_model(path, formula, groups, re_formula="1", reml=True, alpha=0.05):
@@ -365,6 +383,14 @@ def _key(term):
     return re.sub(r"\W+", "_", term).strip("_")
 
 
+def _event_problem(series, name):
+    values = set(series.dropna().unique().tolist())
+    if values <= {0, 1, True, False}:
+        return None
+    shown = ", ".join(map(str, sorted(values, key=str)[:10]))
+    return "The event column %s must hold 1 for an event and 0 for a censored subject. Its values are: %s. If the file uses 1 for censored and 2 for an event (as in R), recode it first." % (name, shown)
+
+
 def kaplan_meier(path, duration, event, group=None, alpha=0.05, time_points=None, subset=None):
     frame = _read(path)
     problem = _need(frame, [duration, event] + ([group] if group else []))
@@ -373,6 +399,12 @@ def kaplan_meier(path, duration, event, group=None, alpha=0.05, time_points=None
     frame, problem = _subset(frame, subset)
     if problem:
         return _fail(problem)
+    problem = _event_problem(frame[event], event)
+    if problem:
+        return _fail(problem)
+    before = len(frame)
+    frame = frame.dropna(subset=[duration, event] + ([group] if group else []))
+    dropped = before - len(frame)
     times = [float(t) for t in (time_points or [])]
     fig, ax = plt.subplots(figsize=(6, 4))
     rows = []
@@ -399,6 +431,9 @@ def kaplan_meier(path, duration, event, group=None, alpha=0.05, time_points=None
     if subset:
         summary += " Rows: subset %s." % subset
         data["subset"] = subset
+    if dropped:
+        summary += " Dropped %d rows with a missing value." % dropped
+        metrics["n_dropped"] = dropped
     if group:
         levels = frame[group].nunique()
         if levels == 2:
@@ -430,6 +465,9 @@ def fit_cox(path, duration, event, covariates, ties="efron", strata=None, alpha=
         return _fail(problem)
     raw = frame[[duration, event] + covs + strata_cols].dropna()
     dropped = len(frame) - len(raw)
+    problem = _event_problem(raw[event], event)
+    if problem:
+        return _fail(problem)
     X, info, problem = _design(raw, covs, categorical, reference)
     if problem:
         return _fail(problem)

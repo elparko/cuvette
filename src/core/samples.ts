@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { channelOf, isMissing, splitName, type Table } from "./datacheck.ts";
-import { parseCsv } from "./results.ts";
+import { decodeText, delimiterOf, parseCsv } from "./results.ts";
 
 export const SAMPLE_COLUMNS = ["sample", "group", "unit", "batch", "path"] as const;
 export type SampleColumn = (typeof SAMPLE_COLUMNS)[number];
@@ -75,9 +75,9 @@ export function sheetFromFiles(rels: string[], source: string): SampleSheet {
   const stemGroups = new Set(list.map((f) => groupFromStem(f.field)));
   const useStemGroup = group < 0 && stemGroups.size >= 2 && stemGroups.size <= 12 && stemGroups.size < list.length && [...stemGroups].every((g) => !UNIT.test(g) && !/^\d+$/.test(g));
   const rows: SampleRow[] = list.map((f) => {
-    const g = group >= 0 ? f.dirs[group]! : useStemGroup ? groupFromStem(f.field) : "";
-    const u = unit >= 0 ? f.dirs[unit]! : (unitFromStem(f.field) ?? "");
-    const b = batch >= 0 ? (dateOf(f.dirs[batch]!) ?? f.dirs[batch]!) : (dateOf(f.files[0]!) ?? "");
+    const g = group >= 0 ? (f.dirs[group] ?? "") : useStemGroup ? groupFromStem(f.field) : "";
+    const u = unit >= 0 ? (f.dirs[unit] ?? "") : (unitFromStem(f.field) ?? "");
+    const b = batch >= 0 ? (dateOf(f.dirs[batch] ?? "") ?? f.dirs[batch] ?? "") : (dateOf(f.files[0]!) ?? "");
     const path = f.files.length === 1 ? f.files[0]! : `${[...f.dirs, f.field].join("/")}*`;
     return { sample: f.field, group: g, unit: u, batch: b, path };
   });
@@ -98,9 +98,11 @@ export function sheetFromTable(t: Table, source: string): SampleSheet | undefine
   const key = id >= 0 ? id : unit;
   const by = new Map<string, number[]>();
   t.rows.forEach((r, i) => {
-    const k = key >= 0 ? (r[key] ?? "").trim() : `row ${i + 2}`;
-    if (isMissing(k)) return;
-    by.set(k, [...(by.get(k) ?? []), i]);
+    const v = key >= 0 ? (r[key] ?? "").trim() : "";
+    const k = v && !isMissing(v) ? v : `row ${i + 2}`;
+    const list = by.get(k);
+    if (list) list.push(i);
+    else by.set(k, [i]);
   });
   const rows: SampleRow[] = [...by.entries()].map(([k, idx]) => {
     const r = t.rows[idx[0]!]!;
@@ -125,9 +127,10 @@ export function writeSheet(path: string, rows: SampleRow[]): void {
 }
 
 export function readSheet(path: string): SampleRow[] {
-  const text = readFileSync(path, "utf8").replace(/^﻿/, "");
-  const [head = [], ...rest] = parseCsv(text.endsWith("\n") ? text : `${text}\n`, text.split("\n", 1)[0]!.includes(";") && !text.split("\n", 1)[0]!.includes(",") ? ";" : ",").filter((r) => r.some((c) => c.trim()));
-  const idx = SAMPLE_COLUMNS.map((c) => head.findIndex((h) => h.trim().toLowerCase().startsWith(c)));
+  const { text } = decodeText(readFileSync(path));
+  const [head = [], ...rest] = parseCsv(text.endsWith("\n") ? text : `${text}\n`, delimiterOf(text, path)).filter((r) => r.some((c) => c.trim()));
+  const names = head.map((h) => h.trim().toLowerCase());
+  const idx = SAMPLE_COLUMNS.map((c) => (names.includes(c) ? names.indexOf(c) : names.findIndex((h) => h.startsWith(c))));
   if (idx[0]! < 0) throw new Error("samples.csv has no column named sample.");
   return rest.map((r) => Object.fromEntries(SAMPLE_COLUMNS.map((c, i) => [c, idx[i]! >= 0 ? (r[idx[i]!] ?? "").trim() : ""])) as SampleRow);
 }
@@ -191,7 +194,12 @@ export function sheetTable(rows: SampleRow[], max = 12): string {
 
 export function groupSummary(rows: SampleRow[]): string {
   const groups = new Map<string, SampleRow[]>();
-  for (const r of rows) groups.set(r.group || "(no group)", [...(groups.get(r.group || "(no group)") ?? []), r]);
+  for (const r of rows) {
+    const g = r.group || "(no group)";
+    const list = groups.get(g);
+    if (list) list.push(r);
+    else groups.set(g, [r]);
+  }
   const units = (rs: SampleRow[]) => new Set(rs.map((r) => r.unit).filter(Boolean)).size;
   const word = unitWord(rows) ?? "unit";
   return [...groups.entries()].map(([g, rs]) => (units(rs) ? `${g}: ${plural(units(rs), word)}, ${plural(rs.length, "sample")}` : `${g}: ${plural(rs.length, "sample")}`)).join("; ");
@@ -223,7 +231,12 @@ export function minPossibleP(n1: number, n2: number): number {
 export function designChecks(rows: SampleRow[], opts: { n?: string; test?: string } = {}): DesignIssue[] {
   const out: DesignIssue[] = [];
   const groups = new Map<string, SampleRow[]>();
-  for (const r of rows) if (r.group) groups.set(r.group, [...(groups.get(r.group) ?? []), r]);
+  for (const r of rows) {
+    if (!r.group) continue;
+    const list = groups.get(r.group);
+    if (list) list.push(r);
+    else groups.set(r.group, [r]);
+  }
   const unitsIn = (rs: SampleRow[]) => new Set(rs.map((r) => r.unit).filter(Boolean));
   const word = unitWord(rows) ?? "unit";
   const level = nLevel(rows, opts.n);

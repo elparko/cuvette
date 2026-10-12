@@ -168,6 +168,28 @@ export function sheetName(wanted: string, used: Set<string>): string {
 
 // ---------------------------------------------------------------- tables
 
+export function decodeText(buf: Buffer): { text: string; encoding: string } {
+  if (buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) return { text: buf.subarray(3).toString("utf8"), encoding: "utf-8" };
+  if (buf[0] === 0xff && buf[1] === 0xfe) return { text: buf.subarray(2).toString("utf16le"), encoding: "utf-16le" };
+  if (buf[0] === 0xfe && buf[1] === 0xff) return { text: Buffer.from(buf.subarray(2, buf.length - (buf.length % 2))).swap16().toString("utf16le"), encoding: "utf-16be" };
+  const head = buf.subarray(0, 4096);
+  let oddNul = 0;
+  for (let i = 1; i < head.length; i += 2) if (head[i] === 0) oddNul++;
+  if (head.length >= 4 && oddNul > head.length / 4) return { text: buf.subarray(0, buf.length - (buf.length % 2)).toString("utf16le"), encoding: "utf-16le" };
+  try {
+    return { text: new TextDecoder("utf-8", { fatal: true }).decode(buf), encoding: "utf-8" };
+  } catch {
+    return { text: new TextDecoder("windows-1252").decode(buf), encoding: "windows-1252" };
+  }
+}
+
+export function delimiterOf(text: string, path: string): string {
+  if (extname(path).toLowerCase() === ".tsv") return "\t";
+  const first = text.split(/\r?\n/, 1)[0] ?? "";
+  const count = (c: string) => first.split(c).length - 1;
+  return (["\t", ";", ","] as const).reduce((best, c) => (count(c) > count(best) ? c : best), ",");
+}
+
 export function parseCsv(text: string, sep = ","): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -228,7 +250,8 @@ export function typed(rows: unknown[][], width: number): Cell[][] {
 
 export function readTable(path: string): { columns: string[]; rows: Cell[][]; total: number } | undefined {
   if (!existsSync(path) || statSync(path).size > MAX_TABLE_BYTES) return undefined;
-  const all = parseCsv(readFileSync(path, "utf8").replace(/^\ufeff/, ""), extname(path).toLowerCase() === ".tsv" ? "\t" : ",");
+  const { text } = decodeText(readFileSync(path));
+  const all = parseCsv(text, delimiterOf(text, path)).filter((r) => r.some((c) => c.trim() !== ""));
   if (!all.length) return undefined;
   const [head, ...body] = all;
   const width = Math.max(head!.length, ...body.slice(0, 1000).map((r) => r.length));

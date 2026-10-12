@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { startApp, type AppHandle } from "../src/server/app.ts";
-import { cardHtml, decisionsHtml, itemHtml, runHtml, sessionsHtml, splitRuns, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
+import { cardHtml, decisionsHtml, itemHtml, runHtml, sessionsHtml, sheetHtml, splitRuns, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
 import type { Item } from "../src/ui/items.ts";
 import { WebView } from "../src/server/app-view.ts";
-import { planInit, type Card } from "../src/ui/cards.ts";
+import { planInit, sheetRows, type Card } from "../src/ui/cards.ts";
 import { CARDS, COMMANDS } from "../src/ui/parity.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { until } from "../src/tui/testing.ts";
@@ -383,7 +383,7 @@ describe("card rendering", () => {
     const s3 = new FakeSession();
     const table = { columns: ["sample", "group", "unit", "batch", "path"], rows: [["Ceramide Set 1_01", "Ceramide", "Set 1", "", "Ox-LDL/Ceramide/Set 1/Set 1_01*"], ["Control Set 1_01", "Control", "Set 1", "", "Ox-LDL/Control/Set 1/Set 1_01*"]] };
     const sheet: Question = { ...q, qid: "c2", title: "Sample sheet", text: "The agent made this sample sheet.", options: [{ value: "accept", label: "The sheet is correct" }, { value: "reload", label: "Read samples.csv again (I edited it)" }], table };
-    const check = "Data check of Ox-LDL: 35 files in 6 folders.\nQuestions for you:\n- 1 field has no 'red' image: Control/Set 3/Set 3_02.";
+    const check = "Data check of Ox-LDL: 35 files in 6 folders.\nProblems found in the data:\n- 1 field has no 'red' image: Control/Set 3/Set 3_02.";
     s3.clarify("I see 2 groups.", [sheet], [], { check, notes: ["n is the Set. n per group: Ceramide 3, Control 3."] });
     const card: Card = { t: "clarify", found: "I see 2 groups.", qids: ["c2"], skipped: [], check, notes: ["n is the Set. n per group: Ceramide 3, Control 3."] };
     const html = cardHtml({ token: "t", session: s3 }, slot(card));
@@ -471,11 +471,33 @@ test("the view streams the thinking text, and a tool call clears it", () => {
   view.close();
 });
 
+test("a retry clears the streamed text of the failed try", () => {
+  const s = new FakeSession();
+  const view = new WebView(s, { token: "t", env, url: (p) => p, quit: async () => {} });
+  const sent: any[] = [];
+  view.attach({ writeHead() {}, write: (d: string) => sent.push(JSON.parse(d.slice(6))), on() {}, end() {} } as never);
+  s.bus.emit({ type: "delta", kind: "text", text: "The mean is" });
+  s.bus.emit({ type: "delta", kind: "thinking", text: "first try" });
+  s.bus.emit({ type: "delta_reset" });
+  expect(sent.slice(-2)).toEqual([{ t: "live", reset: true }, { t: "think", reset: true }]);
+  expect(view.snapshot().live).toBe("");
+  expect(view.snapshot().think).toBe("");
+  view.close();
+});
+
 test("the definitions under a final answer fold into a Definitions toggle", async () => {
   const { itemHtml } = await import("../src/server/app-html.ts");
   const html = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "a", t: "assistant", text: "Drug 2 is better.\n\nDefinitions, from the confirmed analysis:\n- n: One patient." } as never);
   expect(html).toContain("<p>Drug 2 is better.</p>");
   expect(html).toContain('<details class="defs"><summary>Definitions</summary><ul><li>n: One patient.</li></ul></details>');
+});
+
+test("a status line keeps its text and its short path in one element, so the flex row does not split the sentence", async () => {
+  const { itemHtml } = await import("../src/server/app-html.ts");
+  const html = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "l", t: "line", sym: "•", text: "This session saves its results in /very/long/folder/name/that/goes/on/and/on/results-2026-10-12-compare-groups." } as never);
+  expect(html).toMatch(/<span class="sym"[^>]*>•<\/span> <span class="ltext">This session saves its results in <span class="path"[^>]*>.*<\/span>\.<\/span><\/div>$/);
+  const withChange = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "c", t: "line", sym: "•", text: "Test: t test", change: "test" } as never);
+  expect(withChange).toMatch(/<span class="ltext">Test: t test<\/span> <button[^>]*data-change="test"/);
 });
 
 describe("repeated steps", () => {
@@ -528,5 +550,19 @@ describe("agent message markdown", () => {
     const text = "## Result\n\n**Counts:**\n- one *n* is a Set\n  - nested\n\n1. first\n2. second\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nSee [the paper](https://example.com).";
     const html = itemHtml(ctx, { t: "assistant", text } as Item);
     for (const part of ["<h4>Result</h4>", "<strong>Counts:</strong>", "<em>n</em>", "<ul><li>nested</li></ul>", "<ol><li>first</li><li>second</li></ol>", "<th>A</th>", '<a href="https://example.com"']) expect(html).toContain(part);
+  });
+});
+
+describe("sample sheet card", () => {
+  test("a long sheet shows the first 200 rows, and saving keeps the other rows", () => {
+    const rows = Array.from({ length: 500 }, (_, i) => [`s${i}`, i % 2 ? "ctrl" : "drug", `m${i % 10}`, "", `f${i}.tif`]);
+    const q = { qid: "q1", title: "Sample sheet", text: "Is it correct?", table: { columns: ["sample", "group", "unit", "batch", "path"], rows } } as unknown as Question;
+    const html = sheetHtml(q);
+    expect(html.match(/<tr><td>/g)).toHaveLength(200);
+    expect(html).toContain("the first 200 of 500 rows");
+    const saved = sheetRows({ "cell:0:1": "Ceramide" }, q)!;
+    expect(saved).toHaveLength(500);
+    expect(saved[0]![1]).toBe("Ceramide");
+    expect(saved[499]).toEqual(rows[499]);
   });
 });

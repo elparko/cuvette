@@ -119,7 +119,10 @@ export async function summarizeOld(messages: Message[], provider: Provider, cont
   const old = messages.slice(start, end).filter((_, i) => i + start !== r);
   if (!old.length) return null;
   const prev = start ? (messages[0]!.parts[0] as { text: string }).text.slice(SUMMARY_HEAD.length).trim() : "";
-  const input = `${prev ? `Previous summary:\n${prev}\n\n` : ""}Older messages:\n${transcriptText(old)}`;
+  const room = Math.max(4000, Math.floor(contextWindow * 3.5 * 0.6) - SUMMARY_SYSTEM.length - prev.length);
+  const all = transcriptText(old);
+  const text = all.length > room ? `[The harness left out the first ${all.length - room} characters.]\n${all.slice(-room)}` : all;
+  const input = `${prev ? `Previous summary:\n${prev}\n\n` : ""}Older messages:\n${text}`;
   const summary = await provider.complete(SUMMARY_SYSTEM, input, signal);
   return { summary, ...(r >= 0 ? { request: messages[r] } : {}), kept: dropThinking(messages.slice(end)) };
 }

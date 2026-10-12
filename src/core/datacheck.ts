@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { basename, extname, join, relative, sep } from "node:path";
-import { parseCsv } from "./results.ts";
+import { decodeText, delimiterOf, parseCsv } from "./results.ts";
 
 export interface CheckOption {
   value: string;
@@ -33,6 +33,8 @@ export interface DataCheck {
 export interface Table {
   columns: string[];
   rows: string[][];
+  encoding?: string;
+  ragged?: number[];
 }
 
 const MISSING = new Set(["", "na", "n/a", "nan", "null", "none", "-", "—", "#n/a", "?", "."]);
@@ -49,13 +51,12 @@ const listOf = (xs: string[], max = 4) => (xs.length > max ? `${xs.slice(0, max)
 const normName = (s: string) => s.trim().toLowerCase().replace(/[_\s]+/g, " ");
 
 export function readCsvTable(path: string): Table {
-  const text = readFileSync(path, "utf8").replace(/^﻿/, "");
-  const first = text.split(/\r?\n/, 1)[0] ?? "";
-  const count = (c: string) => first.split(c).length - 1;
-  const delim = extname(path).toLowerCase() === ".tsv" ? "\t" : (["\t", ";", ","] as const).reduce((best, c) => (count(c) > count(best) ? c : best), ",");
+  const { text, encoding } = decodeText(readFileSync(path));
+  const delim = delimiterOf(text, path);
   const grid = parseCsv(text.endsWith("\n") ? text : `${text}\n`, delim).filter((r) => r.some((c) => c.trim() !== ""));
   const [head = [], ...rows] = grid;
-  return { columns: head.map((h) => h.trim()), rows: rows.map((r) => head.map((_, i) => r[i] ?? "")) };
+  const ragged = rows.flatMap((r, i) => (r.slice(head.length).some((c) => c.trim() !== "") ? [i] : []));
+  return { columns: head.map((h) => h.trim()), rows: rows.map((r) => head.map((_, i) => r[i] ?? "")), ...(encoding === "utf-8" ? {} : { encoding }), ...(ragged.length ? { ragged } : {}) };
 }
 
 type Kind = "num" | "comma" | "astext" | "text" | "missing";
@@ -82,14 +83,20 @@ interface ColInfo {
   numeric: boolean;
 }
 
+const infoCache = new WeakMap<Table, ColInfo[]>();
+
 export function columnInfo(t: Table): ColInfo[] {
-  return t.columns.map((name, c) => {
+  const hit = infoCache.get(t);
+  if (hit) return hit;
+  const info = t.columns.map((name, c) => {
     const kinds: Record<Kind, number[]> = { num: [], comma: [], astext: [], text: [], missing: [] };
     t.rows.forEach((r, i) => kinds[kindOf(r[c] ?? "")].push(i));
     const numberLike = kinds.num.length + kinds.comma.length + kinds.astext.length;
     const filled = t.rows.length - kinds.missing.length;
     return { name, kinds, numeric: numberLike >= 2 && numberLike / Math.max(1, filled) >= 0.6 };
   });
+  infoCache.set(t, info);
+  return info;
 }
 
 export function idColumn(t: Table): number {
@@ -106,6 +113,28 @@ export function groupColumn(t: Table, cols: ColInfo[], skip: number): number {
   return named >= 0 ? named : t.columns.findIndex((_, i) => fits(i, 0.5));
 }
 
+const STAT_WORD = /^(mean|median|sd|sem|se|std|stdev|min|max|minimum|maximum|avg|average|total|sum|count|n|cv|iqr|range|raw|norm|normalized|corrected|ratio|log|log2|log10)$/i;
+const UNIT_FAMILIES: [string, string[]][] = [
+  ["length", ["nm", "um", "mm", "cm", "m", "km"]],
+  ["mass", ["pg", "ng", "ug", "mg", "g", "kg"]],
+  ["volume", ["nl", "ul", "ml", "dl", "l"]],
+  ["time", ["ms", "s", "sec", "min", "h", "hr", "hrs", "hour", "hours", "d", "day", "days", "wk", "week", "weeks"]],
+  ["percent", ["%", "percent", "pct"]],
+];
+
+const MOLAR = /^[pnum]?M$/;
+
+function unitKey(u: string): string {
+  const k = u.trim().replace(/[µμ]/g, "u");
+  return MOLAR.test(k) ? k : k.toLowerCase();
+}
+
+export function unitFamily(u: string): string | undefined {
+  const k = unitKey(u);
+  if (MOLAR.test(k)) return "concentration";
+  return UNIT_FAMILIES.find(([, us]) => us.includes(k))?.[0];
+}
+
 export function unitOf(column: string): string | undefined {
   const m = UNIT_IN_NAME.exec(column.trim());
   return m ? (m[1] ?? m[2] ?? m[3])!.trim() : undefined;
@@ -114,7 +143,7 @@ export function unitOf(column: string): string | undefined {
 const fileRow = (i: number) => i + 2;
 
 export function median(xs: number[]): number {
-  const s = [...xs].sort((a, b) => a - b);
+  const s = Float64Array.from(xs).sort();
   const m = s.length >> 1;
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
 }
@@ -136,23 +165,36 @@ export function checkTable(t: Table, source: string): DataCheck {
   const id = idColumn(t);
   const group = groupColumn(t, cols, id);
   const key = (r: string[]) => r.map((x) => x.trim()).join("\u0001");
+  const nameCount = new Map<string, number>();
+  for (const c of t.columns) nameCount.set(c, (nameCount.get(c) ?? 0) + 1);
+  for (const c of cols) if ((nameCount.get(c.name) ?? 0) > 1) c.name = `${c.name || "(no name)"} (column ${cols.indexOf(c) + 1})`;
+  const at = (c: ColInfo) => cols.indexOf(c);
+
+  if (t.ragged?.length) {
+    const rows = t.ragged.map(fileRow);
+    const lead = `${plural(rows.length, "row")} ${rows.length === 1 ? "has" : "have"} more cells than the header (${rows.length === 1 ? "row" : "rows"} ${listOf(rows.map(String), 6)})`;
+    items.push({ id: "ragged_rows", check: "ragged_rows", level: "ask", rows, text: `${lead}. The harness does not read the extra cells. A decimal comma in a comma-separated file can cause this.`, question: `${lead}. A decimal comma in a comma-separated file can cause this. Continue without the extra cells, or stop?`, options: [{ value: "continue", label: "Continue without the extra cells" }, { value: "stop", label: "Stop. I correct the file" }], recommendation: "stop" });
+  }
+  const dupNames = [...nameCount].filter(([, k]) => k > 1).map(([c]) => c);
+  if (dupNames.length) items.push({ id: "duplicate_columns", check: "duplicate_columns", level: "note", text: `${dupNames.length === 1 ? "The column name" : "The column names"} ${dupNames.map((c) => quote(c || "(no name)")).join(", ")} ${dupNames.length === 1 ? "is" : "are"} on more than one column. A step that finds a column by its name can read the wrong column.` });
+  if (t.encoding) items.push({ id: "encoding", check: "encoding", level: "note", text: `The file uses the ${t.encoding.toUpperCase()} text encoding, not UTF-8. The harness reads it as ${t.encoding.toUpperCase()}. Other programs can show letters such as µ incorrectly.` });
 
   const commas = cols.filter((c) => c.numeric && c.kinds.comma.length);
-  const ambiguous = commas.filter((c) => c.kinds.comma.every((i) => /,\d{3}$/.test(t.rows[i]![t.columns.indexOf(c.name)]!.trim())));
+  const ambiguous = commas.filter((c) => c.kinds.comma.every((i) => /,\d{3}$/.test(t.rows[i]![at(c)]!.trim())));
   for (const c of ambiguous) {
-    const ex = t.rows[c.kinds.comma[0]!]![t.columns.indexOf(c.name)]!.trim();
+    const ex = t.rows[c.kinds.comma[0]!]![at(c)]!.trim();
     items.push({ id: `comma:${c.name}`, check: "decimal_comma", level: "ask", column: c.name, rows: c.kinds.comma.map(fileRow), text: `Column ${quote(c.name)} has ${plural(c.kinds.comma.length, "value")} like ${ex}. The comma can be a decimal mark or a thousands mark.`, question: `Column ${quote(c.name)} has values like ${ex}. Is the comma a decimal mark (${ex.replace(",", ".")}) or a thousands mark (${ex.replace(",", "")})?`, options: [{ value: "decimal", label: `Decimal mark: ${ex} is ${ex.replace(",", ".")}` }, { value: "thousands", label: `Thousands mark: ${ex} is ${ex.replace(",", "")}` }, { value: "stop", label: "Stop. I correct the file" }] });
   }
   const clear = commas.filter((c) => !ambiguous.includes(c));
   if (clear.length) {
-    const ex = t.rows[clear[0]!.kinds.comma[0]!]![t.columns.indexOf(clear[0]!.name)]!.trim();
+    const ex = t.rows[clear[0]!.kinds.comma[0]!]![at(clear[0]!)]!.trim();
     items.push({ id: "comma", check: "decimal_comma", level: "note", text: `${clear.length === 1 ? `Column ${quote(clear[0]!.name)} uses` : `Columns ${clear.map((c) => quote(c.name)).join(", ")} use`} a decimal comma (for example ${ex}). The harness reads ${ex} as ${ex.replace(",", ".")}.` });
   }
 
   for (const c of cols) {
     if (!c.numeric) continue;
     if (c.kinds.text.length) {
-      const col = t.columns.indexOf(c.name);
+      const col = at(c);
       const ex = [...new Set(c.kinds.text.map((i) => t.rows[i]![col]!.trim()))];
       items.push({ id: `mixed:${c.name}`, check: "mixed_type", level: "ask", column: c.name, rows: c.kinds.text.map(fileRow), text: `Column ${quote(c.name)} has numbers and ${plural(c.kinds.text.length, "text value")} (${listOf(ex.map(quote), 3)}, in ${c.kinds.text.length === 1 ? "row" : "rows"} ${listOf(c.kinds.text.map((i) => String(fileRow(i))))}).`, question: `Column ${quote(c.name)} has numbers and ${plural(c.kinds.text.length, "text value")} (${listOf(ex.map(quote), 3)}). Treat the text as no value, or stop?`, options: [{ value: "missing", label: "Treat the text as no value" }, { value: "stop", label: "Stop. I correct the file" }], recommendation: "missing" });
     }
@@ -175,13 +217,14 @@ export function checkTable(t: Table, source: string): DataCheck {
     items.push({ id: `missing:${c.name}`, check: "missing", level: "ask", column: c.name, rows, text: `${lead} (${miss.length === 1 ? "row" : "rows"} ${listOf(rows.map(String), 6)}).`, question: `${lead}. Leave them out, or stop?`, options: [{ value: "leave_out", label: `Leave out the ${plural(miss.length, "row")}` }, { value: "stop", label: "Stop. I fill in the values" }], recommendation: "leave_out" });
   }
 
-  const seen = new Map<string, number>();
+  const seen = new Set<string>();
   const copies: number[] = [];
   t.rows.forEach((r, i) => {
     const k = key(r);
     if (seen.has(k)) copies.push(i);
-    else seen.set(k, i);
+    else seen.add(k);
   });
+  const copySet = new Set(copies);
   if (copies.length && t.columns.length >= 2) {
     const rows = copies.map(fileRow);
     items.push({ id: "duplicate_rows", check: "duplicate_rows", level: "ask", rows, text: `${plural(copies.length, "row")} ${copies.length === 1 ? "is an exact copy" : "are exact copies"} of another row (${copies.length === 1 ? "row" : "rows"} ${listOf(rows.map(String), 6)}).`, question: `${plural(copies.length, "row")} ${copies.length === 1 ? "is an exact copy" : "are exact copies"} of another row (${listOf(rows.map(String), 6)}). Remove the copies, or keep them?`, options: [{ value: "remove", label: "Remove the copies" }, { value: "keep", label: "Keep them: they are real repeats" }, { value: "stop", label: "Stop. I correct the file" }], recommendation: "remove" });
@@ -190,9 +233,12 @@ export function checkTable(t: Table, source: string): DataCheck {
   if (id >= 0) {
     const where = new Map<string, number[]>();
     t.rows.forEach((r, i) => {
-      if (copies.includes(i)) return;
+      if (copySet.has(i)) return;
       const v = (r[id] ?? "").trim();
-      if (!isMissing(v)) where.set(v, [...(where.get(v) ?? []), i]);
+      if (isMissing(v)) return;
+      const list = where.get(v);
+      if (list) list.push(i);
+      else where.set(v, [i]);
     });
     const dups = [...where.entries()].filter(([, rows]) => rows.length > 1);
     if (dups.length) {
@@ -229,7 +275,8 @@ export function checkTable(t: Table, source: string): DataCheck {
     t.rows.forEach((r, i) => {
       const g = (r[group] ?? "").trim();
       if (isMissing(g)) return;
-      count.set(g, (count.get(g) ?? new Set()).add(unitCol >= 0 ? (r[unitCol] ?? "").trim() : String(i)));
+      const u = unitCol >= 0 ? (r[unitCol] ?? "").trim() : "";
+      count.set(g, (count.get(g) ?? new Set()).add(u && !isMissing(u) ? `id\u0001${u}` : `row\u0001${i}`));
     });
     groups = { column: name, sizes: [...count.entries()].map(([g, s]) => [g, s.size]) };
     const numCols = cols.flatMap((c, i) => (c.numeric && i !== id ? [i] : []));
@@ -245,7 +292,9 @@ export function checkTable(t: Table, source: string): DataCheck {
     t.rows.forEach((r, i) => {
       if (toNumber(r[ci] ?? "") === undefined) return;
       const g = group >= 0 ? (r[group] ?? "").trim() : "";
-      parts.set(g, [...(parts.get(g) ?? []), i]);
+      const list = parts.get(g);
+      if (list) list.push(i);
+      else parts.set(g, [i]);
     });
     const big = [...parts.values()].every((rows) => rows.length >= 5);
     const sets = group >= 0 && big ? [...parts.values()] : [[...parts.values()].flat()];
@@ -257,13 +306,15 @@ export function checkTable(t: Table, source: string): DataCheck {
 
   const units = t.columns.flatMap((c) => {
     const u = unitOf(c);
-    return u ? [[c, u] as [string, string]] : [];
+    return u && (unitFamily(u) || !STAT_WORD.test(u)) ? [[c, u] as [string, string]] : [];
   });
   const base = (c: string) => c.replace(UNIT_IN_NAME, "").trim().toLowerCase();
   const byBase = new Map<string, [string, string][]>();
   for (const u of units) byBase.set(base(u[0]), [...(byBase.get(base(u[0])) ?? []), u]);
   for (const [b, us] of byBase) {
-    if (new Set(us.map((u) => u[1].toLowerCase())).size < 2) continue;
+    if (us.length < 2 || new Set(us.map((u) => unitKey(u[1]))).size < 2) continue;
+    const fams = new Set(us.map((u) => unitFamily(u[1])));
+    if (fams.size > 1 && !fams.has(undefined)) continue;
     items.push({ id: `units:${b}`, check: "mixed_units", level: "ask", text: `The columns ${us.map((u) => quote(u[0])).join(" and ")} give one measure in different units.`, question: `The columns ${us.map((u) => quote(u[0])).join(" and ")} give one measure in different units. Are they two different measures?`, options: [{ value: "different", label: "Yes, two different measures" }, { value: "stop", label: "No. Stop, I correct the file" }] });
   }
   return { source, kind: "table", size: `${plural(n, "row")}, ${plural(t.columns.length, "column")}`, items, groups, units };
@@ -415,11 +466,19 @@ export function checkFiles(files: FileInfo[], source: string): DataCheck {
   }
   if (channels.size >= 2) {
     const want = [...channels.entries()].filter(([, n]) => n >= fields.size / 2).map(([c]) => c);
+    const byLack = new Map<string, { chans: string[]; lack: string[] }>();
     for (const c of want) {
       const lack = [...fields.entries()].filter(([, s]) => !s.has(c)).map(([k]) => k);
       if (!lack.length) continue;
-      const lead = `${plural(lack.length, "field")} ${lack.length === 1 ? "has" : "have"} no ${quote(c)} image`;
-      items.push({ id: `channel:${c}`, check: "missing_channel", level: "ask", files: lack, text: `${lead}: ${listOf(lack, 3)}.`, question: `${lead} (${listOf(lack, 3)}). Leave ${lack.length === 1 ? "this field" : "these fields"} out, or stop?`, options: [{ value: "leave_out", label: `Leave out the ${plural(lack.length, "field")}` }, { value: "stop", label: "Stop. I add the missing images" }], recommendation: "leave_out" });
+      const g = byLack.get(lack.join("\n")) ?? { chans: [], lack };
+      g.chans.push(c);
+      byLack.set(lack.join("\n"), g);
+    }
+    for (const { chans, lack } of byLack.values()) {
+      const names = chans.map(quote);
+      const what = names.length === 1 ? `no ${names[0]} image` : `no ${listOf(names, names.length).replace(/, ([^,]*)$/, " and $1")} images`;
+      const lead = `${plural(lack.length, "field")} ${lack.length === 1 ? "has" : "have"} ${what}`;
+      items.push({ id: `channel:${chans.join("+")}`, check: "missing_channel", level: "ask", files: lack, text: `${lead}: ${listOf(lack, 3)}.`, question: `${lead} (${listOf(lack, 3)}). Leave ${lack.length === 1 ? "this field" : "these fields"} out, or stop?`, options: [{ value: "leave_out", label: `Leave out the ${plural(lack.length, "field")}` }, { value: "stop", label: "Stop. I add the missing images" }], recommendation: "leave_out" });
     }
   }
 
@@ -442,7 +501,9 @@ export function checkFiles(files: FileInfo[], source: string): DataCheck {
   const bucket = new Map<string, typeof parsed>();
   for (const p of parsed) {
     const k = `${p.ext}|${p.channel ?? ""}`;
-    bucket.set(k, [...(bucket.get(k) ?? []), p]);
+    const list = bucket.get(k);
+    if (list) list.push(p);
+    else bucket.set(k, [p]);
   }
   const empty = parsed.filter((p) => p.f.size === 0).map((p) => p.f.rel);
   if (empty.length) items.push({ id: "empty_files", check: "empty_files", level: "note", files: empty, text: `${plural(empty.length, "file")} ${empty.length === 1 ? "is" : "are"} empty (0 bytes): ${listOf(empty, 3)}. The harness leaves ${empty.length === 1 ? "it" : "them"} out.` });
@@ -453,7 +514,13 @@ export function checkFiles(files: FileInfo[], source: string): DataCheck {
     const odd = sized.filter((p) => p.f.size < med / 2 || p.f.size > med * 2);
     if (odd.length && odd.length <= sized.length / 3) items.push({ id: `size:${k}`, check: "file_size", level: "note", files: odd.map((p) => p.f.rel), text: `${plural(odd.length, "file")} ${odd.length === 1 ? "differs" : "differ"} much in size from the others (median ${sizeText(med)}): ${listOf(odd.map((p) => `${p.f.rel} (${sizeText(p.f.size)})`), 3)}. ${odd.length === 1 ? "It" : "They"} can be cut short or have another image size.` });
     const dims = new Map<string, string[]>();
-    for (const p of ps) if (p.f.width && p.f.height) dims.set(`${p.f.width} x ${p.f.height}`, [...(dims.get(`${p.f.width} x ${p.f.height}`) ?? []), p.f.rel]);
+    for (const p of ps) {
+      if (!p.f.width || !p.f.height) continue;
+      const k = `${p.f.width} x ${p.f.height}`;
+      const list = dims.get(k);
+      if (list) list.push(p.f.rel);
+      else dims.set(k, [p.f.rel]);
+    }
     if (dims.size > 1) {
       const sorted = [...dims.entries()].sort((a, b) => b[1].length - a[1].length);
       items.push({ id: `dims:${k}`, check: "image_size", level: "note", files: sorted.slice(1).flatMap(([, f]) => f), text: `The images have ${dims.size} sizes: ${sorted.map(([d, f]) => `${d} pixels (${plural(f.length, "file")})`).join(", ")}. Areas in pixels are not comparable between sizes.` });
@@ -461,7 +528,12 @@ export function checkFiles(files: FileInfo[], source: string): DataCheck {
   }
 
   const bits = new Map<number, string[]>();
-  for (const p of parsed) if (p.f.bits) bits.set(p.f.bits, [...(bits.get(p.f.bits) ?? []), p.f.rel]);
+  for (const p of parsed) {
+    if (!p.f.bits) continue;
+    const list = bits.get(p.f.bits);
+    if (list) list.push(p.f.rel);
+    else bits.set(p.f.bits, [p.f.rel]);
+  }
   if (bits.size > 1) {
     const sorted = [...bits.entries()].sort((a, b) => b[1].length - a[1].length);
     const few = sorted.slice(1).flatMap(([, f]) => f);
@@ -478,8 +550,8 @@ export function dataCheckText(c: DataCheck): string {
   const out = [`Data check of ${basename(c.source) || c.source}: ${c.size}.`];
   const ask = c.items.filter((i) => i.level === "ask");
   const note = c.items.filter((i) => i.level === "note");
-  if (ask.length) out.push("Questions for you:", ...ask.map((i) => `- ${i.text}`));
-  if (note.length) out.push(ask.length ? "Shown, not asked:" : "Found:", ...note.map((i) => `- ${i.text}`));
+  if (ask.length) out.push("Problems found in the data:", ...ask.map((i) => `- ${i.text}`));
+  if (note.length) out.push(ask.length ? "Also found:" : "Found:", ...note.map((i) => `- ${i.text}`));
   if (c.groups) out.push(`Groups in ${quote(c.groups.column)}: ${c.groups.sizes.map(([g, n]) => `${g} ${n}`).join(", ")}.`);
   if (c.units?.length) out.push(`Units in the column names: ${c.units.map(([col, u]) => `${col.replace(UNIT_IN_NAME, "").trim() || col} (${u})`).join(", ")}.`);
   if (!c.items.length) out.push(c.kind === "table" ? "No missing values, copies, mixed columns or extreme values." : "No missing channels, name problems or odd files.");

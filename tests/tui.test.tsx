@@ -801,7 +801,7 @@ describe("proposed analysis card", () => {
   test("Questions: the data check, the design notes and the sample sheet; a typed edit changes a cell", async () => {
     const { h, s } = start();
     await sleep(100);
-    const check = "Data check of Ox-LDL: 35 files in 6 folders, 2 channels (green, red).\nQuestions for you:\n- 1 field has no 'red' image: Control/Set 3/Set 3_02.\nShown, not asked:\n- The names spell one part in 2 ways: '20x' (30 files) and '20X' (5 files).";
+    const check = "Data check of Ox-LDL: 35 files in 6 folders, 2 channels (green, red).\nProblems found in the data:\n- 1 field has no 'red' image: Control/Set 3/Set 3_02.\nAlso found:\n- The names spell one part in 2 ways: '20x' (30 files) and '20X' (5 files).";
     const mk = (qid: string, title: string, text: string, options: string[], evidence = "") => ({ qid, session: s.id, decisionKey: "", title, text, options: options.map((o) => ({ value: o, label: o })), evidence, status: "open" as const, created: "" });
     const evidence = "#  sample             group     unit   batch  path\n1  Ceramide Set 1_01  Ceramide  Set 1         Ox-LDL/Ceramide/Set 1/Set 1_01*\nCeramide: 3 Sets, 9 samples; Control: 3 Sets, 9 samples.";
     s.clarify("I see 2 groups.", [mk("q1", "Data check: missing images", "1 field has no 'red' image (Control/Set 3/Set 3_02). Leave this field out, or stop?", ["leave_out", "stop"]), mk("q2", "Sample sheet", "The agent made this sample sheet. Is it correct?", ["accept", "reload"], evidence)], [], { check, notes: ["n is the Set. n per group: Ceramide 3 (9 samples), Control 3 (9 samples)."] });

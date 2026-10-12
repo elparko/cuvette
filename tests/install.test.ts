@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -127,6 +127,37 @@ describe("adapter add", () => {
     const src = fixture(join(work, "link"));
     execFileSync("ln", ["-s", "/etc/hosts", join(src, "hosts")]);
     await expect(prepareAdd(src)).rejects.toThrow(/symbolic link/);
+  });
+
+  test("a folder that leaves the repository through a link is refused, and the search skips linked folders", async () => {
+    fixture(join(work, "outside"));
+    const r = join(work, "linkrepo");
+    mkdirSync(r);
+    writeFileSync(join(r, "README.md"), "x\n");
+    symlinkSync(join(work, "outside"), join(r, "sub"));
+    repo(r);
+    await expect(prepareAdd(`file://${r}#main:sub`)).rejects.toThrow(/outside it through a symbolic link/);
+    await expect(prepareAdd(`file://${r}`)).rejects.toThrow(/No adapter.yaml/);
+  });
+
+  test("a ref that starts with a dash is refused", async () => {
+    const r = join(work, "dashrepo");
+    fixture(r);
+    repo(r);
+    await expect(prepareAdd(`file://${r}#--detach`)).rejects.toThrow(/is not allowed/);
+  });
+
+  test("a link added to the staged files after the card stops the install", async () => {
+    const plan = await prepareAdd(fixture(join(work, "late")));
+    symlinkSync("/etc/hosts", join(plan.dir, "hosts"));
+    const r = applyInstall(plan.id, { confirmed: true });
+    expect(r.ok).toBe(false);
+    expect(r.text).toMatch(/changed after the card/);
+    expect(existsSync(userAdapterDir("obtest"))).toBe(false);
+  });
+
+  test("an online registry on plain http is refused", async () => {
+    await expect(fetchIndex("http://registry.example.org/index.json")).rejects.toThrow(/plain http/);
   });
 
   test("a broken adapter is refused and nothing is installed", async () => {

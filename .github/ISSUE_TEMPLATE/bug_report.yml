@@ -53,5 +53,5 @@ body:
     id: log
     attributes:
       label: Log
-      description: The part of ~/.cuvette/sessions/<id>/log.jsonl or the terminal output that shows the problem.
+      description: The part of .record/log.jsonl in the session folder or the terminal output that shows the problem.
       render: text

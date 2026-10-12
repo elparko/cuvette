@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { findAdapter } from "../src/adapters/manifest.ts";
 import {
-  allRefs, authorYear, citeText, cuvetteRef, formatRef, Markers, parseBibtex, people, refOf, sessionCitations, toBibtex, toRis, toolCitations,
+  allRefs, authorYear, citeText, cuvetteRef, formatRef, Markers, parseBibtex, people, refOf, referencesHtml, sessionCitations, toBibtex, toRis, toolCitations,
 } from "../src/core/citations.ts";
 import { buildDatabook } from "../src/core/databook.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
@@ -265,4 +265,11 @@ describe("outputs", () => {
     expect(rows[0]!.cite).toMatch(/^Love, M\. I\., Huber, W\., & Anders, S\. \(2014\)/);
     expect(programsHtml(rows)).toContain('<div class="pcite small dim">How to cite: Love, M. I., Huber, W., &amp; Anders, S. (2014).');
   });
+});
+
+test("citation links do not nest when a URL holds doi:", () => {
+  const ref = refOf({ text: "Tool. https://x.org/doi:10.1/onmouseover=alert(1);// (2020).", doi: "", url: "", bibtex: "", kind: "program", when: {} });
+  const html = referencesHtml({ used: [ref], comparison: [], outOfDate: [], notRun: [] }, "apa");
+  expect(html.match(/<a /g)).toHaveLength(1);
+  expect(html).not.toContain('<a href="https://x.org/<a');
 });

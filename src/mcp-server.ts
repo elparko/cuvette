@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Session } from "./core/session.ts";
 import { trail } from "./core/trail.ts";
+import { TRUST_TITLE } from "./core/trust.ts";
 import type { Args } from "./core/types.ts";
 import { FakeProvider } from "./providers/fake.ts";
 
@@ -64,6 +65,7 @@ export async function runMcpServer(opts: { adapters: string[]; trustFolder?: boo
       description: "Record the scientist's answer to a question. Use only the scientist's own answer.",
       inputSchema: obj({ qid: { type: "string" }, value: {}, note: { type: "string" } }, ["qid", "value"]),
       run: async (a) => {
+        if (String(a.qid) === session.trustQid || session.questions.get(String(a.qid))?.title === TRUST_TITLE) return { text: "Only the scientist can trust the folder, in a terminal.", isError: true };
         await session.answer(String(a.qid), a.value, `relayed by the MCP client${a.note ? `: ${a.note}` : ""}`);
         return { text: `Recorded the answer to ${a.qid}.` };
       },

@@ -48,6 +48,7 @@ export async function fetchIndex(url = registryUrl()): Promise<RegistryIndex> {
   const unreachable = (why: string) => new RegistryError(`The adapter registry at ${url} is not reachable: ${why}. Check the network, or set adapter_registry to another address.`);
   let text: string;
   if (/^https?:\/\//i.test(url)) {
+    if (/^http:/i.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//i.test(url)) throw new RegistryError(`The adapter registry at ${url} uses plain http. Use an https address. Plain http is allowed only for localhost.`);
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) throw unreachable(`HTTP ${res.status}`);

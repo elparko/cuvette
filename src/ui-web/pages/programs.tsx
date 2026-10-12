@@ -70,8 +70,11 @@ function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone
   const [finished, setFinished] = useState(false);
   const [stage, setStage] = useState(mode);
   const logRef = useRef<HTMLPreElement>(null);
+  const gen = useRef(0);
+  const live = (g: number) => g === gen.current;
 
   useEffect(() => {
+    gen.current++;
     if (!open) return;
     setInput(mode === "path" ? (run?.path ?? "") : "");
     setResult(null);
@@ -98,74 +101,91 @@ function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone
 
   const checkPath = async () => {
     if (!run) return;
+    const g = gen.current;
     setResult({ text: "Checking the path…" });
     try {
       const r = await call<{ plan: Plan }>("api/programs/plan", { ...run, path: input });
+      if (!live(g)) return;
       setRun({ ...run, path: input });
       show(r.plan);
       setResult(null);
     } catch (e) {
-      setResult({ text: (e as Error).message, ok: false });
+      if (live(g)) setResult({ text: (e as Error).message, ok: false });
     }
   };
 
   const checkAdd = async () => {
+    const g = gen.current;
     setResult({ text: "Fetching and checking the adapter…" });
     try {
       const r = await call<{ plan: Plan }>("api/adapters/plan", { source: input });
+      if (!live(g)) {
+        if (r.plan.installId) call("api/adapters/drop", { install: r.plan.installId }).catch(() => {});
+        return;
+      }
       const next = { action: r.plan.action, name: r.plan.name, install: r.plan.installId };
       setRun(next);
       setPlan(r.plan);
       setResult(null);
       setStage("");
     } catch (e) {
-      setResult({ text: (e as Error).message, ok: false });
+      if (live(g)) setResult({ text: (e as Error).message, ok: false });
     }
   };
 
   const review = async () => {
     if (!run?.install) return;
+    const g = gen.current;
     setBusy(true);
     setResult({ text: "Claude is reading the files…" });
     try {
       const r = await call<{ plan: Plan }>("api/adapters/review", { install: run.install });
+      if (!live(g)) return;
       show(r.plan);
       setResult(null);
     } catch (e) {
-      setResult({ text: (e as Error).message, ok: false });
+      if (live(g)) setResult({ text: (e as Error).message, ok: false });
     }
-    setBusy(false);
+    if (live(g)) setBusy(false);
   };
 
-  const finish = (r: { ok: boolean; text: string }) => {
+  const finish = (r: { ok: boolean; text: string }, g: number) => {
+    onDone();
+    if (!live(g)) return;
     setResult({ text: r.text, ok: r.ok });
     setFinished(true);
     setBusy(false);
     if (run) setRun({ ...run, install: "" });
-    onDone();
   };
 
   const confirm = async () => {
     if (!run) return;
+    const g = gen.current;
     setBusy(true);
     setResult({ text: "Working…" });
     let r: { job?: string; ok: boolean; text: string };
     try {
       r = await call("api/programs/run", { ...run, confirmed: true });
     } catch (e) {
+      if (!live(g)) return;
       setResult({ text: (e as Error).message, ok: false });
       setBusy(false);
       return;
     }
-    if (!r.job) return finish(r);
-    setLog([]);
+    if (!r.job) return finish(r, g);
+    if (live(g)) setLog([]);
     const src = new EventSource(withT("api/programs/progress?job=" + r.job));
+    src.onopen = () => live(g) && setLog([]);
+    src.onerror = () => {
+      if (src.readyState !== EventSource.CLOSED) return;
+      finish({ ok: false, text: "The connection to the job stopped. The program list shows the result." }, g);
+    };
     src.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
-      if (m.line !== undefined) setLog((l) => [...(l ?? []), m.line]);
+      if (m.line !== undefined && live(g)) setLog((l) => [...(l ?? []), m.line]);
       if (m.done) {
         src.close();
-        finish(m);
+        finish(m, g);
       }
     };
   };
@@ -337,6 +357,9 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
     setOpen(true);
   };
 
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = data?.groups.map((g) => ({ ...g, rows: g.rows.filter((r) => words.every((w) => `${g.title} ${r.program} ${r.name} ${r.state} ${r.detail}`.toLowerCase().includes(w))) })).filter((g) => g.rows.length);
+
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-8">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
@@ -371,7 +394,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search programs, adapters and fields" aria-label="Search programs" className="pl-9" />
           </div>
-          {data.groups.map((g) => ({ ...g, rows: g.rows.filter((r) => q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => `${g.title} ${r.program} ${r.name} ${r.state} ${r.detail}`.toLowerCase().includes(w))) })).filter((g) => g.rows.length).map((g) => (
+          {shown!.map((g) => (
             <section key={g.title} className="mb-6">
               <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">{g.title}</h2>
               <Card className="divide-y overflow-hidden">
@@ -438,6 +461,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
             </section>
           ))}
           {!data.groups.length && <p className="text-muted-foreground">No adapters.</p>}
+          {data.groups.length > 0 && !shown!.length && <p className="text-muted-foreground">No program matches the search.</p>}
         </>
       )}
       <ProgramDialog open={open} setOpen={setOpen} run={run} setRun={setRun} plan={plan} setPlan={setPlan} mode={mode} onDone={() => load(true)} />

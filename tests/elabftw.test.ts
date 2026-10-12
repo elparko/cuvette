@@ -75,3 +75,20 @@ test("import sends the file and the entity type", async () => {
   expect(n).toBe(1);
   expect(mock.imports).toEqual([{ name: "a.eln", size: 2, entityType: "experiments" }]);
 });
+
+test("a plain http address that is not localhost gets no request and no key", async () => {
+  let calls = 0;
+  const spy = (async () => {
+    calls++;
+    return new Response("{}");
+  }) as unknown as typeof fetch;
+  await expect(elabftw({ url: "http://elab.example.org", key: "secret" }, spy).createExperiment({ title: "T", body: "" })).rejects.toThrow(/https/);
+  expect(calls).toBe(0);
+});
+
+test("an id that is not a positive whole number is refused before the request", async () => {
+  const c = client();
+  await expect(c.readEntity("experiments", Number("x"))).rejects.toThrow(/positive whole number/);
+  await expect(c.readEntity("items", "1/../../users" as unknown as number)).rejects.toThrow(/positive whole number/);
+  expect(mock.requests.length).toBe(0);
+});

@@ -1,10 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { imageSize, scaledCopy, scaledCopySync } from "../src/core/thumbs.ts";
-import { loadImage, MAX_SIDE, prepareImages } from "../src/providers/images.ts";
+import { loadImage, MAX_SIDE, prepareImages, scaleImages } from "../src/providers/images.ts";
 
 const mac = process.platform === "darwin";
 
@@ -57,4 +57,20 @@ test.runIf(mac)("a stop from the scientist ends the resize before the request", 
   await prepareImages([{ role: "user", parts: [{ type: "image", path: f }] }]);
   const img = loadImage(f) as { data: string };
   expect(Math.max(...Object.values(imageSize(Buffer.from(img.data, "base64"))!))).toBe(MAX_SIDE);
+});
+
+test("a loaded image shows the new file after the file changes", () => {
+  const f = png(40, 20);
+  loadImage(f);
+  writeFileSync(f, readFileSync(png(30, 30)));
+  const b = loadImage(f) as { data: string };
+  expect(imageSize(Buffer.from(b.data, "base64"))).toEqual({ w: 30, h: 30 });
+});
+
+test.runIf(mac)("scaleImages makes the smaller copy before the model step", async () => {
+  const home = mkdtempSync(join(tmpdir(), "cuvette-thumbs-home-"));
+  process.env.CUVETTE_HOME = home;
+  const f = png(2400, 1200);
+  await scaleImages([f, png(100, 100), join(tmpdir(), "no-such-image.png")]);
+  expect(readdirSync(join(home, "cache", "images"))).toHaveLength(1);
 });

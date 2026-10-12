@@ -114,7 +114,7 @@ export function fileLink(c: Ctx, path: string): string {
   const name = basename(path);
   const ext = extname(name).slice(1).toUpperCase();
   const label = /^[0-9a-f]{40,}\./.test(name) ? `${ext || "Output"} file` : name;
-  return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name)}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${esc(path)}">Show in folder</button>`;
+  return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name)}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${esc(path)}" aria-label="Show in folder: ${esc(label)}">Show in folder</button>`;
 }
 
 // ---------------------------------------------------------------- repeated steps
@@ -182,7 +182,7 @@ export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: n
     }
     case "line": {
       const cls = `line ${it.color ?? ""} ${it.dim ? "dim" : ""}`;
-      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> ${shortPaths(esc(it.text))}${it.change ? ` ${btn("Change", `data-change="${esc(it.change)}"`, "quiet small")}` : ""}`;
+      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> <span class="ltext">${shortPaths(esc(it.text.replace(/\s*·\s*\/change \S+$/, "")))}</span>${it.change ? ` ${btn("Change", `data-change="${esc(it.change)}" aria-label="Change ${esc(it.change)}"`, "quiet small")}` : ""}`;
       const sub = it.group && opts.sub ? opts.sub(it.group) : [];
       if (sub.length) return `<details class="${cls} house"><summary>${body}</summary><div class="sub">${sub.map((x) => itemHtml(c, x, opts)).join("")}</div></details>`;
       return `<div class="${cls}">${body}</div>`;
@@ -293,7 +293,7 @@ function findingsCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "findings" }
   const list = card.list;
   if (!list.length) return frame(slot, "Review findings", "yellow", `<p>No open findings.</p>${btn("Close", act("close"))}`);
   return frame(slot, `Review findings (${list.length})`, "yellow", list.map((f) => `<div class="finding ${esc(f.severity)}"><p><strong>${esc(f.severity)}</strong> · ${esc(f.check)} · ${esc(f.fid)}</p><p>${esc(f.message)}</p>${f.nodes?.length ? `<p class="dim small">Steps: ${esc(f.nodes.join(", "))}</p>` : ""}
-<div class="row"><input type="text" name="reason:${esc(f.fid)}" placeholder="Reason or what you fixed (optional)" aria-label="Reason">${btn("Accept", `data-act="resolve" data-value="accept" data-fid="${esc(f.fid)}"`)}${btn("Reject", `data-act="resolve" data-value="reject" data-fid="${esc(f.fid)}"`)}${btn("Mark fixed", `data-act="resolve" data-value="fix" data-fid="${esc(f.fid)}"`)}</div></div>`).join("") + `<div class="row end">${btn("Close", act("close"), "quiet")}</div>`);
+<div class="row"><input type="text" name="reason:${esc(f.fid)}" placeholder="Reason or what you fixed (optional)" aria-label="Reason for ${esc(f.fid)}">${btn("Accept", `data-act="resolve" data-value="accept" data-fid="${esc(f.fid)}"`)}${btn("Reject", `data-act="resolve" data-value="reject" data-fid="${esc(f.fid)}"`)}${btn("Mark fixed", `data-act="resolve" data-value="fix" data-fid="${esc(f.fid)}"`)}</div></div>`).join("") + `<div class="row end">${btn("Close", act("close"), "quiet")}</div>`);
 }
 
 function rewindCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "rewind" }>): string {
@@ -382,11 +382,15 @@ function clarifyCard(c: Ctx, slot: Slot, card: Extract<Card, { t: "clarify" }>):
   return frame(slot, CLARIFY_TITLE, "magenta", `${card.found ? `<p>${esc(card.found)}</p>` : ""}${check}${notes}${skipped}${ask}`);
 }
 
+// A sheet of thousands of rows makes a page that is slow to send and to draw. The other rows stay as they are in samples.csv.
+const SHEET_ROWS = 200;
+
 export function sheetHtml(q: Question): string {
   const t = q.table!;
   const head = `<tr><th>#</th>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>`;
-  const rows = t.rows.map((r, i) => `<tr><td>${i + 1}</td>${t.columns.map((c, j) => `<td><input type="text" name="cell:${i}:${j}" value="${esc(r[j] ?? "")}" aria-label="${esc(`${c}, row ${i + 1}`)}"></td>`).join("")}</tr>`).join("");
-  return `<p>${esc(q.text)}</p><div class="sheetwrap"><table class="sheet"><thead>${head}</thead><tbody>${rows}</tbody></table></div>
+  const more = t.rows.length > SHEET_ROWS ? `<p class="dim small">The table shows the first ${SHEET_ROWS} of ${t.rows.length} rows. To change the other rows, edit samples.csv and choose Read samples.csv again.</p>` : "";
+  const rows = t.rows.slice(0, SHEET_ROWS).map((r, i) => `<tr><td>${i + 1}</td>${t.columns.map((c, j) => `<td><input type="text" name="cell:${i}:${j}" value="${esc(r[j] ?? "")}" aria-label="${esc(`${c}, row ${i + 1}`)}"></td>`).join("")}</tr>`).join("");
+  return `<p>${esc(q.text)}</p><div class="sheetwrap"><table class="sheet"><thead>${head}</thead><tbody>${rows}</tbody></table></div>${more}
 <div class="row">${btn("Save the sheet and continue", `data-act="sheet" data-qid="${esc(q.qid)}"`, "primary")}${btn("Read samples.csv again", `data-act="answer" data-qid="${esc(q.qid)}" data-value="1"`)}</div>
 <p class="dim small">Change a cell in the table, then save. unit is the unit of replication (one n). batch is the slide, plate, day or run.</p>`;
 }
@@ -511,7 +515,7 @@ export function decisionsHtml(c: Ctx, rows: string[][], states: StepState[] = st
               ? `<input type="checkbox" name="value" aria-label="${esc(f.label)}"${v ? " checked" : ""}>`
               : `<input type="${k === "number" ? "number" : "text"}" step="any" name="value" aria-label="Value of ${esc(f.label)}" value="${esc(v === undefined || v === null ? "" : typeof v === "string" ? v : JSON.stringify(v))}">`;
       return `<div class="decision" data-decision="${esc(key)}"><div class="dhead"><strong>${esc(f.label)}</strong> <span class="dim small">${esc(key)}</span></div>
-<div class="row">${input}${owner === "fixed" ? "" : btn("Save", `data-decision-save="${esc(key)}"`)}${owner === "fixed" ? "" : btn("Change", `data-change="${esc(key)}"`, "quiet")}<label class="inline small">Owner <select name="owner" data-owner="${esc(key)}">${["human", "agent", "fixed"].map((o) => `<option value="${o}"${o === owner ? " selected" : ""}>${o === "human" ? "you" : o}</option>`).join("")}</select></label></div>
+<div class="row">${input}${owner === "fixed" ? "" : btn("Save", `data-decision-save="${esc(key)}" aria-label="Save ${esc(f.label)}"`)}${owner === "fixed" ? "" : btn("Change", `data-change="${esc(key)}" aria-label="Change ${esc(f.label)}"`, "quiet")}<label class="inline small">Owner <select name="owner" data-owner="${esc(key)}">${["human", "agent", "fixed"].map((o) => `<option value="${o}"${o === owner ? " selected" : ""}>${o === "human" ? "you" : o}</option>`).join("")}</select></label></div>
 <div class="dim small">Set by: ${esc(by)}</div></div>`;
     })
     .join("")}</div>`;

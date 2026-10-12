@@ -44,7 +44,7 @@ export function DropZone({ choose, disabled, browserHint, children }: { choose: 
       }}
     >
       {children}
-      {msg && <p className="text-sm text-bad">{msg}</p>}
+      {msg && <p role="alert" className="text-sm text-bad">{msg}</p>}
       {over && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-accent-brand bg-card/90 text-sm font-medium" role="status">
           <FolderInputIcon className="size-5 text-accent-brand" /> Drop a folder to open it

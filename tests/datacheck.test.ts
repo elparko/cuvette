@@ -192,3 +192,65 @@ describe("file set checks", () => {
     expect(item(c, "bit_depth").files).toEqual(["A/a_02.tif"]);
   });
 });
+
+describe("file reading and edge cases", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ga-dc-edge-"));
+
+  test("a UTF-16 file with a byte order mark is read as text, and the check names the encoding", () => {
+    const p = join(dir, "u16.csv");
+    writeFileSync(p, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("id,len (µm)\na,1\nb,2\n", "utf16le")]));
+    const tab = readCsvTable(p);
+    expect(tab.columns).toEqual(["id", "len (µm)"]);
+    expect(tab.rows).toEqual([["a", "1"], ["b", "2"]]);
+    expect(ids(checkTable(tab, "u16.csv"))).toContain("encoding");
+  });
+
+  test("a Windows-1252 file keeps the micro sign", () => {
+    const p = join(dir, "latin.csv");
+    writeFileSync(p, Buffer.from("id,len (\xb5m)\na,1\n", "latin1"));
+    const tab = readCsvTable(p);
+    expect(tab.columns).toEqual(["id", "len (µm)"]);
+    expect(tab.encoding).toBe("windows-1252");
+  });
+
+  test("a row with more cells than the header becomes a question, not a silent cut", () => {
+    const p = join(dir, "rag.csv");
+    writeFileSync(p, "id,weight\na,1,5\nb,2\n");
+    const c = checkTable(readCsvTable(p), "rag.csv");
+    expect(item(c, "ragged_rows").rows).toEqual([2]);
+    expect(item(c, "ragged_rows").level).toBe("ask");
+  });
+
+  test("two columns with one name: each check reads its own column", () => {
+    const c = checkTable(t(["id", "value", "value"], [["a", "1", "x"], ["b", "2", "1"], ["c", "3", "2"], ["d", "4", "3"]]), "t");
+    expect(ids(c)).toContain("duplicate_columns");
+    const mixed = c.items.filter((i) => i.check === "mixed_type");
+    expect(mixed).toHaveLength(1);
+    expect(mixed[0]!.column).toBe("value (column 3)");
+    expect(mixed[0]!.text).toContain("'x'");
+  });
+
+  test("rows with no ID count as separate units in the group sizes", () => {
+    const c = checkTable(t(["mouse", "group", "v"], [["", "A", "1"], ["", "A", "2"], ["m3", "B", "3"], ["m4", "B", "4"]]), "t");
+    expect(c.groups!.sizes).toEqual([["A", 2], ["B", 2]]);
+  });
+
+  test("a large table is checked in linear time", () => {
+    const rows = Array.from({ length: 50000 }, (_, i) => [`S${i}`, i % 2 ? "A" : "B", String(i % 997)]);
+    const start = Date.now();
+    checkTable(t(["sample", "group", "value"], rows), "big");
+    expect(Date.now() - start).toBeLessThan(5000);
+  });
+
+  test("statistic names in brackets are not units, and one unit in two spellings is not mixed", () => {
+    const stat = checkTable(t(["Area (mean)", "Area (SD)"], [["1", "2"], ["3", "4"]]), "t");
+    expect(stat.items.filter((i) => i.check === "mixed_units")).toEqual([]);
+    expect(stat.units).toEqual([]);
+    const micro = checkTable(t(["Length (um)", "Length (µm)"], [["1", "2"], ["3", "4"]]), "t");
+    expect(micro.items.filter((i) => i.check === "mixed_units")).toEqual([]);
+    const time = checkTable(t(["Time (min)", "Time (s)"], [["1", "2"], ["3", "4"]]), "t");
+    expect(time.items.filter((i) => i.check === "mixed_units")).toHaveLength(1);
+    const molar = checkTable(t(["Dose (mM)", "Dose (nM)"], [["1", "2"], ["3", "4"]]), "t");
+    expect(molar.items.filter((i) => i.check === "mixed_units")).toHaveLength(1);
+  });
+});

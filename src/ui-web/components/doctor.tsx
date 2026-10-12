@@ -35,9 +35,9 @@ export function DoctorView({ auto = true }: { auto?: boolean }) {
   const run = useCallback(async (full: boolean) => {
     setBusy(true);
     setErr("");
-    setAll(full);
     try {
       setD(await call<Doctor>("api/doctor", { all: full, json: true }));
+      setAll(full);
     } catch (e) {
       setErr((e as Error).message);
     }
@@ -57,7 +57,7 @@ export function DoctorView({ auto = true }: { auto?: boolean }) {
           <LoaderCircleIcon className="size-4 animate-spin" /> Checking the programs that Cuvette uses. This takes about 15 seconds.
         </p>
       )}
-      {err && <p className="text-sm text-bad">{err}</p>}
+      {err && <p role="alert" className="text-sm text-bad">{err}</p>}
       {d && !busy && (
         <>
           <div className={d.ready ? "flex items-start gap-2 rounded-xl bg-ok-bg px-3 py-2.5 text-sm text-ok" : "flex items-start gap-2 rounded-xl bg-warn-bg px-3 py-2.5 text-sm text-warn"}>
@@ -78,24 +78,24 @@ export function DoctorView({ auto = true }: { auto?: boolean }) {
                       <span className="mt-0.5">{ICON[c.status] ?? ICON.old}</span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium">{c.name}</span>
+                          <span className="min-w-0 font-medium break-words">{c.name}</span>
                           {c.status !== "ok" && <Badge tone={c.status === "missing" ? "bad" : "warn"}>{c.status}</Badge>}
                         </div>
                         <p className="text-[13px] break-words text-muted-foreground">{c.detail}</p>
                         {c.status !== "ok" && c.command && (
                           <p className="mt-1 text-xs">
-                            Install: <code className="rounded bg-code px-1.5 py-0.5 font-mono">{c.command}</code>
+                            Install: <code className="rounded bg-code px-1.5 py-0.5 font-mono break-all">{c.command}</code>
                           </p>
                         )}
                         {c.status !== "ok" && c.link && (
                           <p className="mt-1 text-xs">
                             {c.command ? "Or download" : "Download"}:{" "}
-                            <a href={c.link} target="_blank" rel="noopener">
+                            <a href={c.link} target="_blank" rel="noopener" className="break-all">
                               {c.link}
                             </a>
                           </p>
                         )}
-                        {c.cite && <p className="mt-1 text-xs text-muted-foreground">How to cite: {c.cite}</p>}
+                        {c.cite && <p className="mt-1 text-xs break-words text-muted-foreground">How to cite: {c.cite}</p>}
                       </div>
                     </li>
                   ))}

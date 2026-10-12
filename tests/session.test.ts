@@ -10,6 +10,7 @@ import { FakeProvider } from "../src/providers/fake.ts";
 import { unzip } from "./fixtures/unzip.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
 import { recordSpend } from "../src/core/spend.ts";
+import { processStart } from "../src/core/sessions.ts";
 import { trustFolder } from "../src/core/trust.ts";
 
 let session: Session | undefined;
@@ -1579,4 +1580,198 @@ test("the plan card carries the cost estimate for the model, and a local model s
   }
   expect(estimates[0]).toMatch(/^About \$\d+\.\d{2} to \$\d+\.\d{2} with Sonnet\./);
   expect(estimates[1]).toBe("Free: runs on this computer.");
+});
+
+test("a reply cut at the output limit gets a note to continue, not a final answer", async () => {
+  const provider = new FakeProvider([{ text: "The counts are", stop: "max_tokens" }, { text: "All done." }]);
+  session = await recoverySession(provider, { guidance: false });
+  const answer = await session.send("go");
+  expect(answer).toBe("All done.");
+  const sent = provider.requests[1]!.messages.at(-1)!.parts[0] as { text: string };
+  expect(sent.text).toMatch(/output limit stopped your last reply/);
+});
+
+test("a context that is too long is summarized once and the step runs again", async () => {
+  const provider = new FakeProvider([{ text: "All done." }]);
+  const step = provider.step.bind(provider);
+  let n = 0;
+  provider.step = async (req) => {
+    if (n++ === 0) throw new ProviderError("Claude rejected the request: prompt is too long", false, true);
+    return step(req);
+  };
+  session = await recoverySession(provider, { guidance: false });
+  const forced: boolean[] = [];
+  session["maybeCompact"] = async (_s: AbortSignal, force = false) => (forced.push(force), force);
+  expect(await session.send("go")).toBe("All done.");
+  expect(forced.filter(Boolean)).toHaveLength(1);
+  expect(session.record.entries(["notice"]).some((e) => /too long for the model/.test(String(e.data.text)))).toBe(true);
+});
+
+test("a context that stays too long stops the turn with the error and no loop", async () => {
+  const provider = new FakeProvider([{ text: "never" }]);
+  let n = 0;
+  provider.step = async () => {
+    n++;
+    throw new ProviderError("Claude rejected the request: prompt is too long", false, true);
+  };
+  session = await recoverySession(provider, { guidance: false });
+  session["maybeCompact"] = async (_s: AbortSignal, force = false) => force;
+  await session.send("go");
+  expect(n).toBe(2);
+  expect(session.record.entries(["error"]).map((e) => String(e.data.message))).toEqual(["Claude rejected the request: prompt is too long"]);
+});
+
+test("if the turn fails after one of two calls, the call that ran keeps its result", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }, { name: "note", args: { text: "x" } }] }, { text: "All done." }]);
+  session = await recoverySession(provider, { guidance: false });
+  const run = session["runCall"].bind(session);
+  let n = 0;
+  session["runCall"] = async (call: never, signal: AbortSignal) => {
+    if (n++ === 1) throw new Error("hook failed");
+    return run(call, signal);
+  };
+  await session.send("go");
+  const last = session["history"].at(-1)!.parts as { text: string; isError?: boolean }[];
+  expect(last).toHaveLength(2);
+  expect(last[0]!.isError).toBeFalsy();
+  expect(last[0]!.text).not.toMatch(/not run/);
+  expect(last[1]!.text).toMatch(/not run/);
+});
+
+test("a long plain text result says that the harness cut it", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  writeFileSync(join(cwd, "long.txt"), "x".repeat(500));
+  const provider = new FakeProvider([{ calls: [{ name: "read_file", args: { path: join(cwd, "long.txt") } }] }, { text: "All done." }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, maxResultChars: 100, phi_check: false } as never });
+  session.decisions.applySetup({});
+  await session.send("read long.txt");
+  expect(lastToolText(provider)).toMatch(/The harness cut \d+ characters/);
+});
+
+test("a call to an unknown tool names the tools that exist", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "nope", args: {} }] }, { text: "All done." }]);
+  session = await recoverySession(provider, { guidance: false });
+  await session.send("go");
+  expect(lastToolText(provider)).toMatch(/no tool named nope\. Use only these tools: .*\bstate\b/);
+});
+
+test("a pasted API key does not reach the model or the record", async () => {
+  const key = "sk-ant-api03-Zx9_abcdefghijklmnopqrstuvwxyz0123456789";
+  const provider = new FakeProvider([{ text: "ok" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  await session.send(`my key is ${key} please count`);
+  session.steer(`and ${key}`);
+  const q = await session.questions.ask({ decisionKey: "", title: "Which?", text: "Which?", options: [], evidence: [] } as never);
+  await session.answer(q.qid, { picked: ["a"], other: `the key ${key}` }, `note ${key}`);
+  expect(JSON.stringify(provider.requests)).not.toContain(key);
+  expect(readFileSync(join(session.record.dir, "log.jsonl"), "utf8")).not.toContain(key);
+  expect(session.record.entries(["user"])[0]!.data.text).toBe("my key is [API key removed] please count");
+  expect(session.record.entries(["notice"]).some((e) => /removed an API key/.test(String(e.data.text)))).toBe(true);
+});
+
+test("a session open in another live process cannot open twice, and a reused process ID does not hold it", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  const id = session.id;
+  const lock = join(session.record.dir, "open.json");
+  await session.close();
+  session = undefined;
+  const other = process.ppid;
+  const start = processStart(other);
+  writeFileSync(lock, JSON.stringify({ pid: other, procStart: start ?? 0 }));
+  if (start !== undefined) await expect(Session.resume(id, { provider: new FakeProvider([]) })).rejects.toThrow(/open in another window \(process \d+\)/);
+  writeFileSync(lock, JSON.stringify({ pid: other, procStart: (start ?? Date.now()) - 3_600_000 }));
+  session = await Session.resume(id, { provider: new FakeProvider([]) });
+  expect(JSON.parse(readFileSync(lock, "utf8")).pid).toBe(process.pid);
+});
+
+test("read-only calls in one reply run together, keep their order, and a call that writes waits for them", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  for (const f of ["a", "b", "c"]) writeFileSync(join(cwd, `${f}.txt`), `text of ${f}`);
+  const read = (f: string) => ({ name: "read_file", args: { path: join(cwd, `${f}.txt`) } });
+  const provider = new FakeProvider([{ calls: [read("a"), read("b"), { name: "note", args: { text: "x" } }, read("c"), { name: "write_file", args: { name: "out.txt", text: "y" } }] }, { text: "All done." }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, phi_check: false } as never });
+  session.decisions.applySetup({});
+  session.bus.on((e) => {
+    if (e.type === "permission") setTimeout(() => session!.respondPermission(e.rid, true), 0);
+  });
+  const log: string[] = [];
+  const one = session["runOne"].bind(session);
+  session["runOne"] = async (call: { name: string; args: unknown }, signal: AbortSignal) => {
+    const path = (call.args as { path?: string }).path;
+    const name = path ? path.slice(-5, -4) : call.name;
+    log.push(`start ${name}`);
+    await new Promise((r) => setTimeout(r, name === "a" ? 30 : 5));
+    const out = await one(call as never, signal);
+    log.push(`end ${name}`);
+    return out;
+  };
+  await session.send("read the files");
+  expect(log.slice(0, 2)).toEqual(["start a", "start b"]);
+  expect(log.indexOf("start note")).toBeGreaterThan(log.indexOf("end a"));
+  expect(log.indexOf("start c")).toBeGreaterThan(log.indexOf("end note"));
+  expect(log.indexOf("start write_file")).toBeGreaterThan(log.indexOf("end c"));
+  const results = provider.requests[1]!.messages.at(-1)!.parts.filter((p) => p.type === "tool_result") as { name: string; text: string }[];
+  expect(results.map((r) => r.name)).toEqual(["read_file", "read_file", "note", "read_file", "write_file"]);
+  expect(results.filter((r) => r.name === "read_file").map((r) => r.text)).toEqual(["text of a", "text of b", "text of c"]);
+});
+
+test("after a call cancels the plan, the later calls in the same reply do not run", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "note", args: { text: "x" } }, { name: "state", args: {} }] }, { text: "never" }]);
+  session = await recoverySession(provider, { guidance: false });
+  const run = session["runCall"].bind(session);
+  const ran: string[] = [];
+  session["runCall"] = async (call: { name: string }, signal: AbortSignal) => {
+    ran.push(call.name);
+    if (call.name === "note") session!["stopTurn"] = true;
+    return run(call as never, signal);
+  };
+  expect(await session.send("go")).toBe("");
+  expect(ran).toEqual(["note"]);
+  const last = session["history"].at(-1)!.parts as { text: string }[];
+  expect(last[1]!.text).toMatch(/not run/);
+});
+
+test("a switch from a local model to Claude scans the earlier messages for patient identifiers again", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  provider.info = { ...provider.info, provider: "ollama", local: true };
+  session = await recoverySession(provider, { guidance: false });
+  await session.send("go");
+  expect(session["phiFrom"]).toBeGreaterThan(0);
+  await session.applySetting("model", "claude:claude-haiku-5-5");
+  expect(session["phiFrom"]).toBe(0);
+});
+
+test("a read-only call that needs a permission card does not run in parallel", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const provider = new FakeProvider([{ text: "All done." }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, phi_check: false, permissions: { read_file: "ask" } } as never });
+  const call = { type: "tool_call" as const, id: "c1", name: "read_file", args: { path: join(cwd, "a.txt") } };
+  expect(session["parallelSafe"](call)).toBe(false);
+  expect(session["parallelSafe"]({ ...call, name: "list_dir" })).toBe(true);
+  expect(session["parallelSafe"]({ ...call, name: "write_file" })).toBe(false);
+  expect(session["parallelSafe"]({ ...call, name: "ask_scientist" })).toBe(false);
+});
+
+test("a retry removes the partial streamed text, and the notice counts the real tries", async () => {
+  const provider = new FakeProvider([{ text: "All done." }]);
+  const step = provider.step.bind(provider);
+  let n = 0;
+  provider.step = async (req) => {
+    req.onDelta?.({ type: "text", text: "half a rep" });
+    if (n++ === 0) {
+      for (let attempt = 1; attempt <= 3; attempt++) req.onRetry?.({ attempt, of: 3, waitMs: 0, reason: "server error" });
+      throw new ProviderError("The Claude API had a server error (529). Retry in a moment.", true);
+    }
+    req.onRetry?.({ attempt: 1, of: 3, waitMs: 0, reason: "server error" });
+    return step(req);
+  };
+  session = await recoverySession(provider, { guidance: false });
+  const events: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "delta" || e.type === "delta_reset") events.push(e.type === "delta" ? e.text : "reset");
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "resume"), 0);
+  });
+  expect(await session.send("go")).toBe("All done.");
+  expect(events).toEqual(["half a rep", "reset", "half a rep", "reset", "All done."]);
+  expect(session.record.entries(["notice"]).map((e) => String(e.data.text))).toContain("The model did not answer after four tries. The conversation is saved up to the last finished step.");
 });

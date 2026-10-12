@@ -24,18 +24,18 @@ export function StartPage({ ctx, sessions }: { ctx: AppCtx; sessions: Sessions }
     <div className="mx-auto w-full max-w-5xl px-6 py-10">
       <section className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight">Analyze your data</h1>
-        <p className="mt-2 max-w-2xl text-[15px] text-muted-foreground">Choose the folder that holds your data. Cuvette does not change your files. It writes the results to a new folder inside it.</p>
+        <p className="mt-2 max-w-2xl text-base text-foreground/80">Choose the folder that holds your data. Cuvette does not change your files. It writes the results to a new folder inside it.</p>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <div className="flex items-center gap-2 text-sm font-medium">
+            <div className="flex items-center gap-2 text-[15px] font-semibold">
               <ShieldCheckIcon className="size-4 text-ok" /> Your files stay as they are
             </div>
             <FolderChooser start={s.folder || s.start} onOpened={ctx.opened} big />
             {note && (
-              <p className="text-sm text-bad" role="alert">
+              <p className={s.opening ? "text-sm text-muted-foreground" : "text-sm text-bad"} role={s.opening ? "status" : "alert"}>
                 {note}
               </p>
             )}
@@ -44,10 +44,10 @@ export function StartPage({ ctx, sessions }: { ctx: AppCtx; sessions: Sessions }
 
         <Card className="bg-gradient-to-br from-card to-muted">
           <CardContent className="flex h-full flex-col gap-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
+            <div className="flex items-center gap-2 text-[15px] font-semibold">
               <MoonIcon className="size-4 text-accent-brand" /> No data ready? Try the sample
             </div>
-            <p className="text-sm text-muted-foreground">The sample is a sleep study: 10 patients, two drugs, hours of extra sleep. It takes about 2 minutes.</p>
+            <p className="text-[15px] text-foreground/80">The sample is a sleep study: 10 patients, two drugs, hours of extra sleep. It takes about 2 minutes.</p>
             <Button
               variant="outline"
               className="mt-auto self-start"

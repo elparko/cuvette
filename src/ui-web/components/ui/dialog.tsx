@@ -20,7 +20,7 @@ export function DialogContent({ className, children, wide, ...props }: React.Com
         {...props}
       >
         {children}
-        <D.Close className="absolute top-4 right-4 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity outline-none hover:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50" aria-label="Close">
+        <D.Close className="absolute top-4 right-4 rounded-md p-1 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50" aria-label="Close">
           <XIcon className="size-4" />
         </D.Close>
       </D.Content>

@@ -454,8 +454,9 @@ export class FakeSession implements SessionLike {
     return [f];
   }
 
-  async compact(): Promise<void> {
+  async compact(): Promise<boolean> {
     this.record.append("compaction", { summary: "Earlier steps summarized.", upTo: this.record.entries().length });
+    return true;
   }
 
   async exportAs(fmt: string): Promise<string> {

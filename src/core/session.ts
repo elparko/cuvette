@@ -1,9 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { hideKeys, isCredentialsFile } from "./credentials.ts";
+import { claimLock, lockAlive, ownStart, type OpenLock } from "./sessions.ts";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
 import { findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
@@ -42,6 +44,7 @@ import { absentStains, groundQuestions, inspectData, type Inspection } from "./i
 import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
+import { scaleImages } from "../providers/images.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
@@ -358,9 +361,16 @@ export class Session {
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
     if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
     const s = new Session(id, cwd, settings, place, record);
+    const held = claimLock(s.dir);
+    if (held) throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
     s.overrides = overrides;
     s.onceTrusted = !!opts.trustFolder;
-    await s.init(opts);
+    try {
+      await s.init(opts);
+    } catch (e) {
+      s.releaseLock();
+      throw e;
+    }
     if (opts.method) s.startMethod(opts.method);
     if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
     return s;
@@ -368,9 +378,9 @@ export class Session {
 
   static async resume(ref: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
     const place = findPlace(ref, { cwd: opts.cwd, outputFolder: loadSettings(opts.cwd ?? process.cwd(), opts.settings ?? {}).output_folder });
-    if (!place) throw new Error(`no session ${ref}`);
+    if (!place) throw new Error(`No session ${ref}`);
     const log = join(place.recordDir, "log.jsonl");
-    if (!existsSync(log)) throw new Error(`no session ${ref}`);
+    if (!existsSync(log)) throw new Error(`No session ${ref}`);
     const id = place.id;
     const record = new AnalysisRecord(place.recordDir, id, recordPlaces(place));
     const first = record.entries(["session"])[0] as any;
@@ -392,15 +402,20 @@ export class Session {
     this.pick = opts.pick ?? opts.adapters.length === 0;
     const named = [...this.adapters];
     const defaults = opts.defaults ? this.defaultAdapters() : [];
-    for (const a of named) await this.startOne(a);
-    for (const a of [...defaults])
-      try {
-        await this.startOne(a);
-      } catch (e) {
-        this.adapters = this.adapters.filter((x) => x !== a);
-        defaults.splice(defaults.indexOf(a), 1);
-        this.notes.push(`The default adapter ${a.name} did not start: ${(e as Error).message}`);
-      }
+    const launched = await Promise.allSettled([...named, ...defaults].map((a) => this.launch(a)));
+    const failed = launched.flatMap((r, i) => (r.status === "rejected" && i < named.length ? [r.reason] : []));
+    if (failed.length) {
+      await Promise.all(launched.map((r) => (r.status === "fulfilled" ? r.value.rt.close().catch(() => {}) : undefined)));
+      throw failed[0];
+    }
+    for (const r of launched) if (r.status === "fulfilled") this.register(r.value);
+    launched.slice(named.length).forEach((r, i) => {
+      if (r.status === "fulfilled") return;
+      const a = defaults[i]!;
+      this.adapters = this.adapters.filter((x) => x !== a);
+      this.notes.push(`The default adapter ${a.name} did not start: ${(r.reason as Error).message}`);
+    });
+    defaults.splice(0, defaults.length, ...defaults.filter((_, i) => launched[named.length + i]!.status === "fulfilled"));
 
     this.decisions = new DecisionRecord(this.adapters, this.record, [...(this.pick ? [ADAPTER_DECISION] : []), ...TEST_DECISIONS, REPORTING_DECISION]);
     this.interactive = !!opts.interactive;
@@ -571,18 +586,32 @@ export class Session {
   }
 
   private async startOne(a: LoadedAdapter): Promise<string[]> {
+    return this.register(await this.launch(a));
+  }
+
+  // The programs start at the same time. The tools register in a fixed order after that.
+  private async launch(a: LoadedAdapter) {
     const trust = adapterTrust(a.root);
     if (!trust.codeConfirmed) throw new Error(`The adapter ${a.name} is Unlisted and ships code (${trust.codeFiles.join(", ")}). Confirm that it can run: cuvette adapter allow-code ${a.name}`);
     const { startAdapter } = await import("../adapters/runtime.ts");
     const rt = await startAdapter(a, this.dirs());
+    try {
+      const [mod, tools] = await Promise.all([a.module(), rt.tools()]);
+      return { a, trust, rt, mod, tools };
+    } catch (e) {
+      await rt.close().catch(() => {});
+      throw e;
+    }
+  }
+
+  private register({ a, trust, rt, mod, tools }: Awaited<ReturnType<Session["launch"]>>): string[] {
     this.runtimes.push(rt);
     this.envTargets.set(a.name, envTarget({ kind: a.manifest.connection.kind, interpreter: rt.interpreter ?? [], programPath: rt.programPath, program: a.manifest.program.name, programVersion: rt.programVersion }));
     this.runtimeInfo.push({ adapter: a, programVersion: rt.programVersion, instructions: rt.instructions });
     this.adapterInfo.push({ name: a.name, title: a.manifest.adapter.title || a.manifest.program.name, version: a.manifest.adapter.version, programVersion: rt.programVersion, trust: trust.label });
-    const mod = await a.module();
     const names: string[] = [];
     const noCode = blocksCode(a.name, this.cwd);
-    for (const t of [...(await rt.tools()), ...(mod.tools ?? []).map((t) => ({ ...t, adapter: t.adapter ?? a.name, source: "adapter" as const }))]) {
+    for (const t of [...tools, ...(mod.tools ?? []).map((t) => ({ ...t, adapter: t.adapter ?? a.name, source: "adapter" as const }))]) {
       if (noCode && isCodeTool(t.remoteName ?? t.name, (t.inputSchema as { properties?: object }).properties)) continue;
       const name = this.tools.has(t.name) ? `${a.name.replace(/-/g, "_")}_${t.name}` : t.name;
       this.tools.set(name, { ...t, name, remoteName: t.remoteName ?? t.name });
@@ -903,8 +932,22 @@ export class Session {
 
   // ------------------------------------------------------------- turn
 
+  private withoutKeys(text: string): string {
+    const h = hideKeys(text);
+    if (h.found) this.record.append("notice", { text: `Cuvette removed ${h.found === 1 ? "an API key" : `${h.found} API keys`} from your text. The key did not go to the model or into the record. To save a Claude key, use /key.` });
+    return h.text;
+  }
+
+  private valueWithoutKeys(v: unknown): unknown {
+    if (typeof v === "string") return this.withoutKeys(v);
+    if (Array.isArray(v)) return v.map((x) => this.valueWithoutKeys(x));
+    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, this.valueWithoutKeys(x)]));
+    return v;
+  }
+
   async send(text: string, opts: { internal?: boolean; plan?: boolean } = {}): Promise<string> {
     if (this.busy) throw new Error("the agent is busy; wait or press Esc to stop it");
+    text = this.withoutKeys(text);
     this.busy = true;
     this.abort = new AbortController();
     const signal = this.abort.signal;
@@ -914,6 +957,8 @@ export class Session {
     let repeats = 0;
     let forceAnswer = false;
     const turnStart = this.record.entries().length;
+    let results: Part[] = [];
+    this.summaryFailed = false;
     try {
       await this.nameFolder(text);
       await this.hooks.event("UserPromptSubmit", { session: this.id, text });
@@ -950,6 +995,12 @@ export class Session {
         if (!calls.length && this.steered.length) {
           if (said) this.record.append("assistant", { text: said, final: false });
           this.push({ role: "user", parts: [{ type: "text", text: this.takeSteer() }] });
+          continue;
+        }
+        if (!calls.length && res.stopReason === "max_tokens" && nudges < 2 && !forceAnswer) {
+          nudges++;
+          if (said) this.record.append("assistant", { text: said, final: false });
+          this.push({ role: "user", parts: [{ type: "text", text: "[Notes from the harness]\n- The output limit stopped your last reply before its end. If it had a tool call, that call did not run. Do the step again, shorter: one tool call with short inputs, or the complete answer in fewer words." }] });
           continue;
         }
         if (!calls.length && nudges < 2 && !forceAnswer && (this.pilotStage || this.needsValidation())) {
@@ -1009,14 +1060,23 @@ export class Session {
         }
         if (said) this.record.append("assistant", { text: said, final: false });
         nudges = 0;
-        const results: Part[] = [];
-        for (const call of calls) {
-          if (signal.aborted) {
-            results.push({ type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist stopped the turn.", isError: true });
+        results = [];
+        let together: number[] = [];
+        const runTogether = async () => {
+          const list = together;
+          together = [];
+          const parts = await Promise.all(list.map((i) => this.runCall(calls[i]!, signal)));
+          list.forEach((i, k) => (results[i] = parts[k]!));
+        };
+        for (const [i, call] of calls.entries()) {
+          const parallel = this.parallelSafe(call);
+          if (!parallel && together.length) await runTogether();
+          if (signal.aborted || this.stopTurn || this.endTurn) {
+            results[i] = { type: "tool_result", callId: call.id, name: call.name, text: `ERROR: not run. ${this.endTurn && !signal.aborted && !this.stopTurn ? this.endTurn : "The scientist stopped the turn."}`, isError: true };
             continue;
           }
           if (this.steered.some((m) => m.now)) {
-            results.push({ type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist sent a message. Read it first.", isError: true });
+            results[i] = { type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist sent a message. Read it first.", isError: true };
             continue;
           }
           const sig = `${call.name}:${JSON.stringify(call.args)}`;
@@ -1025,15 +1085,18 @@ export class Session {
           if (repeats >= 2) {
             forceAnswer = true;
             this.record.append("notice", { text: `The agent called ${call.name} with the same input three times. The harness asks for the final answer.` });
-            results.push({ type: "tool_result", callId: call.id, name: call.name, text: `ERROR: you called ${call.name} with the same input three times in a row. Stop. Give your final answer now, from the results you have.`, isError: true });
+            results[i] = { type: "tool_result", callId: call.id, name: call.name, text: `ERROR: you called ${call.name} with the same input three times in a row. Stop. Give your final answer now, from the results you have.`, isError: true };
             continue;
           }
-          results.push(await this.runCall(call, signal));
+          if (parallel) together.push(i);
+          else results[i] = await this.runCall(call, signal);
         }
+        if (together.length) await runTogether();
         const pending = this.drainNotes();
         if (pending) results.push({ type: "text", text: pending } as Part);
         if (this.steered.length) results.push({ type: "text", text: this.takeSteer() } as Part);
         this.push({ role: "user", parts: results });
+        results = [];
         if (this.stopTurn) {
           this.stopTurn = false;
           this.record.append("notice", { text: "You cancelled the plan. No analysis step ran." });
@@ -1054,7 +1117,7 @@ export class Session {
     } catch (e) {
       const msg = e instanceof ProviderError ? e.message : signal.aborted ? "Stopped." : `${(e as Error).name}: ${(e as Error).message}`;
       this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg } : { message: msg });
-      this.closeOpenCalls();
+      this.closeOpenCalls(results);
       if (this.draft) {
         const { answer } = this.draft;
         this.draft = undefined;
@@ -1066,6 +1129,7 @@ export class Session {
       return "";
     } finally {
       if (this.planning) this.endPlanning();
+      this.draft = undefined;
       this.stopTurn = false;
       this.endTurn = undefined;
       this.saveResults(turnStart);
@@ -1082,17 +1146,30 @@ export class Session {
 
   private async stepWithRecovery(noTools: boolean, signal: AbortSignal): Promise<StepResult> {
     let rounds = 0;
+    let compacted = false;
     for (;;) {
       let retried = false;
+      let tries = 1;
+      let streamed = false;
+      const dropStreamed = () => {
+        if (streamed) this.bus.emit({ type: "delta_reset" });
+        streamed = false;
+      };
       try {
         const res = await this.provider.step({
           system: this.system,
           messages: this.history,
-          tools: noTools ? [] : this.activeSchemas(),
+          tools: this.activeSchemas(),
+          noToolCalls: noTools,
           signal,
-          onDelta: (d) => this.bus.emit({ type: "delta", kind: d.type, text: d.text }),
+          onDelta: (d) => {
+            streamed = true;
+            this.bus.emit({ type: "delta", kind: d.type, text: d.text });
+          },
           onRetry: (r) => {
             retried = true;
+            tries = r.attempt + 1;
+            dropStreamed();
             const text = `Waiting to retry (${r.attempt} of ${r.of})`;
             this.bus.emit({ type: "status", state: "thinking", purpose: text });
             this.record.append("notice", { text: `${text}: ${r.reason}. The next try is in ${Math.round(r.waitMs / 1000)} s.` });
@@ -1101,8 +1178,16 @@ export class Session {
         if (retried) this.bus.emit({ type: "status", state: "thinking" });
         return res;
       } catch (e) {
+        dropStreamed();
+        if (e instanceof ProviderError && e.overflow && !compacted && !signal.aborted) {
+          compacted = true;
+          if (await this.maybeCompact(signal, true)) {
+            this.record.append("notice", { text: "The context was too long for the model. The harness summarized the older messages and tries again." });
+            continue;
+          }
+        }
         if (!(e instanceof ProviderError) || !e.transient || signal.aborted) throw e;
-        this.record.append("notice", { text: "The model did not answer after three tries. The conversation is saved up to the last finished step." });
+        this.record.append("notice", { text: `The model did not answer after ${countWord(tries)} ${tries === 1 ? "try" : "tries"}. The conversation is saved up to the last finished step.` });
         if (this.settings.headless) {
           if (++rounds > this.recoveryRounds) throw new ProviderError(`${e.message} The run waited ${this.recoveryRounds} times and then stopped.`);
           this.record.append("notice", { text: `No one can answer the card in a headless run. Waiting to try again (round ${rounds} of ${this.recoveryRounds}).` });
@@ -1172,7 +1257,17 @@ export class Session {
       try {
         old = JSON.parse(readFileSync(this.lockPath(), "utf8"));
       } catch {}
-      writeFileSync(this.lockPath(), JSON.stringify({ ...(old.pid === process.pid ? old : {}), pid: process.pid, started: old.started ?? new Date().toISOString(), ...extra }), { mode: 0o600 });
+      if (old.pid !== process.pid && lockAlive(old as unknown as OpenLock)) return;
+      const mine = old.pid === process.pid;
+      const tmp = `${this.lockPath()}.${process.pid}.tmp`;
+      writeFileSync(tmp, JSON.stringify({ ...(mine ? old : {}), pid: process.pid, procStart: ownStart(), started: (mine && old.started) || new Date().toISOString(), ...extra }), { mode: 0o600 });
+      renameSync(tmp, this.lockPath());
+    } catch {}
+  }
+
+  private releaseLock(): void {
+    try {
+      if (JSON.parse(readFileSync(this.lockPath(), "utf8")).pid === process.pid) rmSync(this.lockPath());
     } catch {}
   }
 
@@ -1197,12 +1292,13 @@ export class Session {
     }
   }
 
-  private closeOpenCalls() {
+  private closeOpenCalls(done: Part[] = []) {
     const last = this.history[this.history.length - 1];
     if (last?.role !== "assistant") return;
     const calls = last.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
+    const ran = (id: string) => done.find((p) => p?.type === "tool_result" && p.callId === id);
     if (calls.length)
-      this.push({ role: "user", parts: calls.map((c) => ({ type: "tool_result", callId: c.id, name: c.name, text: "ERROR: not run. The turn stopped.", isError: true })) });
+      this.push({ role: "user", parts: calls.map((c) => ran(c.id) ?? { type: "tool_result", callId: c.id, name: c.name, text: "ERROR: not run. The turn stopped.", isError: true }) });
   }
 
   private push(m: Message) {
@@ -1225,21 +1321,35 @@ export class Session {
   // is shortened in the live history only. Above SUMMARIZE_AT, the older messages are summarized.
   // The latest request and the recent messages stay as they are, also inside one long turn.
   private request?: Message;
+  private summaryFailed = false;
 
-  private async maybeCompact(signal: AbortSignal, force = false) {
+  private async maybeCompact(signal: AbortSignal, force = false): Promise<boolean> {
     const win = this.provider.info.contextWindow;
     const size = () => estimateTokens(this.history, this.system, this.activeSchemas());
-    if (!force && size() <= win * ELIDE_AT) return;
+    if (!force && size() <= win * ELIDE_AT) return false;
     if (!force) {
       const { messages, elided } = elideOld(this.history, win);
       if (elided) {
         this.history = messages;
         this.record.append("notice", { text: `The harness shortened ${elided} older tool output(s) in the context. The record keeps the full output.`, elided });
       }
-      if (size() <= win * SUMMARIZE_AT) return;
+      if (this.summaryFailed || size() <= win * SUMMARIZE_AT) return false;
     }
-    const res = await summarizeOld(this.history, this.provider, win, signal, this.request);
-    if (!res) return;
+    let res: Awaited<ReturnType<typeof summarizeOld>>;
+    try {
+      res = await summarizeOld(this.history, this.provider, win, signal, this.request);
+    } catch (e) {
+      if (signal.aborted) throw e;
+      this.summaryFailed = true;
+      this.record.append("notice", { text: `The harness could not summarize the older messages: ${(e as Error).message} The turn continues with the full context.` });
+      return false;
+    }
+    if (!res) return false;
+    if (!res.summary.trim()) {
+      this.summaryFailed = true;
+      this.record.append("notice", { text: "The summary of the older messages was empty. The turn continues with the full context." });
+      return false;
+    }
     const steps = this.plan?.steps.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`) ?? [];
     const summary = summaryMessage(steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary);
     const upTo = this.record.entries(["message"]).at(-1)?.id ?? 0;
@@ -1249,6 +1359,7 @@ export class Session {
     for (const m of rest) this.record.append("message", { message: m as unknown as Record<string, unknown> });
     this.phiFrom = this.history.length;
     this.contextWarned = false;
+    return true;
   }
 
   // ------------------------------------------------------------- patient identifiers
@@ -1398,6 +1509,10 @@ export class Session {
     const old = this.settings.model;
     try {
       await this.applySetting("model", spec);
+      if (isCloud(this.provider.info)) {
+        await this.applySetting("model", old);
+        return `${spec} does not run on this computer. Set OLLAMA_HOST or the server address to a local address.`;
+      }
     } catch (e) {
       return (e as Error).message;
     }
@@ -1570,12 +1685,13 @@ export class Session {
   }
 
   private steered: { text: string; typedAt: string; afterStep: number; afterTool: string; now: boolean }[] = [];
-  private callAbort?: AbortController;
+  private callAborts = new Set<AbortController>();
 
   steer(text: string, now = false): void {
+    text = this.withoutKeys(text);
     const last = this.record.entries(["tool_result"]).at(-1);
     this.steered.push({ text, typedAt: new Date().toISOString(), afterStep: stepNumbers(this.record.nodes()).size, afterTool: String(last?.data.tool ?? ""), now });
-    if (now) this.callAbort?.abort();
+    if (now) for (const c of this.callAborts) c.abort();
   }
 
   takeSteered(): string[] {
@@ -1599,13 +1715,21 @@ export class Session {
     const ctl = new AbortController();
     const stop = () => ctl.abort();
     outer.addEventListener("abort", stop, { once: true });
-    this.callAbort = ctl;
+    this.callAborts.add(ctl);
     try {
       return await this.runOne(call, ctl.signal);
     } finally {
       outer.removeEventListener("abort", stop);
-      this.callAbort = undefined;
+      this.callAborts.delete(ctl);
     }
+  }
+
+  private parallelSafe(call: Extract<Part, { type: "tool_call" }>): boolean {
+    if (call.parseError || !PARALLEL_TOOLS.has(call.name)) return false;
+    const tool = this.findTool(call.name);
+    if (!tool?.readOnly || tool.source === "adapter") return false;
+    const args = absolutePaths(dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema), this.cwd) as Args;
+    return this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name) || this.permissions.check(tool, args) === "allow";
   }
 
   private async runOne(call: Extract<Part, { type: "tool_call" }>, signal: AbortSignal): Promise<Part> {
@@ -1613,11 +1737,12 @@ export class Session {
     this.record.append("tool_call", { callId: call.id, tool: call.name, adapter: tool?.adapter, args: call.args as Record<string, unknown> });
     this.bus.emit({ type: "status", state: "running", tool: call.name, purpose: activity(call.name, (call.args ?? {}) as Args, tool?.source === "adapter" ? tool.title : undefined), since: Date.now() });
     if (call.parseError) return this.fail(call.id, call.name, `the arguments are not valid JSON: ${call.parseError}`);
-    if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use find_tools to search.`);
+    if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use only these tools: ${this.activeSchemas().map((t) => t.name).join(", ")}.${this.active.has("find_tools") ? " To find more tools, call find_tools." : ""}`);
     if (!this.active.has(tool.name)) this.active.add(tool.name);
     const args = dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema);
     if (!ownPurpose(tool)) delete args.purpose;
     const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
+    if (r.images?.length && this.provider.info.vision) await scaleImages(r.images, signal);
     return { type: "tool_result", callId: call.id, name: call.name, text: r.text, images: r.images, isError: r.isError };
   }
 
@@ -1857,7 +1982,8 @@ export class Session {
     const vis = cloud ? (adapter?.manifest.data_rules.cloud_visibility ?? "all") : "all";
     const small = this.provider.info.small;
     const limit = small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;
-    if (o.text && !o.metrics && !o.table && !o.outputs?.length && vis === "all") return { text: o.text.slice(0, limit) };
+    if (o.text && !o.metrics && !o.table && !o.outputs?.length && vis === "all")
+      return { text: o.text.length > limit ? `${o.text.slice(0, limit)}\n[The harness cut ${o.text.length - limit} characters. Write long output to a file and read it in parts.]` : o.text };
     const obj: Record<string, unknown> = { ok: o.ok };
     if (o.error) obj.error = o.error;
     if (o.summary) obj.summary = o.summary;
@@ -2136,7 +2262,7 @@ export class Session {
   }
 
   respondPermission(rid: string, ok: boolean, note = "", always = false): void {
-    this.permissionWaits.get(rid)?.resolve({ ok, note, always });
+    this.permissionWaits.get(rid)?.resolve({ ok, note: this.withoutKeys(note), always });
   }
 
   pendingPermissions(): string[] {
@@ -2182,7 +2308,7 @@ export class Session {
   }
 
   async followDone(step: number, note = "", agentDoes = false): Promise<void> {
-    this.followWaits.get(step)?.resolve({ note, agentDoes });
+    this.followWaits.get(step)?.resolve({ note: this.withoutKeys(note), agentDoes });
   }
 
   pendingFollowSteps(): number[] {
@@ -2306,6 +2432,8 @@ export class Session {
   }
 
   async answer(qid: string, value: unknown, note = ""): Promise<void> {
+    value = this.valueWithoutKeys(value);
+    note = this.withoutKeys(note);
     if (qid === this.trustQid || this.questions.get(qid)?.title === TRUST_TITLE) {
       const q = this.questions.get(qid);
       if (q?.status === "open") {
@@ -2335,6 +2463,8 @@ export class Session {
   }
 
   async changeAnswer(qid: string, value: unknown, note = ""): Promise<string[]> {
+    value = this.valueWithoutKeys(value);
+    note = this.withoutKeys(note);
     const q = this.questions.get(qid);
     if (!q) throw new Error(`No question ${qid}.`);
     if (q.status === "open") return (await this.answer(qid, value, note), []);
@@ -2378,9 +2508,16 @@ export class Session {
           ? await makeProvider(next.referee, { effort: next.effort })
           : undefined
       : this.refereeProvider;
+    const wasCloud = isCloud(this.provider.info);
+    const wasDeferred = this.deferred();
     this.settings = next;
     this.provider = provider;
     this.refereeProvider = referee;
+    if (isCloud(provider.info) && !wasCloud) this.phiFrom = 0;
+    if (wasDeferred && !this.deferred()) {
+      this.active.clear();
+      this.chooseActiveTools();
+    }
     if (name === "export_xlsx" || name === "figure_formats") this.dirs();
     if (["model", "export_xlsx", "figure_formats", "text_style"].includes(name)) this.system = this.buildSystem();
   }
@@ -3082,6 +3219,7 @@ export class Session {
   }
 
   private async inspectPath(path: string, signal?: AbortSignal): Promise<ToolOutput> {
+    if (isCredentialsFile(path)) return { ok: false, error: `${path} holds the saved API keys. The agent cannot read it.` };
     const insp = await inspectData(path, join(this.workDir, "inspect"), signal);
     if (!insp.ok) return { ok: false, error: insp.error ?? "The inspection failed." };
     this.inspection = insp;
@@ -3315,6 +3453,11 @@ export class Session {
       else if (!found.length && existsTable(g)) found.push({ path: g, label: g, kind: "table" });
     }
     const out: string[] = [];
+    for (const p of [saved, ...given]) {
+      if (!p || own(p) || this.checked.has(p) || !/\.(csv|tsv)$/i.test(p) || !existsSync(p) || !statSync(p).isFile() || existsTable(p)) continue;
+      this.checked.add(p);
+      out.push(`Data check by the harness: ${basename(p)} is larger than 20 MB. The harness did not check it for missing values, copies, mixed columns or extreme values.`);
+    }
     for (const f of found) {
       if (this.checked.has(f.label)) continue;
       this.checked.add(f.label);
@@ -3343,7 +3486,7 @@ export class Session {
       const text = dataCheckText(check);
       this.record.append("data_check", { source: f.label, kind: check.kind, size: check.size, items: check.items, groups: check.groups ?? null, units: check.units ?? [], text, summary: summary ?? null });
       out.push(`Data check by the harness (code, not a model):\n${text}`);
-      if (check.items.some((i) => i.level === "ask")) out.push(this.planning ? "The harness asks the scientist about each problem under Questions for you in the Questions stage. Do not ask about them again." : "Ask the scientist about each problem under Questions for you before a step uses the data.");
+      if (check.items.some((i) => i.level === "ask")) out.push(this.planning ? "The harness asks the scientist about each problem under Problems found in the data in the Questions stage. Do not ask about them again." : "Ask the scientist about each problem under Problems found in the data before a step uses the data.");
       if (sheet?.rows.length) {
         this.sheet = sheet;
         this.saveSheet(sheet.rows, "drafted");
@@ -3580,8 +3723,14 @@ export class Session {
     return out;
   }
 
-  async compact(): Promise<void> {
-    await this.maybeCompact(new AbortController().signal, true);
+  async compact(): Promise<boolean> {
+    if (this.busy) return false;
+    this.busy = true;
+    try {
+      return await this.maybeCompact(new AbortController().signal, true);
+    } finally {
+      this.busy = false;
+    }
   }
 
   citationStyle(): CitationStyle {
@@ -3673,9 +3822,7 @@ export class Session {
     }
     this.interrupt();
     await this.titling?.catch(() => {});
-    try {
-      if (JSON.parse(readFileSync(this.lockPath(), "utf8")).pid === process.pid) rmSync(this.lockPath());
-    } catch {}
+    this.releaseLock();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
   }
 }
@@ -3727,4 +3874,10 @@ function getArg(args: Args, path: string): unknown {
     cur = (cur as Record<string, unknown>)[k];
   }
   return cur;
+}
+
+const PARALLEL_TOOLS = new Set(["read_file", "list_dir", "inspect_data", "load_skill", "find_tools", "search_literature"]);
+
+function countWord(n: number): string {
+  return ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] ?? String(n);
 }

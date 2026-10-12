@@ -39,10 +39,26 @@ function parseMetadata(raw: unknown): ElabEntity["metadata"] {
   return raw && typeof raw === "object" ? (raw as ElabEntity["metadata"]) : {};
 }
 
+export function safeServer(url: string): boolean {
+  try {
+    const u = new URL(baseUrl(url));
+    return u.protocol === "https:" || (u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname));
+  } catch {
+    return false;
+  }
+}
+
+function entityId(id: unknown): number {
+  const n = Number(id);
+  if (!Number.isInteger(n) || n <= 0) throw new ElabftwError(`The eLabFTW id ${String(id)} is not a positive whole number.`, 0);
+  return n;
+}
+
 export function elabftw(cfg: ElabftwConfig, fetchImpl: typeof fetch = fetch) {
   const root = `${baseUrl(cfg.url)}/api/v2`;
 
   async function call(method: string, path: string, body?: unknown | FormData): Promise<Response> {
+    if (!safeServer(cfg.url)) throw new ElabftwError(`The eLabFTW address ${cfg.url} must start with https://. Plain http is allowed only for localhost. Cuvette did not send the key.`, 0);
     const headers: Record<string, string> = { Authorization: cfg.key };
     let payload: BodyInit | undefined;
     if (body instanceof FormData) payload = body;
@@ -72,21 +88,22 @@ export function elabftw(cfg: ElabftwConfig, fetchImpl: typeof fetch = fetch) {
     },
 
     async appendBody(id: number, html: string): Promise<void> {
-      await call("PATCH", `/experiments/${id}`, { bodyappend: html });
+      await call("PATCH", `/experiments/${entityId(id)}`, { bodyappend: html });
     },
 
     async addTags(id: number, tags: string[]): Promise<void> {
-      await call("POST", `/experiments/${id}/tags`, { tags });
+      await call("POST", `/experiments/${entityId(id)}/tags`, { tags });
     },
 
     async upload(id: number, name: string, data: Buffer, mime: string, comment = ""): Promise<number> {
       const form = new FormData();
       form.append("file", new Blob([new Uint8Array(data)], { type: mime }), name);
       if (comment) form.append("comment", comment);
-      return idFrom(await call("POST", `/experiments/${id}/uploads`, form));
+      return idFrom(await call("POST", `/experiments/${entityId(id)}/uploads`, form));
     },
 
     async readEntity(type: "experiments" | "items", id: number): Promise<ElabEntity> {
+      id = entityId(id);
       const j = (await (await call("GET", `/${type}/${id}`)).json()) as Record<string, unknown>;
       return {
         id: Number(j.id ?? id),
@@ -99,11 +116,12 @@ export function elabftw(cfg: ElabftwConfig, fetchImpl: typeof fetch = fetch) {
     },
 
     async listItemLinks(id: number): Promise<ElabLink[]> {
-      return (await (await call("GET", `/experiments/${id}/items_links`)).json()) as ElabLink[];
+      const list = (await (await call("GET", `/experiments/${entityId(id)}/items_links`)).json()) as ElabLink[];
+      return Array.isArray(list) ? list.filter((l) => Number.isInteger(Number(l?.entityid)) && Number(l.entityid) > 0) : [];
     },
 
     async listRevisions(id: number): Promise<{ id: number; created_at: string }[]> {
-      return (await (await call("GET", `/experiments/${id}/revisions`)).json()) as { id: number; created_at: string }[];
+      return (await (await call("GET", `/experiments/${entityId(id)}/revisions`)).json()) as { id: number; created_at: string }[];
     },
 
     async importEln(name: string, data: Buffer, entityType: "experiments" | "items" = "experiments"): Promise<number> {

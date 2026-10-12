@@ -1,17 +1,39 @@
-import { closeSync, existsSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { Args, Tool, ToolContext, ToolOutput } from "../core/types.ts";
-import { cap, commandLine, outputFile, processFailure, runProcess, validateArgs, type Dirs } from "../adapters/kinds/common.ts";
+import { cap, commandLine, outputFile, processFailure, runProcess, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
 import { takeScreenshot } from "../adapters/kinds/screen.ts";
+import { isCredentialsFile } from "../core/credentials.ts";
 
-function insideWorkDir(workDir: string, name: string): string | undefined {
+const below = (root: string, p: string) => {
+  const rel = relative(root, p);
+  return !!rel && rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel);
+};
+
+function existingAncestor(p: string): string {
+  let at = p;
+  while (!existsSync(at) && dirname(at) !== at) at = dirname(at);
+  return at;
+}
+
+function isLink(p: string): boolean {
+  try {
+    return lstatSync(p).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+export function insideWorkDir(workDir: string, name: string): string | undefined {
   const target = resolve(workDir, name);
-  const rel = relative(workDir, target);
-  if (!rel || rel.startsWith("..") || isAbsolute(rel)) return undefined;
+  if (!below(workDir, target)) return undefined;
+  mkdirSync(workDir, { recursive: true });
+  const root = realpathSync(workDir);
+  const inRoot = (p: string) => p === root || below(root, p);
+  if (!inRoot(realpathSync(existingAncestor(dirname(target))))) return undefined;
   mkdirSync(dirname(target), { recursive: true });
-  const real = relative(realpathSync(workDir), realpathSync(dirname(target)));
-  if (real.startsWith("..") || isAbsolute(real)) return undefined;
+  if (!inRoot(realpathSync(dirname(target))) || isLink(target)) return undefined;
   return target;
 }
 
@@ -64,7 +86,7 @@ export function genericTools(dirs: Dirs): Tool[] {
         const argv = a.argv as string[];
         const route = commandLine(argv);
         const cwd = a.cwd ? here(String(a.cwd)) : project;
-        const r = await runProcess(argv, { cwd, signal: ctx.signal, timeoutMs: Number(a.timeout_s) * 1000 });
+        const r = await runProcess(argv, { cwd, env: withoutSecrets(), signal: ctx.signal, timeoutMs: Number(a.timeout_s) * 1000 });
         const text = cap([r.stdout, r.stderr && `[stderr]\n${r.stderr}`].filter(Boolean).join("\n"), 20000);
         const failure = processFailure(r, argv[0], Number(a.timeout_s));
         return failure ? { ok: false, error: failure, text, manualRoute: route } : { ok: true, text, summary: `Ran ${argv[0]} in ${cwd}; exit code 0.`, manualRoute: route };
@@ -84,6 +106,7 @@ export function genericTools(dirs: Dirs): Tool[] {
       run(a) {
         const path = here(String(a.path));
         if (!existsSync(path) || !statSync(path).isFile()) return { ok: false, error: `${path} is not a file` };
+        if (isCredentialsFile(path)) return { ok: false, error: `${path} holds the saved API keys. The agent cannot read it.` };
         const size = statSync(path).size;
         const fd = openSync(path, "r");
         const buf = Buffer.alloc(Math.min(size, Number(a.max_bytes)));

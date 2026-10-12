@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import type { Tool, ToolContext } from "../src/core/types.ts";
-import { genericTools } from "../src/tools/generic.ts";
+import { genericTools, insideWorkDir } from "../src/tools/generic.ts";
+import { withoutSecrets } from "../src/adapters/kinds/common.ts";
+import { credentialsPath, isCredentialsFile } from "../src/core/credentials.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-generic-"));
 const dirs = { workDir: join(root, "work"), sessionDir: join(root, "session") };
@@ -84,5 +86,66 @@ test("screenshot (dry run) returns a PNG", async () => {
     expect(readFileSync(r.images![0]).subarray(1, 4).toString()).toBe("PNG");
   } finally {
     delete process.env.CUVETTE_SCREEN_DRY_RUN;
+  }
+});
+
+test("write_file refuses a symlink as the target file", () => {
+  const root = mkdtempSync(join(tmpdir(), "cuvette-hard-"));
+  const work = join(root, "work");
+  mkdirSync(work);
+  const outside = join(root, "outside.txt");
+  writeFileSync(outside, "keep");
+  symlinkSync(outside, join(work, "out.txt"));
+  expect(insideWorkDir(work, "out.txt")).toBeUndefined();
+  expect(readFileSync(outside, "utf8")).toBe("keep");
+});
+
+test("write_file does not make folders outside the work folder through a symlink", () => {
+  const root = mkdtempSync(join(tmpdir(), "cuvette-hard-"));
+  const work = join(root, "work");
+  const other = join(root, "other");
+  mkdirSync(work);
+  mkdirSync(other);
+  symlinkSync(other, join(work, "link"));
+  expect(insideWorkDir(work, "link/new/deep/x.txt")).toBeUndefined();
+  expect(existsSync(join(other, "new"))).toBe(false);
+});
+
+test("write_file accepts a name that starts with two dots", () => {
+  const work = mkdtempSync(join(tmpdir(), "cuvette-hard-"));
+  expect(insideWorkDir(work, "..notes.txt")).toBe(join(work, "..notes.txt"));
+  expect(insideWorkDir(work, "../x.txt")).toBeUndefined();
+});
+
+test("read_file and the credentials check refuse the saved key file", async () => {
+  const home = mkdtempSync(join(tmpdir(), "cuvette-hard-home-"));
+  const old = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
+  try {
+    writeFileSync(credentialsPath(), '{"anthropic_api_key":"sk-ant-secret"}');
+    symlinkSync(credentialsPath(), join(home, "alias.json"));
+    expect(isCredentialsFile(join(home, "alias.json"))).toBe(true);
+    const read = genericTools({ workDir: home, sessionDir: home, projectDir: home }).find((t) => t.name === "read_file")!;
+    const r = await read.execute({ path: "alias.json" }, ctx());
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r)).not.toContain("sk-ant-secret");
+  } finally {
+    if (old === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = old;
+  }
+});
+
+test("run_command does not pass API keys to the program", async () => {
+  process.env.ANTHROPIC_API_KEY_TEST_ONLY = "sk-ant-secret";
+  try {
+    expect(withoutSecrets()).not.toHaveProperty("ANTHROPIC_API_KEY_TEST_ONLY");
+    const root = mkdtempSync(join(tmpdir(), "cuvette-hard-"));
+    const run = genericTools({ workDir: root, sessionDir: root, projectDir: root }).find((t) => t.name === "run_command")!;
+    const r = await run.execute({ purpose: "Test", does: "Shows the settings.", argv: [process.execPath, "-e", "console.log(JSON.stringify(process.env))"] }, ctx());
+    expect(r.ok).toBe(true);
+    expect(r.text).not.toContain("sk-ant-secret");
+    expect(r.text).toContain("PATH");
+  } finally {
+    delete process.env.ANTHROPIC_API_KEY_TEST_ONLY;
   }
 });

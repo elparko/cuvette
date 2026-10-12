@@ -133,7 +133,7 @@ export function loadMethod(ref: string, project?: string): Method & { path: stri
   const local = project && !ref.endsWith(".json") ? pathOf(ref, projectMethodsDir(project)) : undefined;
   if (local && existsSync(local) && !folderTrusted(project!)) throw new Error(`The method ${ref} is in the project folder, and this folder is not trusted. Check the folder with /trust, then trust it with /trust on.`);
   const path = local && existsSync(local) ? local : ref.endsWith(".json") && existsSync(ref) ? ref : pathOf(ref);
-  if (!existsSync(path)) throw new Error(`No method named ${ref}. Type /method to see the list.`);
+  if (!existsSync(path)) throw new Error(`No method named ${ref}. Type /method in a session, or cuvette method list, to see the list.`);
   const text = readFileSync(path, "utf8");
   return { ...readMethod(text, basename(path)), path, hash: createHash("sha256").update(text).digest("hex") };
 }

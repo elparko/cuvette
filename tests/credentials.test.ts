@@ -2,7 +2,7 @@ import { mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { claudeKey, credentialsPath, elabftwConfig, elabftwProblem, removeElabftw, saveElabftw, keyProblem, keyVersion, maskKey, removeClaudeKey, saveClaudeKey, savedClaudeKey } from "../src/core/credentials.ts";
+import { claudeKey, credentialsPath, elabftwConfig, elabftwProblem, hideKeys, removeElabftw, saveClaudeWorkspace, saveElabftw, keyProblem, keyVersion, maskKey, removeClaudeKey, saveClaudeKey, savedClaudeKey } from "../src/core/credentials.ts";
 
 const old = process.env.CUVETTE_HOME;
 beforeEach(() => {
@@ -62,4 +62,20 @@ test("address and key checks", () => {
   expect(elabftwProblem("not a url", "k")).toMatch(/not valid/);
   expect(elabftwProblem("https://elab.example.org", "")).toMatch(/empty/);
   expect(elabftwProblem("https://elab.example.org", "a b")).toMatch(/space/);
+});
+
+test("hideKeys removes pasted keys and the saved keys, and keeps normal text", () => {
+  const ant = "sk-ant-api03-Zx9_abcdefghijklmnopqrstuvwxyz0123456789";
+  const oai = "sk-proj-Ab3dEfGhIjKlMnOpQrStUvWxYz0123456789abcd";
+  const elab = "4-" + "a1".repeat(42);
+  const h = hideKeys(`my key is ${ant}, the old one ${oai}, eLab ${elab}`, {});
+  expect(h.found).toBe(3);
+  expect(h.text).toBe("my key is [API key removed], the old one [API key removed], eLab [API key removed]");
+  saveElabftw("https://elab.example.org", "plainsavedsecret12345");
+  expect(hideKeys("use plainsavedsecret12345 here", {}).text).toBe("use [API key removed] here");
+  saveClaudeWorkspace("wrkspc_0123456789abcdef");
+  expect(hideKeys("workspace wrkspc_0123456789abcdef", {}).found).toBe(0);
+  expect(hideKeys("token OTHERENVSECRET-value-1234", { MY_TOKEN: "OTHERENVSECRET-value-1234" }).text).toBe("token [API key removed]");
+  const plain = "Run sk-learn-pipeline-results-and-plots on task-1234 at https://elab.example.org with /Users/me/data.csv";
+  expect(hideKeys(plain, { HOME_KEYS_DIR: "/Users/me/data.csv" })).toEqual({ text: plain, found: 0 });
 });

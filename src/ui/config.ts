@@ -95,7 +95,7 @@ export function rowHelp(r: SettingRow): string {
 
 export function modelNote(spec: string): string {
   if (spec === "same" || spec === "none" || spec === "not set") return "";
-  if (spec.startsWith("ollama:") || /^openai:https?:\/\/(localhost|127\.0\.0\.1)/.test(spec)) return "free, on this Mac";
+  if (spec.startsWith("ollama:") || /^openai:https?:\/\/(localhost|127\.0\.0\.1)/.test(spec)) return "free, on this computer";
   if (spec !== "claude" && !spec.startsWith("claude:")) return "";
   const p = modelPrice(spec === "claude" ? DEFAULT_CLAUDE_MODEL : spec);
   return p ? `$${p.input} in, $${p.output} out per million tokens` : "";

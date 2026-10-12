@@ -121,6 +121,7 @@ export interface StepRequest {
   system: string;
   messages: Message[];
   tools: ToolSchema[];
+  noToolCalls?: boolean;
   signal?: AbortSignal;
   onDelta?: (d: { type: "text" | "thinking"; text: string }) => void;
   onRetry?: (r: { attempt: number; of: number; waitMs: number; reason: string }) => void;
@@ -141,10 +142,13 @@ export interface Provider {
 }
 
 export class ProviderError extends Error {
-  constructor(message: string, readonly transient = false) {
+  constructor(message: string, readonly transient = false, readonly overflow = false) {
     super(message);
   }
 }
+
+export const CONTEXT_OVERFLOW =
+  /prompt is too long|maximum context length is|context_length_exceeded|exceeds? (?:the )?(?:available |maximum )?context (?:size|length|window)|longer than the maximum model length|too many input tokens(?! per)/i;
 
 // ---------------------------------------------------------------- tools
 
@@ -327,6 +331,7 @@ export interface Claim {
 export type BusEvent =
   | { type: "entry"; entry: Entry }
   | { type: "delta"; kind: "text" | "thinking"; text: string }
+  | { type: "delta_reset" }
   | { type: "status"; state: "idle" | "thinking" | "running" | "waiting"; tool?: string; purpose?: string; since?: number }
   | { type: "permission"; rid: string; tool: string; args: Args; code?: string; touches: string; search?: { root: string; purpose: string } }
   | { type: "question"; question: Question }

@@ -679,8 +679,25 @@ export function runProcess(given: string[], o: RunOpts = {}): Promise<RunResult>
       child.stdin?.end(o.stdin);
     }
     child.on("error", (e) => finish({ error: e.message }));
+    child.on("exit", (code) => {
+      setTimeout(() => {
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+        finish({ code });
+      }, EXIT_GRACE_MS).unref();
+    });
     child.on("close", (code) => finish({ code }));
   });
+}
+
+export const EXIT_GRACE_MS = 2000;
+
+const SECRET_ENV = /key|token|secret|password|passwd|credential/i;
+
+export function withoutSecrets(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) if (v !== undefined && !SECRET_ENV.test(k)) out[k] = v;
+  return out;
 }
 
 export function processFailure(r: RunResult, label: string, timeoutS: number): string | undefined {

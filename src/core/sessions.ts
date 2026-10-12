@@ -1,4 +1,6 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { existsSync, linkSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 
@@ -19,14 +21,87 @@ export interface SessionInfo {
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg)$/i;
 
-export function openLock(recordDir: string): { pid: number; app?: string; started?: string } | undefined {
+export interface OpenLock {
+  pid: number;
+  app?: string;
+  started?: string;
+  procStart?: number;
+}
+
+const LOCK = "open.json";
+const START_SLACK_MS = 5000;
+
+export function processStart(pid: number): number | undefined {
+  if (process.platform === "win32") return undefined;
   try {
-    const lock = JSON.parse(readFileSync(join(recordDir, "open.json"), "utf8"));
-    process.kill(lock.pid, 0);
-    return lock;
+    const out = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], { encoding: "utf8", timeout: 3000, env: { ...process.env, LC_ALL: "C" }, stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const t = Date.parse(out);
+    return Number.isFinite(t) ? t : undefined;
   } catch {
     return undefined;
   }
+}
+
+export const ownStart = () => Math.round(Date.now() - process.uptime() * 1000);
+
+export function lockAlive(lock: OpenLock | undefined, startOf: (pid: number) => number | undefined = processStart): boolean {
+  if (!lock || !Number.isInteger(lock.pid) || lock.pid <= 0) return false;
+  if (lock.pid === process.pid) return lock.procStart === undefined || Math.abs(lock.procStart - ownStart()) <= START_SLACK_MS;
+  try {
+    process.kill(lock.pid, 0);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "EPERM") return false;
+  }
+  if (typeof lock.procStart !== "number") return true;
+  const real = startOf(lock.pid);
+  return real === undefined || Math.abs(real - lock.procStart) <= START_SLACK_MS;
+}
+
+function readLock(path: string): OpenLock | undefined {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+export function openLock(recordDir: string, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
+  const lock = readLock(join(recordDir, LOCK));
+  return lockAlive(lock, startOf) ? lock : undefined;
+}
+
+export function claimLock(recordDir: string, extra: Record<string, unknown> = {}, startOf?: (pid: number) => number | undefined): OpenLock | undefined {
+  const path = join(recordDir, LOCK);
+  const body = () => JSON.stringify({ pid: process.pid, procStart: ownStart(), started: new Date().toISOString(), ...extra });
+  for (let i = 0; i < 5; i++) {
+    try {
+      writeFileSync(path, body(), { flag: "wx", mode: 0o600 });
+      return undefined;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") return undefined;
+    }
+    const held = readLock(path);
+    if (held && lockAlive(held, startOf)) {
+      if (held.pid === process.pid) return undefined;
+      return held;
+    }
+    const aside = `${path}.${process.pid}.${randomBytes(4).toString("hex")}`;
+    try {
+      renameSync(path, aside);
+    } catch {
+      continue;
+    }
+    const moved = readLock(aside);
+    if (moved && lockAlive(moved, startOf) && moved.pid !== process.pid) {
+      try {
+        linkSync(aside, path);
+      } catch {}
+      rmSync(aside, { force: true });
+      return moved;
+    }
+    rmSync(aside, { force: true });
+  }
+  return readLock(path);
 }
 
 const alive = (dir: string) => !!openLock(dir);

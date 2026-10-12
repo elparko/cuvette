@@ -4,7 +4,7 @@ import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Message, StepRequest, ToolSchema } from "../src/core/types.ts";
-import { ProviderError } from "../src/core/types.ts";
+import { CONTEXT_OVERFLOW, ProviderError } from "../src/core/types.ts";
 import { ClaudeProvider } from "../src/providers/claude.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.ts";
@@ -192,6 +192,54 @@ describe("claude", () => {
     expect(calls[2].api).toBe("stream");
   });
 
+  test("marks a prompt that is too long, so that the session can summarize and try again", async () => {
+    const long = new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "prompt is too long: 1200000 tokens > 1000000 maximum" } } as any, undefined, new Headers());
+    const other = new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "messages.0: bad field" } } as any, undefined, new Headers());
+    const flags: boolean[] = [];
+    for (const e of [long, other]) {
+      const { client } = fakeClient([e]);
+      await new ClaudeProvider("claude-opus-5-5", { client, retries: 0 }).step(req([user("x")])).catch((err) => flags.push(err.overflow));
+    }
+    expect(flags).toEqual([true, false]);
+  });
+
+  test("a stop at the full context window starts a summary, not the output-limit note", async () => {
+    const { client } = fakeClient([claudeMsg([{ type: "text", text: "The cou" }], "model_context_window_exceeded")]);
+    const err = await new ClaudeProvider("claude-opus-5-5", { client }).step(req([user("x")])).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.overflow).toBe(true);
+    expect(err.transient).toBe(false);
+  });
+
+  test("the too-long pattern matches context errors and not rate limits or bad parameters", () => {
+    const yes = [
+      "prompt is too long: 210000 tokens > 200000 maximum",
+      "This model's maximum context length is 8192 tokens. However, your messages resulted in 9000 tokens.",
+      "context_length_exceeded",
+      "the request exceeds the available context size, try increasing it",
+      "input length exceeds the context length",
+      "The decoder prompt (length 5000) is longer than the maximum model length of 4096.",
+      "too many input tokens",
+    ];
+    const no = [
+      "This request would exceed the rate limit for your organization of 400000 input tokens per minute.",
+      "Too many tokens per minute. Retry later.",
+      "invalid context length parameter",
+      "num_ctx: context window must be a positive number",
+      "too many input tokens per minute",
+    ];
+    expect(yes.filter((s) => !CONTEXT_OVERFLOW.test(s))).toEqual([]);
+    expect(no.filter((s) => CONTEXT_OVERFLOW.test(s))).toEqual([]);
+  });
+
+  test("a forced answer keeps the tools, so the history with tool calls stays valid and cached, and sets tool_choice none", async () => {
+    const { client, calls } = fakeClient([claudeMsg([{ type: "text", text: "ok" }])]);
+    const tools = [{ name: "add", description: "Add.", inputSchema: { type: "object", properties: {} } }];
+    await new ClaudeProvider("claude-opus-5-5", { client }).step({ ...req([user("x")]), tools, noToolCalls: true });
+    expect(calls[0].params.tools).toHaveLength(1);
+    expect(calls[0].params.tool_choice).toEqual({ type: "none" });
+  });
+
   test("maps SDK errors to ProviderError", async () => {
     const auth = new Anthropic.AuthenticationError(401, {} as any, "nope", new Headers());
     const rate = new Anthropic.RateLimitError(429, {} as any, "slow", new Headers());
@@ -300,6 +348,27 @@ describe("ollama", () => {
     expect(deltas.filter((d) => d.startsWith("text:")).join("").replace(/text:/g, "")).toBe("Hello");
     expect(r.stopReason).toBe("tool_use");
     expect(r.usage).toEqual({ inputTokens: 11, outputTokens: 7 });
+  });
+
+  test("asks Ollama not to cut the prompt, and marks a context error as too long", async () => {
+    const seen = stubOllama(() => json({ error: "the input length exceeds the context length" }, 400));
+    const p = await makeProvider("ollama:qwen3:8b");
+    const err = await p.step(req([user("x")])).catch((e) => e);
+    expect(seen.find((s) => s.url.endsWith("/api/chat"))!.body.truncate).toBe(false);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.overflow).toBe(true);
+    stubOllama(() => ndjson([{ error: "input length exceeds the context length" }]));
+    expect((await (await makeProvider("ollama:qwen3:8b")).step(req([user("x")])).catch((e) => e)).overflow).toBe(true);
+  });
+
+  test("a prompt that fills the context window counts as too long, because Ollama can cut it without an error", async () => {
+    stubOllama(() => ndjson([{ message: { content: "ok" } }, { done: true, done_reason: "stop", prompt_eval_count: 32768, eval_count: 2 }]));
+    const err = await (await makeProvider("ollama:qwen3:8b")).step(req([user("x")])).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.overflow).toBe(true);
+    stubOllama(() => ndjson([{ message: { content: "ok" } }, { done: true, done_reason: "stop", prompt_eval_count: 20000, eval_count: 2 }]));
+    const r = await (await makeProvider("ollama:qwen3:8b")).step(req([user("x")]));
+    expect(r.stopReason).toBe("end");
   });
 
   test("a reply that repeats the same text is stopped and cut before the repeat", async () => {
@@ -482,6 +551,19 @@ describe("ollama", () => {
 });
 
 describe("openai", () => {
+  test("an empty assistant reply with no calls gets text, not null content", async () => {
+    const p: any = await makeProvider("openai:http://localhost:1234/v1|m");
+    const native: any[] = p.toNative("S", [user("x"), { role: "assistant", parts: [] }, user("y")]);
+    expect(native[2]).toEqual({ role: "assistant", content: "(no reply)" });
+  });
+
+  test("a reply body that stops early gives a transient error that the session can resume", async () => {
+    vi.stubGlobal("fetch", async () => new Response("{\"choices\": [", { status: 200 }));
+    const err = await (await makeProvider("openai:http://localhost:1234/v1|m")).step(req([user("x")])).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.transient).toBe(true);
+  });
+
   test("chat completions with tool calls, bad JSON, reasoning, auth header", async () => {
     vi.stubEnv("OPENAI_API_KEY", "sk-test");
     let seen: any;
@@ -533,6 +615,18 @@ describe("openai", () => {
       { attempt: 1, of: 3, reason: "network error" },
       { attempt: 2, of: 3, reason: "network error" },
     ]);
+  });
+
+  test("a 429 reply waits for the Retry-After time of the server", async () => {
+    let n = 0;
+    vi.stubGlobal("fetch", async () => {
+      if (n++ < 1) return new Response("slow down", { status: 429, headers: { "retry-after": "45" } });
+      return json({ choices: [{ message: { content: "ok" } }] });
+    });
+    const waits: number[] = [];
+    const p = await makeProvider("openai:http://localhost:1234/v1|m", { sleep: async (ms: number) => void waits.push(ms) });
+    await p.step(req([user("x")]));
+    expect(waits).toEqual([45_000]);
   });
 
   test("a 400 reply is not retried", async () => {

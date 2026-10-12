@@ -42,11 +42,11 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
         <Button size={big ? "lg" : "default"} onClick={pick} disabled={busy}>
           <FolderOpenIcon /> Choose a folder in Finder…
         </Button>
-        {(msg || pickMsg) && <p className="text-sm text-bad">{msg || pickMsg}</p>}
+        {(msg || pickMsg) && <p className="text-sm text-bad" role="alert">{msg || pickMsg}</p>}
         {pending && <SuggestCard pending={pending} busy={busy} open={open} cancel={cancel} />}
         {!pending && recent.length > 0 && (
           <div className="w-full">
-            <div className="pb-1 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">Recent project folders</div>
+            <div className="pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent project folders</div>
             <ul className="rounded-xl border bg-card p-1">
               {recent.slice(0, 6).map((r) => (
                 <li key={r}>
@@ -118,7 +118,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
         />
         <Button onClick={() => pick.choose(path)} disabled={pick.busy}>Analyze this folder</Button>
       </div>
-      {(msg || pick.msg) && <p className="text-sm text-bad">{msg || pick.msg}</p>}
+      {(msg || pick.msg) && <p className="text-sm text-bad" role="alert">{msg || pick.msg}</p>}
       {pick.pending && <SuggestCard pending={pick.pending} busy={pick.busy} open={pick.open} cancel={pick.cancel} />}
       {d && !pick.pending && (
         <div className="min-h-0 overflow-y-auto rounded-xl border bg-card p-1" style={{ maxHeight: "min(420px, 50vh)" }}>
@@ -130,7 +130,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
           </ul>
           {d.recent.length > 0 && (
             <>
-              <div className="px-2.5 pt-3 pb-1 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">Recent project folders</div>
+              <div className="px-2.5 pt-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent project folders</div>
               <ul>{d.recent.map((r) => row("r" + r, <ClockIcon className="size-4" />, r.split("/").filter(Boolean).pop() || r, r, r))}</ul>
             </>
           )}

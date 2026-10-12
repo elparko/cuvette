@@ -68,7 +68,11 @@ export async function prepareImages(messages: Message[], signal?: AbortSignal): 
       if (p.type === "tool_result" && !p.isError) paths.push(...(p.images ?? []).slice(0, MAX_IMAGES_PER_RESULT));
       else if (p.type === "image") paths.push(p.path);
     }
-  for (const p of paths.slice(0, IMAGE_BUDGET)) {
+  await scaleImages(paths.slice(0, IMAGE_BUDGET), signal);
+}
+
+export async function scaleImages(paths: string[], signal?: AbortSignal): Promise<void> {
+  for (const p of paths) {
     signal?.throwIfAborted();
     const format = await needsScaling(p);
     if (format) await scaledCopy(p, MAX_SIDE, format, signal);

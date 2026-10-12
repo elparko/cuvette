@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button.tsx";
 
 const MAX = 16;
+const STEP = 60;
+const MOVE: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
-// Wheel or pinch zooms at the pointer, drag moves the image, double-click switches between fit and 100%.
+// Wheel or pinch zooms at the pointer, drag or the arrow keys move the image, double-click switches between fit and 100%.
 export function ImageViewer({ src, alt }: { src: string; alt: string }) {
   const box = useRef<HTMLDivElement>(null);
   const [nat, setNat] = useState({ w: 0, h: 0 });
@@ -42,7 +44,11 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div
         ref={box}
-        className="relative min-h-0 flex-1 touch-none overflow-hidden rounded-lg bg-muted select-none"
+        tabIndex={0}
+        role="group"
+        aria-roledescription="image viewer"
+        aria-label={`${alt || "Image"}. Arrow keys move the image. Plus and minus zoom. 0 fits the image, 1 shows 100%.`}
+        className="relative min-h-0 flex-1 touch-none overflow-hidden rounded-lg bg-muted outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         style={{ cursor: drag.current ? "grabbing" : "grab" }}
         onPointerDown={(e) => {
           drag.current = { x: e.clientX, y: e.clientY };
@@ -55,7 +61,24 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
           setView({ ...cur, x: cur.x + e.clientX - d.x, y: cur.y + e.clientY - d.y });
         }}
         onPointerUp={() => (drag.current = null)}
-        onDoubleClick={(e) => (view && Math.abs(cur.scale - 1) < 0.01 ? setView(null) : zoomTo(1, { x: e.clientX, y: e.clientY }))}
+        onPointerCancel={() => (drag.current = null)}
+        onDoubleClick={(e) => {
+          const at = { x: e.clientX, y: e.clientY };
+          if (Math.abs(cur.scale - 1) >= 0.01) return zoomTo(1, at);
+          if (fit() < 0.99) return setView(null);
+          zoomTo(2, at);
+        }}
+        onKeyDown={(e) => {
+          if (e.metaKey || e.ctrlKey || e.altKey) return;
+          const move = MOVE[e.key];
+          if (move) setView({ ...cur, x: cur.x + move[0] * STEP, y: cur.y + move[1] * STEP });
+          else if (e.key === "+" || e.key === "=") zoomTo(cur.scale * 1.5);
+          else if (e.key === "-") zoomTo(cur.scale / 1.5);
+          else if (e.key === "0") setView(null);
+          else if (e.key === "1") zoomTo(1);
+          else return;
+          e.preventDefault();
+        }}
       >
         <img
           src={src}
@@ -82,7 +105,7 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
         </Button>
         <span className="min-w-0 flex-1 truncate px-2">
           {alt}
-          {nat.w ? ` · ${nat.w} × ${nat.h} px` : ""} · Scroll to zoom, drag to move, double-click for 100%
+          {nat.w ? ` · ${nat.w} × ${nat.h} px` : ""} · Scroll or + and − to zoom. Drag or the arrow keys move the image. Double-click for 100%.
         </span>
         <Button variant="ghost" size="sm" asChild>
           <a href={src} target="_blank" rel="noopener">

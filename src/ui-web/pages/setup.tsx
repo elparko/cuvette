@@ -1,4 +1,3 @@
-import { InfoTip } from "../components/info-tip.tsx";
 import { CheckIcon, CloudIcon, CpuIcon, KeyRoundIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AppCtx } from "../App.tsx";
@@ -25,7 +24,7 @@ function Step({ n, title, done, children }: { n: number; title: string; done?: b
   return (
     <Card>
       <CardContent className="flex gap-4">
-        <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full border text-sm font-semibold", done && "border-transparent bg-ok text-white")}>{done ? <CheckIcon className="size-4" /> : n}</span>
+        <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full border text-sm font-semibold", done && "border-transparent bg-ok text-on-accent")}>{done ? <CheckIcon className="size-4" /> : n}</span>
         <div className="min-w-0 flex-1">
           <h2 className="mb-2 text-base font-semibold tracking-tight">{title}</h2>
           {children}
@@ -40,15 +39,21 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
   const [choice, setChoice] = useState("");
   const [key, setKey] = useState("");
   const [msg, setMsg] = useState("");
+  const [bad, setBad] = useState(false);
+  const say = (text: string, error = false) => {
+    setMsg(text);
+    setBad(error);
+  };
   const [model, setModel] = useState(ctx.state.model);
   const [done, setDone] = useState(false);
   const [starting, setStarting] = useState(false);
   const [folder, setFolder] = useState(ctx.state.folder);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     call<FirstStart>("api/firststart", {})
       .then(setFs)
-      .catch((e: Error) => setMsg(e.message));
+      .catch((e: Error) => say(e.message, true));
   }, []);
 
   const after = async () => {
@@ -59,24 +64,27 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
   };
 
   const saveKey = async () => {
-    setMsg("Checking the key…");
+    if (checking || !key.trim()) return;
+    setChecking(true);
+    say("Checking the key…");
     try {
       const r = await call<{ text: string }>("api/firststart/claude", { key });
       setKey("");
-      setMsg(r.text);
+      say(r.text);
       await after();
     } catch (e) {
-      setMsg((e as Error).message);
+      say((e as Error).message, true);
     }
+    setChecking(false);
   };
 
   const useLocal = async (m: string) => {
     try {
       const r = await call<{ ok: boolean; text: string }>("api/firststart/local", { model: m });
-      setMsg(r.text);
+      say(r.text, !r.ok);
       if (r.ok) await after();
     } catch (e) {
-      setMsg((e as Error).message);
+      say((e as Error).message, true);
     }
   };
 
@@ -97,15 +105,15 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
               aria-pressed={choice === c.id}
               onClick={() => {
                 setChoice(c.id);
-                setMsg("");
+                say("");
               }}
               className={cn("flex flex-col gap-1 rounded-xl border bg-card p-3.5 text-left transition-[border-color,box-shadow] outline-none hover:border-accent-brand/50 focus-visible:ring-[3px] focus-visible:ring-ring/40", choice === c.id && "border-accent-brand ring-[3px] ring-ring/20")}
             >
               <span className="flex items-center gap-2 font-medium">
                 {c.id === "claude" ? <CloudIcon className="size-4" /> : <CpuIcon className="size-4" />}
                 {c.label}
-                <InfoTip label={`About ${c.label}`}>{c.help}</InfoTip>
               </span>
+              <span className="text-[13px] text-muted-foreground">{c.help}</span>
             </button>
           ))}
         </div>
@@ -127,7 +135,9 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
                   className="pl-9 font-mono"
                 />
               </div>
-              <Button onClick={saveKey}>Save the key</Button>
+              <Button onClick={saveKey} disabled={checking || !key.trim()}>
+                Save the key
+              </Button>
             </div>
           </div>
         )}
@@ -175,12 +185,12 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
           </div>
         )}
         {msg && (
-          <p className="mt-3 text-sm" role="alert">
+          <p className={cn("mt-3 text-sm", bad && "text-bad")} role={bad ? "alert" : "status"}>
             {msg}
           </p>
         )}
         <p className="mt-3 text-xs text-muted-foreground">
-          Model now: <span className="font-mono text-foreground">{model}</span>
+          Model now: <span className="font-mono break-all text-foreground">{model}</span>
         </p>
       </Step>
 
@@ -193,7 +203,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
       {done && (
         <Step n={3} title="Run the sample analysis">
           <p className="mb-3 text-sm text-muted-foreground">
-            The sample is a public data set: extra sleep of 10 patients with two drugs (Student, 1908). It takes about 2 minutes. The app copies it to <span className="font-mono text-foreground">{fs?.sample}</span>.
+            The sample is a public data set: extra sleep of 10 patients with two drugs (Student, 1908). It takes about 2 minutes. The app copies it to <span className="font-mono break-all text-foreground">{fs?.sample}</span>.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -208,6 +218,8 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
             <Button
               variant="outline"
               disabled={starting}
+              title={folder || undefined}
+              className="max-w-full"
               onClick={async () => {
                 if (folder) {
                   setStarting(true);
@@ -216,7 +228,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
                 } else ctx.go("start");
               }}
             >
-              {folder ? `Analyze ${folder}` : "Open my own folder"}
+              <span className="truncate">{folder ? `Analyze ${folder.split("/").filter(Boolean).pop() || folder}` : "Open my own folder"}</span>
             </Button>
           </div>
         </Step>

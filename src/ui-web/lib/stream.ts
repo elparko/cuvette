@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "react";
+import { toast } from "sonner";
 import { bridge, withT, type Status } from "./api.ts";
 
 export interface StreamState {
@@ -65,6 +66,11 @@ export function useStream(onSwitch: () => void, hasSession: boolean) {
       frame ||= requestAnimationFrame(flush);
     };
     const es = new EventSource(withT("events"));
+    es.onerror = () => {
+      if (es.readyState === EventSource.CLOSED) toast.error("The connection to Cuvette stopped. Reload the page.", { id: "events", duration: Infinity });
+      else toast.loading("The connection to Cuvette stopped. The page tries again…", { id: "events", duration: Infinity });
+    };
+    es.onopen = () => toast.dismiss("events");
     es.onmessage = (ev) => {
       const m = JSON.parse(ev.data) as Msg;
       if (m.t === "switch") {
@@ -85,6 +91,7 @@ export function useStream(onSwitch: () => void, hasSession: boolean) {
     return () => {
       cancelAnimationFrame(frame);
       es.close();
+      toast.dismiss("events");
     };
   }, [gen]);
 

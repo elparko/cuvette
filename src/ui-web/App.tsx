@@ -180,19 +180,19 @@ export function App() {
           </nav>
           {!rail && recent.length > 0 && (
             <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2">
-              <div className="px-2.5 pb-1 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">Recent</div>
+              <div className="px-2.5 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent</div>
               {recent.map((s) => (
                 <ContextMenu key={s.id}>
                   <ContextMenuTrigger asChild>
                     <button
                       type="button"
-                      title={s.folder}
+                      title={`${s.title}\n${s.folder}`}
                       onClick={() => sessions.open(s.id, opened)}
                       onContextMenu={(e) => e.stopPropagation()}
-                      className={cn("flex w-full min-w-0 flex-col rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", state.session?.id === s.id && "bg-muted")}
+                      className={cn("flex w-full min-w-0 flex-col overflow-hidden rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", state.session?.id === s.id && "bg-muted")}
                     >
-                      <span className="truncate text-[13px]">{s.title}</span>
-                      <span className="truncate text-[11.5px] text-muted-foreground">{s.title === s.folderName ? `No request yet · ${s.age}` : `${s.folderName} · ${s.age}`}</span>
+                      <span className="line-clamp-2 min-w-0 text-[13px] leading-snug break-words">{s.title}</span>
+                      <span className="block min-w-0 truncate text-xs text-muted-foreground">{s.title === s.folderName ? `No request yet · ${s.age}` : `${s.folderName} · ${s.age}`}</span>
                     </button>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
@@ -215,7 +215,7 @@ export function App() {
                   </ContextMenuContent>
                 </ContextMenu>
               ))}
-              <button type="button" onClick={() => go("sessions")} className="mt-1 flex h-8 w-full items-center rounded-lg px-2.5 text-left text-[12.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50">
+              <button type="button" onClick={() => go("sessions")} className="mt-1 flex h-8 w-full items-center rounded-lg px-2.5 text-left text-[13.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50">
                 All sessions
               </button>
             </div>
