@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { imageSize, scaledCopySync } from "../core/thumbs.ts";
+import { closeSync, openSync, readFileSync, readSync, statSync } from "node:fs";
+import { imageSize, scaledCopy, scaledCopySync } from "../core/thumbs.ts";
 
 export const MAX_IMAGE_BYTES = Math.floor(3.7 * 1024 * 1024);
 export const MAX_IMAGES_PER_RESULT = 4;
@@ -20,7 +20,55 @@ export function mediaType(b: Buffer): string | null {
   return null;
 }
 
+// Each model step sends the full history again. The cache keeps the encoded images, so that a step does not read and encode them again.
+const CACHE_BYTES = 64 * 1024 * 1024;
+const cache = new Map<string, LoadedImage>();
+let cached = 0;
+
 export function loadImage(path: string): LoadedImage | string {
+  let key: string;
+  try {
+    const st = statSync(path);
+    key = `${path}\0${st.size}\0${st.mtimeMs}`;
+  } catch {
+    return "file not readable";
+  }
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const img = readImage(path);
+  if (typeof img === "string" || img.data.length > CACHE_BYTES) return img;
+  cache.set(key, img);
+  cached += img.data.length;
+  for (const [k, v] of cache) {
+    if (cached <= CACHE_BYTES) break;
+    cache.delete(k);
+    cached -= v.data.length;
+  }
+  return img;
+}
+
+// Makes the smaller copies before the model step, without a block of the event loop.
+export async function prepareImages(paths: string[]): Promise<void> {
+  await Promise.all(
+    paths.map(async (p) => {
+      try {
+        const head = Buffer.alloc(64 * 1024);
+        const fd = openSync(p, "r");
+        let n: number;
+        try {
+          n = readSync(fd, head, 0, head.length, 0);
+        } finally {
+          closeSync(fd);
+        }
+        const media = mediaType(head.subarray(0, n));
+        const size = imageSize(head.subarray(0, n));
+        if (media && (statSync(p).size > MAX_IMAGE_BYTES || (size && Math.max(size.w, size.h) > MAX_SIDE))) await scaledCopy(p, MAX_SIDE, media === "image/jpeg" ? "jpeg" : "png");
+      } catch {}
+    }),
+  );
+}
+
+function readImage(path: string): LoadedImage | string {
   try {
     let buf = readFileSync(path);
     let media = mediaType(buf);

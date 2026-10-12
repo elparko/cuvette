@@ -60,9 +60,12 @@ export function summarizeTable(t: Table, source: string): DataSummary {
       return { ...base, type: "number", median: median(values), min: values.reduce((a, b) => (b < a ? b : a)), max: values.reduce((a, b) => (b > a ? b : a)) };
     }
     const counts = new Map<string, [string, number]>();
-    for (const v of raw.filter((x) => !isMissing(x))) {
+    for (const v of raw) {
+      if (isMissing(v)) continue;
       const k = v.trim().toLowerCase();
-      counts.set(k, [counts.get(k)?.[0] ?? v.trim(), (counts.get(k)?.[1] ?? 0) + 1]);
+      const hit = counts.get(k);
+      if (hit) hit[1]++;
+      else counts.set(k, [v.trim(), 1]);
     }
     const groups = [...counts.values()].sort((a, b) => a[0].localeCompare(b[0]));
     return { ...base, type: "text", ...(i !== id && groups.length >= 2 && groups.length <= MAX_GROUPS && groups.length <= t.rows.length * 0.5 ? { groups } : {}) };
