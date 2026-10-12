@@ -79,7 +79,7 @@ export function SuggestCard({ pending, busy, open, cancel }: { pending: Pending;
       </div>
       {rest.length > 0 && (
         <div>
-          <div className="pb-1 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">Other matches</div>
+          <div className="pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Other matches</div>
           <ul className="rounded-lg border p-1">
             {rest.slice(0, 5).map((m) => (
               <li key={m.adapter}>

@@ -75,9 +75,9 @@ export function sheetFromFiles(rels: string[], source: string): SampleSheet {
   const stemGroups = new Set(list.map((f) => groupFromStem(f.field)));
   const useStemGroup = group < 0 && stemGroups.size >= 2 && stemGroups.size <= 12 && stemGroups.size < list.length && [...stemGroups].every((g) => !UNIT.test(g) && !/^\d+$/.test(g));
   const rows: SampleRow[] = list.map((f) => {
-    const g = group >= 0 ? f.dirs[group]! : useStemGroup ? groupFromStem(f.field) : "";
-    const u = unit >= 0 ? f.dirs[unit]! : (unitFromStem(f.field) ?? "");
-    const b = batch >= 0 ? (dateOf(f.dirs[batch]!) ?? f.dirs[batch]!) : (dateOf(f.files[0]!) ?? "");
+    const g = group >= 0 ? (f.dirs[group] ?? "") : useStemGroup ? groupFromStem(f.field) : "";
+    const u = unit >= 0 ? (f.dirs[unit] ?? "") : (unitFromStem(f.field) ?? "");
+    const b = batch >= 0 ? (dateOf(f.dirs[batch] ?? "") ?? f.dirs[batch] ?? "") : (dateOf(f.files[0]!) ?? "");
     const path = f.files.length === 1 ? f.files[0]! : `${[...f.dirs, f.field].join("/")}*`;
     return { sample: f.field, group: g, unit: u, batch: b, path };
   });

@@ -13,6 +13,12 @@ function efferocytosis(): string[] {
 const row = (sample: string, group: string, unit: string, batch = ""): SampleRow => ({ sample, group, unit, batch, path: `${sample}.tif` });
 
 describe("sample sheet", () => {
+  test("folders of uneven depth leave no cell undefined, and the sheet table shows", () => {
+    const sh = sheetFromFiles(["Mouse 1/Ctrl/img_01.tif", "Mouse 2/Drug/img_01.tif", "Mouse 3/img_01.tif"], "/data");
+    for (const r of sh.rows) for (const v of Object.values(r)) expect(typeof v).toBe("string");
+    expect(() => sheetTable(sh.rows)).not.toThrow();
+  });
+
   test("from the efferocytosis folder tree: group Ceramide, unit Set 1, one row for each field", () => {
     const sh = sheetFromFiles(efferocytosis(), "/data/Ox-LDL");
     expect(sh.rows).toHaveLength(18);
