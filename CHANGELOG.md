@@ -15,6 +15,7 @@ The project is in early development. Version numbers start at the first public r
 - When you choose a folder, Cuvette reads the file names and the first 16 bytes of each file. It looks two folder levels down and stops at 400 files. It matches them to the `file_types` and the new `file_magic` of each adapter.
 - The app shows a card: "These look like flow cytometry files. Use FlowKit?" The other matches are below it. "Let Cuvette choose later" starts the session with no program, as before.
 - If no program fits, the card says so and offers the table route (the `tables` adapter). A folder with only `.csv`, `.tsv` or `.xlsx` files gets the same offer.
+- Drop a folder or a file on the start page. A file means its parent folder. The desktop app shows "Drop a folder to open it" and then the same card. A browser does not give the path of a dropped item, so the page tells you to use the folder box or the button.
 - `cuvette` in the terminal prints the same suggestion before it starts, if the folder has data files and you gave no `--adapter`.
 - The adapter manifest has three new optional fields: `file_magic`, `file_label` and `file_priority`. 34 catalog adapters now have a label. See [docs/adapter-spec.md](docs/adapter-spec.md).
 
