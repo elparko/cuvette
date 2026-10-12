@@ -1,8 +1,11 @@
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { imageSize, scaledCopySync } from "../core/thumbs.ts";
 
 export const MAX_IMAGE_BYTES = Math.floor(3.7 * 1024 * 1024);
 export const MAX_IMAGES_PER_RESULT = 4;
 export const IMAGE_BUDGET = 50;
+// Claude scales larger images down to about this size, and refuses a side over 2000 pixels when a request has many images.
+export const MAX_SIDE = 1568;
 
 export interface LoadedImage {
   media: string;
@@ -19,10 +22,17 @@ export function mediaType(b: Buffer): string | null {
 
 export function loadImage(path: string): LoadedImage | string {
   try {
-    if (statSync(path).size > MAX_IMAGE_BYTES) return "too large";
-    const buf = readFileSync(path);
-    const media = mediaType(buf);
+    let buf = readFileSync(path);
+    let media = mediaType(buf);
     if (!media) return "not PNG, JPEG, GIF or WebP";
+    const size = imageSize(buf);
+    if ((size && Math.max(size.w, size.h) > MAX_SIDE) || buf.length > MAX_IMAGE_BYTES) {
+      const small = scaledCopySync(path, MAX_SIDE, media === "image/jpeg" ? "jpeg" : "png");
+      if (!small) return "too large";
+      buf = readFileSync(small);
+      media = mediaType(buf);
+      if (!media || buf.length > MAX_IMAGE_BYTES) return "too large";
+    }
     return { media, data: buf.toString("base64") };
   } catch {
     return "file not readable";
@@ -50,7 +60,7 @@ export class ImageBudget {
       images.push(img);
       this.used++;
     }
-    if (skipped) notes.push(`${skipped} image(s) not attached (unreadable, unsupported type, or over 3.7 MB)`);
+    if (skipped) notes.push(`${skipped} image(s) not attached (unreadable, unsupported type, or too large to resize)`);
     if (overLimit) notes.push(`${overLimit} image(s) not attached (image limit reached)`);
     return { images, note: notes.join("; ") };
   }
