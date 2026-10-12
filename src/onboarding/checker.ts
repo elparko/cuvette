@@ -139,6 +139,15 @@ function checkStatic(adapter: LoadedAdapter, errors: string[], warnings: string[
       errors.push(`${what}: the default is not in "choices"`);
     }
     if (d.lo !== undefined && d.hi !== undefined && d.lo > d.hi) errors.push(`${what}: "lo" is above "hi"`);
+    if (d.default !== undefined && (d.kind === "float" || d.kind === "int")) {
+      if (typeof d.default !== "number" || !Number.isFinite(d.default)) errors.push(`${what}: kind is "${d.kind}" but the default ${JSON.stringify(d.default)} is not a number`);
+      else {
+        if (d.kind === "int" && !Number.isInteger(d.default)) errors.push(`${what}: kind is "int" but the default ${d.default} is not a whole number`);
+        if (d.lo !== undefined && d.default < d.lo) errors.push(`${what}: the default ${d.default} is below "lo" (${d.lo})`);
+        if (d.hi !== undefined && d.default > d.hi) errors.push(`${what}: the default ${d.default} is above "hi" (${d.hi})`);
+      }
+    }
+    if (d.kind === "bool" && d.default !== undefined && typeof d.default !== "boolean") errors.push(`${what}: kind is "bool" but the default ${JSON.stringify(d.default)} is not true or false`);
     if (d.owner === "fixed" && d.default === undefined) errors.push(`${what}: owner is "fixed" but there is no default`);
     if (!d.links.length) warnings.push(`${what}: no link to a tool argument, so the harness cannot enforce it`);
   }
@@ -256,7 +265,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
   }
 
   let tests: TestOutcome[] | undefined;
-  let toolsKnown = (tools.size > 0 && m.connection.kind !== "mcp") || m.connection.kind === "files";
+  let toolsKnown = ((tools.size > 0 && m.connection.kind !== "mcp") || m.connection.kind === "files") && !(opts.static && m.module);
   if (opts.runTests && !opts.static) {
     const work = mkdtempSync(join(tmpdir(), "cuvette-check-"));
     let runtime: Awaited<ReturnType<typeof import("../adapters/runtime.ts").startAdapter>> | undefined;
@@ -277,7 +286,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
       for (const t of tests) for (const f of t.failures) errors.push(`test "${t.id}" failed: ${f}`);
       for (const t of tests) if (t.skipped) warnings.push(`test "${t.id}" did not run: ${t.skipped}`);
     } catch (err) {
-      errors.push(`the adapter did not start: ${(err as Error).message}`);
+      errors.push(runtime ? `the known-answer tests stopped with an error: ${(err as Error).message}` : `the adapter did not start: ${(err as Error).message}`);
       if (!runtime) checkStatic(adapter, errors, warnings, tools, toolsKnown);
     } finally {
       await runtime?.close().catch(() => undefined);
