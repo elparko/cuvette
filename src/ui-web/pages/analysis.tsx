@@ -267,7 +267,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
       if (typing(a)) {
         if (inCards && e.key === "Enter" && !e.shiftKey) {
           const f = a as HTMLInputElement;
-          const c = f.closest("[data-card]")!;
+          const c = f.closest("[data-card]") ?? cardsRef.current!;
           const go = f.name === "other" ? f.closest(".row")?.querySelector<HTMLButtonElement>(".btn") : f.tagName === "TEXTAREA" && f.name === "text" ? c.querySelector<HTMLButtonElement>(".row .btn.primary") : f.type === "password" || f.type === "url" ? c.querySelector<HTMLButtonElement>('[data-act="save"]') : null;
           if (go && f.value.trim()) {
             e.preventDefault();

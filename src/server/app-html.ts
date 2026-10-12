@@ -114,7 +114,7 @@ export function fileLink(c: Ctx, path: string): string {
   const name = basename(path);
   const ext = extname(name).slice(1).toUpperCase();
   const label = /^[0-9a-f]{40,}\./.test(name) ? `${ext || "Output"} file` : name;
-  return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name)}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${esc(path)}" aria-label="Show ${esc(label)} in the folder">Show in folder</button>`;
+  return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name)}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${esc(path)}" aria-label="Show in folder: ${esc(label)}">Show in folder</button>`;
 }
 
 // ---------------------------------------------------------------- repeated steps
@@ -182,7 +182,7 @@ export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: n
     }
     case "line": {
       const cls = `line ${it.color ?? ""} ${it.dim ? "dim" : ""}`;
-      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> <span class="ltext">${shortPaths(esc(it.text.replace(/\s*·\s*\/change \S+$/, "")))}${it.change ? ` ${btn("Change", `data-change="${esc(it.change)}" aria-label="Change ${esc(it.change)}"`, "quiet small")}` : ""}</span>`;
+      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> <span class="ltext">${shortPaths(esc(it.text.replace(/\s*·\s*\/change \S+$/, "")))}</span>${it.change ? ` ${btn("Change", `data-change="${esc(it.change)}" aria-label="Change ${esc(it.change)}"`, "quiet small")}` : ""}`;
       const sub = it.group && opts.sub ? opts.sub(it.group) : [];
       if (sub.length) return `<details class="${cls} house"><summary>${body}</summary><div class="sub">${sub.map((x) => itemHtml(c, x, opts)).join("")}</div></details>`;
       return `<div class="${cls}">${body}</div>`;

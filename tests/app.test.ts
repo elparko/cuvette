@@ -482,6 +482,8 @@ test("a status line keeps its text and its short path in one element, so the fle
   const { itemHtml } = await import("../src/server/app-html.ts");
   const html = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "l", t: "line", sym: "•", text: "This session saves its results in /very/long/folder/name/that/goes/on/and/on/results-2026-10-12-compare-groups." } as never);
   expect(html).toMatch(/<span class="sym"[^>]*>•<\/span> <span class="ltext">This session saves its results in <span class="path"[^>]*>.*<\/span>\.<\/span><\/div>$/);
+  const withChange = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "c", t: "line", sym: "•", text: "Test: t test", change: "test" } as never);
+  expect(withChange).toMatch(/<span class="ltext">Test: t test<\/span> <button[^>]*data-change="test"/);
 });
 
 describe("repeated steps", () => {
