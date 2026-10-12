@@ -3,6 +3,7 @@ import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from
 import { ProviderError } from "../core/types.ts";
 import { ImageBudget } from "./images.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText } from "./text.ts";
+import { RETRIES, withRetry, type Sleep } from "./retry.ts";
 
 const TIMEOUT_MS = 600_000;
 const DEFAULT_NUM_CTX = 32768;
@@ -29,6 +30,8 @@ export interface OllamaOpts {
   numCtx?: number;
   think?: boolean;
   promptedTools?: boolean;
+  sleep?: Sleep;
+  retries?: number;
 }
 
 export function ollamaHost(): string {
@@ -88,12 +91,16 @@ export class OllamaProvider implements Provider {
   private numCtx: number;
   private think: boolean;
   private thinkOk = true;
+  private sleep?: Sleep;
+  private retries: number;
   readonly promptedTools: boolean;
 
   constructor(readonly model: string, show: OllamaShow, opts: OllamaOpts = {}) {
     this.numCtx = opts.numCtx ?? Math.min(DEFAULT_NUM_CTX, show.contextLength ?? DEFAULT_NUM_CTX);
     this.think = opts.think ?? false;
     this.promptedTools = opts.promptedTools ?? false;
+    this.sleep = opts.sleep;
+    this.retries = opts.retries ?? RETRIES;
     this.info = {
       provider: "ollama",
       model,
@@ -155,28 +162,40 @@ export class OllamaProvider implements Provider {
     return user ? AbortSignal.any([user, t]) : t;
   }
 
-  private async post(body: Record<string, unknown>, signal: AbortSignal | undefined): Promise<Response> {
-    const host = ollamaHost();
-    let res: Response;
-    try {
-      res = await fetch(`${host}/api/chat`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-        signal,
-      });
-    } catch (e) {
-      throw this.networkError(e, host, signal);
+  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
+    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
+  }
+
+  private async attempt(body: Record<string, unknown>, signal: AbortSignal | undefined): Promise<Response> {
+    const res = await fetch(`${ollamaHost()}/api/chat`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (res.status === 429 || res.status >= 500) {
+      const txt = await res.text();
+      throw Object.assign(new Error(`Ollama error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status });
     }
     return res;
   }
 
+  private async post(body: Record<string, unknown>, signal: AbortSignal | undefined, onRetry?: StepRequest["onRetry"]): Promise<Response> {
+    const host = ollamaHost();
+    try {
+      return await this.retry(() => this.attempt(body, signal), signal, onRetry);
+    } catch (e) {
+      if (typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
+      throw this.networkError(e, host, signal);
+    }
+  }
+
   private networkError(e: unknown, host: string, signal: AbortSignal | undefined): unknown {
     if (signal?.aborted) {
-      if (signal.reason instanceof Error && signal.reason.name === "TimeoutError") return new ProviderError("Ollama did not finish within 600 s.");
+      if (signal.reason instanceof Error && signal.reason.name === "TimeoutError") return new ProviderError("Ollama did not finish within 600 s.", true);
       return e;
     }
-    return new ProviderError(`Cannot reach Ollama at ${host}. Start it with \`ollama serve\`.`);
+    return new ProviderError(`Cannot reach Ollama at ${host}. Start it with \`ollama serve\`.`, true);
   }
 
   async step(req: StepRequest): Promise<StepResult> {
@@ -191,13 +210,13 @@ export class OllamaProvider implements Provider {
       body.tools = req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
     if (this.thinkOk) body.think = this.think;
 
-    let res = await this.post(body, signal);
+    let res = await this.post(body, signal, req.onRetry);
     if (res.status === 400 && "think" in body) {
       const err = await res.text();
       if (/think/i.test(err)) {
         this.thinkOk = false;
         delete body.think;
-        res = await this.post(body, signal);
+        res = await this.post(body, signal, req.onRetry);
       } else throw new ProviderError(`Ollama rejected the request: ${err.slice(0, 300)}`);
     }
     if (!res.ok) {

@@ -426,6 +426,41 @@ describe("ollama", () => {
     await expect(makeProvider("ollama:x")).rejects.toThrow(/Cannot reach Ollama/);
   });
 
+  test("retries network errors, reports each wait, then gives a result", async () => {
+    stubOllama((_, n) => {
+      if (n < 2) throw new TypeError("fetch failed");
+      return ndjson([{ message: { content: "ok" } }, { done: true }]);
+    });
+    const events: unknown[] = [];
+    const p = await makeProvider("ollama:x", { sleep: async () => {} });
+    const r = await p.step(req([user("x")], { onRetry: (e) => events.push(e) }));
+    expect(r.message.parts).toEqual([{ type: "text", text: "ok" }]);
+    expect(events).toMatchObject([
+      { attempt: 1, of: 3, reason: "network error" },
+      { attempt: 2, of: 3, reason: "network error" },
+    ]);
+  });
+
+  test("a 400 reply is not retried", async () => {
+    const seen = stubOllama(() => json({ error: "bad input" }, 400));
+    const events: unknown[] = [];
+    const p = await makeProvider("ollama:x", { sleep: async () => {} });
+    const err = await p.step(req([user("x")], { onRetry: (e) => events.push(e) })).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.transient).toBe(false);
+    expect(seen.filter((s) => s.url.endsWith("/api/chat"))).toHaveLength(1);
+    expect(events).toEqual([]);
+  });
+
+  test("a server that keeps failing gives a transient error after the last try", async () => {
+    const seen = stubOllama(() => json({ error: "busy" }, 503));
+    const p = await makeProvider("ollama:x", { sleep: async () => {} });
+    const err = await p.step(req([user("x")])).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.transient).toBe(true);
+    expect(seen.filter((s) => s.url.endsWith("/api/chat"))).toHaveLength(4);
+  });
+
   test("OLLAMA_HOST overrides the address", async () => {
     vi.stubEnv("OLLAMA_HOST", "10.0.0.5:9999");
     const seen = stubOllama(() => json({}));
@@ -482,6 +517,37 @@ describe("openai", () => {
     expect((r.message.parts[3] as any).parseError).toContain("not valid JSON");
     expect(r.usage).toEqual({ inputTokens: 9, outputTokens: 4 });
     expect(r.stopReason).toBe("tool_use");
+  });
+
+  test("retries network errors, reports each wait, then gives a result", async () => {
+    let n = 0;
+    vi.stubGlobal("fetch", async () => {
+      if (n++ < 2) throw new TypeError("fetch failed");
+      return json({ choices: [{ message: { content: "ok" } }] });
+    });
+    const events: unknown[] = [];
+    const p = await makeProvider("openai:http://localhost:1234/v1|m", { sleep: async () => {} });
+    const r = await p.step(req([user("x")], { onRetry: (e) => events.push(e) }));
+    expect(r.message.parts).toEqual([{ type: "text", text: "ok" }]);
+    expect(events).toMatchObject([
+      { attempt: 1, of: 3, reason: "network error" },
+      { attempt: 2, of: 3, reason: "network error" },
+    ]);
+  });
+
+  test("a 400 reply is not retried", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", async () => {
+      calls++;
+      return json({ error: { message: "bad input" } }, 400);
+    });
+    const events: unknown[] = [];
+    const p = await makeProvider("openai:http://localhost:1234/v1|m", { sleep: async () => {} });
+    const err = await p.step(req([user("x")], { onRetry: (e) => events.push(e) })).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err.transient).toBe(false);
+    expect(calls).toBe(1);
+    expect(events).toEqual([]);
   });
 
   test("rejects a malformed spec", async () => {

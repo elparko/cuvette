@@ -3,6 +3,7 @@ import { ProviderError } from "../core/types.ts";
 import { ClaudeProvider, DEFAULT_CLAUDE_MODEL } from "./claude.ts";
 import { FakeProvider } from "./fake.ts";
 import { OpenAIProvider } from "./openai.ts";
+import type { Sleep } from "./retry.ts";
 import { createOllama, ollamaHost, parseParamSize } from "./ollama.ts";
 
 export { ClaudeProvider, FakeProvider, OpenAIProvider };
@@ -15,6 +16,8 @@ export interface ProviderOpts {
   apiKey?: string;
   client?: any;
   cache?: "off" | "5m" | "1h";
+  sleep?: Sleep;
+  retries?: number;
 }
 
 export interface ModelListing {
