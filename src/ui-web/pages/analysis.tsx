@@ -584,6 +584,11 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                     setSel((s) => (s + (e.key === "ArrowDown" ? 1 : sugg.length - 1)) % sugg.length);
                     return;
                   }
+                  if (e.key === "ArrowUp" && !text && status.queue?.length) {
+                    e.preventDefault();
+                    void post<{ text: string }>("api/unqueue", {}).then((r) => r?.text && setText(r.text));
+                    return;
+                  }
                   if (sugg.length && e.key === "Tab") {
                     e.preventDefault();
                     pick(sugg[sel]);

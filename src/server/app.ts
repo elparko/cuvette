@@ -499,6 +499,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       await c.view.submit(text, !!body.now);
       return send(res, 200, { ok: true });
     }
+    if (p === "/api/unqueue") return send(res, 200, { text: c.view.unqueue() ?? "" });
     if (p === "/api/stop") {
       c.view.stop();
       return send(res, 200, { ok: true });

@@ -131,6 +131,24 @@ describe("the app server", () => {
     ev.close();
   });
 
+  test("the last queued message comes back for editing", async () => {
+    const s = new FakeSession({ delayMs: 1 });
+    s.settings.messages = "queue";
+    app = await startApp({ session: s, env });
+    const c = client(app);
+    const ev = await events(app);
+    await c.post("api/send", { text: "go" });
+    await until(() => ev.msgs.some((m) => m.t === "cards" && m.html.includes("Permission needed")));
+    await c.post("api/send", { text: "first" });
+    await c.post("api/send", { text: "second" });
+    await until(() => ev.msgs.some((m) => m.t === "status" && (m.queue ?? []).length === 2));
+    const back = await (await c.post("api/unqueue", {})).json();
+    expect(back).toEqual({ text: "second" });
+    await until(() => ev.msgs.some((m) => m.t === "status" && (m.queue ?? []).length === 1));
+    await c.post("api/stop", {});
+    ev.close();
+  });
+
   test("files outside the session are not served", async () => {
     const s = new FakeSession();
     app = await startApp({ session: s, env });
