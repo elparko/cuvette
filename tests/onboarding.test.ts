@@ -167,6 +167,8 @@ describe("known-answer runner", () => {
         data: [],
         manual_route_checked: false,
         fetch: "",
+        self_test: false,
+        source: "",
         calls: [
           { tool: "summarize", args: { column: "a" }, save_as: "first" },
           { tool: "summarize", args: { column: "{saved.first.outputs[0].path}", dir: "{adapter_dir}/data", n: "{saved.first.metrics.mean}", label: "m={saved.first.metrics.mean}" }, save_as: "" },

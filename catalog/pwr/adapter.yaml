@@ -286,6 +286,8 @@ tests:
       - { path: "outputs[0].path", contains: ".png" }
 
   - id: t-two-sample-small
+    self_test: true
+    source: "Cohen 1988, Statistical Power Analysis for the Behavioral Sciences, 2nd edition, Table 2.4.1, and Cohen 1992, Psychological Bulletin 112:155, Table 2: n = 393 per group for d = 0.2."
     description: >
       d = 0.2, the same settings. Cohen (1988), Table 2.4.1, and Cohen (1992), Table 2, give n = 393 per group (the table
       uses an approximation). pwr gives 393.41; statsmodels gives 393.41 (checks/pwr_check.txt).
@@ -293,8 +295,8 @@ tests:
       - tool: power_t_test
         args: { solve_for: n, type: two.sample, d: 0.2, alpha: 0.05, power: 0.8, alternative: two.sided }
     expect:
-      - { path: metrics.n_exact, approx: 393, abs: 1 }
-      - { path: metrics.n, equals: 394 }
+      - { path: metrics.n_exact, label: "the exact sample size", approx: 393, abs: 1 }
+      - { path: metrics.n, label: "the sample size", equals: 394 }
 
   - id: correlation-cohen
     description: >

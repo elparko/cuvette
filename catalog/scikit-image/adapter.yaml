@@ -638,6 +638,8 @@ tests:
       - { path: metrics.n_patterns, equals: 2 }
 
   - id: blobs_count_edges_included
+    self_test: true
+    source: "ImageJ 1.53 particle analyzer on the NIH sample image blobs.gif: 64 particles, total area 22243, mean area 347.547."
     description: ImageJ 1.53 finds 64 particles in blobs.gif with the range 126-255 and no edge exclusion. The total area 22243 and the mean area 347.547 come from the ImageJ adapter test. The isodata threshold of scikit-image selects the same pixels, because no pixel has the value 125.
     data: [data/blobs.gif]
     manual_route_checked: true
@@ -645,10 +647,10 @@ tests:
       - tool: count_objects
         args: { path: "{adapter_dir}/data/blobs.gif", threshold_method: isodata, object_polarity: bright, exclude_border_objects: false, min_object_size: 0 }
     expect:
-      - { path: metrics.n_objects, equals: 64 }
+      - { path: metrics.n_objects, label: "the object count", equals: 64 }
       - { path: metrics.threshold, approx: 124.71875, abs: 0.01 }
-      - { path: metrics.total_area_px, equals: 22243 }
-      - { path: metrics.mean_area_px, approx: 347.547, rel: 0.00001 }
+      - { path: metrics.total_area_px, label: "the total area", equals: 22243 }
+      - { path: metrics.mean_area_px, label: "the mean area", approx: 347.547, rel: 0.00001 }
       - { path: table.n_rows, equals: 64 }
 
   - id: blobs_count_edges_excluded

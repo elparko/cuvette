@@ -601,6 +601,8 @@ checks:
 
 tests:
   - id: header-and-wcs
+    self_test: true
+    source: "FITS World Coordinate System standard (Greisen and Calabretta 2002, Astronomy and Astrophysics 395:1061): the reference pixel maps to CRVAL."
     description: >
       By construction. The test image has 300 x 500 pixels, BUNIT ct and a TAN WCS with 1 arcsec pixels.
       FITS CRPIX is 1-based, so 0-based pixel (249, 149) is the reference pixel and must map to
@@ -613,8 +615,8 @@ tests:
       - tool: pixel_to_sky
         args: { path: "{adapter_dir}/data/gaussians_noisy.fits", x: [249.0], y: [149.0] }
     expect:
-      - { path: metrics.ra_deg, approx: 150.0, abs: 1.0e-9 }
-      - { path: metrics.dec_deg, approx: 2.0, abs: 1.0e-9 }
+      - { path: metrics.ra_deg, label: "the right ascension", approx: 150.0, abs: 1.0e-9 }
+      - { path: metrics.dec_deg, label: "the declination", approx: 2.0, abs: 1.0e-9 }
       - { path: saved.info.metrics.n_rows, equals: 300 }
       - { path: saved.info.metrics.n_columns, equals: 500 }
       - { path: saved.info.metrics.has_wcs, equals: 1 }

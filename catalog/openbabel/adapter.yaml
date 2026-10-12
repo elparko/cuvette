@@ -138,6 +138,8 @@ checks:
     text: "If the output has SMILES with a dot, the answer must say how salts were handled."
 tests:
   - id: mini-convert
+    self_test: true
+    source: "PubChem and IUPAC: the InChIKey of aspirin is BSYNRYMUTXBXSQ-UHFFFAOYSA-N."
     description: "Four lines. One SMILES is invalid. With -e the three valid molecules stay. Aspirin InChIKey BSYNRYMUTXBXSQ-UHFFFAOYSA-N is the published key."
     data: [data/mini.smi]
     calls:

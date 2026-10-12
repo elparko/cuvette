@@ -140,6 +140,7 @@ const ExpectItem = z.strictObject({
   min: z.number().optional(),
   max: z.number().optional(),
   contains: z.string().optional(),
+  label: z.string().optional(),
 });
 
 const TestCall = z.strictObject({
@@ -157,6 +158,8 @@ export const KnownAnswerTest = z.strictObject({
   manual_route_checked: z.boolean().default(false),
   gui: z.boolean().optional(),
   fetch: z.string().default(""),
+  self_test: z.boolean().default(false),
+  source: z.string().default(""),
 });
 
 const OutputSpec = z.strictObject({
@@ -238,6 +241,13 @@ export const Manifest = z
     dup("test", m.tests.map((t) => t.id));
     dup("tool", m.tools.map((t) => t.name));
     dup("map entry", m.map.map((e) => e.tool + JSON.stringify(Object.entries(e.match).sort())));
+    const own = m.tests.filter((t) => t.self_test);
+    if (own.length > 1) ctx.addIssue({ code: "custom", message: "only one test can have self_test: true" });
+    for (const t of own) {
+      if (!t.source.trim()) ctx.addIssue({ code: "custom", message: `the self-test ${JSON.stringify(t.id)} needs a source` });
+      if (!t.expect.length) ctx.addIssue({ code: "custom", message: `the self-test ${JSON.stringify(t.id)} needs expected values` });
+      if (t.gui || t.fetch) ctx.addIssue({ code: "custom", message: `the self-test ${JSON.stringify(t.id)} must not open a window or download data` });
+    }
   });
 
 export type Manifest = z.infer<typeof Manifest>;

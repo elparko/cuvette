@@ -1,12 +1,13 @@
-import { existsSync, readdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdtempSync, readdirSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { locate, which } from "../adapters/locate.ts";
-import { adapterDirs, cuvetteHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
+import { adapterDirs, cuvetteHome, loadAdapter, type LoadedAdapter, type Manifest } from "../adapters/manifest.ts";
 import { runProcess } from "../adapters/kinds/common.ts";
 import { howToCite } from "./citations.ts";
 import { claudeKey, credentialsPath } from "./credentials.ts";
+import { selfTestFor, selfTestOf, type SelfTestRuntime } from "./selftest.ts";
 
 export type Status = "ok" | "missing" | "old";
 export type Group = "Needed to start" | "Tools" | "Python environments" | "R packages" | "Programs";
@@ -353,5 +354,69 @@ export function doctorText(checks: Check[], opts: { only?: Status[] } = {}): str
   lines.push(canStart(checks) ? "Cuvette can start: Node is new enough and a model is ready." : "Cuvette cannot start yet. It needs Node 22 or later, and a Claude API key or an Ollama model.");
   const fixes = safeFixes(checks);
   if (fixes.length) lines.push(`cuvette doctor --fix installs ${fixes.length} missing Python environment${fixes.length === 1 ? "" : "s"} or R package set${fixes.length === 1 ? "" : "s"}. It asks before it starts.`);
+  return lines.join("\n");
+}
+
+export interface SelfTestRow {
+  name: string;
+  status: "pass" | "fail" | "error" | "skipped";
+  detail: string;
+  source: string;
+}
+
+export interface SelfTestOpts {
+  only?: string;
+  adapters?: LoadedAdapter[];
+  start?: (a: LoadedAdapter) => Promise<SelfTestRuntime & { close(): Promise<void> }>;
+  onProgress?: (text: string) => void;
+}
+
+function installedAdapters(): LoadedAdapter[] {
+  const out: LoadedAdapter[] = [];
+  for (const dir of Object.values(adapterDirs())) {
+    try {
+      out.push(loadAdapter(dir));
+    } catch {}
+  }
+  return out;
+}
+
+async function startForTest(a: LoadedAdapter) {
+  const { startAdapter } = await import("../adapters/runtime.ts");
+  const work = mkdtempSync(join(tmpdir(), "cuvette-doctor-"));
+  return startAdapter(a, { workDir: work, sessionDir: work });
+}
+
+export async function runSelfTests(checks: Check[], opts: SelfTestOpts = {}): Promise<SelfTestRow[]> {
+  const all = (opts.adapters ?? installedAdapters()).filter((a) => !opts.only || a.name === opts.only);
+  const withTest = all.filter((a) => selfTestOf(a)).sort((a, b) => a.name.localeCompare(b.name));
+  const start = opts.start ?? startForTest;
+  return pool(withTest, 3, async (a): Promise<SelfTestRow> => {
+    const source = selfTestOf(a)!.source;
+    const blocked = checks.filter((c) => (c.id === `program:${a.name}` || c.id === `r:${a.name}`) && c.status !== "ok");
+    if (blocked.length) return { name: a.name, status: "skipped", detail: `Skipped. ${blocked.map((c) => c.detail).join(" ")}`, source };
+    opts.onProgress?.(a.name);
+    let rt: Awaited<ReturnType<typeof start>> | undefined;
+    try {
+      rt = await start(a);
+      const done = await selfTestFor(a, rt, { force: true });
+      return { name: a.name, status: done!.result.status, detail: done!.result.message, source };
+    } catch (err) {
+      return { name: a.name, status: "error", detail: `Could not run: ${(err as Error).message}`, source };
+    } finally {
+      await rt?.close().catch(() => {});
+    }
+  });
+}
+
+export function selfTestText(rows: SelfTestRow[]): string {
+  if (!rows.length) return "Known-answer tests\n  No adapter has a self-test for this selection.";
+  const lines = ["Known-answer tests"];
+  for (const r of rows) {
+    lines.push(`  ${r.status.padEnd(8)} ${r.name}: ${r.detail}`);
+    if (r.status === "fail" || r.status === "error") lines.push(`           Source: ${r.source}`);
+  }
+  const n = (s: SelfTestRow["status"]) => rows.filter((r) => r.status === s).length;
+  lines.push("", `${n("pass")} pass, ${n("fail")} fail, ${n("error")} could not run, ${n("skipped")} skipped.`);
   return lines.join("\n");
 }

@@ -255,6 +255,8 @@ map:
 
 tests:
   - id: roc-s100b-delong
+    self_test: true
+    source: "Turck et al. 2010 and the pROC documentation (help of roc and ci.auc), aSAH data: AUC 0.7314, DeLong 95 percent CI 0.6301 to 0.8326."
     description: >
       aSAH data of pROC (Turck et al. 2010; 113 patients, 41 Poor, 72 Good). The pROC documentation (help of roc and
       ci.auc, and the pROC home page) prints for roc(aSAH$outcome, aSAH$s100b): Area under the curve 0.7314, 95% CI
@@ -265,9 +267,9 @@ tests:
       - tool: roc_curve
         args: { path: "{adapter_dir}/data/asah.csv", outcome: outcome, predictor: s100b, positive: Poor, direction: higher, ci_method: delong }
     expect:
-      - { path: metrics.auc, approx: 0.7314, abs: 0.0001 }
-      - { path: metrics.auc_ci_lo, approx: 0.6301, abs: 0.0001 }
-      - { path: metrics.auc_ci_hi, approx: 0.8326, abs: 0.0001 }
+      - { path: metrics.auc, label: "the area under the curve", approx: 0.7314, abs: 0.0001 }
+      - { path: metrics.auc_ci_lo, label: "the lower confidence limit", approx: 0.6301, abs: 0.0001 }
+      - { path: metrics.auc_ci_hi, label: "the upper confidence limit", approx: 0.8326, abs: 0.0001 }
       - { path: metrics.n_cases, equals: 41 }
       - { path: metrics.n_controls, equals: 72 }
 
