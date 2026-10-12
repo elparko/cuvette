@@ -426,7 +426,7 @@ export const SETTINGS: SettingDef[] = [
     name: "budgetUsd",
     group: "Account and spend",
     label: "Budget per month",
-    help: "The harness stops Claude requests when the spend this month reaches this limit, in US dollars. CUVETTE_BUDGET_USD wins over the setting. Type off to remove it.",
+    help: "The harness stops Claude requests when the spend this month reaches this limit, in US dollars. At 80% of the limit, the agent asks if you want to continue, switch to a cheaper model or stop. CUVETTE_BUDGET_USD wins over the setting. Type off to remove it.",
     brief: "Claude requests stop when the spend this month reaches this limit.",
     scopes: ["user"],
     number: true,

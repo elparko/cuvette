@@ -17,7 +17,8 @@ import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
 import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, summarizeOld, summaryMessage } from "./compaction.ts";
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, Masker, phiOn, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
-import { contextWarning, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
+import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
+import { estimateText, modelName } from "./estimate.ts";
 import { loadSettings, xlsxOn, type Settings } from "./config.ts";
 import { outputDir, savedLine, writeResults, type Saved } from "./results.ts";
 import { outputFile, type Dirs } from "../adapters/kinds/common.ts";
@@ -261,6 +262,7 @@ export class Session {
   private modeBefore: Mode = "watch";
   private planLooks = 0;
   private planWarned = new Set<string>();
+  private budgetAsked = false;
   private stopTurn = false;
   pilotStage = false;
   private clarified = false;
@@ -869,6 +871,7 @@ export class Session {
           this.record.append("notice", { text: "Stopped before the content went to the model. Nothing was sent." });
           return "";
         }
+        if (!(await this.budgetGate(signal))) return "";
         await this.maybeCompact(signal);
         this.bus.emit({ type: "status", state: "thinking" });
         const res = await this.stepWithRecovery(forceAnswer, signal);
@@ -1195,6 +1198,53 @@ export class Session {
   private localSpec(): string | undefined {
     const spec = this.settings.local_model?.trim();
     return spec && /^(ollama|openai):/.test(spec) ? spec : undefined;
+  }
+
+  private async budgetGate(signal: AbortSignal): Promise<boolean> {
+    const b = isLocal(this.provider.info) ? undefined : budgetState();
+    if (!b || b.ratio < BUDGET_WARN) {
+      this.budgetAsked = false;
+      return true;
+    }
+    if (this.budgetAsked || b.ratio >= 1) return true;
+    this.budgetAsked = true;
+    const used = `${dollars(b.spent)} of your ${dollars(b.budget)} limit is used this month.`;
+    if (this.settings.headless || !this.interactive) {
+      this.record.append("notice", { text: `${used} Claude requests stop at the limit.` });
+      return true;
+    }
+    const cheaper = cheaperModel(this.provider.info.model);
+    const options = [
+      { value: "continue", label: "Continue with this model" },
+      ...(cheaper ? [{ value: "cheaper", label: `Switch to ${modelName(cheaper)}, which costs less` }] : []),
+      { value: "stop", label: "Stop now" },
+    ];
+    const q = await this.questions.ask({ decisionKey: "", title: "Spend limit nearly reached", text: `${used} Claude requests stop at the limit. What do you want to do?`, options, evidence: "" });
+    this.bus.emit({ type: "question", question: q });
+    this.waitedQids.add(q.qid);
+    this.bus.emit({ type: "status", state: "waiting", tool: "spend limit" });
+    let answer: unknown;
+    try {
+      answer = (await abortable(this.questions.wait(q.qid), signal)).answer;
+    } catch {
+      return false;
+    }
+    this.bus.emit({ type: "status", state: "thinking" });
+    if (answer === "stop") {
+      this.record.append("notice", { text: "Stopped at your choice, near the spend limit. Nothing more was sent." });
+      return false;
+    }
+    if (answer === "cheaper" && cheaper) {
+      await this.applySetting("model", `claude:${cheaper}`);
+      this.record.append("notice", { text: `The model is now ${modelName(cheaper)}.` });
+    }
+    return true;
+  }
+
+  private planEstimate(plan: AnalysisPlan): string {
+    const steps = plan.steps.filter((x) => x.status !== "skipped").length;
+    const b = budgetState();
+    return estimateText(this.provider.info.model, steps, isLocal(this.provider.info), b ? Math.max(0, b.budget - b.spent) : undefined);
   }
 
   private async phiGate(signal: AbortSignal): Promise<boolean> {
@@ -2764,6 +2814,7 @@ export class Session {
         restatement: plan.restatement,
         definitions: plan.definitions,
         pilot: plan.pilot?.sample,
+        estimate: this.planEstimate(plan) || undefined,
       });
       if (!r || r.action !== "set") break;
       const target = settingsOf(plan)[r.index]?.setting;

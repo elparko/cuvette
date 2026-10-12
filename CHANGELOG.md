@@ -18,6 +18,12 @@ The project is in early development. Version numbers start at the first public r
 - `cuvette` in the terminal prints the same suggestion before it starts, if the folder has data files and you gave no `--adapter`.
 - The adapter manifest has three new optional fields: `file_magic`, `file_label` and `file_priority`. 34 catalog adapters now have a label. See [docs/adapter-spec.md](docs/adapter-spec.md).
 
+### Spend
+
+- The plan card shows a cost range, for example "About $0.40 to $1.20 with Sonnet." A local model shows "Free: runs on this computer." The range comes from the benchmark runs of 9 October. On papers that the fit did not see, 93% to 94% of the runs fall in the range. See [docs/cost-estimate.md](docs/cost-estimate.md).
+- At 80% of the spend limit, a card asks if the scientist wants to continue, switch to a cheaper model or stop. It appears once. A headless run logs a notice instead. At 100%, Claude requests still stop.
+- `scripts/fit-estimate.ts` fits the range again from benchmark results.
+
 ## 9 October 2026
 
 ### Benchmark

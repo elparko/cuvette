@@ -644,6 +644,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
   return (
     <Frame title={planTitle(card)} color="cyan">
       <Text>{card.text}</Text>
+      {card.estimate ? <Text dimColor>{card.estimate}</Text> : null}
       {st.details && card.details ? (
         <Box marginTop={1}>
           <Text dimColor>{card.details}</Text>

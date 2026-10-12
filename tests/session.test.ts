@@ -9,6 +9,7 @@ import { ProviderError } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { unzip } from "./fixtures/unzip.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
+import { recordSpend } from "../src/core/spend.ts";
 import { trustFolder } from "../src/core/trust.ts";
 
 let session: Session | undefined;
@@ -1456,4 +1457,95 @@ test("a headless run goes on if the network comes back", async () => {
   session = await recoverySession(provider, { headless: true });
   session.recoveryWaitMs = 0;
   expect(await session.send("go")).toBe("Back again.");
+});
+
+function nearLimit(): void {
+  process.env.CUVETTE_SPEND_FILE = join(mkdtempSync(join(tmpdir(), "cuvette-spend-")), "spend.jsonl");
+  process.env.CUVETTE_BUDGET_USD = "5";
+  recordSpend("claude-opus-5-5", { inputTokens: 1_000_000, outputTokens: 0 });
+}
+
+function paidProvider(steps: ConstructorParameters<typeof FakeProvider>[0]): FakeProvider {
+  const p = new FakeProvider(steps);
+  p.info = { provider: "claude", model: "claude-opus-5-5", contextWindow: 1_000_000, vision: false, small: false };
+  return p;
+}
+
+test("at 80% of the spend limit the card asks once, and Continue goes on", async () => {
+  nearLimit();
+  const provider = paidProvider([{ calls: [{ name: "state", args: {} }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { guidance: false } });
+  const titles: string[] = [];
+  const values: unknown[][] = [];
+  session.bus.on((e) => {
+    if (e.type !== "question") return;
+    titles.push(e.question.title);
+    values.push(e.question.options.map((o) => o.value));
+    setTimeout(() => session!.answer(e.question.qid, "continue"), 0);
+  });
+  await session.send("go");
+  delete process.env.CUVETTE_BUDGET_USD;
+  expect(titles).toEqual(["Spend limit nearly reached"]);
+  expect(values[0]).toEqual(["continue", "cheaper", "stop"]);
+  expect(provider.requests.length).toBe(2);
+});
+
+test("the Stop answer at 80% sends nothing to the model", async () => {
+  nearLimit();
+  const provider = paidProvider([{ text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { guidance: false } });
+  session.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "stop"), 0);
+  });
+  await session.send("go");
+  delete process.env.CUVETTE_BUDGET_USD;
+  expect(provider.requests.length).toBe(0);
+  expect(session.record.entries(["notice"]).some((e) => String(e.data.text).includes("Stopped at your choice"))).toBe(true);
+});
+
+test("a headless run at 80% logs one notice, asks nothing and goes on", async () => {
+  nearLimit();
+  const provider = paidProvider([{ calls: [{ name: "state", args: {} }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
+  await session.send("go");
+  delete process.env.CUVETTE_BUDGET_USD;
+  expect(session.record.entries(["question"])).toHaveLength(0);
+  expect(session.record.entries(["notice"]).filter((e) => String(e.data.text).includes("of your $5.00 limit"))).toHaveLength(1);
+  expect(provider.requests.length).toBe(2);
+});
+
+test("no card appears for a local model or below 80%", async () => {
+  nearLimit();
+  const local = new FakeProvider([{ text: "done" }]);
+  local.info = { provider: "ollama", model: "qwen3:8b", contextWindow: 32768, vision: false, small: true, local: true };
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: local, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { guidance: false } });
+  await session.send("go");
+  expect(session.record.entries(["question"])).toHaveLength(0);
+  process.env.CUVETTE_BUDGET_USD = "50";
+  await session.close();
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: paidProvider([{ text: "done" }]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { guidance: false } });
+  await session.send("go");
+  delete process.env.CUVETTE_BUDGET_USD;
+  expect(session.record.entries(["question"])).toHaveLength(0);
+});
+
+test("the plan card carries the cost estimate for the model, and a local model shows the free text", async () => {
+  const estimates: (string | undefined)[] = [];
+  for (const info of [{ provider: "claude", model: "claude-sonnet-5-5" }, { provider: "ollama", model: "qwen3:8b", local: true }] as const) {
+    const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: PLAN }] }, { text: "ok" }]);
+    provider.info = { contextWindow: 100_000, vision: false, small: false, ...info };
+    session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true });
+    session.decisions.applySetup({});
+    session.bus.on((e) => {
+      if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "Triangle"), 0);
+      if (e.type === "plan") {
+        estimates.push(e.estimate);
+        setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+      }
+    });
+    await session.send("Blur a.tif and tell me what changes");
+    await session.close();
+  }
+  expect(estimates[0]).toMatch(/^About \$\d+\.\d{2} to \$\d+\.\d{2} with Sonnet\./);
+  expect(estimates[1]).toBe("Free: runs on this computer.");
 });
