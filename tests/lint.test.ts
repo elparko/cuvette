@@ -308,6 +308,11 @@ describe("lint: known-answer tests and data", () => {
     writeFileSync(join(dir, "data/fetch.sh"), "echo 'checksum mismatch' >&2; exit 1\n");
     expect((await fetchData(t, dir)).error).toContain("checksum mismatch");
   });
+  test("a fetch test with no data list still runs its fetch script", async () => {
+    const dir = make((y) => y.replace("    data: [data/a.csv]\n", "    fetch: data/fetch.sh\n"), { "data/fetch.sh": "exit 7\n" });
+    const t = loadAdapter(dir).manifest.tests[0];
+    expect((await fetchData(t, dir)).skip).toContain("exit code 7");
+  });
   test("kat-data-license: missing file, missing row, unconfirmed license, folder row", async () => {
     expect((await findings(make((y) => y, { "data/SOURCES.md": null }), "kat-data-license"))[0].severity).toBe("error");
     expect(await findings(make((y) => y, { "data/SOURCES.md": "| File | Source | License |\n| --- | --- | --- |\n| b.csv | x | CC0 |\n" }), "kat-data-license")).toHaveLength(1);

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { stepNumbers } from "./housekeeping.ts";
 import { approvedPlan, currentPlan } from "./plan.ts";
 import { liveEntries, type AnalysisRecord } from "./record.ts";
+import { replaySheet } from "./samples.ts";
 import type { Node, Question } from "./types.ts";
 
 const Source = z.union([
@@ -164,8 +165,8 @@ function fromPlan(c: Context, path: string): Found | undefined {
 }
 
 function sheetRows(c: Context): Record<string, string>[] | undefined {
-  const sheet = liveEntries(c.record, ["samples"]).filter((e) => Array.isArray(e.data.rows) && (e.data.rows as unknown[]).length).at(-1);
-  return sheet?.data.rows as Record<string, string>[] | undefined;
+  const rows = replaySheet(liveEntries(c.record, ["samples"]));
+  return rows?.length ? rows : undefined;
 }
 
 function fromSheet(c: Context, kind: "groups" | "size" | "batches"): Found | undefined {

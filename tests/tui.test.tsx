@@ -3,7 +3,7 @@ import { runTui } from "../src/tui/app.tsx";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { imageProtocol, inlineImage } from "../src/tui/image.ts";
 import { Collapser, Mapper, mainView, settingsLine, type Item, type Logged } from "../src/ui/items.ts";
-import { tableLines } from "../src/tui/markdown.tsx";
+import { liveTail, tableLines } from "../src/tui/markdown.tsx";
 import { makeHarness, sleep, until, type Harness } from "../src/tui/testing.ts";
 import { renderGraph, suggestions } from "../src/ui/commands.ts";
 import React from "react";
@@ -107,6 +107,16 @@ describe("markdown", () => {
     const lines = tableLines(rows, 40);
     expect(lines.length).toBeGreaterThan(3);
     for (const l of lines) expect(l.text.length).toBeLessThanOrEqual(40);
+  });
+
+  test("the live reply keeps only the last blocks that fit on the screen", () => {
+    const text = Array.from({ length: 50 }, (_, i) => `Paragraph ${i}.`).join("\n\n");
+    const tail = liveTail(text, 6, 80);
+    expect(tail.startsWith("Paragraph 4")).toBe(true);
+    expect(tail.endsWith("Paragraph 49.")).toBe(true);
+    expect(liveTail("short", 6, 80)).toBe("short");
+    const code = `Intro.\n\n\`\`\`\n${Array.from({ length: 30 }, (_, i) => `line ${i}`).join("\n\n")}`;
+    expect(liveTail(code, 4, 80).startsWith("```\n")).toBe(true);
   });
 });
 

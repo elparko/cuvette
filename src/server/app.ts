@@ -125,7 +125,7 @@ function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
 }
 
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json; charset=utf-8") {
-  res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff" });
+  res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" });
   res.end(typeof body === "string" ? body : JSON.stringify(body));
 }
 

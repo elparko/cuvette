@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import { decodePng } from "../src/bench/png.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
+import { zip } from "../src/eln/zip.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, readTable, referenceValues } from "../src/core/reference.ts";
 
 
@@ -80,4 +81,19 @@ test("readTable reads a semicolon file with decimal commas and a quoted comma", 
 test("agreementText leaves out the percent if no reference value is above zero", () => {
   const a = agreement([{ sample: "a", ours: 1, ref: 0, pilot: false }]);
   expect(agreementText("Count", a)).not.toContain("%");
+});
+
+test("readTable reads xlsx cells that have no r attribute or that have r after other attributes", () => {
+  const sheet = `<worksheet><sheetData><row><c t="inlineStr"><is><t>Field</t></is></c><c t="inlineStr"><is><t>Red dots</t></is></c><c t="inlineStr"><is><t>Total</t></is></c></row><row><c t="inlineStr"><is><t>Set 1</t></is></c><c s="1" r="C2"><v>900</v></c></row><row><c t="inlineStr"><is><t>Set 2</t></is></c><c><v>410</v></c><c t="e"><v>#N/A</v></c></row></sheetData></worksheet>`;
+  const files = [
+    { name: "xl/workbook.xml", data: Buffer.from(`<workbook xmlns:r="r"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>`) },
+    { name: "xl/_rels/workbook.xml.rels", data: Buffer.from(`<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>`) },
+    { name: "xl/worksheets/sheet1.xml", data: Buffer.from(sheet) },
+  ];
+  const p = join(mkdtempSync(join(tmpdir(), "cuvette-ref-")), "plain.xlsx");
+  writeFileSync(p, zip(files));
+  const [s] = readTable(p);
+  expect(s!.columns).toEqual(["Field", "Red dots", "Total"]);
+  expect(s!.rows[0]).toEqual(["Set 1", undefined, 900]);
+  expect(s!.rows[1]).toEqual(["Set 2", 410, null]);
 });

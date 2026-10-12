@@ -3,10 +3,20 @@ import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { estimateTokens } from "../core/compaction.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
+import { hideKeys } from "../core/credentials.ts";
 import { RETRIES, errorBody, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 
 const TIMEOUT_MS = 600_000;
 const NO_STREAM = /cannot use tools with stream|stream(?:ing)? (?:is )?not supported|does not support stream/i;
+
+export function keySafe(base: string): boolean {
+  try {
+    const u = new URL(base);
+    return u.protocol === "https:" || (u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname));
+  } catch {
+    return false;
+  }
+}
 
 export interface OpenAIOpts {
   numCtx?: number;
@@ -93,10 +103,10 @@ export class OpenAIProvider implements Provider {
   private async attempt(body: Record<string, unknown>, idle: IdleSignal): Promise<Response> {
     idle.touch();
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (process.env.OPENAI_API_KEY) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
+    if (process.env.OPENAI_API_KEY && keySafe(this.base)) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
     const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: idle.signal });
     if (res.status === 429 || res.status === 408 || res.status >= 500) {
-      const txt = await res.text();
+      const txt = hideKeys(await res.text()).text;
       if (body.stream && NO_STREAM.test(txt)) return new Response(txt, { status: 400 });
       throw Object.assign(new Error(`Model server error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status, headers: res.headers });
     }
@@ -104,14 +114,14 @@ export class OpenAIProvider implements Provider {
   }
 
   private async httpError(res: Response, body: Record<string, unknown>): Promise<ProviderError | "again"> {
-    const txt = await res.text();
+    const txt = hideKeys(await res.text()).text;
     let msg: unknown = txt;
     try {
       const j = JSON.parse(txt);
       msg = j.error?.message ?? j.error ?? j.detail ?? txt;
     } catch {}
     const text = typeof msg === "string" ? msg : JSON.stringify(msg);
-    if (res.status === 401 || res.status === 403) return new ProviderError("The model server rejected the credentials. Set OPENAI_API_KEY.");
+    if (res.status === 401 || res.status === 403) return new ProviderError(process.env.OPENAI_API_KEY && !keySafe(this.base) ? "The model server rejected the request. Cuvette did not send OPENAI_API_KEY, because the address uses plain http and is not on this computer. Use https." : "The model server rejected the credentials. Set OPENAI_API_KEY.");
     if (res.status === 400 && body.stream_options && /stream_options|include_usage/i.test(text)) {
       this.usageOption = false;
       return "again";
@@ -129,7 +139,7 @@ export class OpenAIProvider implements Provider {
     if (signal.aborted) return e;
     if (typeof (e as any).status === "number") return new ProviderError((e as Error).message, true);
     if ((e as any).partial) return new ProviderError(`The model server stopped during the reply: ${(e as Error).message}.`, true);
-    return new ProviderError(`Cannot reach the model server at ${this.base}. Check that it is running.`, true);
+    return new ProviderError(`Cannot reach the model server at ${this.base.replace(/\/\/[^@/]*@/, "//")}. Check that it is running.`, true);
   }
 
   private body(messages: unknown[], tools: StepRequest["tools"]): Record<string, unknown> {
@@ -183,7 +193,7 @@ export class OpenAIProvider implements Provider {
     let ended = false;
     const chunk = (j: any) => {
       if (j.error) {
-        const msg = typeof j.error === "string" ? j.error : (j.error.message ?? JSON.stringify(j.error));
+        const msg = hideKeys(typeof j.error === "string" ? j.error : String(j.error.message ?? JSON.stringify(j.error))).text;
         throw new ProviderError(`Model server error: ${String(msg).slice(0, 300)}`, false, CONTEXT_OVERFLOW.test(msg));
       }
       if (j.usage) reply.usage = j.usage;

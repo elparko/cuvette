@@ -85,7 +85,7 @@ def _gene_sets(gene_sets):
     if not os.path.exists(path):
         return None, "Gene set file not found: %s. Give a GMT file, or run fetch_gene_sets to download an Enrichr library." % path
     sets = {}
-    with open(path) as fh:
+    with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             parts = line.rstrip("\n").split("\t")
             if len(parts) >= 3:
@@ -237,7 +237,7 @@ def run_ora(path, gene_sets, id_column, background, padj_column=None, padj_max=N
             sel &= frame[padj_column].notna() & (frame[padj_column] < float(padj_max))
             rules.append("%s < %g" % (padj_column, float(padj_max)))
         rule = ", ".join(rules)
-        if lfc_column and lfc_min is not None:
+        if lfc_column and (lfc_min is not None or direction != "both"):
             lfc = frame[lfc_column]
             cut = float(lfc_min or 0)
             if direction == "up":
@@ -371,7 +371,8 @@ def run_gsea_prerank(path, gene_sets, id_column, rank_metric, rank_column=None, 
     res["leading_edge_n"] = res["Tag %"].str.split("/").str[0].astype(int)
     out = pd.DataFrame({"term": res["Term"], "size": res["size"], "es": res["ES"].astype(float), "nes": res["NES"].astype(float),
                         "p_value": res["NOM p-val"].astype(float), "fdr_q": res["FDR q-val"].astype(float), "leading_edge_n": res["leading_edge_n"],
-                        "leading_edge_genes": res["Lead_genes"]}).sort_values(["p_value", "nes"], ascending=[True, False]).reset_index(drop=True)
+                        "leading_edge_genes": res["Lead_genes"]})
+    out = out.assign(_abs_nes=out["nes"].abs()).sort_values(["p_value", "_abs_nes"], ascending=[True, False]).drop(columns="_abs_nes").reset_index(drop=True)
     floor = 1.0 / (int(permutations) + 1)
     sig = out[out["fdr_q"] < 0.25]
     metrics = {"n_ranked_genes": len(rnk), "n_ranked_in_gene_sets": n_found, "n_sets_tested": len(out), "n_sets_fdr_q_below_025": len(sig),

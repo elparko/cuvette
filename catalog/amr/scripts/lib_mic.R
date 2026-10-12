@@ -29,9 +29,10 @@ read_mic_long <- function(p) {
     }))
   }
   long$mic <- sub("^(<=|>=|<|>)\\s+", "\\1", trimws(long$mic))
+  before <- nrow(long)
   long <- long[!is.na(long$mic) & nzchar(long$mic) & !tolower(long$mic) %in% c("na", "nd", "-"), ]
   if (!nrow(long)) fail("the data have no MIC values")
-  list(long = long, group_cols = group_cols)
+  list(long = long, group_cols = group_cols, n_no_value = before - nrow(long))
 }
 
 mic_numeric <- function(m) suppressWarnings(as.numeric(sub("^(<=|>=|<|>)", "", m)))

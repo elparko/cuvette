@@ -531,7 +531,7 @@ tools:
     title: Measure DAB in the nuclei of an image
     description: >-
       Separate hematoxylin and DAB in a brightfield image by color deconvolution. Find the nuclei. Write a cell table with
-      the DAB optical density of each nucleus. If cell_expand is above 0, the table also has the cytoplasm, the membrane and the cell.
+      the DAB optical density of each nucleus. If cell_expand is 1 pixel or more, the table also has the cytoplasm, the membrane and the cell.
       It writes a QC overlay of the counted nuclei. For a whole slide image or a measured cell outline, run QuPath and give its export
       to the scoring tools.
     read_only: true
@@ -547,7 +547,7 @@ tools:
       min_diameter: { type: number, minimum: 0, description: "Leave out. The harness sets it from the decision record. Smallest nucleus, in pixels across." }
       max_diameter: { type: number, minimum: 0, default: 0, description: "Largest nucleus, in pixels across. 0 means no limit." }
       split_touching: { type: boolean, default: true, description: True to split touching nuclei with a watershed. }
-      cell_expand: { type: number, minimum: 0, default: 0, description: "Distance that each nucleus grows to make the cell, in pixels. 0 gives the nucleus only." }
+      cell_expand: { type: number, minimum: 0, default: 0, description: "Distance that each nucleus grows to make the cell, in pixels. 0 gives the nucleus only. The cytoplasm, membrane and cell need 1 or more." }
       membrane_width: { type: number, minimum: 0.5, default: 2, description: "Width of the outer cell band that counts as membrane, in pixels." }
       smoothing_sigma: { type: number, minimum: 0, default: 1, description: "Blur of the detection image before the threshold, in pixels." }
       pixel_size: { type: number, minimum: 0, default: 0, description: "Micrometers for each pixel. 0 means unknown, and the table has positions in pixels only." }
@@ -1031,4 +1031,4 @@ tests:
       - { tool: measure_stain_intensity, args: { path: "{adapter_dir}/data/synthetic_ihc.png", compartment: cytoplasm, region: whole, detection_image: hematoxylin, nucleus_threshold: otsu, min_diameter: 5, cell_expand: 0 } }
     expect:
       - { path: ok, equals: false }
-      - { path: error, contains: "needs cell_expand above 0" }
+      - { path: error, contains: "needs cell_expand of 1 pixel or more" }

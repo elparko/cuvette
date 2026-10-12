@@ -67,9 +67,9 @@ run_tool(function() {
     hit <- d$well %in% exclude | as.character(d$row) %in% exclude
     missing <- setdiff(exclude, c(d$well, as.character(d$row)))
     if (length(missing)) fail(sprintf("exclude names wells or rows that are not in the data: %s. Give well names from the column '%s' or file row numbers.", paste(missing, collapse = ", "), if (is.null(well_col)) "(no well column)" else well_col))
+    n_excluded <- sum(hit)
     d <- d[!hit, ]
-  }
-  n_excluded <- length(exclude)
+  } else n_excluded <- 0L
 
   plates <- unique(d$plate)
   std_rows <- list(); smp_rows <- list(); metrics <- list(); curves <- list()

@@ -186,8 +186,14 @@ def list_databases():
 
 def _results(ds, database, fdr):
     df = _retry(lambda: ds.results(database=_database(database), fdr=fdr))
+    processed = ["%s %s" % (d.name, d.version) for d in ds.database_details]
+    if df.empty and database.strip() in processed:
+        import pandas as pd
+
+        empty = pd.DataFrame(columns=["formula", "adduct", "mz", "msm", "fdr", "offSample", "moleculeNames"])
+        return empty.set_index(["formula", "adduct"])
     if "offSample" not in df.columns or "msm" not in df.columns:
-        names = ", ".join("%s %s" % (d.name, d.version) for d in ds.database_details) or "none"
+        names = ", ".join(processed) or "none"
         raise ValueError("No results for the database %s in this dataset. The dataset was processed with: %s. Use one of these." % (database, names))
     return df
 

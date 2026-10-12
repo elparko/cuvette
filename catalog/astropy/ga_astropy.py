@@ -271,9 +271,11 @@ def measure_apertures(path, radius, hdu=0, positions_csv=None, x_column="x_centr
         bkg = np.array(stats.median, dtype=float)
     else:
         bkg = np.zeros(len(xs))
-    net = raw - bkg * area
+    area_in = np.atleast_1d(np.asarray(aper.area_overlap(data), dtype=float))
+    edge = area_in < area * (1 - 1e-6)
+    net = raw - bkg * area_in
     frame = pd.DataFrame({"id": np.arange(1, len(xs) + 1), "x": xs, "y": ys, "aperture_sum": raw,
-                          "background_per_pixel": bkg, "net_flux": net})
+                          "background_per_pixel": bkg, "net_flux": net, "area_in_image": area_in, "at_edge": edge})
     w = _wcs(header)
     if w is not None:
         sky = w.pixel_to_world(xs, ys)
@@ -290,11 +292,12 @@ def measure_apertures(path, radius, hdu=0, positions_csv=None, x_column="x_centr
     plt.close(fig)
     return {
         "ok": True,
-        "summary": "%d apertures of radius %g px (area %.1f px). Median net flux %.4g. Local background: %s." % (
+        "summary": "%d apertures of radius %g px (area %.1f px). Median net flux %.4g. Local background: %s.%s" % (
             len(xs), radius, area, float(np.median(net)),
-            "annulus %g to %g px, clipped at %g sigma" % (annulus_inner, annulus_outer, clip_sigma) if local_background == "annulus" else "none"),
+            "annulus %g to %g px, clipped at %g sigma" % (annulus_inner, annulus_outer, clip_sigma) if local_background == "annulus" else "none",
+            " %d apertures extend past the image edge (column at_edge). Their flux misses the part outside the image." % int(edge.sum()) if edge.any() else ""),
         "metrics": _metrics({"n_sources": len(xs), "aperture_area": area, "median_net_flux": np.median(net),
-                             "total_net_flux": net.sum(), "median_background_per_pixel": np.median(bkg)}),
+                             "total_net_flux": net.sum(), "median_background_per_pixel": np.median(bkg), "n_at_edge": int(edge.sum())}),
         "table": _table(frame, "photometry"),
         "outputs": _files(os.path.join(os.getcwd(), "photometry.csv"), plot),
     }

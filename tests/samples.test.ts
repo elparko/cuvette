@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { applyEdit, designChecks, groupSummary, minPossibleP, nLevel, readSheet, sheetCsv, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type SampleRow } from "../src/core/samples.ts";
+import { applyChanges, applyEdit, designChecks, replaySheet, sheetChanges, groupSummary, minPossibleP, nLevel, readSheet, sheetCsv, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type SampleRow } from "../src/core/samples.ts";
 
 function efferocytosis(): string[] {
   const out: string[] = [];
@@ -123,11 +123,25 @@ describe("design checks", () => {
     expect(one).toMatchObject({ level: "ask", recommendation: "descriptive" });
     const two = designChecks([row("a", "Ctrl", "M1"), row("b", "Ctrl", "M2"), row("c", "Drug", "M3"), row("d", "Drug", "M4")]).find((i) => i.id === "too_few")!;
     expect(two.level).toBe("warn");
+    const none = designChecks([row("a", "Ctrl", "Set 1"), row("b", "Ctrl", "Set 2"), row("c", "Drug", "")]).find((i) => i.id === "too_few")!;
+    expect(none.text).toBe("Some groups have fewer than 2 Sets: Drug n = 0. No test can estimate the spread with n below 2.");
     const rank = designChecks(sheet, { n: "One Set", test: "Mann-Whitney U test" }).find((i) => i.id === "too_few_rank")!;
     expect(rank.text).toBe("With n = 3 and n = 3, the smallest possible two-sided p of the Mann-Whitney test is 0.10. The test cannot reach p < 0.05.");
     expect(minPossibleP(3, 3)).toBeCloseTo(0.1);
     expect(minPossibleP(4, 4)).toBeCloseTo(2 / 70);
     expect(designChecks(sheet, { n: "One Set", test: "Welch t-test" }).some((i) => i.id === "too_few_rank")).toBe(false);
+  });
+});
+
+describe("sheet changes", () => {
+  test("an edit stores only the changed cells, and the replay gives the full sheet", () => {
+    const rows = [row("a", "Ctrl", "M1"), row("b", "Ctrl", "M2"), row("c", "Drug", "M3")];
+    const edited = (applyEdit(rows, "2 group Drug") as { rows: SampleRow[] }).rows;
+    const changes = sheetChanges(rows, edited)!;
+    expect(changes).toEqual([[1, "group", "Drug"]]);
+    expect(applyChanges(rows, changes)).toEqual(edited);
+    expect(replaySheet([{ data: { action: "drafted", rows } }, { data: { action: "edited", changes } }, { data: { action: "accepted", rows: 3 } }])).toEqual(edited);
+    expect(sheetChanges(rows, rows.slice(1))).toBeUndefined();
   });
 });
 

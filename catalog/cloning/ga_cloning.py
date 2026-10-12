@@ -305,7 +305,7 @@ def simulate_pcr(template, forward, reverse, min_anneal_bp=None, topology="file"
             return _fail("The %s primer is %d bases long, shorter than min_anneal_bp (%s)." % (label, len(s), min_anneal_bp))
         primers[label] = s
     k = int(min_anneal_bp)
-    target = seq + seq[: max(len(p) for p in primers.values()) + 2] if top == "circular" else seq
+    target = seq + seq if top == "circular" else seq
     fwd = _bind(primers["forward"], target, k)
     rev = [{"start": len(target) - h["end"], "footprint": h["footprint"]} for h in _bind(primers["reverse"], _revcomp(target), k)]
     other_f = [{"start": len(target) - h["end"]} for h in _bind(primers["forward"], _revcomp(target), k)]

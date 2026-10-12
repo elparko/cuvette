@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { loadAdapter, type LoadedAdapter } from "../src/adapters/manifest.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
-import { exportHtml, exportJsonl, exportMarkdown, exportPdf, groupTrail, parseRoute, renderMarkdown, shortReason, trail } from "../src/core/trail.ts";
+import { exportHtml, exportJsonl, exportMarkdown, exportPdf, groupTrail, parseRoute, renderMarkdown, shortReason, trail, TRAIL_CSP } from "../src/core/trail.ts";
 import type { NodeIn } from "../src/core/types.ts";
 
 const YAML = `
@@ -224,6 +224,20 @@ test("the html and md exports put the approved plan at the top, with its changes
   expect(md.indexOf("## Proposed analysis (version 1")).toBeLessThan(md.indexOf("## Steps"));
   expect(md).toContain("- Version 2: A <plot> helps.");
   expect(trail(r, 1).map((l) => l.line)).toEqual(["Confirmed: version 1 of the proposed analysis", "Plan changed to version 2. Reason: A <plot> helps."]);
+});
+
+test("the html export blocks scripts and escapes a plan version from the record", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-trail-csp-"));
+  const r = new AnalysisRecord(join(dir, "s"), "20260101-000000-csp1");
+  r.append("session", { adapters: [], model: "m" });
+  r.append("plan_approved", { version: "<img src=x onerror=alert(1)>", text: "x", plan: { steps: [] } });
+  r.append("user", { text: "[a](javascript:alert(1)) and <script>alert(2)</script>" });
+  const html = readFileSync(exportHtml(r, [], join(dir, "t.html")), "utf8");
+  expect(html).toContain(`<meta http-equiv="Content-Security-Policy" content="${TRAIL_CSP}">`);
+  expect(TRAIL_CSP).toMatch(/default-src 'none'/);
+  expect(html).not.toContain("<img src=x");
+  expect(html).not.toContain("<script>");
+  expect(html).not.toContain('href="javascript:');
 });
 
 test("the html report shows the confirmed analysis with its pilot and the validation as one unit", () => {

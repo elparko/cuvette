@@ -337,6 +337,8 @@ def find_spatial_domains(adata, resolution=0.5, spatial_weight=0.3, n_top_genes=
         return _fail("No spatial graph. Run build_spatial_graph first.")
     if not 0 <= spatial_weight <= 1:
         return _fail("spatial_weight %g is not in the range 0 to 1." % spatial_weight)
+    if _is_counts(a) and float(a.X.max()) > 50:
+        return _fail("X looks like raw counts. Run normalize_expression first. The domains need log-normalized values.")
     if compare_to is not None and compare_to not in a.obs:
         return _fail("Column %s (argument compare_to) not found in obs. Columns: %s." % (compare_to, ", ".join(map(str, a.obs.columns))))
     work = a.copy()

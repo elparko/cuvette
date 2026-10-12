@@ -1,5 +1,5 @@
 import { BoxesIcon, CalendarIcon, CopyIcon, ExternalLinkIcon, FlaskConicalIcon, FolderOpenIcon, FolderSearchIcon, HistoryIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, PencilIcon, SettingsIcon, Trash2Icon, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import { FolderDialog } from "./components/folder-chooser.tsx";
 import { Button } from "./components/ui/button.tsx";
@@ -12,11 +12,12 @@ import { call, copyText, enableFinder, type AppState } from "./lib/api.ts";
 import { useStream } from "./lib/stream.ts";
 import { cn } from "./lib/utils.ts";
 import { AnalysisPage } from "./pages/analysis.tsx";
-import { ProgramsPage } from "./pages/programs.tsx";
 import { SessionsPage, useSessions, type SessionCard } from "./pages/sessions.tsx";
-import { SettingsPage } from "./pages/settings.tsx";
-import { SetupPage } from "./pages/setup.tsx";
 import { StartPage } from "./pages/start.tsx";
+
+const ProgramsPage = lazy(() => import("./pages/programs.tsx").then((m) => ({ default: m.ProgramsPage })));
+const SettingsPage = lazy(() => import("./pages/settings.tsx").then((m) => ({ default: m.SettingsPage })));
+const SetupPage = lazy(() => import("./pages/setup.tsx").then((m) => ({ default: m.SetupPage })));
 
 export type Page = "session" | "start" | "setup" | "settings" | "sessions" | "programs";
 const OWN_PAGES: Page[] = ["settings", "sessions", "programs"];
@@ -267,12 +268,14 @@ export function App() {
             <AnalysisPage ctx={ctx} stream={stream} />
           ) : (
             <main className="min-h-0 flex-1 overflow-y-auto">
-              {page === "start" && <StartPage ctx={ctx} sessions={sessions} />}
-              {page === "setup" && <SetupPage ctx={ctx} />}
-              {page === "sessions" && <SessionsPage ctx={ctx} sessions={sessions} />}
-              {page === "programs" && <ProgramsPage ctx={ctx} />}
-              {page === "settings" && <SettingsPage ctx={ctx} />}
-              {page === "session" && !state.session && <StartPage ctx={ctx} sessions={sessions} />}
+              <Suspense fallback={null}>
+                {page === "start" && <StartPage ctx={ctx} sessions={sessions} />}
+                {page === "setup" && <SetupPage ctx={ctx} />}
+                {page === "sessions" && <SessionsPage ctx={ctx} sessions={sessions} />}
+                {page === "programs" && <ProgramsPage ctx={ctx} />}
+                {page === "settings" && <SettingsPage ctx={ctx} />}
+                {page === "session" && !state.session && <StartPage ctx={ctx} sessions={sessions} />}
+              </Suspense>
             </main>
           )}
         </div>

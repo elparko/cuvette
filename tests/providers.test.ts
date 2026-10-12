@@ -9,7 +9,7 @@ import { ClaudeProvider } from "../src/providers/claude.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { CLAUDE_MODELS, listModels, makeProvider } from "../src/providers/index.ts";
 import { ThinkSplitter, extractTextToolCall, splitThink } from "../src/providers/text.ts";
-import { parseArgs } from "../src/providers/openai.ts";
+import { keySafe, parseArgs } from "../src/providers/openai.ts";
 import { retryReason } from "../src/providers/retry.ts";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
@@ -564,6 +564,25 @@ describe("openai", () => {
     const err = await (await makeProvider("openai:http://localhost:1234/v1|m", { sleep: async () => {} })).step(req([user("x")])).catch((e) => e);
     expect(err).toBeInstanceOf(ProviderError);
     expect(err.transient).toBe(true);
+  });
+
+  test("the key goes only over https or to this computer, and a key in a server error is removed", async () => {
+    expect(keySafe("https://api.example.org/v1")).toBe(true);
+    expect(keySafe("http://localhost:1234/v1")).toBe(true);
+    expect(keySafe("http://192.168.1.5:8000/v1")).toBe(false);
+    vi.stubEnv("OPENAI_API_KEY", "sk-test-0123456789abcdef0123");
+    let headers: Record<string, string> = {};
+    vi.stubGlobal("fetch", async (_url: string, init: any) => {
+      headers = init.headers;
+      return new Response(JSON.stringify({ error: { message: "bad key sk-test-0123456789abcdef0123" } }), { status: 400 });
+    });
+    const lan = await makeProvider("openai:http://192.168.1.5:8000/v1|m");
+    const e = await lan.step(req([user("q")])).catch((x: Error) => x);
+    expect(headers.authorization).toBeUndefined();
+    expect((e as Error).message).not.toContain("sk-test-0123456789abcdef0123");
+    const remote = await makeProvider("openai:https://api.example.org/v1|m");
+    await remote.step(req([user("q")])).catch(() => {});
+    expect(headers.authorization).toBe("Bearer sk-test-0123456789abcdef0123");
   });
 
   test("chat completions with tool calls, bad JSON, reasoning, auth header", async () => {

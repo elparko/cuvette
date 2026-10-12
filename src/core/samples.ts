@@ -157,6 +157,32 @@ export function applyEdit(rows: SampleRow[], text: string): { rows: SampleRow[];
   return { error: "Type: row column value (for example: 3 group Ceramide), or: column old = new (for example: group Cer = Ceramide)." };
 }
 
+export type SheetChange = [row: number, column: SampleColumn, value: string];
+
+export function sheetChanges(before: SampleRow[], after: SampleRow[]): SheetChange[] | undefined {
+  if (before.length !== after.length) return undefined;
+  const out: SheetChange[] = [];
+  after.forEach((r, i) => {
+    for (const c of SAMPLE_COLUMNS) if ((r[c] ?? "") !== (before[i]![c] ?? "")) out.push([i, c, r[c] ?? ""]);
+  });
+  return out.length > after.length ? undefined : out;
+}
+
+export function applyChanges(rows: SampleRow[], changes: SheetChange[]): SampleRow[] {
+  const next = [...rows];
+  for (const [i, c, v] of changes) if (next[i]) next[i] = { ...next[i]!, [c]: v };
+  return next;
+}
+
+export function replaySheet(entries: { data: Record<string, unknown> }[]): SampleRow[] | undefined {
+  let rows: SampleRow[] | undefined;
+  for (const e of entries) {
+    if (Array.isArray(e.data.rows)) rows = e.data.rows as SampleRow[];
+    else if (rows && Array.isArray(e.data.changes)) rows = applyChanges(rows, e.data.changes as SheetChange[]);
+  }
+  return rows;
+}
+
 export function sheetTable(rows: SampleRow[], max = 12): string {
   const head = ["#", "sample", "group", "unit", "batch", "path"];
   const short = (p: string) => (p.length > 40 ? `…${p.slice(-39)}` : p);
@@ -250,8 +276,11 @@ export function designChecks(rows: SampleRow[], opts: { n?: string; test?: strin
     const hi = Math.max(...ns);
     if (lo > 0 && (hi >= 2 * lo || hi - lo >= 3)) out.push({ id: "unbalanced", check: "unbalanced", level: "warn", text: `The groups are not balanced: ${counts.map((c) => `${c.g} n = ${c.units}`).join(", ")}. A test that assumes equal variances is less safe. Welch's test or a model is safer.` });
     const one = counts.filter((c) => c.units < 2);
+    const what = hasUnits ? word : "sample";
+    const lowNs = one.map((c) => `${c.g} n = ${c.units}`).join(", ");
+    const allOne = one.every((c) => c.units === 1);
     if (one.length)
-      out.push({ id: "too_few", check: "too_few", level: "ask", text: `${one.map((c) => c.g).join(", ")} ${one.length === 1 ? "has" : "have"} only one ${hasUnits ? word : "sample"}. No test can estimate the spread with n = 1.`, question: `${one.map((c) => c.g).join(", ")} ${one.length === 1 ? "has" : "have"} n = 1. No test can estimate the spread. Show the results without a test, or stop?`, options: [{ value: "descriptive", label: "Show the results without a test" }, { value: "stop", label: "Stop. I add data" }], recommendation: "descriptive" });
+      out.push({ id: "too_few", check: "too_few", level: "ask", text: allOne ? `${one.map((c) => c.g).join(", ")} ${one.length === 1 ? "has" : "have"} only one ${what}. No test can estimate the spread with n = 1.` : `Some groups have fewer than 2 ${what}s: ${lowNs}. No test can estimate the spread with n below 2.`, question: allOne ? `${one.map((c) => c.g).join(", ")} ${one.length === 1 ? "has" : "have"} n = 1. No test can estimate the spread. Show the results without a test, or stop?` : `Some groups have fewer than 2 ${what}s: ${lowNs}. No test can estimate the spread. Show the results without a test, or stop?`, options: [{ value: "descriptive", label: "Show the results without a test" }, { value: "stop", label: "Stop. I add data" }], recommendation: "descriptive" });
     else if (lo < 3) out.push({ id: "too_few", check: "too_few", level: "warn", text: `The smallest group has n = ${lo}. With fewer than 3 ${word}s in a group, a test has very little power. Report the values and the effect size.` });
     const rank = /mann|whitney|wilcoxon|rank/i.test(opts.test ?? "");
     if (rank && lo >= 2) {

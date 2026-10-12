@@ -1,7 +1,7 @@
 import { localUrl } from "../core/phi.ts";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
-import { ImageBudget } from "./images.ts";
+import { ImageBudget, prepareImages } from "./images.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText } from "./text.ts";
 import { RETRIES, errorBody, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
 import { estimateTokens } from "../core/compaction.ts";
@@ -240,6 +240,7 @@ export class OllamaProvider implements Provider {
   async step(input: StepRequest): Promise<StepResult> {
     const req = input.noToolCalls ? { ...input, tools: [] } : input;
     const system = this.promptedTools && req.tools.length ? `${req.system}\n\n${promptedToolsText(req.tools)}` : req.system;
+    if (this.info.vision) await prepareImages(req.messages, req.signal);
     const body: Record<string, unknown> = {
       model: this.model,
       messages: this.toNative(system, req.messages),

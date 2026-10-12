@@ -59,9 +59,12 @@ def _read(path):
     else:
         try:
             with Image.open(p) as im:
-                if im.mode in ("RGBA", "LA", "CMYK", "YCbCr"):
+                palette = im.mode in ("P", "PA")
+                if im.mode in ("RGBA", "LA", "CMYK", "YCbCr", "P", "PA"):
                     im = im.convert("RGB")
                 arr = np.array(im)
+                if palette and (arr[..., 0] == arr[..., 1]).all() and (arr[..., 1] == arr[..., 2]).all():
+                    arr = arr[..., 0]
         except Exception as e:
             _fail("cannot read the image file %s: %s" % (path, e))
         axes = "YXS" if arr.ndim == 3 else "YX"
@@ -503,6 +506,8 @@ def measure_colocalization(path, channel1=0, channel2=1, path2=None, mask=None, 
     metrics = {"pearson_r": r, "manders_m1": m1, "manders_m2": m2, "n_pixels": int(x.size)}
     slope = icpt = float("nan")
     warnings = []
+    if threshold_method in ("costes", "bisection") and np.dtype(dt).kind == "f":
+        _fail("threshold_method %s steps through whole intensity values, as Coloc 2 does, but the image holds floating-point values (%s). Convert the image to 16-bit with the same scale for both channels, or give manual thresholds" % (threshold_method, dt))
     if threshold_method in ("costes", "bisection"):
         t1, t2, slope, icpt, steps = _auto_threshold(x, y, threshold_method, lo, hi)
         if t1 > x.mean() or t2 > y.mean():
@@ -650,7 +655,7 @@ def _uptake_one(path, s):
     cellc = _pick(chs, s["cell_channel"], "cell_channel") if s["cell_channel"] not in (None, "") else None
     mode = s["cell_mode"]
     h, w = cargo.shape
-    nl, nt, n_nuc_size = None, None, 0
+    nl, nt, n_nuc_size, n_nuc_border = None, None, 0, 0
     if nuc is not None:
         ns = filters.gaussian(nuc, 1, preserve_range=True)
         nt = _threshold(ns, s["nucleus_threshold"], "nucleus_threshold")
@@ -661,7 +666,9 @@ def _uptake_one(path, s):
         nl = _split_by_peaks(nuc, nm, sigma, mdist) if s["split_nuclei"] else measure.label(nm)
         nl, n_nuc_size = _size_filter(nl, s["nucleus_min_diameter"], s["nucleus_max_diameter"])
         if s["exclude_border_cells"]:
+            before_nuc = int(np.unique(nl[nl > 0]).size)
             nl = segmentation.relabel_sequential(segmentation.clear_border(nl))[0]
+            n_nuc_border = before_nuc - int(np.unique(nl[nl > 0]).size)
     if mode in ("expand", "membrane") and nl is None:
         _fail("cell_mode %s grows cells from nuclei, so it needs nucleus_channel. For a brightfield image without a nuclear stain use cell_mode texture, or labels with a Cellpose label image" % mode)
     if mode in ("membrane", "threshold", "texture") and cellc is None:
@@ -707,7 +714,7 @@ def _uptake_one(path, s):
     if s["exclude_border_cells"]:
         kept = segmentation.clear_border(cl)
         border_ids = np.setdiff1d(np.unique(cl[cl > 0]), np.unique(kept[kept > 0]))
-        n_border = int(border_ids.size)
+        n_border = int(border_ids.size) + (n_nuc_border if mode in ("expand", "membrane") else 0)
         excluded = np.where(np.isin(cl, border_ids), cl, 0)
         cl = kept
     cl, n_cell_size = _size_filter(cl, s["cell_min_diameter"], 0)
@@ -853,15 +860,18 @@ def count_cell_uptake(path, cargo_channel, nucleus_channel=None, cell_channel=No
     cols = ["image", "cells", "positive", "fraction_positive", "cargo_in_cells", "cargo_per_cell", "nuclei"] + (["hand_total", "hand_positive"] if hand is not None else [])
     cpath = os.path.abspath("uptake_counts.csv")
     _write_csv(cpath, cols, rows)
-    fr = [r_[3] for r_ in rows]
-    metrics = {"n_images": len(rows), "total_cells": tot_cells, "total_positive": tot_pos, "pooled_fraction_positive": tot_pos / tot_cells if tot_cells else 0.0,
-               "mean_fraction_positive": float(np.mean(fr)), "sd_fraction_positive": float(np.std(fr, ddof=1)) if len(fr) > 1 else 0.0, "total_cargo_in_cells": tot_cargo,
+    fr = [r_[3] for r_ in rows if r_[1] > 0]
+    n_empty = len(rows) - len(fr)
+    metrics = {"n_images": len(rows), "n_images_no_cells": n_empty, "total_cells": tot_cells, "total_positive": tot_pos, "pooled_fraction_positive": tot_pos / tot_cells if tot_cells else 0.0,
+               "mean_fraction_positive": float(np.mean(fr)) if fr else float("nan"), "sd_fraction_positive": float(np.std(fr, ddof=1)) if len(fr) > 1 else float("nan"), "total_cargo_in_cells": tot_cargo,
                "mean_cargo_per_cell": tot_cargo / tot_cells if tot_cells else 0.0, "total_cargo_objects": tot_obj}
     if nucleus_channel not in (None, ""):
         metrics["total_nuclei"] = tot_nuc
     summary = "%d images (cargo threshold %s, rule %s %g): %d of %d cells positive (pooled %.1f percent; mean of images %.1f percent); %d cargo objects in cells, %.3f for each cell; %d cargo objects in all" % (len(rows), cargo_threshold, positivity_rule, float(positivity_min), tot_pos, tot_cells, 100 * metrics["pooled_fraction_positive"], 100 * metrics["mean_fraction_positive"], tot_cargo, metrics["mean_cargo_per_cell"], tot_obj)
     if "total_nuclei" in metrics:
         summary += "; %d nuclei" % tot_nuc
+    if n_empty:
+        summary += "; %d images with no cell are not in the mean of images" % n_empty
     if len(rows) <= 24:
         summary += "; positive of all cells in each image: " + ", ".join("%s %d of %d" % (r_[0], r_[2], r_[1]) for r_ in rows)
     if hand is not None:

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { auditLines, runReview } from "./audit.ts";
 import { cardLines, discardPlan, installedRows, installLines, inspectDir, prepareAdd, prepareUpdate, removeLines, reviewPlan, type InstallPlan } from "./install.ts";
 import { adapterDirs } from "./manifest.ts";
-import { fetchIndex } from "./registry.ts";
+import { fetchIndex, trustedRegistry } from "./registry.ts";
 import { confirmCode, adapterTrust, readInstalled, userAdapterDir } from "./source.ts";
 import { runAction, planFromInstall, planAction, listPrograms } from "../core/programs.ts";
 
@@ -113,7 +113,7 @@ async function list(io: Io, flags: Flags): Promise<number> {
   if (flags.registry) {
     try {
       const idx = await fetchIndex();
-      io.say(idx.adapters.length ? table(["Name", "Version", "Program", "Field", "Trust", "Needs"], idx.adapters.map((a) => [a.name, a.version, a.program, a.field, "Checked", [a.needs.network ? "network" : "", a.needs.code ? "code" : "", ...a.needs.programs].filter(Boolean).join(", ") || "nothing"])) : `The registry ${idx.registry} lists no adapters.`);
+      io.say(idx.adapters.length ? table(["Name", "Version", "Program", "Field", "Trust", "Needs"], idx.adapters.map((a) => [a.name, a.version, a.program, a.field, a.trust === "checked" && trustedRegistry(idx.registry) ? "Checked" : "Unlisted", [a.needs.network ? "network" : "", a.needs.code ? "code" : "", ...a.needs.programs].filter(Boolean).join(", ") || "nothing"])) : `The registry ${idx.registry} lists no adapters.`);
       return 0;
     } catch (e) {
       io.say((e as Error).message);

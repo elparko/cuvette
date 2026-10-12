@@ -266,8 +266,9 @@ def inspect_structure(path):
     for chain in model:
         kinds = [_kind(r) for r in chain]
         n_std = kinds.count("standard")
+        std = [int(r.id[1]) for r in chain if _kind(r) == "standard"]
         chains[chain.id] = {"residues": n_std, "hetero": kinds.count("hetero"), "water": kinds.count("water"),
-                            "first": int(next(r.id[1] for r in chain if _kind(r) == "standard")), "last": int([r.id[1] for r in chain if _kind(r) == "standard"][-1])}
+                            "first": std[0] if std else None, "last": std[-1] if std else None}
         metrics["residues_" + str(chain.id)] = n_std
         metrics["hetero_" + str(chain.id)] = kinds.count("hetero")
         metrics["water_" + str(chain.id)] = kinds.count("water")
@@ -299,6 +300,7 @@ def superpose_structures(mobile_path, reference_path, mobile_chain, reference_ch
     mc = _structure(mobile_path)[mobile_model][mobile_chain]
     rc = _structure(reference_path)[reference_model][reference_chain]
     ref_ids = {r.id for r in rc if _kind(r) == "standard"}
+    mob_ids = {r.id for r in mc if _kind(r) == "standard"}
     moving, fixed, skipped = [], [], 0
     for r in mc:
         if _kind(r) != "standard" or r.id not in ref_ids:
@@ -320,6 +322,10 @@ def superpose_structures(mobile_path, reference_path, mobile_chain, reference_ch
     io = PDBIO()
     io.set_structure(mc)
     io.save(out)
-    metrics = {"n_atoms_fitted": len(moving), "rmsd_before_fit": before, "rmsd_after_fit": float(sup.rms), "n_residues_skipped": skipped}
+    only_mobile, only_ref = len(mob_ids - ref_ids), len(ref_ids - mob_ids)
+    metrics = {"n_atoms_fitted": len(moving), "rmsd_before_fit": before, "rmsd_after_fit": float(sup.rms), "n_residues_skipped": skipped,
+               "n_residues_only_mobile": only_mobile, "n_residues_only_reference": only_ref}
     summary = "Fitted %d %s atoms: RMSD %.3f A before the fit, %.3f A after the fit." % (len(moving), fit_atoms, before, sup.rms)
+    if skipped or only_mobile or only_ref:
+        summary += " Not fitted: %d residues with another name or a missing atom, %d residues only in the mobile chain, %d only in the reference chain." % (skipped, only_mobile, only_ref)
     return _result(summary, metrics, [out])

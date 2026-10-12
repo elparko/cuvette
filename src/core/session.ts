@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { hideKeys, isCredentialsFile } from "./credentials.ts";
@@ -13,7 +14,7 @@ import { makeProvider } from "../providers/index.ts";
 import { coreTools, searchTools } from "../tools/core.ts";
 import { broadSearch } from "../tools/broad-search.ts";
 import { taskTool } from "../tools/task.ts";
-import { findPlace, inProject, placeAt, legacyPlace, local, newPlace, outputRoot, outside, provisional, saveIndexRow, titlePlace, type Place } from "./places.ts";
+import { findPlace, inProject, placeAt, legacyPlace, newPlace, outputRoot, outside, provisional, saveIndexRow, titlePlace, type Place } from "./places.ts";
 import { changedAnalysis, describeSession, lastTitle } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
@@ -43,12 +44,12 @@ import { absentStains, groundQuestions, inspectData, type Inspection } from "./i
 import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
-import { prepareImages } from "../providers/images.ts";
+import { scaleImages } from "../providers/images.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
-import { applyEdit, designChecks, groupSummary, readSheet, SAMPLE_COLUMNS, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet } from "./samples.ts";
+import { applyChanges, applyEdit, designChecks, groupSummary, readSheet, replaySheet, SAMPLE_COLUMNS, sheetChanges, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet, type SheetChange } from "./samples.ts";
 import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
 import { AnalysisRecord } from "./record.ts";
 import { rewindPoints, type RewindResult } from "./rewind.ts";
@@ -102,6 +103,11 @@ export interface SessionOptions {
   trustFolder?: boolean;
   method?: string;
 }
+
+const sheetGrid = (rows: SampleRow[]) => ({ columns: [...SAMPLE_COLUMNS] as string[], rows: rows.map((r) => SAMPLE_COLUMNS.map((c) => r[c])) });
+const gridRows = (grid: unknown[]) => grid.filter(Array.isArray).map((r) => Object.fromEntries(SAMPLE_COLUMNS.map((c, i) => [c, String((r as unknown[])[i] ?? "").trim()])) as SampleRow);
+
+const recordPlaces = (place: Place) => (place.legacy ? {} : { workDir: place.outDir, exportDir: place.outDir, project: inProject(place) ? place.project : undefined });
 
 interface Pending<T> {
   resolve: (v: T) => void;
@@ -300,7 +306,7 @@ export class Session {
   lastStatus: Extract<BusEvent, { type: "status" }> = { type: "status", state: "idle" };
   method?: Method;
 
-  private constructor(id: string, cwd: string, settings: Settings, place: Place) {
+  private constructor(id: string, cwd: string, settings: Settings, place: Place, record?: AnalysisRecord) {
     this.id = id;
     this.cwd = cwd;
     this.settings = settings;
@@ -309,7 +315,7 @@ export class Session {
     this.place = place;
     this.dir = place.recordDir;
     mkdirSync(this.dir, { recursive: true });
-    this.record = new AnalysisRecord(this.dir, id, place.legacy ? {} : { workDir: place.outDir, exportDir: place.outDir, project: inProject(place) ? place.project : undefined });
+    this.record = record ?? new AnalysisRecord(this.dir, id, recordPlaces(place));
     this.workDir = this.record.workDir;
     this.record.onAppend = (entry: Entry) => this.bus.emit({ type: "entry", entry });
     this.bus.on((e) => {
@@ -346,7 +352,7 @@ export class Session {
     return this.provider.info;
   }
 
-  static async create(opts: SessionOptions): Promise<Session> {
+  static async create(opts: SessionOptions, record?: AnalysisRecord): Promise<Session> {
     const cwd = opts.cwd ?? process.cwd();
     if (opts.trustFolder) trustOnce(cwd);
     const overrides = { ...(opts.settings ?? {}), mode: opts.mode, model: opts.model, referee: opts.referee };
@@ -354,7 +360,7 @@ export class Session {
     const id = opts.place?.id ?? opts.id ?? newId();
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
     if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
-    const s = new Session(id, cwd, settings, place);
+    const s = new Session(id, cwd, settings, place, record);
     const held = claimLock(s.dir);
     if (held) throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
     s.overrides = overrides;
@@ -376,20 +382,14 @@ export class Session {
     const log = join(place.recordDir, "log.jsonl");
     if (!existsSync(log)) throw new Error(`No session ${ref}`);
     const id = place.id;
-    const entries = readFileSync(log, "utf8").split("\n").map((l) => {
-      try {
-        return l ? local(JSON.parse(l), inProject(place) ? place.project : undefined) : null;
-      } catch {
-        return null;
-      }
-    }) as any[];
-    const first = entries.find((e) => e?.kind === "session");
-    const loaded = entries.filter((e) => e?.kind === "adapter").map((e) => e.data);
+    const record = new AnalysisRecord(place.recordDir, id, recordPlaces(place));
+    const first = record.entries(["session"])[0] as any;
+    const loaded = record.entries(["adapter"]).map((e) => e.data as { name: string; path?: string });
     const adapters = opts.adapters ?? [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded].map((a) => (a.path && existsSync(a.path) ? a.path : a.name));
     const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
-    const lastMode = entries.filter((e) => e?.kind === "mode").at(-1)?.data;
+    const lastMode = record.entries(["mode"]).at(-1)?.data;
     const mode = lastMode ? (lastMode.reason === "plan first" ? lastMode.old : lastMode.new) : first?.data.mode;
-    return Session.create({ ...opts, cwd, place, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? mode, pick: opts.pick ?? !!first?.data.pick });
+    return Session.create({ ...opts, cwd, place, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
   }
 
   private async init(opts: SessionOptions) {
@@ -448,6 +448,9 @@ export class Session {
       } catch {}
     }
     this.questions = new QuestionQueue(this.record, { notify });
+    const sheetQs = this.questions.open().filter((q) => q.tableFrom === "samples");
+    const sheetNow = sheetQs.length ? replaySheet(this.record.live(["samples"])) : undefined;
+    for (const q of sheetQs) if (sheetNow) q.table = sheetGrid(sheetNow);
     this.findings = new Findings(this.record);
     this.permissions = new Permissions(this.settings.permissions);
 
@@ -558,12 +561,20 @@ export class Session {
     this.record.append("notice", { text: `This session saves its results in ${next.outDir}.` });
   }
 
-  private async writeReport() {
-    if (this.place.legacy || provisional(this.place)) return;
-    try {
-      const trail = await import("./trail.ts");
-      trail.exportHtml(this.record, this.adapters, join(this.place.outDir, "index.html"), this.citationStyle());
-    } catch {}
+  private reporting = Promise.resolve();
+
+  private writeReport(): Promise<void> {
+    if (this.place.legacy || provisional(this.place)) return this.reporting;
+    const path = join(this.place.outDir, "index.html");
+    this.reporting = this.reporting.then(async () => {
+      try {
+        await new Promise((r) => setTimeout(r, 0));
+        const html = (await import("./trail.ts")).trailHtml(this.record, this.adapters, this.citationStyle());
+        await writeFile(`${path}.tmp`, html);
+        await rename(`${path}.tmp`, path);
+      } catch {}
+    });
+    return this.reporting;
   }
 
   private buildSystem(): string {
@@ -1152,9 +1163,9 @@ export class Session {
       this.stopTurn = false;
       this.endTurn = undefined;
       this.saveResults(turnStart);
-      await this.writeReport();
       this.busy = false;
       this.bus.emit({ type: "status", state: "idle" });
+      await this.writeReport();
       if (!stopHooked) await this.hooks.event("Stop", { session: this.id }).catch(() => {});
       this.titling = this.retitle(turnStart);
     }
@@ -1807,11 +1818,19 @@ export class Session {
     const args = coerceArgs(dropNulls((call.args && typeof call.args === "object" && !Array.isArray(call.args) ? call.args : {}) as Args, tool.inputSchema), tool.inputSchema);
     if (!ownPurpose(tool)) delete args.purpose;
     const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
-    if (r.images?.length && this.provider.info.vision) await prepareImages(r.images);
+    if (r.images?.length && this.provider.info.vision) await scaleImages(r.images, signal);
     return { type: "tool_result", callId: call.id, name: call.name, text: r.text, images: r.images, isError: r.isError };
   }
 
   async pipeline(tool: Tool, args: Args, callId: string, signal: AbortSignal, depth = 0): Promise<{ text: string; images?: string[]; isError: boolean; output?: ToolOutput }> {
+    const r = await this.runPipeline(tool, args, callId, signal, depth);
+    const h = hideKeys(r.text);
+    if (!h.found) return r;
+    this.record.append("notice", { text: `Cuvette removed ${h.found === 1 ? "an API key" : `${h.found} API keys`} from the result of ${tool.name}. The key did not go to the model.` });
+    return { ...r, text: h.text };
+  }
+
+  private async runPipeline(tool: Tool, args: Args, callId: string, signal: AbortSignal, depth: number): Promise<{ text: string; images?: string[]; isError: boolean; output?: ToolOutput }> {
     const error = (message: string) => {
       this.record.append("tool_result", { callId, tool: tool.name, adapter: tool.adapter, ok: false, error: message, text: message });
       return { text: `ERROR: ${message}`, isError: true };
@@ -1882,7 +1901,7 @@ export class Session {
     for (const f of post.findings ?? []) this.findings.add(f, "hook");
     const r = this.render(tool, out.output);
     const inspected = tool.name === "inspect_data" ? { path: resolve(this.cwd, String(eff.path ?? ".")) } : undefined;
-    const checked = depth === 0 && tool.readOnly && (tool.source !== "harness" || inspected) && out.output.ok ? this.checkData(tool.remoteName ?? tool.name, inspected ?? eff, out.output) : "";
+    const checked = depth === 0 && tool.readOnly && (tool.source !== "harness" || inspected) && out.output.ok ? await this.checkData(tool.remoteName ?? tool.name, inspected ?? eff, out.output) : "";
     const extra = [keptNote, post.additionalContext, checked].filter(Boolean).join("\n");
     return { text: extra ? `${r.text}\n\nNote: ${extra}` : r.text, images: r.images, isError: !out.output.ok, output: out.output };
   }
@@ -1936,9 +1955,9 @@ export class Session {
         tool: tool.name,
         adapter: tool.adapter,
         ok: output.ok,
-        error: output.error,
-        summary,
-        text: (output.text ?? "").slice(0, 4000),
+        error: output.error === undefined ? undefined : hideKeys(output.error).text,
+        summary: hideKeys(summary).text,
+        text: hideKeys(output.text ?? "").text.slice(0, 4000),
         metrics: output.metrics,
         table: output.table,
         images: images.map((o) => o.sha),
@@ -2516,6 +2535,10 @@ export class Session {
       if (open.recommendation) value = open.recommendation.value;
       else if (open.default !== undefined) value = open.default;
       else throw new Error(`${open.title}: choose an option or type a value.`);
+    }
+    if (open?.tableFrom === "samples" && this.sheet && Array.isArray((value as { rows?: unknown })?.rows)) {
+      const changes = sheetChanges(this.sheet.rows, gridRows((value as { rows: unknown[] }).rows));
+      if (changes) value = { changes };
     }
     if (open?.decisionKey && open.status === "open") this.decisions.validate(open.decisionKey, this.questions.match(open, value));
     const q = this.questions.answer(qid, value, note);
@@ -3529,7 +3552,7 @@ export class Session {
     }));
   }
 
-  private checkData(name: string, args: Args, output: ToolOutput): string {
+  private async checkData(name: string, args: Args, output: ToolOutput): Promise<string> {
     const given = ["path", "folder", "input", "dir", "directory", "input_dir", "data_dir"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && isAbsolute(v));
     const own = (p: string) => [this.dir, this.outputDir, cuvetteHome()].some((d) => p === d || p.startsWith(`${d}/`));
     const found: { path: string; label: string; kind: "table" | "files" }[] = [];
@@ -3556,7 +3579,7 @@ export class Session {
         if (f.kind === "files") {
           const rels = listDataFiles(f.path);
           if (rels.length < 2) continue;
-          check = checkFiles(fileInfos(f.path, rels), f.path);
+          check = checkFiles(await fileInfos(f.path, rels), f.path);
           const inside = (p: string) => (p.startsWith(`${this.cwd}/`) ? relative(this.cwd, p) : p);
           if (!this.sheet) sheet = sheetFromFiles(rels.map((r) => inside(join(f.path, r))), f.path);
         } else {
@@ -3586,6 +3609,8 @@ export class Session {
 
   private saveSheet(rows: SampleRow[], action: string, said = ""): void {
     if (!this.sheet) return;
+    const logged = action === "drafted" ? undefined : replaySheet(this.record.live(["samples"]));
+    const changes = logged && sheetChanges(logged, rows);
     this.sheet = { ...this.sheet, rows };
     const path = join(this.outputDir, "samples.csv");
     try {
@@ -3593,7 +3618,7 @@ export class Session {
     } catch (e) {
       this.record.append("notice", { text: `The harness could not save ${path}: ${(e as Error).message}` });
     }
-    this.record.append("samples", { action, source: this.sheet.source, from: this.sheet.from, path, rows, said });
+    this.record.append("samples", { action, source: this.sheet.source, from: this.sheet.from, path, ...(changes ? { changes, count: rows.length } : { rows }), said });
   }
 
   private sheetQuestion(msg = ""): Omit<Question, "qid" | "session" | "status" | "created"> {
@@ -3605,7 +3630,8 @@ export class Session {
       evidence: `${sheetTable(s.rows)}\n${groupSummary(s.rows)}.\nTo change a cell, type: row column value (for example: 3 group Ceramide), or: column old = new (for example: batch Day1 = 2024-03-01). You can also edit ${join(this.outputDir, "samples.csv")} and choose Read samples.csv again.`,
       options: [{ value: "accept", label: "The sheet is correct" }, { value: "reload", label: "Read samples.csv again (I edited it)" }],
       recommendation: { value: "accept", reason: "" },
-      table: { columns: [...SAMPLE_COLUMNS], rows: s.rows.map((r) => SAMPLE_COLUMNS.map((c) => r[c])) },
+      table: sheetGrid(s.rows),
+      tableFrom: "samples",
     };
   }
 
@@ -3625,9 +3651,9 @@ export class Session {
   }
 
   private sheetAnswer(value: unknown): { done: boolean; said: string } {
-    const v = value as { rows?: unknown };
-    if (v && typeof v === "object" && Array.isArray(v.rows)) {
-      const rows = (v.rows as unknown[]).filter(Array.isArray).map((r) => Object.fromEntries(SAMPLE_COLUMNS.map((c, i) => [c, String((r as unknown[])[i] ?? "").trim()])) as SampleRow);
+    const v = value as { rows?: unknown; changes?: unknown };
+    if (v && typeof v === "object" && (Array.isArray(v.rows) || Array.isArray(v.changes))) {
+      const rows = Array.isArray(v.changes) ? applyChanges(this.sheet!.rows, v.changes as SheetChange[]) : gridRows(v.rows as unknown[]);
       if (JSON.stringify(rows) !== JSON.stringify(this.sheet!.rows)) this.saveSheet(rows, "edited", "edited in the table");
       this.record.append("samples", { action: "accepted", rows: rows.length });
       return { done: true, said: "" };

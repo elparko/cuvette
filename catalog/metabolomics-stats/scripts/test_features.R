@@ -56,7 +56,7 @@ run_tool(function() {
   sig <- !is.na(res$adj_p) & res$adj_p < fdr
   if (lfc_min > 0 && !is.null(ga)) sig <- sig & !is.na(res$log2fc) & abs(res$log2fc) >= lfc_min
   res$significant <- sig
-  res$direction <- ifelse(!sig, "ns", if (!is.null(ga)) ifelse(res$log2fc > 0, "up", "down") else ifelse(res$statistic > 0, "up", "down"))
+  res$direction <- ifelse(!sig, "ns", if (!is.null(ga)) ifelse(res$log2fc > 0, "up", "down") else if (numeric_test) ifelse(res$statistic > 0, "up", "down") else "changed")
   res <- res[order(res$p_value), ]
   if (nzchar(out_path("results"))) write.csv(res, out_path("results"), row.names = FALSE)
 

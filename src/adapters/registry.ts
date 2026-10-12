@@ -33,6 +33,12 @@ export interface RegistryIndex {
 
 export class RegistryError extends Error {}
 
+export function trustedRegistry(url: string | undefined): boolean {
+  if (!url) return false;
+  const extra = (process.env.CUVETTE_TRUSTED_REGISTRIES ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return url === DEFAULT_REGISTRY || extra.includes(url);
+}
+
 export function registryUrl(): string {
   const file = join(cuvetteHome(), "settings.json");
   try {

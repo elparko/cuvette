@@ -187,6 +187,7 @@ export class AnalysisRecord {
     if (!this.blobPath(sha)) {
       if (typeof src === "string") copyFileSync(src, dest);
       else writeFileSync(dest, buf);
+      this.blobNames = undefined;
     }
     return sha;
   }
@@ -196,11 +197,26 @@ export class AnalysisRecord {
     return existsSync(ref) ? (local(JSON.parse(readFileSync(ref, "utf8")), this.project) as { path: string; size: number; mtime: string; sha256: string }) : undefined;
   }
 
+  private blobNames?: { dir: string; mtimeMs: number; names: Map<string, string> };
+
+  private blobName(sha: string): string | undefined {
+    if (sha.length !== 64) return readdirSync(this.blobDir).find((f) => f.startsWith(sha) && !f.endsWith(".ref.json"));
+    let c = this.blobNames;
+    const hit = c?.dir === this.blobDir ? c.names.get(sha) : undefined;
+    if (hit) return hit;
+    const mtimeMs = statSync(this.blobDir, { throwIfNoEntry: false })?.mtimeMs ?? 0;
+    if (c?.dir !== this.blobDir || c.mtimeMs !== mtimeMs) {
+      c = this.blobNames = { dir: this.blobDir, mtimeMs, names: new Map() };
+      for (const f of mtimeMs ? readdirSync(this.blobDir) : []) if (!f.endsWith(".ref.json") && !c.names.has(f.slice(0, 64))) c.names.set(f.slice(0, 64), f);
+    }
+    return c.names.get(sha);
+  }
+
   blobPath(sha: string): string | undefined {
     const bare = join(this.blobDir, sha);
     if (existsSync(bare)) return bare;
-    const hit = readdirSync(this.blobDir).find((f) => f.startsWith(sha) && !f.endsWith(".ref.json"));
-    if (hit) return join(this.blobDir, hit);
+    const hit = this.blobName(sha);
+    if (hit && existsSync(join(this.blobDir, hit))) return join(this.blobDir, hit);
     const ref = this.blobRef(sha);
     return ref && existsSync(ref.path) ? ref.path : undefined;
   }

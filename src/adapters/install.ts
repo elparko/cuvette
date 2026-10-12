@@ -1,13 +1,14 @@
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, renameSync, rmSync, statSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, renameSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { checkAdapter, type Report } from "../onboarding/checker.ts";
 import { auditLines, estimateReview, runReview, type Audit, type LintSummary } from "./audit.ts";
 import { codeTools } from "./access.ts";
 import { CATALOG_DIR, cuvetteHome, loadAdapter, type Manifest } from "./manifest.ts";
-import { fetchIndex, findEntry, type RegistryEntry } from "./registry.ts";
+import { fetchIndex, findEntry, trustedRegistry, type RegistryEntry } from "./registry.ts";
 import { adapterTrust, codeFilesIn, fileHash, forgetInstalled, hashFolder, licenseOf, listFiles, networkFilesIn, readInstalled, saveInstalled, TRUST_DETAIL, TRUST_NAME, userAdapterDir, type InstalledEntry, type SourceKind, type TrustLevel } from "./source.ts";
 
 const exec = promisify(execFile);
@@ -74,10 +75,19 @@ const plans = new Map<string, InstallPlan>();
 export const getInstallPlan = (id: string) => plans.get(id);
 
 export function stagingRoot(): string {
-  if (process.env.CUVETTE_STAGING) return process.env.CUVETTE_STAGING;
-  const t7 = "/Volumes/T7/guided-analysis/tools";
-  return existsSync(t7) ? join(t7, "adapter-staging") : join(cuvetteHome(), "staging");
+  const root = process.env.CUVETTE_STAGING || join(tmpdir(), `cuvette-staging-${process.getuid?.() ?? "user"}`);
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  const st = lstatSync(root);
+  if (!st.isDirectory() || (process.getuid && st.uid !== process.getuid())) throw new Error(`The staging folder ${root} is not a folder that your user account owns. Cuvette did not use it.`);
+  if (process.platform !== "win32" && (st.mode & 0o077) !== 0) chmodSync(root, 0o700);
+  return root;
 }
+
+export function withoutCredentials(address: string): string {
+  return address.replace(/^([a-z][a-z0-9+.-]*:\/\/)([^@/?#]*)@/i, (_, scheme: string, user: string) => (/^https?:/i.test(scheme) ? scheme : `${scheme}${user.split(":")[0]}@`));
+}
+
+const hideUserInfo = (text: string) => text.replace(/([a-z][a-z0-9+.-]*:\/\/)[^@\s/?#]*@/gi, "$1");
 
 function sweepStaging(): void {
   const root = stagingRoot();
@@ -110,7 +120,7 @@ async function git(args: string[], cwd?: string): Promise<string> {
     return r.stdout.trim();
   } catch (e) {
     const err = e as Error & { stderr?: string };
-    throw new Error(`git ${args.find((a) => !a.startsWith("-") && a !== "core.hooksPath=/dev/null") ?? ""} failed: ${(err.stderr ?? err.message).trim().split("\n").slice(-2).join(" ")}`);
+    throw new Error(`git ${args.find((a) => !a.startsWith("-") && a !== "core.hooksPath=/dev/null") ?? ""} failed: ${hideUserInfo((err.stderr ?? err.message).trim().split("\n").slice(-2).join(" "))}`);
   }
 }
 
@@ -215,8 +225,8 @@ async function stage(source: string, opts: PrepareOpts): Promise<Staged> {
       const [ref, sub] = hash < 0 ? [undefined, undefined] : source.slice(hash + 1).split(":");
       const repo = join(work, "repo");
       const commit = await cloneAt(url, ref || undefined, repo);
-      copyClean(findRoot(repo, sub || undefined, url), dir);
-      return { work, dir, kind, source, commit };
+      copyClean(findRoot(repo, sub || undefined, withoutCredentials(url)), dir);
+      return { work, dir, kind, source: withoutCredentials(source), commit };
     }
     const [name, version] = source.split("@");
     if (!NAME.test(name!)) throw new Error(`"${source}" is not a git address, a folder, a zip file or an adapter name.`);
@@ -239,7 +249,7 @@ async function stageEntry(entry: RegistryEntry, registry: string, work: string):
   const dir = join(work, "adapter");
   copyClean(within(repo, entry.path, entry.name), dir);
   if (hashFolder(dir) !== entry.sha256) throw new Error(`The files of ${entry.name} do not match the SHA-256 in the registry index. Cuvette did not install them.`);
-  return { work, dir, kind: "registry", source: `${entry.name}@${entry.version}`, commit, version: entry.version, registry, checked: entry.trust === "checked", expected: entry.sha256 };
+  return { work, dir, kind: "registry", source: `${entry.name}@${entry.version}`, commit, version: entry.version, registry, checked: entry.trust === "checked" && trustedRegistry(registry), expected: entry.sha256 };
 }
 
 function commandsOf(m: Manifest): string[] {
@@ -407,7 +417,7 @@ async function assemble(mode: "add" | "update", st: Staged, opts: PrepareOpts, o
 
 function describe(st: Staged): string {
   if (st.kind === "git") return `git ${st.source}, pinned to commit ${st.commit}`;
-  if (st.kind === "registry") return `the registry ${st.registry}, version ${st.version}, commit ${st.commit?.slice(0, 12)}`;
+  if (st.kind === "registry") return `the registry ${withoutCredentials(st.registry ?? "")}, version ${st.version}, commit ${st.commit?.slice(0, 12)}`;
   return `${st.kind} ${st.source}`;
 }
 
@@ -499,7 +509,7 @@ export function installedRows(): InstalledRow[] {
     const dir = userAdapterDir(e.name);
     const here = existsSync(dir);
     const changed = here && hashFolder(dir) !== e.sha256;
-    return { name: e.name, version: e.version, trust: changed || !e.checked ? TRUST_NAME.unlisted : TRUST_NAME.checked, source: e.kind === "registry" ? `registry ${e.registry ?? ""}`.trim() : `${e.kind} ${e.source}`, commit: e.commit ?? "", sha256: e.sha256, state: !here ? "missing" : changed ? "changed after install" : "as installed" };
+    return { name: e.name, version: e.version, trust: changed || !e.checked || !trustedRegistry(e.registry) ? TRUST_NAME.unlisted : TRUST_NAME.checked, source: e.kind === "registry" ? `registry ${withoutCredentials(e.registry ?? "")}`.trim() : `${e.kind} ${withoutCredentials(e.source)}`, commit: e.commit ?? "", sha256: e.sha256, state: !here ? "missing" : changed ? "changed after install" : "as installed" };
   });
 }
 
