@@ -1044,13 +1044,22 @@ export class Session {
         if (said) this.record.append("assistant", { text: said, final: false });
         nudges = 0;
         results = [];
-        for (const call of calls) {
-          if (signal.aborted) {
-            results.push({ type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist stopped the turn.", isError: true });
+        let together: number[] = [];
+        const runTogether = async () => {
+          const list = together;
+          together = [];
+          const parts = await Promise.all(list.map((i) => this.runCall(calls[i]!, signal)));
+          list.forEach((i, k) => (results[i] = parts[k]!));
+        };
+        for (const [i, call] of calls.entries()) {
+          const parallel = this.parallelSafe(call);
+          if (!parallel && together.length) await runTogether();
+          if (signal.aborted || this.stopTurn || this.endTurn) {
+            results[i] = { type: "tool_result", callId: call.id, name: call.name, text: `ERROR: not run. ${this.endTurn && !signal.aborted && !this.stopTurn ? this.endTurn : "The scientist stopped the turn."}`, isError: true };
             continue;
           }
           if (this.steered.some((m) => m.now)) {
-            results.push({ type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist sent a message. Read it first.", isError: true });
+            results[i] = { type: "tool_result", callId: call.id, name: call.name, text: "ERROR: not run. The scientist sent a message. Read it first.", isError: true };
             continue;
           }
           const sig = `${call.name}:${JSON.stringify(call.args)}`;
@@ -1059,11 +1068,13 @@ export class Session {
           if (repeats >= 2) {
             forceAnswer = true;
             this.record.append("notice", { text: `The agent called ${call.name} with the same input three times. The harness asks for the final answer.` });
-            results.push({ type: "tool_result", callId: call.id, name: call.name, text: `ERROR: you called ${call.name} with the same input three times in a row. Stop. Give your final answer now, from the results you have.`, isError: true });
+            results[i] = { type: "tool_result", callId: call.id, name: call.name, text: `ERROR: you called ${call.name} with the same input three times in a row. Stop. Give your final answer now, from the results you have.`, isError: true };
             continue;
           }
-          results.push(await this.runCall(call, signal));
+          if (parallel) together.push(i);
+          else results[i] = await this.runCall(call, signal);
         }
+        if (together.length) await runTogether();
         const pending = this.drainNotes();
         if (pending) results.push({ type: "text", text: pending } as Part);
         if (this.steered.length) results.push({ type: "text", text: this.takeSteer() } as Part);
@@ -1101,6 +1112,7 @@ export class Session {
       return "";
     } finally {
       if (this.planning) this.endPlanning();
+      this.draft = undefined;
       this.stopTurn = false;
       this.endTurn = undefined;
       this.saveResults(turnStart);
@@ -1120,6 +1132,12 @@ export class Session {
     let compacted = false;
     for (;;) {
       let retried = false;
+      let tries = 1;
+      let streamed = false;
+      const dropStreamed = () => {
+        if (streamed) this.bus.emit({ type: "delta_reset" });
+        streamed = false;
+      };
       try {
         const res = await this.provider.step({
           system: this.system,
@@ -1127,9 +1145,14 @@ export class Session {
           tools: this.activeSchemas(),
           noToolCalls: noTools,
           signal,
-          onDelta: (d) => this.bus.emit({ type: "delta", kind: d.type, text: d.text }),
+          onDelta: (d) => {
+            streamed = true;
+            this.bus.emit({ type: "delta", kind: d.type, text: d.text });
+          },
           onRetry: (r) => {
             retried = true;
+            tries = r.attempt + 1;
+            dropStreamed();
             const text = `Waiting to retry (${r.attempt} of ${r.of})`;
             this.bus.emit({ type: "status", state: "thinking", purpose: text });
             this.record.append("notice", { text: `${text}: ${r.reason}. The next try is in ${Math.round(r.waitMs / 1000)} s.` });
@@ -1138,6 +1161,7 @@ export class Session {
         if (retried) this.bus.emit({ type: "status", state: "thinking" });
         return res;
       } catch (e) {
+        dropStreamed();
         if (e instanceof ProviderError && e.overflow && !compacted && !signal.aborted) {
           compacted = true;
           if (await this.maybeCompact(signal, true)) {
@@ -1146,7 +1170,7 @@ export class Session {
           }
         }
         if (!(e instanceof ProviderError) || !e.transient || signal.aborted) throw e;
-        this.record.append("notice", { text: "The model did not answer after three tries. The conversation is saved up to the last finished step." });
+        this.record.append("notice", { text: `The model did not answer after ${countWord(tries)} ${tries === 1 ? "try" : "tries"}. The conversation is saved up to the last finished step.` });
         if (this.settings.headless) {
           if (++rounds > this.recoveryRounds) throw new ProviderError(`${e.message} The run waited ${this.recoveryRounds} times and then stopped.`);
           this.record.append("notice", { text: `No one can answer the card in a headless run. Waiting to try again (round ${rounds} of ${this.recoveryRounds}).` });
@@ -1255,7 +1279,7 @@ export class Session {
     const last = this.history[this.history.length - 1];
     if (last?.role !== "assistant") return;
     const calls = last.parts.filter((p): p is Extract<Part, { type: "tool_call" }> => p.type === "tool_call");
-    const ran = (id: string) => done.find((p) => p.type === "tool_result" && p.callId === id);
+    const ran = (id: string) => done.find((p) => p?.type === "tool_result" && p.callId === id);
     if (calls.length)
       this.push({ role: "user", parts: calls.map((c) => ran(c.id) ?? { type: "tool_result", callId: c.id, name: c.name, text: "ERROR: not run. The turn stopped.", isError: true }) });
   }
@@ -1304,6 +1328,11 @@ export class Session {
       return false;
     }
     if (!res) return false;
+    if (!res.summary.trim()) {
+      this.summaryFailed = true;
+      this.record.append("notice", { text: "The summary of the older messages was empty. The turn continues with the full context." });
+      return false;
+    }
     const steps = this.plan?.steps.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`) ?? [];
     const summary = summaryMessage(steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary);
     const upTo = this.record.entries(["message"]).at(-1)?.id ?? 0;
@@ -1463,6 +1492,10 @@ export class Session {
     const old = this.settings.model;
     try {
       await this.applySetting("model", spec);
+      if (isCloud(this.provider.info)) {
+        await this.applySetting("model", old);
+        return `${spec} does not run on this computer. Set OLLAMA_HOST or the server address to a local address.`;
+      }
     } catch (e) {
       return (e as Error).message;
     }
@@ -1635,13 +1668,13 @@ export class Session {
   }
 
   private steered: { text: string; typedAt: string; afterStep: number; afterTool: string; now: boolean }[] = [];
-  private callAbort?: AbortController;
+  private callAborts = new Set<AbortController>();
 
   steer(text: string, now = false): void {
     text = this.withoutKeys(text);
     const last = this.record.entries(["tool_result"]).at(-1);
     this.steered.push({ text, typedAt: new Date().toISOString(), afterStep: stepNumbers(this.record.nodes()).size, afterTool: String(last?.data.tool ?? ""), now });
-    if (now) this.callAbort?.abort();
+    if (now) for (const c of this.callAborts) c.abort();
   }
 
   takeSteered(): string[] {
@@ -1665,13 +1698,21 @@ export class Session {
     const ctl = new AbortController();
     const stop = () => ctl.abort();
     outer.addEventListener("abort", stop, { once: true });
-    this.callAbort = ctl;
+    this.callAborts.add(ctl);
     try {
       return await this.runOne(call, ctl.signal);
     } finally {
       outer.removeEventListener("abort", stop);
-      this.callAbort = undefined;
+      this.callAborts.delete(ctl);
     }
+  }
+
+  private parallelSafe(call: Extract<Part, { type: "tool_call" }>): boolean {
+    if (call.parseError || !PARALLEL_TOOLS.has(call.name)) return false;
+    const tool = this.findTool(call.name);
+    if (!tool?.readOnly || tool.source === "adapter") return false;
+    const args = absolutePaths(dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema), this.cwd) as Args;
+    return this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name) || this.permissions.check(tool, args) === "allow";
   }
 
   private async runOne(call: Extract<Part, { type: "tool_call" }>, signal: AbortSignal): Promise<Part> {
@@ -2446,9 +2487,16 @@ export class Session {
           ? await makeProvider(next.referee, { effort: next.effort })
           : undefined
       : this.refereeProvider;
+    const wasCloud = isCloud(this.provider.info);
+    const wasDeferred = this.deferred();
     this.settings = next;
     this.provider = provider;
     this.refereeProvider = referee;
+    if (isCloud(provider.info) && !wasCloud) this.phiFrom = 0;
+    if (wasDeferred && !this.deferred()) {
+      this.active.clear();
+      this.chooseActiveTools();
+    }
     if (name === "export_xlsx" || name === "figure_formats") this.dirs();
     if (["model", "export_xlsx", "figure_formats", "text_style"].includes(name)) this.system = this.buildSystem();
   }
@@ -3651,8 +3699,14 @@ export class Session {
     return out;
   }
 
-  async compact(): Promise<void> {
-    await this.maybeCompact(new AbortController().signal, true);
+  async compact(): Promise<boolean> {
+    if (this.busy) return false;
+    this.busy = true;
+    try {
+      return await this.maybeCompact(new AbortController().signal, true);
+    } finally {
+      this.busy = false;
+    }
   }
 
   citationStyle(): CitationStyle {
@@ -3796,4 +3850,10 @@ function getArg(args: Args, path: string): unknown {
     cur = (cur as Record<string, unknown>)[k];
   }
   return cur;
+}
+
+const PARALLEL_TOOLS = new Set(["read_file", "list_dir", "inspect_data", "load_skill", "find_tools", "search_literature"]);
+
+function countWord(n: number): string {
+  return ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] ?? String(n);
 }

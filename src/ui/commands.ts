@@ -915,8 +915,8 @@ export const commands: Command[] = [
     name: "compact",
     help: "Summarize old messages to free space.",
     async run(_, ctx) {
-      await ctx.session.compact();
-      ctx.notice("Older messages are summarized.");
+      if (ctx.session.busy) return ctx.notice("The agent is busy. Type /compact again after it stops.");
+      ctx.notice((await ctx.session.compact()) ? "The harness summarized the older messages." : "The harness did not summarize. The context has too few older messages, or the summary failed.");
     },
   },
   {

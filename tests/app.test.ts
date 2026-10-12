@@ -471,6 +471,20 @@ test("the view streams the thinking text, and a tool call clears it", () => {
   view.close();
 });
 
+test("a retry clears the streamed text of the failed try", () => {
+  const s = new FakeSession();
+  const view = new WebView(s, { token: "t", env, url: (p) => p, quit: async () => {} });
+  const sent: any[] = [];
+  view.attach({ writeHead() {}, write: (d: string) => sent.push(JSON.parse(d.slice(6))), on() {}, end() {} } as never);
+  s.bus.emit({ type: "delta", kind: "text", text: "The mean is" });
+  s.bus.emit({ type: "delta", kind: "thinking", text: "first try" });
+  s.bus.emit({ type: "delta_reset" });
+  expect(sent.slice(-2)).toEqual([{ t: "live", reset: true }, { t: "think", reset: true }]);
+  expect(view.snapshot().live).toBe("");
+  expect(view.snapshot().think).toBe("");
+  view.close();
+});
+
 test("the definitions under a final answer fold into a Definitions toggle", async () => {
   const { itemHtml } = await import("../src/server/app-html.ts");
   const html = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "a", t: "assistant", text: "Drug 2 is better.\n\nDefinitions, from the confirmed analysis:\n- n: One patient." } as never);

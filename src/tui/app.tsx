@@ -218,6 +218,9 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
             setLive((t) => t + more);
           }, LIVE_MS);
           break;
+        case "delta_reset":
+          setLive("");
+          break;
         case "status":
           setStatus({ state: e.state, tool: e.tool, purpose: e.purpose, since: e.state === "running" ? e.since : undefined });
           idle.current = e.state === "idle";

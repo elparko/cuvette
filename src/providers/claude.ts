@@ -189,6 +189,7 @@ export class ClaudeProvider implements Provider {
     }
     const out = this.fromNative(msg);
     if (!this.fixedClient) recordSpend(this.model, out.usage);
+    if (msg.stop_reason === "model_context_window_exceeded") throw new ProviderError("The reply stopped because the context window of the model is full.", false, true);
     return out;
   }
 
@@ -214,7 +215,7 @@ export class ClaudeProvider implements Provider {
     if (u.cache_read_input_tokens != null) usage.cacheRead = u.cache_read_input_tokens;
     if (u.cache_creation_input_tokens != null) usage.cacheWrite = u.cache_creation_input_tokens;
     const stopReason: StepResult["stopReason"] =
-      stop === "tool_use" ? "tool_use" : stop === "refusal" ? "refusal" : stop === "max_tokens" || stop === "model_context_window_exceeded" ? "max_tokens" : "end";
+      stop === "tool_use" ? "tool_use" : stop === "refusal" ? "refusal" : stop === "max_tokens" ? "max_tokens" : "end";
     const result: StepResult = {
       message: { role: "assistant", parts, provider: "claude", model: this.model, raw: content },
       usage,
