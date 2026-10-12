@@ -517,6 +517,7 @@ export class Session {
     try {
       next = titlePlace(this.place, request, this.runtimes.length > 0);
     } catch (e) {
+      if (!(e as { renameFailed?: boolean }).renameFailed) throw e;
       this.record.append("notice", { text: `The results folder keeps its temporary name. The rename failed: ${(e as Error).message}` });
       return;
     }

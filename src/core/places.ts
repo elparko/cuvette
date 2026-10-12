@@ -185,7 +185,11 @@ export function titlePlace(p: Place, request: string, keepOldName: boolean): Pla
   let name = base;
   for (let i = 2; existsSync(join(dirname(p.outDir), name)); i++) name = `${base}-${i}`;
   const outDir = join(dirname(p.outDir), name);
-  renameFolder(p.outDir, outDir);
+  try {
+    renameFolder(p.outDir, outDir);
+  } catch (e) {
+    throw Object.assign(e as Error, { renameFailed: true });
+  }
   if (keepOldName) {
     try {
       symlinkSync(name, p.outDir);

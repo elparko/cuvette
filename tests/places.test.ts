@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { COPY_LIMIT_BYTES, findPlace, listPlaces, readIndex, slug } from "../src/core/places.ts";
+import { COPY_LIMIT_BYTES, findPlace, listPlaces, readIndex, slug, titlePlace } from "../src/core/places.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -208,4 +208,16 @@ test("a project setting for the output folder wins over a user setting", async (
   trustFolder(cwd);
   session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd, settings: { guidance: false, referee: "none" } });
   expect(session.folderLine).toBe(`Results go to ${join(cwd, "project-results")}/<date>-<title>/`);
+});
+
+test("a failed rename of the results folder carries the renameFailed mark", () => {
+  const root = mkdtempSync(join(tmpdir(), "cuvette-rename-"));
+  const p = { id: "x", outDir: join(root, "missing"), recordDir: join(root, "missing", ".record"), project: root, created: new Date().toISOString(), legacy: false };
+  let err: unknown;
+  try {
+    titlePlace(p as never, "Count the cells", false);
+  } catch (e) {
+    err = e;
+  }
+  expect((err as { renameFailed?: boolean }).renameFailed).toBe(true);
 });
