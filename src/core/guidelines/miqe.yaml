@@ -1,0 +1,123 @@
+id: miqe
+name: "MIQE"
+full: "Minimum Information for Publication of Quantitative Real-Time PCR Experiments"
+reference: "Bustin SA, et al. Clinical Chemistry 55(4):611-622 (2009)"
+numbering: "The MIQE checklist has no item numbers. The ids here are a section code and a running number."
+guess:
+  adapters: [qpcr]
+  words: "\\b(qpcr|rt-qpcr|real.time pcr|cq|ct values?|delta.?delta|reference genes?|amplification efficiency|melt curve)\\b"
+items:
+  - id: ED1
+    section: "Experimental design"
+    text: "Define the experimental groups and the control groups."
+    from:
+      - { sheet: groups }
+      - { decision: [calibrator, group_variable, group_column] }
+    ask: "The record has no list of the groups. Add them?"
+  - id: ED2
+    section: "Experimental design"
+    text: "Give the number of samples in each group."
+    from:
+      - { sheet: size }
+      - { plan: data.n }
+      - { metric: ["^n_samples"] }
+    ask: "The record has no number of samples for each group. Add it?"
+  - id: VA1
+    section: "Assay validation"
+    text: "Give the PCR efficiency of each assay and say how you got it."
+    from:
+      - { decision: [efficiencies] }
+      - { metric: ["^efficiency_"] }
+    ask: "The record has no PCR efficiency. Add it?"
+  - id: VA2
+    section: "Assay validation"
+    text: "Give the slope, the intercept and the r squared of each calibration curve."
+    from:
+      - { metric: ["^slope_", "^r_squared_", "intercept"] }
+    ask: "The record has no calibration curve. Add it, or answer not applicable?"
+  - id: VA3
+    section: "Assay validation"
+    text: "Give the Cq of the no-template controls."
+    from:
+      - { metric: ["ntc"] }
+    ask: "The record has no result for the no-template controls. Add it?"
+  - id: DA1
+    section: "Data analysis"
+    text: "Name the qPCR analysis program, with the source and the version."
+    from:
+      - { software: true }
+  - id: DA2
+    section: "Data analysis"
+    text: "Say how you set the Cq, such as the threshold method, and the highest Cq that counts as detected."
+    from:
+      - { decision: [cq_cutoff, cq_method, threshold_method] }
+    ask: "The record has no Cq method. Add it?"
+  - id: DA3
+    section: "Data analysis"
+    text: "Say how you found outliers and what you did with them."
+    from:
+      - { decision: [exclude_wells, exclusions, outlier_rule] }
+      - { data_check: [extreme_values], clear: "The data check found no extreme value." }
+    ask: "The record has no outlier rule. Add it?"
+  - id: DA4
+    section: "Data analysis"
+    text: "Give the results for the no-template controls."
+    from:
+      - { metric: ["ntc"] }
+    ask: "The record has no result for the no-template controls. Add it?"
+  - id: DA5
+    section: "Data analysis"
+    text: "Give the number of reference genes and the reason for your choice."
+    from:
+      - { decision: [reference_genes, stability_groups] }
+      - { metric: ["genorm", "normfinder", "n_reference_genes"] }
+    ask: "The record has no reference genes. Add them?"
+  - id: DA6
+    section: "Data analysis"
+    text: "Describe the normalization method."
+    from:
+      - { decision: [quant_method, normalization, normalize, calibrator] }
+    ask: "The record has no normalization method. Add it?"
+  - id: DA7
+    section: "Data analysis"
+    text: "Give the number of biological replicates and how well they agree."
+    from:
+      - { decision: [replicate] }
+      - { plan: data.replicate }
+      - { sheet: size }
+    ask: "The record has no number of biological replicates. Add it?"
+  - id: DA8
+    section: "Data analysis"
+    text: "Give the number of technical replicates and the stage where they were made, reverse transcription or qPCR."
+    from:
+      - { decision: [replicates] }
+    ask: "The record has no number of technical replicates. Add it?"
+  - id: DA9
+    section: "Data analysis"
+    text: "Give the repeatability, the variation inside one run."
+    from:
+      - { metric: ["cv", "repeatab", "sd_cq"] }
+    ask: "The record has no repeatability. Add it, or answer not applicable?"
+  - id: DA10
+    section: "Data analysis"
+    text: "Give the reproducibility, the variation between runs."
+    from:
+      - { metric: ["reproduc", "inter_assay"] }
+    ask: "The record has no reproducibility. Add it, or answer not applicable?"
+  - id: DA11
+    section: "Data analysis"
+    text: "Give the power analysis."
+    from:
+      - { decision: [power, sample_size] }
+    ask: "The record has no power analysis. Add it, or answer not applicable?"
+  - id: DA12
+    section: "Data analysis"
+    text: "Give the statistical methods for the significance of the results."
+    from:
+      - { decision: [error_type, test, group_test, two_group_test, p_adjust_method] }
+      - { steps: "test|anova|regress|model|quantification" }
+    ask: "The record has no statistical method. Add it?"
+  - id: DA13
+    section: "Data analysis"
+    text: "Submit the Cq or the raw data in the RDML format (Real-Time PCR Data Markup Language)."
+    hand: "Cuvette does not write RDML. Add the submission by hand."

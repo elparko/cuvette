@@ -544,6 +544,8 @@ tests:
       - { path: metrics.min_total, equals: 15 }
 
   - id: nmds_dune_stress
+    self_test: true
+    source: "vegan introduction vignette, NMDS of the dune data with Bray-Curtis distance: stress 0.1183."
     description: >
       NMDS of the dune data with Bray-Curtis distance in 2 dimensions has a stress of 0.1183. The
       vegan introduction vignette prints a stress of 0.1183 for this call. The value does not
@@ -553,7 +555,7 @@ tests:
       - tool: run_nmds
         args: { community: "{adapter_dir}/data/dune.csv", environment: "{adapter_dir}/data/dune_env.csv", color_by: Management, distance: bray, transform: none, k: 2, trymax: 20, seed: 1 }
     expect:
-      - { path: metrics.stress, approx: 0.118319, abs: 0.0001 }
+      - { path: metrics.stress, label: "the stress", approx: 0.118319, abs: 0.0001 }
       - { path: metrics.k, equals: 2 }
       - { path: "outputs[0].path", contains: ".png" }
 

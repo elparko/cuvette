@@ -1,4 +1,6 @@
+import { CHECKLIST_COLUMNS, checklistRows, recordChecklist } from "./checklist.ts";
 import { pilotRows, validationRows } from "./pilot.ts";
+import { AFTER_RESULT, NO_DEVIATIONS, deviations, frozenPlan } from "./freeze.ts";
 import { approvedPlan, definitionsOf } from "./plan.ts";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, isAbsolute, join, relative } from "node:path";
@@ -12,6 +14,7 @@ import { stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Node, TablePreview } from "./types.ts";
 import { renvLock, requirementsText } from "./envlock.ts";
+import { testsTable } from "./testcount.ts";
 import { changeCell, reruns, stepStatus } from "./status.ts";
 
 export type Cell = string | number | boolean | null | undefined;
@@ -416,9 +419,16 @@ export function checkSheets(record: AnalysisRecord): Sheet[] {
   return out;
 }
 
+export function deviationSheets(record: AnalysisRecord): Sheet[] {
+  if (!frozenPlan(record)) return [];
+  const list = deviations(record);
+  const rows: Cell[][] = list.length ? list.map((d) => [d.ts, d.kind, d.what, d.from ?? "", d.to ?? "", d.reason, d.afterResult ? AFTER_RESULT : ""]) : [["", "", NO_DEVIATIONS, "", "", "", ""]];
+  return [{ name: "Deviations", columns: ["Time", "Kind", "What changed", "Planned", "Now", "Reason", "Mark"], rows }];
+}
+
 export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const { record, adapters, dir } = w;
-  const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation", "data check", "samples", "changes", "packages", "references"]);
+  const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation", "data check", "samples", "changes", "packages", "references", "tests in this session", "deviations"]);
   const steps = stepNumbers(record.nodes());
   const status = new Map(stepStatus(record, { labels: Object.fromEntries(w.fields.map((f) => [f.key, f.label || f.key])) }).map((x) => [x.node, x]));
   const rewound = record.rewound();
@@ -528,16 +538,21 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
 
   const pilot = pilotRows(record);
   const validation = validationRows(record);
+  const tests = testsTable(record);
+  const checklist = recordChecklist(record);
   return [
     { name: "Summary", columns: ["Section", "Item", "Value", "Source", "Definition"], rows: summary },
     ...(pilot.rows.length ? [{ name: "Pilot", columns: pilot.columns, rows: pilot.rows }] : []),
     ...(validation ? [{ name: "Validation", columns: validation.columns, rows: [...validation.rows, [], ...validation.summary.map((x) => [x]), ...(validation.plot ? [[`Bland-Altman plot: ${rel(dir, validation.plot)}`]] : [])] }] : []),
     ...checkSheets(record),
+    ...deviationSheets(record),
+    ...(tests ? [{ name: "Tests in this session", columns: tests.columns, rows: tests.rows }] : []),
     ...tableSheets,
     { name: "Steps", columns: ["Step", "Tool", "Adapter", "Description", "Result", "Inputs", "Input SHA-256", "Outputs", "Table sheets", "Manual route", "Fidelity", "Status", "Environment", "Node"], rows: stepRows },
     ...(metricRows.length ? [{ name: "Metrics", columns: ["Step", "Metric", "Value"], rows: metricRows }] : []),
     { name: "Files", columns: ["Step", "Kind", "Path", "Copied from"], rows: fileRows },
     ...(changeRowsOut.length ? [{ name: "Changes", columns: ["Step", "Repeats step", "Tool", "Number", "Before", "After", "Change", "Change shown", "Why it ran again"], rows: changeRowsOut }] : []),
+    ...(checklist ? [{ name: "Checklist", columns: CHECKLIST_COLUMNS, rows: checklistRows(checklist) }] : []),
     ...(packageRows.length ? [{ name: "Packages", columns: ["Environment", "Language", "Package", "Version", "Path", "Lock"], rows: packageRows }] : []),
     referenceSheet(record, adapters, w.citationStyle),
   ];

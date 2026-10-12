@@ -2,6 +2,9 @@ adapter:
   name: scanpy
   field: single-cell transcriptomics
   file_types: [".h5ad", ".h5", "matrix.mtx", "matrix.mtx.gz"]
+  file_magic: ["894844460d0a1a0a"]
+  file_label: single-cell data files
+  file_priority: 1
   title: Scanpy
   version: 0.1.2
   spec: "1"

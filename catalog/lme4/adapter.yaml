@@ -309,6 +309,8 @@ map:
 
 tests:
   - id: sleepstudy_fit
+    self_test: true
+    source: "Bates, Maechler, Bolker and Walker 2015, Journal of Statistical Software 67(1), sleepstudy model with REML criterion 1743.6."
     description: >
       Sleepstudy data (18 subjects, 180 observations). The model Reaction ~ Days + (Days | Subject)
       fitted by REML. Fixed effects 251.405 and 10.467, REML criterion 1743.6, random-effect
@@ -321,12 +323,12 @@ tests:
       - tool: fit_mixed_model
         args: { data: "{adapter_dir}/data/sleepstudy.csv", formula: "Reaction ~ Days + (Days | Subject)", reml: true, p_value_method: satterthwaite }
     expect:
-      - { path: metrics.estimate_Intercept, approx: 251.405, abs: 0.001 }
-      - { path: metrics.estimate_Days, approx: 10.467, abs: 0.001 }
-      - { path: metrics.criterion, approx: 1743.6, abs: 0.05 }
-      - { path: metrics.sd_Subject_Intercept, approx: 24.74, abs: 0.01 }
-      - { path: metrics.sd_Subject_Days, approx: 5.92, abs: 0.01 }
-      - { path: metrics.sd_residual, approx: 25.59, abs: 0.01 }
+      - { path: metrics.estimate_Intercept, label: "the intercept", approx: 251.405, abs: 0.001 }
+      - { path: metrics.estimate_Days, label: "the slope of Days", approx: 10.467, abs: 0.001 }
+      - { path: metrics.criterion, label: "the REML criterion", approx: 1743.6, abs: 0.05 }
+      - { path: metrics.sd_Subject_Intercept, label: "the subject intercept standard deviation", approx: 24.74, abs: 0.01 }
+      - { path: metrics.sd_Subject_Days, label: "the subject slope standard deviation", approx: 5.92, abs: 0.01 }
+      - { path: metrics.sd_residual, label: "the residual standard deviation", approx: 25.59, abs: 0.01 }
       - { path: metrics.corr_Subject, approx: 0.066, abs: 0.005 }
       - { path: metrics.n_groups_Subject, equals: 18 }
       - { path: metrics.singular, equals: 0 }

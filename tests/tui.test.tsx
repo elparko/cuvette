@@ -545,6 +545,8 @@ describe("quiet view", () => {
     expect(activityText("running", "Reading sleep.csv", "read_file")).toBe("Reading sleep.csv");
     expect(activityText("running", undefined, "read_file")).toBe("Running read file");
     expect(activityText("waiting")).toBe("Waiting for your answer");
+    expect(activityText("thinking", "Waiting to retry (2 of 3)")).toBe("Waiting to retry (2 of 3)");
+    expect(activityText("thinking")).toBe("Thinking about the next step");
     expect(activityText("thinking")).toBe("Thinking about the next step");
   });
 

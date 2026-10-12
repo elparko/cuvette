@@ -18,6 +18,7 @@ interface FirstStart {
   choices: { id: string; label: string; help: string }[];
   recommended: string;
   sample: string;
+  keyGuide: { title: string; intro: string; steps: string[]; notes: string[] };
 }
 
 function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: React.ReactNode }) {
@@ -128,6 +129,25 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
               <Button onClick={saveKey}>Save the key</Button>
             </div>
           </div>
+        )}
+        {choice === "claude" && fs && (
+          <details className="mt-3 rounded-lg border bg-card px-3 py-2 text-[13px]">
+            <summary className="cursor-pointer font-medium">How do I get a key?</summary>
+            <p className="mt-2 text-muted-foreground">{fs.keyGuide.intro}</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5">
+              {fs.keyGuide.steps.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ol>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              {fs.keyGuide.notes.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ul>
+            <a className="mt-2 inline-block text-accent-brand underline" href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener noreferrer">
+              Open the keys page
+            </a>
+          </details>
         )}
         {choice === "local" && o && fs && (
           <div className="mt-4 flex flex-col gap-2">

@@ -3,6 +3,7 @@ import type { Mode, Owner, Question } from "../core/types.ts";
 import { pilotText } from "../core/pilot.ts";
 import { planView } from "../core/plan.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
+import { KEYS_URL, keyGuideText } from "../core/keyhelp.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
 import { statusText, stepStatus, type StepState } from "../core/status.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
@@ -10,6 +11,7 @@ import { listSessions, sessionLine } from "../core/sessions.ts";
 import { groupSummary, sheetTable } from "../core/samples.ts";
 import { dollars, kTokens, percentText, priceLine, usageLong, type UsageSummary } from "../core/spend.ts";
 import { applyRewind, changeCard, changePicker, changeRows, choiceLabel, choiceValue, findChange, show, type Card } from "./cards.ts";
+import { testsText } from "../core/testcount.ts";
 import { rewindPoints } from "../core/rewind.ts";
 import { branchesText } from "../core/branch.ts";
 import { listMethods, methodText } from "../core/methods.ts";
@@ -563,12 +565,33 @@ export const commands: Command[] = [
     },
   },
   {
+    name: "tests",
+    help: "Show each test with a p value in this session, with the Holm and Benjamini-Hochberg p values for its family.",
+    run(_, ctx) {
+      ctx.print(testsText(ctx.session.record), "Tests in this session");
+    },
+  },
+  {
     name: "findings",
     help: "Accept, reject or mark fixed each open finding.",
     run(_, ctx) {
       const list = ctx.session.findings.list("open");
       if (!list.length) return ctx.notice("No open findings.");
       ctx.openCard({ t: "findings", list });
+    },
+  },
+  {
+    name: "checklist",
+    args: "[arrive|consort|strobe|miqe]",
+    help: "Fill the reporting checklist from the record. Cards ask for each item that is not in the record.",
+    async run([which], ctx) {
+      if (!ctx.session.checklist) return unavailable(ctx);
+      try {
+        const r = await ctx.session.checklist(which ?? "");
+        ctx.print(r.text, "Reporting checklist");
+      } catch (e) {
+        ctx.error((e as Error).message);
+      }
     },
   },
   {
@@ -766,7 +789,7 @@ export const commands: Command[] = [
   },
   {
     name: "key",
-    args: "[status|remove|workspace <id>]",
+    args: "[status|remove|workspace <id>|help|open]",
     help: "Add, check or remove your Claude API key.",
     run(args, ctx) {
       const sub = args[0] ?? "";
@@ -786,7 +809,12 @@ export const commands: Command[] = [
         saveClaudeWorkspace(args[1] ?? "");
         return ctx.notice(args[1] ? `Saved the workspace ID ${args[1]}. Each request now sends it.` : "Removed the workspace ID.");
       }
-      if (sub) return ctx.error("Use /key, /key status, /key remove or /key workspace <id>.");
+      if (sub === "help") return ctx.print(keyGuideText(), "How do I get a key?");
+      if (sub === "open") {
+        openWithOs(KEYS_URL);
+        return ctx.notice(`Opening ${KEYS_URL}`);
+      }
+      if (sub) return ctx.error("Use /key, /key status, /key remove, /key workspace <id>, /key help or /key open.");
       ctx.openCard({ t: "key" });
     },
   },

@@ -3,6 +3,50 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
+## 11 October 2026
+
+### Network failures
+
+- The Claude provider waits and tries again three times after a rate limit (HTTP 429), a server error (HTTP 5xx or 529) or a network error. The wait grows each time, has random jitter, and follows the `retry-after` header. The session shows "Waiting to retry (2 of 3)".
+- After the last try fails, a card offers "Resume", "Switch to the local model" or "Stop". "Resume" goes on from the last finished step. No finished tool call runs again. A headless run waits and tries again three more times, then stops with an error.
+
+### Suggest the program from the files
+
+- When you choose a folder, Cuvette reads the file names and the first 16 bytes of each file. It looks two folder levels down and stops at 400 files. It matches them to the `file_types` and the new `file_magic` of each adapter.
+- The app shows a card: "These look like flow cytometry files. Use FlowKit?" The other matches are below it. "Let Cuvette choose later" starts the session with no program, as before.
+- If no program fits, the card says so and offers the table route (the `tables` adapter). A folder with only `.csv`, `.tsv` or `.xlsx` files gets the same offer.
+- `cuvette` in the terminal prints the same suggestion before it starts, if the folder has data files and you gave no `--adapter`.
+- The adapter manifest has three new optional fields: `file_magic`, `file_label` and `file_priority`. 34 catalog adapters now have a label. See [docs/adapter-spec.md](docs/adapter-spec.md).
+
+### Spend
+
+- The plan card shows a cost range, for example "About $0.40 to $1.20 with Sonnet." A local model shows "Free: runs on this computer." The range comes from the benchmark runs of 9 October. On papers that the fit did not see, 93% to 94% of the runs fall in the range. See [docs/cost-estimate.md](docs/cost-estimate.md).
+- At 80% of the spend limit, a card asks if the scientist wants to continue, switch to a cheaper model or stop. It appears once. A headless run logs a notice instead. At 100%, Claude requests still stop.
+- `scripts/fit-estimate.ts` fits the range again from benchmark results.
+
+### Methods
+
+- A saved method now stores a summary of its data: the column names and order, the types, the units, the median, the range, the missing count and the group sizes.
+- When you run a method on new data, Cuvette compares the new data with the summary. It shows one card for each difference before any step runs. The differences are a missing, new or renamed column, a changed column order, a type change, a likely unit change (a median that is 10, 60, 100, 1000, 3600 or 1,000,000 times different), a range far outside the old range, more missing values, new or missing groups, and very different group sizes.
+- You continue or stop on each card. The record keeps the comparison and the answers.
+- In headless mode, a likely unit change stops the run. Add `data-change` to `--allow` to continue.
+- A method saved before this change has no summary. It still runs, and Cuvette shows one note. The next save stores the summary.
+
+### Reporting checklist
+- `/checklist [arrive|consort|strobe|miqe]` fills a reporting checklist from the record: ARRIVE 2.0 Essential 10 (22 items), CONSORT 2010 (28 items), STROBE (26 items) and MIQE (18 items). Each item is "Covered" (with the value and the source), "Not in the record" or "Not applicable". The items are data files in `src/core/guidelines/`.
+- The guideline is the decision `reporting_guideline`. If it is not set, a card asks for it and recommends one from the program or the request.
+- A missing item that you can answer becomes a question card, such as "The record has no randomization method. Add it?". The answer goes into the record and the item becomes Covered. An item that needs facts from outside the analysis (ethics approval, housing) says to add it by hand.
+- After the last step of an analysis, Cuvette offers the checklist once if a guideline is set.
+- The checklist is in the trail (`trail.md`, `trail.html`), in the `Checklist` sheet of `results.xlsx` and in the `.eln` file (`checklist.md` and `checklist.csv`).
+
+### Known-answer self-test
+
+- An adapter can ship one self-test: a small data set, one tool call and expected values from a published source. The test has `self_test: true` and a `source` in the `tests:` block of `adapter.yaml`. An expectation can have a `label`. See [docs/adapter-spec.md](docs/adapter-spec.md).
+- Ten adapters ship a self-test: astropy, biostats, lme4, metafor, openbabel, proc, pwr, rdkit, scikit-image and vegan.
+- `cuvette doctor` runs the self-test of each installed adapter and shows "Passes" or, for example, "Fails by 0.003 on the t statistic". `--adapter <name>` runs one adapter. `--no-self-test` skips the tests. An adapter whose program is not installed is skipped with a note.
+- The first session with an adapter, and the first one after a change of the adapter version or the package lock, runs the test before the adapter loads. The result goes to the record. Cuvette keeps the result in `cache/self-tests.json`, so the test does not run again.
+- A failed test shows a card before the analysis starts: continue or stop. `CUVETTE_SELF_TEST=0` turns the session test off.
+
 ## 9 October 2026
 
 ### Benchmark

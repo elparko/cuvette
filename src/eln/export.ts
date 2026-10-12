@@ -1,4 +1,6 @@
+import { CHECKLIST_COLUMNS, checklistHtml, checklistMarkdown, checklistRows, recordChecklist } from "../core/checklist.ts";
 import { pilotText } from "../core/pilot.ts";
+import { deviationHtml } from "../core/freeze.ts";
 import { approvedPlan, planMarkdown } from "../core/plan.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -124,6 +126,7 @@ export function collect(src: ElnSource): ElnContent {
   const refs = allRefs(sessionCitations(record, adapters));
   const logBuf = readFileSync(join(record.dir, "log.jsonl"));
   const plan = planMarkdown(record);
+  const checklist = recordChecklist(record);
   const files: ElnFile[] = [
     ...(plan.length ? [file("plan.md", `${plan.join("\n").replace(/^## /, "# ")}\n`, "The confirmed analysis, with its pilot, that the scientist confirmed before the analysis")] : []),
     file("question.md", `# Question\n\n${question || "No question was recorded."}\n`),
@@ -132,6 +135,12 @@ export function collect(src: ElnSource): ElnContent {
     file("trail.html", readFileSync(trailPath), "Audit trail"),
     file("decisions.csv", csv([["key", "label", "value", "owner", "set_by"], ...decisionRows.map((r) => [r.key, r.label, r.value, r.owner, r.setBy])]), "Each decision and who set it"),
     file("findings.md", findingsMd(findings), "Review findings"),
+    ...(checklist
+      ? [
+          file("checklist.md", `${checklistMarkdown(checklist).join("\n").replace(/^## /, "# ")}\n`, `Reporting checklist ${checklist.guideline.name}, filled from the record`),
+          file("checklist.csv", csv([CHECKLIST_COLUMNS, ...checklistRows(checklist)]), "Reporting checklist as a table"),
+        ]
+      : []),
     ...(record.nodes().some((n) => n.adapter) ? [file("references.bib", toBibtex(refs), "BibTeX references for the programs and methods that ran")] : []),
     file("log.jsonl", logBuf, "The append-only session log"),
   ];
@@ -162,11 +171,12 @@ export function collect(src: ElnSource): ElnContent {
   const adapterNames = [...new Set(record.nodes().map((n) => n.adapter))];
   const approved = approvedPlan(record);
   const html = [
-    ...(approved ? [`<h2>Proposed analysis, confirmed (version ${approved.version})</h2><h3>Proposed metrics</h3><pre>${esc(approved.text)}</pre>${approved.pilot ? `<h3>Demonstration on a sample</h3><pre>${esc(pilotText(approved.pilot))}</pre>` : ""}`] : []),
+    ...(approved ? [`<h2>Proposed analysis, confirmed (version ${approved.version})</h2><h3>Proposed metrics</h3><pre>${esc(approved.text)}</pre>${approved.pilot ? `<h3>Demonstration on a sample</h3><pre>${esc(pilotText(approved.pilot))}</pre>` : ""}${deviationHtml(record, "h2")}`] : []),
     `<h2>Question</h2><p>${esc(question)}</p>`,
     `<h2>Final answer</h2><p>${esc(answer).replace(/\n/g, "<br>")}</p>`,
     `<h2>Decisions</h2>${decisionRows.length ? table(["Decision", "Value", "Owner", "Set by"], decisionRows.map((r) => [r.label, r.value, r.owner, r.setBy])) : "<p>No setup values were recorded.</p>"}`,
     `<h2>Steps</h2>${steps.length ? `<ol>${mainNodes(record).map((n, i) => `<li><b>${esc(n.summary || n.tool)}</b><br>${esc(stepLines(adapters, n).join(" "))}</li>`).join("")}</ol>` : "<p>No steps were recorded.</p>"}`,
+    ...(checklist ? [checklistHtml(checklist, esc)] : []),
     `<h2>Review findings</h2>${findings.length ? `<ul>${findings.map((f) => `<li>[${esc(f.severity)}] ${esc(f.message)} (${esc(f.status)})</li>`).join("")}</ul>` : "<p>No findings.</p>"}`,
     `<p>Log SHA-256: <code>${sha(logBuf)}</code></p>`,
   ].join("\n");

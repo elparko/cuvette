@@ -2,6 +2,7 @@ import React, { useContext, useState } from "react";
 import { CardRows, Fit } from "./fit.tsx";
 import { pointTime } from "../core/rewind.ts";
 import { Box, Text, useInput } from "ink";
+import { KEYS_URL } from "../core/keyhelp.ts";
 import { Field } from "./input-box.tsx";
 import type { Question } from "../core/types.ts";
 import {
@@ -502,7 +503,8 @@ export function KeyCard(props: { card: Extract<Card, { t: "key" }>; path: string
   return (
     <Frame title="Claude API key" color="cyan">
       {props.card.reason ? <Text>{props.card.reason}</Text> : null}
-      <Text>Paste your key from console.anthropic.com. The screen shows it masked.</Text>
+      <Text>Paste your key from {KEYS_URL}. The screen shows it masked.</Text>
+      <Text dimColor>No key yet? Type /key help to see the steps. Type /key open to open the keys page.</Text>
       <Text dimColor>The harness checks it with the API, then saves it to {props.path}. Only your user can read that file.</Text>
       <Box marginTop={1}>
         <Text>Key: </Text>
@@ -642,6 +644,7 @@ export function PlanCard(props: { card: Extract<Card, { t: "plan" }>; session: S
   return (
     <Frame title={planTitle(card)} color="cyan">
       <Text>{card.text}</Text>
+      {card.estimate ? <Text dimColor>{card.estimate}</Text> : null}
       {st.details && card.details ? (
         <Box marginTop={1}>
           <Text dimColor>{card.details}</Text>

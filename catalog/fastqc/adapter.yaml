@@ -2,6 +2,7 @@ adapter:
   name: fastqc
   field: genomics
   file_types: [".fastq", ".fq", ".fastq.gz", ".fq.gz"]
+  file_label: sequencing read files
   title: FastQC
   version: 0.1.2
   spec: "1"

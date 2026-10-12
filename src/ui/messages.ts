@@ -37,7 +37,7 @@ export function inputPlaceholder(session: SessionLike, busy: boolean): string {
 export function activityText(state: string, purpose?: string, tool?: string): string {
   if (state === "running") return purpose || (tool ? `Running ${tool.replace(/_/g, " ")}` : "Working");
   if (state === "waiting") return "Waiting for your answer";
-  return "Thinking about the next step";
+  return state === "thinking" && purpose ? purpose : "Thinking about the next step";
 }
 
 export function usageOf(session: SessionLike): UsageSummary | undefined {

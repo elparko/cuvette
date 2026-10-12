@@ -2,8 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult, ToolSchema, Usage } from "../core/types.ts";
 import { ProviderError } from "../core/types.ts";
 import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
+import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
 import { ImageBudget } from "./images.ts";
+import { RETRIES, retryReason, withRetry, type Sleep } from "./retry.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
 const MAX_TOKENS = 64000;
@@ -14,20 +16,25 @@ export interface ClaudeOpts {
   apiKey?: string;
   effort?: string;
   client?: any;
+  sleep?: Sleep;
+  retries?: number;
   cache?: "off" | "5m" | "1h";
 }
 
 function mapError(e: unknown, model: string): unknown {
   if (e instanceof Anthropic.APIUserAbortError) return e;
   if (e instanceof Anthropic.AuthenticationError) return new ProviderError(`${NO_CREDENTIALS} The API said: ${e.message}`);
-  if (e instanceof Anthropic.PermissionDeniedError) return new ProviderError(`This key cannot use ${model}: ${e.message}`);
+  if (e instanceof Anthropic.APIError && /credit balance/i.test(e.message)) return new ProviderError(keyApiProblem(e.status, e.message));
+  if (e instanceof Anthropic.PermissionDeniedError) return new ProviderError(`This key cannot use ${model}: ${e.message} ${keyApiProblem(403)}`);
   if (e instanceof Anthropic.NotFoundError) return new ProviderError(`Unknown Claude model ${model}: ${e.message}`);
-  if (e instanceof Anthropic.RateLimitError) return new ProviderError("Claude rate limit reached. Wait a moment and retry.");
+  if (e instanceof Anthropic.RateLimitError) return new ProviderError("Claude rate limit reached. Wait a moment and retry.", true);
   if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return new ProviderError(WORKSPACE_HELP);
   if (e instanceof Anthropic.BadRequestError) return new ProviderError(`Claude rejected the request: ${e.message}`);
-  if (e instanceof Anthropic.APIConnectionError) return new ProviderError("Cannot reach the Claude API. Check the network.");
+  if (e instanceof Anthropic.APIConnectionError) return new ProviderError("Cannot reach the Claude API. Check the network.", true);
   if (e instanceof Anthropic.APIError && typeof e.status === "number" && e.status >= 500)
-    return new ProviderError(`The Claude API had a server error (${e.status}). Retry in a moment.`);
+    return new ProviderError(`The Claude API had a server error (${e.status}). Retry in a moment.`, true);
+  if (retryReason(e) === "network error") return new ProviderError("Cannot reach the Claude API. Check the network.", true);
+  if (retryReason(e)) return new ProviderError(`The Claude API had a server error: ${(e as Error).message}`, true);
   if (e instanceof Error && /authentication|api key|auth token|credentials/i.test(e.message)) return new ProviderError(`${NO_CREDENTIALS} Detail: ${e.message}`);
   return e;
 }
@@ -46,7 +53,7 @@ function cacheLast(messages: any[], mark?: Record<string, unknown>): any[] {
 function makeClient(key?: string): any {
   const ws = claudeWorkspace();
   const headers = ws ? { defaultHeaders: { "anthropic-workspace-id": ws } } : {};
-  return key ? new Anthropic({ apiKey: key, ...headers }) : new Anthropic(headers);
+  return key ? new Anthropic({ apiKey: key, maxRetries: 0, ...headers }) : new Anthropic({ maxRetries: 0, ...headers });
 }
 
 function toolResultContent(text: string, images: { media: string; data: string }[], note: string): unknown {
@@ -65,6 +72,8 @@ export class ClaudeProvider implements Provider {
   private made?: { client: any; version: number };
   private effort: string;
   private fallbacks = true;
+  private sleep?: Sleep;
+  private retries: number;
   private mark?: Record<string, unknown>;
 
   constructor(readonly model: string, opts: ClaudeOpts = {}) {
@@ -72,7 +81,13 @@ export class ClaudeProvider implements Provider {
     this.effort = opts.effort || (model === "claude-haiku-5-5" ? "medium" : "high");
     this.fixedClient = opts.client;
     this.apiKey = opts.apiKey;
+    this.sleep = opts.sleep;
+    this.retries = opts.retries ?? RETRIES;
     this.mark = opts.cache === "off" ? undefined : opts.cache === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
+  }
+
+  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
+    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
   }
 
   private get client(): any {
@@ -160,11 +175,11 @@ export class ClaudeProvider implements Provider {
     let msg: any;
     try {
       try {
-        msg = await run();
+        msg = await this.retry(run, req.signal, req.onRetry);
       } catch (e) {
         if (this.fallbacks && e instanceof Anthropic.BadRequestError && /fallback|betas?\b|server-side/i.test(e.message)) {
           this.fallbacks = false;
-          msg = await run();
+          msg = await this.retry(run, req.signal, req.onRetry);
         } else throw e;
       }
     } catch (e) {
@@ -219,7 +234,7 @@ export class ClaudeProvider implements Provider {
     try {
       const over = budgetProblem();
       if (over) throw new ProviderError(over);
-      const msg = await this.client.messages.create(params, signal ? { signal } : undefined);
+      const msg: any = await this.retry(() => this.client.messages.create(params, signal ? { signal } : undefined), signal);
       const u = msg.usage ?? {};
       if (!this.fixedClient) recordSpend(this.model, { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0 });
       return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("\n\n");
@@ -244,10 +259,11 @@ export async function checkClaudeKey(key: string, model = DEFAULT_CLAUDE_MODEL):
     await makeClient(key).models.retrieve(model);
     return { ok: true, text: `The key works. It can use ${model}.` };
   } catch (e) {
-    if (e instanceof Anthropic.AuthenticationError) return { ok: false, text: "The API rejected this key (HTTP 401). Check it and try again." };
-    if (e instanceof Anthropic.NotFoundError || e instanceof Anthropic.PermissionDeniedError) return { ok: true, text: `The key works, but it cannot use ${model}.` };
+    if (e instanceof Anthropic.APIError && /credit balance/i.test(e.message)) return { ok: false, text: keyApiProblem(e.status, e.message) };
+    if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return { ok: false, text: keyApiProblem(e.status, e.message) };
+    if (e instanceof Anthropic.NotFoundError) return { ok: true, text: `The key works, but it cannot use ${model}.` };
     if (e instanceof Anthropic.BadRequestError && /anthropic-workspace-id/.test(e.message)) return { ok: false, text: WORKSPACE_HELP };
-    if (e instanceof Anthropic.APIConnectionError) return { ok: true, text: "Cannot reach the Claude API to check the key. It is saved; the first request will test it." };
+    if (e instanceof Anthropic.APIConnectionError) return { ok: true, text: `${keyApiProblem(undefined)} The key is saved. The first request tests it.` };
     return { ok: true, text: `Cannot check the key: ${(e as Error).message}. It is saved; the first request will test it.` };
   }
 }

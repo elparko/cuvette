@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { budgetProblem, costUsd, dollars, entryCost, monthStart, promptTokens, recordSpend, spendFile, totalSpend, usageLong, usageShort, usageSummary } from "../src/core/spend.ts";
+import { BUDGET_WARN, budgetProblem, budgetState, budgetUsd, cheaperModel, costUsd, dollars, entryCost, monthStart, promptTokens, recordSpend, spendFile, totalSpend, usageLong, usageShort, usageSummary } from "../src/core/spend.ts";
 import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { WebView } from "../src/server/app-view.ts";
@@ -139,4 +139,40 @@ test("the terminal status line and the app header show the spend and the context
     h.type("\x03");
     await Promise.race([done, sleep(500)]);
   }
+});
+
+test("the environment variable wins over the saved setting, and the setting works alone", () => {
+  const home = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-budget-"));
+  try {
+    writeFileSync(join(process.env.CUVETTE_HOME, "settings.json"), JSON.stringify({ budgetUsd: 20 }));
+    expect(budgetUsd({})).toBe(20);
+    expect(budgetUsd({ CUVETTE_BUDGET_USD: "5" })).toBe(5);
+    expect(budgetUsd({ CUVETTE_BUDGET_USD: "50" })).toBe(50);
+    expect(budgetUsd({ CUVETTE_BUDGET_USD: "off" })).toBe(20);
+    writeFileSync(join(process.env.CUVETTE_HOME, "settings.json"), "{}");
+    expect(budgetUsd({})).toBeUndefined();
+  } finally {
+    if (home === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = home;
+  }
+});
+
+test("the budget state gives the share of the limit that is spent", () => {
+  const file = process.env.CUVETTE_SPEND_FILE;
+  process.env.CUVETTE_SPEND_FILE = join(mkdtempSync(join(tmpdir(), "cuvette-spend-")), "spend.jsonl");
+  try {
+    expect(budgetState({})).toBeUndefined();
+    recordSpend("claude-opus-5-5", { inputTokens: 1_000_000, outputTokens: 0 });
+    expect(budgetState({ CUVETTE_BUDGET_USD: "5" })).toMatchObject({ budget: 5, ratio: 0.8 });
+    expect(BUDGET_WARN).toBe(0.8);
+  } finally {
+    process.env.CUVETTE_SPEND_FILE = file;
+  }
+});
+
+test("each Claude model has the next cheaper model, and Haiku has none", () => {
+  expect(cheaperModel("claude:claude-opus-5-5")).toBe("claude-sonnet-5-5");
+  expect(cheaperModel("claude-sonnet-5-5")).toBe("claude-haiku-5-5");
+  expect(cheaperModel("claude-haiku-5-5")).toBeUndefined();
 });

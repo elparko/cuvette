@@ -2,6 +2,7 @@ adapter:
   name: mdanalysis
   field: structural biology
   file_types: [".pdb", ".dcd", ".psf", ".xtc", ".gro", ".cif"]
+  file_label: molecular dynamics files
   title: MDAnalysis and Bio.PDB
   version: 0.1.1
   spec: "1"

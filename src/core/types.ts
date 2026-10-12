@@ -13,8 +13,8 @@ export type EntryKind =
   | "finding" | "finding_resolution" | "claim_check"
   | "mode" | "follow_step" | "lab_memory" | "plan" | "plan_approved" | "clarify"
   | "pilot_run" | "pilot_approved" | "pilot_rejected" | "reference" | "validation"
-  | "data_check" | "samples" | "eln_push" | "eln_link" | "setting" | "note" | "notice" | "error" | "usage" | "compaction" | "correction" | "adapter" | "title" | "program" | "trust"
-  | "rewind" | "fork" | "branch" | "method" | "phi" | "inspection";
+  | "data_check" | "samples" | "eln_push" | "eln_link" | "setting" | "note" | "notice" | "error" | "usage" | "compaction" | "correction" | "adapter" | "title" | "program" | "trust" | "self_test"
+  | "rewind" | "fork" | "branch" | "method" | "phi" | "inspection" | "plan_frozen" | "plan_deviation" | "data_compare";
 
 export interface Entry {
   id: number;
@@ -123,6 +123,7 @@ export interface StepRequest {
   tools: ToolSchema[];
   signal?: AbortSignal;
   onDelta?: (d: { type: "text" | "thinking"; text: string }) => void;
+  onRetry?: (r: { attempt: number; of: number; waitMs: number; reason: string }) => void;
 }
 
 export interface StepResult {
@@ -139,7 +140,11 @@ export interface Provider {
   countTokens?(req: Omit<StepRequest, "signal" | "onDelta">): Promise<number>;
 }
 
-export class ProviderError extends Error {}
+export class ProviderError extends Error {
+  constructor(message: string, readonly transient = false) {
+    super(message);
+  }
+}
 
 // ---------------------------------------------------------------- tools
 
@@ -353,6 +358,7 @@ export interface PlanEvent {
   reference?: { question: string; candidates: { path: string; sheet?: string; columns: string[]; label: string }[] };
   images?: string[];
   details?: string;
+  estimate?: string;
   settings?: { index: number; step: number; label: string; key?: string; value?: unknown; by?: string; options?: string[] }[];
 }
 

@@ -66,6 +66,25 @@ export function budgetUsd(env: Record<string, string | undefined> = process.env)
   return undefined;
 }
 
+export const BUDGET_WARN = 0.8;
+
+const CHEAPER: Record<string, string> = {
+  "claude-fable-5-1": "claude-sonnet-5-5",
+  "claude-opus-5-5": "claude-sonnet-5-5",
+  "claude-sonnet-5-5": "claude-haiku-5-5",
+};
+
+export function cheaperModel(model: string): string | undefined {
+  return CHEAPER[model.replace(/^claude:/, "")];
+}
+
+export function budgetState(env: Record<string, string | undefined> = process.env): { budget: number; spent: number; ratio: number } | undefined {
+  const budget = budgetUsd(env);
+  if (budget === undefined) return undefined;
+  const spent = totalSpend(env.CUVETTE_BUDGET_SINCE || monthStart());
+  return { budget, spent, ratio: spent / budget };
+}
+
 export function budgetProblem(): string | undefined {
   const budget = budgetUsd();
   if (budget === undefined) return undefined;

@@ -5,9 +5,11 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts";
 import { applyHeadlessSetup, attachHeadless } from "../src/core/headless.ts";
 import { Session, announcesStep, endsWithPromise } from "../src/core/session.ts";
+import { ProviderError } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { unzip } from "./fixtures/unzip.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
+import { recordSpend } from "../src/core/spend.ts";
 import { trustFolder } from "../src/core/trust.ts";
 
 let session: Session | undefined;
@@ -1398,4 +1400,183 @@ test("batch runner: after the pilot, the harness repeats the pilot steps on the 
   expect(table).toBe("sample,status,blur.sigma,error\nSet 2.tif,done,2,\nSet 3.tif,done,2,\n");
   const notices = session.record.entries(["notice"]).map((e) => String(e.data.text));
   expect(notices.find((t) => t.startsWith("The harness ran"))).toMatch(/^The harness ran the pilot steps on 2 of 2 samples: 2 done, 0 with an error\. Table: .*batch-results\.csv\. Ask the agent for a summary when you want one\.$/);
+});
+
+function failOn(provider: FakeProvider, failures: Set<number>) {
+  const step = provider.step.bind(provider);
+  let n = 0;
+  provider.step = async (req) => {
+    const i = n++;
+    if (failures.has(i)) throw new ProviderError("Cannot reach the Claude API. Check the network.", true);
+    return step(req);
+  };
+}
+
+async function recoverySession(provider: FakeProvider, extra: Record<string, unknown> = {}) {
+  const s = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none", ...extra } });
+  s.decisions.applySetup({});
+  return s;
+}
+
+const toolCalls = (s: Session) => s.record.entries(["tool_call"]).map((e) => `${e.data.callId}:${e.data.tool}`);
+
+test("a failure in the middle of a turn shows a card and Resume does not repeat a finished tool call", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }] }, { calls: [{ name: "note", args: { text: "x" } }] }, { text: "All done." }]);
+  failOn(provider, new Set([1]));
+  session = await recoverySession(provider);
+  const titles: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "question") {
+      titles.push(`${e.question.title}|${e.question.options.map((o) => o.label).join(",")}`);
+      setTimeout(() => session!.answer(e.question.qid, "resume"), 0);
+    }
+  });
+  const answer = await session.send("go");
+  expect(answer).toBe("All done.");
+  expect(titles).toEqual(["The model did not answer|Resume,Stop"]);
+  const calls = toolCalls(session);
+  expect(calls.filter((c) => c.endsWith(":state"))).toHaveLength(1);
+  expect(new Set(calls).size).toBe(calls.length);
+  const sent = provider.requests.map((r) => r.messages.length);
+  expect(sent[1]).toBe(sent[0]! + 2);
+});
+
+test("Stop on the card ends the turn and keeps the finished steps", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }] }, { text: "never" }]);
+  failOn(provider, new Set([1, 2, 3]));
+  session = await recoverySession(provider);
+  session.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "stop"), 0);
+  });
+  await session.send("go");
+  expect(toolCalls(session)).toHaveLength(1);
+  expect(session.record.entries(["error"]).map((e) => String(e.data.message))).toEqual(["Cannot reach the Claude API. Check the network."]);
+  expect(session.record.entries(["tool_result"])).toHaveLength(1);
+});
+
+test("the card offers the local model if one is set", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  failOn(provider, new Set([0]));
+  session = await recoverySession(provider, { local_model: "ollama:qwen3:8b" });
+  const labels: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "question") {
+      labels.push(...e.question.options.map((o) => o.label));
+      setTimeout(() => session!.answer(e.question.qid, "resume"), 0);
+    }
+  });
+  await session.send("go");
+  expect(labels).toEqual(["Resume", "Switch to the local model", "Stop"]);
+});
+
+test("a headless run waits, tries again and then stops with a clear error", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  failOn(provider, new Set([0, 1, 2, 3, 4]));
+  session = await recoverySession(provider, { headless: true });
+  session.recoveryWaitMs = 0;
+  session.recoveryRounds = 2;
+  const cards: unknown[] = [];
+  session.bus.on((e) => e.type === "question" && cards.push(e));
+  await session.send("go");
+  expect(cards).toHaveLength(0);
+  expect(String(session.record.entries(["error"]).at(-1)!.data.message)).toMatch(/waited 2 times and then stopped/);
+});
+
+test("a headless run goes on if the network comes back", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }] }, { text: "Back again." }]);
+  failOn(provider, new Set([1, 2]));
+  session = await recoverySession(provider, { headless: true });
+  session.recoveryWaitMs = 0;
+  expect(await session.send("go")).toBe("Back again.");
+});
+
+function nearLimit(): void {
+  process.env.CUVETTE_SPEND_FILE = join(mkdtempSync(join(tmpdir(), "cuvette-spend-")), "spend.jsonl");
+  process.env.CUVETTE_BUDGET_USD = "5";
+  recordSpend("claude-opus-5-5", { inputTokens: 1_000_000, outputTokens: 0 });
+}
+
+function paidProvider(steps: ConstructorParameters<typeof FakeProvider>[0]): FakeProvider {
+  const p = new FakeProvider(steps);
+  p.info = { provider: "claude", model: "claude-opus-5-5", contextWindow: 1_000_000, vision: false, small: false };
+  return p;
+}
+
+test("at 80% of the spend limit the card asks once, and Continue goes on", async () => {
+  nearLimit();
+  const provider = paidProvider([{ calls: [{ name: "state", args: {} }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { guidance: false } });
+  const titles: string[] = [];
+  const values: unknown[][] = [];
+  session.bus.on((e) => {
+    if (e.type !== "question") return;
+    titles.push(e.question.title);
+    values.push(e.question.options.map((o) => o.value));
+    setTimeout(() => session!.answer(e.question.qid, "continue"), 0);
+  });
+  await session.send("go");
+  delete process.env.CUVETTE_BUDGET_USD;
+  expect(titles).toEqual(["Spend limit nearly reached"]);
+  expect(values[0]).toEqual(["continue", "cheaper", "stop"]);
+  expect(provider.requests.length).toBe(2);
+});
+
+test("the Stop answer at 80% sends nothing to the model", async () => {
+  nearLimit();
+  const provider = paidProvider([{ text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { guidance: false } });
+  session.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "stop"), 0);
+  });
+  await session.send("go");
+  delete process.env.CUVETTE_BUDGET_USD;
+  expect(provider.requests.length).toBe(0);
+  expect(session.record.entries(["notice"]).some((e) => String(e.data.text).includes("Stopped at your choice"))).toBe(true);
+});
+
+test("a headless run at 80% logs one notice, asks nothing and goes on", async () => {
+  nearLimit();
+  const provider = paidProvider([{ calls: [{ name: "state", args: {} }] }, { text: "done" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, headless: true } });
+  await session.send("go");
+  delete process.env.CUVETTE_BUDGET_USD;
+  expect(session.record.entries(["question"])).toHaveLength(0);
+  expect(session.record.entries(["notice"]).filter((e) => String(e.data.text).includes("of your $5.00 limit"))).toHaveLength(1);
+  expect(provider.requests.length).toBe(2);
+});
+
+test("no card appears for a local model or below 80%", async () => {
+  nearLimit();
+  const local = new FakeProvider([{ text: "done" }]);
+  local.info = { provider: "ollama", model: "qwen3:8b", contextWindow: 32768, vision: false, small: true, local: true };
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: local, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { guidance: false } });
+  await session.send("go");
+  expect(session.record.entries(["question"])).toHaveLength(0);
+  process.env.CUVETTE_BUDGET_USD = "50";
+  await session.close();
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: paidProvider([{ text: "done" }]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { guidance: false } });
+  await session.send("go");
+  delete process.env.CUVETTE_BUDGET_USD;
+  expect(session.record.entries(["question"])).toHaveLength(0);
+});
+
+test("the plan card carries the cost estimate for the model, and a local model shows the free text", async () => {
+  const estimates: (string | undefined)[] = [];
+  for (const info of [{ provider: "claude", model: "claude-sonnet-5-5" }, { provider: "ollama", model: "qwen3:8b", local: true }] as const) {
+    const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: PLAN }] }, { text: "ok" }]);
+    provider.info = { contextWindow: 100_000, vision: false, small: false, ...info };
+    session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true });
+    session.decisions.applySetup({});
+    session.bus.on((e) => {
+      if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "Triangle"), 0);
+      if (e.type === "plan") {
+        estimates.push(e.estimate);
+        setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+      }
+    });
+    await session.send("Blur a.tif and tell me what changes");
+    await session.close();
+  }
+  expect(estimates[0]).toMatch(/^About \$\d+\.\d{2} to \$\d+\.\d{2} with Sonnet\./);
+  expect(estimates[1]).toBe("Free: runs on this computer.");
 });

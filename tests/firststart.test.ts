@@ -35,7 +35,7 @@ test("first start is needed with no key and no local model", async () => {
 });
 
 test("choose Claude: a bad key is not saved, a good key is saved with the model", async () => {
-  expect(await chooseClaude("abc", { cwd, env: {} })).toEqual({ ok: false, text: "A Claude API key starts with sk-ant-." });
+  expect(await chooseClaude("abc", { cwd, env: {} })).toMatchObject({ ok: false, text: expect.stringMatching(/starts with sk-ant-/) });
   const rejected = await chooseClaude(KEY, { cwd, env: {}, check: async () => ({ ok: false, text: "The API rejected this key (HTTP 401)." }) });
   expect(rejected.ok).toBe(false);
   expect(savedClaudeKey()).toBeUndefined();

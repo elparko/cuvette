@@ -90,6 +90,9 @@ or tool name is an error. Two map entries with the same tool and the same `match
 | `description` | text | `""` | One sentence. `list_adapters` shows the first sentence. |
 | `field` | text | `""` | The science field, such as `statistics` or `mass spectrometry imaging`. `list_adapters` shows it. |
 | `file_types` | list of text | `[]` | The input files that the adapter reads. An entry that starts with a dot is a file ending, such as `.bam` or `.vcf.gz`. Another entry is a file name, such as `quant.sf` or `matrix.mtx.gz`. Case does not matter. Put the main type first. The harness uses the list for the file-type hint and for the other options on the program card. |
+| `file_magic` | list of hex text | `[]` | The first bytes of a file that the adapter reads, as hex at offset 0, such as `464353` for FCS. A file that starts with these bytes counts as a match even if its name has no matching ending. |
+| `file_label` | text | `""` | What the files are, such as `flow cytometry files`. The suggestion card shows it. If empty, the card uses `field`. |
+| `file_priority` | whole number | `0` | Breaks a tie. If two adapters match the same files, the adapter with the higher number is first. |
 | `authors` | list of text | `[]` | Who wrote the adapter. |
 | `status` | `draft`, `approved`, `locked` | `draft` | Approval state. See "Versioning and approval". |
 | `approved_by` | text | `""` | Who approved the adapter. |
@@ -347,6 +350,8 @@ numbers.
 | `data` | list of text | `[]` | Files in the adapter folder that the test needs. They must exist. |
 | `manual_route_checked` | true or false | `false` | `true` if a person ran the manual route and got the same numbers. |
 | `gui` | true or false | none | `true` if the test opens a program window or takes the focus. `cuvette adapter check --run-tests` skips it; `--gui` runs it. Each test of a `macro` or `screen` adapter must state it. |
+| `self_test` | true or false | `false` | `true` for the known-answer self-test. One test in an adapter can have it. See "Self-test" below. |
+| `source` | text | `""` | The published source of the expected values. A self-test must have it. |
 
 A call has `tool`, `args` (default `{}`) and `save_as` (default empty). The tool can be a program tool
 or a tool of the module.
@@ -362,6 +367,7 @@ An expectation has `path` and one or more of these comparisons:
 | `min` | The value is at least this number. |
 | `max` | The value is at most this number. |
 | `contains` | A text value contains this text. For a list, one item contains it. |
+| `label` | Optional. The name of the value in the self-test message, for example "the t statistic". Default: the `path`. |
 
 The `path` is a dotted path into the result of the last call. The result has the shape that
 "Tool results" describes. Examples: `ok`, `summary`, `metrics.n_peaks`, `data.rows[0].mz`,
@@ -397,6 +403,33 @@ tests:
       - { path: metrics.n_objects, equals: 64 }
       - { path: outputs[0].path, contains: ".png" }
 ```
+
+#### Self-test
+
+A self-test is a known-answer test that Cuvette runs on the computer of the scientist. An update of
+R, Python or a package can change a number. The package lock records the versions, but it does not
+show that the numbers are the same. The self-test shows it.
+
+Rules for the test that has `self_test: true`:
+
+- It has a `source`: a paper, a manual or a program documentation that prints the expected values.
+- It has at least one expectation, and each expectation has a `label`.
+- It has no `gui` and no `fetch`. The data is small and ships in the adapter folder.
+- It finishes in a few seconds. Each call has a limit of 90 seconds.
+
+Cuvette runs the self-test in these places:
+
+- `cuvette doctor` runs it for each installed adapter and shows "Passes" or, for example, "Fails by
+  0.003 on the t statistic". `--adapter <name>` runs one adapter only. `--no-self-test` skips the
+  tests. If the program of an adapter is missing, doctor skips the adapter and says why.
+- The first session with an adapter runs it before the adapter loads. The first session after a
+  change of the adapter version or of the package lock runs it again. The result goes to the
+  record as a `self_test` entry.
+- Cuvette keeps the result in `cache/self-tests.json` in the Cuvette home folder. The key is the
+  adapter name and a hash of the adapter version, the package lock and the test. A saved result
+  does not run again. Cuvette does not save a test that could not run.
+- If the test fails, a card asks the scientist before the analysis starts: continue or stop.
+- `CUVETTE_SELF_TEST=0` turns the session test off.
 
 ### `data_rules`
 

@@ -1,3 +1,4 @@
+import { testsMarkdown } from "./testcount.ts";
 import { planMarkdown } from "./plan.ts";
 import { existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -150,6 +151,8 @@ export function exportProtocol(record: AnalysisRecord, adapters: LoadedAdapter[]
     lines.push("| Decision | Value |", "| --- | --- |");
     for (const [k, v] of setup) lines.push(`| ${labelOf(adapters, k).replace(/\|/g, "\\|")} | ${show(v).replace(/\|/g, "\\|")} |`);
   } else lines.push("No setup values were recorded.");
+  const tests = testsMarkdown(record);
+  if (tests.length) lines.push("", ...tests);
   const loads = record.entries(["adapter"]);
   if (loads.length) {
     lines.push("", "## Programs", "");

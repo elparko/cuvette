@@ -6,10 +6,14 @@ import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { adapterIndex } from "../adapters/catalog.ts";
+import { suggestPrograms } from "../core/suggest.ts";
 import { loadSettings } from "../core/config.ts";
 import { claudeKey } from "../core/credentials.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
+import { KEY_GUIDE } from "../core/keyhelp.ts";
 import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
+import { deviationHtml } from "../core/freeze.ts";
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
 import { listSessions, openLock } from "../core/sessions.ts";
@@ -40,7 +44,7 @@ export interface AppOptions {
   adapters?: string[];
   env?: Record<string, string | undefined>;
   port?: number;
-  makeSession?: (o: { folder?: string; resume?: string; model?: string }) => Promise<SessionLike>;
+  makeSession?: (o: { folder?: string; resume?: string; model?: string; adapter?: string }) => Promise<SessionLike>;
   checkKey?: (key: string) => Promise<{ ok: boolean; text: string }>;
   doctor?: () => Promise<Check[]>;
   fetch?: typeof fetch;
@@ -172,11 +176,11 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
 
   const makeSession =
     opts.makeSession ??
-    (async (o: { folder?: string; resume?: string; model?: string }) => {
+    (async (o: { folder?: string; resume?: string; model?: string; adapter?: string }) => {
       const { Session } = await import("../core/session.ts");
       const trustFolder = !!opts.trustFolder && resolve(o.folder ?? process.cwd()) === resolve(opts.folder ?? process.cwd());
       if (o.resume) return (await Session.resume(o.resume, { model: o.model, interactive: true, trustFolder, settings: {} })) as unknown as SessionLike;
-      return (await Session.create({ adapters: opts.adapters ?? [], model: o.model, cwd: o.folder, defaults: true, interactive: true, trustFolder, settings: {} })) as unknown as SessionLike;
+      return (await Session.create({ adapters: o.adapter ? [o.adapter] : opts.adapters ?? [], model: o.model, cwd: o.folder, defaults: true, interactive: true, trustFolder, settings: {} })) as unknown as SessionLike;
     });
 
   const broadcastIdle = (msg: unknown) => {
@@ -207,14 +211,14 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     opts.onQuit?.();
   };
 
-  const open = (o: { folder?: string; resume?: string; first?: string }) => {
+  const open = (o: { folder?: string; resume?: string; first?: string; adapter?: string }) => {
     opening = (async () => {
       lastError = "";
       const old = current;
       if (old && !old.owned) throw new Error("This session belongs to the terminal. Open another session there.");
       await detach();
       try {
-        const s = await makeSession({ folder: o.folder, resume: o.resume, model: opts.model });
+        const s = await makeSession({ folder: o.folder, resume: o.resume, model: opts.model, adapter: o.adapter });
         attach(s, true);
         if (o.first) s.send(o.first).catch(() => {});
       } catch (e) {
@@ -260,7 +264,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       const states = await freshStatus(s);
       const v = planView(s.record);
       const plan = v ? `<h4>${v.approved ? "Confirmed analysis" : "Proposed analysis"}, version ${v.version}</h4><div class="plantext">${planTextHtml(v.text)}</div>` : `<p class="empty">No proposed analysis yet. Type your question. The agent proposes the analysis first.</p>`;
-      return `${plan}<h4>Steps</h4>${statusHtml(states)}${stepsHtml(ctx())}<p class="dim small"><a href="graph/?t=${encodeURIComponent(token)}" target="_blank" rel="noopener">Open the step graph</a></p>`;
+      return `${plan}${deviationHtml(s.record, "h4")}<h4>Steps</h4>${statusHtml(states)}${stepsHtml(ctx())}<p class="dim small"><a href="graph/?t=${encodeURIComponent(token)}" target="_blank" rel="noopener">Open the step graph</a></p>`;
     }
     if (name === "results") return resultsHtml(ctx(), outDir(), sheets());
     if (name === "decisions") return decisionsHtml(ctx(), decisionRows(s), await freshStatus(s));
@@ -352,6 +356,11 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       const recent = [...new Set(listSessions().map((s) => s.cwd).filter((x) => x && existsSync(x)))].slice(0, 8);
       return send(res, 200, { path: at, parent: dirname(at) === at ? null : dirname(at), dirs, recent, home: homedir() });
     }
+    if (get && p === "/api/suggest") {
+      const at = resolve((url.searchParams.get("p") || "").replace(/^~(?=\/|$)/, homedir()));
+      if (!existsSync(at) || !statSync(at).isDirectory()) return send(res, 404, { error: `No folder ${at}` });
+      return send(res, 200, suggestPrograms(at, adapterIndex(at)));
+    }
     if (get && p === "/api/file") {
       const f = resolve(url.searchParams.get("p") ?? "");
       if (!allowedFile(f) || !existsSync(f) || !statSync(f).isFile()) return send(res, 404, { error: "no such file" });
@@ -385,11 +394,12 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       else if (typeof body.folder === "string" && body.folder.trim()) {
         const f = resolve(body.folder.trim().replace(/^~(?=\/|$)/, homedir()));
         if (!existsSync(f) || !statSync(f).isDirectory()) return send(res, 404, { error: `No folder ${f}` });
-        void open({ folder: f });
+        const adapter = typeof body.adapter === "string" && body.adapter ? body.adapter : undefined;
+        void open({ folder: f, adapter });
       } else return send(res, 400, { error: "Give a folder or a session." });
       return send(res, 200, { ok: true });
     }
-    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: CHOICES, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
+    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: CHOICES, keyGuide: KEY_GUIDE, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
     if (p === "/api/firststart/claude") {
       const r = await chooseClaude(String(body.key ?? ""), { ...fsCtx(), check: opts.checkKey });
       if (r.ok) recordSetting(c?.session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");

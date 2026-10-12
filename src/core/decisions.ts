@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { Decision, cuvetteHome } from "../adapters/manifest.ts";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
-import type { Args, Deviation, Enforcement, Hook, Owner, PreToolUseInput, PreToolUseResult } from "./types.ts";
+import { frozenPlan, recordDeviation } from "./freeze.ts";
+import type { Args, Deviation, Entry, Enforcement, Hook, Owner, PreToolUseInput, PreToolUseResult } from "./types.ts";
 
 export interface DecisionField {
   key: string;
@@ -51,6 +52,45 @@ export const ADAPTER_DECISION: Decision = Decision.parse({
   stage: "when_needed",
   help: "The programs that do the analysis, as adapter names. The agent chooses one with use_adapter and gives the reason. Change it with /program.",
 });
+
+export const TEST_DECISIONS: Decision[] = [
+  Decision.parse({
+    key: "test_family",
+    label: "Group of tests for a correction",
+    kind: "choice",
+    choices: ["same_data", "one_family", "separate"],
+    default: "same_data",
+    owner: "human",
+    group: "Statistics",
+    stage: "when_needed",
+    changes_conclusion: false,
+    help: "same_data: tests on the same data file are one family. one_family: all tests in the session are one family. separate: each test is its own family and has no correction.",
+  }),
+  Decision.parse({
+    key: "test_correction",
+    label: "Correction for the tests in this session",
+    kind: "choice",
+    choices: ["holm", "benjamini_hochberg", "not_part_of_analysis"],
+    owner: "human",
+    group: "Statistics",
+    stage: "when_needed",
+    changes_conclusion: false,
+    help: "Each test in a family adds a chance of a false positive. Holm controls the chance of any false positive. Benjamini-Hochberg controls the share of false positives among the positive tests. Choose not_part_of_analysis if the extra tests were only checks and not part of the analysis.",
+  }),
+];
+
+export const REPORTING_DECISION: Decision = Decision.parse({
+  key: "reporting_guideline",
+  label: "Reporting guideline",
+  kind: "choice",
+  choices: ["arrive", "consort", "strobe", "miqe"],
+  owner: "human",
+  group: "Report",
+  stage: "when_needed",
+  help: "The guideline for the reporting checklist. arrive: animal studies. consort: randomized trials. strobe: observational studies. miqe: qPCR. Set it with /checklist.",
+});
+
+const HIDDEN_FROM_AGENT = new Set([ADAPTER_DECISION.key, REPORTING_DECISION.key]);
 
 export function getPath(obj: unknown, path: string): unknown {
   let cur: any = obj;
@@ -137,9 +177,13 @@ function profileVersions(name: string): number[] {
     .sort((a, b) => a - b);
 }
 
+const PLAN_FLOW_REASON = /^(set in the confirmed analysis|the scientist approved plan version|from the method|from the answers file|changed during the demonstration|the scientist asked:)/;
+const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+
 export class DecisionRecord {
   private states = new Map<string, State>();
   private setupDone = false;
+  onDeviation?: (e: Entry) => void;
 
   constructor(private adapters: LoadedAdapter[], private record: AnalysisRecord, harness: Decision[] = []) {
     for (const def of harness) this.states.set(def.key, { def, adapters: [], owner: def.owner, value: undefined, set: false });
@@ -378,6 +422,10 @@ export class DecisionRecord {
     const reason = opts.reason ?? "";
     const staleNodes = s.set ? this.record.markStale(key, reason || `${s.def.label} changed`) : [];
     this.record.append("decision", { key, old, new: next, by: opts.by ?? "human", reason, staleNodes });
+    if (s.set && !PLAN_FLOW_REASON.test(reason) && frozenPlan(this.record)) {
+      const e = recordDeviation(this.record, { kind: "setting", what: s.def.label, from: show(old), to: show(next) }, "decision", reason);
+      if (e) this.onDeviation?.(e);
+    }
     s.value = next;
     s.set = true;
     return staleNodes;
@@ -432,7 +480,7 @@ export class DecisionRecord {
   }
 
   brief(keys?: string[]): string {
-    const fields = this.fields().filter((f) => (!keys || keys.includes(f.key)) && f.key !== ADAPTER_DECISION.key);
+    const fields = this.fields().filter((f) => (!keys || keys.includes(f.key)) && !HIDDEN_FROM_AGENT.has(f.key));
     const lines: string[] = [];
     const groups = new Map<string, DecisionField[]>();
     for (const f of fields.filter((f) => f.set)) groups.set(f.group, [...(groups.get(f.group) ?? []), f]);

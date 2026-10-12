@@ -2,6 +2,8 @@ adapter:
   name: squidpy
   field: spatial transcriptomics
   file_types: [".h5", ".h5ad", "tissue_positions_list.txt", "tissue_positions.csv"]
+  file_magic: ["894844460d0a1a0a"]
+  file_label: spatial transcriptomics files
   title: Squidpy spatial statistics
   version: 0.1.0
   spec: "1"

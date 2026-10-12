@@ -30,6 +30,9 @@ Usage
   card, or set "adapter": "<name>" in the answers file. The record keeps each load and its
   reason. With --adapter, the session has only the adapters that you name.
 
+  With --method, the harness compares the new data with the data that the method used.
+  A likely unit change stops the run. Add data-change to --allow to continue.
+
   --bypass-permissions
   WARNING: In bypass, the agent can run commands and write files without asking.
   The harness allows each tool call that has a permission card and logs it with the reason
@@ -71,7 +74,10 @@ Usage
   setting wins over a user setting. If the folder is read-only, the session folder goes to
   ~/.cuvette/projects/.
 
-  cuvette doctor [--fix]               check Node, the model, the Python environments, R, Java and each adapter's program;
+  cuvette doctor [--fix] [--adapter <name>] [--no-self-test]
+                                       check Node, the model, the Python environments, R, Java and each adapter's program;
+                                       then run the known-answer test of each adapter, for example "Fails by 0.003 on the t statistic";
+                                       --adapter checks and tests one adapter only; --no-self-test skips the tests;
                                        --fix installs the missing Python environments and R packages after it asks
   cuvette programs                     list each adapter with its program: status, version, size, last use, access
   cuvette programs install|update|remove|check <adapter>
@@ -197,6 +203,7 @@ const { values: o, positionals: pos } = parseArgs({
     plan: { type: "boolean" },
     "no-plan": { type: "boolean" },
     fix: { type: "boolean" },
+    "no-self-test": { type: "boolean" },
     "no-open": { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
@@ -267,7 +274,15 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   while (pick !== "1" && pick !== "2") pick = (await ask("Type 1 or 2: ")).trim();
   if (pick === "1") {
     for (let i = 1; ; i++) {
-      const r = await fs.chooseClaude(await readSecret("Paste your Claude API key (it starts with sk-ant-): "));
+      const pasted = await readSecret("Paste your Claude API key (it starts with sk-ant-). Type ? and press Enter if you have no key: ");
+      if (pasted.trim() === "?") {
+        const kh = await import("./core/keyhelp.ts");
+        console.log(`\n${kh.keyGuideText()}\n`);
+        if (/^y/i.test((await ask("Open the keys page in your browser? [y/N] ")).trim())) (await import("./ui/commands.ts")).openWithOs(kh.KEYS_URL);
+        i--;
+        continue;
+      }
+      const r = await fs.chooseClaude(pasted);
       console.log(r.text);
       if (r.ok) break;
       if (i === 3) fail("No key was saved. Run cuvette key when you have a key, or run cuvette again and choose the local model.");
@@ -311,6 +326,14 @@ async function interactive(resumeId?: string, folder?: string) {
     if (lock) fail(lock.app ? `This session is open in the app: ${lock.app}\nUse it there, or close the session there (Sessions, or /quit) and run this again.` : "This session is open in another terminal. Close it there first.");
   }
   if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `cuvette adapters`.");
+  if (!adapters.length && !resumeId && !sample) {
+    const dir = resolve(folder ?? process.cwd());
+    const { suggestPrograms, suggestLines } = await import("./core/suggest.ts");
+    const { adapterIndex } = await import("./adapters/catalog.ts");
+    const hint = suggestPrograms(dir, adapterIndex(dir));
+    const lines = suggestLines(hint);
+    if (lines.length) console.error([...lines, `To use it, run: cuvette --adapter ${hint.matches[0].adapter}`].join("\n"));
+  }
   const s = resumeId
     ? await Session.resume(resumeId, { model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See cuvette sessions.`))
     : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, trustFolder, cwd: sample?.cwd ?? folder, method: str(o.method), settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(e.message));
@@ -454,8 +477,15 @@ async function main() {
         cred.saveClaudeWorkspace(a2 ?? "");
         return console.log(a2 ? `Saved the workspace ID ${a2}. Each request now sends it.` : "Removed the workspace ID.");
       }
-      if (a1) return fail("usage: cuvette key [status|remove|workspace <id>]");
-      const key = (await readSecret("Claude API key: ")).trim();
+      if (a1 === "help" || a1 === "open") {
+        const kh = await import("./core/keyhelp.ts");
+        if (a1 === "help") return console.log(kh.keyGuideText());
+        (await import("./ui/commands.ts")).openWithOs(kh.KEYS_URL);
+        return console.log(`Opening ${kh.KEYS_URL}`);
+      }
+      if (a1) return fail("usage: cuvette key [status|remove|workspace <id>|help|open]");
+      const key = (await readSecret("Claude API key (type ? for help): ")).trim();
+      if (key === "?") return console.log((await import("./core/keyhelp.ts")).keyGuideText());
       const problem = cred.keyProblem(key);
       if (problem) return fail(problem);
       const { checkClaudeKey } = await import("./providers/claude.ts");
@@ -579,9 +609,20 @@ async function main() {
       const dr = await import("./core/doctor.ts");
       const tty = process.stderr.isTTY;
       const progress = (t: string) => tty && process.stderr.write(`\rChecking ${t}...`.padEnd(40));
-      let checks = await dr.runDoctor({ onProgress: progress });
+      const only = (o.adapter as string[] | undefined)?.[0];
+      const { adapterDirs, loadAdapter } = await import("./adapters/manifest.ts");
+      if (only && !adapterDirs()[only]) return fail(`no adapter named ${only}. cuvette adapters lists the names.`);
+      const scope = only ? { adapters: { [only]: loadAdapter(adapterDirs()[only]!).manifest } } : {};
+      let checks = await dr.runDoctor({ onProgress: progress, ...scope });
       if (tty) process.stderr.write("\r".padEnd(41) + "\r");
       console.log(dr.doctorText(checks));
+      let selfTestFailed = false;
+      if (!o["no-self-test"]) {
+        const rows = await dr.runSelfTests(checks, { only, onProgress: (t) => tty && process.stderr.write(`\rTesting ${t}...`.padEnd(40)) });
+        if (tty) process.stderr.write("\r".padEnd(41) + "\r");
+        console.log(`\n${dr.selfTestText(rows)}`);
+        selfTestFailed = rows.some((r) => r.status === "fail");
+      }
       if (o.fix) {
         const cmds = dr.safeFixes(checks);
         if (!cmds.length) console.log("\nNothing to install: no Python environment or R package set is missing that --fix can install.");
@@ -600,7 +641,7 @@ async function main() {
           console.log(`\nAfter the install:\n${dr.doctorText(checks, { only: ["missing", "old"] })}`);
         }
       }
-      process.exitCode = dr.canStart(checks) ? 0 : 1;
+      process.exitCode = dr.canStart(checks) && !selfTestFailed ? 0 : 1;
       return;
     }
     case "programs": {

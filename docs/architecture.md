@@ -388,7 +388,7 @@ class Session {
 
 Built like Claude Code: a scrolling transcript, an input box at the bottom, a status line, and
 modal cards. Esc interrupts. Shift+Tab cycles the mode. Slash commands: `/setup`, `/decisions`,
-`/owner`, `/mode`, `/questions`, `/answer`, `/trail [1|2|3]`, `/graph`, `/review`, `/findings`,
+`/owner`, `/mode`, `/questions`, `/answer`, `/trail [1|2|3]`, `/graph`, `/review`, `/findings`, `/tests`,
 `/export <fmt>`, `/model`, `/adapters`, `/skills`, `/lab`, `/compact`, `/resume`, `/help`,
 `/quit`. Cards: setup form, permission request, question with options and sensitivity table,
 Follow-mode instruction.
@@ -475,3 +475,27 @@ can start and stop it without the command line.
   `description`. `cuvette sessions`, the terminal picker and the app's Sessions page show them.
 - **Tests and windows.** `openWithOs`, the reveal action and the pilot image viewer do nothing
   under vitest or with `CUVETTE_NO_OPEN=1` (`--no-open` sets it).
+
+## Reporting checklist (`src/core/checklist.ts`, 2026-10-11)
+
+`/checklist [arrive|consort|strobe|miqe]` fills a reporting checklist from the record. The harness decision `reporting_guideline` holds the guideline. If the decision has no value, a question card asks for it. The card recommends a guideline from the adapter (`qpcr`, `trial-endpoints`, `epi-rates`) or from the words of the request and the plan.
+
+- **Data files.** `src/core/guidelines/*.yaml` hold the items for four guidelines.
+  - ARRIVE (Animal Research: Reporting of In Vivo Experiments) 2.0 Essential 10.
+  - CONSORT (Consolidated Standards of Reporting Trials) 2010.
+  - STROBE (Strengthening the Reporting of Observational Studies in Epidemiology).
+  - MIQE (Minimum Information for Publication of Quantitative Real-Time PCR Experiments).
+  - Each item has the real item number and a short text. MIQE has no item numbers. Its ids are a section code and a number.
+- **Sources.** Each item lists the places in the record that can answer it. The first place that has a value gives "Covered", with the value and the place.
+  - `decision`: the setup and decision values.
+  - `plan`: the confirmed plan.
+  - `sheet`: the sample sheet.
+  - `data_check`: the data check.
+  - `steps`: a pattern on the tool and the summary of the steps.
+  - `metric`: a pattern on the metrics of the steps.
+  - `software`: the programs and the environment lock.
+  - `plan_changes`: the changes that follow the confirmation of the plan.
+- **Status.** An item is "Covered", "Not in the record" or "Not applicable". An item with no source needs facts from outside the analysis, such as ethics approval or housing. It stays "Not in the record". Its note says to add it by hand.
+- **Question cards.** An item with an `ask` text and no value becomes a question card. The title is `Checklist ARRIVE 4a: Randomisation`. The answer is an `answer` entry in the record. The next `/checklist` reads it and shows the item as "Covered". The answer "not applicable" gives "Not applicable". An answer to a checklist card does not restart the agent.
+- **Offer.** A turn can run a step and leave no open plan step. After such a turn, the session writes one `notice` entry with `checklist: "offer"`. It does this only when the scientist sets a guideline.
+- **Exports.** The checklist is in `trail.md`, `trail.html`, the `Checklist` sheet of `results.xlsx`, and `checklist.md` and `checklist.csv` in the `.eln` file. Without a guideline, no file has a checklist.

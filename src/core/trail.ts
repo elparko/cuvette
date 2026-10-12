@@ -1,10 +1,13 @@
+import { checklistHtml, checklistMarkdown, recordChecklist } from "./checklist.ts";
 import { pilotText, validationRows } from "./pilot.ts";
+import { deviationHtml } from "./freeze.ts";
 import { approvedPlan, planMarkdown, questionsOf } from "./plan.ts";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import type { LoadedAdapter, MapEntry } from "../adapters/manifest.ts";
+import { testsMarkdown, testsTable } from "./testcount.ts";
 import { referencesHtml, referencesMarkdown, sessionCitations, type CitationStyle } from "./citations.ts";
 import { roleInRecord, stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
@@ -303,6 +306,10 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       return { icon: "finding", line: `Finding ${show(d.fid)} ${show(d.action)}${d.reason ? `: ${clip(show(d.reason))}` : ""}`, technical: tech() };
     case "note":
       return { icon: "note", line: clip(show(d.text)), technical: tech() };
+    case "plan_frozen":
+      return { icon: "setup", line: `Plan frozen. SHA-256 ${show(d.hash).slice(0, 12)}`, details: { hash: d.hash, version: d.version }, technical: tech() };
+    case "plan_deviation":
+      return { icon: "deviation", line: `Plan deviation: ${clip(show(d.what))}${d.to !== undefined ? ` (${show(d.from ?? "none")} to ${show(d.to)})` : ""}. Reason: ${clip(show(d.reason || "No reason given"))}`, badges: d.afterResult ? ["Changed after the result was seen"] : undefined, technical: tech() };
     case "plan_approved":
       return { icon: "setup", line: `Confirmed: version ${show(d.version)} of the proposed analysis`, details: { text: d.text, mode: d.mode, answers: d.answers }, technical: tech() };
     case "plan":
@@ -664,7 +671,18 @@ function planHtml(record: AnalysisRecord): string {
   const validation = v
     ? `<h3>Validation against the reference</h3><ul>${v.summary.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="scroll"><table><thead><tr>${v.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${v.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${v.plot ? `${imgTag(v.plot, "Bland-Altman plot")}<p class="muted">Bland-Altman plot. Each dot is one sample: the mean of the two values (across) against the agent minus the reference (up). The dark line is the mean difference. The dashed lines are the mean plus and minus 1.96 SD. The gray dot is the pilot sample.</p>` : ""}`
     : "";
-  return `<section class="plan" id="plan"><h2>Proposed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${p.version}.</p>${updates}${validation}</section>`;
+  return `<section class="plan" id="plan"><h2>Proposed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${p.version}.</p>${updates}${validation}${deviationHtml(record, "h3")}</section>`;
+}
+
+function testsHtml(record: AnalysisRecord): string {
+  const t = testsTable(record);
+  if (!t) return "";
+  return `<h3>Tests in this session</h3><div class="scroll"><table><thead><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+function checklistSection(record: AnalysisRecord): string {
+  const c = recordChecklist(record);
+  return c ? `<section id="checklist">${checklistHtml(c, esc)}</section>` : "";
 }
 
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
@@ -697,7 +715,9 @@ ${title ? `<p class="question"><b>Question</b> ${esc(title)}</p>` : ""}
 <p class="meta"><b>Session</b> ${esc(m.id)} &middot; <b>Adapters</b> ${esc(m.adapters)} &middot; <b>Model</b> ${esc(m.model)} &middot; <b>Date</b> ${esc(m.date)}</p>
 ${planHtml(record)}
 ${settingRowsHtml ? `<h3>Settings</h3><div class="scroll"><table><thead><tr><th>Decision</th><th>Value</th><th>Set by</th></tr></thead><tbody>${settingRowsHtml}</tbody></table></div>` : ""}
+${testsHtml(record)}
 ${sections.join("\n")}
+${checklistSection(record)}
 <section id="cite">${referencesHtml(sessionCitations(record, adapters, stepNumbers(record.nodes())), style)}</section>
 </main></body></html>
 `;
@@ -762,11 +782,14 @@ function markdownText(record: AnalysisRecord, adapters: LoadedAdapter[], style: 
     for (const [k, v] of setup) lines.push(`| ${mdCell(labels.get(k) ?? k)} | ${mdCell(v)} |`);
     lines.push("");
   }
+  lines.push(...testsMarkdown(record));
   lines.push("## Steps", "");
   for (const t of trail(record, 2, adapters)) {
     lines.push(`${t.n}. ${t.line.replace(/\n/g, " ")}${t.badges.map((b) => ` [${b}]`).join("")}`);
     if (t.details) lines.push(...mdDetails(record, t.details));
   }
+  const checklist = recordChecklist(record);
+  if (checklist) lines.push("", ...checklistMarkdown(checklist));
   lines.push("", ...referencesMarkdown(sessionCitations(record, adapters, stepNumbers(record.nodes())), style));
   return lines.join("\n") + "\n";
 }

@@ -1,0 +1,142 @@
+id: arrive
+name: "ARRIVE 2.0 Essential 10"
+full: "Animal Research: Reporting of In Vivo Experiments, version 2.0, Essential 10"
+reference: "Percie du Sert N, et al. PLoS Biology 18(7):e3000410 (2020)"
+guess:
+  adapters: []
+  words: "\\b(mice|mouse|murine|rats?|zebrafish|animals?|in vivo|knockout|litter)\\b"
+items:
+  - id: 1a
+    section: "Study design"
+    text: "Name the groups that you compare, with the control group."
+    from:
+      - { sheet: groups }
+      - { decision: [group_variable, group_column, groups, comparison, calibrator] }
+    ask: "The record has no list of the groups. Add them?"
+  - id: 1b
+    section: "Study design"
+    text: "State the experimental unit, such as one animal, one litter or one cage."
+    from:
+      - { decision: [replicate, replication_unit, replicate_unit, unit_of_replication] }
+      - { plan: data.replicate }
+    ask: "The record has no experimental unit. Add it?"
+  - id: 2a
+    section: "Sample size"
+    text: "Give the number of experimental units in each group and in total."
+    from:
+      - { sheet: size }
+      - { plan: data.n }
+      - { decision: [sample_size, n_per_group] }
+    ask: "The record has no number of units for each group. Add it?"
+  - id: 2b
+    section: "Sample size"
+    text: "Explain how you chose the sample size. Give the details of a calculation made before the study."
+    from:
+      - { decision: [power, sample_size, effect_source] }
+    ask: "The record has no sample size calculation. Add it?"
+  - id: 3a
+    section: "Inclusion and exclusion criteria"
+    text: "Give the criteria for the inclusion and the exclusion of animals and data points. Say if you set them before the study."
+    from:
+      - { decision: [exclusions, exclude_samples, exclude_wells, exclude_flags, exclusion_criteria] }
+      - { plan: exclusions }
+    ask: "The record has no inclusion or exclusion criteria. Add them?"
+  - id: 3b
+    section: "Inclusion and exclusion criteria"
+    text: "For each group, report each animal or data point that you left out of the analysis, with the reason. If none, say so."
+    from:
+      - { decision: [exclusions, exclude_samples, exclude_wells, exclude_flags] }
+      - { plan: exclusions }
+      - { data_check: [empty_group, empty_column, missing, duplicate_rows], clear: "The data check found no empty group, empty column or missing value." }
+    ask: "The record does not say which animals or data points you left out. Add it?"
+  - id: 3c
+    section: "Inclusion and exclusion criteria"
+    text: "Report how many animals or units are in each analysis."
+    from:
+      - { sheet: size }
+      - { plan: data.n }
+      - { metric: ["^n($|_)", "^n_samples", "^n_units", "^n_animals", "^n_cells"] }
+    ask: "The record has no number of units for each analysis. Add it?"
+  - id: 4a
+    section: "Randomisation"
+    text: "Describe the method that made the random sequence. If you did not randomize, say so."
+    from:
+      - { decision: [randomization, randomisation, randomization_method, allocation_method] }
+    ask: "The record has no randomization method. Add it?"
+  - id: 4b
+    section: "Randomisation"
+    text: "Describe how you limited confounders, such as the order of treatment and measurement, or the cage position."
+    from:
+      - { decision: [confounders, batch_effect, covariates, fixed_effects, random_effects] }
+      - { sheet: batches }
+    ask: "The record has no step against confounders. Add it?"
+  - id: "5"
+    section: "Blinding"
+    text: "Say who knew the group of each animal at each stage: allocation, the experiment, the outcome measure and the analysis."
+    from:
+      - { decision: [blinding, blinded, blinding_method, masking] }
+    ask: "The record has no blinding. Add it?"
+  - id: 6a
+    section: "Outcome measures"
+    text: "Define each outcome measure."
+    from:
+      - { plan: definitions }
+      - { decision: [outcome, outcome_variable, endpoint_definition, response] }
+    ask: "The record has no outcome measure. Add it?"
+  - id: 6b
+    section: "Outcome measures"
+    text: "For a test of a hypothesis, name the primary outcome. It is the outcome that set the sample size."
+    from:
+      - { decision: [primary_outcome, endpoint_definition] }
+    ask: "The record has no primary outcome. Add it?"
+  - id: 7a
+    section: "Statistical methods"
+    text: "Give the statistical method of each analysis, with the software."
+    from:
+      - { decision: [test, group_test, two_group_test, binary_test, model_formula, posthoc, p_adjust_method, alternative] }
+      - { steps: "test|anova|regress|model|ttest|t_test|wilcoxon|mann|kruskal|fisher|chi" }
+    ask: "The record has no statistical method. Add it?"
+  - id: 7b
+    section: "Statistical methods"
+    text: "Describe how you checked the assumptions of the method, and what you did if the data did not meet them."
+    from:
+      - { steps: "normality|shapiro|levene|variance|assumption|residual|diagnostic" }
+      - { decision: [equal_variance, variance_model, transform] }
+    ask: "The record has no check of the assumptions. Add it?"
+  - id: 8a
+    section: "Experimental animals"
+    text: "Give the species, strain, sex, developmental stage and weight."
+    hand: "This item is outside the analysis. Add the animal details by hand."
+  - id: 8b
+    section: "Experimental animals"
+    text: "Give other relevant details, such as the source, the genetic changes, the genotype and the health state."
+    hand: "This item is outside the analysis. Add the animal details by hand."
+  - id: 9a
+    section: "Experimental procedures"
+    text: "Say what was done, how it was done and what was used, for each group."
+    hand: "The record holds the analysis, not the experiment. Add the procedure by hand."
+  - id: 9b
+    section: "Experimental procedures"
+    text: "Say when and how often each procedure took place."
+    hand: "The record holds the analysis, not the experiment. Add the times by hand."
+  - id: 9c
+    section: "Experimental procedures"
+    text: "Say where the work took place, with the housing and the time to settle in."
+    hand: "The record has no housing or place. Add them by hand."
+  - id: 9d
+    section: "Experimental procedures"
+    text: "Give the reason for each procedure."
+    hand: "The record holds the analysis, not the experiment. Add the reasons by hand."
+  - id: 10a
+    section: "Results"
+    text: "For each experiment, give summary statistics for each group, with a measure of spread."
+    from:
+      - { metric: ["mean", "median", "^sd", "_sd", "sem", "std", "iqr"] }
+      - { steps: "summary|descriptive" }
+    ask: "The record has no summary statistics. Add them?"
+  - id: 10b
+    section: "Results"
+    text: "If it applies, give the effect size with a confidence interval."
+    from:
+      - { metric: ["lower", "upper", "ci_", "_ci", "conf"] }
+    ask: "The record has no effect size with an interval. Add it?"

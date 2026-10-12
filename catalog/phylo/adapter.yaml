@@ -2,6 +2,7 @@ adapter:
   name: phylo
   field: phylogenetics
   file_types: [".fasta", ".fa", ".phy", ".aln"]
+  file_label: sequence alignment files
   title: MAFFT and IQ-TREE
   version: 0.1.2
   spec: "1"

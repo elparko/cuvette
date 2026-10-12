@@ -1,7 +1,9 @@
+import { testsTable } from "../core/testcount.ts";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import type { Mode, Question } from "../core/types.ts";
 import type { Check } from "../core/doctor.ts";
+import { KEY_GUIDE, KEYS_URL } from "../core/keyhelp.ts";
 import { credentialsPath } from "../core/credentials.ts";
 import type { SettingCtx } from "../core/settings.ts";
 import { ageText, type SessionInfo } from "../core/sessions.ts";
@@ -299,8 +301,13 @@ function rewindCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "rewind" }>): 
   return frame(slot, REWIND_TITLE, "cyan", `<p class="dim small">${esc(REWIND_HELP)}</p><ol class="rewind">${rows}</ol><div class="row end">${btn("Close", act("cancel"), "quiet")}</div>`);
 }
 
+function keyGuideHtml(): string {
+  return `<details class="keyguide"><summary>${esc(KEY_GUIDE.title)}</summary><p class="small">${esc(KEY_GUIDE.intro)}</p><ol class="small">${KEY_GUIDE.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol><ul class="small">${KEY_GUIDE.notes.map((s) => `<li>${esc(s)}</li>`).join("")}</ul><p class="small"><a href="${esc(KEYS_URL)}" target="_blank" rel="noopener">Open the keys page</a></p></details>`;
+}
+
 function keyCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "key" }>, path: string): string {
-  return frame(slot, "Claude API key", "cyan", `${card.reason ? `<p>${esc(card.reason)}</p>` : ""}<p>Paste your key from console.anthropic.com. The page does not show it.</p>
+  return frame(slot, "Claude API key", "cyan", `${card.reason ? `<p>${esc(card.reason)}</p>` : ""}<p>Paste your key from ${esc(KEYS_URL)}. The page does not show it.</p>
+${keyGuideHtml()}
 <p class="dim small">The app checks it with the API, then saves it to ${esc(path)}. Only your user can read that file.</p>
 <label class="field"><span>Key</span><input type="password" name="key" autocomplete="off"></label>
 <div class="row">${btn("Save", act("save"), "primary")}${btn("Close", act("cancel"), "quiet")}</div>`);
@@ -335,7 +342,8 @@ function planCard(c: Ctx, slot: Slot, card: Extract<Card, { t: "plan" }>): strin
   const images = card.images?.length ? `<div class="images">${card.images.map((p) => imageHtml(c, p)).join("")}</div>` : "";
   const details = card.details ? `<div class="row">${btn(st.details ? "Hide the details" : "Show the details", planAct({ a: "details" }), "quiet")}</div>${st.details ? `<div class="plantext details">${itemChips(planTextHtml(card.details))}</div>` : ""}` : "";
   const text = card.stage === "pilot" ? `<div class="plantext">${planTextHtml(card.text)}</div>${images}${settingList(card)}` : `<div class="plantext">${itemChips(planTextHtml(card.text))}</div>${images}`;
-  const head = st.step === "restate" && card.restatement ? `<p class="restate"><strong>You want: ${esc(card.restatement.replace(/^you want:?\s*/i, ""))}</strong></p><p>Is that right?</p><div class="row">${btn("Yes", planAct({ a: "restate", ok: true }), "primary")}${btn("Correct it", planAct({ a: "restate", ok: false }))}</div>` : text + details;
+  const estimate = card.estimate ? `<p class="dim estimate">${esc(card.estimate)}</p>` : "";
+  const head = st.step === "restate" && card.restatement ? `<p class="restate"><strong>You want: ${esc(card.restatement.replace(/^you want:?\s*/i, ""))}</strong></p><p>Is that right?</p><div class="row">${btn("Yes", planAct({ a: "restate", ok: true }), "primary")}${btn("Correct it", planAct({ a: "restate", ok: false }))}</div>` : text + estimate + details;
   const setQ = st.step === "setting" ? settingQuestion(card, st) : undefined;
   let body = "";
   if (st.step === "pick") body = prompt(PICK_LABEL, "text", planAct({ a: "item", n: 0 }), planAct({ a: "back" }));
@@ -574,8 +582,10 @@ export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; colu
       `</div>`,
   );
   if (existsSync(xlsx)) parts.push(`<h4>Tables</h4><p>${fileLink(c, xlsx)}</p>`);
+  const tests = testsTable(c.session.record);
+  if (tests) parts.push(`<h4>Tests in this session</h4><p class="dim small">Each test with a p value. A test on the same data file joins the same family. Change the grouping with the decision test_family. Choose the correction with the decision test_correction.</p>${tableHtml(tests.columns.map(esc), tests.rows.map((r) => r.map((v) => esc(v))))}`);
   if (sheets?.length) {
-    for (const s of sheets) {
+    for (const s of sheets.filter((x) => x.name !== "Tests in this session")) {
       const rows = s.rows.slice(0, 200);
       const table = tableHtml(s.columns.map(esc), rows.map((r) => s.columns.map((_, i) => esc(r[i] ?? ""))));
       const wide = s.columns.length > 3 ? `<div class="row end">${btn("Open full width", `data-wide="1"`, "quiet")}</div>` : "";

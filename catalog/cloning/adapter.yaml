@@ -2,6 +2,7 @@ adapter:
   name: cloning
   field: molecular cloning
   file_types: [".dna", ".gb", ".gbk", ".fasta", ".fa", ".ab1", ".fastq"]
+  file_label: DNA sequence files
   title: Sequences, primers and cloning (Biopython, primer3-py)
   version: 0.1.0
   spec: "1"

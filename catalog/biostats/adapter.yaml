@@ -1415,6 +1415,8 @@ checks:
 
 tests:
   - id: sleep-paired
+    self_test: true
+    source: "Student 1908 (Biometrika 6:1) sleep data, as in the R datasets package. R t.test(extra ~ group, data = sleep, paired = TRUE): t = -4.0621, df = 9, p = 0.002833."
     description: >
       Cushny and Peebles sleep data (R dataset sleep). R t.test(extra ~ group, paired = TRUE) gives
       |t| = 4.0621, df = 9, p = 0.002833, 95 percent CI 0.7001 to 2.4599 for the mean difference 1.58.
@@ -1423,12 +1425,12 @@ tests:
       - tool: compare_two_groups
         args: { path: "{adapter_dir}/data/sleep.csv", outcome: extra, group: group, paired: true, id_column: ID }
     expect:
-      - { path: metrics.mean_diff, approx: 1.58, abs: 1.0e-9 }
-      - { path: metrics.statistic, approx: 4.0621, abs: 0.0001 }
-      - { path: metrics.df, equals: 9 }
-      - { path: metrics.p_value, approx: 0.002833, abs: 0.000001 }
-      - { path: metrics.ci_lo, approx: 0.7001, abs: 0.0005 }
-      - { path: metrics.ci_hi, approx: 2.4599, abs: 0.0005 }
+      - { path: metrics.mean_diff, label: "the mean difference", approx: 1.58, abs: 1.0e-9 }
+      - { path: metrics.statistic, label: "the t statistic", approx: 4.0621, abs: 0.0001 }
+      - { path: metrics.df, label: "the degrees of freedom", equals: 9 }
+      - { path: metrics.p_value, label: "the p value", approx: 0.002833, abs: 0.000001 }
+      - { path: metrics.ci_lo, label: "the lower confidence limit", approx: 0.7001, abs: 0.0005 }
+      - { path: metrics.ci_hi, label: "the upper confidence limit", approx: 2.4599, abs: 0.0005 }
 
   - id: sleep-unpaired-welch
     description: >

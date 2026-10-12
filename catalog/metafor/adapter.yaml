@@ -259,6 +259,8 @@ map:
 
 tests:
   - id: bcg-random-reml
+    self_test: true
+    source: "Viechtbauer 2010, Journal of Statistical Software 36(3), section 4, BCG vaccine trials of Colditz et al. 1994: estimate -0.7145, tau2 0.3132, Q 152.2330."
     description: >
       BCG vaccine trials (metafor dat.bcg, 13 trials; Colditz et al. 1994, JAMA 271:698). Viechtbauer (2010, JSS
       36(3), section 4) prints for the random-effects model with REML: estimate -0.7145, SE 0.1798, z -3.9744,
@@ -271,15 +273,15 @@ tests:
         args: { path: "{adapter_dir}/data/bcg.csv", measure: RR, ai: tpos, bi: tneg, ci: cpos, di: cneg, study: author, model: random, method: REML }
     expect:
       - { path: metrics.k, equals: 13 }
-      - { path: metrics.estimate, approx: -0.7145, abs: 0.0001 }
-      - { path: metrics.se, approx: 0.1798, abs: 0.0001 }
+      - { path: metrics.estimate, label: "the pooled log risk ratio", approx: -0.7145, abs: 0.0001 }
+      - { path: metrics.se, label: "the standard error", approx: 0.1798, abs: 0.0001 }
       - { path: metrics.ci_lo, approx: -1.0669, abs: 0.0001 }
       - { path: metrics.ci_hi, approx: -0.3622, abs: 0.0001 }
-      - { path: metrics.tau2, approx: 0.3132, abs: 0.0001 }
+      - { path: metrics.tau2, label: "tau squared", approx: 0.3132, abs: 0.0001 }
       - { path: metrics.tau2_se, approx: 0.1664, abs: 0.0001 }
-      - { path: metrics.i2, approx: 92.22, abs: 0.005 }
-      - { path: metrics.h2, approx: 12.86, abs: 0.005 }
-      - { path: metrics.q, approx: 152.2330, abs: 0.0001 }
+      - { path: metrics.i2, label: "I squared", approx: 92.22, abs: 0.005 }
+      - { path: metrics.h2, label: "H squared", approx: 12.86, abs: 0.005 }
+      - { path: metrics.q, label: "the Q statistic", approx: 152.2330, abs: 0.0001 }
       - { path: metrics.q_df, equals: 12 }
       - { path: "outputs[0].path", contains: ".png" }
 

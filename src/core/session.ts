@@ -17,11 +17,13 @@ import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
 import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, summarizeOld, summaryMessage } from "./compaction.ts";
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, Masker, phiOn, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
-import { contextWarning, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
+import { BUDGET_WARN, budgetState, cheaperModel, contextWarning, dollars, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
+import { estimateText, modelName } from "./estimate.ts";
 import { loadSettings, xlsxOn, type Settings } from "./config.ts";
 import { outputDir, savedLine, writeResults, type Saved } from "./results.ts";
 import { outputFile, type Dirs } from "../adapters/kinds/common.ts";
-import { ADAPTER_DECISION, decisionHook, DecisionRecord } from "./decisions.ts";
+import { ADAPTER_DECISION, decisionHook, DecisionRecord, REPORTING_DECISION, TEST_DECISIONS } from "./decisions.ts";
+import { buildChecklist, checklistText, GUIDELINE_IDS, GUIDELINE_QUESTION_TITLE, guessGuideline, guidelineId, isChecklistQuestion, itemTitle, loadGuideline, offerText, REPORTING_KEY, setGuideline } from "./checklist.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
 import { accessOf, blocksCode, isCodeTool, usable } from "../adapters/access.ts";
@@ -31,6 +33,7 @@ import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
 import { definitionsOf } from "./plan.ts";
 import { abs, metricsOf, planBatch, swapArgs, writeTable, type BatchPlan, type BatchRow } from "./batch.ts";
+import { NO_REASON, freezePlan, frozenPlan, planChanges, recordDeviation, setDeviationReason, type PlanChange } from "./freeze.ts";
 import { goalOnly, matchSettings, settingsOf, type KnownDecision } from "./plan.ts";
 import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
 import { citationStyle, type CitationStyle } from "./citations.ts";
@@ -40,6 +43,7 @@ import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
+import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
 import { checkFiles, checkTable, dataCheckText, existsTable, fileInfos, listDataFiles, readCsvTable, type CheckItem, type DataCheck } from "./datacheck.ts";
 import { applyEdit, designChecks, groupSummary, readSheet, SAMPLE_COLUMNS, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type DesignIssue, type SampleRow, type SampleSheet } from "./samples.ts";
 import { endTrustOnce, projectSettings, TRUST_OPTIONS, TRUST_TITLE, trustEvidence, trustFolder, trustOnce, trustStatus, trustText, untrustedNotice, untrustFolder, type TrustChoice, type TrustStatus } from "./trust.ts";
@@ -50,11 +54,13 @@ import { branchesOf, branchSession, compareRows, findBranch, openRecord, type Br
 import { Findings, referee, runChecks } from "./review.ts";
 import { runSensitivity } from "./sensitivity.ts";
 import { captureEnv, envTarget, type EnvLock, type EnvTarget } from "./envlock.ts";
+import { selfTestEnabled, selfTestFor, warningCard } from "./selftest.ts";
 import { changeRows, fileSha, liveReasons, recordReasons, replacedNode, stepStatus, type Current, type Reason, type RerunData, type StepState } from "./status.ts";
 import { scriptPython } from "../tools/run_script.ts";
 import {
   ProviderError,
   type Args,
+  type StepResult,
   type Entry,
   type Finding,
   type BusEvent,
@@ -117,7 +123,7 @@ const DATA_CHECK_NOTE = "When you first read a table or list a data folder, the 
 const PLAN_UPDATE_NOTE = "This is a new request in a session with an approved plan. If the request needs analysis steps that are not in the plan, call plan with only what changes: the new steps and the changed sections. The scientist approves the update before a new step runs. If the request needs no new step, answer directly.";
 const PILOT_NOTE = "Pilot: before the first step that changes or counts things, say in one sentence how you will check the method on one sample first. A step that processes many files does not run until the scientist approves a pilot: run the method on one sample, save QC images with outlines of what was counted and what was left out, and call pilot_result.";
 const TECHNICAL = /\b(threshold|otsu|triangle|segmentation model|cellpose model|stardist|cyto\d|diameter|size (filter|limit|cut-?off)|(minimum|maximum|min|max)\.? (cell |object |particle )?size|pixels? (size|area)|sigma|blur|error bars?|standard error|sem|sd bars|test family|t-?test|wilcoxon|mann-?whitney|anova|alpha|significance level|p-?value cut|one-?sided|two-?sided|sidedness|fdr|bonferroni|correction method|random seed|iterations|normali[sz]ation method)\b/i;
-const CHECK_TITLE: Record<string, string> = { missing: "missing values", mixed_type: "text in a number column", decimal_comma: "decimal comma", duplicate_rows: "copied rows", duplicate_ids: "repeated IDs", group_labels: "group names", mixed_units: "units", missing_channel: "missing images", bit_depth: "bit depth", pseudoreplication: "what is n", confounding: "group and batch", too_few: "too few n" };
+const CHECK_TITLE: Record<string, string> = { missing: "missing values", mixed_type: "text in a number column", decimal_comma: "decimal comma", duplicate_rows: "copied rows", duplicate_ids: "repeated IDs", group_labels: "group names", mixed_units: "units", missing_channel: "missing images", bit_depth: "bit depth", pseudoreplication: "what is n", confounding: "group and batch", too_few: "too few n", [METHOD_DATA_CHECK]: METHOD_DATA_TITLE };
 const CLARIFY_SKIP = "No answer. Use your judgment and say what you chose.";
 const SHEET_TITLE = "Sample sheet";
 const PROGRAM_REASON = "chosen by the scientist with /program";
@@ -219,6 +225,7 @@ export class Session {
   runtimes: AdapterRuntime[] = [];
   adapterInfo: { name: string; title: string; version: string; programVersion: string; trust?: string }[] = [];
   private codeAsks = new Map<string, string>();
+  private selfTestAsks = new Map<string, string>();
   pick = false;
   setupPreset: Record<string, unknown> = {};
   history: Message[] = [];
@@ -252,6 +259,7 @@ export class Session {
   planning = false;
   plan?: AnalysisPlan;
   private planUpdate = false;
+  private replanReason = "";
   private planVersion = 0;
   private approvedEntry = 0;
   private planWait?: Pending<PlanResponse>;
@@ -259,12 +267,14 @@ export class Session {
   private modeBefore: Mode = "watch";
   private planLooks = 0;
   private planWarned = new Set<string>();
+  private budgetAsked = false;
   private stopTurn = false;
   private endTurn?: string;
   private batchAllow = new Set<string>();
   pilotStage = false;
   private clarified = false;
   private checked = new Set<string>();
+  private noCompareNoted = false;
   private sheet?: SampleSheet;
   private toolsHinted = false;
   private planStart = 0;
@@ -386,8 +396,9 @@ export class Session {
         this.notes.push(`The default adapter ${a.name} did not start: ${(e as Error).message}`);
       }
 
-    this.decisions = new DecisionRecord(this.adapters, this.record, this.pick ? [ADAPTER_DECISION] : []);
+    this.decisions = new DecisionRecord(this.adapters, this.record, [...(this.pick ? [ADAPTER_DECISION] : []), ...TEST_DECISIONS, REPORTING_DECISION]);
     this.interactive = !!opts.interactive;
+    this.decisions.onDeviation = (e) => this.askMissingReason(e);
     const pf = this.settings.planFirst;
     this.planFirst = pf === undefined ? !!opts.interactive : pf === true || pf === "on";
     const approved = approvedPlan(this.record);
@@ -688,6 +699,42 @@ export class Session {
     return { ok: true, text: `The program is now ${a.manifest.program.name} through ${a.name}. The agent uses it from the next step.` };
   }
 
+  private async selfTestGate(a: LoadedAdapter, names: string[]): Promise<string | undefined> {
+    if (!selfTestEnabled()) return undefined;
+    const done = await selfTestFor(a, this.runtimes.at(-1)!).catch(() => undefined);
+    if (!done) return undefined;
+    const { result, cached } = done;
+    this.record.append("self_test", { adapter: a.name, cached, ...result });
+    if (result.status === "error") this.record.append("notice", { text: `The self-test of the adapter ${a.name} did not run. ${result.message}.` });
+    if (result.status !== "fail") return undefined;
+    let q = this.selfTestAsks.has(a.name) ? this.questions.get(this.selfTestAsks.get(a.name)!) : undefined;
+    if (!q) {
+      q = await this.questions.ask(warningCard(a.name, result));
+      this.selfTestAsks.set(a.name, q.qid);
+      this.bus.emit({ type: "question", question: q });
+      this.record.append("blocked", { tool: "use_adapter", reason: `waiting for the scientist: self-test of ${a.name}`, qid: q.qid });
+    }
+    if (q.status === "open" && this.settings.askWaits) {
+      this.waitedQids.add(q.qid);
+      this.bus.emit({ type: "status", state: "waiting", tool: "use_adapter" });
+      try {
+        await abortable(this.questions.wait(q.qid), this.abort?.signal);
+      } catch {}
+      q = this.questions.get(q.qid) ?? q;
+    }
+    if (q.answer === "continue") {
+      this.record.append("notice", { text: `The scientist continued with the adapter ${a.name} after the self-test failed: ${result.message}.` });
+      return undefined;
+    }
+    const rt = this.runtimes.pop();
+    await rt?.close().catch(() => {});
+    this.runtimeInfo.pop();
+    this.adapterInfo.pop();
+    this.envTargets.delete(a.name);
+    for (const n of names) this.tools.delete(n);
+    return q.status === "open" ? `BLOCKED: the self-test of ${a.name} failed (${result.message}). Question ${q.qid} waits for the scientist: continue or stop.` : `The adapter ${a.name} is not loaded. Its self-test failed (${result.message}) and the scientist stopped it.`;
+  }
+
   private async confirmUnlistedCode(a: LoadedAdapter): Promise<string | undefined> {
     const t = adapterTrust(a.root);
     if (t.codeConfirmed) return undefined;
@@ -742,6 +789,8 @@ export class Session {
       this.record.append("notice", { text: msg });
       return { ok: false, error: msg };
     }
+    const stopped = await this.selfTestGate(a, names);
+    if (stopped) return { ok: false, error: stopped };
     this.adapters.push(a);
     const added = this.decisions.addAdapter(a, this.setupPreset);
     const planned = this.activePlan();
@@ -868,15 +917,10 @@ export class Session {
           this.record.append("notice", { text: "Stopped before the content went to the model. Nothing was sent." });
           return "";
         }
+        if (!(await this.budgetGate(signal))) return "";
         await this.maybeCompact(signal);
         this.bus.emit({ type: "status", state: "thinking" });
-        const res = await this.provider.step({
-          system: this.system,
-          messages: this.history,
-          tools: forceAnswer ? [] : this.activeSchemas(),
-          signal,
-          onDelta: (d) => this.bus.emit({ type: "delta", kind: d.type, text: d.text }),
-        });
+        const res = await this.stepWithRecovery(forceAnswer, signal);
         this.push(res.message);
         this.record.append("usage", { ...res.usage, model: this.provider.info.model, provider: this.provider.info.provider, local: isLocal(this.provider.info) });
         this.checkContext();
@@ -1016,6 +1060,75 @@ export class Session {
     }
   }
 
+  recoveryWaitMs = 60_000;
+  recoveryRounds = 3;
+
+  private async stepWithRecovery(noTools: boolean, signal: AbortSignal): Promise<StepResult> {
+    let rounds = 0;
+    for (;;) {
+      let retried = false;
+      try {
+        const res = await this.provider.step({
+          system: this.system,
+          messages: this.history,
+          tools: noTools ? [] : this.activeSchemas(),
+          signal,
+          onDelta: (d) => this.bus.emit({ type: "delta", kind: d.type, text: d.text }),
+          onRetry: (r) => {
+            retried = true;
+            const text = `Waiting to retry (${r.attempt} of ${r.of})`;
+            this.bus.emit({ type: "status", state: "thinking", purpose: text });
+            this.record.append("notice", { text: `${text}: ${r.reason}. The next try is in ${Math.round(r.waitMs / 1000)} s.` });
+          },
+        });
+        if (retried) this.bus.emit({ type: "status", state: "thinking" });
+        return res;
+      } catch (e) {
+        if (!(e instanceof ProviderError) || !e.transient || signal.aborted) throw e;
+        this.record.append("notice", { text: "The model did not answer after three tries. The conversation is saved up to the last finished step." });
+        if (this.settings.headless) {
+          if (++rounds > this.recoveryRounds) throw new ProviderError(`${e.message} The run waited ${this.recoveryRounds} times and then stopped.`);
+          this.record.append("notice", { text: `No one can answer the card in a headless run. Waiting to try again (round ${rounds} of ${this.recoveryRounds}).` });
+          await abortable(new Promise((r) => setTimeout(r, this.recoveryWaitMs)), signal);
+          continue;
+        }
+        const choice = await this.askRecovery(e.message, signal);
+        if (choice === "stop") throw e;
+        if (choice === "local") {
+          const problem = await this.useLocalModel("the Claude API could not be reached");
+          if (problem) this.record.append("notice", { text: `The local model did not start: ${problem}` });
+        }
+      }
+    }
+  }
+
+  private async askRecovery(problem: string, signal: AbortSignal): Promise<"resume" | "local" | "stop"> {
+    const local = this.localSpec();
+    const options = [
+      { value: "resume", label: "Resume" },
+      ...(local ? [{ value: "local", label: "Switch to the local model" }] : []),
+      { value: "stop", label: "Stop" },
+    ];
+    const q = await this.questions.ask({
+      decisionKey: "",
+      title: "The model did not answer",
+      text: `${problem} The finished steps are saved. Resume goes on from the last finished step. No finished step runs again.`,
+      options,
+      recommendation: { value: "resume", reason: "A short network failure usually ends." },
+      evidence: "",
+    });
+    this.bus.emit({ type: "question", question: q });
+    this.bus.emit({ type: "status", state: "waiting" });
+    this.waitedQids.add(q.qid);
+    try {
+      const done = await abortable(this.questions.wait(q.qid), signal);
+      const answer = String(done.answer);
+      return answer === "resume" || answer === "local" ? answer : "stop";
+    } catch {
+      return "stop";
+    }
+  }
+
   titling?: Promise<void>;
 
   private async retitle(turnStart: number): Promise<void> {
@@ -1139,6 +1252,53 @@ export class Session {
     return spec && /^(ollama|openai):/.test(spec) ? spec : undefined;
   }
 
+  private async budgetGate(signal: AbortSignal): Promise<boolean> {
+    const b = isLocal(this.provider.info) ? undefined : budgetState();
+    if (!b || b.ratio < BUDGET_WARN) {
+      this.budgetAsked = false;
+      return true;
+    }
+    if (this.budgetAsked || b.ratio >= 1) return true;
+    this.budgetAsked = true;
+    const used = `${dollars(b.spent)} of your ${dollars(b.budget)} limit is used this month.`;
+    if (this.settings.headless || !this.interactive) {
+      this.record.append("notice", { text: `${used} Claude requests stop at the limit.` });
+      return true;
+    }
+    const cheaper = cheaperModel(this.provider.info.model);
+    const options = [
+      { value: "continue", label: "Continue with this model" },
+      ...(cheaper ? [{ value: "cheaper", label: `Switch to ${modelName(cheaper)}, which costs less` }] : []),
+      { value: "stop", label: "Stop now" },
+    ];
+    const q = await this.questions.ask({ decisionKey: "", title: "Spend limit nearly reached", text: `${used} Claude requests stop at the limit. What do you want to do?`, options, evidence: "" });
+    this.bus.emit({ type: "question", question: q });
+    this.waitedQids.add(q.qid);
+    this.bus.emit({ type: "status", state: "waiting", tool: "spend limit" });
+    let answer: unknown;
+    try {
+      answer = (await abortable(this.questions.wait(q.qid), signal)).answer;
+    } catch {
+      return false;
+    }
+    this.bus.emit({ type: "status", state: "thinking" });
+    if (answer === "stop") {
+      this.record.append("notice", { text: "Stopped at your choice, near the spend limit. Nothing more was sent." });
+      return false;
+    }
+    if (answer === "cheaper" && cheaper) {
+      await this.applySetting("model", `claude:${cheaper}`);
+      this.record.append("notice", { text: `The model is now ${modelName(cheaper)}.` });
+    }
+    return true;
+  }
+
+  private planEstimate(plan: AnalysisPlan): string {
+    const steps = plan.steps.filter((x) => x.status !== "skipped").length;
+    const b = budgetState();
+    return estimateText(this.provider.info.model, steps, isLocal(this.provider.info), b ? Math.max(0, b.budget - b.spent) : undefined);
+  }
+
   private async phiGate(signal: AbortSignal): Promise<boolean> {
     const from = Math.min(this.phiFrom, this.history.length);
     this.phiFrom = this.history.length;
@@ -1215,7 +1375,7 @@ export class Session {
     this.phiWaits.get(rid)?.resolve(action);
   }
 
-  private async useLocalModel(): Promise<string | undefined> {
+  private async useLocalModel(reason = "patient data card"): Promise<string | undefined> {
     const spec = this.localSpec();
     if (!spec) return "no local model is set (the local_model setting).";
     const old = this.settings.model;
@@ -1224,7 +1384,7 @@ export class Session {
     } catch (e) {
       return (e as Error).message;
     }
-    this.record.append("setting", { name: "model", old, new: spec, scope: "session", reason: "patient data card" });
+    this.record.append("setting", { name: "model", old, new: spec, scope: "session", reason });
     if (this.refereeProvider && isCloud(this.refereeProvider.info)) {
       this.refereeProvider = undefined;
       this.record.append("notice", { text: "The referee is off for this session: its model is a cloud model." });
@@ -1311,7 +1471,51 @@ export class Session {
     const annotated = annotate(finalAnswer, finalClaims) + (tail ? `\n\n${tail}` : "");
     this.record.append("assistant", { text: shown, annotated, final: true, findings: fids, settings, results: missing || undefined });
     this.lastAnswer = finalAnswer;
+    this.offerChecklist();
     return { text: annotated };
+  }
+
+  private offerChecklist(): void {
+    const id = setGuideline(this.record);
+    if (!id || this.record.entries(["notice"]).some((e) => e.data.checklist === "offer")) return;
+    const turnStart = this.lastRequest()?.id ?? 0;
+    if (!this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf)) return;
+    if (this.plan?.steps.some((s) => s.tool && s.status !== "done" && s.status !== "skipped")) return;
+    this.record.append("notice", { text: offerText(buildChecklist(this.record, id)), checklist: "offer" });
+  }
+
+  async checklist(arg = ""): Promise<{ text: string; asked: number }> {
+    const want = arg.trim().toLowerCase();
+    if (want && !guidelineId(want)) throw new Error("Use: /checklist or /checklist arrive, consort, strobe or miqe.");
+    if (want) this.decisions.change(REPORTING_KEY, want, { by: "human", reason: "set with /checklist" });
+    const id = setGuideline(this.record);
+    if (!id) {
+      if (!this.questions.open().some((q) => q.title === GUIDELINE_QUESTION_TITLE)) {
+        const guess = guessGuideline(this.record, this.adapters.map((a) => a.name));
+        const q = await this.questions.ask({
+          decisionKey: REPORTING_KEY,
+          title: GUIDELINE_QUESTION_TITLE,
+          text: guess ? `Which reporting guideline does the journal ask for? ${loadGuideline(guess.id).name} fits, because ${guess.why}.` : "Which reporting guideline does the journal ask for?",
+          options: GUIDELINE_IDS.map((g) => ({ value: g, label: loadGuideline(g).name })),
+          recommendation: guess ? { value: guess.id, reason: guess.why } : undefined,
+          evidence: "",
+        });
+        this.bus.emit({ type: "question", question: q });
+      }
+      return { text: "Choose the reporting guideline in the question card. Then type /checklist again.", asked: 1 };
+    }
+    const list = buildChecklist(this.record, id);
+    const open = new Set(this.questions.open().map((q) => q.title));
+    let asked = 0;
+    for (const item of list.items) {
+      const title = itemTitle(list.guideline, item);
+      if (item.status !== "missing" || !item.ask || open.has(title)) continue;
+      const q = await this.questions.ask({ decisionKey: "", title, text: item.ask, options: [{ value: "not applicable", label: "Not applicable" }], evidence: "" });
+      this.bus.emit({ type: "question", question: q });
+      asked++;
+    }
+    const tail = asked ? `\n\n${asked} question ${asked === 1 ? "card asks" : "cards ask"} for items that are not in the record. Each answer goes into the record. Type /checklist again to see the result.` : "";
+    return { text: checklistText(list) + tail, asked };
   }
 
   private resultsNotIn(answer: string): string {
@@ -2104,8 +2308,9 @@ export class Session {
     const q = this.questions.answer(qid, value, note);
     if (q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by: "human", reason: `answer to ${qid}` });
     if (waited) return;
+    const quiet = isChecklistQuestion(q);
     this.notes.push(`The scientist answered ${qid} (${q.title}): ${String(q.answer)}${note ? ` - ${note}` : ""}.`);
-    if (!this.busy && this.settings.autoResume && this.history.length) void this.send("Continue the analysis with this answer.", { internal: true }).catch(() => {});
+    if (!quiet && !this.busy && this.settings.autoResume && this.history.length) void this.send("Continue the analysis with this answer.", { internal: true }).catch(() => {});
   }
 
   async changeAnswer(qid: string, value: unknown, note = ""): Promise<string[]> {
@@ -2329,6 +2534,31 @@ export class Session {
     }
   }
 
+  private noteDeviation(change: PlanChange, source: string, reason: string): void {
+    const e = recordDeviation(this.record, change, source, reason);
+    if (e) this.askMissingReason(e);
+  }
+
+  private askMissingReason(e: Entry): void {
+    if (e.data.reason || !this.interactive || this.settings.headless) return;
+    const d = e.data;
+    void this.askDeviationReason(e.id, `${String(d.what)}${d.to !== undefined ? ` (${String(d.from ?? "none")} to ${String(d.to)})` : ""}`);
+  }
+
+  private async askDeviationReason(id: number, what: string): Promise<void> {
+    const q = await this.questions.ask({
+      decisionKey: "",
+      title: "Why did the plan change?",
+      text: `The confirmed plan changed: ${what}. The report lists each change with its reason. Type a short reason.`,
+      options: [{ value: NO_REASON, label: NO_REASON }],
+      recommendation: undefined,
+      evidence: "",
+    });
+    this.bus.emit({ type: "question", question: q });
+    const done = await this.questions.wait(q.qid);
+    if (done.status === "answered" && typeof done.answer === "string" && done.answer !== NO_REASON) setDeviationReason(this.record, id, done.answer);
+  }
+
   private changeDefinition(d: { measure: string; old: string; new: string }) {
     this.record.append("decision", { key: `definition:${d.measure}`, old: d.old, new: d.new, by: "human", reason: "the scientist changed the definition" });
   }
@@ -2343,8 +2573,12 @@ export class Session {
 
   private approvePlan(plan: AnalysisPlan, version: number, target: Mode, answers: string[], pilot?: PilotRun): number {
     const text = planText(plan);
+    const before = this.plan;
     this.plan = structuredClone(plan);
     this.approvedEntry = this.record.append("plan_approved", { phase: "Confirmed", version, text, plan: structuredClone(plan), mode: target, update: this.planUpdate, answers, ...(pilot ? { pilot } : {}) }).id;
+    if (!frozenPlan(this.record)) freezePlan(this.record, plan, version, this.approvedEntry);
+    else if (before) for (const c of planChanges(before, plan, { settings: false })) this.noteDeviation(c, "replan", this.replanReason);
+    this.replanReason = "";
     this.planWarned.clear();
     return this.approvedEntry;
   }
@@ -2684,8 +2918,9 @@ export class Session {
       const added = addedSteps(prev, next);
       const skipped = next.steps.filter((x) => x.status === "skipped" && prev.steps.find((p) => p.step.toLowerCase() === x.step.toLowerCase())?.status !== "skipped");
       const sections = (["restatement", "question", "definitions", "exclusions", "pilot", "reference", "data", "programs", "outputs", "checks", "out_of_scope"] as const).some((k) => given[k] !== undefined);
-      const changed = added.length > 0 || skipped.length > 0 || sections;
-      if (changed && !reason && ![...added, ...skipped].every((x) => x.reason)) return { ok: false, error: "Give the reason for this change of the approved plan in reason. The scientist sees it." };
+      const diffs = planChanges(prev, next);
+      const changed = added.length > 0 || skipped.length > 0 || sections || diffs.length > 0;
+      if (changed && !reason && (![...added, ...skipped].every((x) => x.reason) || diffs.some((c) => c.kind !== "step"))) return { ok: false, error: "Give the reason for this change of the approved plan in reason. The scientist sees it." };
       const ran = this.record.nodes().filter((n) => n.entry > this.approvedEntry && !n.sensitivityOf).map((n) => n.tool);
       for (const x of added) if (x.status === "todo" && ran.some((t) => matchStep({ steps: [x] }, t, this.findTool(t)?.adapter) === 0)) x.status = "done";
       for (const d of given.definitions ?? []) {
@@ -2694,12 +2929,14 @@ export class Session {
       }
       this.plan = next;
       if (changed) this.planVersion++;
+      for (const c of diffs) this.noteDeviation(c, "plan_update", reason || [...added, ...skipped].map((x) => x.reason).join(" "));
       this.record.append("plan", { action: changed ? "updated" : "status", version: this.planVersion, reason: reason || [...added, ...skipped].map((x) => x.reason).join(" "), text: planText(next), plan: structuredClone(next) });
       for (const x of skipped) this.record.append("notice", { text: `Skipped from the approved plan: ${x.step}. Reason: ${x.reason || reason}`, plan: "skipped" });
       for (const x of added) this.record.append("notice", { text: `Added to the approved plan: ${x.step}. Reason: ${x.reason || reason}`, plan: "added" });
       return { ok: true, summary: changed ? `The plan is now version ${this.planVersion}. The scientist sees the change and the reason.` : "Plan status saved." };
     }
     if (!this.planUpdate && !this.clarified) return { ok: false, error: "Phase 1 first: call clarify with what you found in the data and your clarifying questions about meaning (or none). Then call plan with the proposed analysis." };
+    if (this.planUpdate && reason) this.replanReason = reason;
     const plan = this.planUpdate && this.plan ? mergePlan(this.plan, given) : ({ steps: [], ...readPlan(a) } as AnalysisPlan);
     if (this.method && !this.planUpdate) fillFromMethod(plan, this.method);
     if (plan.restatement) {
@@ -2745,6 +2982,7 @@ export class Session {
         restatement: plan.restatement,
         definitions: plan.definitions,
         pilot: plan.pilot?.sample,
+        estimate: this.planEstimate(plan) || undefined,
       });
       if (!r || r.action !== "set") break;
       const target = settingsOf(plan)[r.index]?.setting;
@@ -3021,6 +3259,29 @@ export class Session {
     return items.filter((i, k) => i.level === "ask" && !done.has(`data_check:${i.id}`) && items.findIndex((x) => x.id === i.id) === k).slice(0, 8);
   }
 
+  private compareWithMethod(now: DataSummary): CheckItem[] {
+    if (!this.method) return [];
+    if (!this.method.inputs?.length) {
+      if (!this.noCompareNoted) this.record.append("notice", { text: `The method ${this.method.name} has no stored summary of its data. Cuvette cannot compare the new data with the old data. The next save of a method stores the summary.` });
+      this.noCompareNoted = true;
+      return [];
+    }
+    const before = matchSummary(this.method.inputs, now);
+    if (!before) return [];
+    const found = compareChecks(before, now);
+    this.record.append("data_compare", { method: this.method.name, source: now.source, before: before.source, differences: found });
+    return found.slice(0, 8).map((d) => ({
+      id: `${METHOD_DATA_CHECK}:${now.source}:${d.id}`,
+      check: METHOD_DATA_CHECK,
+      level: "ask" as const,
+      column: d.column,
+      text: d.text,
+      question: `${d.text} The method ${this.method!.name} used the old data. Continue with the new data, or stop?`,
+      options: [{ value: "continue", label: "Continue. The new data is correct" }, { value: "stop", label: "Stop. I check the data" }],
+      recommendation: d.kind === "unit" ? "stop" : "continue",
+    }));
+  }
+
   private checkData(name: string, args: Args, output: ToolOutput): string {
     const given = ["path", "folder", "input", "dir", "directory", "input_dir", "data_dir"].map((k) => args[k]).filter((v): v is string => typeof v === "string" && isAbsolute(v));
     const own = (p: string) => [this.dir, this.outputDir, cuvetteHome()].some((d) => p === d || p.startsWith(`${d}/`));
@@ -3038,6 +3299,7 @@ export class Session {
       this.checked.add(f.label);
       let check: DataCheck;
       let sheet: SampleSheet | undefined;
+      let summaryOf: DataSummary | undefined;
       try {
         if (f.kind === "files") {
           const rels = listDataFiles(f.path);
@@ -3049,13 +3311,16 @@ export class Session {
           const t = readCsvTable(f.path);
           if (!t.rows.length) continue;
           check = checkTable(t, f.label);
+          summaryOf = summarizeTable(t, f.label);
           if (!this.sheet) sheet = sheetFromTable(t, f.label);
         }
       } catch {
         continue;
       }
+      const summary = f.kind === "table" ? summaryOf : undefined;
+      if (summary) check.items.push(...this.compareWithMethod(summary));
       const text = dataCheckText(check);
-      this.record.append("data_check", { source: f.label, kind: check.kind, size: check.size, items: check.items, groups: check.groups ?? null, units: check.units ?? [], text });
+      this.record.append("data_check", { source: f.label, kind: check.kind, size: check.size, items: check.items, groups: check.groups ?? null, units: check.units ?? [], text, summary: summary ?? null });
       out.push(`Data check by the harness (code, not a model):\n${text}`);
       if (check.items.some((i) => i.level === "ask")) out.push(this.planning ? "The harness asks the scientist about each problem under Questions for you in the Questions stage. Do not ask about them again." : "Ask the scientist about each problem under Questions for you before a step uses the data.");
       if (sheet?.rows.length) {

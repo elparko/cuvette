@@ -2,6 +2,8 @@ adapter:
   name: cellprofiler
   field: microscopy
   file_types: [".tif", ".tiff", ".png", ".cppipe"]
+  file_magic: ["49492a00", "4d4d002a", "89504e470d0a1a0a"]
+  file_label: image files
   title: CellProfiler
   version: 0.1.3
   spec: "1"
