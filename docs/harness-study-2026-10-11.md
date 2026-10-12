@@ -73,7 +73,8 @@ p value. Use it to test a harness change on the same papers before and after.
 ## How to check it on a local model
 
 The check costs nothing, because it uses a local model. A 16k window makes the
-largest earlier request (28,893 tokens, wolf2018) too large without compaction.
+largest earlier wolf2018 requests (21,717 tokens on 9 October, 28,893 on 8 October)
+too large without compaction.
 
 1. Run one paper on qwen3:8b with `numCtx` 16384.
 2. Look for the notices that start with "The harness shortened" and for a
@@ -82,10 +83,12 @@ largest earlier request (28,893 tokens, wolf2018) too large without compaction.
 
 ## Result of the local check (11 October 2026)
 
-| Setting | Status | Computed items | Summaries | Shortened outputs | Largest request |
-|---|---|---|---|---|---|
-| wolf2018-scanpy, qwen3:8b, window 16,384 | answer | 6 of 6 | 5 | 3 | 14,843 tokens |
-| Same paper, window 32,768 (final benchmark, 9 October) | answer | 6 of 6 | 0 | 0 | 28,893 tokens |
+| Setting | Status | Computed items | Summaries | Shortened outputs | Largest request | Input tokens |
+|---|---|---|---|---|---|---|
+| wolf2018-scanpy, qwen3:8b, window 16,384 | answer | 6 of 6 | 5 | 3 | 14,843 | 155,030 |
+| Same paper, window 32,768 (final benchmark, 9 October) | answer | 6 of 6 | 0 | 0 | 21,717 | 166,045 |
+
+The 9 October request of 21,717 tokens is too large for a 16,384 window.
 
 All context management happened inside one turn. The largest request stayed below
 the window. This is one run on one paper, so it shows no overflow. It does not show
