@@ -36,6 +36,7 @@ run_tool(function() {
 
   grp_rows <- list()
   cmp_rows <- list()
+  skipped <- character()
   for (pp in pops) {
     dd <- d[d$population == pp & is.finite(d$value), ]
     levs <- sort(unique(dd$group))
@@ -47,18 +48,18 @@ run_tool(function() {
       v <- dd$value[dd$group == g]
       grp_rows[[length(grp_rows) + 1]] <- data.frame(population = pp, group = g, n = length(v), mean = mean(v), sd = if (length(v) > 1) sd(v) else NA, sem = if (length(v) > 1) sd(v) / sqrt(length(v)) else NA, median = median(v), stringsAsFactors = FALSE)
     }
-    pairs <- if (!is.null(ref)) lapply(setdiff(levs, ref), function(g) c(ref, g)) else combn(levs, 2, simplify = FALSE)
+    pairs <- if (!is.null(ref)) lapply(setdiff(levs, ref), function(g) c(ref, g)) else if (length(levs) >= 2) combn(levs, 2, simplify = FALSE) else list()
     for (pr in pairs) {
       a <- dd[dd$group == pr[1], ]
       b <- dd[dd$group == pr[2], ]
-      if (nrow(a) < 2 || nrow(b) < 2) next
+      if (nrow(a) < 2 || nrow(b) < 2) { skipped <- c(skipped, sprintf("%s %s against %s (fewer than 2 samples)", pp, pr[2], pr[1])); next }
       res <- if (test == "paired") {
         m <- merge(a[, c(pair_col, "value")], b[, c(pair_col, "value")], by = pair_col)
         tryCatch(t.test(m$value.y, m$value.x, paired = TRUE), error = function(e) NULL)
       } else if (test == "mann-whitney") {
         tryCatch(wilcox.test(b$value, a$value, exact = FALSE, conf.int = FALSE), error = function(e) NULL)
       } else tryCatch(t.test(b$value, a$value, var.equal = test == "student"), error = function(e) NULL)
-      if (is.null(res)) next
+      if (is.null(res)) { skipped <- c(skipped, sprintf("%s %s against %s (the test failed)", pp, pr[2], pr[1])); next }
       cmp_rows[[length(cmp_rows) + 1]] <- data.frame(population = pp, group_a = pr[1], group_b = pr[2], mean_a = mean(a$value), mean_b = mean(b$value), difference_b_minus_a = mean(b$value) - mean(a$value),
         ci_low = if (!is.null(res$conf.int)) res$conf.int[1] else NA, ci_high = if (!is.null(res$conf.int)) res$conf.int[2] else NA, statistic = unname(res$statistic), df = if (!is.null(res$parameter)) unname(res$parameter) else NA, p_value = res$p.value, stringsAsFactors = FALSE)
     }
@@ -82,7 +83,7 @@ run_tool(function() {
     }
   })
 
-  metrics <- list(n_populations = length(pops), n_comparisons = nrow(cmp))
+  metrics <- list(n_populations = length(pops), n_comparisons = nrow(cmp), n_comparisons_skipped = length(skipped))
   for (i in seq_len(nrow(grp))) {
     tag <- paste(pop_tag(grp$population[i]), clean_name(grp$group[i]), sep = "_")
     metrics[[paste0("mean_", tag)]] <- grp$mean[i]
@@ -99,7 +100,8 @@ run_tool(function() {
   per <- if (nrow(cmp)) paste(head(sprintf("%s, %s against %s: difference %s, p %s (%s %s)", cmp$population, cmp$group_b, cmp$group_a, fmt(cmp$difference_b_minus_a), fmt(cmp$p_value), adjust, fmt(cmp$p_adjusted)), 20), collapse = "; ") else "no comparison (a group has fewer than 2 samples)"
   emit(list(
     ok = TRUE,
-    summary = sprintf("%s of %d populations in groups of %s. Test: %s. %s.", metric, length(pops), group_col, test, per),
+    summary = sprintf("%s of %d populations in groups of %s. Test: %s. %s.%s", metric, length(pops), group_col, test, per,
+      if (length(skipped)) sprintf(" Not tested, and not in the %s adjustment: %s.", adjust, paste(head(skipped, 10), collapse = "; ")) else ""),
     metrics = metrics,
     data = list(groups_file = out_path("groups"), comparisons_file = if (nrow(cmp)) out_path("comparisons") else NULL, test = test, adjust = adjust),
     table = table_of(if (nrow(cmp)) cmp else grp, out_path("groups")),
