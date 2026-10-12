@@ -44,6 +44,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
   const [done, setDone] = useState(false);
   const [starting, setStarting] = useState(false);
   const [folder, setFolder] = useState(ctx.state.folder);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     call<FirstStart>("api/firststart", {})
@@ -59,6 +60,8 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
   };
 
   const saveKey = async () => {
+    if (checking || !key.trim()) return;
+    setChecking(true);
     setMsg("Checking the key…");
     try {
       const r = await call<{ text: string }>("api/firststart/claude", { key });
@@ -68,6 +71,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
     } catch (e) {
       setMsg((e as Error).message);
     }
+    setChecking(false);
   };
 
   const useLocal = async (m: string) => {
@@ -127,7 +131,9 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
                   className="pl-9 font-mono"
                 />
               </div>
-              <Button onClick={saveKey}>Save the key</Button>
+              <Button onClick={saveKey} disabled={checking || !key.trim()}>
+                Save the key
+              </Button>
             </div>
           </div>
         )}

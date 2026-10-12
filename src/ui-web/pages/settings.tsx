@@ -137,7 +137,7 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
     setSaved(r.name, next);
     if (next.ok) setPending(null);
     await reload();
-    if (!ctx.state.session) ctx.boot();
+    ctx.boot();
   };
 
   const save = (scope: string) => {

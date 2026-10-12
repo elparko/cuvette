@@ -156,18 +156,22 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     return () => clearInterval(t);
   }, [busy, stream.items.length]);
 
+  const itemCount = useRef(0);
+  itemCount.current = stream.items.length;
   const send = useCallback(async (value: string, now = false) => {
-    if (!value.trim()) return;
+    if (!value.trim()) return true;
     askNotify();
     if (!value.trim().startsWith("/") && (!busy || now)) {
-      sentAt.current = stream.items.length;
+      sentAt.current = itemCount.current;
       setSent(value.trim());
     }
     try {
-      await post("api/send", { text: value, now });
+      await call("api/send", { text: value, now });
+      return true;
     } catch (e) {
       setSent("");
-      throw e;
+      toast.error((e as Error).message);
+      return false;
     }
   }, [busy]);
 
@@ -238,13 +242,14 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   // Side panel tab.
   const loadTab = useCallback(
     async (quiet: boolean) => {
+      if (!side) return;
       const box = tabRef.current;
       if (quiet && box && box.contains(document.activeElement) && document.activeElement !== box) return;
       try {
         setTabHtml(await call<string>("api/tab?name=" + tab));
       } catch {}
     },
-    [tab],
+    [tab, side],
   );
   useEffect(() => {
     void loadTab(false);
@@ -260,6 +265,8 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
       if (typing(document.activeElement) || document.querySelector("[role=dialog], [role=menu]")) return;
       const card = activeCard(cardsRef.current);
       if (!card) return;
+      const a = document.activeElement;
+      if (a && !cardsRef.current!.contains(a) && (e.key === "Enter" ? a.closest("button, a[href], summary, [role=tab], [role=button]") : a.closest("[role=tab]"))) return;
       const bs = optionButtons(card);
       const i = Number(card.dataset.sel || 0);
       if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) {
@@ -386,6 +393,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         list = await call<Command[]>("api/commands");
         setCommands(list);
       } catch {}
+      if (inputRef.current?.value !== v) return;
     }
     setSugg(list.filter((c) => c.name.startsWith(v.slice(1).toLowerCase())).slice(0, 8));
     setSel(0);
@@ -408,7 +416,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     const v = text;
     setText("");
     setSugg([]);
-    void send(v, now);
+    void send(v, now).then((ok) => ok || setText((t) => t || v));
   };
 
   useLayoutEffect(() => {
@@ -458,7 +466,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
           <ModelMenu model={session.model} busy={busy} openSettings={() => ctx.go("settings")} />
           <ModeMenu mode={status.mode ?? "watch"} />
           <Tooltip content={side ? "Hide the side panel" : "Show the side panel"}>
-            <Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground lg:inline-flex" onClick={() => setSide(!side)} aria-label={side ? "Hide the side panel" : "Show the side panel"} aria-expanded={side}>
+            <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => setSide(!side)} aria-label={side ? "Hide the side panel" : "Show the side panel"} aria-expanded={side}>
               {side ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
             </Button>
           </Tooltip>
@@ -480,7 +488,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onSelect={() => send("/details")}>{session.details ? "Hide the housekeeping steps" : "Show every step (/details)"}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => send("/details")}>{(status.details ?? session.details) ? "Hide the housekeeping steps" : "Show every step (/details)"}</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => window.open(withT("graph/"), "_blank", "noopener")}>
                 <NetworkIcon /> Open the step graph
               </DropdownMenuItem>
