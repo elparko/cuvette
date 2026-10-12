@@ -118,7 +118,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
         />
         <Button onClick={() => pick.choose(path)} disabled={pick.busy}>Analyze this folder</Button>
       </div>
-      {(msg || pick.msg) && <p className="text-sm text-bad">{msg || pick.msg}</p>}
+      {(msg || pick.msg) && <p className="text-sm text-bad" role="alert">{msg || pick.msg}</p>}
       {pick.pending && <SuggestCard pending={pick.pending} busy={pick.busy} open={pick.open} cancel={pick.cancel} />}
       {d && !pick.pending && (
         <div className="min-h-0 overflow-y-auto rounded-xl border bg-card p-1" style={{ maxHeight: "min(420px, 50vh)" }}>

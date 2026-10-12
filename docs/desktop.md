@@ -7,7 +7,7 @@ in Rust. The core is the same Node code as the terminal tool. It runs in the app
 
 There are two installs. Both use the same core.
 
-- Terminal: install the npm package. You get `cuvette` (and the old name `cuvette`). `cuvette app`
+- Terminal: install the npm package. You get the `cuvette` command. `cuvette app`
   opens the browser app. Until the package is on npm, run `npm install`, then `npm link`, in this
   repository. The npm package does not contain `desktop/` or the build output.
 - Desktop: open `Cuvette-<version>-arm64.dmg` and drag Cuvette to Applications.

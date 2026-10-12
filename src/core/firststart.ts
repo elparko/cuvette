@@ -10,7 +10,7 @@ export type ModelChoice = "claude" | "local";
 
 export const CHOICES: { id: ModelChoice; label: string; help: string }[] = [
   { id: "claude", label: "Use Claude (needs an API key)", help: "Claude does the analysis. You pay Anthropic for each request. No key yet? Choose this, then ask for help to get a key." },
-  { id: "local", label: "Use a local model (Ollama, free, runs on this Mac)", help: "A model on this Mac does the analysis. Nothing leaves the Mac. Small models make more mistakes than Claude." },
+  { id: "local", label: "Use a local model (Ollama, free, runs on this computer)", help: "A model on this computer does the analysis. Nothing leaves the computer. Small models make more mistakes than Claude." },
 ];
 
 export const RECOMMENDED_LOCAL = "qwen3:8b";
@@ -81,7 +81,7 @@ export async function chooseLocal(model: string | undefined, ctx: Ctx = {}): Pro
   await changeSetting({ cwd: ctx.cwd ?? process.cwd(), env: ctx.env }, "model", `ollama:${name}`, "user");
   const o = await ollamaState(ctx);
   const text = !o.reachable
-    ? `Saved the model ollama:${name}. Ollama does not run on this Mac yet. Install it: brew install ollama (or download https://ollama.com/download). Then get the model: ollama pull ${name}.`
+    ? `Saved the model ollama:${name}. Ollama does not run on this computer yet. Install it: brew install ollama (or download https://ollama.com/download). Then get the model: ollama pull ${name}.`
     : !o.models.includes(name)
       ? `Saved the model ollama:${name}. Ollama does not have it yet. Get it: ollama pull ${name}.`
       : `Saved the model ollama:${name}.`;

@@ -43,8 +43,6 @@ Usage
   sandbox still apply; a push to eLabFTW still asks; "deny" rules in settings still deny.
 
   cuvette adapters                   list the adapters (name, kind, status, trust, field, program)
-  cuvette adapter check <name|dir> --static
-                                     check the files only. It imports no code and starts no program.
   cuvette adapter add <name | git address | folder | .zip> [--run-tests]
                                      install an adapter in the user adapter folder. A git address
                                      is pinned to a commit (add #ref to choose one). A name comes
@@ -57,7 +55,8 @@ Usage
   cuvette adapter audit <folder|name> [--model claude:<id>]
                                      ask Claude to review the files; asks first because it costs tokens
   cuvette adapter allow-code <name>  allow the code of an installed Unlisted adapter to run
-  cuvette adapter check <name|dir> [--run-tests] [--gui]
+  cuvette adapter check <name|dir> [--static] [--run-tests] [--gui]
+                                     --static checks the files only. It imports no code and starts no program.
                                      --gui also runs the tests marked gui: true (they open a window)
   cuvette adapter check <name|dir> --drive [--model ollama:qwen3:8b] [--tool <name>]
                                      drive test: one plain request for each tool, run by the
@@ -91,7 +90,7 @@ Usage
   cuvette uninstall-launcher           remove it
 
   On the first start with no Claude API key and no local model, cuvette asks which model to use,
-  checks this Mac, and offers a 2-minute sample analysis.
+  checks this computer, and offers a 2-minute sample analysis.
 
   cuvette trust list                   list the trusted folders
   cuvette trust add|remove|show <folder>    trust a folder, remove the trust, or show what the folder contains
@@ -107,6 +106,7 @@ Usage
   cuvette config set <name> <value> [--user|--project]   save a setting (default: user settings)
   cuvette spend                        Claude spend by day and model (set CUVETTE_BUDGET_USD to stop at a limit)
   cuvette key [status|remove|workspace <id>] save, show or remove your Claude API key
+  cuvette key help|open                show how to get a key, or open the keys page in the browser
   cuvette eln setup [--url <address>]  save your eLabFTW address and API key
   cuvette eln status|remove            show or remove the saved eLabFTW key
   cuvette eln push <session>           send a session to eLabFTW after you approve the list
@@ -136,6 +136,7 @@ Usage
                                        (a changed decision, input file, adapter, program or package version)
   cuvette bench [scenario|all] --model <model> [--guidance on|off|both]
   cuvette bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run] [--no-blind]
+  cuvette bench rescore --results a.json[,b.json]   score each run again from its record and write the result files again
   cuvette bench compare --results a.json,b.json [--model spec]
                                        paired test of two result files: each paper run and item in A and B (exact McNemar)
   cuvette bench site --results a.json[,b.json] --out <folder>
@@ -148,6 +149,8 @@ Proposed analysis: in an interactive session the agent goes through four stages 
   --no-plan, /plan off, or "planFirst": "off" in settings.json skips it. --plan turns it on for a -p run.
   A step that processes many files waits for a confirmed demonstration. /pilot off skips that.
   CUVETTE_NO_OPEN=1 or "openImages": "off" keeps the QC images from opening on screen.
+
+cuvette --version shows the version. cuvette help shows this text.
 
 Models: "claude" (claude-opus-5-5), "claude:<model id>", "ollama:<model>", "openai:<base url>|<model>".`;
 
@@ -206,6 +209,7 @@ const { values: o, positionals: pos } = parseArgs({
     "no-self-test": { type: "boolean" },
     "no-open": { type: "boolean" },
     help: { type: "boolean", short: "h" },
+    version: { type: "boolean", short: "v" },
   },
 });
 
@@ -216,7 +220,14 @@ function fail(msg: string): never {
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 const planSetting = () => (o.plan ? { planFirst: true } : o["no-plan"] ? { planFirst: false } : {});
-const readJson = (p?: string) => (p ? JSON.parse(readFileSync(p, "utf8")) : undefined);
+const readJson = (p?: string) => {
+  if (!p) return undefined;
+  try {
+    return JSON.parse(readFileSync(p, "utf8"));
+  } catch (e) {
+    fail(`Cannot read the JSON file ${p}: ${(e as Error).message}`);
+  }
+};
 const FORMATS = new Set(["text", "json", "stream-json"]);
 const outputFolder = () => {
   const v = str(o.output);
@@ -291,7 +302,7 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
     const st = await fs.ollamaState();
     let model = st.recommended ?? fs.RECOMMENDED_LOCAL;
     if (st.models.length > 1) {
-      console.log("\nModels in Ollama on this Mac:");
+      console.log("\nModels in Ollama on this computer:");
       st.models.forEach((m, i) => console.log(`  ${i + 1}  ${m}${m === model ? " (recommended)" : ""}`));
       const a = (await ask(`Type a number, or press Enter for ${model}: `)).trim();
       model = st.models[Number(a) - 1] ?? (a || model);
@@ -303,7 +314,7 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
       process.exit(0);
     }
   }
-  console.log("\nChecking this Mac for the programs that Cuvette uses (about 15 seconds)...");
+  console.log("\nChecking this computer for the programs that Cuvette uses (about 15 seconds)...");
   const dr = await import("./core/doctor.ts");
   const checks = await dr.runDoctor();
   console.log(dr.doctorText(checks, { only: ["missing", "old"] }) + "\nThe full list: cuvette doctor\n");
@@ -395,6 +406,7 @@ async function app(folder?: string) {
 
 async function main() {
   if (o.help) return console.log(HELP);
+  if (o.version) return console.log(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
   if (typeof o.print === "string") return headless(o.print);
   const [cmd, a1, a2, a3] = pos;
   if (typeof o.method === "string" && (cmd === undefined || existsSync(cmd))) {
@@ -430,6 +442,7 @@ async function main() {
         return;
       }
       const checker = await import("./onboarding/checker.ts");
+      if ((a1 === "check" || a1 === "approve") && !a2) return fail(`usage: cuvette adapter ${a1} <name|dir>${a1 === "approve" ? " --by <name>" : ""}`);
       if (a1 === "check" && o.drive) {
         const { runDrive, driveText } = await import("./onboarding/drive.ts");
         const results = await runDrive(a2, { model: str(o.model) ?? "ollama:qwen3:8b", only: (o.tool as string[]) ?? [] });
@@ -448,13 +461,14 @@ async function main() {
       }
       if (a1 === "approve") {
         const dir = existsSync(a2) ? a2 : adapterDirs()[a2];
-        if (!dir) fail(`no adapter ${a2}`);
+        if (!dir) fail(`No adapter ${a2}. cuvette adapters lists the names.`);
         await checker.approveAdapter(dir, str(o.by) ?? process.env.USER ?? "scientist");
         return console.log(`Approved ${a2}.`);
       }
       return fail("usage: cuvette adapter add|update|remove|list|audit|allow-code|check|approve");
     }
     case "onboard": {
+      if (!a1) return fail("usage: cuvette onboard <program> --model <model> [--docs <url>] [--kind cli]");
       const { onboardCommand } = await import("./onboarding/agent.ts");
       const { Session } = await import("./core/session.ts");
       const { runTui } = await import("./tui/app.tsx");
@@ -611,7 +625,7 @@ async function main() {
       const progress = (t: string) => tty && process.stderr.write(`\rChecking ${t}...`.padEnd(40));
       const only = (o.adapter as string[] | undefined)?.[0];
       const { adapterDirs, loadAdapter } = await import("./adapters/manifest.ts");
-      if (only && !adapterDirs()[only]) return fail(`no adapter named ${only}. cuvette adapters lists the names.`);
+      if (only && !adapterDirs()[only]) return fail(`No adapter named ${only}. cuvette adapters lists the names.`);
       const scope = only ? { adapters: { [only]: loadAdapter(adapterDirs()[only]!).manifest } } : {};
       let checks = await dr.runDoctor({ onProgress: progress, ...scope });
       if (tty) process.stderr.write("\r".padEnd(41) + "\r");
@@ -715,6 +729,7 @@ async function main() {
     case "open":
       return interactive(a1 ?? ".");
     case "export": {
+      if (!a1) return fail("usage: cuvette export <session> --format html|md|jsonl|pdf|protocol|script|notebook|flow|eln|xlsx|pptx. See cuvette sessions.");
       const { Session } = await import("./core/session.ts");
       const s = await Session.resume(a1, { model: "fake:" });
       const fmt = str(o.format) ?? "html";
@@ -764,18 +779,26 @@ async function main() {
       return fail("Use: cuvette method list | show <name> | delete <name> | export <name> [<file or folder>] | import <file> [<name>]");
     }
     case "replay": {
+      if (!a1) return fail("usage: cuvette replay <flow.json> [--input name=path ...] [--session <id>]");
       const { replayFlow } = await import("./core/replay.ts");
       const inputs = Object.fromEntries(((o.input as string[]) ?? []).map((kv) => kv.split("=", 2)));
       const { findPlace } = await import("./core/places.ts");
-      const sessionDir = o.session ? (findPlace(str(o.session)!)?.recordDir ?? fail(`no session ${str(o.session)}`)) : undefined;
+      const sessionDir = o.session ? (findPlace(str(o.session)!)?.recordDir ?? fail(`No session ${str(o.session)}. See cuvette sessions.`)) : undefined;
       const r = await replayFlow(a1, inputs, { sessionDir });
       for (const st of r.steps) console.log(`${st.ok ? "●" : "✗"} ${st.tool} ${st.diffs.length ? "differs: " + st.diffs.join("; ") : "same"}`);
       return;
     }
     case "run-step": {
+      if (!a1 || !a2) return fail("usage: cuvette run-step <adapter> <tool> '<json args>'");
+      let args: Record<string, unknown> = {};
+      try {
+        if (a3) args = JSON.parse(a3);
+      } catch {
+        return fail(`The arguments are not valid JSON: ${a3}`);
+      }
       const { ToolRunner } = await import("./core/replay.ts");
       const run = await ToolRunner.start([a1]);
-      const r = await run.call(a1, a2, a3 ? JSON.parse(a3) : {});
+      const r = await run.call(a1, a2, args);
       console.log(JSON.stringify(r, null, 1));
       return run.close();
     }
@@ -858,7 +881,7 @@ async function main() {
       return runMcpServer({ adapters: (o.adapter as string[]) ?? [], trustFolder });
     }
     default:
-      fail(`unknown command ${cmd}\n\n${HELP}`);
+      fail(`Unknown command: ${cmd}. Type cuvette help to see the commands.`);
   }
 }
 
@@ -900,7 +923,11 @@ async function readSecret(prompt: string): Promise<string> {
     const on = (chunk: string) => {
       for (const ch of chunk) {
         if (ch === "\r" || ch === "\n") return done(v);
-        if (ch === "\u0003") return done("");
+        if (ch === "\u0003") {
+          input.setRawMode(false);
+          process.stderr.write("\n");
+          process.exit(130);
+        }
         if (ch === "\u007f" || ch === "\b") {
           if (v.length) (v = v.slice(0, -1)), process.stderr.write("\b \b");
         } else if (ch >= " ") (v += ch), process.stderr.write("*");

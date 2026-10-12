@@ -14,6 +14,16 @@ import { Switch } from "../components/ui/switch.tsx";
 import { bridge, call } from "../lib/api.ts";
 import { cn } from "../lib/utils.ts";
 
+const MOVE: Record<string, number> = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+
+function radioKeys(e: React.KeyboardEvent<HTMLElement>) {
+  const rs = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]:not(:disabled)')];
+  const i = rs.indexOf(document.activeElement as HTMLButtonElement);
+  if (i < 0 || e.altKey || e.metaKey || e.ctrlKey || !(e.key in MOVE || e.key === "Home" || e.key === "End")) return;
+  e.preventDefault();
+  rs[e.key === "Home" ? 0 : e.key === "End" ? rs.length - 1 : (i + MOVE[e.key]! + rs.length) % rs.length]!.focus();
+}
+
 interface Row {
   name: string;
   label: string;
@@ -158,6 +168,7 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
   };
 
   const shown = pending ?? r.value;
+  const tabStop = (v: string) => (v === shown || (!r.choices.some((c) => c.value === shown) && v === r.choices[0]?.value) ? 0 : -1);
   let control: React.ReactNode;
   switch (r.control) {
     case "toggle":
@@ -170,13 +181,14 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
       break;
     case "segmented":
       control = (
-        <div role="radiogroup" aria-labelledby={id} className="inline-flex flex-wrap rounded-lg bg-muted p-[3px]">
+        <div role="radiogroup" aria-labelledby={id} onKeyDown={radioKeys} className="inline-flex flex-wrap rounded-lg bg-muted p-[3px]">
           {r.choices.map((c) => (
             <button
               key={c.value}
               type="button"
               role="radio"
               aria-checked={c.value === shown}
+              tabIndex={tabStop(c.value)}
               disabled={dis}
               onClick={() => ask(c.value)}
               className={cn("h-7 rounded-md px-3 text-[13px] text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40", c.value === shown && "bg-card font-medium text-foreground shadow-sm")}
@@ -190,16 +202,17 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
     case "options":
       control = (
         <div className="flex w-full max-w-xl flex-col gap-2">
-          <div role="radiogroup" aria-labelledby={id} className="flex flex-col overflow-hidden rounded-xl border">
+          <div role="radiogroup" aria-labelledby={id} onKeyDown={radioKeys} className="flex flex-col overflow-hidden rounded-xl border">
             {r.choices.map((c) => (
               <button
                 key={c.value}
                 type="button"
                 role="radio"
                 aria-checked={c.value === shown}
+                tabIndex={tabStop(c.value)}
                 disabled={dis}
                 onClick={() => ask(c.value)}
-                className={cn("flex items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors outline-none last:border-b-0 hover:bg-muted focus-visible:bg-muted", c.value === shown && "bg-muted")}
+                className={cn("flex items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors outline-none last:border-b-0 hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", c.value === shown && "bg-muted")}
               >
                 <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border", c.value === shown && "border-accent-brand")}>{c.value === shown && <span className="size-2 rounded-full bg-accent-brand" />}</span>
                 <span className={cn("flex-1", c.value === shown && "font-medium")}>{c.label}</span>

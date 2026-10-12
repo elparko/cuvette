@@ -20,7 +20,8 @@
   --accent-brand: #c9395f;
   --ring: #c9395f;
   --destructive: #c0362c;
-  --switch-off: #d6d5d1;
+  --switch-off: #8e8d88;
+  --on-accent: #ffffff;
   --ok: #157a45;
   --ok-bg: #e5f3ea;
   --bad: #b8322a;
@@ -55,7 +56,8 @@
     --accent-brand: #f06a8e;
     --ring: #f06a8e;
     --destructive: #e5534b;
-    --switch-off: #3a3a41;
+    --switch-off: #77777f;
+    --on-accent: #141416;
     --ok: #5fd28a;
     --ok-bg: #15301f;
     --bad: #ff8a7d;
@@ -90,7 +92,8 @@
   --accent-brand: #f06a8e;
   --ring: #f06a8e;
   --destructive: #e5534b;
-  --switch-off: #3a3a41;
+  --switch-off: #77777f;
+  --on-accent: #141416;
   --ok: #5fd28a;
   --ok-bg: #15301f;
   --bad: #ff8a7d;
@@ -129,6 +132,7 @@
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-switch-off: var(--switch-off);
+  --color-on-accent: var(--on-accent);
   --color-ok: var(--ok);
   --color-ok-bg: var(--ok-bg);
   --color-bad: var(--bad);
@@ -170,7 +174,8 @@
     color: var(--info);
   }
   :focus-visible {
-    outline: none;
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
   * {
     scrollbar-width: thin;
@@ -432,6 +437,7 @@
 .srv .btn.sel {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 45%, transparent);
   border-color: var(--ring);
+  outline: none;
 }
 .srv .btn.primary {
   background: var(--primary);
