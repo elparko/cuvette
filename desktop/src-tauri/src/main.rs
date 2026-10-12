@@ -11,7 +11,7 @@ use serde::Deserialize;
 use tauri::ipc::{CapabilityBuilder, InvokeBody, Request};
 use tauri::menu::{AboutMetadataBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::webview::{NewWindowResponse, PageLoadEvent};
-use tauri::{ActivationPolicy, AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{ActivationPolicy, AppHandle, DragDropEvent, Manager, RunEvent, Url, WebviewEvent, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
@@ -181,6 +181,19 @@ fn open_folder(app: &AppHandle, path: PathBuf) {
     } else {
         *core.pending.lock().unwrap() = Some(dir);
     }
+}
+
+fn drag_script(event: &DragDropEvent) -> Option<String> {
+    let (name, detail) = match event {
+        DragDropEvent::Enter { .. } => ("cuvette-drag", serde_json::json!("enter")),
+        DragDropEvent::Leave => ("cuvette-drag", serde_json::json!("leave")),
+        DragDropEvent::Drop { paths, .. } => {
+            let items: Vec<_> = paths.iter().map(|p| serde_json::json!({ "path": p.to_string_lossy(), "dir": p.is_dir() })).collect();
+            ("cuvette-drop", serde_json::Value::Array(items))
+        }
+        _ => return None,
+    };
+    Some(format!("window.dispatchEvent(new CustomEvent({}, {{ detail: {} }}))", serde_json::to_string(name).ok()?, detail))
 }
 
 fn zoom(app: &AppHandle, step: f64) {
@@ -360,7 +373,7 @@ fn window(app: &AppHandle, hidden: bool) -> tauri::Result<WebviewWindow> {
     let nav = app.clone();
     let popup = app.clone();
     let load = app.clone();
-    WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+    let w = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("Cuvette")
         .inner_size(1240.0, 860.0)
         .min_inner_size(720.0, 520.0)
@@ -389,7 +402,18 @@ fn window(app: &AppHandle, hidden: bool) -> tauri::Result<WebviewWindow> {
                 open_folder(&load, PathBuf::from(dir));
             }
         })
-        .build()
+        .build()?;
+    let drag = w.clone();
+    w.on_webview_event(move |e| {
+        let WebviewEvent::DragDrop(d) = e else { return };
+        if let Some(js) = drag_script(d) {
+            let _ = drag.eval(js);
+        }
+        if matches!(d, DragDropEvent::Drop { .. }) {
+            let _ = drag.eval("window.dispatchEvent(new CustomEvent('cuvette-drag', { detail: 'leave' }))");
+        }
+    });
+    Ok(w)
 }
 
 fn main() {

@@ -1,6 +1,7 @@
 import { ArrowUpIcon, ClockIcon, FolderIcon, FolderOpenIcon, HomeIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { bridge, call, midText } from "../lib/api.ts";
+import { DropZone } from "./drop-zone.tsx";
 import { SuggestCard, useFolderPick } from "./suggest-card.tsx";
 import { Button } from "./ui/button.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog.tsx";
@@ -36,6 +37,7 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
       }
     };
     return (
+      <DropZone choose={choose} disabled={busy} browserHint="Choose the folder with the button.">
       <div className="flex flex-col items-start gap-3">
         <Button size={big ? "lg" : "default"} onClick={pick} disabled={busy}>
           <FolderOpenIcon /> Choose a folder in Finder…
@@ -59,6 +61,7 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
           </div>
         )}
       </div>
+      </DropZone>
     );
   }
   return <FolderBrowser start={start} onOpened={onOpened} />;
@@ -96,6 +99,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
   );
 
   return (
+    <DropZone choose={pick.choose} disabled={pick.busy} browserHint="Type the path in the Folder box.">
     <div className="flex min-h-0 flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         <Input
@@ -133,6 +137,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
         </div>
       )}
     </div>
+    </DropZone>
   );
 }
 
