@@ -599,6 +599,7 @@ function cardViews(d: CardDeps): CardViews {
             });
           }}
           onDismiss={() => {
+            session.answerLater?.(d.cards.filter(isPlainQuestion).map((c) => c.q.qid));
             d.setCards(seqLeave);
             d.setSeq(SEQ_START);
             d.line("▸", "The questions stay open. They come back with your next message or with /questions.", undefined, true);

@@ -133,6 +133,9 @@ const PLAN_UPDATE_NOTE = "This is a new request in a session with an approved pl
 const PILOT_NOTE = "Pilot: before the first step that changes or counts things, say in one sentence how you will check the method on one sample first. A step that processes many files does not run until the scientist approves a pilot: run the method on one sample, save QC images with outlines of what was counted and what was left out, and call pilot_result.";
 const TECHNICAL = /\b(threshold|otsu|triangle|segmentation model|cellpose model|stardist|cyto\d|diameter|size (filter|limit|cut-?off)|(minimum|maximum|min|max)\.? (cell |object |particle )?size|pixels? (size|area)|sigma|blur|error bars?|standard error|sem|sd bars|test family|t-?test|wilcoxon|mann-?whitney|anova|alpha|significance level|p-?value cut|one-?sided|two-?sided|sidedness|fdr|bonferroni|correction method|random seed|iterations|normali[sz]ation method)\b/i;
 const CHECK_TITLE: Record<string, string> = { missing: "missing values", mixed_type: "text in a number column", decimal_comma: "decimal comma", duplicate_rows: "copied rows", duplicate_ids: "repeated IDs", group_labels: "group names", mixed_units: "units", missing_channel: "missing images", bit_depth: "bit depth", pseudoreplication: "what is n", confounding: "group and batch", too_few: "too few n", [METHOD_DATA_CHECK]: METHOD_DATA_TITLE };
+const TOOL_IDLE_TURNS = 2;
+const MAX_ADAPTER_TOOLS = 16;
+const MAX_EXTRA_TOOLS = 10;
 const CLARIFY_SKIP = "No answer. Use your judgment and say what you chose.";
 const SHEET_TITLE = "Sample sheet";
 const PROGRAM_REASON = "chosen by the scientist with /program";
@@ -282,6 +285,7 @@ export class Session {
   private batchAllow = new Set<string>();
   pilotStage = false;
   private clarified = false;
+  private clarifyLeft = new Set<string>();
   private checked = new Set<string>();
   private noCompareNoted = false;
   private sheet?: SampleSheet;
@@ -463,7 +467,7 @@ export class Session {
       ...coreTools({
         adapters: this.adapters,
         allTools: () => [...this.tools.values()],
-        activate: (names) => names.forEach((n) => this.active.add(n)),
+        activate: (names) => this.useTools(names),
         ask: (spec) => this.askTool(spec),
         proposeChange: (spec) => this.proposeChange(spec),
         compare: (spec) => this.compareOptions(spec),
@@ -506,6 +510,7 @@ export class Session {
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
       if (choice) this.phiChoice = choice as PhiAction;
       this.restorePilot();
+      this.closeUnfinishedClarify();
       this.notes.push("The session was resumed after a restart. Program state may have reset; outputs from earlier steps are still on disk.");
     } else {
       this.record.append("session", {
@@ -732,7 +737,7 @@ export class Session {
     try {
       await this.waitFor(q.qid);
     } catch {
-      return { load: [], by: "human", blocked: `The question ${q.qid} about the program is still open.${this.steerText()}` };
+      return { load: [], by: "human", blocked: `The question ${q.qid} about the program is still open.${this.steerText(q.qid)}` };
     }
     const now = split(this.decisions.value(key)).filter((n) => !loaded.includes(n));
     return { load: now, by: "human", text: now.includes(a.name) ? undefined : `The scientist chose ${now.join(", ") || "no new adapter"} instead of ${a.name}.` };
@@ -820,7 +825,7 @@ export class Session {
       try {
         await this.waitFor(q.qid);
       } catch {
-        return `The question ${q.qid} about the code of ${a.name} is still open.${this.steerText()}`;
+        return `The question ${q.qid} about the code of ${a.name} is still open.${this.steerText(q.qid)}`;
       }
       q = this.questions.get(q.qid) ?? q;
     }
@@ -909,7 +914,22 @@ export class Session {
     return this.settings.toolExposure === "search" || (this.settings.toolExposure === "auto" && this.provider.info.small && n > 24);
   }
 
-  private chooseActiveTools(request = "") {
+  private turnNo = 0;
+  private toolTurn = new Map<string, number>();
+
+  private useTools(names: string[]) {
+    for (const n of names) {
+      this.active.add(n);
+      this.toolTurn.set(n, this.turnNo);
+    }
+  }
+
+  // With deferred tools, a fixed base of adapter tools stays in the list. A tool that find_tools, a call or the request brings in
+  // is an extra: it leaves after TOOL_IDLE_TURNS turns with no call, and at most MAX_EXTRA_TOOLS extras stay.
+  // The list changes only at the start of a turn or after find_tools, so the prompt cache stays valid between the other steps.
+  private baseTools = new Set<string>();
+
+  private chooseActiveTools(request = "", turnStart = false) {
     const all = [...this.tools.values()];
     const adapterTools = all.filter((t) => t.source === "adapter");
     const deferred = this.deferred();
@@ -919,15 +939,18 @@ export class Session {
       return;
     }
     const states = new Set(this.adapters.map((a) => a.manifest.connection.state_tool).filter(Boolean));
-    const keep = [
-      ...adapterTools.filter((t) => states.has(t.remoteName ?? t.name)),
-      ...(request ? searchTools(adapterTools, request, 10) : []),
-      ...adapterTools.filter((t) => !t.deferred),
-    ];
-    for (const t of keep) {
-      if ([...this.active].filter((n) => this.tools.get(n)?.source === "adapter").length >= 16) break;
-      this.active.add(t.name);
+    for (const t of [...adapterTools.filter((t) => states.has(t.remoteName ?? t.name)), ...adapterTools.filter((t) => !t.deferred)]) {
+      if (this.baseTools.size >= MAX_ADAPTER_TOOLS) break;
+      this.baseTools.add(t.name);
     }
+    for (const n of this.baseTools) this.active.add(n);
+    if (!turnStart) return;
+    const hits = request ? searchTools(adapterTools.filter((t) => !this.baseTools.has(t.name)), request, 4) : [];
+    this.useTools(hits.map((t) => t.name));
+    const extras = [...this.active].filter((n) => this.tools.get(n)?.source === "adapter" && !this.baseTools.has(n));
+    for (const n of extras) if (this.turnNo - (this.toolTurn.get(n) ?? 0) > TOOL_IDLE_TURNS) this.active.delete(n);
+    const kept = extras.filter((n) => this.active.has(n)).sort((x, y) => (this.toolTurn.get(y) ?? 0) - (this.toolTurn.get(x) ?? 0));
+    for (const n of kept.slice(MAX_EXTRA_TOOLS)) this.active.delete(n);
   }
 
   findTool(name: string): Tool | undefined {
@@ -984,8 +1007,9 @@ export class Session {
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode], ...(this.pilotOn() ? [PILOT_NOTE] : []));
       if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning(text);
-      else if (this.settings.guidance && this.planFirst && !this.planning && !this.approvedEntry && !this.pilotPlan) this.startPlanning(String(this.record.entries(["user"]).filter((e) => !e.data.during && !e.data.internal).at(-1)?.data.text ?? text));
-      this.chooseActiveTools(text);
+      else if (this.settings.guidance && this.planFirst && !this.planning && !this.approvedEntry && !this.pilotPlan) this.startPlanning(String(this.realRequest()?.data.text ?? text), true);
+      this.turnNo++;
+      this.chooseActiveTools(text, true);
       if (this.pick) {
         const hint = fileTypeHint(text, this.adapterList(), this.cwd, this.adapters.map((a) => a.name));
         if (hint) this.notes.push(hint);
@@ -1635,7 +1659,9 @@ export class Session {
       this.refereeOffNoted = true;
       this.record.append("notice", { text: "The referee did not run: it reads the record, and the record holds the values that the patient data card masked." });
     }
-    if (this.refereeProvider && !signal.aborted && !(this.phiChoice === "mask" && isCloud(this.refereeProvider.info))) {
+    const turnStart = this.lastRequest()?.id ?? 0;
+    const nothingToCheck = !claims.length && !this.record.nodes().some((n) => n.entry > turnStart && !n.sensitivityOf);
+    if (this.refereeProvider && !signal.aborted && !nothingToCheck && !(this.phiChoice === "mask" && isCloud(this.refereeProvider.info))) {
       try {
         for (const f of await referee(this.refereeProvider, ctx)) found.push({ f, source: "referee" });
       } catch (e) {
@@ -1778,20 +1804,50 @@ export class Session {
   }
 
   // A wait for an answer stops when the turn stops or when the scientist sends a message with "now". The card stays open, and a later answer comes to the agent as a note.
+  // "Answer later" on a card also stops the wait. The card stays in /questions.
   private async waitFor(qid: string, signal?: AbortSignal): Promise<Question> {
     const calls = [...this.callAborts].map((c) => c.signal);
-    const sig = signal ?? (calls.length ? AbortSignal.any(calls) : this.abort?.signal);
+    const base = signal ?? (calls.length ? AbortSignal.any(calls) : this.abort?.signal);
+    const later = new AbortController();
+    if (this.laterQids.has(qid)) later.abort();
+    this.laterWaits.set(qid, later);
     this.waitedQids.add(qid);
     try {
-      return await abortable(this.questions.wait(qid), sig);
+      return await abortable(this.questions.wait(qid), base ? AbortSignal.any([base, later.signal]) : later.signal);
     } catch (e) {
       this.waitedQids.delete(qid);
       throw e;
+    } finally {
+      if (this.laterWaits.get(qid) === later) this.laterWaits.delete(qid);
     }
   }
 
-  private steerText(): string {
+  private laterQids = new Set<string>();
+  private laterWaits = new Map<string, AbortController>();
+
+  answerLater(qids: string[]): void {
+    for (const qid of qids) {
+      if (this.questions.get(qid)?.status !== "open") continue;
+      this.laterQids.add(qid);
+      this.laterWaits.get(qid)?.abort();
+    }
+  }
+
+  private steerText(qid?: string): string {
+    if (qid && this.laterQids.has(qid)) return " The scientist chose to answer it later. Continue with work that does not need the answer. The answer comes to you as a note.";
     return this.steered.some((m) => m.now) ? " The scientist sent a message instead. Read it first. The card stays open, and the answer comes to you as a note." : "";
+  }
+
+  // A card wait ends for one of three causes: the turn stopped, the scientist sent a message now, or the scientist chose "Answer later".
+  private waitEnd(qid?: string): "stopped" | "later" | "now" {
+    if (this.abort?.signal.aborted) return "stopped";
+    if (qid && this.laterQids.has(qid)) return "later";
+    return "now";
+  }
+
+  private cardSignal(): AbortSignal | undefined {
+    const calls = [...this.callAborts].map((c) => c.signal);
+    return calls.length ? AbortSignal.any(calls) : this.abort?.signal;
   }
 
   private lastRequest(): Entry | undefined {
@@ -1836,12 +1892,23 @@ export class Session {
     this.bus.emit({ type: "status", state: "running", tool: call.name, purpose: activity(call.name, (call.args ?? {}) as Args, tool?.source === "adapter" ? tool.title : undefined), since: Date.now() });
     if (call.parseError) return this.fail(call.id, call.name, `the arguments are not valid JSON: ${call.parseError}`);
     if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use only these tools: ${this.activeSchemas().map((t) => t.name).join(", ")}.${this.active.has("find_tools") ? " To find more tools, call find_tools." : ""}`);
-    if (!this.active.has(tool.name)) this.active.add(tool.name);
+    this.useTools([tool.name]);
     const args = coerceArgs(dropNulls((call.args && typeof call.args === "object" && !Array.isArray(call.args) ? call.args : {}) as Args, tool.inputSchema), tool.inputSchema);
     if (!ownPurpose(tool)) delete args.purpose;
     const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
     if (r.images?.length && this.provider.info.vision) await scaleImages(r.images, signal);
+    const earlier = tool.readOnly && !r.isError && !r.images?.length && r.text.length > 400 ? this.sameEarlierResult(call, r.text) : undefined;
+    if (earlier) return { type: "tool_result", callId: call.id, name: call.name, text: `[The output is the same as the output of the earlier call ${earlier} with the same input. It is still above in this conversation.]` };
     return { type: "tool_result", callId: call.id, name: call.name, text: r.text, images: r.images, isError: r.isError };
+  }
+
+  // A read-only call that repeats an earlier call with the same output does not put the output in the context a second time.
+  private sameEarlierResult(call: Extract<Part, { type: "tool_call" }>, text: string): string | undefined {
+    const args = JSON.stringify(call.args ?? {});
+    const ids = new Set(this.history.flatMap((m) => m.parts.flatMap((p) => (p.type === "tool_call" && p.id !== call.id && p.name === call.name && JSON.stringify(p.args ?? {}) === args ? [p.id] : []))));
+    if (!ids.size) return undefined;
+    for (const m of this.history) for (const p of m.parts) if (p.type === "tool_result" && ids.has(p.callId) && (p.text === text || p.text.startsWith(`${text}\n\nNote: `))) return p.callId;
+    return undefined;
   }
 
   async pipeline(tool: Tool, args: Args, callId: string, signal: AbortSignal, depth = 0): Promise<{ text: string; images?: string[]; isError: boolean; output?: ToolOutput }> {
@@ -1874,6 +1941,10 @@ export class Session {
       return error(gate);
     }
     if (this.planning && depth === 0 && tool.readOnly && tool.name !== "plan" && tool.name !== "clarify" && ++this.planLooks === 4) this.notes.push(this.clarified ? "You have looked at the data enough. Call plan now." : "You have looked at the data enough. Call clarify now.");
+    if (this.planning && this.planUpdate && this.mode === "plan" && !tool.readOnly && depth === 0 && this.plan && this.plan.steps.some((x) => x.status !== "skipped" && !!x.tool && x.tool.toLowerCase().split(/[\s,;/()]+/).includes((tool.remoteName ?? tool.name).toLowerCase()))) {
+      this.endPlanning();
+      this.record.append("notice", { text: `${tool.remoteName ?? tool.name} is a step of the confirmed plan, so it runs with no plan update.` });
+    }
     if ((this.mode === "plan" || this.mode === "teach") && !tool.readOnly)
       return error(this.planning ? "Plan first: no analysis step runs before the scientist approves the plan. Call plan now." : this.mode === "plan" ? "Plan mode: the agent plans and runs only read-only tools. Switch to watch mode to run steps." : "Teach mode: the scientist runs the steps and the agent runs only read-only tools.");
     const pre = await this.hooks.pre({ event: "PreToolUse", session: this.id, mode: this.mode, tool: tool.remoteName ?? tool.name, adapter: tool.adapter, args, readOnly: tool.readOnly } as never);
@@ -2115,7 +2186,7 @@ export class Session {
             : { path: o.table.path, ...o.table, rows: data?.fullTable ? o.table.rows : o.table.rows.slice(0, small ? 5 : 12) };
     }
     if (o.manualRoute && !small) obj.manual_route = o.manualRoute;
-    let text = JSON.stringify(obj, null, small ? 0 : 1);
+    let text = small ? JSON.stringify(obj) : `{\n${Object.entries(obj).map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(",\n")}\n}`;
     if (text.length > limit) text = text.slice(0, limit) + `\n[cut ${text.length - limit} characters; read the files for the rest]`;
     const images = vis === "all" && this.provider.info.vision ? (o.outputs ?? []).filter((f) => f.kind === "image" && /\.(png|jpe?g)$/i.test(f.path)).map((f) => f.path).slice(0, 4) : [];
     return { text, images };
@@ -2254,7 +2325,7 @@ export class Session {
       const note = this.record.entries(["answer"]).filter((e) => e.data.qid === q.qid).at(-1)?.data.note;
       return { ok: true, summary: `The scientist answered: ${String(done.answer)}${note ? ` (${note})` : ""}`, data: { answer: done.answer, note } };
     } catch {
-      return { ok: false, error: `Question ${q.qid} is still open. The scientist did not answer it yet.${this.steerText()}` };
+      return { ok: false, error: `Question ${q.qid} is still open. The scientist did not answer it yet.${this.steerText(q.qid)}` };
     }
   }
 
@@ -2298,7 +2369,7 @@ export class Session {
       const now = this.decisions.value(f.key);
       return { ok: true, summary: `The scientist answered. The record now says ${JSON.stringify(now)} for ${f.label}.`, data: { key: f.key, value: now } };
     } catch {
-      return { ok: false, error: `Question ${q.qid} is still open, so ${f.label} has not changed.${this.steerText()}` };
+      return { ok: false, error: `Question ${q.qid} is still open, so ${f.label} has not changed.${this.steerText(q.qid)}` };
     }
   }
 
@@ -2563,6 +2634,7 @@ export class Session {
     }
     if (open?.decisionKey && open.status === "open") this.decisions.validate(open.decisionKey, this.questions.match(open, value));
     const q = this.questions.answer(qid, value, note);
+    this.laterQids.delete(qid);
     if (q.decisionKey) this.decisions.change(q.decisionKey, q.answer, { by: "human", reason: `answer to ${qid}` });
     if (waited) return;
     const quiet = isChecklistQuestion(q);
@@ -2645,27 +2717,46 @@ export class Session {
 
   // ------------------------------------------------------------- analysis plan
 
-  private startPlanning(request: string) {
+  private realRequest(): Entry | undefined {
+    return this.record.entries(["user"]).filter((e) => !e.data.during && !e.data.internal && !CONTINUE.test(String(e.data.text ?? "").trim())).at(-1);
+  }
+
+  private inHistory(text: string): boolean {
+    const head = text.slice(0, 80);
+    return this.history.some((m) => m.role === "user" && m.parts.some((p) => p.type === "text" && p.text.includes(head)));
+  }
+
+  // same: a "continue" or an answer that resumes the turn plans the same request again. The answers to its questions stay.
+  private startPlanning(request: string, same = false) {
+    if (!same) {
+      for (const qid of this.clarifyLeft) this.questions.withdraw(qid, "A new request replaced this question.");
+      this.clarifyLeft.clear();
+    }
+    const since = this.realRequest()?.id ?? 0;
+    const answered = same && this.tools.has("clarify") && this.record.entries(["clarify"]).some((e) => e.id > since && e.data.action === "answered");
     this.planning = true;
     this.pilotStage = false;
     this.pilotPlan = undefined;
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
-    this.inspection = undefined;
-    this.planStart = this.record.entries().at(-1)?.id ?? 0;
+    if (!answered) this.inspection = undefined;
+    if (!answered || !this.planStart) this.planStart = this.record.entries().at(-1)?.id ?? 0;
     this.toolsHinted = false;
-    this.clarified = !this.tools.has("clarify");
+    this.clarified = !this.tools.has("clarify") || answered;
     this.modeBefore = this.mode;
     this.refCandidates = this.findReferenceFiles(request);
     if (this.mode !== "plan") {
       this.record.append("mode", { old: this.mode, new: "plan", reason: "plan first" });
       this.mode = "plan";
     }
-    this.notes.push(this.planUpdate ? PLAN_UPDATE_NOTE : `${PLAN_NOTE} ${DATA_CHECK_NOTE}`);
-    if (!this.planUpdate && this.method) this.notes.push(methodNote(this.method));
-    if (!this.planUpdate && this.pick && !this.adapters.length) this.notes.push("No adapter is loaded yet. Call list_adapters, then name the adapter for each part in programs, with its exact name. When the scientist confirms the plan, call use_adapter for it. The confirmation covers that load, so no second card shows.");
+    if (this.planUpdate) this.notes.push(PLAN_UPDATE_NOTE);
+    else if (!this.inHistory(PLAN_NOTE)) this.notes.push(`${PLAN_NOTE} ${DATA_CHECK_NOTE}`);
+    else this.notes.push(answered ? "Plan first, as in the earlier note: no analysis step runs before the scientist confirms the proposed analysis. The scientist answered the questions above. Call plan now with the proposed metrics." : `Plan first, in the two phases of the earlier note: inspect_data, then clarify, then plan. No analysis step runs before the scientist confirms the proposed analysis.${same ? "" : " This is a new request."}`);
+    const once = (text: string) => (same && this.inHistory(text)) || this.notes.push(text);
+    if (!this.planUpdate && this.method) once(methodNote(this.method));
+    if (!this.planUpdate && this.pick && !this.adapters.length) once("No adapter is loaded yet. Call list_adapters, then name the adapter for each part in programs, with its exact name. When the scientist confirms the plan, call use_adapter for it. The confirmation covers that load, so no second card shows.");
     if (!this.planUpdate && this.refCandidates.length)
-      this.notes.push(`Files in the project folder that may be earlier results on the same data: ${this.refCandidates.map(describeCandidate).join("; ")}. If one fits, name it in the reference section, state each measure in the reference's own terms, and ask in reference.question whether your measure is the same as the reference's measure.`);
+      once(`Files in the project folder that may be earlier results on the same data: ${this.refCandidates.map(describeCandidate).join("; ")}. If one fits, name it in the reference section, state each measure in the reference's own terms, and ask in reference.question whether your measure is the same as the reference's measure.`);
   }
 
   private findReferenceFiles(text: string): Candidate[] {
@@ -2749,6 +2840,16 @@ export class Session {
     this.notes.push(`The pilot on ${String(asked.data.sample)} still waits for the scientist. The proposed analysis is confirmed with the pilot. Run the method on the pilot sample, then call pilot_result.`);
   }
 
+  // A clarify that a crash cut off has no turn that waits for its answers. A new plan asks again, so its questions close.
+  private closeUnfinishedClarify() {
+    const all = this.record.live(["clarify"]);
+    const asked = all.filter((e) => e.data.action === "asked").at(-1);
+    if (!asked || all.some((e) => e.id > asked.id && e.data.action !== "asked")) return;
+    const reason = "The session stopped before the answers.";
+    for (const e of this.record.entries(["question"]).filter((x) => x.id > asked.id)) this.questions.withdraw(String(e.data.qid), reason);
+    this.record.append("clarify", { action: "stopped", phase: "Questions", found: asked.data.found, reason, answers: [] });
+  }
+
   private addPilotTools() {
     for (const t of this.pilotTools()) if (!this.tools.has(t.name)) (this.tools.set(t.name, t), this.active.add(t.name));
   }
@@ -2817,7 +2918,7 @@ export class Session {
     this.emitWaiting("plan", { type: "plan", ...event });
     this.bus.emit({ type: "status", state: "waiting", tool: event.stage === "pilot" ? "pilot_result" : "plan" });
     try {
-      return await abortable(wait, this.abort?.signal);
+      return await abortable(wait, this.cardSignal());
     } catch {
       return undefined;
     } finally {
@@ -2855,18 +2956,27 @@ export class Session {
     this.record.append("decision", { key: `definition:${d.measure}`, old: d.old, new: d.new, by: "human", reason: "the scientist changed the definition" });
   }
 
+  // With no pending plan, a change on the pilot card goes into a new pending plan. The approved plan stays as it is until the scientist confirms the pilot.
+  private pendingFromApproved(sample: string, reason: string) {
+    if (!this.plan || !this.approvedEntry) return undefined;
+    const target: Mode = this.mode === "plan" ? "watch" : this.mode;
+    this.pilotPlan = { plan: structuredClone(this.plan), version: this.planVersion, target, answers: [] };
+    this.pilotStage = true;
+    this.replanReason = reason;
+    this.record.append("plan", { action: "pilot_requested", phase: "Demonstration on a sample", version: this.planVersion, sample, target, answers: [], reason });
+    return this.pilotPlan;
+  }
+
   // The pending plan is the one that the pilot confirmation approves, so a definition change on the pilot card goes into it.
-  private redefineOnPilot(plan: AnalysisPlan, d: { measure: string; new: string }, pending: boolean) {
-    const before = structuredClone(plan);
+  private redefineOnPilot(plan: AnalysisPlan, d: { measure: string; new: string }) {
     const defs = (plan.definitions ??= []);
     const at = defs.find((x) => x.measure.toLowerCase() === d.measure.toLowerCase());
     if (at) at.definition = d.new;
     else defs.push({ measure: d.measure, definition: d.new });
     this.planVersion++;
-    if (this.pilotPlan && pending) this.pilotPlan.version = this.planVersion;
+    if (this.pilotPlan) this.pilotPlan.version = this.planVersion;
     const reason = `the scientist changed the definition of ${d.measure} on the pilot card`;
-    this.record.append("plan", { action: pending ? "pilot_changed" : "updated", phase: "Demonstration on a sample", version: this.planVersion, reason, text: planText(plan), plan: structuredClone(plan) });
-    if (!pending) for (const c of planChanges(before, plan)) this.noteDeviation(c, "plan_update", reason);
+    this.record.append("plan", { action: "pilot_changed", phase: "Demonstration on a sample", version: this.planVersion, reason, text: planText(plan), plan: structuredClone(plan) });
   }
 
   private referenceQuestion(): { question: string; candidates: { path: string; sheet?: string; columns: string[]; label: string }[] } {
@@ -2940,7 +3050,9 @@ export class Session {
       images,
     });
     if (!r) {
-      this.record.append("pilot_rejected", { run: entry, sample, reason: "the turn stopped before an answer" });
+      const now = this.waitEnd() === "now";
+      this.record.append("pilot_rejected", { run: entry, sample, reason: now ? "the scientist sent a message instead of an answer" : "the turn stopped before an answer" });
+      if (now) return { ok: false, error: `The scientist sent a message instead of answering the pilot on ${sample}. Read it first. To show the same pilot again, call pilot_result again with the same values and images. Do not run the method again for that.` };
       return { ok: false, error: "the scientist stopped the turn before answering the pilot" };
     }
     if (r.action === "confirm") {
@@ -2970,22 +3082,23 @@ export class Session {
       return { ok: true, summary: `The scientist wants the pilot on another sample${r.text ? `: ${r.text}` : ""}. Run the same method on one other sample, then call pilot_result.` };
     }
     if (r.action === "set" && shownPlan) {
-      const t = settingsOf(shownPlan)[r.index]?.setting;
-      if (!t) return { ok: false, error: "no such setting" };
+      if (!settingsOf(shownPlan)[r.index]) return { ok: false, error: "no such setting" };
+      const p = pending ?? this.pendingFromApproved(sample, "the scientist changed a setting on the pilot card")!;
+      const t = settingsOf(p.plan)[r.index]!.setting;
       const old = t.value;
       t.value = typeof old === "number" && typeof r.value === "string" && Number.isFinite(Number(r.value)) ? Number(r.value) : r.value;
       t.by = "you";
-      this.planVersion++;
-      if (pending) pending.version = this.planVersion;
-      this.record.append("plan", { action: "setting_changed", phase: "Demonstration on a sample", version: this.planVersion, label: t.label, key: t.key, old: old ?? null, new: t.value, text: planText(shownPlan), plan: structuredClone(shownPlan) });
-      this.commitSettings(shownPlan);
+      p.version = ++this.planVersion;
+      this.record.append("plan", { action: "setting_changed", phase: "Demonstration on a sample", version: this.planVersion, label: t.label, key: t.key, old: old ?? null, new: t.value, text: planText(p.plan), plan: structuredClone(p.plan) });
+      this.commitSettings(p.plan);
       this.record.append("pilot_rejected", { run: entry, sample, reason: `${t.label} changed to ${String(t.value)}` });
       return { ok: true, summary: `The scientist changed ${t.label} from ${String(old)} to ${String(t.value)}. Run the demonstration again on ${sample} with this value, then call pilot_result.` };
     }
     if (r.action === "change") {
       if (r.definition) {
         this.changeDefinition(r.definition);
-        if (shownPlan) this.redefineOnPilot(shownPlan, r.definition, !!pending);
+        const p = pending ?? this.pendingFromApproved(sample, `the scientist changed the definition of ${r.definition.measure} on the pilot card`);
+        if (p) this.redefineOnPilot(p.plan, r.definition);
       }
       this.record.append("pilot_rejected", { run: entry, sample, reason: r.text });
       this.scientistAsked = r.text;
@@ -3228,6 +3341,11 @@ export class Session {
     if (!this.planning && this.pilotPlan) {
       const p = this.pilotPlan;
       const next = mergePlan(p.plan, given);
+      matchSettings(next, this.knownDecisions(next));
+      this.fillDecisions(next);
+      const open = openDecisions(next);
+      if (open.length) return { ok: false, error: `Open settings: ${open.map((x) => x.decision.label).join("; ")}. Fill in every setting with a value and say who set it (default, from your answer, or agent). The pilot runs with these values.` };
+      this.commitSettings(next);
       for (const d of given.definitions ?? []) {
         const old = p.plan.definitions?.find((x) => x.measure.toLowerCase() === d.measure.toLowerCase());
         if (old?.definition !== d.definition) this.record.append("decision", { key: `definition:${d.measure}`, old: old?.definition ?? null, new: d.definition, by: "agent", reason: reason || "the agent changed the definition" });
@@ -3325,7 +3443,9 @@ export class Session {
       this.record.append("plan", { action: "setting_changed", phase: "Proposed metrics", version, label: target.label, key: target.key, old: old ?? null, new: target.value, text: planText(plan), plan: structuredClone(plan) });
     }
     if (!r) {
-      this.record.append("plan", { action: "stopped", version });
+      const now = this.waitEnd() === "now";
+      this.record.append("plan", { action: "stopped", version, ...(now ? { reason: "the scientist sent a message instead of an answer" } : {}) });
+      if (now) return { ok: false, error: `The scientist sent a message instead of answering the proposed analysis (version ${version}). Read it first. Then call plan again, changed if the message asks for a change. No step runs before the scientist confirms.` };
       return { ok: false, error: "the scientist stopped the turn before answering the proposed analysis" };
     }
     if (r.action === "change") {
@@ -3403,8 +3523,10 @@ export class Session {
       this.inspectionOrder = order;
     }
     this.record.append("inspection", { path, kind: insp.kind, summary: insp.summary, colors: insp.colors, kinds: insp.kinds, groups: (insp.groups ?? []).map((g) => g.name), columns: (insp.columns ?? []).map((c) => c.name) });
-    const { previews, ...rest } = insp;
-    return { ok: true, summary: insp.summary, text: JSON.stringify(rest).slice(0, 8000), outputs: previews.map((p) => outputFile(p)) };
+    const { previews, ok: _ok, summary: _summary, error: _error, ...rest } = insp;
+    const json = JSON.stringify(rest);
+    const outputs = previews.map((p) => outputFile(p));
+    return json.length <= 8000 ? { ok: true, summary: insp.summary, data: rest, text: json, outputs } : { ok: true, summary: insp.summary, text: json.slice(0, 8000), outputs };
   }
 
   private clarifyTool(): Tool {
@@ -3512,9 +3634,16 @@ export class Session {
     const checkAnswers: string[] = [];
     const stops: string[] = [];
     let n: string | undefined;
+    let cut: "stopped" | "now" | undefined;
     const take = async (q: Asked): Promise<boolean> => {
       const ans = await this.waitAnswer(q.qid);
-      if (!ans) return false;
+      if (!ans) {
+        const why = this.waitEnd(q.qid);
+        if (why !== "later") return ((cut = why), false);
+        this.clarifyLeft.add(q.qid);
+        if (q.item) checkAnswers.push(`${q.item.text} Answer: none yet (the scientist answers later).`);
+        return true;
+      }
       const value = String(ans.value ?? "");
       if (q.item) {
         this.record.append("decision", { key: `${q.design ? "design" : "data_check"}:${q.item.id}`, old: null, new: value, by: ans.by, reason: q.item.text });
@@ -3526,12 +3655,22 @@ export class Session {
       if (q.ref && c && (value === "compare" || value === "blind")) this.setReference({ mode: value, path: c.path, sheet: c.sheet });
       return true;
     };
-    const stopped = { ok: false, error: "the scientist stopped the turn before answering the questions" };
-    for (const q of [...qs]) if (!(await take(q))) return stopped;
-    const last = (qid: string) => this.record.entries(["answer"]).filter((e) => e.data.qid === qid).at(-1);
-    answers.splice(0, answers.length, ...qs.filter((q) => !q.item).map((q) => `${q.question} -> ${String(last(q.qid)?.data.value ?? "")}${last(q.qid)?.data.note ? ` (${String(last(q.qid)!.data.note)})` : ""}`));
+    const last = (qid: string) => this.record.entries(["answer"]).filter((e) => e.data.qid === qid && !e.data.withdrawn).at(-1);
+    const answerLines = () => qs.filter((q) => !q.item).map((q) => (last(q.qid) ? `${q.question} -> ${String(last(q.qid)!.data.value ?? "")}${last(q.qid)!.data.note ? ` (${String(last(q.qid)!.data.note)})` : ""}` : `${q.question} -> ${CLARIFY_SKIP}`));
+    const stopped = () => {
+      const why = cut ?? this.waitEnd();
+      const reason = why === "now" ? "The scientist sent a message instead of an answer." : "The turn stopped before an answer.";
+      for (const q of qs) this.questions.withdraw(q.qid, reason);
+      this.record.append("clarify", { action: "stopped", phase: "Questions", found, reason, answers: answerLines().filter((x) => !x.endsWith(CLARIFY_SKIP)) });
+      if (why !== "now") return { ok: false, error: "the scientist stopped the turn before answering the questions" };
+      this.clarified = true;
+      const got = answerLines().filter((x) => !x.endsWith(CLARIFY_SKIP));
+      return { ok: false, error: `The scientist sent a message instead of answering the questions. Read it first. ${got.length ? `Answers so far: ${got.join("; ")}. ` : ""}The other questions are closed. If one still matters after the message, call clarify again with only that question. Otherwise call plan.` };
+    };
+    for (const q of [...qs]) if (!(await take(q))) return stopped();
+    answers.splice(0, answers.length, ...answerLines());
     if (!stops.length && this.sheet) {
-      if (!(await this.askSheet(qs, emit))) return stopped;
+      if (!(await this.askSheet(qs, emit))) return stopped();
       n ??= this.decisions.isSet("replicate") ? String(this.decisions.value("replicate")) : undefined;
       const issues = designChecks(this.sheet.rows, { n });
       this.record.append("samples", { action: "design_checks", n: n ?? null, issues });
@@ -3540,7 +3679,7 @@ export class Session {
       for (const i of issues.filter((x) => x.level === "ask")) await askItem(i, true);
       const more = qs.slice(before);
       if (more.length || notes.length) show(more);
-      for (const q of more) if (!(await take(q))) return stopped;
+      for (const q of more) if (!(await take(q))) return stopped();
     }
     this.clarified = true;
     this.record.append("clarify", { action: "answered", phase: "Questions", found, answers: [...checkAnswers, ...answers], skipped, notes });
@@ -3581,9 +3720,8 @@ export class Session {
   }
 
   private async waitAnswer(qid: string): Promise<{ value: unknown; note: string; by: string } | undefined> {
-    this.waitedQids.add(qid);
     try {
-      await abortable(this.questions.wait(qid), this.abort?.signal);
+      await this.waitFor(qid);
     } catch {
       return undefined;
     }
@@ -3711,6 +3849,11 @@ export class Session {
       emit();
       this.bus.emit({ type: "question", question: q });
       const ans = await this.waitAnswer(q.qid);
+      if (!ans && this.waitEnd(q.qid) === "later") {
+        this.questions.withdraw(q.qid, "The scientist chose to answer later. The sample sheet stays as it is.");
+        this.sheetAnswer("accept");
+        return true;
+      }
       if (!ans) return false;
       const r = this.sheetAnswer(ans.value);
       if (r.done) return true;
@@ -3852,6 +3995,8 @@ export class Session {
       this.mode = modeThen as Mode;
     }
     this.history = this.record.messages();
+    this.phiFrom = 0;
+    this.summaryFailed = false;
     this.closeOpenCalls();
     const a = approvedPlan(this.record);
     this.approvedEntry = a?.entry ?? 0;
