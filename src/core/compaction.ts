@@ -76,9 +76,16 @@ export function elisionStub(p: Extract<Part, { type: "tool_result" }>): string {
 
 const isElided = (text: string) => text.includes("[Older tool output shortened:");
 
+// Claude ties each thinking block to the exact history before it. After an edit, the thinking
+// blocks after that point must go, or the API refuses the request. The text and tool calls stay.
+export function dropThinking(messages: Message[], from = 0): Message[] {
+  return messages.map((m, i) => (i < from || m.role !== "assistant" || (!m.raw && !m.parts.some((p) => p.type === "thinking")) ? m : { ...m, raw: undefined, parts: m.parts.filter((p) => p.type !== "thinking") }));
+}
+
 export function elideOld(messages: Message[], contextWindow: number): { messages: Message[]; elided: number } {
   const end = recentStart(messages, contextWindow);
   let elided = 0;
+  let first = -1;
   const out = messages.map((m, i) => {
     if (i >= end || !isResults(m)) return m;
     let changed = false;
@@ -89,9 +96,10 @@ export function elideOld(messages: Message[], contextWindow: number): { messages
       const head = p.text.length > KEEP_CHARS ? `${p.text.slice(0, KEEP_CHARS)}\n…\n` : `${p.text}\n`;
       return { type: "tool_result", callId: p.callId, name: p.name, text: head + elisionStub(p), ...(p.isError ? { isError: true } : {}) } as Part;
     });
+    if (changed && first < 0) first = i;
     return changed ? { ...m, parts } : m;
   });
-  return { messages: out, elided };
+  return { messages: first < 0 ? out : dropThinking(out, first), elided };
 }
 
 export interface Summarized {
@@ -113,7 +121,7 @@ export async function summarizeOld(messages: Message[], provider: Provider, cont
   const prev = start ? (messages[0]!.parts[0] as { text: string }).text.slice(SUMMARY_HEAD.length).trim() : "";
   const input = `${prev ? `Previous summary:\n${prev}\n\n` : ""}Older messages:\n${transcriptText(old)}`;
   const summary = await provider.complete(SUMMARY_SYSTEM, input, signal);
-  return { summary, ...(r >= 0 ? { request: messages[r] } : {}), kept: messages.slice(end) };
+  return { summary, ...(r >= 0 ? { request: messages[r] } : {}), kept: dropThinking(messages.slice(end)) };
 }
 
 export function summaryMessage(summary: string): Message {

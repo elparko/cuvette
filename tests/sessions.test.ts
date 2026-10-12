@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
+import { removeIndexRow, renameIndexRow } from "../src/core/places.ts";
 import { ageText, defaultSession, listSessions, sessionLine } from "../src/core/sessions.ts";
 
 function home(): string {
@@ -88,4 +89,27 @@ test("a session shows its title, its sentence and its status", () => {
   writeFileSync(join(dir, "log.jsonl"), [...lines, { id: 5, kind: "user", data: { text: "Now by sex" } }, { id: 6, kind: "question", data: { qid: "q1" } }].map((l) => JSON.stringify(l)).join("\n") + "\n");
   writeFileSync(join(dir, "open.json"), JSON.stringify({ pid: process.pid }));
   expect(listSessions(h)[0]!.status).toBe("waiting for you");
+});
+
+test("a custom name wins over the automatic title, and a removed session leaves the list", () => {
+  const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-rename-"));
+  const folder = join(h, "proj", "cuvette", "2026-10-08-count");
+  mkdirSync(join(folder, ".record"), { recursive: true });
+  const lines = [{ id: 1, kind: "session", data: { cwd: "/p" } }, { id: 2, kind: "user", data: { text: "Count" } }, { id: 3, kind: "title", data: { title: "Auto title", description: "" } }];
+  writeFileSync(join(folder, ".record", "log.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+  writeFileSync(join(h, "sessions-index.json"), JSON.stringify([{ id: "a1", project: "/p", folder, title: "Count", date: new Date().toISOString() }]));
+  const old = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = h;
+  try {
+    expect(renameIndexRow("a1", "  Oct  11 ")).toBe(true);
+    expect(listSessions(h)[0]?.name).toBe("Oct 11");
+    renameIndexRow("a1", "");
+    expect(listSessions(h)[0]?.name).toBe("Auto title");
+    expect(removeIndexRow("a1")).toBe(true);
+    expect(listSessions(h)).toEqual([]);
+    expect(removeIndexRow("a1")).toBe(false);
+  } finally {
+    if (old === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = old;
+  }
 });

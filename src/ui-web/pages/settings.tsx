@@ -1,4 +1,5 @@
-import { ArrowUpIcon, ChevronRightIcon, FolderIcon, LockIcon, SearchIcon } from "lucide-react";
+import { InfoTip } from "../components/info-tip.tsx";
+import { ArrowUpIcon, FolderIcon, LockIcon, SearchIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx } from "../App.tsx";
@@ -110,7 +111,6 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
   const [confirm, setConfirm] = useState("");
   const [sure, setSure] = useState(false);
   const [picking, setPicking] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const id = `sl-${r.name}`;
   const dis = r.locked;
 
@@ -358,8 +358,21 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
   return (
     <div data-setting={r.name} className="border-t py-4 first:border-t-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span id={id} className="font-medium">
-          {r.label}
+        <span className="flex items-center gap-1.5">
+          <span id={id} className="font-medium">
+            {r.label}
+          </span>
+          <InfoTip label={`About ${r.label}`}>
+            <p>{r.brief}</p>
+            {r.more && <p className="mt-1.5">{r.more}</p>}
+            {r.details.length > 0 && (
+              <ul className="mt-1.5 list-disc pl-4 font-mono">
+                {r.details.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            )}
+          </InfoTip>
         </span>
         {r.badge.text && (
           <Badge title={r.badge.file} tone={r.source === "default" || r.source === "env" ? "default" : "info"}>
@@ -369,26 +382,6 @@ function SettingRow({ r, ctx, reload, saved, setSaved }: { r: Row; ctx: AppCtx; 
         )}
       </div>
       <div className={cn("mt-2 mb-1.5 flex flex-wrap items-center gap-2", r.locked && "opacity-55")}>{control}</div>
-      <p className="text-[13px] text-muted-foreground">{r.brief}</p>
-      {(r.more || r.details.length > 0) && (
-        <div className="mt-1">
-          <button type="button" onClick={() => setMoreOpen(!moreOpen)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" aria-expanded={moreOpen}>
-            <ChevronRightIcon className={cn("size-3 transition-transform", moreOpen && "rotate-90")} /> More
-          </button>
-          {moreOpen && (
-            <div className="mt-1 pl-4 text-[13px] text-muted-foreground">
-              {r.more && <p>{r.more}</p>}
-              {r.details.length > 0 && (
-                <ul className="mt-1 list-disc pl-4 font-mono text-xs">
-                  {r.details.map((x) => (
-                    <li key={x}>{x}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
-      )}
       {r.locked && (
         <p className="mt-1 flex items-center gap-1.5 text-[13px] text-warn">
           <LockIcon className="size-3.5" /> {r.lock}

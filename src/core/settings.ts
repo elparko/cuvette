@@ -111,6 +111,16 @@ export const SETTINGS: SettingDef[] = [
     shown: (ctx) => String(resolve(find("model")!, ctx).value).startsWith("claude"),
   },
   {
+    name: "promptCache",
+    group: "Model",
+    label: "Prompt cache",
+    help: "5m: Claude keeps the history for 5 minutes, and each step in a turn reads it at a low price. 1h: the cache stays for 1 hour, so a pause between your messages costs less; each write costs more. off: each step pays the full price for the whole history.",
+    scopes: ALL,
+    choices: () => ["5m", "1h", "off"],
+    lockedInTurn: true,
+    shown: (ctx) => String(resolve(find("model")!, ctx).value).startsWith("claude"),
+  },
+  {
     name: "mode",
     group: "Session",
     label: "Mode",

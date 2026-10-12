@@ -24,6 +24,7 @@ export interface SessionCard {
 export function useSessions(page: Page, boots: number) {
   const [list, setList] = useState<SessionCard[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     call<SessionCard[]>("api/sessions.json")
       .then((l) => {
@@ -31,7 +32,7 @@ export function useSessions(page: Page, boots: number) {
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
-  }, [page, boots]);
+  }, [page, boots, tick]);
   const open = useCallback(async (id: string, done: () => void) => {
     try {
       await call("api/open", { id });
@@ -40,7 +41,30 @@ export function useSessions(page: Page, boots: number) {
       toast.error((e as Error).message);
     }
   }, []);
-  return { list, loaded, open };
+  const rename = useCallback(async (id: string, name: string) => {
+    try {
+      await call("api/session-rename", { id, name });
+      setTick((n) => n + 1);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }, []);
+  const remove = useCallback(async (id: string) => {
+    try {
+      await call("api/session-remove", { id });
+      setTick((n) => n + 1);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }, []);
+  const reveal = useCallback(async (id: string) => {
+    try {
+      await call("api/session-reveal", { id });
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }, []);
+  return { list, loaded, open, rename, remove, reveal };
 }
 
 export type Sessions = ReturnType<typeof useSessions>;

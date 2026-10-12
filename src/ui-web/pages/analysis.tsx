@@ -1,5 +1,5 @@
 import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx } from "../App.tsx";
 import { ImageViewer } from "../components/image-viewer.tsx";
@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.tsx";
 import { Tooltip } from "../components/ui/tooltip.tsx";
 import { askNotify, bridge, call, midText, post, withT } from "../lib/api.ts";
 import type { StreamState } from "../lib/stream.ts";
+import { liveHtml } from "../lib/markdown.ts";
 import { useStored } from "../lib/stored.ts";
 import { cn } from "../lib/utils.ts";
 import { SettingsPanel } from "./settings.tsx";
@@ -87,6 +88,8 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   const [light, setLight] = useState<{ src: string; alt: string } | null>(null);
   const [wide, setWide] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sent, setSent] = useState("");
+  const sentAt = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<HTMLDivElement>(null);
@@ -99,13 +102,29 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     if (!busy) return;
     const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
-  }, [busy]);
+  }, [busy, stream.items.length]);
 
   const send = useCallback(async (value: string, now = false) => {
     if (!value.trim()) return;
     askNotify();
-    await post("api/send", { text: value, now });
-  }, []);
+    if (!value.trim().startsWith("/") && (!busy || now)) {
+      sentAt.current = stream.items.length;
+      setSent(value.trim());
+    }
+    try {
+      await post("api/send", { text: value, now });
+    } catch (e) {
+      setSent("");
+      throw e;
+    }
+  }, [busy]);
+
+  // The message shows at once; the copy from the server replaces it.
+  useEffect(() => {
+    if (sent && stream.items.slice(sentAt.current).some((h) => h.includes('class="msg user"'))) setSent("");
+  }, [stream.items, sent]);
+  const itemsHtml = useMemo(() => stream.items.map((h, i) => <div key={i} className="item" dangerouslySetInnerHTML={{ __html: h }} />), [stream.items]);
+  const working = (busy || !!sent) && !stream.live && !stream.think;
 
   // Scroll: follow the end of the conversation unless the user scrolled up.
   useLayoutEffect(() => {
@@ -114,10 +133,11 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     if (!sc) return;
     autoScroll.current = Date.now();
     sc.scrollTop = sc.scrollHeight;
-  }, [stream.items, stream.pending, stream.live, stream.think, stream.cards]);
+  }, [stream.items, stream.pending, stream.live, stream.think, stream.cards, sent]);
 
   useEffect(() => {
     follow.current = true;
+    setSent("");
   }, [stream.resets]);
 
   // Step groups: an open group stays open when the server sends new HTML for it.
@@ -426,15 +446,21 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
             className="flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
             <div aria-live="polite" className="srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4" onClick={onClick} onChange={onChange}>
-              {stream.items.map((h, i) => (
-                <div key={i} dangerouslySetInnerHTML={{ __html: h }} />
-              ))}
+              {itemsHtml}
+              {sent && (
+                <div className="msg user">
+                  <div className="bubble">{sent}</div>
+                </div>
+              )}
               <div dangerouslySetInnerHTML={{ __html: stream.pending }} />
               {stream.think && !stream.live && <Thinking text={stream.think} />}
               {stream.live && (
-                <div className="msg agent whitespace-pre-wrap">
-                  {stream.live}
-                  <span className="caret" aria-hidden="true" />
+                <div className="msg agent" dangerouslySetInnerHTML={{ __html: liveHtml(stream.live) }} />
+              )}
+              {working && (
+                <div className="msg agent working" role="status">
+                  <span className="caret working" aria-hidden="true" />
+                  <span>{busy ? (status.text ?? "Working") : "Sending"}</span>
                 </div>
               )}
               <div ref={cardsRef} dangerouslySetInnerHTML={{ __html: stream.cards }} />

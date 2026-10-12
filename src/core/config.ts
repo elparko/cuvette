@@ -13,6 +13,7 @@ export interface Settings {
   autoResume: boolean;
   reviseOnFindings: boolean;
   effort: string;
+  promptCache: "off" | "5m" | "1h";
   numCtx: number;
   think: boolean;
   maxResultChars: number;
@@ -50,6 +51,7 @@ export const DEFAULTS: Settings = {
   autoResume: true,
   reviseOnFindings: true,
   effort: "high",
+  promptCache: "5m",
   numCtx: 32768,
   think: false,
   maxResultChars: 20000,

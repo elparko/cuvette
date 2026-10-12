@@ -51,6 +51,19 @@ export function useStream(onSwitch: () => void, hasSession: boolean) {
 
   useEffect(() => {
     dispatch({ t: "clear" });
+    // Many small text pieces can come in one frame. Apply them together, once per frame, so the page draws each frame.
+    let queue: Msg[] = [];
+    let frame = 0;
+    const flush = () => {
+      frame = 0;
+      const list = queue;
+      queue = [];
+      for (const m of list) dispatch(m);
+    };
+    const later = (m: Msg) => {
+      queue.push(m);
+      frame ||= requestAnimationFrame(flush);
+    };
     const es = new EventSource(withT("events"));
     es.onmessage = (ev) => {
       const m = JSON.parse(ev.data) as Msg;
@@ -67,9 +80,12 @@ export function useStream(onSwitch: () => void, hasSession: boolean) {
         if (!m.quiet || document.hidden) bridge.notify(String(m.title ?? ""), String(m.body ?? ""));
         return;
       }
-      dispatch(m);
+      later(m);
     };
-    return () => es.close();
+    return () => {
+      cancelAnimationFrame(frame);
+      es.close();
+    };
   }, [gen]);
 
   return state;

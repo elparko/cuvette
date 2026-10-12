@@ -251,6 +251,18 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     expect(answer).toMatch(/declined this request \(category: cyber\)/);
   });
 
+  test("the prompt cache setting: 5m by default, 1h with a TTL, off with no cache marks", async () => {
+    const tool = { name: "count", description: "c", inputSchema: { type: "object", properties: {} } };
+    const run = async (cache?: "off" | "5m" | "1h") => {
+      replies = [{ blocks: [{ type: "text", text: "ok" }] }];
+      await new ClaudeProvider("claude-opus-5-5", { apiKey: "test", cache }).step({ system: "s", messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }], tools: [tool] });
+      return JSON.stringify(captured.at(-1)!.body);
+    };
+    expect(await run()).toContain('"cache_control":{"type":"ephemeral"}');
+    expect((await run("1h")).match(/"cache_control":\{"type":"ephemeral","ttl":"1h"\}/g)).toHaveLength(3);
+    expect(await run("off")).not.toContain("cache_control");
+  });
+
   test("refusal drops tool_use blocks", async () => {
     replies = [{ blocks: [{ type: "tool_use", id: "toolu_09", name: "count", input: {} }], stop: "refusal", stopDetails: { type: "refusal", category: null } }];
     const p = new ClaudeProvider("claude-opus-5-5", { apiKey: "test" });

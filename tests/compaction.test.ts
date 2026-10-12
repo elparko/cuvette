@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { elideOld, estimateTokens, recentStart, summarizeOld, summaryMessage } from "../src/core/compaction.ts";
+import { dropThinking, elideOld, estimateTokens, recentStart, summarizeOld, summaryMessage } from "../src/core/compaction.ts";
 import { Session } from "../src/core/session.ts";
 import type { Message } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
@@ -114,4 +114,16 @@ test("only the request of the current turn stays; it stays in the recent window 
   expect(res!.request).toBeUndefined();
   expect(res!.kept[0]).toBe(h[3]);
   expect((await summarizeOld(h, provider, 10, undefined, h[0]))!.request).toBe(h[0]);
+});
+
+test("after an edit, the thinking blocks after it go, so Claude does not refuse the history", async () => {
+  const h = oneLongTurn(6).map((m) => (m.role === "assistant" ? { ...m, raw: [{ type: "thinking", thinking: "t", signature: "s" }], parts: [{ type: "thinking", text: "t" }, ...m.parts] } : m)) as Message[];
+  const { messages } = elideOld(h, 10);
+  const thinkingAt = (list: Message[]) => list.flatMap((m, i) => (m.role === "assistant" && (m.raw || m.parts.some((p) => p.type === "thinking")) ? [i] : []));
+  expect(thinkingAt(messages)).toEqual([1]);
+  expect(messages[3]!.parts.some((p) => p.type === "tool_call")).toBe(true);
+  expect(thinkingAt(elideOld(oneLongTurn(2), 10).messages)).toEqual([]);
+  const res = await summarizeOld(h, new FakeProvider({ steps: [], complete: "s" }), 10, undefined, h[0]);
+  expect(thinkingAt(res!.kept)).toEqual([]);
+  expect(dropThinking(h, 5)[3]).toBe(h[3]);
 });

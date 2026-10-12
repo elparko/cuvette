@@ -33,6 +33,7 @@ export interface IndexRow {
   title: string;
   date: string;
   name?: string;
+  custom?: string;
   description?: string;
 }
 
@@ -53,10 +54,26 @@ export function readIndex(): IndexRow[] {
 export function saveIndexRow(p: Place, named?: { title: string; description: string }): void {
   if (p.legacy) return;
   const old = readIndex().find((r) => r.id === p.id);
-  const row: IndexRow = { id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, description: named?.description ?? old?.description };
+  const row: IndexRow = { id: p.id, project: p.project, folder: p.outDir, title: p.title, date: p.created, name: named?.title ?? old?.name, custom: old?.custom, description: named?.description ?? old?.description };
   const rows = readIndex().filter((r) => r.id !== p.id);
   mkdirSync(cuvetteHome(), { recursive: true });
   writeFileSync(indexPath(), JSON.stringify([...rows, row], null, 1));
+}
+
+export function renameIndexRow(id: string, custom: string): boolean {
+  const rows = readIndex();
+  const row = rows.find((r) => r.id === id);
+  if (!row) return false;
+  row.custom = custom.replace(/\s+/g, " ").trim().slice(0, 60) || undefined;
+  writeFileSync(indexPath(), JSON.stringify(rows, null, 1));
+  return true;
+}
+
+export function removeIndexRow(id: string): boolean {
+  const rows = readIndex();
+  if (!rows.some((r) => r.id === id)) return false;
+  writeFileSync(indexPath(), JSON.stringify(rows.filter((r) => r.id !== id), null, 1));
+  return true;
 }
 
 export function slug(text: string, max = 40): string {

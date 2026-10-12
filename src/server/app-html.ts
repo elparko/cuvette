@@ -22,6 +22,9 @@ import { fieldTitle, groupRows, rowActions, summaryLine } from "../ui/programs.t
 import { changeCell, num, reruns, stepStatus, type RerunData, type StepState } from "../core/status.ts";
 import { formatRef, sessionCitations, type CitationStyle, type Ref } from "../core/citations.ts";
 import type { SessionLike } from "../ui/types.ts";
+import { esc, inline, md, shortPaths, tableHtml } from "../core/markdown.ts";
+
+export { esc, md, shortPaths, tableHtml };
 
 export interface Slot {
   id: number;
@@ -39,8 +42,6 @@ export interface Ctx {
   busy?: boolean;
 }
 
-const ENT: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-export const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ENT[c]!);
 const IMG = /\.(png|jpe?g|gif|webp|svg)$/i;
 
 export function fileUrl(c: Ctx, path: string, download = false): string {
@@ -51,79 +52,6 @@ export function midPath(p: string, n = 52): string {
   if (p.length <= n) return esc(p);
   const keep = Math.floor((n - 1) / 2);
   return `<span title="${esc(p)}">${esc(p.slice(0, keep))}…${esc(p.slice(p.length - keep))}</span>`;
-}
-
-export function tableHtml(columns: string[], rows: string[][], cls = ""): string {
-  return `<table class="stack ${cls}"><thead><tr>${columns.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows
-    .map((r) => `<tr>${columns.map((h, i) => `<td data-label="${esc(h.replace(/<[^>]+>/g, ""))}">${r[i] ?? ""}</td>`).join("")}</tr>`)
-    .join("")}</tbody></table>`;
-}
-
-const PATH = /(^|[\s(\[])((?:~|\/)[^\s<>"'`,;()\[\]]*\/[^\s<>"'`,;()\[\]]+?)(?=[.:]?(?:\s|$|[)\],;]))/g;
-
-export function shortPaths(html: string, n = 44): string {
-  return html.replace(PATH, (_m, pre: string, p: string) => {
-    if (p.length <= n) return pre + p;
-    const keep = Math.floor((n - 1) / 2);
-    return `${pre}<span class="path" title="${p}">${p.slice(0, keep)}…${p.slice(p.length - keep)}</span>`;
-  });
-}
-
-function inline(text: string): string {
-  return shortPaths(esc(text))
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-}
-
-export function md(src: string, opts: { code?: boolean } = {}): string {
-  const lines = String(src).split("\n");
-  const out: string[] = [];
-  let i = 0;
-  const li = /^\s*([-*]|\d+[.)])\s+/;
-  while (i < lines.length) {
-    const line = lines[i]!;
-    if (!line.trim()) {
-      i++;
-      continue;
-    }
-    if (line.trim().startsWith("```")) {
-      const code: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i]!.trim().startsWith("```")) code.push(lines[i++]!);
-      i++;
-      out.push(opts.code ? `<pre>${esc(code.join("\n"))}</pre>` : `<p class="dim">The code is in the Record tab.</p>`);
-      continue;
-    }
-    if (/^\s*\|.*\|\s*$/.test(line)) {
-      const rows: string[][] = [];
-      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i]!)) rows.push(lines[i++]!.trim().slice(1, -1).split("|").map((c) => c.trim()));
-      const body = rows.filter((r) => !r.every((c) => /^:?-{2,}:?$/.test(c)));
-      const [head, ...rest] = body;
-      out.push(tableHtml((head ?? []).map(inline), rest.map((r) => r.map(inline))));
-      continue;
-    }
-    const head = /^#{1,6}\s+(.*)$/.exec(line);
-    if (head) {
-      out.push(`<h4>${inline(head[1]!)}</h4>`);
-      i++;
-      continue;
-    }
-    if (li.test(line)) {
-      const ordered = /\d/.test(li.exec(line)![1]!);
-      const items: string[] = [];
-      while (i < lines.length && (li.test(lines[i]!) || (/^\s{2,}\S/.test(lines[i]!) && items.length))) {
-        const l = lines[i++]!;
-        if (li.test(l)) items.push(inline(l.replace(li, "")));
-        else items[items.length - 1] += `<br>${inline(l.trim())}`;
-      }
-      out.push(`<${ordered ? "ol" : "ul"}>${items.map((x) => `<li>${x}</li>`).join("")}</${ordered ? "ol" : "ul"}>`);
-      continue;
-    }
-    const para: string[] = [];
-    while (i < lines.length && lines[i]!.trim() && !li.test(lines[i]!) && !/^#{1,6}\s/.test(lines[i]!) && !lines[i]!.trim().startsWith("```") && !/^\s*\|.*\|\s*$/.test(lines[i]!)) para.push(lines[i++]!);
-    out.push(`<p>${para.map(inline).join("<br>")}</p>`);
-  }
-  return out.join("");
 }
 
 const SECTIONS = new Set(["Metrics", "Demonstration on a sample", "Settings", "Data", "What I will count", "What I will leave out, and what it does", "Programs", "Steps", "Pilot", "Reference", "Outputs", "Checks", "Out of scope", "Numbers", "Check", "Comparison with the reference", "Images", "Definitions"]);

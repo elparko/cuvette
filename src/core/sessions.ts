@@ -74,7 +74,7 @@ function firstFigure(folder: string | undefined): string | undefined {
   return f ? join(dir, f) : undefined;
 }
 
-function info(id: string, log: string, base: Omit<SessionInfo, "id" | "used" | "ask">, fallbackAsk = "", named?: { name?: string; description?: string }): SessionInfo {
+function info(id: string, log: string, base: Omit<SessionInfo, "id" | "used" | "ask">, fallbackAsk = "", named?: { name?: string; custom?: string; description?: string }): SessionInfo {
   const s = scanLog(log);
   if (s.owner && s.owner !== id) return { id, ...base, used: 0, ask: fallbackAsk, moved: true };
   return {
@@ -82,7 +82,7 @@ function info(id: string, log: string, base: Omit<SessionInfo, "id" | "used" | "
     ...base,
     used: statSync(log).mtimeMs,
     ask: String(s.ask?.data.text ?? fallbackAsk),
-    name: s.title?.title || named?.name,
+    name: named?.custom || s.title?.title || named?.name,
     description: s.title?.description || named?.description,
     status: s.status,
     figure: s.figure ?? firstFigure(base.folder),
@@ -90,7 +90,7 @@ function info(id: string, log: string, base: Omit<SessionInfo, "id" | "used" | "
 }
 
 function indexed(home: string): SessionInfo[] {
-  let rows: { id: string; project: string; folder: string; title: string; date: string; name?: string; description?: string }[] = [];
+  let rows: { id: string; project: string; folder: string; title: string; date: string; name?: string; custom?: string; description?: string }[] = [];
   try {
     rows = JSON.parse(readFileSync(join(home, "sessions-index.json"), "utf8"));
   } catch {
@@ -98,7 +98,7 @@ function indexed(home: string): SessionInfo[] {
   }
   return rows.map((r) => {
     const log = join(r.folder, ".record", "log.jsonl");
-    if (!existsSync(log)) return { id: r.id, cwd: r.project, used: Date.parse(r.date) || 0, ask: r.title, folder: r.folder, moved: true, name: r.name, description: r.description };
+    if (!existsSync(log)) return { id: r.id, cwd: r.project, used: Date.parse(r.date) || 0, ask: r.title, folder: r.folder, moved: true, name: r.custom || r.name, description: r.description };
     return info(r.id, log, { cwd: r.project, folder: r.folder }, r.title, r);
   });
 }
