@@ -71,10 +71,10 @@ or_ci <- function(x1, n1, x0, n0, z) {
   c(o, exp(log(o) - z * se), exp(log(o) + z * se))
 }
 
-nnt_text <- function(rd) {
+nnt_text <- function(rd, direction = "event is bad") {
   if (is.na(rd[1]) || rd[1] == 0) return(list(value = NA_real_, low = NA_real_, high = NA_real_, text = "not defined because the risk difference is 0"))
   v <- 1 / abs(rd[1])
-  kind <- if (rd[1] < 0) "benefit" else "harm"
+  kind <- if ((rd[1] < 0) == (direction != "event is good")) "benefit" else "harm"
   if (rd[2] > 0 || rd[3] < 0) {
     lims <- sort(abs(1 / c(rd[2], rd[3])))
     list(value = v, low = lims[1], high = lims[2], text = sprintf("%.1f (%.1f to %.1f) for %s", v, lims[1], lims[2], kind))

@@ -51,7 +51,7 @@ run_tool(function() {
   tab <- tab[order(tab$p), ]
   tab_path <- out_path("table")
   write.csv(tab, tab_path, row.names = FALSE)
-  sig <- tab$p_adj <= fdr
+  sig <- !is.na(tab$p_adj) & tab$p_adj <= fdr
   design_text <- if (method == "glmm") paste0("binomial GLMM: ", cond, " + (1|sample_id)", if (paired) paste0(" + (1|", pair, ")") else "") else paste0(method, ": ~ ", cond, if (paired) paste0(" + ", pair) else "")
   emit(list(
     ok = TRUE,

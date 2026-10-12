@@ -50,7 +50,7 @@ table_of <- function(df, path = NULL, max_rows = 12) {
 
 read_data <- function(path) {
   if (!file.exists(path)) fail(paste("file not found:", path))
-  df <- read.csv(path, check.names = FALSE, stringsAsFactors = FALSE)
+  df <- read.csv(path, check.names = FALSE, stringsAsFactors = FALSE, na.strings = c("", "NA"))
   for (v in names(df)) if (is.character(df[[v]])) df[[v]] <- factor(df[[v]])
   df
 }

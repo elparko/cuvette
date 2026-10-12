@@ -22,6 +22,7 @@ run_tool(function() {
   empty <- rownames(m)[rowSums(m) == 0]
   if (length(empty)) fail(paste0("samples with zero reads after the feature filter: ", paste(head(empty, 5), collapse = ", "), ". Remove them or lower min_prevalence."))
   norm <- pick(p, "normalization", NULL)
+  below_depth <- character()
   if (is.null(norm)) fail("normalization is missing. The scientist must choose relative, rarefy, clr or none.")
   distance <- pick(p, "distance", "bray")
   seed <- as.integer(pick(p, "seed", 1))
@@ -34,6 +35,7 @@ run_tool(function() {
     if (is.na(depth)) fail("rarefy_depth is missing. Rarefaction needs a depth in reads.")
     if (!is_whole(m)) fail("rarefaction needs whole-number counts.")
     keep <- rowSums(m) >= depth
+    below_depth <- rownames(m)[!keep]
     if (sum(keep) < 3) fail(sprintf("only %d samples have %d reads or more. Lower rarefy_depth.", sum(keep), depth))
     m <- m[keep, , drop = FALSE]
     md <- md[keep, , drop = FALSE]
@@ -77,11 +79,11 @@ run_tool(function() {
   plot(pc$points, col = col, pch = 16, xlab = sprintf("PCo1 (%.1f%%)", 100 * pc$eig[1] / sum(abs(pc$eig))), ylab = sprintf("PCo2 (%.1f%%)", 100 * pc$eig[2] / sum(abs(pc$eig))), main = paste("PCoA,", distance, "distance"))
   if (is.factor(md[[v1]])) legend("topright", legend = levels(md[[v1]]), col = seq_len(nlevels(md[[v1]])), pch = 16, cex = 0.8)
   dev.off()
-  metrics <- list(r2 = first$R2, f = first$F, p = first$p, df = first$Df, n_samples = nrow(m), n_features = ncol(m), permutations = nperm, n_missing_dropped = n_missing, residual_r2 = df$R2[df$term == "Residual"])
+  metrics <- list(r2 = first$R2, f = first$F, p = first$p, df = first$Df, n_samples = nrow(m), n_features = ncol(m), permutations = nperm, n_missing_dropped = n_missing, residual_r2 = df$R2[df$term == "Residual"], n_below_rarefy_depth = length(below_depth))
   if (!is.null(disp)) { metrics$dispersion_f <- disp$f; metrics$dispersion_p <- disp$p }
   emit(list(
     ok = TRUE,
-    summary = sprintf("PERMANOVA %s on %d samples, %s distance after %s, %d permutations, seed %d: %s R2 %.4f, F %.3f, p %.4f.%s", rhs, nrow(m), distance, norm, nperm, seed, first$term, first$R2, first$F, first$p, if (!is.null(disp)) sprintf(" Dispersion test of %s: F %.3f, p %.4f.", disp$variable, disp$f, disp$p) else ""),
+    summary = sprintf("PERMANOVA %s on %d samples, %s distance after %s, %d permutations, seed %d: %s R2 %.4f, F %.3f, p %.4f.%s", rhs, nrow(m), distance, norm, nperm, seed, first$term, first$R2, first$F, first$p, if (!is.null(disp)) sprintf(" Dispersion test of %s: F %.3f, p %.4f.", disp$variable, disp$f, disp$p) else "", if (length(below_depth)) sprintf(" %d samples have fewer reads than the rarefaction depth and are left out: %s.", length(below_depth), paste(head(below_depth, 10), collapse = ", ")) else ""),
     metrics = metrics,
     data = list(formula = rhs, distance = distance, normalization = norm, by = by, strata = strata, seed = seed, min_p_possible = 1 / (nperm + 1), dispersion = disp, vegan_version = as.character(packageVersion("vegan"))),
     table = table_of(df, out, 20),

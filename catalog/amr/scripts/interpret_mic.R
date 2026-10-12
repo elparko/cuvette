@@ -84,7 +84,7 @@ run_tool(function() {
     legend("bottomright", legend = c("S", "I or SDD", "R"), fill = c("#2e7d32", "#f9a825", "#c62828"), cex = 0.7, bg = "white")
   })
 
-  metrics <- list(n_rows = nrow(long), n_interpreted = sum(!is.na(long$sir)), n_no_breakpoint = sum(is.na(long$sir)), n_S = sum(long$sir == "S", na.rm = TRUE), n_SDD = sum(long$sir == "SDD", na.rm = TRUE), n_I = sum(long$sir == "I", na.rm = TRUE), n_R = sum(long$sir == "R", na.rm = TRUE), n_groups = nrow(summ))
+  metrics <- list(n_rows = nrow(long), n_interpreted = sum(!is.na(long$sir)), n_no_breakpoint = sum(is.na(long$sir)), n_S = sum(long$sir == "S", na.rm = TRUE), n_SDD = sum(long$sir == "SDD", na.rm = TRUE), n_I = sum(long$sir == "I", na.rm = TRUE), n_R = sum(long$sir == "R", na.rm = TRUE), n_groups = nrow(summ), n_no_value = inp$n_no_value)
   for (i in seq_len(min(nrow(summ), 60))) {
     tag <- clean_name(paste(summ[i, keys], collapse = "_"))
     metrics[[paste0("pct_S_", tag)]] <- summ$pct_S[i]
@@ -97,6 +97,7 @@ run_tool(function() {
     metrics[[paste0("n_I_", tag)]] <- summ$n_I[i]
   }
   notes <- character()
+  if (inp$n_no_value > 0) notes <- c(notes, sprintf("%d cells have no MIC value (blank, NA, nd or -) and are left out.", inp$n_no_value))
   if (metrics$n_no_breakpoint > 0) notes <- c(notes, sprintf("%d of %d values have no breakpoint in %s for this organism, drug, host and site. Their S, I, R is empty.", metrics$n_no_breakpoint, metrics$n_rows, guideline))
   emit(list(
     ok = TRUE,

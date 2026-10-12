@@ -17,18 +17,18 @@ while [ $# -gt 0 ]; do
   shift 2
 done
 [ -s "$aln" ] || { echo "error: alignment file not found: $aln" >&2; exit 1; }
-args="-s $aln -pre $pre -seed $seed -T 1 -redo -quiet"
+set -- -s "$aln" -pre "$pre" -seed "$seed" -T 1 -redo -quiet
 if [ "$mode" = select ]; then
-  args="$args -m MF"
+  set -- "$@" -m MF
 else
-  args="$args -m ${model:-MFP}"
+  set -- "$@" -m "${model:-MFP}"
   case $btype in
-    ufboot) args="$args -B $nrep" ;;
-    standard) args="$args -b $nrep" ;;
+    ufboot) set -- "$@" -B "$nrep" ;;
+    standard) set -- "$@" -b "$nrep" ;;
   esac
-  [ -n "$outgroup" ] && args="$args -o $outgroup"
+  [ -n "$outgroup" ] && set -- "$@" -o "$outgroup"
 fi
-"$prog" $args > "$dir/stdout.txt" 2> "$dir/stderr.txt" || { tail -5 "$dir/stdout.txt" "$dir/stderr.txt" >&2; exit 1; }
+"$prog" "$@" > "$dir/stdout.txt" 2> "$dir/stderr.txt" || { tail -5 "$dir/stdout.txt" "$dir/stderr.txt" >&2; exit 1; }
 rep=$pre.iqtree
 echo "report=$rep"
 echo "seed=$seed"
