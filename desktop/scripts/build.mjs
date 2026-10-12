@@ -156,6 +156,8 @@ if (mode === "dev") {
   const appOut = join(OUT, "Cuvette.app");
   rmSync(appOut, { recursive: true, force: true });
   run("ditto", [app, appOut]);
+  run("codesign", ["--force", "--deep", "--sign", "-", appOut]);
+  run("codesign", ["--verify", "--deep", "--strict", appOut]);
   const file = dmg(appOut);
   console.log(`\nCuvette.app ${mb(appOut)}: ${appOut}`);
   console.log(`  node ${mb(join(appOut, "Contents", "MacOS", "node"))}, shell ${mb(join(appOut, "Contents", "MacOS", "cuvette"))}, core ${mb(join(appOut, "Contents", "Resources", "core"))}`);
