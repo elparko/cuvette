@@ -59,10 +59,10 @@ def _clean(mask, fill_holes):
 
 
 def _label(mask, min_object_size, exclude_border_objects, split_touching, min_distance):
-    n_before = int(measure.label(mask, connectivity=1).max())
+    n_before = int(measure.label(mask, connectivity=2).max())
     if min_object_size > 1:
-        mask = morphology.remove_small_objects(mask, max_size=int(min_object_size) - 1)
-    n_small = n_before - int(measure.label(mask, connectivity=1).max())
+        mask = morphology.remove_small_objects(mask, max_size=int(min_object_size) - 1, connectivity=2)
+    n_small = n_before - int(measure.label(mask, connectivity=2).max())
     lab = measure.label(mask, connectivity=2)
     if split_touching:
         dist = ndi.distance_transform_edt(mask)
@@ -305,7 +305,7 @@ def _score(pred, truth):
     inter = int((p & t).sum())
     dice = 2.0 * inter / max(int(p.sum()) + int(t.sum()), 1)
     iou = inter / max(int((p | t).sum()), 1)
-    npred, ntrue = len(np.unique(pred)) - 1, len(np.unique(truth)) - 1
+    npred, ntrue = int(np.unique(pred[pred > 0]).size), int(np.unique(truth[truth > 0]).size)
     out = {"dice": dice, "pixel_iou": iou, "n_pred": npred, "n_truth": ntrue}
     pairs = np.stack([pred.ravel(), truth.ravel()], axis=1)
     pairs = pairs[(pairs[:, 0] > 0) & (pairs[:, 1] > 0)]
@@ -333,7 +333,7 @@ def compare_masks(prediction, truth):
     pred = _read(prediction)
     if pred.ndim == 3:
         pred = pred[..., 0]
-    pred = pred.astype(np.int64)
+    pred = measure.label(pred) if pred.dtype == np.uint8 else pred.astype(np.int64)
     tr = _read_truth(truth)
     if pred.shape != tr.shape:
         raise ValueError("the shapes differ: %s and %s" % (pred.shape, tr.shape))

@@ -1031,4 +1031,4 @@ tests:
       - { tool: measure_stain_intensity, args: { path: "{adapter_dir}/data/synthetic_ihc.png", compartment: cytoplasm, region: whole, detection_image: hematoxylin, nucleus_threshold: otsu, min_diameter: 5, cell_expand: 0 } }
     expect:
       - { path: ok, equals: false }
-      - { path: error, contains: "needs cell_expand above 0" }
+      - { path: error, contains: "needs cell_expand of 1 pixel or more" }

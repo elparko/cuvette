@@ -694,8 +694,8 @@ tests:
           truth: "{adapter_dir}/data/nuinsseg-mini/mouse_spleen/label masks/mouse_spleen_01.tif"
     expect:
       - { path: metrics.n_truth, equals: 24 }
-      - { path: metrics.n_pred, equals: 10 }
-      - { path: metrics.dice, approx: 0.72839, abs: 0.0005 }
+      - { path: metrics.n_pred, equals: 8 }
+      - { path: metrics.dice, approx: 0.72707, abs: 0.0005 }
 
   - id: nuinsseg_mini_folder
     description: >
@@ -716,7 +716,7 @@ tests:
       - { path: metrics.n_images, equals: 2 }
       - { path: metrics.n_groups, equals: 2 }
       - { path: metrics.total_truth, equals: 27 }
-      - { path: metrics.mean_dice, approx: 0.70745, abs: 0.0005 }
+      - { path: metrics.mean_dice, approx: 0.68695, abs: 0.0005 }
 
   - id: missing_image
     description: An image file that does not exist fails, and the error names the file.

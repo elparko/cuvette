@@ -78,11 +78,17 @@ def _write_table(path, df):
 
 def _read_table(path, what="cell table"):
     _check_file(path, what)
-    with open(path, encoding="utf-8-sig") as f:
-        head = f.readline()
+    with open(path, "rb") as f:
+        raw = f.read()
+    try:
+        raw.decode("utf-8")
+        enc = "utf-8-sig"
+    except UnicodeDecodeError:
+        enc = "cp1252"
+    head = raw.decode(enc, errors="replace").split("\n", 1)[0]
     sep = "\t" if head.count("\t") > head.count(",") else ","
     try:
-        df = pd.read_csv(path, sep=sep, encoding="utf-8-sig")
+        df = pd.read_csv(path, sep=sep, encoding=enc, encoding_errors="replace")
     except Exception as e:
         _fail("cannot read the %s %s as a table: %s" % (what, path, e))
     if df.empty:
@@ -718,8 +724,8 @@ def measure_stain_intensity(path, stain_vectors="ruifrok_hdab", compartment=None
         _fail("detection_image is %s. Use hematoxylin or od_sum" % detection_image)
     if min_diameter is None:
         _need(None, "min_diameter", "nucleus_min_diameter")
-    if comp != "nucleus" and float(cell_expand) <= 0:
-        _fail("compartment %s needs cell_expand above 0 pixels, because the cell is the nucleus grown by that distance" % comp)
+    if comp != "nucleus" and float(cell_expand) < 1:
+        _fail("compartment %s needs cell_expand of 1 pixel or more, because the cell is the nucleus grown by that distance" % comp)
     matrix = stain_matrix(stain_vectors)
     im = _read_image(path)
     if im.shape[0] * im.shape[1] > MAX_PIXELS:
@@ -792,6 +798,7 @@ def measure_stain_intensity(path, stain_vectors="ruifrok_hdab", compartment=None
     if threshold_1plus is not None and threshold_2plus is not None and threshold_3plus is not None:
         t = _thresholds(threshold_1plus, threshold_2plus, threshold_3plus)
         v = ndi.mean(dab, comps[comp], labels)
+        metrics["n_cells_no_%s_pixels" % comp] = float(np.isnan(v[inside]).sum())
         cls = _classify(np.nan_to_num(v), t)
         cls_img = np.zeros(nuc.shape, int)
         cls_img[nuc > 0] = cls[nuc[nuc > 0] - 1] + 1
