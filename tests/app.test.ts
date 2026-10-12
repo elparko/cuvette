@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { startApp, type AppHandle } from "../src/server/app.ts";
-import { cardHtml, decisionsHtml, itemHtml, runHtml, sessionsHtml, splitRuns, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
+import { cardHtml, decisionsHtml, itemHtml, runHtml, sessionsHtml, sheetHtml, splitRuns, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
 import type { Item } from "../src/ui/items.ts";
 import { WebView } from "../src/server/app-view.ts";
-import { planInit, type Card } from "../src/ui/cards.ts";
+import { planInit, sheetRows, type Card } from "../src/ui/cards.ts";
 import { CARDS, COMMANDS } from "../src/ui/parity.ts";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { until } from "../src/tui/testing.ts";
@@ -528,5 +528,19 @@ describe("agent message markdown", () => {
     const text = "## Result\n\n**Counts:**\n- one *n* is a Set\n  - nested\n\n1. first\n2. second\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nSee [the paper](https://example.com).";
     const html = itemHtml(ctx, { t: "assistant", text } as Item);
     for (const part of ["<h4>Result</h4>", "<strong>Counts:</strong>", "<em>n</em>", "<ul><li>nested</li></ul>", "<ol><li>first</li><li>second</li></ol>", "<th>A</th>", '<a href="https://example.com"']) expect(html).toContain(part);
+  });
+});
+
+describe("sample sheet card", () => {
+  test("a long sheet shows the first 200 rows, and saving keeps the other rows", () => {
+    const rows = Array.from({ length: 500 }, (_, i) => [`s${i}`, i % 2 ? "ctrl" : "drug", `m${i % 10}`, "", `f${i}.tif`]);
+    const q = { qid: "q1", title: "Sample sheet", text: "Is it correct?", table: { columns: ["sample", "group", "unit", "batch", "path"], rows } } as unknown as Question;
+    const html = sheetHtml(q);
+    expect(html.match(/<tr><td>/g)).toHaveLength(200);
+    expect(html).toContain("the first 200 of 500 rows");
+    const saved = sheetRows({ "cell:0:1": "Ceramide" }, q)!;
+    expect(saved).toHaveLength(500);
+    expect(saved[0]![1]).toBe("Ceramide");
+    expect(saved[499]).toEqual(rows[499]);
   });
 });

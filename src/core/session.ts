@@ -41,6 +41,7 @@ import { absentStains, groundQuestions, inspectData, type Inspection } from "./i
 import { addedSteps, approvedPlan, currentPlan, matchStep, mergePlan, openDecisions, planText, plannedAdapters, readPlan, type AnalysisPlan, type PlanDecision } from "./plan.ts";
 import { modeHook, Permissions } from "./permissions.ts";
 import { systemPrompt } from "./prompt.ts";
+import { prepareImages } from "../providers/images.ts";
 import { activity, makesNode as makesNodeFor, PURPOSE, stepNumbers } from "./housekeeping.ts";
 import { QuestionQueue } from "./questions.ts";
 import { compareChecks, matchSummary, summarizeTable, METHOD_DATA_CHECK, METHOD_DATA_TITLE, type DataSummary } from "./datacompare.ts";
@@ -386,15 +387,20 @@ export class Session {
     this.pick = opts.pick ?? opts.adapters.length === 0;
     const named = [...this.adapters];
     const defaults = opts.defaults ? this.defaultAdapters() : [];
-    for (const a of named) await this.startOne(a);
-    for (const a of [...defaults])
-      try {
-        await this.startOne(a);
-      } catch (e) {
-        this.adapters = this.adapters.filter((x) => x !== a);
-        defaults.splice(defaults.indexOf(a), 1);
-        this.notes.push(`The default adapter ${a.name} did not start: ${(e as Error).message}`);
-      }
+    const launched = await Promise.allSettled([...named, ...defaults].map((a) => this.launch(a)));
+    const failed = launched.flatMap((r, i) => (r.status === "rejected" && i < named.length ? [r.reason] : []));
+    if (failed.length) {
+      await Promise.all(launched.map((r) => (r.status === "fulfilled" ? r.value.rt.close().catch(() => {}) : undefined)));
+      throw failed[0];
+    }
+    for (const r of launched) if (r.status === "fulfilled") this.register(r.value);
+    launched.slice(named.length).forEach((r, i) => {
+      if (r.status === "fulfilled") return;
+      const a = defaults[i]!;
+      this.adapters = this.adapters.filter((x) => x !== a);
+      this.notes.push(`The default adapter ${a.name} did not start: ${(r.reason as Error).message}`);
+    });
+    defaults.splice(0, defaults.length, ...defaults.filter((_, i) => launched[named.length + i]!.status === "fulfilled"));
 
     this.decisions = new DecisionRecord(this.adapters, this.record, [...(this.pick ? [ADAPTER_DECISION] : []), ...TEST_DECISIONS, REPORTING_DECISION]);
     this.interactive = !!opts.interactive;
@@ -554,18 +560,32 @@ export class Session {
   }
 
   private async startOne(a: LoadedAdapter): Promise<string[]> {
+    return this.register(await this.launch(a));
+  }
+
+  // The programs start at the same time. The tools register in a fixed order after that.
+  private async launch(a: LoadedAdapter) {
     const trust = adapterTrust(a.root);
     if (!trust.codeConfirmed) throw new Error(`The adapter ${a.name} is Unlisted and ships code (${trust.codeFiles.join(", ")}). Confirm that it can run: cuvette adapter allow-code ${a.name}`);
     const { startAdapter } = await import("../adapters/runtime.ts");
     const rt = await startAdapter(a, this.dirs());
+    try {
+      const [mod, tools] = await Promise.all([a.module(), rt.tools()]);
+      return { a, trust, rt, mod, tools };
+    } catch (e) {
+      await rt.close().catch(() => {});
+      throw e;
+    }
+  }
+
+  private register({ a, trust, rt, mod, tools }: Awaited<ReturnType<Session["launch"]>>): string[] {
     this.runtimes.push(rt);
     this.envTargets.set(a.name, envTarget({ kind: a.manifest.connection.kind, interpreter: rt.interpreter ?? [], programPath: rt.programPath, program: a.manifest.program.name, programVersion: rt.programVersion }));
     this.runtimeInfo.push({ adapter: a, programVersion: rt.programVersion, instructions: rt.instructions });
     this.adapterInfo.push({ name: a.name, title: a.manifest.adapter.title || a.manifest.program.name, version: a.manifest.adapter.version, programVersion: rt.programVersion, trust: trust.label });
-    const mod = await a.module();
     const names: string[] = [];
     const noCode = blocksCode(a.name, this.cwd);
-    for (const t of [...(await rt.tools()), ...(mod.tools ?? []).map((t) => ({ ...t, adapter: t.adapter ?? a.name, source: "adapter" as const }))]) {
+    for (const t of [...tools, ...(mod.tools ?? []).map((t) => ({ ...t, adapter: t.adapter ?? a.name, source: "adapter" as const }))]) {
       if (noCode && isCodeTool(t.remoteName ?? t.name, (t.inputSchema as { properties?: object }).properties)) continue;
       const name = this.tools.has(t.name) ? `${a.name.replace(/-/g, "_")}_${t.name}` : t.name;
       this.tools.set(name, { ...t, name, remoteName: t.remoteName ?? t.name });
@@ -1601,6 +1621,7 @@ export class Session {
     const args = dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema);
     if (!ownPurpose(tool)) delete args.purpose;
     const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
+    if (r.images?.length && this.provider.info.vision) await prepareImages(r.images);
     return { type: "tool_result", callId: call.id, name: call.name, text: r.text, images: r.images, isError: r.isError };
   }
 

@@ -100,7 +100,9 @@ export function sheetFromTable(t: Table, source: string): SampleSheet | undefine
   t.rows.forEach((r, i) => {
     const k = key >= 0 ? (r[key] ?? "").trim() : `row ${i + 2}`;
     if (isMissing(k)) return;
-    by.set(k, [...(by.get(k) ?? []), i]);
+    const list = by.get(k);
+    if (list) list.push(i);
+    else by.set(k, [i]);
   });
   const rows: SampleRow[] = [...by.entries()].map(([k, idx]) => {
     const r = t.rows[idx[0]!]!;
@@ -165,7 +167,12 @@ export function sheetTable(rows: SampleRow[], max = 12): string {
 
 export function groupSummary(rows: SampleRow[]): string {
   const groups = new Map<string, SampleRow[]>();
-  for (const r of rows) groups.set(r.group || "(no group)", [...(groups.get(r.group || "(no group)") ?? []), r]);
+  for (const r of rows) {
+    const g = r.group || "(no group)";
+    const list = groups.get(g);
+    if (list) list.push(r);
+    else groups.set(g, [r]);
+  }
   const units = (rs: SampleRow[]) => new Set(rs.map((r) => r.unit).filter(Boolean)).size;
   const word = unitWord(rows) ?? "unit";
   return [...groups.entries()].map(([g, rs]) => (units(rs) ? `${g}: ${plural(units(rs), word)}, ${plural(rs.length, "sample")}` : `${g}: ${plural(rs.length, "sample")}`)).join("; ");
@@ -197,7 +204,12 @@ export function minPossibleP(n1: number, n2: number): number {
 export function designChecks(rows: SampleRow[], opts: { n?: string; test?: string } = {}): DesignIssue[] {
   const out: DesignIssue[] = [];
   const groups = new Map<string, SampleRow[]>();
-  for (const r of rows) if (r.group) groups.set(r.group, [...(groups.get(r.group) ?? []), r]);
+  for (const r of rows) {
+    if (!r.group) continue;
+    const list = groups.get(r.group);
+    if (list) list.push(r);
+    else groups.set(r.group, [r]);
+  }
   const unitsIn = (rs: SampleRow[]) => new Set(rs.map((r) => r.unit).filter(Boolean));
   const word = unitWord(rows) ?? "unit";
   const level = nLevel(rows, opts.n);

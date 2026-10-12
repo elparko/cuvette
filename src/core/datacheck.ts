@@ -81,14 +81,20 @@ interface ColInfo {
   numeric: boolean;
 }
 
+const infoCache = new WeakMap<Table, ColInfo[]>();
+
 export function columnInfo(t: Table): ColInfo[] {
-  return t.columns.map((name, c) => {
+  const hit = infoCache.get(t);
+  if (hit) return hit;
+  const info = t.columns.map((name, c) => {
     const kinds: Record<Kind, number[]> = { num: [], comma: [], astext: [], text: [], missing: [] };
     t.rows.forEach((r, i) => kinds[kindOf(r[c] ?? "")].push(i));
     const numberLike = kinds.num.length + kinds.comma.length + kinds.astext.length;
     const filled = t.rows.length - kinds.missing.length;
     return { name, kinds, numeric: numberLike >= 2 && numberLike / Math.max(1, filled) >= 0.6 };
   });
+  infoCache.set(t, info);
+  return info;
 }
 
 export function idColumn(t: Table): number {
@@ -113,7 +119,7 @@ export function unitOf(column: string): string | undefined {
 const fileRow = (i: number) => i + 2;
 
 export function median(xs: number[]): number {
-  const s = [...xs].sort((a, b) => a - b);
+  const s = Float64Array.from(xs).sort();
   const m = s.length >> 1;
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
 }
@@ -176,9 +182,13 @@ export function checkTable(t: Table, source: string): DataCheck {
 
   const seen = new Map<string, number>();
   const copies: number[] = [];
+  const copied = new Set<number>();
   t.rows.forEach((r, i) => {
     const k = key(r);
-    if (seen.has(k)) copies.push(i);
+    if (seen.has(k)) {
+      copies.push(i);
+      copied.add(i);
+    }
     else seen.set(k, i);
   });
   if (copies.length && t.columns.length >= 2) {
@@ -189,9 +199,12 @@ export function checkTable(t: Table, source: string): DataCheck {
   if (id >= 0) {
     const where = new Map<string, number[]>();
     t.rows.forEach((r, i) => {
-      if (copies.includes(i)) return;
+      if (copied.has(i)) return;
       const v = (r[id] ?? "").trim();
-      if (!isMissing(v)) where.set(v, [...(where.get(v) ?? []), i]);
+      if (isMissing(v)) return;
+      const list = where.get(v);
+      if (list) list.push(i);
+      else where.set(v, [i]);
     });
     const dups = [...where.entries()].filter(([, rows]) => rows.length > 1);
     if (dups.length) {
@@ -244,7 +257,9 @@ export function checkTable(t: Table, source: string): DataCheck {
     t.rows.forEach((r, i) => {
       if (toNumber(r[ci] ?? "") === undefined) return;
       const g = group >= 0 ? (r[group] ?? "").trim() : "";
-      parts.set(g, [...(parts.get(g) ?? []), i]);
+      const list = parts.get(g);
+      if (list) list.push(i);
+      else parts.set(g, [i]);
     });
     const big = [...parts.values()].every((rows) => rows.length >= 5);
     const sets = group >= 0 && big ? [...parts.values()] : [[...parts.values()].flat()];
@@ -420,7 +435,9 @@ export function checkFiles(files: FileInfo[], source: string): DataCheck {
   const bucket = new Map<string, typeof parsed>();
   for (const p of parsed) {
     const k = `${p.ext}|${p.channel ?? ""}`;
-    bucket.set(k, [...(bucket.get(k) ?? []), p]);
+    const list = bucket.get(k);
+    if (list) list.push(p);
+    else bucket.set(k, [p]);
   }
   const empty = parsed.filter((p) => p.f.size === 0).map((p) => p.f.rel);
   if (empty.length) items.push({ id: "empty_files", check: "empty_files", level: "note", files: empty, text: `${plural(empty.length, "file")} ${empty.length === 1 ? "is" : "are"} empty (0 bytes): ${listOf(empty, 3)}. The harness leaves ${empty.length === 1 ? "it" : "them"} out.` });
@@ -431,7 +448,13 @@ export function checkFiles(files: FileInfo[], source: string): DataCheck {
     const odd = sized.filter((p) => p.f.size < med / 2 || p.f.size > med * 2);
     if (odd.length && odd.length <= sized.length / 3) items.push({ id: `size:${k}`, check: "file_size", level: "note", files: odd.map((p) => p.f.rel), text: `${plural(odd.length, "file")} ${odd.length === 1 ? "differs" : "differ"} much in size from the others (median ${sizeText(med)}): ${listOf(odd.map((p) => `${p.f.rel} (${sizeText(p.f.size)})`), 3)}. ${odd.length === 1 ? "It" : "They"} can be cut short or have another image size.` });
     const dims = new Map<string, string[]>();
-    for (const p of ps) if (p.f.width && p.f.height) dims.set(`${p.f.width} x ${p.f.height}`, [...(dims.get(`${p.f.width} x ${p.f.height}`) ?? []), p.f.rel]);
+    for (const p of ps) {
+      if (!p.f.width || !p.f.height) continue;
+      const k = `${p.f.width} x ${p.f.height}`;
+      const list = dims.get(k);
+      if (list) list.push(p.f.rel);
+      else dims.set(k, [p.f.rel]);
+    }
     if (dims.size > 1) {
       const sorted = [...dims.entries()].sort((a, b) => b[1].length - a[1].length);
       items.push({ id: `dims:${k}`, check: "image_size", level: "note", files: sorted.slice(1).flatMap(([, f]) => f), text: `The images have ${dims.size} sizes: ${sorted.map(([d, f]) => `${d} pixels (${plural(f.length, "file")})`).join(", ")}. Areas in pixels are not comparable between sizes.` });
@@ -439,7 +462,12 @@ export function checkFiles(files: FileInfo[], source: string): DataCheck {
   }
 
   const bits = new Map<number, string[]>();
-  for (const p of parsed) if (p.f.bits) bits.set(p.f.bits, [...(bits.get(p.f.bits) ?? []), p.f.rel]);
+  for (const p of parsed) {
+    if (!p.f.bits) continue;
+    const list = bits.get(p.f.bits);
+    if (list) list.push(p.f.rel);
+    else bits.set(p.f.bits, [p.f.rel]);
+  }
   if (bits.size > 1) {
     const sorted = [...bits.entries()].sort((a, b) => b[1].length - a[1].length);
     const few = sorted.slice(1).flatMap(([, f]) => f);

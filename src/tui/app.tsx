@@ -24,6 +24,8 @@ import { terminalStdin } from "./key-stream.ts";
 
 const MODE_ORDER: Mode[] = ["watch", "follow", "teach", "plan"];
 const MAX_SUGGESTIONS = 8;
+// Streamed text arrives in many small pieces. One render each 50 ms keeps the terminal responsive.
+const LIVE_MS = 50;
 
 export const RESIZE_MS = 150;
 const CLEAR_ALL = "\x1b[2J\x1b[3J\x1b[H";
@@ -53,6 +55,12 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
   if (screen) screen.reprint = () => setEpoch((x) => x + 1);
   const wipe = () => (screen?.wipe ? screen.wipe() : (opts.stdout ?? process.stdout).write(CLEAR_ALL));
   const [live, setLive] = useState("");
+  const liveBuf = useRef<{ text: string; timer?: NodeJS.Timeout }>({ text: "" });
+  const clearLive = useCallback(() => {
+    clearTimeout(liveBuf.current.timer);
+    liveBuf.current = { text: "" };
+    setLive("");
+  }, []);
   const [status, setStatus] = useState<{ state: string; tool?: string; purpose?: string; since?: number }>({ state: "idle" });
   const [cards, setCards] = useState<Card[]>([]);
   const [seq, setSeq] = useState<QuestionSeq>(SEQ_START);
@@ -195,14 +203,20 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
             }
           }
           record({ e: en, items: out });
-          if (en.kind === "assistant") setLive("");
+          if (en.kind === "assistant") clearLive();
           if (en.kind === "usage" || en.kind === "setting") setUsage(usageFields(session).usage);
           dropCard((c) => closesCard(en, c));
           if (refreshesStatus(en)) refresh();
           break;
         }
         case "delta":
-          if (e.kind === "text") setLive((t) => t + e.text);
+          if (e.kind !== "text") break;
+          liveBuf.current.text += e.text;
+          liveBuf.current.timer ??= setTimeout(() => {
+            const more = liveBuf.current.text;
+            liveBuf.current = { text: "" };
+            setLive((t) => t + more);
+          }, LIVE_MS);
           break;
         case "status":
           setStatus({ state: e.state, tool: e.tool, purpose: e.purpose, since: e.state === "running" ? e.since : undefined });
@@ -210,7 +224,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
           if (e.state === "idle") {
             show(collapser.current.flush());
             setPending([]);
-            setLive("");
+            clearLive();
             const { next, rest } = nextQueued(session, queueRef.current);
             if (next !== undefined) {
               updateQueue(rest);
@@ -226,6 +240,8 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
       }
     });
   }, [session]);
+
+  useEffect(() => () => clearTimeout(liveBuf.current.timer), []);
 
   const ctx: CommandCtx = useMemo(
     () => ({
