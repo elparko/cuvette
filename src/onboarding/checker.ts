@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse as parseYaml, parseDocument, YAMLSeq } from "yaml";
@@ -281,6 +281,7 @@ export async function checkAdapter(dirOrName: string, opts: { runTests?: boolean
       if (!runtime) checkStatic(adapter, errors, warnings, tools, toolsKnown);
     } finally {
       await runtime?.close().catch(() => undefined);
+      rmSync(work, { recursive: true, force: true });
     }
   } else {
     checkStatic(adapter, errors, warnings, tools, toolsKnown);

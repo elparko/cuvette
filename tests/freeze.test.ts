@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { attachHeadless } from "../src/core/headless.ts";
-import { AFTER_RESULT, NO_DEVIATIONS, NO_REASON, deviationMarkdown, deviations, frozenPlan, planChanges, planHash } from "../src/core/freeze.ts";
+import { AFTER_RESULT, NO_DEVIATIONS, NO_REASON, deviationHtml, deviationMarkdown, deviations, frozenPlan, planChanges, planHash } from "../src/core/freeze.ts";
 import { planMarkdown, type AnalysisPlan } from "../src/core/plan.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
 import { Session } from "../src/core/session.ts";
@@ -141,4 +141,12 @@ test("planChanges lists steps, methods, exclusions and definitions but not a sta
   const to = { steps: [{ step: "A", status: "done", method: "Mann-Whitney" }, { step: "C", status: "todo" }], exclusions: [], definitions: [{ measure: "positive", definition: "above 50" }] } as AnalysisPlan;
   expect(planChanges(from, to).map((c) => c.what)).toEqual(["Method of step A", "Added step: C", "Removed step: B", "Removed exclusion: Sample 3", "Definition of positive"]);
   expect(planChanges(from, { ...from, steps: from.steps.map((s) => ({ ...s, status: "done" })) })).toEqual([]);
+});
+
+test("the plan hash is escaped in the deviation HTML", () => {
+  const r = new AnalysisRecord(mkdtempSync(join(tmpdir(), "cuvette-hard-")), "s1");
+  r.append("plan_frozen", { hash: "<img src=x onerror=alert(1)>", version: 1, plan: { steps: [] } });
+  const html = deviationHtml(r);
+  expect(html).not.toContain("<img");
+  expect(html).toContain("&lt;img");
 });

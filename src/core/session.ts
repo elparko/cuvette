@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { isCredentialsFile } from "./credentials.ts";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
 import { findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
@@ -3061,6 +3062,7 @@ export class Session {
   }
 
   private async inspectPath(path: string, signal?: AbortSignal): Promise<ToolOutput> {
+    if (isCredentialsFile(path)) return { ok: false, error: `${path} holds the saved API keys. The agent cannot read it.` };
     const insp = await inspectData(path, join(this.workDir, "inspect"), signal);
     if (!insp.ok) return { ok: false, error: insp.error ?? "The inspection failed." };
     this.inspection = insp;

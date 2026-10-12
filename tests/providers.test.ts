@@ -535,6 +535,18 @@ describe("openai", () => {
     ]);
   });
 
+  test("a 429 reply waits for the Retry-After time of the server", async () => {
+    let n = 0;
+    vi.stubGlobal("fetch", async () => {
+      if (n++ < 1) return new Response("slow down", { status: 429, headers: { "retry-after": "45" } });
+      return json({ choices: [{ message: { content: "ok" } }] });
+    });
+    const waits: number[] = [];
+    const p = await makeProvider("openai:http://localhost:1234/v1|m", { sleep: async (ms: number) => void waits.push(ms) });
+    await p.step(req([user("x")]));
+    expect(waits).toEqual([45_000]);
+  });
+
   test("a 400 reply is not retried", async () => {
     let calls = 0;
     vi.stubGlobal("fetch", async () => {

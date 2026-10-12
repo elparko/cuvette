@@ -28,7 +28,7 @@ const Program = z.strictObject({
   name: z.string(),
   version: z.string().default(""),
   tested_versions: z.array(z.string()).default([]),
-  homepage: z.string().default(""),
+  homepage: z.string().default("").transform((s) => (/^https?:\/\//i.test(s.trim()) ? s.trim() : "")),
   docs: z.array(z.string()).default([]),
   install: z.string().default(""),
   citation: CitationList.default([]),

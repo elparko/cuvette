@@ -62,7 +62,7 @@ export class OpenAIProvider implements Provider {
     const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal });
     if (res.status === 429 || res.status >= 500) {
       const txt = await res.text();
-      throw Object.assign(new Error(`Model server error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status });
+      throw Object.assign(new Error(`Model server error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status, headers: res.headers });
     }
     return res;
   }

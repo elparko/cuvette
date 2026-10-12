@@ -170,7 +170,7 @@ export function deviationHtml(record: AnalysisRecord, heading = "h2"): string {
   const f = frozenPlan(record);
   if (!f) return "";
   const list = deviations(record);
-  const head = `<p>Plan frozen ${esc(stamp(f.ts))}. SHA-256 of the plan: <code>${f.hash}</code>.</p>`;
+  const head = `<p>Plan frozen ${esc(stamp(f.ts))}. SHA-256 of the plan: <code>${esc(String(f.hash))}</code>.</p>`;
   const body = list.length
     ? `<ul>${list.map((d) => `<li>${esc(stamp(d.ts))} ${esc(deviationLine(d))}${d.afterResult ? ` <strong>${AFTER_RESULT}.</strong>` : ""}</li>`).join("")}</ul>`
     : `<p>${NO_DEVIATIONS}</p>`;
