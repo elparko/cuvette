@@ -5,6 +5,7 @@ export interface StreamState {
   items: string[];
   pending: string;
   live: string;
+  think: string;
   cards: string;
   status: Status;
   changed: number;
@@ -13,14 +14,14 @@ export interface StreamState {
 
 type Msg = { t: string; [k: string]: unknown };
 
-const START: StreamState = { items: [], pending: "", live: "", cards: "", status: { state: "idle" }, changed: 0, resets: 0 };
+const START: StreamState = { items: [], pending: "", live: "", think: "", cards: "", status: { state: "idle" }, changed: 0, resets: 0 };
 
 function reduce(s: StreamState, m: Msg): StreamState {
   switch (m.t) {
     case "clear":
       return START;
     case "reset":
-      return { ...s, items: [String(m.items ?? "")], pending: String(m.pending ?? ""), live: String(m.live ?? ""), cards: String(m.cards ?? ""), status: (m.status as Status) ?? s.status, resets: s.resets + 1 };
+      return { ...s, items: [String(m.items ?? "")], pending: String(m.pending ?? ""), live: String(m.live ?? ""), think: String(m.think ?? ""), cards: String(m.cards ?? ""), status: (m.status as Status) ?? s.status, resets: s.resets + 1 };
     case "append":
       return { ...s, items: [...s.items, String(m.html ?? "")] };
     case "pending":
@@ -29,6 +30,8 @@ function reduce(s: StreamState, m: Msg): StreamState {
       return { ...s, cards: String(m.html ?? "") };
     case "live":
       return { ...s, live: m.reset ? "" : s.live + String(m.text ?? "") };
+    case "think":
+      return { ...s, think: m.reset ? "" : (s.think + String(m.text ?? "")).slice(-4000) };
     case "status":
       return { ...s, status: m as unknown as Status };
     case "changed":

@@ -22,6 +22,7 @@ export interface ViewHost {
 
 type Fields = Record<string, unknown>;
 const LONG_STEP_MS = 30_000;
+const THINK_KEEP = 4000;
 
 export class WebView {
   readonly session: SessionLike;
@@ -37,6 +38,7 @@ export class WebView {
   private counter = 0;
   status: { state: string; tool?: string; purpose?: string; since?: number } = { state: "idle" };
   private live = "";
+  private thinking = "";
   queue: string[] = [];
   details = false;
   private clients = new Set<ServerResponse>();
@@ -98,7 +100,7 @@ export class WebView {
   private html = (items: Item[]) => items.map((it) => itemHtml(this.c(), it, { sub: this.sub })).join("");
 
   snapshot(): Record<string, unknown> {
-    return { t: "reset", items: this.html(this.settled), pending: this.html(this.pending), cards: this.cardsHtml(), cardCount: this.slots.length, live: this.live, status: this.statusMsg(), session: this.header() };
+    return { t: "reset", items: this.html(this.settled), pending: this.html(this.pending), cards: this.cardsHtml(), cardCount: this.slots.length, live: this.live, think: this.thinking.slice(-THINK_KEEP), status: this.statusMsg(), session: this.header() };
   }
 
   header(): Record<string, unknown> {
@@ -220,6 +222,10 @@ export class WebView {
           this.live = "";
           this.send({ t: "live", reset: true });
         }
+        if ((en.kind === "assistant" || en.kind === "tool_call") && this.thinking) {
+          this.thinking = "";
+          this.send({ t: "think", reset: true });
+        }
         const before = this.slots.length;
         this.slots = this.slots.filter((sl) => !closesCard(en, sl.card));
         if (this.slots.length !== before || en.kind === "answer") this.sendCards();
@@ -231,6 +237,9 @@ export class WebView {
         if (e.kind === "text") {
           this.live += e.text;
           this.send({ t: "live", text: e.text });
+        } else {
+          this.thinking = (this.thinking + e.text).slice(-THINK_KEEP * 2);
+          this.send({ t: "think", text: e.text });
         }
         break;
       case "status": {
@@ -243,8 +252,10 @@ export class WebView {
           if (flushed.length) this.send({ t: "append", html: this.html(flushed) });
           this.pending = [];
           this.live = "";
+          this.thinking = "";
           this.send({ t: "pending", html: "" });
           this.send({ t: "live", reset: true });
+          this.send({ t: "think", reset: true });
           const { next, rest } = nextQueued(this.session, this.queue);
           this.queue = rest;
           if (next !== undefined) this.session.send(next).catch((err: Error) => this.line("✗", `The agent stopped: ${err.message}`, "red"));

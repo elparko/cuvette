@@ -439,3 +439,18 @@ test("the Analysis tab has a status line with the reason and the rerun button; t
   expect(decisions).toContain("Changes after a step ran again");
   expect(decisions).toContain(">131<");
 });
+
+test("the view streams the thinking text, and a tool call clears it", () => {
+  const s = new FakeSession();
+  const view = new WebView(s, { token: "t", env, url: (p) => p, quit: async () => {} });
+  const sent: any[] = [];
+  view.attach({ writeHead() {}, write: (d: string) => sent.push(JSON.parse(d.slice(6))), on() {}, end() {} } as never);
+  s.bus.emit({ type: "delta", kind: "thinking", text: "The data are paired, " });
+  s.bus.emit({ type: "delta", kind: "thinking", text: "so a paired test fits." });
+  expect(sent.filter((m) => m.t === "think").map((m) => m.text).join("")).toBe("The data are paired, so a paired test fits.");
+  expect(view.snapshot().think).toBe("The data are paired, so a paired test fits.");
+  s.record.append("tool_call", { tool: "run_script", args: {} });
+  expect(sent.at(-1)).toEqual({ t: "think", reset: true });
+  expect(view.snapshot().think).toBe("");
+  view.close();
+});

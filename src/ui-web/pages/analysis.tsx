@@ -1,4 +1,4 @@
-import { ArrowUpIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
+import { ArrowUpIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx } from "../App.tsx";
@@ -56,6 +56,20 @@ function markSel(card: HTMLElement, i: number) {
 
 const typing = (a: Element | null) => !!a && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA");
 
+function Thinking({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const tail = text.replace(/\s+/g, " ").slice(-220);
+  return (
+    <div className="my-3 rounded-xl border border-dashed bg-muted/50 px-3.5 py-2.5 text-[13px] text-muted-foreground">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-2 font-medium text-foreground">
+        <BrainIcon className="pulse-dot size-4 text-accent-brand" /> Thinking
+        <span className="text-xs font-normal text-muted-foreground">{open ? "Hide" : "Show all"}</span>
+      </button>
+      <p className={cn("mt-1 whitespace-pre-wrap", open ? "max-h-80 overflow-y-auto" : "line-clamp-2")}>{open ? text : "…" + tail}</p>
+    </div>
+  );
+}
+
 export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState }) {
   const session = ctx.state.session!;
   const status = stream.status;
@@ -97,7 +111,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     if (!sc) return;
     autoScroll.current = Date.now();
     sc.scrollTop = sc.scrollHeight;
-  }, [stream.items, stream.pending, stream.live, stream.cards]);
+  }, [stream.items, stream.pending, stream.live, stream.think, stream.cards]);
 
   useEffect(() => {
     follow.current = true;
@@ -387,7 +401,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 <div key={i} dangerouslySetInnerHTML={{ __html: h }} />
               ))}
               <div dangerouslySetInnerHTML={{ __html: stream.pending }} />
-              {stream.live && <div className="msg agent whitespace-pre-wrap">{stream.live}</div>}
+              {stream.think && !stream.live && <Thinking text={stream.think} />}
+              {stream.live && (
+                <div className="msg agent whitespace-pre-wrap">
+                  {stream.live}
+                  <span className="caret" aria-hidden="true" />
+                </div>
+              )}
               <div ref={cardsRef} dangerouslySetInnerHTML={{ __html: stream.cards }} />
             </div>
           </div>
