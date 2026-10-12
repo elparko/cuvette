@@ -40,7 +40,7 @@ The target was 90% or more. A 5th to 95th percentile band gave 85.8% to 88.1%, w
 
 ## Spend limit
 
-- The setting is `budgetUsd` ("Budget per month"). It is in the Settings page and in `/settings`.
+- The setting is `budgetUsd` ("Budget per month"). It is in the Settings page and in `/config`.
 - `CUVETTE_BUDGET_USD` wins over the setting. If the variable is not a positive number, the harness uses the setting.
 - At 100% of the limit, Claude requests stop. This did not change.
 - At 80%, an interactive session asks one question: continue, switch to a cheaper model, or stop. The cheaper model is Sonnet for Opus and Fable, and Haiku for Sonnet. Haiku has no cheaper model, so the card has two choices.

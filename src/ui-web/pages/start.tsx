@@ -35,7 +35,7 @@ export function StartPage({ ctx, sessions }: { ctx: AppCtx; sessions: Sessions }
             </div>
             <FolderChooser start={s.folder || s.start} onOpened={ctx.opened} big />
             {note && (
-              <p className="text-sm text-bad" role="alert">
+              <p className={s.opening ? "text-sm text-muted-foreground" : "text-sm text-bad"} role={s.opening ? "status" : "alert"}>
                 {note}
               </p>
             )}

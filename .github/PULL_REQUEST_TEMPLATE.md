@@ -16,6 +16,6 @@ For an adapter, use the adapter template: add ?template=adapter.md to the addres
 - [ ] `npx tsc --noEmit` shows no errors.
 - [ ] `npx vitest run` passes.
 - [ ] I added or changed tests in `tests/<module>.test.ts` for the new behavior.
-- [ ] The tests need no network, API key, Java or Ollama, or they check `GA_LIVE`.
+- [ ] The tests need no network, API key, Java or Ollama, or they check `CUVETTE_LIVE`.
 - [ ] New text in docs, comments and the user interface uses Simplified Technical English.
 - [ ] I accept the CLA in [CLA.md](https://github.com/elparko/cuvette/blob/main/CLA.md), or I accepted it before.

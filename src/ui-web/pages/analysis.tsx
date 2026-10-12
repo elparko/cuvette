@@ -68,7 +68,7 @@ function Thinking({ text }: { text: string }) {
         <BrainIcon className="pulse-dot size-4 text-accent-brand" /> Thinking
         <span className="text-xs font-normal text-muted-foreground">{open ? "Hide" : "Show all"}</span>
       </button>
-      <p className={cn("mt-1 whitespace-pre-wrap", open ? "max-h-80 overflow-y-auto" : "line-clamp-2")}>{open ? text : "…" + tail}</p>
+      <p aria-live="off" className={cn("mt-1 whitespace-pre-wrap", open ? "max-h-80 overflow-y-auto" : "line-clamp-2")}>{open ? text : "…" + tail}</p>
     </div>
   );
 }
@@ -445,7 +445,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
             }}
             className="flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
-            <div aria-live="polite" className="srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4" onClick={onClick} onChange={onChange}>
+            <div role="log" aria-label="Messages" className="srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4" onClick={onClick} onChange={onChange}>
               {itemsHtml}
               {sent && (
                 <div className="msg user">
@@ -455,10 +455,10 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               <div dangerouslySetInnerHTML={{ __html: stream.pending }} />
               {stream.think && !stream.live && <Thinking text={stream.think} />}
               {stream.live && (
-                <div className="msg agent" dangerouslySetInnerHTML={{ __html: liveHtml(stream.live) }} />
+                <div className="msg agent" aria-live="off" dangerouslySetInnerHTML={{ __html: liveHtml(stream.live) }} />
               )}
               {working && (
-                <div className="msg agent working" role="status">
+                <div className="msg agent working" aria-live="off">
                   <span className="caret working" aria-hidden="true" />
                   <span>{busy ? (status.text ?? "Working") : "Sending"}</span>
                 </div>
@@ -490,16 +490,14 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               }}
             >
               {sugg.length > 0 && (
-                <ul role="listbox" aria-label="Commands" className="absolute right-0 bottom-full left-0 z-20 mb-2 max-h-72 overflow-y-auto rounded-xl border bg-popover p-1 shadow-xl">
+                <ul id="cmd-list" role="listbox" aria-label="Commands" className="absolute right-0 bottom-full left-0 z-20 mb-2 max-h-72 overflow-y-auto rounded-xl border bg-popover p-1 shadow-xl">
                   {sugg.map((c, i) => (
-                    <li key={c.name} role="option" aria-selected={i === sel}>
-                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)} className={cn("flex w-full items-baseline gap-3 rounded-lg px-2.5 py-1.5 text-left text-sm", i === sel && "bg-muted")}>
-                        <span className="shrink-0 font-mono text-[13px] font-medium whitespace-nowrap">
-                          /{c.name}
-                          {c.args && <span className="text-muted-foreground"> {c.args}</span>}
-                        </span>
-                        <span className="min-w-0 truncate text-xs text-muted-foreground">{c.help}</span>
-                      </button>
+                    <li key={c.name} id={`cmd-${i}`} role="option" aria-selected={i === sel} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)} className={cn("flex w-full items-baseline gap-3 rounded-lg px-2.5 py-1.5 text-left text-sm", i === sel && "bg-muted")}>
+                      <span className="shrink-0 font-mono text-[13px] font-medium whitespace-nowrap">
+                        /{c.name}
+                        {c.args && <span className="text-muted-foreground"> {c.args}</span>}
+                      </span>
+                      <span className="min-w-0 truncate text-xs text-muted-foreground">{c.help}</span>
                     </li>
                   ))}
                 </ul>
@@ -511,6 +509,9 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 id="msg"
                 ref={inputRef}
                 rows={1}
+                aria-autocomplete="list"
+                aria-controls={sugg.length ? "cmd-list" : undefined}
+                aria-activedescendant={sugg.length ? `cmd-${sel}` : undefined}
                 value={text}
                 placeholder={status.placeholder || "Ask for an analysis, or type / for commands"}
                 onChange={(e) => onInput(e.target.value)}
@@ -572,7 +573,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 </TabsList>
               </Tabs>
             </div>
-            <div ref={tabRef} role="tabpanel" className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} dangerouslySetInnerHTML={{ __html: tabHtml }} />
+            <div ref={tabRef} role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label} className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} dangerouslySetInnerHTML={{ __html: tabHtml }} />
           </aside>
         )}
       </div>

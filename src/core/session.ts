@@ -362,9 +362,9 @@ export class Session {
 
   static async resume(ref: string, opts: Partial<SessionOptions> = {}): Promise<Session> {
     const place = findPlace(ref, { cwd: opts.cwd, outputFolder: loadSettings(opts.cwd ?? process.cwd(), opts.settings ?? {}).output_folder });
-    if (!place) throw new Error(`no session ${ref}`);
+    if (!place) throw new Error(`No session ${ref}`);
     const log = join(place.recordDir, "log.jsonl");
-    if (!existsSync(log)) throw new Error(`no session ${ref}`);
+    if (!existsSync(log)) throw new Error(`No session ${ref}`);
     const id = place.id;
     const entries = readFileSync(log, "utf8").split("\n").map((l) => (l ? local(JSON.parse(l), inProject(place) ? place.project : undefined) : null)) as any[];
     const first = entries.find((e) => e?.kind === "session");

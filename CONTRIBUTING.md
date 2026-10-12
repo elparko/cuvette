@@ -58,7 +58,8 @@ Do not report a security problem in a public issue. See [SECURITY.md](SECURITY.m
 4. Give the adapter name and the version of the program that it runs.
 5. Give the steps that cause the problem, the result you expected, and the result you got.
 6. Add the part of the session log that shows the problem. The log is
-   `~/.cuvette/sessions/<id>/log.jsonl`.
+   `.record/log.jsonl` in the session folder (`cuvette/<date>-<title>/` in the project folder).
+   `cuvette sessions` shows the folder of each session.
 
 The session log can contain your data, file paths and results. Remove private data before you
 paste it.
@@ -77,7 +78,7 @@ from the owner before you write the code.
 4. Make the change. Follow the rules in
    [docs/architecture.md](docs/architecture.md#rules-for-every-module).
 5. Add or change tests in `tests/<module>.test.ts`. A test must not need the network, an API
-   key, Java or Ollama, unless it checks `GA_LIVE`.
+   key, Java or Ollama, unless it checks `CUVETTE_LIVE`.
 6. Run `npx tsc --noEmit`. It must show no errors.
 7. Run `npx vitest run`. All tests must pass.
 8. Open a pull request. Fill in the template.
