@@ -13,7 +13,7 @@ import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsF
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
 import { listSessions, openLock } from "../core/sessions.ts";
-import { findPlace } from "../core/places.ts";
+import { findPlace, removeIndexRow, renameIndexRow } from "../core/places.ts";
 import { find, recordSetting, type SettingCtx, type SettingSession } from "../core/settings.ts";
 import type { Mode } from "../core/types.ts";
 import { commands, decisionRows, freshStatus, noOpen, openWithOs } from "../ui/commands.ts";
@@ -458,6 +458,21 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     if (p === "/api/choose-folder") {
       if (process.platform !== "darwin" || noOpen()) return send(res, 501, { error: "The Finder dialog works only on a Mac." });
       return send(res, 200, { path: await chooseFolder(resolve(String(body.start || opts.folder || homedir()))) });
+    }
+    if (p === "/api/session-rename") {
+      if (typeof body.id !== "string" || !renameIndexRow(body.id, String(body.name ?? ""))) return send(res, 404, { error: "No such session." });
+      return send(res, 200, { ok: true });
+    }
+    if (p === "/api/session-remove") {
+      if (typeof body.id !== "string" || c?.session.id === body.id) return send(res, 409, { error: "Close this session before you remove it." });
+      if (!removeIndexRow(body.id)) return send(res, 404, { error: "No such session." });
+      return send(res, 200, { ok: true });
+    }
+    if (p === "/api/session-reveal") {
+      const place = typeof body.id === "string" ? findPlace(body.id) : undefined;
+      if (!place || !existsSync(place.outDir)) return send(res, 404, { error: "The session folder is not here." });
+      reveal(place.outDir);
+      return send(res, 200, { ok: true });
     }
     if (p === "/api/reveal") {
       const f = resolve(String(body.path ?? ""));

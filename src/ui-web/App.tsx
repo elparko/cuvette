@@ -1,16 +1,19 @@
-import { BoxesIcon, FlaskConicalIcon, FolderOpenIcon, HistoryIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SettingsIcon, type LucideIcon } from "lucide-react";
+import { BoxesIcon, CalendarIcon, CopyIcon, ExternalLinkIcon, FlaskConicalIcon, FolderOpenIcon, FolderSearchIcon, HistoryIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, PencilIcon, SettingsIcon, Trash2Icon, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import { FolderDialog } from "./components/folder-chooser.tsx";
 import { Button } from "./components/ui/button.tsx";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "./components/ui/context-menu.tsx";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog.tsx";
+import { Input } from "./components/ui/input.tsx";
 import { Tooltip, TooltipProvider } from "./components/ui/tooltip.tsx";
 import { useStored } from "./lib/stored.ts";
-import { call, enableFinder, type AppState } from "./lib/api.ts";
+import { call, copyText, enableFinder, type AppState } from "./lib/api.ts";
 import { useStream } from "./lib/stream.ts";
 import { cn } from "./lib/utils.ts";
 import { AnalysisPage } from "./pages/analysis.tsx";
 import { ProgramsPage } from "./pages/programs.tsx";
-import { SessionsPage, useSessions } from "./pages/sessions.tsx";
+import { SessionsPage, useSessions, type SessionCard } from "./pages/sessions.tsx";
 import { SettingsPage } from "./pages/settings.tsx";
 import { SetupPage } from "./pages/setup.tsx";
 import { StartPage } from "./pages/start.tsx";
@@ -58,6 +61,9 @@ export function App() {
   const [boots, setBoots] = useState(0);
   const [folderOpen, setFolderOpen] = useState(false);
   const [programStart, setProgramStart] = useState("");
+  const [renaming, setRenaming] = useState<SessionCard | null>(null);
+  const [removing, setRemoving] = useState<SessionCard | null>(null);
+  const [draft, setDraft] = useState("");
   const [rail, setRail] = useStored("cuvette.rail", false);
   const wanted = useRef(page);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -117,10 +123,21 @@ export function App() {
   const ctx: AppCtx = { state, go, boot, openFolder: () => setFolderOpen(true), opened, programStart, setProgramStart };
   const current = (p: Page) => p === page || (p === "session" && !OWN_PAGES.includes(page));
   const recent = sessions.list.filter((x) => !x.moved).slice(0, 6);
+  const dateName = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const startRename = (s: SessionCard) => {
+    setDraft(s.title);
+    setRenaming(s);
+  };
+  const saveRename = () => {
+    if (renaming) void sessions.rename(renaming.id, draft);
+    setRenaming(null);
+  };
 
   return (
     <TooltipProvider delayDuration={400}>
       <div className="flex h-full min-h-0">
+        <ContextMenu>
+        <ContextMenuTrigger asChild>
         <aside className={cn("hidden shrink-0 flex-col overflow-hidden border-r bg-sidebar transition-[width] duration-150 md:flex", rail ? "w-14" : "w-60")} aria-label="Navigation">
           <div className={cn("flex items-center pt-4 pb-3", rail ? "flex-col gap-2 px-2" : "gap-2.5 px-4")}>
             <Logo className="size-7 shrink-0" />
@@ -164,20 +181,42 @@ export function App() {
             <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2">
               <div className="px-2.5 pb-1 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">Recent</div>
               {recent.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  disabled={s.moved}
-                  title={s.folder}
-                  onClick={() => sessions.open(s.id, opened)}
-                  className={cn("flex w-full min-w-0 flex-col rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 disabled:opacity-50", state.session?.id === s.id && "bg-muted")}
-                >
-                  <span className="truncate text-[13px]">{s.title}</span>
-                  <span className="truncate text-[11.5px] text-muted-foreground">
-                    {s.title === s.folderName ? `No request yet · ${s.age}` : `${s.folderName} · ${s.age}`}
-                  </span>
-                </button>
+                <ContextMenu key={s.id}>
+                  <ContextMenuTrigger asChild>
+                    <button
+                      type="button"
+                      title={s.folder}
+                      onClick={() => sessions.open(s.id, opened)}
+                      onContextMenu={(e) => e.stopPropagation()}
+                      className={cn("flex w-full min-w-0 flex-col rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", state.session?.id === s.id && "bg-muted")}
+                    >
+                      <span className="truncate text-[13px]">{s.title}</span>
+                      <span className="truncate text-[11.5px] text-muted-foreground">{s.title === s.folderName ? `No request yet · ${s.age}` : `${s.folderName} · ${s.age}`}</span>
+                    </button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onSelect={() => sessions.open(s.id, opened)}>
+                      <ExternalLinkIcon /> Open
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => startRename(s)}>
+                      <PencilIcon /> Rename
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => void sessions.reveal(s.id)}>
+                      <FolderSearchIcon /> Show in Finder
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => copyText(s.folder)}>
+                      <CopyIcon /> Copy the project folder
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem destructive disabled={state.session?.id === s.id} onSelect={() => setRemoving(s)}>
+                      <Trash2Icon /> Remove from the list
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               ))}
+              <button type="button" onClick={() => go("sessions")} className="mt-1 flex h-8 w-full items-center rounded-lg px-2.5 text-left text-[12.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50">
+                All sessions
+              </button>
             </div>
           )}
           {!rail && (
@@ -193,6 +232,20 @@ export function App() {
             </div>
           )}
         </aside>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={() => setFolderOpen(true)}>
+            <FolderOpenIcon /> Open a folder
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => setRail(!rail)}>{rail ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />} {rail ? "Show the sidebar" : "Hide the sidebar"}</ContextMenuItem>
+          <ContextMenuSeparator />
+          {NAV.map((n) => (
+            <ContextMenuItem key={n.page} onSelect={() => go(n.page)}>
+              <n.icon /> {n.label}
+            </ContextMenuItem>
+          ))}
+        </ContextMenuContent>
+        </ContextMenu>
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center gap-2 border-b bg-sidebar px-3 py-2 md:hidden">
@@ -224,6 +277,51 @@ export function App() {
           )}
         </div>
       </div>
+      <Dialog open={!!renaming} onOpenChange={(o) => !o && setRenaming(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename the session</DialogTitle>
+            <DialogDescription>Use one or two words, or the date. An empty name brings back the automatic name.</DialogDescription>
+          </DialogHeader>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveRename();
+            }}
+          >
+            <Input autoFocus value={draft} maxLength={60} onChange={(e) => setDraft(e.target.value)} aria-label="Session name" />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setDraft(dateName)}>
+                <CalendarIcon /> Use the date
+              </Button>
+              <Button type="submit">Save</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove this session from the list?</DialogTitle>
+            <DialogDescription>The files stay in the results folder. To show the session again, open that folder.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRemoving(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (removing) void sessions.remove(removing.id);
+                setRemoving(null);
+              }}
+            >
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <FolderDialog open={folderOpen} onOpenChange={setFolderOpen} start={state.folder || state.start} onOpened={opened} />
       <Toaster position="bottom-center" toastOptions={{ className: "!rounded-xl !border !bg-popover !text-popover-foreground !shadow-xl" }} />
     </TooltipProvider>
