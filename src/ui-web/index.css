@@ -590,6 +590,43 @@
 .srv .msg.agent > p:first-child {
   margin-top: 0;
 }
+.srv .msg.agent > :last-child {
+  margin-bottom: 0;
+}
+.srv .msg.agent h4 {
+  line-height: 1.35;
+}
+.srv .msg.agent li {
+  margin: 3px 0;
+}
+.srv .msg.agent li > ul,
+.srv .msg.agent li > ol {
+  margin: 3px 0;
+}
+.srv .msg.agent ul ul {
+  list-style: circle;
+}
+.srv .msg.agent blockquote {
+  margin: 8px 0;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+.srv .msg.agent blockquote > :first-child {
+  margin-top: 0;
+}
+.srv .msg.agent blockquote > :last-child {
+  margin-bottom: 0;
+}
+.srv .msg.agent hr {
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+.srv .msg.agent a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .srv .line {
   margin: 3px 0;
   font-size: 13px;

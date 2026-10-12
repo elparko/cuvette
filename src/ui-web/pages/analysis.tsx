@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.tsx";
 import { Tooltip } from "../components/ui/tooltip.tsx";
 import { askNotify, bridge, call, midText, post, withT } from "../lib/api.ts";
 import type { StreamState } from "../lib/stream.ts";
+import { liveHtml } from "../lib/markdown.ts";
 import { useStored } from "../lib/stored.ts";
 import { cn } from "../lib/utils.ts";
 import { SettingsPanel } from "./settings.tsx";
@@ -432,10 +433,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               <div dangerouslySetInnerHTML={{ __html: stream.pending }} />
               {stream.think && !stream.live && <Thinking text={stream.think} />}
               {stream.live && (
-                <div className="msg agent whitespace-pre-wrap">
-                  {stream.live}
-                  <span className="caret" aria-hidden="true" />
-                </div>
+                <div className="msg agent" dangerouslySetInnerHTML={{ __html: liveHtml(stream.live) }} />
               )}
               <div ref={cardsRef} dangerouslySetInnerHTML={{ __html: stream.cards }} />
             </div>

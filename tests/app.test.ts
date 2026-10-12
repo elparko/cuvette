@@ -505,3 +505,13 @@ describe("repeated steps", () => {
     expect(html).toMatch(/<details class="callinfo"><summary>Settings<\/summary><div class="dim small">cellpose_tools\.segment_cells/);
   });
 });
+
+describe("agent message markdown", () => {
+  const ctx = { token: "t", session: new FakeSession() } as never;
+
+  test("an agent message shows headings, lists, links and a table", () => {
+    const text = "## Result\n\n**Counts:**\n- one *n* is a Set\n  - nested\n\n1. first\n2. second\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nSee [the paper](https://example.com).";
+    const html = itemHtml(ctx, { t: "assistant", text } as Item);
+    for (const part of ["<h4>Result</h4>", "<strong>Counts:</strong>", "<em>n</em>", "<ul><li>nested</li></ul>", "<ol><li>first</li><li>second</li></ol>", "<th>A</th>", '<a href="https://example.com"']) expect(html).toContain(part);
+  });
+});
