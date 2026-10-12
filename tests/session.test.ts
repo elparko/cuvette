@@ -825,6 +825,42 @@ test("a message with send now stops the running tool and the agent reads it next
   expect(session.record.entries(["user"]).at(-1)!.data).toMatchObject({ during: true, now: true });
 });
 
+test("a message with send now stops the wait for a question card; the card stays open and a later answer reaches the agent", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "ask_scientist", args: { question: "Which file?", options: ["a.csv", "b.csv"] } }] }, { text: "I read your message." }]);
+  session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  let qid = "";
+  session.bus.on((e) => {
+    if (e.type === "question") {
+      qid = e.question.qid;
+      setTimeout(() => session!.steer("Use the second file.", true), 0);
+    }
+  });
+  await session.send("Read the data.");
+  const parts = provider.requests[1]!.messages.at(-1)!.parts as { type: string; text?: string }[];
+  expect(parts[0]!.text).toMatch(/Question q\d+ is still open\. The scientist did not answer it yet\. The scientist sent a message instead\./);
+  expect(parts.at(-1)!.text).toContain("Use the second file.");
+  expect(session.questions.get(qid)?.status).toBe("open");
+  await session.answer(qid, "b.csv");
+  expect(session["notes"].join("\n")).toContain(`The scientist answered ${qid}`);
+});
+
+test("a failed tool with printed output still tells the model why it failed", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  const tool = session.findTool("run_script")!;
+  expect(session["render"](tool, { ok: false, error: "the script timed out after 5 s", text: "step 1 done" }).text).toBe("ERROR: the script timed out after 5 s\nstep 1 done");
+  expect(session["render"](tool, { ok: false, error: "boom", text: "Traceback: boom" }).text).toBe("Traceback: boom");
+  expect(session["render"](tool, { ok: true, text: "fine" }).text).toBe("fine");
+});
+
+test("with plan first and no confirmed plan, a continue or an answer that resumes the turn plans first", async () => {
+  const provider = new FakeProvider([{ text: "a" }, { text: "b" }, { text: "c" }, { text: "d" }, { text: "e" }, { text: "f" }]);
+  session = await recoverySession(provider, { planFirst: "on" });
+  await session.send("Count the cells in images/");
+  await session.send("continue");
+  await session.send("Continue the analysis with this answer.", { internal: true });
+  expect(session.record.entries(["mode"]).filter((e) => e.data.reason === "plan first")).toHaveLength(3);
+});
+
 test("a turn with results writes results.xlsx in the output folder and one saved line; export_xlsx off writes none", async () => {
   const run = async (settings: Record<string, unknown>) => {
     const provider = new FakeProvider([{ calls: [{ name: "count", args: { input: "/data/a.tif", method: "Default" } }] }, { text: "The count is 64 (step 1)." }]);
@@ -1930,4 +1966,95 @@ test("resume keeps a blind reference hidden and keeps the last mode", async () =
   expect(session["hidden"]).toEqual([join(cwd, "hand-counts.csv")]);
   expect(session["reference"]?.mode).toBe("blind");
   expect(session.mode).toBe("teach");
+});
+
+function answerCards(s: Session, plan: (e: any) => any) {
+  s.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => s.answer(e.question.qid, e.question.title === "Earlier results" ? "none" : e.question.options[0]?.value ?? "yes"), 0);
+    if (e.type === "plan") setTimeout(() => s.respondPlan(plan(e)), 0);
+  });
+}
+
+const PILOT_CALL = { name: "pilot_result", args: { sample: "Set 1", values: { "positive cell": 41 }, images: [], check: "" } };
+
+test("pilot: a definition change on the pilot card goes into the plan that the pilot confirmation approves", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [PILOT_CALL] }, { calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  const cards: any[] = [];
+  const s = session;
+  answerCards(s, (e) => {
+    cards.push(e);
+    if (e.stage === "plan") return { action: "pilot" };
+    return cards.filter((c) => c.stage === "pilot").length === 1 ? { action: "change", text: "Count 5 red pixels.", definition: { measure: "positive cell", old: "A cell with at least 1 red pixel inside its outline.", new: "A cell with at least 5 red pixels inside its outline." } } : { action: "confirm" };
+  });
+  await s.send(`Count the red-positive cells in ${images}`);
+  const second = cards.filter((c) => c.stage === "pilot")[1];
+  expect(second.definitions).toEqual([{ measure: "positive cell", definition: "A cell with at least 5 red pixels inside its outline." }]);
+  const approved = s.record.entries(["plan_approved"]).at(-1)!;
+  expect((approved.data.plan as any).definitions).toEqual([{ measure: "positive cell", definition: "A cell with at least 5 red pixels inside its outline." }]);
+  expect(s.record.entries(["plan"]).some((e) => e.data.action === "pilot_changed")).toBe(true);
+});
+
+test("pilot: a plan call during the pilot changes the pending plan, not the earlier one", async () => {
+  const { proj, images } = pilotProject();
+  const redefine = { name: "plan", args: { definitions: [{ measure: "positive cell", definition: "A cell with at least 3 red pixels inside its outline." }], reason: "The scientist asked." } };
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [redefine] }, { calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  const s = session;
+  answerCards(s, (e) => (e.stage === "plan" ? { action: "pilot" } : { action: "confirm" }));
+  await s.send(`Count the red-positive cells in ${images}`);
+  const planResult = s.record.entries(["tool_result"]).filter((e) => e.data.tool === "plan").at(-1)!;
+  expect(String(planResult.data.summary)).toMatch(/^The proposed analysis is now version \d+\./);
+  const approved = s.record.entries(["plan_approved"]).at(-1)!;
+  expect((approved.data.plan as any).definitions[0].definition).toBe("A cell with at least 3 red pixels inside its outline.");
+});
+
+test("resume restores a pilot that waits, so its confirmation also approves the plan", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { text: "Later." }, { text: "Later." }, { text: "Later." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  answerCards(session, () => ({ action: "pilot" }));
+  await session.send(`Count the red-positive cells in ${images}`);
+  expect(session.record.entries(["plan_approved"])).toHaveLength(0);
+  const id = session.id;
+  await session.close();
+  const p2 = new FakeProvider([{ calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.resume(id, { provider: p2, cwd: proj, interactive: true, settings: { referee: "none" } });
+  expect(session.pilotStage).toBe(true);
+  answerCards(session, () => ({ action: "confirm" }));
+  await session.send("continue");
+  const approved = session.record.entries(["plan_approved"]);
+  expect(approved).toHaveLength(1);
+  expect((approved[0]!.data.pilot as { sample: string }).sample).toBe("Set 1");
+});
+
+test("resume does not restore a pilot that a new request replaced", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [LAB], provider: new FakeProvider([]), cwd, settings: { referee: "none" } });
+  const id = session.id;
+  session.record.append("plan", { action: "proposed", version: 1, plan: { steps: [] } });
+  session.record.append("plan", { action: "pilot_requested", version: 1, sample: "Set 1", target: "watch", answers: [] });
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
+  expect(session.pilotStage).toBe(true);
+  session.record.append("mode", { old: "watch", new: "plan", reason: "plan first" });
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
+  expect(session.pilotStage).toBe(false);
+});
+
+test("resume uses the model that the session used last, not the first one", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const script = join(cwd, "second.json");
+  writeFileSync(script, "[]");
+  session = await Session.create({ adapters: [LAB], provider: new FakeProvider([]), cwd, model: "fake:", settings: { guidance: false } });
+  const id = session.id;
+  session.record.append("setting", { name: "model", old: "fake:", new: `fake:${script}`, scope: "session" });
+  await session.close();
+  session = await Session.resume(id, { cwd });
+  expect(session.settings.model).toBe(`fake:${script}`);
 });

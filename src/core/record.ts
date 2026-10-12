@@ -354,7 +354,7 @@ export class AnalysisRecord {
     let out: Message[] = [];
     for (const e of this.log) {
       if (e.id > upTo) break;
-      if (e.kind === "compaction") out = [{ role: "user", parts: [{ type: "text", text: String(e.data.summary ?? "") }] }];
+      if (e.kind === "compaction") out = [{ role: "user", parts: [{ type: "text", text: String(e.data.summary ?? "") }] }, ...((e.data.kept as Message[] | undefined) ?? [])];
       else if (e.kind === "rewind") out = this.messages(Number(e.data.upTo));
       else if (e.kind === "message") out.push(e.data.message as Message);
     }

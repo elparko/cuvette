@@ -130,3 +130,14 @@ test("messages returns messages, or the summary plus later messages after compac
   expect(m[0]).toEqual({ role: "user", parts: [{ type: "text", text: "short" }] });
   expect(m[1].parts[0]).toEqual({ type: "text", text: "three" });
 });
+
+test("a compaction entry holds the messages that it keeps, so a crash after it loses none", () => {
+  const r = new AnalysisRecord(tmp(), "s1");
+  const msg = (t: string) => ({ role: "user" as const, parts: [{ type: "text" as const, text: t }] });
+  r.append("message", { message: msg("one") });
+  r.append("message", { message: msg("two") });
+  r.append("compaction", { summary: "short", upTo: 2, kept: [msg("two")] });
+  expect(r.messages().map((m) => (m.parts[0] as { text: string }).text)).toEqual(["short", "two"]);
+  r.append("message", { message: msg("three") });
+  expect(r.messages().map((m) => (m.parts[0] as { text: string }).text)).toEqual(["short", "two", "three"]);
+});

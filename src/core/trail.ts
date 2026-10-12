@@ -314,6 +314,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       return { icon: "setup", line: `Confirmed: version ${show(d.version)} of the proposed analysis`, details: { text: d.text, mode: d.mode, answers: d.answers }, technical: tech() };
     case "plan":
       if (d.action === "updated") return { icon: "decision", line: `Plan changed to version ${show(d.version)}. Reason: ${clip(show(d.reason || "none given"))}`, details: { text: d.text }, technical: tech() };
+      if (d.action === "pilot_changed") return { icon: "decision", line: `The proposed analysis changed to version ${show(d.version)} before the pilot confirmation. Reason: ${clip(show(d.reason || "none given"))}`, details: { text: d.text }, technical: tech() };
       if (d.action === "change_requested") return { icon: "note", line: `You asked to change the plan: ${clip(show(d.text))}`, technical: tech() };
       if (d.action === "cancelled") return { icon: "note", line: "You cancelled the plan. No step ran.", technical: tech() };
       return undefined;

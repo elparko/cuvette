@@ -13,6 +13,7 @@ export interface CoreDeps {
   log: (kind: "note", data: Record<string, unknown>) => void;
   plan?: (args: Args) => Promise<ToolOutput>;
   fullPlan?: () => boolean;
+  partialPlan?: () => boolean;
 }
 
 const PLAN_STEPS_SHORT = {
@@ -209,7 +210,8 @@ export function coreTools(d: CoreDeps): Tool[] {
           : "Write or update the analysis plan: a short list of steps. The scientist sees it in the trail.";
       },
       get inputSchema() {
-        return d.fullPlan?.() ? PLAN_FULL : { type: "object", properties: { steps: PLAN_STEPS_SHORT }, required: ["steps"] };
+        if (!d.fullPlan?.()) return { type: "object", properties: { steps: PLAN_STEPS_SHORT }, required: ["steps"] };
+        return d.partialPlan?.() ? { ...PLAN_FULL, required: [] } : PLAN_FULL;
       },
     },
     tool(
