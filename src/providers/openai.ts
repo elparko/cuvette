@@ -2,9 +2,19 @@ import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
+import { hideKeys } from "../core/credentials.ts";
 import { RETRIES, withRetry, type Sleep } from "./retry.ts";
 
 const TIMEOUT_MS = 600_000;
+
+export function keySafe(base: string): boolean {
+  try {
+    const u = new URL(base);
+    return u.protocol === "https:" || (u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname));
+  } catch {
+    return false;
+  }
+}
 
 export interface OpenAIOpts {
   numCtx?: number;
@@ -56,10 +66,10 @@ export class OpenAIProvider implements Provider {
 
   private async attempt(body: Record<string, unknown>, signal: AbortSignal): Promise<Response> {
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (process.env.OPENAI_API_KEY) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
+    if (process.env.OPENAI_API_KEY && keySafe(this.base)) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
     const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal });
     if (res.status === 429 || res.status >= 500) {
-      const txt = await res.text();
+      const txt = hideKeys(await res.text()).text;
       throw Object.assign(new Error(`Model server error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status, headers: res.headers });
     }
     return res;
@@ -75,16 +85,16 @@ export class OpenAIProvider implements Provider {
       if (user?.aborted) throw e;
       if (typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
       if ((e as Error).name === "TimeoutError") throw new ProviderError("The model server did not answer within 600 s.", true);
-      throw new ProviderError(`Cannot reach the model server at ${this.base}. Check that it is running.`, true);
+      throw new ProviderError(`Cannot reach the model server at ${this.base.replace(/\/\/[^@/]*@/, "//")}. Check that it is running.`, true);
     }
     if (!res.ok) {
-      const txt = await res.text();
+      const txt = hideKeys(await res.text()).text;
       let msg = txt;
       try {
         const j = JSON.parse(txt);
         msg = j.error?.message ?? j.error ?? txt;
       } catch {}
-      if (res.status === 401 || res.status === 403) throw new ProviderError("The model server rejected the credentials. Set OPENAI_API_KEY.");
+      if (res.status === 401 || res.status === 403) throw new ProviderError(process.env.OPENAI_API_KEY && !keySafe(this.base) ? "The model server rejected the request. Cuvette did not send OPENAI_API_KEY, because the address uses plain http and is not on this computer. Use https." : "The model server rejected the credentials. Set OPENAI_API_KEY.");
       throw new ProviderError(`Model server error ${res.status}: ${String(msg).slice(0, 300)}`, false, res.status === 400 && CONTEXT_OVERFLOW.test(String(msg)));
     }
     try {

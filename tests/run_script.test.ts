@@ -5,7 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { Args, ToolContext, ToolOutput } from "../src/core/types.ts";
-import { describeLimits, runScriptTool, scriptPython } from "../src/tools/run_script.ts";
+import { describeLimits, linuxWrap, runScriptTool, scriptPython } from "../src/tools/run_script.ts";
 import { setBlindPolicy } from "../src/adapters/blind.ts";
 import { blindPolicyFor } from "../src/bench/papers-blind.ts";
 import { loadPaper, paperIds } from "../src/bench/papers-spec.ts";
@@ -30,6 +30,36 @@ test("tool shape and plain limits text", () => {
   expect(tool.description).toContain("ga_api");
   expect(describeLimits(false)).toMatch(/network/);
   expect(describeLimits(true)).toMatch(/can use the network/);
+});
+
+test("Linux and Windows limits: the notice names the key file and bubblewrap", () => {
+  expect(describeLimits(false, "off", "linux")).toMatch(/Install bubblewrap \(bwrap\).*also the saved key file.*network is not blocked/);
+  expect(describeLimits(false, "bwrap", "linux")).toMatch(/bubblewrap sandbox.*not the saved key file.*cannot use the network/);
+  expect(describeLimits(true, "unshare", "linux")).toMatch(/read of the saved key file fails.*can remove this limit.*can use the network/);
+  expect(describeLimits(false, "off", "win32")).toMatch(/Windows.*also the saved key file/);
+  expect(describeLimits(false, "on", "darwin")).toMatch(/not the saved key file/);
+});
+
+test("Linux wrap: bubblewrap covers the key file and blocks the network; unshare covers it with a bind mount", () => {
+  const cred = join(root, "credentials.json");
+  writeFileSync(cred, "{}");
+  const work = join(root, "linux-work");
+  mkdirSync(work, { recursive: true });
+  const argv = ["python3", "-c", "pass"];
+  const b = linuxWrap("bwrap", argv, { network: false, writable: [work, join(root, "missing")], cred });
+  expect(b.slice(0, 3)).toEqual(["bwrap", "--ro-bind", "/"]);
+  expect(b.join(" ")).toContain(`--ro-bind /dev/null ${cred}`);
+  expect(b.join(" ")).toContain(`--bind ${work} ${work}`);
+  expect(b.join(" ")).not.toContain("missing");
+  expect(b).toContain("--unshare-net");
+  expect(b.slice(-3)).toEqual(argv);
+  expect(linuxWrap("bwrap", argv, { network: true, writable: [], cred })).not.toContain("--unshare-net");
+  const u = linuxWrap("unshare", argv, { network: false, writable: [], cred });
+  expect(u.slice(0, 4)).toEqual(["unshare", "-rmn", "sh", "-c"]);
+  expect(u[4]).toContain('mount --bind /dev/null "$1"');
+  expect(u.slice(5)).toEqual(["sh", realpathSync(cred), ...argv]);
+  expect(linuxWrap("unshare", argv, { network: true, writable: [], cred: join(root, "none.json") })).toEqual(["unshare", "-rm", ...argv]);
+  expect(linuxWrap("off", argv, { network: false, writable: [], cred })).toEqual(argv);
 });
 
 test("stdout, stderr, exit code and a traceback", async () => {

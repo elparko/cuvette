@@ -215,7 +215,7 @@ function readBody(req: IncomingMessage): Promise<string> {
 }
 
 function send(res: ServerResponse, status: number, body: string, type = "application/json; charset=utf-8") {
-  res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
+  res.writeHead(status, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" });
   res.end(body);
 }
 
@@ -324,12 +324,12 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
   };
 }
 
-export const FILE_HEADERS = { "x-content-type-options": "nosniff", "content-security-policy": "sandbox" };
+export const FILE_HEADERS = { "x-content-type-options": "nosniff", "content-security-policy": "sandbox", "referrer-policy": "no-referrer" };
 
 export function pipeFile(res: ServerResponse, path: string, headers: Record<string, string>, o: { sandbox?: boolean } = {}): void {
   const stream = createReadStream(path);
   stream.once("open", () => {
-    res.writeHead(200, { ...(o.sandbox === false ? { "x-content-type-options": "nosniff" } : FILE_HEADERS), ...headers });
+    res.writeHead(200, { ...(o.sandbox === false ? { "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } : FILE_HEADERS), ...headers });
     stream.pipe(res);
   });
   stream.once("error", () => {

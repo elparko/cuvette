@@ -1669,6 +1669,20 @@ test("a pasted API key does not reach the model or the record", async () => {
   expect(session.record.entries(["notice"]).some((e) => /removed an API key/.test(String(e.data.text)))).toBe(true);
 });
 
+test("an API key in a data file does not reach the model through a tool result", async () => {
+  const key = "sk-ant-api03-Qq7_abcdefghijklmnopqrstuvwxyz0123456789";
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  writeFileSync(join(cwd, "notes.txt"), `run 1\nANTHROPIC_API_KEY=${key}\n`);
+  const provider = new FakeProvider([{ calls: [{ name: "read_file", args: { path: join(cwd, "notes.txt") } }] }, { text: "All done." }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, phi_check: false } as never });
+  session.decisions.applySetup({});
+  await session.send("read notes.txt");
+  expect(lastToolText(provider)).toContain("[API key removed]");
+  expect(JSON.stringify(provider.requests)).not.toContain(key);
+  expect(readFileSync(join(session.record.dir, "log.jsonl"), "utf8")).not.toContain(key);
+  expect(session.record.entries(["notice"]).some((e) => /from the result of read_file/.test(String(e.data.text)))).toBe(true);
+});
+
 test("a session open in another live process cannot open twice, and a reused process ID does not hold it", async () => {
   session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
   const id = session.id;

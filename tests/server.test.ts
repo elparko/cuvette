@@ -175,5 +175,10 @@ test("the window server sandboxes blobs, refuses a foreign origin and survives a
   rmSync(s.record.blobPath(sha)!);
   const gone = await fetch(`${u.origin}/api/blob/${sha}?t=${token}`);
   expect(gone.status).toBe(404);
-  expect((await fetch(`${u.origin}/api/state?t=${token}`)).status).toBe(200);
+  const state = await fetch(`${u.origin}/api/state?t=${token}`);
+  expect(state.status).toBe(200);
+  expect(state.headers.get("referrer-policy")).toBe("no-referrer");
+  const page = await fetch(`${u.origin}/?t=${token}`);
+  expect(page.headers.get("referrer-policy")).toBe("no-referrer");
+  await Promise.all([state.text(), page.text()]);
 });

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { CATALOG_DIR, cuvetteHome, loadAdapter, type Manifest } from "./manifest.ts";
+import { trustedRegistry } from "./registry.ts";
 
 export type TrustLevel = "reviewed" | "checked" | "unlisted";
 export type SourceKind = "git" | "folder" | "zip" | "registry";
@@ -175,7 +176,7 @@ export function adapterTrust(root: string): TrustInfo {
   } catch {
     codeFiles = codeFilesIn(root);
   }
-  const level: TrustLevel = entry?.checked && !changed ? "checked" : "unlisted";
+  const level: TrustLevel = entry?.checked && trustedRegistry(entry.registry) && !changed ? "checked" : "unlisted";
   const info = make(level, { entry, changed, codeFiles });
   if (changed) info.detail = `${TRUST_DETAIL.unlisted} The files changed after the install.`;
   info.codeConfirmed = !(entry && level === "unlisted" && codeFiles.length) || index.confirmed[realOf(root)] === digest;
