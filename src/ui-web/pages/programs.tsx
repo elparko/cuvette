@@ -160,6 +160,11 @@ function ProgramDialog({ open, setOpen, run, setRun, plan, setPlan, mode, onDone
     if (!r.job) return finish(r);
     setLog([]);
     const src = new EventSource(withT("api/programs/progress?job=" + r.job));
+    src.onopen = () => setLog([]);
+    src.onerror = () => {
+      if (src.readyState !== EventSource.CLOSED) return;
+      finish({ ok: false, text: "The connection to the job stopped. The program list shows the result." });
+    };
     src.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
       if (m.line !== undefined) setLog((l) => [...(l ?? []), m.line]);
@@ -337,6 +342,9 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
     setOpen(true);
   };
 
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = data?.groups.map((g) => ({ ...g, rows: g.rows.filter((r) => words.every((w) => `${g.title} ${r.program} ${r.name} ${r.state} ${r.detail}`.toLowerCase().includes(w))) })).filter((g) => g.rows.length);
+
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-8">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
@@ -371,7 +379,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search programs, adapters and fields" aria-label="Search programs" className="pl-9" />
           </div>
-          {data.groups.map((g) => ({ ...g, rows: g.rows.filter((r) => q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => `${g.title} ${r.program} ${r.name} ${r.state} ${r.detail}`.toLowerCase().includes(w))) })).filter((g) => g.rows.length).map((g) => (
+          {shown!.map((g) => (
             <section key={g.title} className="mb-6">
               <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">{g.title}</h2>
               <Card className="divide-y overflow-hidden">
@@ -438,6 +446,7 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
             </section>
           ))}
           {!data.groups.length && <p className="text-muted-foreground">No adapters.</p>}
+          {data.groups.length > 0 && !shown!.length && <p className="text-muted-foreground">No program matches the search.</p>}
         </>
       )}
       <ProgramDialog open={open} setOpen={setOpen} run={run} setRun={setRun} plan={plan} setPlan={setPlan} mode={mode} onDone={() => load(true)} />

@@ -55,6 +55,7 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
           setView({ ...cur, x: cur.x + e.clientX - d.x, y: cur.y + e.clientY - d.y });
         }}
         onPointerUp={() => (drag.current = null)}
+        onPointerCancel={() => (drag.current = null)}
         onDoubleClick={(e) => (view && Math.abs(cur.scale - 1) < 0.01 ? setView(null) : zoomTo(1, { x: e.clientX, y: e.clientY }))}
       >
         <img
