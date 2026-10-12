@@ -54,6 +54,7 @@ import { scriptPython } from "../tools/run_script.ts";
 import {
   ProviderError,
   type Args,
+  type StepResult,
   type Entry,
   type Finding,
   type BusEvent,
@@ -867,13 +868,7 @@ export class Session {
         }
         await this.maybeCompact(signal);
         this.bus.emit({ type: "status", state: "thinking" });
-        const res = await this.provider.step({
-          system: this.system,
-          messages: this.history,
-          tools: forceAnswer ? [] : this.activeSchemas(),
-          signal,
-          onDelta: (d) => this.bus.emit({ type: "delta", kind: d.type, text: d.text }),
-        });
+        const res = await this.stepWithRecovery(forceAnswer, signal);
         this.push(res.message);
         this.record.append("usage", { ...res.usage, model: this.provider.info.model, provider: this.provider.info.provider, local: isLocal(this.provider.info) });
         this.checkContext();
@@ -1004,6 +999,75 @@ export class Session {
       this.bus.emit({ type: "status", state: "idle" });
       await this.hooks.event("Stop", { session: this.id }).catch(() => {});
       this.titling = this.retitle(turnStart);
+    }
+  }
+
+  recoveryWaitMs = 60_000;
+  recoveryRounds = 3;
+
+  private async stepWithRecovery(noTools: boolean, signal: AbortSignal): Promise<StepResult> {
+    let rounds = 0;
+    for (;;) {
+      let retried = false;
+      try {
+        const res = await this.provider.step({
+          system: this.system,
+          messages: this.history,
+          tools: noTools ? [] : this.activeSchemas(),
+          signal,
+          onDelta: (d) => this.bus.emit({ type: "delta", kind: d.type, text: d.text }),
+          onRetry: (r) => {
+            retried = true;
+            const text = `Waiting to retry (${r.attempt} of ${r.of})`;
+            this.bus.emit({ type: "status", state: "thinking", purpose: text });
+            this.record.append("notice", { text: `${text}: ${r.reason}. The next try is in ${Math.round(r.waitMs / 1000)} s.` });
+          },
+        });
+        if (retried) this.bus.emit({ type: "status", state: "thinking" });
+        return res;
+      } catch (e) {
+        if (!(e instanceof ProviderError) || !e.transient || signal.aborted) throw e;
+        this.record.append("notice", { text: "The model did not answer after three tries. The conversation is saved up to the last finished step." });
+        if (this.settings.headless) {
+          if (++rounds > this.recoveryRounds) throw new ProviderError(`${e.message} The run waited ${this.recoveryRounds} times and then stopped.`);
+          this.record.append("notice", { text: `No one can answer the card in a headless run. Waiting to try again (round ${rounds} of ${this.recoveryRounds}).` });
+          await abortable(new Promise((r) => setTimeout(r, this.recoveryWaitMs)), signal);
+          continue;
+        }
+        const choice = await this.askRecovery(e.message, signal);
+        if (choice === "stop") throw e;
+        if (choice === "local") {
+          const problem = await this.useLocalModel("the Claude API could not be reached");
+          if (problem) this.record.append("notice", { text: `The local model did not start: ${problem}` });
+        }
+      }
+    }
+  }
+
+  private async askRecovery(problem: string, signal: AbortSignal): Promise<"resume" | "local" | "stop"> {
+    const local = this.localSpec();
+    const options = [
+      { value: "resume", label: "Resume" },
+      ...(local ? [{ value: "local", label: "Switch to the local model" }] : []),
+      { value: "stop", label: "Stop" },
+    ];
+    const q = await this.questions.ask({
+      decisionKey: "",
+      title: "The model did not answer",
+      text: `${problem} The finished steps are saved. Resume goes on from the last finished step. No finished step runs again.`,
+      options,
+      recommendation: { value: "resume", reason: "A short network failure usually ends." },
+      evidence: "",
+    });
+    this.bus.emit({ type: "question", question: q });
+    this.bus.emit({ type: "status", state: "waiting" });
+    this.waitedQids.add(q.qid);
+    try {
+      const done = await abortable(this.questions.wait(q.qid), signal);
+      const answer = String(done.answer);
+      return answer === "resume" || answer === "local" ? answer : "stop";
+    } catch {
+      return "stop";
     }
   }
 
@@ -1206,7 +1270,7 @@ export class Session {
     this.phiWaits.get(rid)?.resolve(action);
   }
 
-  private async useLocalModel(): Promise<string | undefined> {
+  private async useLocalModel(reason = "patient data card"): Promise<string | undefined> {
     const spec = this.localSpec();
     if (!spec) return "no local model is set (the local_model setting).";
     const old = this.settings.model;
@@ -1215,7 +1279,7 @@ export class Session {
     } catch (e) {
       return (e as Error).message;
     }
-    this.record.append("setting", { name: "model", old, new: spec, scope: "session", reason: "patient data card" });
+    this.record.append("setting", { name: "model", old, new: spec, scope: "session", reason });
     if (this.refereeProvider && isCloud(this.refereeProvider.info)) {
       this.refereeProvider = undefined;
       this.record.append("notice", { text: "The referee is off for this session: its model is a cloud model." });

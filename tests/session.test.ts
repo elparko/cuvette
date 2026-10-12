@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts";
 import { applyHeadlessSetup, attachHeadless } from "../src/core/headless.ts";
 import { Session, announcesStep, endsWithPromise } from "../src/core/session.ts";
+import { ProviderError } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { unzip } from "./fixtures/unzip.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
@@ -1367,4 +1368,92 @@ test("settings of a program that loads after the confirmation count at run time:
   expect(session.decisions.value("method")).toBe("Triangle");
   expect(session.decisions.value("min_size")).toBe(5);
   expect(session.record.nodes().find((n) => n.tool === "count")!.decisions).toMatchObject({ method: "Triangle", min_size: 5 });
+});
+
+function failOn(provider: FakeProvider, failures: Set<number>) {
+  const step = provider.step.bind(provider);
+  let n = 0;
+  provider.step = async (req) => {
+    const i = n++;
+    if (failures.has(i)) throw new ProviderError("Cannot reach the Claude API. Check the network.", true);
+    return step(req);
+  };
+}
+
+async function recoverySession(provider: FakeProvider, extra: Record<string, unknown> = {}) {
+  const s = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { referee: "none", ...extra } });
+  s.decisions.applySetup({});
+  return s;
+}
+
+const toolCalls = (s: Session) => s.record.entries(["tool_call"]).map((e) => `${e.data.callId}:${e.data.tool}`);
+
+test("a failure in the middle of a turn shows a card and Resume does not repeat a finished tool call", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }] }, { calls: [{ name: "note", args: { text: "x" } }] }, { text: "All done." }]);
+  failOn(provider, new Set([1]));
+  session = await recoverySession(provider);
+  const titles: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "question") {
+      titles.push(`${e.question.title}|${e.question.options.map((o) => o.label).join(",")}`);
+      setTimeout(() => session!.answer(e.question.qid, "resume"), 0);
+    }
+  });
+  const answer = await session.send("go");
+  expect(answer).toBe("All done.");
+  expect(titles).toEqual(["The model did not answer|Resume,Stop"]);
+  const calls = toolCalls(session);
+  expect(calls.filter((c) => c.endsWith(":state"))).toHaveLength(1);
+  expect(new Set(calls).size).toBe(calls.length);
+  const sent = provider.requests.map((r) => r.messages.length);
+  expect(sent[1]).toBe(sent[0]! + 2);
+});
+
+test("Stop on the card ends the turn and keeps the finished steps", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }] }, { text: "never" }]);
+  failOn(provider, new Set([1, 2, 3]));
+  session = await recoverySession(provider);
+  session.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "stop"), 0);
+  });
+  await session.send("go");
+  expect(toolCalls(session)).toHaveLength(1);
+  expect(session.record.entries(["error"]).map((e) => String(e.data.message))).toEqual(["Cannot reach the Claude API. Check the network."]);
+  expect(session.record.entries(["tool_result"])).toHaveLength(1);
+});
+
+test("the card offers the local model if one is set", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  failOn(provider, new Set([0]));
+  session = await recoverySession(provider, { local_model: "ollama:qwen3:8b" });
+  const labels: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "question") {
+      labels.push(...e.question.options.map((o) => o.label));
+      setTimeout(() => session!.answer(e.question.qid, "resume"), 0);
+    }
+  });
+  await session.send("go");
+  expect(labels).toEqual(["Resume", "Switch to the local model", "Stop"]);
+});
+
+test("a headless run waits, tries again and then stops with a clear error", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  failOn(provider, new Set([0, 1, 2, 3, 4]));
+  session = await recoverySession(provider, { headless: true });
+  session.recoveryWaitMs = 0;
+  session.recoveryRounds = 2;
+  const cards: unknown[] = [];
+  session.bus.on((e) => e.type === "question" && cards.push(e));
+  await session.send("go");
+  expect(cards).toHaveLength(0);
+  expect(String(session.record.entries(["error"]).at(-1)!.data.message)).toMatch(/waited 2 times and then stopped/);
+});
+
+test("a headless run goes on if the network comes back", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "state", args: {} }] }, { text: "Back again." }]);
+  failOn(provider, new Set([1, 2]));
+  session = await recoverySession(provider, { headless: true });
+  session.recoveryWaitMs = 0;
+  expect(await session.send("go")).toBe("Back again.");
 });

@@ -123,6 +123,7 @@ export interface StepRequest {
   tools: ToolSchema[];
   signal?: AbortSignal;
   onDelta?: (d: { type: "text" | "thinking"; text: string }) => void;
+  onRetry?: (r: { attempt: number; of: number; waitMs: number; reason: string }) => void;
 }
 
 export interface StepResult {
@@ -139,7 +140,11 @@ export interface Provider {
   countTokens?(req: Omit<StepRequest, "signal" | "onDelta">): Promise<number>;
 }
 
-export class ProviderError extends Error {}
+export class ProviderError extends Error {
+  constructor(message: string, readonly transient = false) {
+    super(message);
+  }
+}
 
 // ---------------------------------------------------------------- tools
 

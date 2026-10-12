@@ -3,6 +3,13 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
+## 11 October 2026
+
+### Network failures
+
+- The Claude provider waits and tries again three times after a rate limit (HTTP 429), a server error (HTTP 5xx or 529) or a network error. The wait grows each time, has random jitter, and follows the `retry-after` header. The session shows "Waiting to retry (2 of 3)".
+- After the last try fails, a card offers "Resume", "Switch to the local model" or "Stop". "Resume" goes on from the last finished step. No finished tool call runs again. A headless run waits and tries again three more times, then stops with an error.
+
 ## 9 October 2026
 
 ### Benchmark

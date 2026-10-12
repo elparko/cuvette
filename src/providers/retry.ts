@@ -1,0 +1,78 @@
+import Anthropic from "@anthropic-ai/sdk";
+
+export const RETRIES = 3;
+const MAX_WAIT_MS = 120_000;
+const NETWORK_TEXT = /fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up|terminated|timed? ?out/i;
+
+export interface RetryInfo {
+  attempt: number;
+  of: number;
+  waitMs: number;
+  reason: string;
+}
+
+export type Sleep = (ms: number, signal?: AbortSignal) => Promise<void>;
+
+export const realSleep: Sleep = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason ?? new Error("interrupted"));
+    const onAbort = () => (clearTimeout(timer), reject(signal?.reason ?? new Error("interrupted")));
+    const timer = setTimeout(() => (signal?.removeEventListener("abort", onAbort), resolve()), ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
+function headerOf(e: any, name: string): string | undefined {
+  const h = e?.headers;
+  const v = typeof h?.get === "function" ? h.get(name) : h?.[name];
+  return typeof v === "string" ? v : undefined;
+}
+
+function retryAfterMs(e: unknown): number | undefined {
+  const rawMs = headerOf(e, "retry-after-ms");
+  if (rawMs && Number.isFinite(Number(rawMs)) && Number(rawMs) >= 0) return Number(rawMs);
+  const raw = headerOf(e, "retry-after");
+  if (!raw) return undefined;
+  const s = Number(raw);
+  if (Number.isFinite(s) && s >= 0) return s * 1000;
+  const date = Date.parse(raw);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
+}
+
+export function retryReason(e: unknown): string | undefined {
+  if (e instanceof Anthropic.APIUserAbortError) return undefined;
+  if (e instanceof Anthropic.RateLimitError) return "rate limit";
+  if (e instanceof Anthropic.APIConnectionError) return "network error";
+  if (e instanceof Anthropic.APIError) {
+    const type = (e as any).error?.error?.type ?? (e as any).error?.type;
+    if (typeof e.status === "number" && (e.status >= 500 || e.status === 529)) return `server error (${e.status})`;
+    if (e.status === undefined && (type === "overloaded_error" || type === "api_error")) return "server error";
+    return undefined;
+  }
+  if (e instanceof Error && !(e as any).status && NETWORK_TEXT.test(`${e.message} ${(e as any).code ?? ""} ${(e as any).cause?.code ?? ""}`)) return "network error";
+  return undefined;
+}
+
+export function waitMs(attempt: number, e: unknown, random: () => number = Math.random): number {
+  const base = Math.min(30_000, 1000 * 2 ** (attempt - 1));
+  const own = base / 2 + random() * (base / 2);
+  return Math.min(MAX_WAIT_MS, Math.max(own, retryAfterMs(e) ?? 0));
+}
+
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  o: { retries?: number; sleep?: Sleep; signal?: AbortSignal; onRetry?: (r: RetryInfo) => void } = {},
+): Promise<T> {
+  const retries = o.retries ?? RETRIES;
+  const sleep = o.sleep ?? realSleep;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const reason = retryReason(e);
+      if (!reason || attempt > retries || o.signal?.aborted) throw e;
+      const wait = waitMs(attempt, e);
+      o.onRetry?.({ attempt, of: retries, waitMs: wait, reason });
+      await sleep(wait, o.signal);
+    }
+  }
+}

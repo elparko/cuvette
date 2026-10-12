@@ -262,7 +262,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
 
   async function stepError(reply: Reply) {
     replies = [reply];
-    const p = new ClaudeProvider("claude-opus-5-5");
+    const p = new ClaudeProvider("claude-opus-5-5", { retries: 0 });
     return p.step({ system: "s", messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }], tools: [] }).then(
       () => "",
       (e: Error) => e.message,
