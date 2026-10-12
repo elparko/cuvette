@@ -101,6 +101,38 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     expect(await until(page, `document.activeElement?.matches('[data-card][data-type="question"]')`)).toBe(true);
   });
 
+  test("card keys: Enter on a focused card button is that button, arrows move the focus, Enter in Other answers", async () => {
+    const q = `document.querySelector('[data-card][data-type="question"]')`;
+    const key = (k: string) => page.eval<boolean>(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);
+    await page.eval(`[...${q}.querySelectorAll(".btn")].find((b) => b.textContent === "Answer later").focus()`);
+    expect(await page.eval(`document.activeElement.matches(":focus-visible") ? getComputedStyle(document.activeElement).boxShadow : "not visible"`)).not.toBe("none");
+    expect(await key("Enter")).toBe(true);
+    await wait(300);
+    expect(await page.eval(`!!${q}`)).toBe(true);
+    await page.eval(`${q}.querySelectorAll(".opts .btn")[1].focus()`);
+    expect(await page.eval(`${q}.dataset.sel`)).toBe("1");
+    expect(await key("ArrowLeft")).toBe(false);
+    expect(await page.eval(`document.activeElement === ${q}.querySelectorAll(".opts .btn")[0]`)).toBe(true);
+    expect(await page.eval(`${q}.dataset.sel`)).toBe("0");
+    await setText(`[data-card][data-type="question"] input[name="other"]`, "Welch t test");
+    expect(await key("Enter")).toBe(false);
+    expect(await until(page, `!document.querySelector('[data-card][data-type="question"]')`)).toBe(true);
+  });
+
+  test("the side panel tabs on a phone fit the width, and each decision button names its decision", async () => {
+    await page.size(390, 844);
+    for (const tab of ["Analysis", "Results", "Record", "Decisions"]) {
+      await page.eval(`[...document.querySelectorAll('[role="tab"]')].find((x) => x.textContent === ${JSON.stringify(tab)}).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+      expect(await until(page, `document.querySelector('[role="tabpanel"]')?.getAttribute("aria-label") === ${JSON.stringify(tab)} && document.querySelector('[role="tabpanel"]').textContent.length > 20`)).toBe(true);
+      await wait(200);
+      expect({ tab, ...(await overflow(page)) }).toEqual({ tab, page: 390, wide: [] });
+    }
+    const names = await page.eval<string[]>(`[...document.querySelectorAll('[role="tabpanel"] [data-decision-save]')].map((b) => b.getAttribute("aria-label"))`);
+    expect(names.length).toBeGreaterThan(1);
+    expect(new Set(names).size).toBe(names.length);
+    await page.size(1280, 900);
+  });
+
   test("the image viewer: a double-click at 100% zooms in, and the arrow keys move the image", async () => {
     await page.eval(`(() => {
       const c = document.createElement("canvas");
