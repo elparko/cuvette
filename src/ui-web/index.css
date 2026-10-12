@@ -10,7 +10,7 @@
   --popover: #ffffff;
   --foreground: #1b1b1f;
   --muted: #f0efec;
-  --muted-foreground: #66666f;
+  --muted-foreground: #4f4f58;
   --border: #e2e1dd;
   --field: #ffffff;
   --primary: #1b1b1f;
@@ -45,7 +45,7 @@
     --popover: #222227;
     --foreground: #ececef;
     --muted: #26262b;
-    --muted-foreground: #a0a0aa;
+    --muted-foreground: #b4b4be;
     --border: #2e2e34;
     --field: #17171a;
     --primary: #ececef;
@@ -80,7 +80,7 @@
   --popover: #222227;
   --foreground: #ececef;
   --muted: #26262b;
-  --muted-foreground: #a0a0aa;
+  --muted-foreground: #b4b4be;
   --border: #2e2e34;
   --field: #17171a;
   --primary: #ececef;
@@ -158,7 +158,7 @@
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
@@ -657,9 +657,16 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.srv div.line,
+.srv details.line > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
 .srv .line {
-  margin: 3px 0;
-  font-size: 13px;
+  margin: 4px 0;
+  font-size: 14px;
+  line-height: 1.45;
   color: var(--foreground);
 }
 .srv .line.dim {
@@ -681,10 +688,12 @@
   color: var(--mag);
 }
 .srv .line .sym {
-  display: inline-block;
-  width: 1.3em;
+  flex: none;
+  width: 1.2em;
   text-align: center;
-  opacity: 0.8;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  opacity: 0.7;
 }
 .srv details.house > summary {
   list-style: none;
@@ -730,11 +739,11 @@
   background: var(--ok);
 }
 .srv .step.bad {
-  background: var(--bad-bg);
+  background: var(--warn-bg);
   border-color: transparent;
 }
 .srv .step.bad::before {
-  background: var(--bad);
+  background: var(--warn);
 }
 .srv .step.minor {
   padding: 6px 12px;
@@ -752,8 +761,8 @@
   margin-right: 6px;
 }
 .srv .step.bad .badge {
-  color: var(--bad);
-  background: color-mix(in srgb, var(--bad) 14%, transparent);
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
 }
 .srv details.callinfo {
   margin-top: 2px;
@@ -908,17 +917,9 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--card);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
+  box-shadow: inset 0 3px 0 var(--tone), 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
   --tone: var(--info);
   --tone-bg: var(--info-bg);
-}
-.srv .card::before {
-  content: "";
-  position: absolute;
-  inset: -1px -1px auto -1px;
-  height: 3px;
-  border-radius: 16px 16px 0 0;
-  background: var(--tone);
 }
 .srv .card.yellow {
   --tone: var(--warn);
@@ -1215,4 +1216,15 @@
 }
 .srv details.defs[open] > summary {
   margin-bottom: 4px;
+}
+
+.srv .line.magenta {
+  display: none;
+}
+.srv .line > button {
+  margin-left: auto;
+  flex: none;
+}
+.srv.hide-notes .line:not(.red):not(.yellow):not(:has([data-change])) {
+  display: none;
 }

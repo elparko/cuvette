@@ -393,11 +393,19 @@ export function checkFiles(files: FileInfo[], source: string): DataCheck {
   }
   if (channels.size >= 2) {
     const want = [...channels.entries()].filter(([, n]) => n >= fields.size / 2).map(([c]) => c);
+    const byLack = new Map<string, { chans: string[]; lack: string[] }>();
     for (const c of want) {
       const lack = [...fields.entries()].filter(([, s]) => !s.has(c)).map(([k]) => k);
       if (!lack.length) continue;
-      const lead = `${plural(lack.length, "field")} ${lack.length === 1 ? "has" : "have"} no ${quote(c)} image`;
-      items.push({ id: `channel:${c}`, check: "missing_channel", level: "ask", files: lack, text: `${lead}: ${listOf(lack, 3)}.`, question: `${lead} (${listOf(lack, 3)}). Leave ${lack.length === 1 ? "this field" : "these fields"} out, or stop?`, options: [{ value: "leave_out", label: `Leave out the ${plural(lack.length, "field")}` }, { value: "stop", label: "Stop. I add the missing images" }], recommendation: "leave_out" });
+      const g = byLack.get(lack.join("\n")) ?? { chans: [], lack };
+      g.chans.push(c);
+      byLack.set(lack.join("\n"), g);
+    }
+    for (const { chans, lack } of byLack.values()) {
+      const names = chans.map(quote);
+      const what = names.length === 1 ? `no ${names[0]} image` : `no ${listOf(names, names.length).replace(/, ([^,]*)$/, " and $1")} images`;
+      const lead = `${plural(lack.length, "field")} ${lack.length === 1 ? "has" : "have"} ${what}`;
+      items.push({ id: `channel:${chans.join("+")}`, check: "missing_channel", level: "ask", files: lack, text: `${lead}: ${listOf(lack, 3)}.`, question: `${lead} (${listOf(lack, 3)}). Leave ${lack.length === 1 ? "this field" : "these fields"} out, or stop?`, options: [{ value: "leave_out", label: `Leave out the ${plural(lack.length, "field")}` }, { value: "stop", label: "Stop. I add the missing images" }], recommendation: "leave_out" });
     }
   }
 
@@ -456,8 +464,8 @@ export function dataCheckText(c: DataCheck): string {
   const out = [`Data check of ${basename(c.source) || c.source}: ${c.size}.`];
   const ask = c.items.filter((i) => i.level === "ask");
   const note = c.items.filter((i) => i.level === "note");
-  if (ask.length) out.push("Questions for you:", ...ask.map((i) => `- ${i.text}`));
-  if (note.length) out.push(ask.length ? "Shown, not asked:" : "Found:", ...note.map((i) => `- ${i.text}`));
+  if (ask.length) out.push("Problems found in the data:", ...ask.map((i) => `- ${i.text}`));
+  if (note.length) out.push(ask.length ? "Also found:" : "Found:", ...note.map((i) => `- ${i.text}`));
   if (c.groups) out.push(`Groups in ${quote(c.groups.column)}: ${c.groups.sizes.map(([g, n]) => `${g} ${n}`).join(", ")}.`);
   if (c.units?.length) out.push(`Units in the column names: ${c.units.map(([col, u]) => `${col.replace(UNIT_IN_NAME, "").trim() || col} (${u})`).join(", ")}.`);
   if (!c.items.length) out.push(c.kind === "table" ? "No missing values, copies, mixed columns or extreme values." : "No missing channels, name problems or odd files.");

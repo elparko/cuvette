@@ -66,7 +66,8 @@ async function core() {
   await adapterModules();
   cpSync(join(ROOT, "samples"), join(CORE, "samples"), { recursive: true, filter: (p) => !skip(p) });
   cpSync(join(ROOT, "ui-dist"), join(CORE, "ui-dist"), { recursive: true });
-  for (const f of ["src/adapters/kinds/ga_figures.py", "src/adapters/kinds/python_worker.py", "src/adapters/kinds/cuvette.mplstyle", "src/tools/science-requirements.txt", "package.json"]) {
+  cpSync(join(ROOT, "src/core/guidelines"), join(CORE, "src/core/guidelines"), { recursive: true });
+  for (const f of ["src/adapters/kinds/ga_figures.py", "src/adapters/kinds/python_worker.py", "src/adapters/kinds/cuvette.mplstyle", "src/tools/science-requirements.txt", "src/tools/inspect_data.py", "src/core/imagedeck.py", "package.json", "CITATION.cff"]) {
     mkdirSync(dirname(join(CORE, f)), { recursive: true });
     copyFileSync(join(ROOT, f), join(CORE, f));
   }

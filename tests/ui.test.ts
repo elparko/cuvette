@@ -36,7 +36,7 @@ describe("card queue", () => {
 
 describe("the data check and the sample sheet on the questions card", () => {
   test("the clarify event carries the data check and the design notes", () => {
-    const check = ["Data check of Ox-LDL: 35 files in 6 folders.", "Questions for you:", ...Array.from({ length: 20 }, (_, i) => `- problem ${i + 1}`)].join("\n");
+    const check = ["Data check of Ox-LDL: 35 files in 6 folders.", "Problems found in the data:", ...Array.from({ length: 20 }, (_, i) => `- problem ${i + 1}`)].join("\n");
     const c = cardFromEvent({ type: "clarify", found: "I see 2 groups.", qids: ["q1"], skipped: [], check, notes: ["n is the Set."] }) as Extract<Card, { t: "clarify" }>;
     expect(c.notes).toEqual(["n is the Set."]);
     expect(checkLines(c, 1)).toEqual(["Data check of Ox-LDL: 35 files in 6 folders."]);

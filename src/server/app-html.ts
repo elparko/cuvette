@@ -182,7 +182,7 @@ export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: n
     }
     case "line": {
       const cls = `line ${it.color ?? ""} ${it.dim ? "dim" : ""}`;
-      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> ${shortPaths(esc(it.text))}${it.change ? ` ${btn("Change", `data-change="${esc(it.change)}"`, "quiet small")}` : ""}`;
+      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> ${shortPaths(esc(it.text.replace(/\s*·\s*\/change \S+$/, "")))}${it.change ? ` ${btn("Change", `data-change="${esc(it.change)}"`, "quiet small")}` : ""}`;
       const sub = it.group && opts.sub ? opts.sub(it.group) : [];
       if (sub.length) return `<details class="${cls} house"><summary>${body}</summary><div class="sub">${sub.map((x) => itemHtml(c, x, opts)).join("")}</div></details>`;
       return `<div class="${cls}">${body}</div>`;

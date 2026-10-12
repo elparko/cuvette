@@ -1,9 +1,10 @@
-import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
+import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ScrollTextIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx } from "../App.tsx";
 import { ImageViewer } from "../components/image-viewer.tsx";
 import { ModeMenu } from "../components/mode-menu.tsx";
+import { ModelMenu } from "../components/model-menu.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.tsx";
@@ -59,16 +60,36 @@ function markSel(card: HTMLElement, i: number) {
 
 const typing = (a: Element | null) => !!a && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA");
 
-function Thinking({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const tail = text.replace(/\s+/g, " ").slice(-220);
+function Thinking({ text, done }: { text: string; done: boolean }) {
+  const [manual, setManual] = useState<boolean | null>(null);
+  const [seconds, setSeconds] = useState(0);
+  const box = useRef<HTMLParagraphElement>(null);
+  const open = manual ?? !done;
+  useEffect(() => {
+    if (done) return;
+    setSeconds(0);
+    const start = Date.now();
+    const t = setInterval(() => setSeconds(Math.round((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [done]);
+  useEffect(() => {
+    if (!done && box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [text, done, open]);
+  useEffect(() => {
+    if (done) setManual(null);
+  }, [done]);
   return (
-    <div className="my-3 rounded-xl border border-dashed bg-muted/50 px-3.5 py-2.5 text-[13px] text-muted-foreground">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-2 font-medium text-foreground">
-        <BrainIcon className="pulse-dot size-4 text-accent-brand" /> Thinking
-        <span className="text-xs font-normal text-muted-foreground">{open ? "Hide" : "Show all"}</span>
+    <div className="my-3 rounded-xl border border-dashed bg-muted/50 px-3.5 py-2.5 text-sm text-muted-foreground">
+      <button type="button" onClick={() => setManual(!open)} aria-expanded={open} className="flex w-full items-center gap-2 text-left font-medium text-foreground">
+        <BrainIcon className={cn("size-4 shrink-0 text-accent-brand", !done && "pulse-dot")} /> {done ? "Thought" : "Thinking"}
+        {seconds > 0 && ` · ${seconds}s`}
+        <span className="ml-auto text-xs font-normal text-muted-foreground">{open ? "Hide" : "Show"}</span>
       </button>
-      <p className={cn("mt-1 whitespace-pre-wrap", open ? "max-h-80 overflow-y-auto" : "line-clamp-2")}>{open ? text : "…" + tail}</p>
+      {open && (
+        <p ref={box} className="mt-1.5 max-h-72 overflow-y-auto whitespace-pre-wrap">
+          {text}
+        </p>
+      )}
     </div>
   );
 }
@@ -80,6 +101,37 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   const [tab, setTab] = useState("analysis");
   const [tabHtml, setTabHtml] = useState("");
   const [side, setSide] = useStored("cuvette.side", true);
+  const [notes, setNotes] = useStored("cuvette.notes", false);
+  const [sideWidth, setSideWidth] = useState(() => {
+    try {
+      return Number(localStorage.getItem("cuvette.sideWidth")) || 480;
+    } catch {
+      return 480;
+    }
+  });
+  const gridRef = useRef<HTMLDivElement>(null);
+  const dragSide = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const box = gridRef.current!.getBoundingClientRect();
+    let last = sideWidth;
+    const move = (m: PointerEvent) => {
+      const w = box.right - m.clientX;
+      if (w < 220) return setSide(false), up();
+      last = Math.round(Math.min(w, box.width * 0.75));
+      setSideWidth(Math.max(last, 300));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem("cuvette.sideWidth", String(Math.max(last, 300)));
+      } catch {}
+    };
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   const [text, setText] = useState("");
   const [commands, setCommands] = useState<Command[]>([]);
   const [sugg, setSugg] = useState<Command[]>([]);
@@ -398,6 +450,12 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               <Badge className="tabular-nums">{status.usage}</Badge>
             </Tooltip>
           )}
+          <Tooltip content={notes ? "Hide the status notes" : "Show the status notes"}>
+            <Button variant="ghost" size="icon-sm" className={cn("text-muted-foreground", notes && "bg-muted text-foreground")} onClick={() => setNotes(!notes)} aria-label={notes ? "Hide the status notes" : "Show the status notes"} aria-pressed={notes}>
+              <ScrollTextIcon />
+            </Button>
+          </Tooltip>
+          <ModelMenu model={session.model} busy={busy} openSettings={() => ctx.go("settings")} />
           <ModeMenu mode={status.mode ?? "watch"} />
           <Tooltip content={side ? "Hide the side panel" : "Show the side panel"}>
             <Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground lg:inline-flex" onClick={() => setSide(!side)} aria-label={side ? "Hide the side panel" : "Show the side panel"} aria-expanded={side}>
@@ -434,7 +492,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         </div>
       </header>
 
-      <div className={cn("grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:overflow-hidden", side && "lg:grid-cols-[minmax(0,1fr)_minmax(360px,40%)]")}>
+      <div ref={gridRef} style={{ "--side": `${sideWidth}px` } as React.CSSProperties} className={cn("grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:overflow-hidden", side && "lg:grid-cols-[minmax(0,1fr)_var(--side)]")}>
         <section aria-label="Conversation" className="flex h-[calc(100dvh-150px)] min-h-[420px] min-w-0 flex-col lg:h-auto lg:min-h-0">
           <div
             ref={scrollRef}
@@ -445,7 +503,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
             }}
             className="flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
-            <div aria-live="polite" className="srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4" onClick={onClick} onChange={onChange}>
+            <div aria-live="polite" className={cn("srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4", !notes && "hide-notes")} onClick={onClick} onChange={onChange}>
               {itemsHtml}
               {sent && (
                 <div className="msg user">
@@ -453,7 +511,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 </div>
               )}
               <div dangerouslySetInnerHTML={{ __html: stream.pending }} />
-              {stream.think && !stream.live && <Thinking text={stream.think} />}
+              {stream.think && <Thinking text={stream.think} done={!!stream.live || !busy} />}
               {stream.live && (
                 <div className="msg agent" dangerouslySetInnerHTML={{ __html: liveHtml(stream.live) }} />
               )}
@@ -560,7 +618,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         </section>
 
         {side && (
-          <aside aria-label="Analysis details" className="flex min-h-[50vh] min-w-0 flex-col border-t bg-sidebar/60 lg:min-h-0 lg:border-t-0 lg:border-l">
+          <aside aria-label="Analysis details" className="relative flex min-h-[50vh] min-w-0 flex-col border-t bg-sidebar/60 lg:min-h-0 lg:border-t-0 lg:border-l">
+            <div role="separator" aria-orientation="vertical" aria-label="Drag to resize the side panel" onPointerDown={dragSide} onDoubleClick={() => {
+              setSideWidth(480);
+              try {
+                localStorage.setItem("cuvette.sideWidth", "480");
+              } catch {}
+            }} className="absolute inset-y-0 -left-1 z-10 hidden w-2 cursor-col-resize transition-colors hover:bg-ring/40 active:bg-ring/60 lg:block" />
             <div className="flex items-center gap-2 px-4 pt-3 pb-2">
               <Tabs value={tab} onValueChange={setTab} className="min-w-0 flex-1">
                 <TabsList className="w-full">

@@ -3332,7 +3332,7 @@ export class Session {
       const text = dataCheckText(check);
       this.record.append("data_check", { source: f.label, kind: check.kind, size: check.size, items: check.items, groups: check.groups ?? null, units: check.units ?? [], text, summary: summary ?? null });
       out.push(`Data check by the harness (code, not a model):\n${text}`);
-      if (check.items.some((i) => i.level === "ask")) out.push(this.planning ? "The harness asks the scientist about each problem under Questions for you in the Questions stage. Do not ask about them again." : "Ask the scientist about each problem under Questions for you before a step uses the data.");
+      if (check.items.some((i) => i.level === "ask")) out.push(this.planning ? "The harness asks the scientist about each problem under Problems found in the data in the Questions stage. Do not ask about them again." : "Ask the scientist about each problem under Problems found in the data before a step uses the data.");
       if (sheet?.rows.length) {
         this.sheet = sheet;
         this.saveSheet(sheet.rows, "drafted");
