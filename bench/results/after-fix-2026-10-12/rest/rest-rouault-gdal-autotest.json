@@ -1,0 +1,1480 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "rouault-gdal-autotest",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 75.795,
+   "session": "20261012-034040-d903",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/rouault-gdal-autotest/claude_claude-haiku-5-5/rouault-gdal-autotest/run1/home/sessions/20261012-034040-d903",
+   "answer": "The image is 20 by 20 pixels in EPSG:26711 (NAD27 / UTM zone 11N), and each pixel is 60 m by 60 m. The first square has 100 pixels with a mean of 129.5. The second square has 42 pixels, counted by pixel centers, with a mean of 135.0.\n\n| Measure | Value | 95% CI | n, and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Image size, original (EPSG:26711) | 20 wide × 20 high pixels; pixel 60 m × 60 m | Not applicable | 400 pixels in the image (calculated as 20 × 20) | None (read only) | raster_info; calculate |\n| Lowest, highest, mean, standard deviation (SD) of pixel values | 74, 255, 126.765, 22.928 | Not applicable | 400 pixels; no nodata value set, so no pixel skipped | None (descriptive) | raster_info (gdalinfo -stats) |\n| Image size, latitude and longitude (EPSG:4326, nearest-neighbour) | 22 wide × 18 high pixels; pixel 0.000598 degrees × 0.000598 degrees | Not applicable | 396 pixels in the new image (calculated as 22 × 18) | None | reproject_raster (gdalwarp); calculate |\n| Mean of the converted image | 126.551 (differs from 126.765 because of resampling) | Not applicable | 396 pixels | None | reproject_raster |\n| Square A: mean pixel value | 129.5 (SD 17.903) | 125.99 to 133.01 | 100 pixels; one pixel is one value | None | zonal_stats (centers) and calculate |\n| Square A: pixel count | 100 pixels | Not applicable | 100 pixels with centers inside | None | zonal_stats (centers) |\n| Square B: pixel count (centers inside) | 42 pixels | Not applicable | 42 pixels with centers inside | None | zonal_stats (centers) |\n| Square B: mean pixel value (centers inside) | 135.0 (SD 17.210) | 129.80 to 140.20 | 42 pixels; one pixel is one value | None | zonal_stats (centers) and calculate |\n\nUncertain:\n- The intervals treat each pixel as independent. Neighbouring pixels are alike, so the true intervals are wider.\n- Pixel size in the converted image is in degrees, not metres. Do not use it for distances.\n- Counting all touched pixels could change square B's count and mean. I did not run that method.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Target coordinate reference system: EPSG:4326 · Resampling method: near · Pixels that a zone edge cuts: centers.",
+   "items": [
+    {
+     "key": "width",
+     "description": "Raster width in pixels",
+     "expected": 20,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.width",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 20,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 65,
+      "text": "The image is 20 by 20 pixels in EPSG:26711 (NAD27 / UTM zone 11N), and each pixel is 60 m by 60 m."
+     }
+    },
+    {
+     "key": "height",
+     "description": "Raster height in pixels",
+     "expected": 20,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.width",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 20,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 65,
+      "text": "The image is 20 by 20 pixels in EPSG:26711 (NAD27 / UTM zone 11N), and each pixel is 60 m by 60 m."
+     }
+    },
+    {
+     "key": "epsg",
+     "description": "EPSG code of the raster",
+     "expected": 26711,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 26711,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.epsg",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 26711,
+      "diff": 0,
+      "via": "code",
+      "node": null,
+      "claimEntry": 65,
+      "text": null
+     }
+    },
+    {
+     "key": "pixel_size_m",
+     "description": "Pixel size in metres",
+     "expected": 60,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 60,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.pixel_x",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 60,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 65,
+      "text": "The image is 20 by 20 pixels in EPSG:26711 (NAD27 / UTM zone 11N), and each pixel is 60 m by 60 m."
+     }
+    },
+    {
+     "key": "band_min",
+     "description": "Band minimum",
+     "expected": 74,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 74,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.min",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 74,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 65,
+      "text": "| Lowest, highest, mean, standard deviation (SD) of pixel values | 74, 255, 126.765, 22.928 | Not applicable | 400 pixels; no nodata value set, so no pixel skipped | None (descriptive) | raster_info (gdalinfo -stats) |"
+     }
+    },
+    {
+     "key": "band_max",
+     "description": "Band maximum",
+     "expected": 255,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 255,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.max",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 255,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 65,
+      "text": "| Lowest, highest, mean, standard deviation (SD) of pixel values | 74, 255, 126.765, 22.928 | Not applicable | 400 pixels; no nodata value set, so no pixel skipped | None (descriptive) | raster_info (gdalinfo -stats) |"
+     }
+    },
+    {
+     "key": "band_mean",
+     "description": "Band mean",
+     "expected": 126.765,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 126.765,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mean",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 126.765,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 65,
+      "text": "| Lowest, highest, mean, standard deviation (SD) of pixel values | 74, 255, 126.765, 22.928 | Not applicable | 400 pixels; no nodata value set, so no pixel skipped | None (descriptive) | raster_info (gdalinfo -stats) |"
+     }
+    },
+    {
+     "key": "band_std",
+     "description": "Band standard deviation",
+     "expected": 22.93,
+     "tolerance": 0.05,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22.928,
+      "diff": 0.0019999999999988916,
+      "node": "n1",
+      "path": "metrics.stddev",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 22.928,
+      "diff": 0.0019999999999988916,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 65,
+      "text": "| Lowest, highest, mean, standard deviation (SD) of pixel values | 74, 255, 126.765, 22.928 | Not applicable | 400 pixels; no nodata value set, so no pixel skipped | None (descriptive) | raster_info (gdalinfo -stats) |"
+     }
+    },
+    {
+     "key": "warp_width",
+     "description": "Width after warp to EPSG:4326",
+     "expected": 22,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.width",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 22,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 65,
+      "text": "| Image size, latitude and longitude (EPSG:4326, nearest-neighbour) | 22 wide × 18 high pixels; pixel 0.000598 degrees × 0.000598 degrees | Not applicable | 396 pixels in the new image (calculated as 22 × 18) | None | reproject_raster (gdalwarp); calculate |"
+     }
+    },
+    {
+     "key": "warp_height",
+     "description": "Height after warp to EPSG:4326",
+     "expected": 18,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 18,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.height",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 18,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 65,
+      "text": "| Image size, latitude and longitude (EPSG:4326, nearest-neighbour) | 22 wide × 18 high pixels; pixel 0.000598 degrees × 0.000598 degrees | Not applicable | 396 pixels in the new image (calculated as 22 × 18) | None | reproject_raster (gdalwarp); calculate |"
+     }
+    },
+    {
+     "key": "zone_a_pixels",
+     "description": "Zone A pixel count",
+     "expected": 100,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.count",
+      "entry": 26
+     },
+     "reported": {
+      "pass": true,
+      "value": 100,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 65,
+      "text": "The first square has 100 pixels with a mean of 129.5."
+     }
+    },
+    {
+     "key": "zone_a_mean",
+     "description": "Zone A mean",
+     "expected": 129.5,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 129.5,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.mean",
+      "entry": 26
+     },
+     "reported": {
+      "pass": true,
+      "value": 129.5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 65,
+      "text": "The first square has 100 pixels with a mean of 129.5."
+     }
+    },
+    {
+     "key": "zone_b_pixels_centers",
+     "description": "Zone B pixel count, pixel centers",
+     "expected": 42,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42,
+      "diff": 0,
+      "node": "n4",
+      "path": "table.rows[1][1]",
+      "entry": 26
+     },
+     "reported": {
+      "pass": true,
+      "value": 42,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 65,
+      "text": "The second square has 42 pixels, counted by pixel centers, with a mean of 135.0."
+     }
+    },
+    {
+     "key": "zone_b_mean_centers",
+     "description": "Zone B mean, pixel centers",
+     "expected": 135,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 135,
+      "diff": 0,
+      "node": "n4",
+      "path": "table.rows[1][4]",
+      "entry": 26
+     },
+     "reported": {
+      "pass": true,
+      "value": 135,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 65,
+      "text": "The second square has 42 pixels, counted by pixel centers, with a mean of 135.0."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 6902,
+    "cacheRead": 84197,
+    "cacheWrite": 23058,
+    "toolCalls": 7,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 3,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 6
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/rouault-gdal-autotest/claude_claude-haiku-5-5/rouault-gdal-autotest/run1/home/sessions/20261012-034040-d903/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/rouault-gdal-autotest",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/rouault-gdal-autotest/claude_claude-haiku-5-5/rouault-gdal-autotest/run1",
+     "/Users/parker/Code/guided-analysis/catalog/gdal",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/gdal/3.13.3_3",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/gdal"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/rouault-gdal-autotest/byte.tif",
+     "/Volumes/T7/guided-analysis/data/rouault-gdal-autotest/zones.geojson"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "rouault-gdal-autotest",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 59.328,
+   "session": "20261012-034157-24cd",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/rouault-gdal-autotest/claude_claude-haiku-5-5/rouault-gdal-autotest/run2/home/sessions/20261012-034157-24cd",
+   "answer": "1. The image is 20 by 20 pixels in EPSG:26711 (NAD27 / UTM zone 11N), and one pixel is 60 m by 60 m. Square A has 100 pixels with a mean of 129.5. Square B has 42 pixels with a mean of 135.0, counting pixels whose center is inside.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Width × height | 20 × 20 pixels | Not applicable | 1 raster | None | raster_info |\n| Pixel size | 60 m × 60 m (EPSG:26711) | Not applicable | 1 raster | None | raster_info |\n| Lowest pixel value | 74 | Not applicable | 400 pixels (20 × 20, from calculate), one pixel each | None (descriptive) | raster_info |\n| Highest pixel value | 255 | Not applicable | 400 pixels | None (descriptive) | raster_info |\n| Mean pixel value | 126.765 | Not applicable | 400 pixels | None (descriptive) | raster_info |\n| Standard deviation | 22.928 | Not applicable | 400 pixels | None (descriptive) | raster_info |\n| Width × height after conversion to EPSG:4326 | 22 × 18 pixels (near resampling, pixel size about 0.000598 degrees) | Not applicable | 1 raster | None | reproject_raster |\n| Square A: mean pixel value | 129.5 | Not applicable | 100 pixels (center rule, original EPSG:26711 image) | None (descriptive) | zonal_stats |\n| Square A: pixel count | 100 pixels | Not applicable | 100 pixels, one pixel each | None | zonal_stats |\n| Square B (cut by edge): pixel count, center rule | 42 pixels | Not applicable | 42 pixels whose center is inside | None | zonal_stats |\n| Square B: mean pixel value, center rule | 135.0 | Not applicable | 42 pixels | None (descriptive) | zonal_stats |\n\nUncertain:\n- The tools labeled the squares A and B. I did not check that these labels match the id field values.\n- The converted image has a different mean (126.551) from the original (126.765). Zonal values use the original image, so they do not change.\n- raster_info did not report a nodata value, and the setup left nodata blank. zonal_stats reported nodata as null, so I counted all pixels. I did not confirm the file's nodata setting directly.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Target coordinate reference system: EPSG:4326 · Resampling method: near · Pixels that a zone edge cuts: centers.",
+   "items": [
+    {
+     "key": "width",
+     "description": "Raster width in pixels",
+     "expected": 20,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.width",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 20,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 58,
+      "text": "The image is 20 by 20 pixels in EPSG:26711 (NAD27 / UTM zone 11N), and one pixel is 60 m by 60 m."
+     }
+    },
+    {
+     "key": "height",
+     "description": "Raster height in pixels",
+     "expected": 20,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.width",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 20,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 58,
+      "text": "The image is 20 by 20 pixels in EPSG:26711 (NAD27 / UTM zone 11N), and one pixel is 60 m by 60 m."
+     }
+    },
+    {
+     "key": "epsg",
+     "description": "EPSG code of the raster",
+     "expected": 26711,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 26711,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.epsg",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 26711,
+      "diff": 0,
+      "via": "code",
+      "node": null,
+      "claimEntry": 58,
+      "text": null
+     }
+    },
+    {
+     "key": "pixel_size_m",
+     "description": "Pixel size in metres",
+     "expected": 60,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 60,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.pixel_x",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 60,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 58,
+      "text": "The image is 20 by 20 pixels in EPSG:26711 (NAD27 / UTM zone 11N), and one pixel is 60 m by 60 m."
+     }
+    },
+    {
+     "key": "band_min",
+     "description": "Band minimum",
+     "expected": 74,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 74,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.min",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 74,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 58,
+      "text": "| Lowest pixel value | 74 | Not applicable | 400 pixels (20 × 20, from calculate), one pixel each | None (descriptive) | raster_info |"
+     }
+    },
+    {
+     "key": "band_max",
+     "description": "Band maximum",
+     "expected": 255,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 255,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.max",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 255,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 58,
+      "text": "| Highest pixel value | 255 | Not applicable | 400 pixels | None (descriptive) | raster_info |"
+     }
+    },
+    {
+     "key": "band_mean",
+     "description": "Band mean",
+     "expected": 126.765,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 126.765,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mean",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 126.765,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 58,
+      "text": "| Mean pixel value | 126.765 | Not applicable | 400 pixels | None (descriptive) | raster_info |"
+     }
+    },
+    {
+     "key": "band_std",
+     "description": "Band standard deviation",
+     "expected": 22.93,
+     "tolerance": 0.05,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22.928,
+      "diff": 0.0019999999999988916,
+      "node": "n1",
+      "path": "metrics.stddev",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 22.928,
+      "diff": 0.0019999999999988916,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 58,
+      "text": "| Standard deviation | 22.928 | Not applicable | 400 pixels | None (descriptive) | raster_info |"
+     }
+    },
+    {
+     "key": "warp_width",
+     "description": "Width after warp to EPSG:4326",
+     "expected": 22,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.width",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 22,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 58,
+      "text": "| Width × height after conversion to EPSG:4326 | 22 × 18 pixels (near resampling, pixel size about 0.000598 degrees) | Not applicable | 1 raster | None | reproject_raster |"
+     }
+    },
+    {
+     "key": "warp_height",
+     "description": "Height after warp to EPSG:4326",
+     "expected": 18,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 18,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.height",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 18,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 58,
+      "text": "| Width × height after conversion to EPSG:4326 | 22 × 18 pixels (near resampling, pixel size about 0.000598 degrees) | Not applicable | 1 raster | None | reproject_raster |"
+     }
+    },
+    {
+     "key": "zone_a_pixels",
+     "description": "Zone A pixel count",
+     "expected": 100,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.count",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 100,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 58,
+      "text": "Square A has 100 pixels with a mean of 129.5."
+     }
+    },
+    {
+     "key": "zone_a_mean",
+     "description": "Zone A mean",
+     "expected": 129.5,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 129.5,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.mean",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 129.5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 58,
+      "text": "Square A has 100 pixels with a mean of 129.5."
+     }
+    },
+    {
+     "key": "zone_b_pixels_centers",
+     "description": "Zone B pixel count, pixel centers",
+     "expected": 42,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42,
+      "diff": 0,
+      "node": "n4",
+      "path": "table.rows[1][1]",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 42,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 58,
+      "text": "Square B has 42 pixels with a mean of 135.0, counting pixels whose center is inside."
+     }
+    },
+    {
+     "key": "zone_b_mean_centers",
+     "description": "Zone B mean, pixel centers",
+     "expected": 135,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 135,
+      "diff": 0,
+      "node": "n4",
+      "path": "table.rows[1][4]",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 135,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 58,
+      "text": "Square B has 42 pixels with a mean of 135.0, counting pixels whose center is inside."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 5220,
+    "cacheRead": 76676,
+    "cacheWrite": 20849,
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 4,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/rouault-gdal-autotest/claude_claude-haiku-5-5/rouault-gdal-autotest/run2/home/sessions/20261012-034157-24cd/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/rouault-gdal-autotest",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/rouault-gdal-autotest/claude_claude-haiku-5-5/rouault-gdal-autotest/run2",
+     "/Users/parker/Code/guided-analysis/catalog/gdal",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/gdal/3.13.3_3",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/gdal"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/rouault-gdal-autotest/byte.tif",
+     "/Volumes/T7/guided-analysis/data/rouault-gdal-autotest/zones.geojson"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "rouault-gdal-autotest",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 59.813,
+   "session": "20261012-034256-7c25",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/rouault-gdal-autotest/claude_claude-haiku-5-5/rouault-gdal-autotest/run3/home/sessions/20261012-034256-7c25",
+   "answer": "1. The image is 20 by 20 pixels, in EPSG:26711 (NAD27 / UTM zone 11N, metres). One pixel is 60 m by 60 m.\n\n2. Pixel values (raster_info, gdalinfo stats, original image):\n\n| Measure | Value | 95% CI | n | Test | Step |\n|---|---|---|---|---|---|\n| Minimum | 74 | not applicable | 400 pixels (20 × 20, calculate) | none (descriptive) | raster_info |\n| Maximum | 255 | not applicable | 400 pixels (20 × 20, calculate) | none (descriptive) | raster_info |\n| Mean | 126.765 | not computed | 400 pixels (20 × 20, calculate) | none (descriptive) | raster_info |\n| Standard deviation | 22.928 | not applicable | 400 pixels (20 × 20, calculate) | none (descriptive) | raster_info |\n\n3. The image in EPSG:4326 is 22 pixels wide and 18 pixels high. Pixel size is 0.00059812 degrees. The resampling was nearest neighbour (near). The file has no nodata value, so no pixels were skipped.\n\n4. and 5. Zonal statistics on the original image, counting pixels whose center is inside each square:\n\n| Measure | Value | 95% CI | n | Test | Step |\n|---|---|---|---|---|---|\n| Square A: pixel count | 100 pixels | not applicable | 100 pixels | none (descriptive) | zonal_stats |\n| Square A: mean pixel value | 129.5 | not computed | 100 pixels | none (descriptive) | zonal_stats |\n| Square B: pixel count | 42 pixels | not applicable | 42 pixels | none (descriptive) | zonal_stats |\n| Square B: mean pixel value | 135.0 | not computed | 42 pixels | none (descriptive) | zonal_stats |\n\nUncertain:\n- Square B has a cut edge, so its 42 pixels follow the center rule. Another rule would give other counts.\n- Reprojected statistics differ from the original (mean 126.551 in EPSG:4326, against 126.765 in EPSG:26711). The zonal results use the original image.\n- No hypothesis test ran, so no p values or correction apply yet.\n\nWaits for you:\n- Nothing. The test group and correction question was answered: keep it open until a test runs, then use Holm for a small number of tests.\n\nSettings used, from the decision record: Target coordinate reference system: EPSG:4326 · Resampling method: near · Pixels that a zone edge cuts: centers.",
+   "items": [
+    {
+     "key": "width",
+     "description": "Raster width in pixels",
+     "expected": 20,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.width",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 20,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 61,
+      "text": "The image is 20 by 20 pixels, in EPSG:26711 (NAD27 / UTM zone 11N, metres)."
+     }
+    },
+    {
+     "key": "height",
+     "description": "Raster height in pixels",
+     "expected": 20,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 20,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.width",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 20,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 61,
+      "text": "The image is 20 by 20 pixels, in EPSG:26711 (NAD27 / UTM zone 11N, metres)."
+     }
+    },
+    {
+     "key": "epsg",
+     "description": "EPSG code of the raster",
+     "expected": 26711,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 26711,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.epsg",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 26711,
+      "diff": 0,
+      "via": "code",
+      "node": null,
+      "claimEntry": 61,
+      "text": null
+     }
+    },
+    {
+     "key": "pixel_size_m",
+     "description": "Pixel size in metres",
+     "expected": 60,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 60,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.pixel_x",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 60,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 61,
+      "text": "One pixel is 60 m by 60 m."
+     }
+    },
+    {
+     "key": "band_min",
+     "description": "Band minimum",
+     "expected": 74,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 74,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.min",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 74,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 61,
+      "text": "| Minimum | 74 | not applicable | 400 pixels (20 × 20, calculate) | none (descriptive) | raster_info |"
+     }
+    },
+    {
+     "key": "band_max",
+     "description": "Band maximum",
+     "expected": 255,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 255,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.max",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 255,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 61,
+      "text": "| Maximum | 255 | not applicable | 400 pixels (20 × 20, calculate) | none (descriptive) | raster_info |"
+     }
+    },
+    {
+     "key": "band_mean",
+     "description": "Band mean",
+     "expected": 126.765,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 126.765,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.mean",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 126.765,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 61,
+      "text": "| Mean | 126.765 | not computed | 400 pixels (20 × 20, calculate) | none (descriptive) | raster_info |"
+     }
+    },
+    {
+     "key": "band_std",
+     "description": "Band standard deviation",
+     "expected": 22.93,
+     "tolerance": 0.05,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22.928,
+      "diff": 0.0019999999999988916,
+      "node": "n1",
+      "path": "metrics.stddev",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 22.928,
+      "diff": 0.0019999999999988916,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 61,
+      "text": "| Standard deviation | 22.928 | not applicable | 400 pixels (20 × 20, calculate) | none (descriptive) | raster_info |"
+     }
+    },
+    {
+     "key": "warp_width",
+     "description": "Width after warp to EPSG:4326",
+     "expected": 22,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.width",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 22,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 61,
+      "text": "The image in EPSG:4326 is 22 pixels wide and 18 pixels high."
+     }
+    },
+    {
+     "key": "warp_height",
+     "description": "Height after warp to EPSG:4326",
+     "expected": 18,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 18,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.height",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 18,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 61,
+      "text": "The image in EPSG:4326 is 22 pixels wide and 18 pixels high."
+     }
+    },
+    {
+     "key": "zone_a_pixels",
+     "description": "Zone A pixel count",
+     "expected": 100,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.count",
+      "entry": 26
+     },
+     "reported": {
+      "pass": true,
+      "value": 100,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 61,
+      "text": "| Square A: pixel count | 100 pixels | not applicable | 100 pixels | none (descriptive) | zonal_stats |"
+     }
+    },
+    {
+     "key": "zone_a_mean",
+     "description": "Zone A mean",
+     "expected": 129.5,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 129.5,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.mean",
+      "entry": 26
+     },
+     "reported": {
+      "pass": true,
+      "value": 129.5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 61,
+      "text": "| Square A: mean pixel value | 129.5 | not computed | 100 pixels | none (descriptive) | zonal_stats |"
+     }
+    },
+    {
+     "key": "zone_b_pixels_centers",
+     "description": "Zone B pixel count, pixel centers",
+     "expected": 42,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42,
+      "diff": 0,
+      "node": "n4",
+      "path": "table.rows[1][1]",
+      "entry": 26
+     },
+     "reported": {
+      "pass": true,
+      "value": 42,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 61,
+      "text": "| Square B: pixel count | 42 pixels | not applicable | 42 pixels | none (descriptive) | zonal_stats |"
+     }
+    },
+    {
+     "key": "zone_b_mean_centers",
+     "description": "Zone B mean, pixel centers",
+     "expected": 135,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 135,
+      "diff": 0,
+      "node": "n4",
+      "path": "table.rows[1][4]",
+      "entry": 26
+     },
+     "reported": {
+      "pass": true,
+      "value": 135,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 61,
+      "text": "| Square B: mean pixel value | 135.0 | not computed | 42 pixels | none (descriptive) | zonal_stats |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 5033,
+    "cacheRead": 81977,
+    "cacheWrite": 20845,
+    "toolCalls": 6,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 4,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/rouault-gdal-autotest/claude_claude-haiku-5-5/rouault-gdal-autotest/run3/home/sessions/20261012-034256-7c25/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/rouault-gdal-autotest",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/rouault-gdal-autotest/claude_claude-haiku-5-5/rouault-gdal-autotest/run3",
+     "/Users/parker/Code/guided-analysis/catalog/gdal",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/gdal/3.13.3_3",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/gdal"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/rouault-gdal-autotest/byte.tif",
+     "/Volumes/T7/guided-analysis/data/rouault-gdal-autotest/zones.geojson"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-rouault-gdal-autotest.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-rouault-gdal-autotest.json"
+ },
+ "summary": {
+  "cells": {
+   "rouault-gdal-autotest": {
+    "claude:claude-haiku-5-5": {
+     "computed": 42,
+     "computedOf": 42,
+     "reported": 42,
+     "reportedOf": 42,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 42,
+    "computedOf": 42,
+    "reported": 42,
+    "reportedOf": 42,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 194.93599999999998,
+    "requests": 18,
+    "inputTokens": 48,
+    "outputTokens": 17155,
+    "cacheRead": 242850,
+    "cacheWrite": 64752,
+    "toolCalls": 18,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 3,
+    "findings_info": 10,
+    "findings_warning": 11,
+    "findings_error": 1,
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 16
+   }
+  },
+  "skipped": []
+ }
+}

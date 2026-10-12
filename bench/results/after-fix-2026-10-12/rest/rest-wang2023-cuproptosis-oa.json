@@ -1,0 +1,1483 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "wang2023-cuproptosis-oa",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 93.101,
+   "session": "20261012-025941-0ad6",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/wang2023-cuproptosis-oa/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run1/home/sessions/20261012-025941-0ad6",
+   "answer": "1. The top term by raw p-value is latamoxef HL60 DOWN (3 of 4 hub genes in a set of 1578; p = 0.00185; odds ratio 35.09). No term passes adjusted p < 0.05. The DSigDB file has no version or date in its header, so the source version is not recorded.\n\n| Measure | Value | 95% CI | n (what one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Gene list rule | The 4 hub genes DBT, DLST, FDX1, LIPT1; no cutoffs; direction both | not applicable | 4 genes; all 4 in the background | Not applicable | run_ora |\n| Background | 20000 genes (Enrichr default) | not applicable | 20000 genes | Not applicable | run_ora |\n| Gene set size limits | 1 to 100000 genes | not applicable | 4026 DSigDB sets tested | Not applicable | run_ora |\n| Gene set file | DSigDB.gmt; version and download date not recorded | not applicable | 4026 sets; 19512 annotated genes | Not applicable | inspect_gene_table |\n| Rank 1: latamoxef HL60 DOWN; overlap / set size; raw p / adjusted p | 3 / 1578 (DBT, DLST, FDX1); 0.00185 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted over 4026 sets | run_ora |\n| Rank 1: odds ratio | 35.09 | 3.65 to 337.53 (Woolf method) | 4 hub genes | Hypergeometric; CI from 2 by 2 counts | run_ora, then calculate |\n| Rank 2: ethotoin HL60 DOWN; overlap / set size; raw p / adjusted p | 1 / 24; 0.00479 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |\n| Rank 3: betulinic acid PC3 DOWN; overlap / set size; raw p / adjusted p | 1 / 30; 0.00599 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |\n| Rank 4: staurosporine MCF7 DOWN; overlap / set size; raw p / adjusted p | 2 / 649 (DBT, LIPT1); 0.00604 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |\n| Rank 5: cloperastine PC3 DOWN; overlap / set size; raw p / adjusted p | 1 / 37; 0.00738 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |\n| Count: sets with any hub gene | 106 of 4026 | not applicable | 4026 sets | Not applicable | run_ora |\n| Count: sets with adjusted p < 0.05 | 0 of 4026 | not applicable | 4026 sets | BH adjusted | run_ora |\n\nUncertain:\n- The odds ratio rests on 3 overlapping genes. Its CI is very wide.\n- I ran the hypergeometric test in the program, not the Enrichr web site. The Enrichr site can give other p values and its own combined score.\n- The 4 genes in the list come from one hub gene file. Several top terms share the same genes, so they are not independent results.\n\nWaits for you: The version or download date of DSigDB.gmt. Send it, and I add it to the record. Without it, another lab cannot repeat the gene set step exactly.\n\nSettings used, from the decision record: Gene set collection (GMT file):  · Background (universe) for over-representation: 20000 genes (the Enrichr default) · Adjusted p cutoff for a differentially expressed gene: 1 · Smallest absolute log2 fold change for the gene list: 0 · Up, down or both: both · Smallest gene set size: 1 · Largest gene set size: 100000.",
+   "items": [
+    {
+     "key": "overlap_1",
+     "description": "Genes of the list in the top term",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.top_overlap",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 3,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "The top term by raw p-value is latamoxef HL60 DOWN (3 of 4 hub genes in a set of 1578; p = 0.00185; odds ratio 35.09)."
+     }
+    },
+    {
+     "key": "set_size_1",
+     "description": "Size of the top term",
+     "expected": 1578,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1578,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.top_set_size",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 1578,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "The top term by raw p-value is latamoxef HL60 DOWN (3 of 4 hub genes in a set of 1578; p = 0.00185; odds ratio 35.09)."
+     }
+    },
+    {
+     "key": "p_value_1",
+     "description": "Raw p of the top term",
+     "expected": 0.0018453476993364856,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0018453839711629735,
+      "diff": 3.6271826487884254e-8,
+      "node": "n4",
+      "path": "metrics.top_p_value",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00185,
+      "diff": 0.000004652300663514439,
+      "via": "rounding",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "The top term by raw p-value is latamoxef HL60 DOWN (3 of 4 hub genes in a set of 1578; p = 0.00185; odds ratio 35.09)."
+     }
+    },
+    {
+     "key": "p_adjusted_1",
+     "description": "Adjusted p of the top term",
+     "expected": 0.11186607610867805,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.11186724021582133,
+      "diff": 0.0000011641071432783034,
+      "node": "n4",
+      "path": "metrics.top_p_adjusted",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.112,
+      "diff": 0.0001339238913219548,
+      "via": "rounding",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "| Rank 1: latamoxef HL60 DOWN; overlap / set size; raw p / adjusted p | 3 / 1578 (DBT, DLST, FDX1); 0.00185 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted over 4026 sets | run_ora |"
+     }
+    },
+    {
+     "key": "odds_ratio_1",
+     "description": "Odds ratio of the top term",
+     "expected": 35.08761904761905,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.08761904761905,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.top_odds_ratio",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 35.09,
+      "diff": 0.0023809523809532607,
+      "via": "rounding",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "The top term by raw p-value is latamoxef HL60 DOWN (3 of 4 hub genes in a set of 1578; p = 0.00185; odds ratio 35.09)."
+     }
+    },
+    {
+     "key": "set_size_2",
+     "description": "Size of the second term",
+     "expected": 24,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 24,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_2",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 24,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "| Rank 2: ethotoin HL60 DOWN; overlap / set size; raw p / adjusted p | 1 / 24; 0.00479 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_2",
+     "description": "Raw p of the second term",
+     "expected": 0.004791660011821214,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.004791725657295827,
+      "diff": 6.564547461347658e-8,
+      "node": "n4",
+      "path": "metrics.p_value_2",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00479,
+      "diff": 0.000001660011821213829,
+      "via": "rounding",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "| Rank 2: ethotoin HL60 DOWN; overlap / set size; raw p / adjusted p | 1 / 24; 0.00479 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_3",
+     "description": "Size of the third term",
+     "expected": 30,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 30,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_3",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 30,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "| Rank 3: betulinic acid PC3 DOWN; overlap / set size; raw p / adjusted p | 1 / 30; 0.00599 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_3",
+     "description": "Raw p of the third term",
+     "expected": 0.0059868860535258585,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.005986961525182604,
+      "diff": 7.54716567453323e-8,
+      "node": "n4",
+      "path": "metrics.p_value_3",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00599,
+      "diff": 0.0000031139464741411493,
+      "via": "rounding",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "| Rank 3: betulinic acid PC3 DOWN; overlap / set size; raw p / adjusted p | 1 / 30; 0.00599 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_4",
+     "description": "Size of the fourth term",
+     "expected": 649,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 649,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_4",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 649,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "| Rank 4: staurosporine MCF7 DOWN; overlap / set size; raw p / adjusted p | 2 / 649 (DBT, LIPT1); 0.00604 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_4",
+     "description": "Raw p of the fourth term",
+     "expected": 0.0060396749482483575,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.006039754232033397,
+      "diff": 7.928378503978956e-8,
+      "node": "n4",
+      "path": "metrics.p_value_4",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00604,
+      "diff": 3.250517516427062e-7,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "| Rank 4: staurosporine MCF7 DOWN; overlap / set size; raw p / adjusted p | 2 / 649 (DBT, LIPT1); 0.00604 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_5",
+     "description": "Size of the fifth term",
+     "expected": 37,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 37,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_5",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 37,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "| Rank 5: cloperastine PC3 DOWN; overlap / set size; raw p / adjusted p | 1 / 37; 0.00738 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_5",
+     "description": "Raw p of the fifth term",
+     "expected": 0.007379956522320185,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.007380042304537234,
+      "diff": 8.578221704844124e-8,
+      "node": "n4",
+      "path": "metrics.p_value_5",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00738,
+      "diff": 4.347767981489198e-8,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 86,
+      "text": "| Rank 5: cloperastine PC3 DOWN; overlap / set size; raw p / adjusted p | 1 / 37; 0.00738 / 0.112 | not applicable | 4 hub genes | Hypergeometric; BH adjusted | run_ora |"
+     }
+    },
+    {
+     "key": "n_sets_tested",
+     "description": "Number of gene sets tested",
+     "expected": 4026,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4026,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_gene_sets",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 86,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 18,
+    "outputTokens": 7012,
+    "cacheRead": 87366,
+    "cacheWrite": 24576,
+    "toolCalls": 4,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 3,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/wang2023-cuproptosis-oa/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run1/home/sessions/20261012-025941-0ad6/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/wang2023-cuproptosis-oa/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run1",
+     "/Users/parker/Code/guided-analysis/catalog/enrichment",
+     "/Users/parker/.cuvette/envs/enrichment",
+     "/Volumes/ga-envs/enrichment",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/enrichment"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/DSigDB.gmt",
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/hub_genes.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "wang2023-cuproptosis-oa",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 95.609,
+   "session": "20261012-030114-f7c2",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/wang2023-cuproptosis-oa/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run2/home/sessions/20261012-030114-f7c2",
+   "answer": "No DSigDB signature passes the 5% adjusted p cutoff. The top five by raw p are listed below, all with adjusted p 0.1119.\n\n| Measure | Value | 95% CI | n | Test | Step |\n|---|---|---|---|---|---|\n| 1. latamoxef HL60 DOWN: overlap / set size | 3 of 1578 (genes DBT, DLST, FDX1) | not reported | 4 hub genes (one n = one gene) | Hypergeometric, BH over 4026 sets | run_ora |\n| 1. latamoxef HL60 DOWN: raw p / adjusted p | 0.001845 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |\n| 1. latamoxef HL60 DOWN: odds ratio | 35.09 | 3.65 to 337.53 (Woolf, computed from the 2x2 counts) | 4 hub genes | 2x2 from the test | run_ora, calculate |\n| 2. ethotoin HL60 DOWN: overlap / set size; raw p / adjusted p | 1 of 24; 0.004792 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |\n| 3. betulinic acid PC3 DOWN: overlap / set size; raw p / adjusted p | 1 of 30; 0.005987 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |\n| 4. staurosporine MCF7 DOWN: overlap / set size; raw p / adjusted p | 2 of 649; 0.006040 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |\n| 5. cloperastine PC3 DOWN: overlap / set size; raw p / adjusted p | 1 of 37; 0.007380 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |\n| Significant sets (adjusted p < 0.05) | 0 of 4026 | not applicable | 4026 gene sets | BH | run_ora |\n| Settings: background; set size limits | 20000 genes (Enrichr default); 1 to 100000 genes (run_ora output, and your answer to the largest set size question) | not applicable | 4 hub genes, all found in background | Gene symbols, DSigDB.gmt | run_ora |\n\nUncertain:\n- The top terms rest on 1 to 3 overlapping genes. DBT appears in most of them, so the ranking is not stable.\n- I did not compare the results with the Enrichr web site. The 20000 background is the tool's Enrichr default.\n- The odds ratio CI is wide because the counts are small. It comes from my calculation, not from the tool.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Gene set collection (GMT file):  · Background (universe) for over-representation: 20000 genes (the Enrichr default) · Adjusted p cutoff for a differentially expressed gene: 1 · Smallest absolute log2 fold change for the gene list: 0 · Up, down or both: both · Smallest gene set size: 1 · Largest gene set size: 100000.",
+   "items": [
+    {
+     "key": "overlap_1",
+     "description": "Genes of the list in the top term",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.top_overlap",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 3,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "latamoxef HL60 DOWN: overlap / set size | 3 of 1578 (genes DBT, DLST, FDX1) | not reported | 4 hub genes (one n = one gene) | Hypergeometric, BH over 4026 sets | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_1",
+     "description": "Size of the top term",
+     "expected": 1578,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1578,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.top_set_size",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 1578,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "latamoxef HL60 DOWN: overlap / set size | 3 of 1578 (genes DBT, DLST, FDX1) | not reported | 4 hub genes (one n = one gene) | Hypergeometric, BH over 4026 sets | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_1",
+     "description": "Raw p of the top term",
+     "expected": 0.0018453476993364856,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0018453839711629735,
+      "diff": 3.6271826487884254e-8,
+      "node": "n4",
+      "path": "metrics.top_p_value",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.001845,
+      "diff": 3.476993364855737e-7,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "latamoxef HL60 DOWN: raw p / adjusted p | 0.001845 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |"
+     }
+    },
+    {
+     "key": "p_adjusted_1",
+     "description": "Adjusted p of the top term",
+     "expected": 0.11186607610867805,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.11186724021582133,
+      "diff": 0.0000011641071432783034,
+      "node": "n4",
+      "path": "metrics.top_p_adjusted",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.1119,
+      "diff": 0.00003392389132195195,
+      "via": "rounding",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "The top five by raw p are listed below, all with adjusted p 0.1119."
+     }
+    },
+    {
+     "key": "odds_ratio_1",
+     "description": "Odds ratio of the top term",
+     "expected": 35.08761904761905,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.08761904761905,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.top_odds_ratio",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 35.09,
+      "diff": 0.0023809523809532607,
+      "via": "rounding",
+      "node": "n5",
+      "claimEntry": 85,
+      "text": "latamoxef HL60 DOWN: odds ratio | 35.09 | 3.65 to 337.53 (Woolf, computed from the 2x2 counts) | 4 hub genes | 2x2 from the test | run_ora, calculate |"
+     }
+    },
+    {
+     "key": "set_size_2",
+     "description": "Size of the second term",
+     "expected": 24,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 24,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_2",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 24,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "ethotoin HL60 DOWN: overlap / set size; raw p / adjusted p | 1 of 24; 0.004792 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_2",
+     "description": "Raw p of the second term",
+     "expected": 0.004791660011821214,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.004791725657295827,
+      "diff": 6.564547461347658e-8,
+      "node": "n4",
+      "path": "metrics.p_value_2",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.004792,
+      "diff": 3.3998817878643645e-7,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "ethotoin HL60 DOWN: overlap / set size; raw p / adjusted p | 1 of 24; 0.004792 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_3",
+     "description": "Size of the third term",
+     "expected": 30,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 30,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_3",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 30,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "betulinic acid PC3 DOWN: overlap / set size; raw p / adjusted p | 1 of 30; 0.005987 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_3",
+     "description": "Raw p of the third term",
+     "expected": 0.0059868860535258585,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.005986961525182604,
+      "diff": 7.54716567453323e-8,
+      "node": "n4",
+      "path": "metrics.p_value_3",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.005987,
+      "diff": 1.1394647414161851e-7,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "betulinic acid PC3 DOWN: overlap / set size; raw p / adjusted p | 1 of 30; 0.005987 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_4",
+     "description": "Size of the fourth term",
+     "expected": 649,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 649,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_4",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 649,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "staurosporine MCF7 DOWN: overlap / set size; raw p / adjusted p | 2 of 649; 0.006040 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_4",
+     "description": "Raw p of the fourth term",
+     "expected": 0.0060396749482483575,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.006039754232033397,
+      "diff": 7.928378503978956e-8,
+      "node": "n4",
+      "path": "metrics.p_value_4",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00604,
+      "diff": 3.250517516427062e-7,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "staurosporine MCF7 DOWN: overlap / set size; raw p / adjusted p | 2 of 649; 0.006040 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_5",
+     "description": "Size of the fifth term",
+     "expected": 37,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 37,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.set_size_5",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 37,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "cloperastine PC3 DOWN: overlap / set size; raw p / adjusted p | 1 of 37; 0.007380 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_5",
+     "description": "Raw p of the fifth term",
+     "expected": 0.007379956522320185,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.007380042304537234,
+      "diff": 8.578221704844124e-8,
+      "node": "n4",
+      "path": "metrics.p_value_5",
+      "entry": 53
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00738,
+      "diff": 4.347767981489198e-8,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 85,
+      "text": "cloperastine PC3 DOWN: overlap / set size; raw p / adjusted p | 1 of 37; 0.007380 / 0.1119 | not reported | 4 hub genes | Hypergeometric, BH | run_ora |"
+     }
+    },
+    {
+     "key": "n_sets_tested",
+     "description": "Number of gene sets tested",
+     "expected": 4026,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4026,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_gene_sets",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 85,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 16,
+    "outputTokens": 7586,
+    "cacheRead": 66836,
+    "cacheWrite": 25269,
+    "toolCalls": 4,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 5,
+     "error": 1
+    },
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/wang2023-cuproptosis-oa/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run2/home/sessions/20261012-030114-f7c2/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/wang2023-cuproptosis-oa/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run2",
+     "/Users/parker/Code/guided-analysis/catalog/enrichment",
+     "/Users/parker/.cuvette/envs/enrichment",
+     "/Volumes/ga-envs/enrichment",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/enrichment"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/DSigDB.gmt",
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/hub_genes.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "wang2023-cuproptosis-oa",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 83.535,
+   "session": "20261012-030250-3f4c",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/wang2023-cuproptosis-oa/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run3/home/sessions/20261012-030250-3f4c",
+   "answer": "1. The top term by raw p is latamoxef HL60 DOWN (3 of 4 hub genes, p = 0.00185), but no term reaches adjusted p < 0.05 (lowest BH-adjusted p = 0.112).\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Gene set collection | DSigDB.gmt, 4026 sets, species human, ID type gene symbol; version not in the file; file date 2026-10-08 (file system date) | — | 1 gene set = 1 DSigDB signature | — | inspect_gene_table, run_script |\n| Background used | 20000 genes (Enrichr default, your setting) | — | 20000 background genes; the 4 hub genes are all in it | — | run_ora |\n| Gene set size limits | 1 to 100000 genes (no limit in practice) | — | 4026 gene sets | — | run_ora |\n| 1. latamoxef HL60 DOWN | Overlap 3 (FDX1, DBT, DLST); set size 1578; raw p 0.00185; adjusted p 0.112 | — | 4 hub genes on the list | Hypergeometric over-representation, BH adjustment | run_ora |\n| 2. ethotoin HL60 DOWN | Overlap 1 (DBT); set size 24; raw p 0.00479; adjusted p 0.112 | — | same | same | run_ora |\n| 3. betulinic acid PC3 DOWN | Overlap 1 (DBT); set size 30; raw p 0.00599; adjusted p 0.112 | — | same | same | run_ora |\n| 4. staurosporine MCF7 DOWN | Overlap 2 (LIPT1, DBT); set size 649; raw p 0.00604; adjusted p 0.112 | — | same | same | run_ora |\n| 5. cloperastine PC3 DOWN | Overlap 1 (DBT); set size 37; raw p 0.00738; adjusted p 0.112 | — | same | same | run_ora |\n| Odds ratio, term 1 | 35.09 | 3.65 to 337.5 (Woolf log method, my calculation from the 2x2 counts) | 3 overlapping genes out of 4 | Odds ratio from the same 2x2 table | run_ora, calculate |\n| Count: genes on the list | 4 | — | 4 hub genes | — | run_ora |\n| Count: gene sets tested | 4026 | — | 1 gene set | — | run_ora |\n| Count: sets with adjusted p < 0.05 | 0 | — | 4026 gene sets | BH | run_ora |\n\nUncertain:\n- The odds ratio rests on 3 overlapping genes, so the interval is very wide.\n- The file has no version line. The file date does not show which DSigDB release this is.\n- Your cutoffs (adjusted p 1, log2 fold change 0) did not apply. The four hub genes went in as the list. Enrichment does not show that a drug acts on these genes.\n\nWaits for you: the DSigDB version or download date, from the source of the file.\n\nSettings used, from the decision record: Gene set collection (GMT file):  · Background (universe) for over-representation: 20000 genes (the Enrichr default) · Adjusted p cutoff for a differentially expressed gene: 1 · Smallest absolute log2 fold change for the gene list: 0 · Up, down or both: both · Smallest gene set size: 1 · Largest gene set size: 100000.",
+   "items": [
+    {
+     "key": "overlap_1",
+     "description": "Genes of the list in the top term",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.top_overlap",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 3,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "The top term by raw p is latamoxef HL60 DOWN (3 of 4 hub genes, p = 0.00185), but no term reaches adjusted p < 0.05 (lowest BH-adjusted p = 0.112)."
+     }
+    },
+    {
+     "key": "set_size_1",
+     "description": "Size of the top term",
+     "expected": 1578,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1578,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.top_set_size",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 1578,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "latamoxef HL60 DOWN | Overlap 3 (FDX1, DBT, DLST); set size 1578; raw p 0.00185; adjusted p 0.112 | — | 4 hub genes on the list | Hypergeometric over-representation, BH adjustment | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_1",
+     "description": "Raw p of the top term",
+     "expected": 0.0018453476993364856,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0018453839711629735,
+      "diff": 3.6271826487884254e-8,
+      "node": "n2",
+      "path": "metrics.top_p_value",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00185,
+      "diff": 0.000004652300663514439,
+      "via": "rounding",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "The top term by raw p is latamoxef HL60 DOWN (3 of 4 hub genes, p = 0.00185), but no term reaches adjusted p < 0.05 (lowest BH-adjusted p = 0.112)."
+     }
+    },
+    {
+     "key": "p_adjusted_1",
+     "description": "Adjusted p of the top term",
+     "expected": 0.11186607610867805,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.11186724021582133,
+      "diff": 0.0000011641071432783034,
+      "node": "n2",
+      "path": "metrics.top_p_adjusted",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.112,
+      "diff": 0.0001339238913219548,
+      "via": "rounding",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "The top term by raw p is latamoxef HL60 DOWN (3 of 4 hub genes, p = 0.00185), but no term reaches adjusted p < 0.05 (lowest BH-adjusted p = 0.112)."
+     }
+    },
+    {
+     "key": "odds_ratio_1",
+     "description": "Odds ratio of the top term",
+     "expected": 35.08761904761905,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.08761904761905,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.top_odds_ratio",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 35.09,
+      "diff": 0.0023809523809532607,
+      "via": "rounding",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "| Odds ratio, term 1 | 35.09 | 3.65 to 337.5 (Woolf log method, my calculation from the 2x2 counts) | 3 overlapping genes out of 4 | Odds ratio from the same 2x2 table | run_ora, calculate |"
+     }
+    },
+    {
+     "key": "set_size_2",
+     "description": "Size of the second term",
+     "expected": 24,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 24,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.set_size_2",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 24,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "ethotoin HL60 DOWN | Overlap 1 (DBT); set size 24; raw p 0.00479; adjusted p 0.112 | — | same | same | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_2",
+     "description": "Raw p of the second term",
+     "expected": 0.004791660011821214,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.004791725657295827,
+      "diff": 6.564547461347658e-8,
+      "node": "n2",
+      "path": "metrics.p_value_2",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00479,
+      "diff": 0.000001660011821213829,
+      "via": "rounding",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "ethotoin HL60 DOWN | Overlap 1 (DBT); set size 24; raw p 0.00479; adjusted p 0.112 | — | same | same | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_3",
+     "description": "Size of the third term",
+     "expected": 30,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 30,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.set_size_3",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 30,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "betulinic acid PC3 DOWN | Overlap 1 (DBT); set size 30; raw p 0.00599; adjusted p 0.112 | — | same | same | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_3",
+     "description": "Raw p of the third term",
+     "expected": 0.0059868860535258585,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.005986961525182604,
+      "diff": 7.54716567453323e-8,
+      "node": "n2",
+      "path": "metrics.p_value_3",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00599,
+      "diff": 0.0000031139464741411493,
+      "via": "rounding",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "betulinic acid PC3 DOWN | Overlap 1 (DBT); set size 30; raw p 0.00599; adjusted p 0.112 | — | same | same | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_4",
+     "description": "Size of the fourth term",
+     "expected": 649,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 649,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.set_size_4",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 649,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "staurosporine MCF7 DOWN | Overlap 2 (LIPT1, DBT); set size 649; raw p 0.00604; adjusted p 0.112 | — | same | same | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_4",
+     "description": "Raw p of the fourth term",
+     "expected": 0.0060396749482483575,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.006039754232033397,
+      "diff": 7.928378503978956e-8,
+      "node": "n2",
+      "path": "metrics.p_value_4",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00604,
+      "diff": 3.250517516427062e-7,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "staurosporine MCF7 DOWN | Overlap 2 (LIPT1, DBT); set size 649; raw p 0.00604; adjusted p 0.112 | — | same | same | run_ora |"
+     }
+    },
+    {
+     "key": "set_size_5",
+     "description": "Size of the fifth term",
+     "expected": 37,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 37,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.set_size_5",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 37,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "cloperastine PC3 DOWN | Overlap 1 (DBT); set size 37; raw p 0.00738; adjusted p 0.112 | — | same | same | run_ora |"
+     }
+    },
+    {
+     "key": "p_value_5",
+     "description": "Raw p of the fifth term",
+     "expected": 0.007379956522320185,
+     "tolerance": 0.000001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.007380042304537234,
+      "diff": 8.578221704844124e-8,
+      "node": "n2",
+      "path": "metrics.p_value_5",
+      "entry": 56
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00738,
+      "diff": 4.347767981489198e-8,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 91,
+      "text": "cloperastine PC3 DOWN | Overlap 1 (DBT); set size 37; raw p 0.00738; adjusted p 0.112 | — | same | same | run_ora |"
+     }
+    },
+    {
+     "key": "n_sets_tested",
+     "description": "Number of gene sets tested",
+     "expected": 4026,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4026,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_gene_sets",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 91,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 7,
+    "inputTokens": 20,
+    "outputTokens": 8029,
+    "cacheRead": 102575,
+    "cacheWrite": 25935,
+    "toolCalls": 6,
+    "failedToolCalls": 5,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 2,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/wang2023-cuproptosis-oa/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run3/home/sessions/20261012-030250-3f4c/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/wang2023-cuproptosis-oa/claude_claude-haiku-5-5/wang2023-cuproptosis-oa/run3",
+     "/Users/parker/Code/guided-analysis/catalog/enrichment",
+     "/Users/parker/.cuvette/envs/enrichment",
+     "/Volumes/ga-envs/enrichment",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/enrichment"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/DSigDB.gmt",
+     "/Volumes/T7/guided-analysis/data/wang2023-cuproptosis-oa/hub_genes.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-wang2023-cuproptosis-oa.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-wang2023-cuproptosis-oa.json"
+ },
+ "summary": {
+  "cells": {
+   "wang2023-cuproptosis-oa": {
+    "claude:claude-haiku-5-5": {
+     "computed": 42,
+     "computedOf": 42,
+     "reported": 39,
+     "reportedOf": 39,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 42,
+    "computedOf": 42,
+    "reported": 39,
+    "reportedOf": 39,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 272.245,
+    "requests": 18,
+    "inputTokens": 54,
+    "outputTokens": 22627,
+    "cacheRead": 256777,
+    "cacheWrite": 75780,
+    "toolCalls": 14,
+    "failedToolCalls": 9,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 3,
+    "findings_info": 11,
+    "findings_warning": 10,
+    "findings_error": 2,
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 9
+   }
+  },
+  "skipped": []
+ }
+}

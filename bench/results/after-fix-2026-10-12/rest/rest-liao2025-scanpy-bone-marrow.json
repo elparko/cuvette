@@ -1,0 +1,774 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "liao2025-scanpy-bone-marrow",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 105.492,
+   "session": "20261012-034845-026f",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f",
+   "answer": "The QC is done for both samples: pulse went from 10608 to 9612 cells, and chase went from 10046 to 8887 cells.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Pulse cells before QC | 10608 | Not applicable (exact count) | 1 sample (one 10x library) | None | load_data, filter_genes |\n| Pulse cells after QC | 9612 | Not applicable (exact count) | 1 sample | None | filter_cells (filter_cells-1/filter_cells.h5ad) |\n| Pulse cells removed | 996 (154 with few genes, 62 with many genes, 919 with high mitochondrial percent) | Not applicable | 1 sample | None | filter_cells |\n| Chase cells before QC | 10046 | Not applicable | 1 sample | None | load_data, filter_genes |\n| Chase cells after QC | 8887 | Not applicable | 1 sample | None | filter_cells (filter_cells-2/filter_cells.h5ad) |\n| Chase cells removed | 1159 (136 with few genes, 51 with many genes, 1097 with high mitochondrial percent) | Not applicable | 1 sample | None | filter_cells |\n| Genes before and after gene filter (both samples) | 32286 | Not applicable | 32286 genes | None | filter_genes (0 removed) |\n| Cutoffs used (both samples) | Min genes 200; max genes 6000; max mitochondrial percent 10 | Not applicable | Per cell | None | filter_cells |\n\nUncertain:\n- The gene filter used a minimum of 0 cells per gene, the recorded value. My request of 3 was not used, so no genes were removed.\n- The first QC run used the prefix \"MT-\" and found no mitochondrial genes. I reran with \"mt-\" (mouse), which found 13 genes in each sample.\n- I entered the cell cutoffs myself. The harness showed no deviation, but they must match your choice.\n\nWaits for you: Confirm the cell cutoffs (200, 6000, 10 percent) and the minimum cells per gene (0 or 3).\n\nSettings used, from the decision record: Minimum genes per cell: 200 · Maximum genes per cell: 6000 · Maximum percent mitochondrial counts: 10 · Minimum cells per gene: 0.",
+   "items": [
+    {
+     "key": "pulse_cells_loaded",
+     "description": "Cells in the pulse matrix",
+     "expected": 10608,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10608,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_cells",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 10608,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 112,
+      "text": "The QC is done for both samples: pulse went from 10608 to 9612 cells, and chase went from 10046 to 8887 cells."
+     }
+    },
+    {
+     "key": "chase_cells_loaded",
+     "description": "Cells in the chase matrix",
+     "expected": 10046,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10046,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_cells",
+      "entry": 18
+     },
+     "reported": {
+      "pass": true,
+      "value": 10046,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 112,
+      "text": "The QC is done for both samples: pulse went from 10608 to 9612 cells, and chase went from 10046 to 8887 cells."
+     }
+    },
+    {
+     "key": "pulse_cells_after_qc",
+     "description": "Pulse cells after quality control",
+     "expected": 9612,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9612,
+      "diff": 0,
+      "node": "n10",
+      "path": "metrics.n_cells_after",
+      "entry": 84
+     },
+     "reported": {
+      "pass": true,
+      "value": 9612,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 112,
+      "text": "The QC is done for both samples: pulse went from 10608 to 9612 cells, and chase went from 10046 to 8887 cells."
+     }
+    },
+    {
+     "key": "chase_cells_after_qc",
+     "description": "Chase cells after quality control",
+     "expected": 8887,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8887,
+      "diff": 0,
+      "node": "n11",
+      "path": "metrics.n_cells_after",
+      "entry": 87
+     },
+     "reported": {
+      "pass": true,
+      "value": 8887,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 112,
+      "text": "The QC is done for both samples: pulse went from 10608 to 9612 cells, and chase went from 10046 to 8887 cells."
+     }
+    },
+    {
+     "key": "genes_in_matrix",
+     "description": "Genes in each matrix",
+     "expected": 32286,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 32286,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_genes",
+      "entry": 15
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 112,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 9,
+    "inputTokens": 22,
+    "outputTokens": 8196,
+    "cacheRead": 169909,
+    "cacheWrite": 30820,
+    "toolCalls": 13,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 0,
+    "findings": {
+     "info": 3,
+     "warning": 4,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 11
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1",
+     "/Users/parker/Code/guided-analysis/catalog/scanpy",
+     "/Users/parker/.cuvette/envs/scanpy",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/scanpy"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow/chase",
+     "/Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow/pulse",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f/work/calculate_qc-3/qc.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f/work/calculate_qc-3/qc_cells.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f/work/calculate_qc-4/qc.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f/work/calculate_qc-4/qc_cells.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f/work/filter_genes-1/filter_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f/work/filter_genes-2/filter_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f/work/load_data-1/loaded.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run1/home/sessions/20261012-034845-026f/work/load_data-2/loaded.h5ad"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "liao2025-scanpy-bone-marrow",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 125.365,
+   "session": "20261012-035033-edf6",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6",
+   "answer": "1. Pulse kept 9612 of 10608 cells and chase kept 8887 of 10046 cells after quality control.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Pulse cells before QC | 10608 | Not applicable (count) | 10608 cells in the pulse sample | None | load_data |\n| Pulse cells after QC | 9612 | Not applicable (count) | 9612 cells kept in the pulse sample | None | filter_cells |\n| Pulse cells removed: few genes / many genes / high mito | 154 / 62 / 919 | Not applicable (count) | Cells in the pulse sample | None | filter_cells |\n| Chase cells before QC | 10046 | Not applicable (count) | 10046 cells in the chase sample | None | load_data |\n| Chase cells after QC | 8887 | Not applicable (count) | 8887 cells kept in the chase sample | None | filter_cells |\n| Chase cells removed: few genes / many genes / high mito | 136 / 51 / 1097 | Not applicable (count) | Cells in the chase sample | None | filter_cells |\n| Genes before and after QC (both samples) | 32286 | Not applicable (count) | 32286 genes; min cells per gene = 0 | None | filter_genes |\n| Share of cells kept, pulse | 90.6% | Not applicable | 10608 cells before QC | None | calculate |\n| Share of cells kept, chase | 88.5% | Not applicable | 10046 cells before QC | None | calculate |\n| Cells removed for high mito, share of all cells, pulse | 8.7% | Not applicable | 10608 cells before QC | None | calculate |\n| Cells removed for high mito, share of all cells, chase | 10.9% | Not applicable | 10046 cells before QC | None | calculate |\n| Share of removed cells that were high mito, pulse | 92.3% | Not applicable | 996 cells removed in pulse | None | calculate |\n| Share of removed cells that were high mito, chase | 94.7% | Not applicable | 1159 cells removed in chase | None | calculate |\n\nThe cutoffs were min genes per cell 200, max genes per cell 6000, max percent mitochondrial counts 10, and min cells per gene 0. These values are the ones written in the logged call records of filter_cells and filter_genes (the manual_route field of each result). No statistical test was run. Replicate is one cell, and it is descriptive only.\n\nUncertain:\n- Min cells per gene was recorded as 0, not the 3 I passed. No gene was removed at either value.\n- The 10% mitochondrial cutoff removed 8.7% of pulse cells and 10.9% of chase cells. Most removed cells were high mito, but most cells were not. Check that the cutoff fits the tissue.\n- Donor count is not in the files. Sample count is two: pulse and chase.\n\nWaits for you:\n- Confirm the cutoffs (200 min genes, 6000 max genes, 10% mito) and min cells per gene (0). The filtered files are saved for clustering.\n\nStep results that the answer does not mention, from the record:\n- n6 run_script: The script ran in /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work and wrote 0 new file(s) to /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work.\n- n8 run_script: The script ran in /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work and wrote 0 new file(s) to /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work.\n\nSettings used, from the decision record: Minimum genes per cell: 200 · Maximum genes per cell: 6000 · Maximum percent mitochondrial counts: 10 · Minimum cells per gene: 0.",
+   "items": [
+    {
+     "key": "pulse_cells_loaded",
+     "description": "Cells in the pulse matrix",
+     "expected": 10608,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10608,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_cells",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 10608,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 139,
+      "text": "Pulse kept 9612 of 10608 cells and chase kept 8887 of 10046 cells after quality control."
+     }
+    },
+    {
+     "key": "chase_cells_loaded",
+     "description": "Cells in the chase matrix",
+     "expected": 10046,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10046,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_cells",
+      "entry": 18
+     },
+     "reported": {
+      "pass": true,
+      "value": 10046,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 139,
+      "text": "Pulse kept 9612 of 10608 cells and chase kept 8887 of 10046 cells after quality control."
+     }
+    },
+    {
+     "key": "pulse_cells_after_qc",
+     "description": "Pulse cells after quality control",
+     "expected": 9612,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9612,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.n_cells_after",
+      "entry": 85
+     },
+     "reported": {
+      "pass": true,
+      "value": 9612,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 139,
+      "text": "Pulse kept 9612 of 10608 cells and chase kept 8887 of 10046 cells after quality control."
+     }
+    },
+    {
+     "key": "chase_cells_after_qc",
+     "description": "Chase cells after quality control",
+     "expected": 8887,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8887,
+      "diff": 0,
+      "node": "n10",
+      "path": "metrics.n_cells_after",
+      "entry": 93
+     },
+     "reported": {
+      "pass": true,
+      "value": 8887,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 139,
+      "text": "Pulse kept 9612 of 10608 cells and chase kept 8887 of 10046 cells after quality control."
+     }
+    },
+    {
+     "key": "genes_in_matrix",
+     "description": "Genes in each matrix",
+     "expected": 32286,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 32286,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_genes",
+      "entry": 15
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 139,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 14,
+    "inputTokens": 34,
+    "outputTokens": 9275,
+    "cacheRead": 271942,
+    "cacheWrite": 28291,
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 1,
+     "warning": 4,
+     "error": 2
+    },
+    "unsourced": 4,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 12
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2",
+     "/Users/parker/Code/guided-analysis/catalog/scanpy",
+     "/Users/parker/.cuvette/envs/scanpy",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/scanpy"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow/chase",
+     "/Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow/pulse",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work/calculate_qc-1/qc.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work/calculate_qc-1/qc_cells.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work/calculate_qc-2/qc.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work/calculate_qc-2/qc_cells.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work/filter_genes-1/filter_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work/filter_genes-2/filter_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work/load_data-1/loaded.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run2/home/sessions/20261012-035033-edf6/work/load_data-2/loaded.h5ad"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 4,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "liao2025-scanpy-bone-marrow",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 150.644,
+   "session": "20261012-035240-e62b",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3/home/sessions/20261012-035240-e62b",
+   "answer": "The cutoffs of 200 and 6000 genes per cell and 10 percent mitochondrial counts reproduce the logged results. I give the answer again with that check.\n\n1. Pulse went from 10608 to 9612 cells and chase went from 10046 to 8887 cells after QC on each sample.\n\n| Measure | Value | 95% CI | n (one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Pulse cells before QC | 10608 | Not applicable (count) | 1 sample; n = cells | None | load_data, filter_genes, calculate_qc |\n| Pulse cells after QC | 9612 | Not applicable (count) | 1 sample; n = cells | None | filter_cells-1; check: qc_cutoff_check |\n| Pulse cells removed: few genes / many genes / high mito (tool count) | 154 / 62 / 919 | Not applicable (count) | 1 sample; n = cells | None | filter_cells-1 |\n| Chase cells before QC | 10046 | Not applicable (count) | 1 sample; n = cells | None | load_data, filter_genes, calculate_qc |\n| Chase cells after QC | 8887 | Not applicable (count) | 1 sample; n = cells | None | filter_cells-2; check: qc_cutoff_check |\n| Chase cells removed: few genes / many genes / high mito (tool count) | 136 / 51 / 1097 | Not applicable (count) | 1 sample; n = cells | None | filter_cells-2 |\n| Genes before and after QC (both samples) | 32286 | Not applicable (count) | genes | None | filter_genes, filter_cells |\n| Min genes per cell | 200 | Not applicable (cutoff) | cells | None | filter_cells; reproduced in qc_cutoff_check |\n| Max genes per cell | 6000 | Not applicable (cutoff) | cells | None | filter_cells; reproduced in qc_cutoff_check |\n| Max percent mitochondrial counts | 10 | Not applicable (cutoff) | cells | None | filter_cells; reproduced in qc_cutoff_check |\n| Min cells per gene | 0 | Not applicable (cutoff) | genes | None | filter_genes |\n\nCheckpoints: pulse is filter_cells-1/filter_cells.h5ad and chase is filter_cells-2/filter_cells.h5ad. Tables: qc_quantiles_pulse_chase.csv, qc_cell_counts_pulse_chase.csv and qc_cutoff_check_pulse_chase.csv.\n\nUncertain:\n- The check applies the cutoffs to the per-cell QC table. It reproduces the removals for genes and the cells left in both samples. Its mitochondrial count is lower than the tool count because the tool counts overlap.\n- Each sample is one sample. The donor count is not stated, so no test between samples was run.\n- The cutoffs come from the recorded values. The tool logs did not show the values directly, so I checked them against the data.\n\nWaits for you:\n- Confirm the cutoffs (min genes 200, max genes 6000, max percent mito 10) and min cells per gene (0). Min cells per gene of 0 removed no genes.\n\nSettings used, from the decision record: Minimum genes per cell: 200 · Maximum genes per cell: 6000 · Maximum percent mitochondrial counts: 10 · Minimum cells per gene: 0.",
+   "items": [
+    {
+     "key": "pulse_cells_loaded",
+     "description": "Cells in the pulse matrix",
+     "expected": 10608,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10608,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_cells",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 10608,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 155,
+      "text": "Pulse went from 10608 to 9612 cells and chase went from 10046 to 8887 cells after QC on each sample."
+     }
+    },
+    {
+     "key": "chase_cells_loaded",
+     "description": "Cells in the chase matrix",
+     "expected": 10046,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10046,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_cells",
+      "entry": 18
+     },
+     "reported": {
+      "pass": true,
+      "value": 10046,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 155,
+      "text": "Pulse went from 10608 to 9612 cells and chase went from 10046 to 8887 cells after QC on each sample."
+     }
+    },
+    {
+     "key": "pulse_cells_after_qc",
+     "description": "Pulse cells after quality control",
+     "expected": 9612,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9612,
+      "diff": 0,
+      "node": "n8",
+      "path": "metrics.n_cells_after",
+      "entry": 88
+     },
+     "reported": {
+      "pass": true,
+      "value": 9612,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 155,
+      "text": "Pulse went from 10608 to 9612 cells and chase went from 10046 to 8887 cells after QC on each sample."
+     }
+    },
+    {
+     "key": "chase_cells_after_qc",
+     "description": "Chase cells after quality control",
+     "expected": 8887,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8887,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.n_cells_after",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 8887,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 155,
+      "text": "Pulse went from 10608 to 9612 cells and chase went from 10046 to 8887 cells after QC on each sample."
+     }
+    },
+    {
+     "key": "genes_in_matrix",
+     "description": "Genes in each matrix",
+     "expected": 32286,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 32286,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_genes",
+      "entry": 15
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 155,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 15,
+    "inputTokens": 36,
+    "outputTokens": 13133,
+    "cacheRead": 331820,
+    "cacheWrite": 34942,
+    "toolCalls": 16,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 4,
+     "error": 2
+    },
+    "unsourced": 6,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 11
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3/home/sessions/20261012-035240-e62b/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3",
+     "/Users/parker/Code/guided-analysis/catalog/scanpy",
+     "/Users/parker/.cuvette/envs/scanpy",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/scanpy"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow/chase",
+     "/Volumes/T7/guided-analysis/data/liao2025-scanpy-bone-marrow/pulse",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3/home/sessions/20261012-035240-e62b/work",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3/home/sessions/20261012-035240-e62b/work/calculate_qc-1/qc.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3/home/sessions/20261012-035240-e62b/work/calculate_qc-2/qc.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3/home/sessions/20261012-035240-e62b/work/filter_genes-1/filter_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3/home/sessions/20261012-035240-e62b/work/filter_genes-2/filter_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3/home/sessions/20261012-035240-e62b/work/load_data-1/loaded.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/liao2025-scanpy-bone-marrow/claude_claude-haiku-5-5/liao2025-scanpy-bone-marrow/run3/home/sessions/20261012-035240-e62b/work/load_data-2/loaded.h5ad"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 6,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-liao2025-scanpy-bone-marrow.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-liao2025-scanpy-bone-marrow.json"
+ },
+ "summary": {
+  "cells": {
+   "liao2025-scanpy-bone-marrow": {
+    "claude:claude-haiku-5-5": {
+     "computed": 15,
+     "computedOf": 15,
+     "reported": 12,
+     "reportedOf": 12,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 15,
+    "computedOf": 15,
+    "reported": 12,
+    "reportedOf": 12,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 381.501,
+    "requests": 38,
+    "inputTokens": 92,
+    "outputTokens": 30604,
+    "cacheRead": 773671,
+    "cacheWrite": 94053,
+    "toolCalls": 44,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 3,
+    "revisions": 2,
+    "findings_info": 6,
+    "findings_warning": 12,
+    "findings_error": 4,
+    "unsourced": 10,
+    "deviations": 2,
+    "overwritten": 2,
+    "nodes": 34
+   }
+  },
+  "skipped": []
+ }
+}

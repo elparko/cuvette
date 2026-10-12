@@ -1,0 +1,913 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "schramm2012-imzml-pyimzml",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 48.452,
+   "session": "20261012-031955-650e",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/schramm2012-imzml-pyimzml/claude_claude-haiku-5-5/schramm2012-imzml-pyimzml/run1/home/sessions/20261012-031955-650e",
+   "answer": "1. Both files have 9 pixels (3 x 3 grid). Both cover m/z 100.083 to 799.917. The processed file is larger because it stores an m/z array for each pixel. The two files hold identical spectra.\n\n| Measure | Value | 95% CI | n (what one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Pixel count, both files | 9 (3 x 3) | Not applicable | 9 pixels | Not applicable (file facts) | read_file_info |\n| m/z range, both files | 100.083 to 799.917 | Not applicable | Full scan range | Not applicable | read_file_info |\n| Data file size, continuous | 335,976 bytes | Not applicable | 1 file | Not applicable | read_file_info |\n| Data file size, processed | 604,744 bytes | Not applicable | 1 file | Not applicable | read_file_info |\n| Size ratio, processed to continuous | 1.80 | Not applicable | 1 ratio | Not applicable | calculate |\n| Strongest pixel (TIC, raw, no normalization) | (3, 3), TIC 243.54 | Not applicable | 9 pixels | Not applicable (maximum) | get_tic_image |\n| Spectra identical, continuous vs processed | 0 of 9 pixels differ; max m/z and intensity difference 0 | Not applicable | 9 pixels | Exact comparison, no p-value | compare_files |\n\nSize check (calculate): the sizes follow from the storage layout. Each value uses 4 bytes (32-bit float, mz_precision and intensity_precision \"f\"). The continuous file stores one shared m/z array of 8399 values, plus 9 x 8399 intensities. The processed file stores 9 x 8399 m/z values plus 9 x 8399 intensities. The continuous sum is 335,976 bytes and the processed sum is 604,744 bytes. Both sums equal the logged sizes. I did not measure a file header. I set a remainder of 16 bytes so the sums match. This remainder is an inference, not a measured value.\n\nUncertain:\n- The strongest pixel uses raw summed intensity. A high total can come from one strong peak, so check the TIC image before you call it biology.\n- The m/z range for the continuous file comes from the file axis. The processed file range comes from all 9 spectra.\n- Identical spectra in these two files do not show that other files match.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Polarity: negative.",
+   "items": [
+    {
+     "key": "spectra_per_file",
+     "description": "Spectra (pixels) in each file.",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_pixels",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 9,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 54,
+      "text": "Both files have 9 pixels (3 x 3 grid)."
+     }
+    },
+    {
+     "key": "mz_min",
+     "description": "Minimum m/z.",
+     "expected": 100.083336,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100.08333587646484,
+      "diff": 1.2353515899121703e-7,
+      "node": "n1",
+      "path": "metrics.mz_min",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 100.083,
+      "diff": 0.00033600000000433283,
+      "via": "rounding",
+      "node": "n2",
+      "claimEntry": 54,
+      "text": "Both cover m/z 100.083 to 799.917."
+     }
+    },
+    {
+     "key": "mz_max",
+     "description": "Maximum m/z.",
+     "expected": 799.9167,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 799.9166870117188,
+      "diff": 0.000012988281241632649,
+      "node": "n1",
+      "path": "metrics.mz_max",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 799.917,
+      "diff": 0.0003000000000383807,
+      "via": "rounding",
+      "node": "n2",
+      "claimEntry": 54,
+      "text": "Both cover m/z 100.083 to 799.917."
+     }
+    },
+    {
+     "key": "max_pixel_tic",
+     "description": "Total ion current of the strongest pixel.",
+     "expected": 243.5395,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 243.53950660310795,
+      "diff": 0.0000066031079484218935,
+      "node": "n3",
+      "path": "metrics.tic_max",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 243.54,
+      "diff": 0.0004999999999881766,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 54,
+      "text": "| Strongest pixel (TIC, raw, no normalization) | (3, 3), TIC 243.54 | Not applicable | 9 pixels | Not applicable (maximum) | get_tic_image |"
+     }
+    },
+    {
+     "key": "mean_tic",
+     "description": "Mean total ion current per pixel.",
+     "expected": 161.1444,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 161.1443790255365,
+      "diff": 0.00002097446349580423,
+      "node": "n3",
+      "path": "metrics.tic_mean",
+      "entry": 23
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 54,
+      "text": null
+     }
+    },
+    {
+     "key": "continuous_ibd_bytes",
+     "description": "Size of the continuous ibd file in bytes.",
+     "expected": 335976,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 335976,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.ibd_bytes",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 54,
+      "text": null
+     }
+    },
+    {
+     "key": "processed_ibd_bytes",
+     "description": "Size of the processed ibd file in bytes.",
+     "expected": 604744,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 604744,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.ibd_bytes",
+      "entry": 15
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 54,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 14,
+    "outputTokens": 4010,
+    "cacheRead": 58330,
+    "cacheWrite": 18878,
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 3,
+     "error": 1
+    },
+    "unsourced": 2,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/schramm2012-imzml-pyimzml/claude_claude-haiku-5-5/schramm2012-imzml-pyimzml/run1/home/sessions/20261012-031955-650e/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/schramm2012-imzml-pyimzml/claude_claude-haiku-5-5/schramm2012-imzml-pyimzml/run1",
+     "/Users/parker/Code/guided-analysis/catalog/pyimzml",
+     "/Users/parker/.cuvette/envs/pyimzml",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/pyimzml"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Continuous.imzML",
+     "/Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Processed.imzML"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 2,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "schramm2012-imzml-pyimzml",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 58.578,
+   "session": "20261012-032043-5ea7",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/schramm2012-imzml-pyimzml/claude_claude-haiku-5-5/schramm2012-imzml-pyimzml/run2/home/sessions/20261012-032043-5ea7",
+   "answer": "1. Both files have 9 pixels (3 x 3 grid) and cover m/z 100.0833 to 799.9167. The strongest total signal is at pixel (3, 3) in both files. The two files hold identical spectra.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Pixel count, Example_Continuous | 9 (3 x 3 grid, 100 µm pixels) | Not applicable | 9 pixels; one n is one pixel | None (descriptive) | read_file_info |\n| Pixel count, Example_Processed | 9 (3 x 3 grid, 100 µm pixels) | Not applicable | 9 pixels; one n is one pixel | None (descriptive) | read_file_info |\n| m/z range (both files) | 100.0833 to 799.9167 | Not applicable | 8399 points per spectrum; one n is one m/z point | None (descriptive) | read_file_info |\n| Strongest total signal pixel (x, y) | (3, 3), TIC 243.54 | Not applicable | 9 pixels; one n is one pixel | None (descriptive) | get_tic_image |\n| Normalization of that TIC image | none (raw sum of intensities) | Not applicable | 9 pixels | None | get_tic_image |\n| Same strongest pixel in processed file | (3, 3), TIC 243.54 | Not applicable | 9 pixels | None (descriptive) | get_tic_image |\n| File size, continuous (ibd) | 335,976 bytes | Not applicable | 1 file | None (descriptive) | read_file_info |\n| File size, processed (ibd) | 604,744 bytes (1.80 times the continuous size) | Not applicable | 1 file | None (descriptive) | read_file_info, calculate |\n| Pixels that differ between files | 0 of 9 (max m/z difference 0, max intensity difference 0) | Not applicable | 9 pixels; one n is one pixel | None (pixel-by-pixel comparison) | compare_files |\n\nWhy the processed file is bigger: a continuous file stores one shared m/z axis (8399 values x 4 bytes = 33,596 bytes) and one intensity array for each pixel. A processed file stores an m/z array and an intensity array for each pixel. My estimate from these array sizes is 335,960 bytes for the continuous file and 604,728 bytes for the processed file. The measured sizes are 16 bytes larger than each estimate (calculate step). The tools do not show the source of these 16 bytes.\n\nUncertain:\n- The TIC is a raw sum of intensities. A few strong peaks can set the top pixel.\n- The m/z range of the continuous file comes from one spectrum. The m/z axis is shared, so this range applies to all pixels.\n- The byte explanation is inferred from array sizes, not read from the file structure.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Polarity: negative.",
+   "items": [
+    {
+     "key": "spectra_per_file",
+     "description": "Spectra (pixels) in each file.",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_pixels",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 9,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 61,
+      "text": "Both files have 9 pixels (3 x 3 grid) and cover m/z 100.0833 to 799.9167."
+     }
+    },
+    {
+     "key": "mz_min",
+     "description": "Minimum m/z.",
+     "expected": 100.083336,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100.08333587646484,
+      "diff": 1.2353515899121703e-7,
+      "node": "n1",
+      "path": "metrics.mz_min",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 100.0833,
+      "diff": 0.00003600000000858472,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 61,
+      "text": "Both files have 9 pixels (3 x 3 grid) and cover m/z 100.0833 to 799.9167."
+     }
+    },
+    {
+     "key": "mz_max",
+     "description": "Maximum m/z.",
+     "expected": 799.9167,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 799.9166870117188,
+      "diff": 0.000012988281241632649,
+      "node": "n1",
+      "path": "metrics.mz_max",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 799.9167,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 61,
+      "text": "Both files have 9 pixels (3 x 3 grid) and cover m/z 100.0833 to 799.9167."
+     }
+    },
+    {
+     "key": "max_pixel_tic",
+     "description": "Total ion current of the strongest pixel.",
+     "expected": 243.5395,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 243.53950660310795,
+      "diff": 0.0000066031079484218935,
+      "node": "n3",
+      "path": "metrics.tic_max",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 243.54,
+      "diff": 0.0004999999999881766,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 61,
+      "text": "| Strongest total signal pixel (x, y) | (3, 3), TIC 243.54 | Not applicable | 9 pixels; one n is one pixel | None (descriptive) | get_tic_image |"
+     }
+    },
+    {
+     "key": "mean_tic",
+     "description": "Mean total ion current per pixel.",
+     "expected": 161.1444,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 161.1443790255365,
+      "diff": 0.00002097446349580423,
+      "node": "n3",
+      "path": "metrics.tic_mean",
+      "entry": 23
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 61,
+      "text": null
+     }
+    },
+    {
+     "key": "continuous_ibd_bytes",
+     "description": "Size of the continuous ibd file in bytes.",
+     "expected": 335976,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 335976,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.ibd_bytes",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 61,
+      "text": null
+     }
+    },
+    {
+     "key": "processed_ibd_bytes",
+     "description": "Size of the processed ibd file in bytes.",
+     "expected": 604744,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 604744,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.ibd_bytes",
+      "entry": 15
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 61,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 6032,
+    "cacheRead": 87528,
+    "cacheWrite": 23693,
+    "toolCalls": 7,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 1,
+     "warning": 3,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 7
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/schramm2012-imzml-pyimzml/claude_claude-haiku-5-5/schramm2012-imzml-pyimzml/run2/home/sessions/20261012-032043-5ea7/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/schramm2012-imzml-pyimzml/claude_claude-haiku-5-5/schramm2012-imzml-pyimzml/run2",
+     "/Users/parker/Code/guided-analysis/catalog/pyimzml",
+     "/Users/parker/.cuvette/envs/pyimzml",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/pyimzml"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Continuous.imzML",
+     "/Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Processed.imzML"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "schramm2012-imzml-pyimzml",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 26.963,
+   "session": "20261012-032142-acb0",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/schramm2012-imzml-pyimzml/claude_claude-haiku-5-5/schramm2012-imzml-pyimzml/run3/home/sessions/20261012-032142-acb0",
+   "answer": "1. Both files have 9 pixels (3 x 3 grid, 100 µm pixels) and cover m/z 100.083 to 799.917. The strongest total signal is at pixel (3, 3), and the two files hold identical spectra.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Pixel count, both files | 9 each (3 x 3) | Not applicable | 9 pixels, all pixels of each file | None | read_file_info |\n| m/z range, both files | 100.083 to 799.917 | Not applicable | All 9 spectra, 8,399 points each | None | read_file_info |\n| Data file size, continuous vs processed | 335,976 vs 604,744 bytes | Not applicable | 2 files | None | read_file_info |\n| Strongest total signal (TIC) | 243.54 at (3, 3) | Not applicable | 9 pixels, one TIC value each | None | get_tic_image |\n| Spectra identical | 0 of 9 pixels differ | Not applicable | 9 pixels compared, all pixels | None | compare_files |\n\nWhy the processed file is bigger: the continuous file stores one shared m/z list. The processed file stores its own m/z list for every pixel. The intensity values are the same in both files.\n\nUncertain:\n- The TIC is not normalized. A bright TIC pixel can come from a high total signal, not from biology.\n- The data have 9 pixels, so no statistical test was run. The results describe these files only.\n- The m/z range is the range of the stored data. It does not show the instrument scan limits.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Polarity: negative.",
+   "items": [
+    {
+     "key": "spectra_per_file",
+     "description": "Spectra (pixels) in each file.",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_pixels",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 9,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 38,
+      "text": "Both files have 9 pixels (3 x 3 grid, 100 µm pixels) and cover m/z 100.083 to 799.917."
+     }
+    },
+    {
+     "key": "mz_min",
+     "description": "Minimum m/z.",
+     "expected": 100.083336,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 100.08333587646484,
+      "diff": 1.2353515899121703e-7,
+      "node": "n1",
+      "path": "metrics.mz_min",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 100.083,
+      "diff": 0.00033600000000433283,
+      "via": "rounding",
+      "node": "n2",
+      "claimEntry": 38,
+      "text": "Both files have 9 pixels (3 x 3 grid, 100 µm pixels) and cover m/z 100.083 to 799.917."
+     }
+    },
+    {
+     "key": "mz_max",
+     "description": "Maximum m/z.",
+     "expected": 799.9167,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 799.9166870117188,
+      "diff": 0.000012988281241632649,
+      "node": "n1",
+      "path": "metrics.mz_max",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 799.917,
+      "diff": 0.0003000000000383807,
+      "via": "rounding",
+      "node": "n2",
+      "claimEntry": 38,
+      "text": "Both files have 9 pixels (3 x 3 grid, 100 µm pixels) and cover m/z 100.083 to 799.917."
+     }
+    },
+    {
+     "key": "max_pixel_tic",
+     "description": "Total ion current of the strongest pixel.",
+     "expected": 243.5395,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 243.53950660310795,
+      "diff": 0.0000066031079484218935,
+      "node": "n4",
+      "path": "metrics.tic_max",
+      "entry": 26
+     },
+     "reported": {
+      "pass": true,
+      "value": 243.54,
+      "diff": 0.0004999999999881766,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 38,
+      "text": "| Strongest total signal (TIC) | 243.54 at (3, 3) | Not applicable | 9 pixels, one TIC value each | None | get_tic_image |"
+     }
+    },
+    {
+     "key": "mean_tic",
+     "description": "Mean total ion current per pixel.",
+     "expected": 161.1444,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 161.1443790255365,
+      "diff": 0.00002097446349580423,
+      "node": "n4",
+      "path": "metrics.tic_mean",
+      "entry": 26
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 38,
+      "text": null
+     }
+    },
+    {
+     "key": "continuous_ibd_bytes",
+     "description": "Size of the continuous ibd file in bytes.",
+     "expected": 335976,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 335976,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.ibd_bytes",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 38,
+      "text": null
+     }
+    },
+    {
+     "key": "processed_ibd_bytes",
+     "description": "Size of the processed ibd file in bytes.",
+     "expected": 604744,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 604744,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.ibd_bytes",
+      "entry": 15
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 38,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 3,
+    "inputTokens": 8,
+    "outputTokens": 2421,
+    "cacheRead": 24885,
+    "cacheWrite": 16599,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings": {
+     "info": 4,
+     "warning": 1,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 4
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/schramm2012-imzml-pyimzml/claude_claude-haiku-5-5/schramm2012-imzml-pyimzml/run3/home/sessions/20261012-032142-acb0/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/schramm2012-imzml-pyimzml/claude_claude-haiku-5-5/schramm2012-imzml-pyimzml/run3",
+     "/Users/parker/Code/guided-analysis/catalog/pyimzml",
+     "/Users/parker/.cuvette/envs/pyimzml",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/pyimzml"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Continuous.imzML",
+     "/Volumes/T7/guided-analysis/data/schramm2012-imzml-pyimzml/Example_Processed.imzML"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-schramm2012-imzml-pyimzml.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-schramm2012-imzml-pyimzml.json"
+ },
+ "summary": {
+  "cells": {
+   "schramm2012-imzml-pyimzml": {
+    "claude:claude-haiku-5-5": {
+     "computed": 21,
+     "computedOf": 21,
+     "reported": 12,
+     "reportedOf": 12,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 21,
+    "computedOf": 21,
+    "reported": 12,
+    "reportedOf": 12,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 133.993,
+    "requests": 14,
+    "inputTokens": 38,
+    "outputTokens": 12463,
+    "cacheRead": 170743,
+    "cacheWrite": 59170,
+    "toolCalls": 16,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 2,
+    "findings_info": 8,
+    "findings_warning": 7,
+    "findings_error": 1,
+    "unsourced": 2,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 16
+   }
+  },
+  "skipped": []
+ }
+}

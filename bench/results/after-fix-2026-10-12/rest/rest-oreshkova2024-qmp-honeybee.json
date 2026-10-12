@@ -1,0 +1,1892 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "oreshkova2024-qmp-honeybee",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 161.465,
+   "session": "20261012-031105-27f3",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261012-031105-27f3",
+   "answer": "Age and replicate change abdominal protein (fb_mg), and QMP treatment does not. Acini area cannot be interpreted until the bee or cage unit is known. Normalized FAS differs by replicate and, more weakly, by order.\n\n| Measure | Value | 95% CI | n (one n) | Test | Step |\n|---|---|---|---|---|---|\n| fb_mg, age | F(1, 60) = 35.69, p < 0.0001 | Not given by the F test | 72 (one pooled sample of two abdomens) | 3-way ANOVA, type I (recorded setting), balanced | anova_factorial, fb_mg |\n| fb_mg, treatment | F(1, 60) = 0.032, p = 0.860 | Not given by the F test | 72 | same | same |\n| fb_mg, replicate | F(2, 60) = 36.00, p < 0.0001 | Not given by the F test | 72 | same | same |\n| fb_mg, age × treatment | F(1, 60) = 1.057, p = 0.308 | Not given by the F test | 72 | same | same |\n| fb_mg, age × replicate | F(2, 60) = 2.809, p = 0.068 | Not given by the F test | 72 | same | same |\n| fb_mg, treatment × replicate | F(2, 60) = 0.717, p = 0.493 | Not given by the F test | 72 | same | same |\n| fb_mg, age × treatment × replicate | F(2, 60) = 1.240, p = 0.297 | Not given by the F test | 72 | same | same |\n| Average (acini area, mm²), age (not interpreted) | F(1, 60) = 27.78, p < 0.0001 | Not given by the F test | 72 glands (subject count unknown) | 3-way ANOVA, type I (recorded setting), unbalanced | anova_factorial, Average |\n| Average, treatment (not interpreted) | F(1, 60) = 29.16, p < 0.0001 | Not given by the F test | 72 glands | same | same |\n| Average, replicate (not interpreted) | F(2, 60) = 6.853, p = 0.002 | Not given by the F test | 72 glands | same | same |\n| Average, age × treatment (not interpreted) | F(1, 60) = 0.568, p = 0.454 | Not given by the F test | 72 glands | same | same |\n| Average, age × replicate (not interpreted) | F(2, 60) = 1.338, p = 0.270 | Not given by the F test | 72 glands | same | same |\n| Average, treatment × replicate (not interpreted) | F(2, 60) = 2.369, p = 0.102 | Not given by the F test | 72 glands | same | same |\n| Average, age × treatment × replicate (not interpreted) | F(2, 60) = 4.457, p = 0.016 | Not given by the F test | 72 glands | same | same |\n| fas by order | H(3) = 9.35, p = 0.025 | Not given by the rank test | 72 (18 per order) | Kruskal-Wallis | kruskal_dunn, order |\n| fas, order B vs C (medians 2.813 vs 1.473) | z = −2.716, Bonferroni p = 0.040 | Not given | 6 pairs corrected | Dunn test, Bonferroni | kruskal_dunn, order; medians checked by script |\n| fas, order A vs C (medians 2.704 vs 1.473) | z = −2.437, Bonferroni p = 0.089 | Not given | 6 pairs corrected | Dunn test, Bonferroni | same |\n| fas, order B vs D (medians 2.813 vs 1.966) | z = −1.529, Bonferroni p = 0.758 | Not given | 6 pairs corrected | Dunn test, Bonferroni | same |\n| fas by replicate | H(2) = 23.87, p < 0.0001 | Not given by the rank test | 72 (24 per replicate) | Kruskal-Wallis | kruskal_dunn, replicate |\n| fas, replicate A vs B (medians 2.633 vs 1.564) | z = −4.228, Bonferroni p = 0.00007 | Not given | 3 pairs corrected | Dunn test, Bonferroni | kruskal_dunn, replicate; medians checked by script |\n| fas, replicate B vs C (medians 1.564 vs 2.569) | z = 4.235, Bonferroni p = 0.00007 | Not given | 3 pairs corrected | Dunn test, Bonferroni | same |\n| fas, replicate A vs C | z = 0.007, Bonferroni p = 1.00 | Not given | 3 pairs corrected | Dunn test, Bonferroni | same |\n\nUncertain:\n- Acini area rows are 72 glands with no bee or cage id. The unit of replication is unresolved, so the Average results are not interpreted.\n- Each order label is one age and treatment group (A = age 3 QMP −, B = age 3 QMP +, C = age 8 QMP −, D = age 8 QMP +). The order test cannot separate order from age and treatment. No comparisons of cell means after the factorial ANOVA were run (setting: none).\n- Two 3-way ANOVAs (7 terms each) and two rank tests (9 Dunn pairs) ran in this session. Bonferroni applies only inside the Dunn tests. The ANOVA terms have no correction across the session.\n\nWaits for you:\n- A bee or cage id column for hpg_data.csv. Or confirmation that each gland comes from its own bee.\n\nSettings used, from the decision record: Type of sums of squares: 1 · Comparisons of the cell means after a factorial ANOVA: none · Correction after a rank test over many groups: bonferroni.",
+   "items": [
+    {
+     "key": "protein_f_age",
+     "description": "Abdominal protein, F for age",
+     "expected": 35.693,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.69279686518904,
+      "diff": 0.000203134810959682,
+      "node": "n6",
+      "path": "metrics.F_age",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 35.69,
+      "diff": 0.0030000000000001137,
+      "via": "rounding",
+      "node": "n6",
+      "claimEntry": 148,
+      "text": "| fb_mg, age | F(1, 60) = 35.69, p < 0.0001 | Not given by the F test | 72 (one pooled sample of two abdomens) | 3-way ANOVA, type I (recorded setting), balanced | anova_factorial, fb_mg |"
+     }
+    },
+    {
+     "key": "protein_f_treatment",
+     "description": "Abdominal protein, F for QMP treatment",
+     "expected": 0.032,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03156445331095737,
+      "diff": 0.00043554668904263044,
+      "node": "n6",
+      "path": "metrics.F_treatment",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.032,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 148,
+      "text": "| fb_mg, treatment | F(1, 60) = 0.032, p = 0.860 | Not given by the F test | 72 | same | same |"
+     }
+    },
+    {
+     "key": "protein_f_replicate",
+     "description": "Abdominal protein, F for replicate",
+     "expected": 36,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.99951570302398,
+      "diff": 0.00048429697601903854,
+      "node": "n6",
+      "path": "metrics.F_replicate",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 36,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 148,
+      "text": "| fb_mg, replicate | F(2, 60) = 36.00, p < 0.0001 | Not given by the F test | 72 | same | same |"
+     }
+    },
+    {
+     "key": "protein_p_age",
+     "description": "Abdominal protein, p for age",
+     "expected": 1.356e-7,
+     "tolerance": 1e-7,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.3560494352539e-7,
+      "diff": 4.943525390010357e-12,
+      "node": "n6",
+      "path": "metrics.p_age",
+      "entry": 54
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 148,
+      "text": null
+     }
+    },
+    {
+     "key": "protein_p_treatment",
+     "description": "Abdominal protein, p for QMP treatment",
+     "expected": 0.8596,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.8595854024736869,
+      "diff": 0.0000145975263131648,
+      "node": "n6",
+      "path": "metrics.p_treatment",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.86,
+      "diff": 0.00039999999999995595,
+      "via": "rounding",
+      "node": "n5",
+      "claimEntry": 148,
+      "text": "| fb_mg, treatment | F(1, 60) = 0.032, p = 0.860 | Not given by the F test | 72 | same | same |"
+     }
+    },
+    {
+     "key": "protein_f_age_x_treatment",
+     "description": "Abdominal protein, F for age by treatment",
+     "expected": 1.057,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0566528954730137,
+      "diff": 0.0003471045269862749,
+      "node": "n6",
+      "path": "metrics.F_age_x_treatment",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.057,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 148,
+      "text": "| fb_mg, age × treatment | F(1, 60) = 1.057, p = 0.308 | Not given by the F test | 72 | same | same |"
+     }
+    },
+    {
+     "key": "protein_f_age_x_replicate",
+     "description": "Abdominal protein, F for age by replicate",
+     "expected": 2.809,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.8085062251289026,
+      "diff": 0.0004937748710975853,
+      "node": "n6",
+      "path": "metrics.F_age_x_replicate",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.809,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 148,
+      "text": "| fb_mg, age × replicate | F(2, 60) = 2.809, p = 0.068 | Not given by the F test | 72 | same | same |"
+     }
+    },
+    {
+     "key": "protein_df_residual",
+     "description": "Residual degrees of freedom of the three-way ANOVA",
+     "expected": 60,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 60,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.df_residual",
+      "entry": 54
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 148,
+      "text": null
+     }
+    },
+    {
+     "key": "acini_f_age",
+     "description": "Acini area, F for age",
+     "expected": 27.78,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 27.779909487507354,
+      "diff": 0.00009051249264757644,
+      "node": "n7",
+      "path": "metrics.F_Age",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 27.78,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 148,
+      "text": "| Average (acini area, mm²), age (not interpreted) | F(1, 60) = 27.78, p < 0.0001 | Not given by the F test | 72 glands (subject count unknown) | 3-way ANOVA, type I (recorded setting), unbalanced | anova_factorial, Average |"
+     }
+    },
+    {
+     "key": "acini_f_treatment",
+     "description": "Acini area, F for QMP treatment",
+     "expected": 29.156,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 29.155534150533626,
+      "diff": 0.00046584946637295843,
+      "node": "n7",
+      "path": "metrics.F_Treatment",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 29.16,
+      "diff": 0.004000000000001336,
+      "via": "rounding",
+      "node": "n7",
+      "claimEntry": 148,
+      "text": "| Average, treatment (not interpreted) | F(1, 60) = 29.16, p < 0.0001 | Not given by the F test | 72 glands | same | same |"
+     }
+    },
+    {
+     "key": "acini_f_replicate",
+     "description": "Acini area, F for replicate",
+     "expected": 6.853,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6.853005833185857,
+      "diff": 0.000005833185857007095,
+      "node": "n7",
+      "path": "metrics.F_Replicate",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 6.853,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 148,
+      "text": "| Average, replicate (not interpreted) | F(2, 60) = 6.853, p = 0.002 | Not given by the F test | 72 glands | same | same |"
+     }
+    },
+    {
+     "key": "acini_p_replicate",
+     "description": "Acini area, p for replicate",
+     "expected": 0.00209,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.002086652666208499,
+      "diff": 0.0000033473337915008484,
+      "node": "n7",
+      "path": "metrics.p_Replicate",
+      "entry": 58
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.002,
+      "diff": 0.0000899999999999998,
+      "via": null,
+      "node": "n12",
+      "claimEntry": 148,
+      "text": "| Average, replicate (not interpreted) | F(2, 60) = 6.853, p = 0.002 | Not given by the F test | 72 glands | same | same |"
+     }
+    },
+    {
+     "key": "acini_f_three_way",
+     "description": "Acini area, F for age by treatment by replicate",
+     "expected": 4.457,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.457195104998093,
+      "diff": 0.00019510499809349824,
+      "node": "n7",
+      "path": "metrics.F_Age_x_Treatment_x_Replicate",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.457,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 148,
+      "text": "| Average, age × treatment × replicate (not interpreted) | F(2, 60) = 4.457, p = 0.016 | Not given by the F test | 72 glands | same | same |"
+     }
+    },
+    {
+     "key": "acini_p_three_way",
+     "description": "Acini area, p for age by treatment by replicate",
+     "expected": 0.01568,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.01568,
+      "diff": 0,
+      "node": "n12",
+      "path": "stdout",
+      "entry": 89
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.016,
+      "diff": 0.00032000000000000084,
+      "via": "rounding",
+      "node": "n12",
+      "claimEntry": 148,
+      "text": "| Average, age × treatment × replicate (not interpreted) | F(2, 60) = 4.457, p = 0.016 | Not given by the F test | 72 glands | same | same |"
+     }
+    },
+    {
+     "key": "fas_kruskal_chi2",
+     "description": "Kruskal-Wallis chi-squared for the four treatment groups",
+     "expected": 9.3498,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9.349822425164916,
+      "diff": 0.000022425164916128892,
+      "node": "n8",
+      "path": "metrics.H",
+      "entry": 65
+     },
+     "reported": {
+      "pass": true,
+      "value": 9.35,
+      "diff": 0.00019999999999953388,
+      "via": "rounding",
+      "node": "n8",
+      "claimEntry": 148,
+      "text": "| fas by order | H(3) = 9.35, p = 0.025 | Not given by the rank test | 72 (18 per order) | Kruskal-Wallis | kruskal_dunn, order |"
+     }
+    },
+    {
+     "key": "fas_kruskal_df",
+     "description": "Kruskal-Wallis degrees of freedom",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n1",
+      "path": "table.rows[0][3]",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 148,
+      "text": null
+     }
+    },
+    {
+     "key": "fas_kruskal_p",
+     "description": "Kruskal-Wallis p for the four treatment groups",
+     "expected": 0.02498,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.024983853117398966,
+      "diff": 0.000003853117398967126,
+      "node": "n8",
+      "path": "metrics.p_value",
+      "entry": 65
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.025,
+      "diff": 0.000020000000000002655,
+      "via": "rounding",
+      "node": "n8",
+      "claimEntry": 148,
+      "text": "| fas by order | H(3) = 9.35, p = 0.025 | Not given by the rank test | 72 (18 per order) | Kruskal-Wallis | kruskal_dunn, order |"
+     }
+    },
+    {
+     "key": "fas_dunn_padj",
+     "description": "Dunn adjusted p, the only significant pair",
+     "expected": 0.0397,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03969327143246251,
+      "diff": 0.00000672856753748674,
+      "node": "n8",
+      "path": "metrics.min_p_adjusted",
+      "entry": 65
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.04,
+      "diff": 0.00030000000000000165,
+      "via": "rounding",
+      "node": "n6",
+      "claimEntry": 148,
+      "text": "| fas, order B vs C (medians 2.813 vs 1.473) | z = −2.716, Bonferroni p = 0.040 | Not given | 6 pairs corrected | Dunn test, Bonferroni | kruskal_dunn, order; medians checked by script |"
+     }
+    },
+    {
+     "key": "fas_replicate_chi2",
+     "description": "Kruskal-Wallis chi-squared for the three replicates",
+     "expected": 23.87,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 23.87005327245052,
+      "diff": 0.00005327245051844898,
+      "node": "n9",
+      "path": "metrics.H",
+      "entry": 68
+     },
+     "reported": {
+      "pass": true,
+      "value": 23.87,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 148,
+      "text": "| fas by replicate | H(2) = 23.87, p < 0.0001 | Not given by the rank test | 72 (24 per replicate) | Kruskal-Wallis | kruskal_dunn, replicate |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 11,
+    "inputTokens": 30,
+    "outputTokens": 20084,
+    "cacheRead": 336109,
+    "cacheWrite": 48713,
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 8,
+     "error": 4
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 8
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1/home/sessions/20261012-031105-27f3/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run1",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/hpg_data.csv",
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/qmp_pooled_data.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "oreshkova2024-qmp-honeybee",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 146.241,
+   "session": "20261012-031347-240c",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run2/home/sessions/20261012-031347-240c",
+   "answer": "The four points are checked. The 0.86, 36, 1.057, 0.308, 0.493 and 0.297 values come from the main calls, not from compare_options. I did not run compare_options. The logged setting for these calls is type I sums of squares (ss_type 1). The post-hoc setting was \"none\", not Bonferroni. The median values are logged in the rank test summaries. I applied the correction now.\n\n1. Age and replicate change abdominal protein (fb_mg). Acini area changes with age, treatment and replicate. QMP treatment does not change fb_mg. After Holm correction across all 14 F tests, five terms stay significant at alpha 0.05.\n\n| Measure | Value (F, df, raw p, Holm p) | 95% CI | n, and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| fb_mg, age | F(1, 60) = 35.69, p < 0.0001, Holm p = 1.8e-6 (significant) | Not reported | 72 pooled samples (two abdomens each) | Three-way factorial ANOVA, type I sums of squares, post-hoc none, alpha 0.05 | anova_factorial, file 1 |\n| fb_mg, treatment | F(1, 60) = 0.032, p = 0.860, Holm p = 1.0 | Not reported | 72 pooled samples | Same | Same |\n| fb_mg, replicate | F(2, 60) = 36.00, p < 0.0001, Holm p = 7.5e-10 (significant) | Not reported | 72 pooled samples | Same | Same |\n| fb_mg, age x treatment | F(1, 60) = 1.057, p = 0.308, Holm p = 1.0 | Not reported | 72 pooled samples | Same | Same |\n| fb_mg, age x replicate | F(2, 60) = 2.809, p = 0.068, Holm p = 0.546 | Not reported | 72 pooled samples | Same | Same |\n| fb_mg, treatment x replicate | F(2, 60) = 0.717, p = 0.493, Holm p = 1.0 | Not reported | 72 pooled samples | Same | Same |\n| fb_mg, age x treatment x replicate | F(2, 60) = 1.240, p = 0.297, Holm p = 1.0 | Not reported | 72 pooled samples | Same | Same |\n| Acini area, Age | F(1, 60) = 27.78, p < 0.0001, Holm p = 2.1e-5 (significant) | Not reported | 72 glands | Three-way factorial ANOVA, type I sums of squares, post-hoc none, alpha 0.05 | anova_factorial, file 2 |\n| Acini area, Treatment | F(1, 60) = 29.16, p < 0.0001, Holm p = 1.4e-5 (significant) | Not reported | 72 glands | Same | Same |\n| Acini area, Replicate | F(2, 60) = 6.853, p = 0.002, Holm p = 0.021 (significant) | Not reported | 72 glands | Same | Same |\n| Acini area, Age x Treatment | F(1, 60) = 0.568, p = 0.454, Holm p = 1.0 | Not reported | 72 glands | Same | Same |\n| Acini area, Age x Replicate | F(2, 60) = 1.338, p = 0.270, Holm p = 1.0 | Not reported | 72 glands | Same | Same |\n| Acini area, Treatment x Replicate | F(2, 60) = 2.369, p = 0.102, Holm p = 0.716 | Not reported | 72 glands | Same | Same |\n| Acini area, Age x Treatment x Replicate | F(2, 60) = 4.457, p = 0.016, Holm p = 0.141 | Not reported | 72 glands | Same | Same |\n| fas by treatment group (order) | H = 9.350, df = 3, p = 0.025 | Not reported | 72 pooled samples, 4 groups | Kruskal-Wallis rank test, alpha 0.05 | kruskal_dunn, order |\n| Median fas, groups A, B, C, D | 2.704, 2.813, 1.473, 1.966 | Not reported | 72 pooled samples | Descriptive, from the rank test | Same |\n| Pairwise B vs C (Bonferroni) | adjusted p = 0.040 (significant) | Not reported | 72 pooled samples | Dunn test, Bonferroni, 6 pairs | Same |\n| Pairwise A vs C (Bonferroni) | adjusted p = 0.089 | Not reported | 72 pooled samples | Same | Same |\n| Pairwise B vs D (Bonferroni) | adjusted p = 0.758 | Not reported | 72 pooled samples | Same | Same |\n| Pairwise A vs B, A vs D, C vs D (Bonferroni) | adjusted p = 1.0 each | Not reported | 72 pooled samples | Same | Same |\n| fas by replicate | H = 23.870, df = 2, p < 0.0001 | Not reported | 72 pooled samples, 3 groups | Kruskal-Wallis rank test, alpha 0.05 | kruskal_dunn, replicate |\n| Median fas, replicates A, B, C | 2.633, 1.564, 2.569 | Not reported | 72 pooled samples | Descriptive, from the rank test | Same |\n| Pairwise A vs B (Bonferroni) | adjusted p = 7.1e-5 (significant) | Not reported | 72 pooled samples | Dunn test, Bonferroni, 3 pairs | Same |\n| Pairwise B vs C (Bonferroni) | adjusted p = 6.9e-5 (significant) | Not reported | 72 pooled samples | Same | Same |\n| Pairwise A vs C (Bonferroni) | adjusted p = 1.0 | Not reported | 72 pooled samples | Same | Same |\n\nCounts: 14 F terms (7 for each ANOVA, from 7 + 7), 2 Kruskal-Wallis tests and 9 Dunn pairwise tests. Holm correction covers the 14 F terms. Bonferroni covers the Dunn pairs. The Kruskal-Wallis tests are not in the Holm family. Alpha is 0.05 and all tests are two-sided.\n\nUncertain:\n- File 2 is unbalanced. Type I sums of squares depend on factor order. Levene p = 0.015 for acini area, so the variances are unequal.\n- I chose Holm for the 14 F terms because the correction setting was not in the record I could see. Confirm the method.\n- The F tests and rank tests give no 95% confidence intervals. Partial eta squared values are in the factorial output CSV.\n\nWaits for you: Confirm the correction for the 14 F tests. I used Holm.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Correction for a list of p-values: holm · Type of sums of squares: 1 · Comparisons of the cell means after a factorial ANOVA: none · Correction after a rank test over many groups: bonferroni.",
+   "items": [
+    {
+     "key": "protein_f_age",
+     "description": "Abdominal protein, F for age",
+     "expected": 35.693,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.69279686518904,
+      "diff": 0.000203134810959682,
+      "node": "n6",
+      "path": "metrics.F_age",
+      "entry": 52
+     },
+     "reported": {
+      "pass": true,
+      "value": 35.69,
+      "diff": 0.0030000000000001137,
+      "via": "rounding",
+      "node": "n6",
+      "claimEntry": 140,
+      "text": "| fb_mg, age | F(1, 60) = 35.69, p < 0.0001, Holm p = 1.8e-6 (significant) | Not reported | 72 pooled samples (two abdomens each) | Three-way factorial ANOVA, type I sums of squares, post-hoc none, alpha 0.05 | anova_factorial, file 1 |"
+     }
+    },
+    {
+     "key": "protein_f_treatment",
+     "description": "Abdominal protein, F for QMP treatment",
+     "expected": 0.032,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03156445331095737,
+      "diff": 0.00043554668904263044,
+      "node": "n6",
+      "path": "metrics.F_treatment",
+      "entry": 52
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.032,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 140,
+      "text": "| fb_mg, treatment | F(1, 60) = 0.032, p = 0.860, Holm p = 1.0 | Not reported | 72 pooled samples | Same | Same |"
+     }
+    },
+    {
+     "key": "protein_f_replicate",
+     "description": "Abdominal protein, F for replicate",
+     "expected": 36,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.99951570302398,
+      "diff": 0.00048429697601903854,
+      "node": "n6",
+      "path": "metrics.F_replicate",
+      "entry": 52
+     },
+     "reported": {
+      "pass": true,
+      "value": 36,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 140,
+      "text": "The 0.86, 36, 1.057, 0.308, 0.493 and 0.297 values come from the main calls, not from compare_options."
+     }
+    },
+    {
+     "key": "protein_p_age",
+     "description": "Abdominal protein, p for age",
+     "expected": 1.356e-7,
+     "tolerance": 1e-7,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.3560494352539e-7,
+      "diff": 4.943525390010357e-12,
+      "node": "n6",
+      "path": "metrics.p_age",
+      "entry": 52
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 140,
+      "text": null
+     }
+    },
+    {
+     "key": "protein_p_treatment",
+     "description": "Abdominal protein, p for QMP treatment",
+     "expected": 0.8596,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.8595854024736869,
+      "diff": 0.0000145975263131648,
+      "node": "n6",
+      "path": "metrics.p_treatment",
+      "entry": 52
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.86,
+      "diff": 0.00039999999999995595,
+      "via": "rounding",
+      "node": "n5",
+      "claimEntry": 140,
+      "text": "The 0.86, 36, 1.057, 0.308, 0.493 and 0.297 values come from the main calls, not from compare_options."
+     }
+    },
+    {
+     "key": "protein_f_age_x_treatment",
+     "description": "Abdominal protein, F for age by treatment",
+     "expected": 1.057,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0566528954730137,
+      "diff": 0.0003471045269862749,
+      "node": "n6",
+      "path": "metrics.F_age_x_treatment",
+      "entry": 52
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.057,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 140,
+      "text": "The 0.86, 36, 1.057, 0.308, 0.493 and 0.297 values come from the main calls, not from compare_options."
+     }
+    },
+    {
+     "key": "protein_f_age_x_replicate",
+     "description": "Abdominal protein, F for age by replicate",
+     "expected": 2.809,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.8085062251289026,
+      "diff": 0.0004937748710975853,
+      "node": "n6",
+      "path": "metrics.F_age_x_replicate",
+      "entry": 52
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.809,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 140,
+      "text": "| fb_mg, age x replicate | F(2, 60) = 2.809, p = 0.068, Holm p = 0.546 | Not reported | 72 pooled samples | Same | Same |"
+     }
+    },
+    {
+     "key": "protein_df_residual",
+     "description": "Residual degrees of freedom of the three-way ANOVA",
+     "expected": 60,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 60,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.df_residual",
+      "entry": 52
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 140,
+      "text": null
+     }
+    },
+    {
+     "key": "acini_f_age",
+     "description": "Acini area, F for age",
+     "expected": 27.78,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 27.779909487507354,
+      "diff": 0.00009051249264757644,
+      "node": "n7",
+      "path": "metrics.F_Age",
+      "entry": 55
+     },
+     "reported": {
+      "pass": true,
+      "value": 27.78,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 140,
+      "text": "| Acini area, Age | F(1, 60) = 27.78, p < 0.0001, Holm p = 2.1e-5 (significant) | Not reported | 72 glands | Three-way factorial ANOVA, type I sums of squares, post-hoc none, alpha 0.05 | anova_factorial, file 2 |"
+     }
+    },
+    {
+     "key": "acini_f_treatment",
+     "description": "Acini area, F for QMP treatment",
+     "expected": 29.156,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 29.155534150533626,
+      "diff": 0.00046584946637295843,
+      "node": "n7",
+      "path": "metrics.F_Treatment",
+      "entry": 55
+     },
+     "reported": {
+      "pass": true,
+      "value": 29.16,
+      "diff": 0.004000000000001336,
+      "via": "rounding",
+      "node": "n7",
+      "claimEntry": 140,
+      "text": "| Acini area, Treatment | F(1, 60) = 29.16, p < 0.0001, Holm p = 1.4e-5 (significant) | Not reported | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "acini_f_replicate",
+     "description": "Acini area, F for replicate",
+     "expected": 6.853,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6.853005833185857,
+      "diff": 0.000005833185857007095,
+      "node": "n7",
+      "path": "metrics.F_Replicate",
+      "entry": 55
+     },
+     "reported": {
+      "pass": true,
+      "value": 6.853,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 140,
+      "text": "| Acini area, Replicate | F(2, 60) = 6.853, p = 0.002, Holm p = 0.021 (significant) | Not reported | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "acini_p_replicate",
+     "description": "Acini area, p for replicate",
+     "expected": 0.00209,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.002086652666208499,
+      "diff": 0.0000033473337915008484,
+      "node": "n7",
+      "path": "metrics.p_Replicate",
+      "entry": 55
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.002,
+      "diff": 0.0000899999999999998,
+      "via": null,
+      "node": "n10",
+      "claimEntry": 140,
+      "text": "| Acini area, Replicate | F(2, 60) = 6.853, p = 0.002, Holm p = 0.021 (significant) | Not reported | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "acini_f_three_way",
+     "description": "Acini area, F for age by treatment by replicate",
+     "expected": 4.457,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.457195104998093,
+      "diff": 0.00019510499809349824,
+      "node": "n7",
+      "path": "metrics.F_Age_x_Treatment_x_Replicate",
+      "entry": 55
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.457,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 140,
+      "text": "| Acini area, Age x Treatment x Replicate | F(2, 60) = 4.457, p = 0.016, Holm p = 0.141 | Not reported | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "acini_p_three_way",
+     "description": "Acini area, p for age by treatment by replicate",
+     "expected": 0.01568,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.015676170637107398,
+      "diff": 0.000003829362892601718,
+      "node": "n7",
+      "path": "metrics.p_Age_x_Treatment_x_Replicate",
+      "entry": 55
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.016,
+      "diff": 0.00032000000000000084,
+      "via": "rounding",
+      "node": "n10",
+      "claimEntry": 140,
+      "text": "| Acini area, Age x Treatment x Replicate | F(2, 60) = 4.457, p = 0.016, Holm p = 0.141 | Not reported | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "fas_kruskal_chi2",
+     "description": "Kruskal-Wallis chi-squared for the four treatment groups",
+     "expected": 9.3498,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9.349822425164916,
+      "diff": 0.000022425164916128892,
+      "node": "n8",
+      "path": "metrics.H",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 9.35,
+      "diff": 0.00019999999999953388,
+      "via": "rounding",
+      "node": "n8",
+      "claimEntry": 140,
+      "text": "| fas by treatment group (order) | H = 9.350, df = 3, p = 0.025 | Not reported | 72 pooled samples, 4 groups | Kruskal-Wallis rank test, alpha 0.05 | kruskal_dunn, order |"
+     }
+    },
+    {
+     "key": "fas_kruskal_df",
+     "description": "Kruskal-Wallis degrees of freedom",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n1",
+      "path": "table.rows[0][3]",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 140,
+      "text": null
+     }
+    },
+    {
+     "key": "fas_kruskal_p",
+     "description": "Kruskal-Wallis p for the four treatment groups",
+     "expected": 0.02498,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.024983853117398966,
+      "diff": 0.000003853117398967126,
+      "node": "n8",
+      "path": "metrics.p_value",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.025,
+      "diff": 0.000020000000000002655,
+      "via": "rounding",
+      "node": "n8",
+      "claimEntry": 140,
+      "text": "| fas by treatment group (order) | H = 9.350, df = 3, p = 0.025 | Not reported | 72 pooled samples, 4 groups | Kruskal-Wallis rank test, alpha 0.05 | kruskal_dunn, order |"
+     }
+    },
+    {
+     "key": "fas_dunn_padj",
+     "description": "Dunn adjusted p, the only significant pair",
+     "expected": 0.0397,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03969327143246251,
+      "diff": 0.00000672856753748674,
+      "node": "n8",
+      "path": "metrics.min_p_adjusted",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.04,
+      "diff": 0.00030000000000000165,
+      "via": "rounding",
+      "node": "n6",
+      "claimEntry": 140,
+      "text": "| Pairwise B vs C (Bonferroni) | adjusted p = 0.040 (significant) | Not reported | 72 pooled samples | Dunn test, Bonferroni, 6 pairs | Same |"
+     }
+    },
+    {
+     "key": "fas_replicate_chi2",
+     "description": "Kruskal-Wallis chi-squared for the three replicates",
+     "expected": 23.87,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 23.87005327245052,
+      "diff": 0.00005327245051844898,
+      "node": "n9",
+      "path": "metrics.H",
+      "entry": 70
+     },
+     "reported": {
+      "pass": true,
+      "value": 23.87,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 140,
+      "text": "| fas by replicate | H = 23.870, df = 2, p < 0.0001 | Not reported | 72 pooled samples, 3 groups | Kruskal-Wallis rank test, alpha 0.05 | kruskal_dunn, replicate |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 11,
+    "inputTokens": 30,
+    "outputTokens": 18083,
+    "cacheRead": 326683,
+    "cacheWrite": 46143,
+    "toolCalls": 14,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 7,
+     "error": 5
+    },
+    "unsourced": 4,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 8
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run2/home/sessions/20261012-031347-240c/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run2",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/hpg_data.csv",
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/qmp_pooled_data.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run2/home/sessions/20261012-031347-240c/work/adjust_pvalues-1/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run2/home/sessions/20261012-031347-240c/work/kruskal_dunn-1/dunn.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 4,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "oreshkova2024-qmp-honeybee",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 221.198,
+   "session": "20261012-031613-96af",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run3/home/sessions/20261012-031613-96af",
+   "answer": "1. After a Holm correction across all 25 tests (alpha 0.05), age and replicate pass for abdominal protein, and QMP treatment does not. For acini area, age, treatment and replicate pass; the three-way interaction does not. Fas differs by replicate and does not pass for treatment order.\n\n| Measure | Value (raw p) | Holm p (25 tests) | 95% CI | n (one n is) | Test | Step |\n|---|---|---|---|---|---|---|\n| fb_mg: age | F(1, 60) = 35.69; p < 0.0001; partial eta² = 0.373 | 3.3e-06 (passes) | n/a | 72 pooled samples (two abdomens each) | Three-way ANOVA, type I SS (recorded setting) | anova_factorial, file 1 |\n| fb_mg: QMP treatment | F(1, 60) = 0.032; p = 0.860; partial eta² = 0.0005 | 1.0 | n/a | 72 pooled samples | Same | Same |\n| fb_mg: replicate | F(2, 60) = 36.00; p < 0.0001; partial eta² = 0.545 | 1.3e-09 (passes) | n/a | 72 pooled samples | Same | Same |\n| fb_mg: age x treatment | F(1, 60) = 1.057; p = 0.308; partial eta² = 0.017 | 1.0 | n/a | 72 pooled samples | Same | Same |\n| fb_mg: age x replicate | F(2, 60) = 2.809; p = 0.068; partial eta² = 0.086 | 0.887 | n/a | 72 pooled samples | Same | Same |\n| fb_mg: treatment x replicate | F(2, 60) = 0.717; p = 0.493; partial eta² = 0.023 | 1.0 | n/a | 72 pooled samples | Same | Same |\n| fb_mg: age x treatment x replicate | F(2, 60) = 1.240; p = 0.297; partial eta² = 0.040 | 1.0 | n/a | 72 pooled samples | Same | Same |\n| Acini area: age | F(1, 60) = 27.78; p < 0.0001; partial eta² = 0.316 | 4.3e-05 (passes) | n/a | 72 glands | Three-way ANOVA, type I SS (recorded setting) | anova_factorial, file 2 |\n| Acini area: treatment | F(1, 60) = 29.16; p < 0.0001; partial eta² = 0.327 | 2.8e-05 (passes) | n/a | 72 glands | Same | Same |\n| Acini area: replicate | F(2, 60) = 6.853; p = 0.0021; partial eta² = 0.186 | 0.038 (passes) | n/a | 72 glands | Same | Same |\n| Acini area: age x treatment | F(1, 60) = 0.568; p = 0.454; partial eta² = 0.009 | 1.0 | n/a | 72 glands | Same | Same |\n| Acini area: age x replicate | F(2, 60) = 1.338; p = 0.270; partial eta² = 0.043 | 1.0 | n/a | 72 glands | Same | Same |\n| Acini area: treatment x replicate | F(2, 60) = 2.369; p = 0.102; partial eta² = 0.073 | 1.0 | n/a | 72 glands | Same | Same |\n| Acini area: age x treatment x replicate | F(2, 60) = 4.457; p = 0.0157; partial eta² = 0.129 | 0.237 (does not pass) | n/a | 72 glands | Same | Same |\n| fas by treatment order | H = 9.350, df = 3, p = 0.0250 | 0.350 (does not pass) | n/a | 72 pooled samples (18 per order) | Kruskal-Wallis | kruskal_dunn, order |\n| fas, B vs C (medians 2.813 vs 1.473) | Dunn Bonferroni p = 0.0397 | 0.112 | n/a | 72 pooled samples | Dunn test, Bonferroni within 6 pairs | kruskal_dunn, order |\n| fas, A vs C | Dunn Bonferroni p = 0.0889 | 0.237 | n/a | 72 pooled samples | Same | Same |\n| fas, A vs B | Dunn Bonferroni p = 1.0 | 1.0 | n/a | 72 pooled samples | Same | Same |\n| fas, A vs D | Dunn Bonferroni p = 1.0 | 1.0 | n/a | 72 pooled samples | Same | Same |\n| fas, B vs D | Dunn Bonferroni p = 0.758 | 1.0 | n/a | 72 pooled samples | Same | Same |\n| fas, C vs D | Dunn Bonferroni p = 1.0 | 1.0 | n/a | 72 pooled samples | Same | Same |\n| fas by replicate | H = 23.870, df = 2, p < 0.0001 (6.6e-06) | 0.00014 (passes) | n/a | 72 pooled samples (24 per replicate) | Kruskal-Wallis | kruskal_dunn, replicate |\n| fas, A vs B | Dunn Bonferroni p = 7.08e-05 | 0.00046 (passes) | n/a | 72 pooled samples | Dunn test, Bonferroni within 3 pairs | kruskal_dunn, replicate |\n| fas, B vs C | Dunn Bonferroni p = 6.87e-05 | 0.00046 (passes) | n/a | 72 pooled samples | Same | Same |\n| fas, A vs C | Dunn Bonferroni p = 1.0 | 1.0 | n/a | 72 pooled samples | Same | Same |\n| Tests in this session | 25 = 14 F tests (7 terms x 2 models) + 2 Kruskal-Wallis + 9 Dunn pairs | n/a | n/a | n/a | Count (calculate) | calculate |\n\nCell-mean comparisons after the factorial ANOVA: none, per your choice. The Bonferroni correction applies only to the Dunn pairs of fas.\n\nUncertain:\n- The Holm correction across 25 tests is my proposal. The correction is your choice (test_correction). Holm p values use the raw Dunn p values.\n- All numbers come from the recorded setting: type I sums of squares, not the type 3 I requested. No comparison run was used. The tools gave no confidence intervals for F or eta². The acini design is unbalanced and Levene p = 0.0147.\n- The gland file has no bee ID. If two glands come from one bee, the 72 rows are not independent.\n\nWaits for you:\n- Confirm the correction across the 25 tests (Holm proposed), the sums of squares type for the unbalanced acini data, and whether each gland is one independent unit.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Correction for a list of p-values: holm · Type of sums of squares: 1 · Comparisons of the cell means after a factorial ANOVA: none · Correction after a rank test over many groups: bonferroni.",
+   "items": [
+    {
+     "key": "protein_f_age",
+     "description": "Abdominal protein, F for age",
+     "expected": 35.693,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.69279686518904,
+      "diff": 0.000203134810959682,
+      "node": "n6",
+      "path": "metrics.F_age",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 35.69,
+      "diff": 0.0030000000000001137,
+      "via": "rounding",
+      "node": "n6",
+      "claimEntry": 176,
+      "text": "| fb_mg: age | F(1, 60) = 35.69; p < 0.0001; partial eta² = 0.373 | 3.3e-06 (passes) | n/a | 72 pooled samples (two abdomens each) | Three-way ANOVA, type I SS (recorded setting) | anova_factorial, file 1 |"
+     }
+    },
+    {
+     "key": "protein_f_treatment",
+     "description": "Abdominal protein, F for QMP treatment",
+     "expected": 0.032,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03156445331095737,
+      "diff": 0.00043554668904263044,
+      "node": "n6",
+      "path": "metrics.F_treatment",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.032,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 176,
+      "text": "| fb_mg: QMP treatment | F(1, 60) = 0.032; p = 0.860; partial eta² = 0.0005 | 1.0 | n/a | 72 pooled samples | Same | Same |"
+     }
+    },
+    {
+     "key": "protein_f_replicate",
+     "description": "Abdominal protein, F for replicate",
+     "expected": 36,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 35.99951570302398,
+      "diff": 0.00048429697601903854,
+      "node": "n6",
+      "path": "metrics.F_replicate",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 36,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 176,
+      "text": "| fb_mg: replicate | F(2, 60) = 36.00; p < 0.0001; partial eta² = 0.545 | 1.3e-09 (passes) | n/a | 72 pooled samples | Same | Same |"
+     }
+    },
+    {
+     "key": "protein_p_age",
+     "description": "Abdominal protein, p for age",
+     "expected": 1.356e-7,
+     "tolerance": 1e-7,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.3560494352539e-7,
+      "diff": 4.943525390010357e-12,
+      "node": "n6",
+      "path": "metrics.p_age",
+      "entry": 58
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 176,
+      "text": null
+     }
+    },
+    {
+     "key": "protein_p_treatment",
+     "description": "Abdominal protein, p for QMP treatment",
+     "expected": 0.8596,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.8595854024736869,
+      "diff": 0.0000145975263131648,
+      "node": "n6",
+      "path": "metrics.p_treatment",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.86,
+      "diff": 0.00039999999999995595,
+      "via": "rounding",
+      "node": "n5",
+      "claimEntry": 176,
+      "text": "| fb_mg: QMP treatment | F(1, 60) = 0.032; p = 0.860; partial eta² = 0.0005 | 1.0 | n/a | 72 pooled samples | Same | Same |"
+     }
+    },
+    {
+     "key": "protein_f_age_x_treatment",
+     "description": "Abdominal protein, F for age by treatment",
+     "expected": 1.057,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0566528954730137,
+      "diff": 0.0003471045269862749,
+      "node": "n6",
+      "path": "metrics.F_age_x_treatment",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.057,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 176,
+      "text": "| fb_mg: age x treatment | F(1, 60) = 1.057; p = 0.308; partial eta² = 0.017 | 1.0 | n/a | 72 pooled samples | Same | Same |"
+     }
+    },
+    {
+     "key": "protein_f_age_x_replicate",
+     "description": "Abdominal protein, F for age by replicate",
+     "expected": 2.809,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.8085062251289026,
+      "diff": 0.0004937748710975853,
+      "node": "n6",
+      "path": "metrics.F_age_x_replicate",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.809,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 176,
+      "text": "| fb_mg: age x replicate | F(2, 60) = 2.809; p = 0.068; partial eta² = 0.086 | 0.887 | n/a | 72 pooled samples | Same | Same |"
+     }
+    },
+    {
+     "key": "protein_df_residual",
+     "description": "Residual degrees of freedom of the three-way ANOVA",
+     "expected": 60,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 60,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.df_residual",
+      "entry": 58
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 176,
+      "text": null
+     }
+    },
+    {
+     "key": "acini_f_age",
+     "description": "Acini area, F for age",
+     "expected": 27.78,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 27.779909487507354,
+      "diff": 0.00009051249264757644,
+      "node": "n7",
+      "path": "metrics.F_Age",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 27.78,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 176,
+      "text": "| Acini area: age | F(1, 60) = 27.78; p < 0.0001; partial eta² = 0.316 | 4.3e-05 (passes) | n/a | 72 glands | Three-way ANOVA, type I SS (recorded setting) | anova_factorial, file 2 |"
+     }
+    },
+    {
+     "key": "acini_f_treatment",
+     "description": "Acini area, F for QMP treatment",
+     "expected": 29.156,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 29.155534150533626,
+      "diff": 0.00046584946637295843,
+      "node": "n7",
+      "path": "metrics.F_Treatment",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 29.16,
+      "diff": 0.004000000000001336,
+      "via": "rounding",
+      "node": "n7",
+      "claimEntry": 176,
+      "text": "| Acini area: treatment | F(1, 60) = 29.16; p < 0.0001; partial eta² = 0.327 | 2.8e-05 (passes) | n/a | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "acini_f_replicate",
+     "description": "Acini area, F for replicate",
+     "expected": 6.853,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6.853005833185857,
+      "diff": 0.000005833185857007095,
+      "node": "n7",
+      "path": "metrics.F_Replicate",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 6.853,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 176,
+      "text": "| Acini area: replicate | F(2, 60) = 6.853; p = 0.0021; partial eta² = 0.186 | 0.038 (passes) | n/a | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "acini_p_replicate",
+     "description": "Acini area, p for replicate",
+     "expected": 0.00209,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.002086652666208499,
+      "diff": 0.0000033473337915008484,
+      "node": "n7",
+      "path": "metrics.p_Replicate",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0021,
+      "diff": 0.000010000000000000026,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 176,
+      "text": "| Acini area: replicate | F(2, 60) = 6.853; p = 0.0021; partial eta² = 0.186 | 0.038 (passes) | n/a | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "acini_f_three_way",
+     "description": "Acini area, F for age by treatment by replicate",
+     "expected": 4.457,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.457195104998093,
+      "diff": 0.00019510499809349824,
+      "node": "n7",
+      "path": "metrics.F_Age_x_Treatment_x_Replicate",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.457,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 176,
+      "text": "| Acini area: age x treatment x replicate | F(2, 60) = 4.457; p = 0.0157; partial eta² = 0.129 | 0.237 (does not pass) | n/a | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "acini_p_three_way",
+     "description": "Acini area, p for age by treatment by replicate",
+     "expected": 0.01568,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.015676170637107398,
+      "diff": 0.000003829362892601718,
+      "node": "n7",
+      "path": "metrics.p_Age_x_Treatment_x_Replicate",
+      "entry": 67
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0157,
+      "diff": 0.000019999999999999185,
+      "via": "rounding",
+      "node": "n10",
+      "claimEntry": 176,
+      "text": "| Acini area: age x treatment x replicate | F(2, 60) = 4.457; p = 0.0157; partial eta² = 0.129 | 0.237 (does not pass) | n/a | 72 glands | Same | Same |"
+     }
+    },
+    {
+     "key": "fas_kruskal_chi2",
+     "description": "Kruskal-Wallis chi-squared for the four treatment groups",
+     "expected": 9.3498,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9.349822425164916,
+      "diff": 0.000022425164916128892,
+      "node": "n8",
+      "path": "metrics.H",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 9.35,
+      "diff": 0.00019999999999953388,
+      "via": "rounding",
+      "node": "n8",
+      "claimEntry": 176,
+      "text": "| fas by treatment order | H = 9.350, df = 3, p = 0.0250 | 0.350 (does not pass) | n/a | 72 pooled samples (18 per order) | Kruskal-Wallis | kruskal_dunn, order |"
+     }
+    },
+    {
+     "key": "fas_kruskal_df",
+     "description": "Kruskal-Wallis degrees of freedom",
+     "expected": 3,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3,
+      "diff": 0,
+      "node": "n1",
+      "path": "table.rows[0][3]",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 176,
+      "text": null
+     }
+    },
+    {
+     "key": "fas_kruskal_p",
+     "description": "Kruskal-Wallis p for the four treatment groups",
+     "expected": 0.02498,
+     "tolerance": 0.00001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.024983853117398966,
+      "diff": 0.000003853117398967126,
+      "node": "n8",
+      "path": "metrics.p_value",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.025,
+      "diff": 0.000020000000000002655,
+      "via": "rounding",
+      "node": "n10",
+      "claimEntry": 176,
+      "text": "| fas by treatment order | H = 9.350, df = 3, p = 0.0250 | 0.350 (does not pass) | n/a | 72 pooled samples (18 per order) | Kruskal-Wallis | kruskal_dunn, order |"
+     }
+    },
+    {
+     "key": "fas_dunn_padj",
+     "description": "Dunn adjusted p, the only significant pair",
+     "expected": 0.0397,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03969327143246251,
+      "diff": 0.00000672856753748674,
+      "node": "n8",
+      "path": "metrics.min_p_adjusted",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0397,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 176,
+      "text": "| fas, B vs C (medians 2.813 vs 1.473) | Dunn Bonferroni p = 0.0397 | 0.112 | n/a | 72 pooled samples | Dunn test, Bonferroni within 6 pairs | kruskal_dunn, order |"
+     }
+    },
+    {
+     "key": "fas_replicate_chi2",
+     "description": "Kruskal-Wallis chi-squared for the three replicates",
+     "expected": 23.87,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 23.87005327245052,
+      "diff": 0.00005327245051844898,
+      "node": "n9",
+      "path": "metrics.H",
+      "entry": 82
+     },
+     "reported": {
+      "pass": true,
+      "value": 23.87,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 176,
+      "text": "| fas by replicate | H = 23.870, df = 2, p < 0.0001 (6.6e-06) | 0.00014 (passes) | n/a | 72 pooled samples (24 per replicate) | Kruskal-Wallis | kruskal_dunn, replicate |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 16,
+    "inputTokens": 40,
+    "outputTokens": 28054,
+    "cacheRead": 547865,
+    "cacheWrite": 55350,
+    "toolCalls": 17,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 9,
+     "error": 5
+    },
+    "unsourced": 1,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 8
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run3/home/sessions/20261012-031613-96af/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run3",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/hpg_data.csv",
+     "/Volumes/T7/guided-analysis/data/oreshkova2024-qmp-honeybee/qmp_pooled_data.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run3/home/sessions/20261012-031613-96af/work/adjust_pvalues-1/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run3/home/sessions/20261012-031613-96af/work/anova_factorial-4/anova_factorial.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run3/home/sessions/20261012-031613-96af/work/anova_factorial-5/anova_factorial.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run3/home/sessions/20261012-031613-96af/work/kruskal_dunn-1/dunn.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/oreshkova2024-qmp-honeybee/claude_claude-haiku-5-5/oreshkova2024-qmp-honeybee/run3/home/sessions/20261012-031613-96af/work/kruskal_dunn-2/dunn.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-oreshkova2024-qmp-honeybee.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-oreshkova2024-qmp-honeybee.json"
+ },
+ "summary": {
+  "cells": {
+   "oreshkova2024-qmp-honeybee": {
+    "claude:claude-haiku-5-5": {
+     "computed": 57,
+     "computedOf": 57,
+     "reported": 46,
+     "reportedOf": 48,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 57,
+    "computedOf": 57,
+    "reported": 46,
+    "reportedOf": 48,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 528.904,
+    "requests": 38,
+    "inputTokens": 100,
+    "outputTokens": 66221,
+    "cacheRead": 1210657,
+    "cacheWrite": 150206,
+    "toolCalls": 46,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 3,
+    "revisions": 3,
+    "findings_info": 11,
+    "findings_warning": 24,
+    "findings_error": 14,
+    "unsourced": 5,
+    "deviations": 2,
+    "overwritten": 2,
+    "nodes": 24
+   }
+  },
+  "skipped": []
+ }
+}

@@ -1,0 +1,715 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "korsunsky2019-harmony",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 430.058,
+   "session": "20261012-045357-9599",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599",
+   "answer": "Harmony raised batch mixing inside each cell line (median iLISI for Jurkat-labeled cells 1.00 to 1.52; for HEK293T-labeled cells 1.64 to 1.77), and the two cell lines stayed apart (median cLISI 1.00 before and after). Because the batch and the cell line are the same for the pure samples, this is not a clean batch correction.\n\n| Measure | Value | n and unit | Test | Step |\n|---|---|---|---|---|\n| Cells after QC, total | 9528 (from 9531) | 9528 cells | Count only | filter_cells |\n| Cells after QC, jurkat sample | 3255 (from 3258) | 3255 cells | Count only | filter_cells |\n| Cells after QC, t293 sample | 2885 (from 2885) | 2885 cells | Count only | filter_cells |\n| Cells after QC, mix sample | 3388 (from 3388) | 3388 cells | Count only | filter_cells |\n| Cells labeled Jurkat / HEK293T | 5028 / 4500 | 9528 cells | Correlation to pure samples | label_by_reference |\n| Median iLISI, all cells, before Harmony | 1.06 (outer tails 1.00 to 1.98) | 9528 cells | None (LISI only) | compute_lisi on X_pca |\n| Median iLISI, all cells, after Harmony | 1.66 (outer tails 1.09 to 2.00) | 9528 cells | None (LISI only) | compute_lisi on X_pca_harmony |\n| Median iLISI, Jurkat-labeled cells, before / after | 1.00 / 1.52 | 5028 cells | None (LISI only) | compute_lisi by cell_line |\n| Median iLISI, HEK293T-labeled cells, before / after | 1.64 / 1.77 | 4500 cells | None (LISI only) | compute_lisi by cell_line |\n| Median cLISI, before Harmony | 1.00 (outer tails 1.00 to 1.00) | 9528 cells | None (LISI only) | compute_lisi on X_pca |\n| Median cLISI, after Harmony | 1.00 (outer tails 1.00 to 1.00) | 9528 cells | None (LISI only) | compute_lisi on X_pca_harmony |\n| Leiden clusters | 8 (sizes 2546 to 46) | 9528 cells; resolution 0.5, 30 PCs, 15 neighbors, seed 0 | None | cluster_leiden |\n\nFinal checkpoint: /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/run_umap-1/umap.h5ad\n\nUncertain:\n- Batch and cell line are confounded in the pure samples. Harmony with batch = sample can remove the cell line difference. The cLISI of 1.00 after Harmony shows that the lines stayed apart.\n- Each cell line is in only two samples, so the per-cell iLISI maximum is 2, not 3.\n- Cell line labels come from correlation to the pure samples (median gap 0.062; 1960 cells with low gap). No confidence intervals or tests were computed. The run used recorded settings (min genes 500, max mito 20%, 1000 highly variable genes, theta 2), not my typed values.\n\nWaits for you: Nothing.\n\nStep results that the answer does not mention, from the record:\n- n2 filter_genes: Kept 18877 of 32738 genes that are present in at least 3 cells.\n- n6 normalize_log: Scaled each cell to 10000 total counts and applied log1p. Raw counts are in layers['counts']. Log values are in .raw.\n- n9 run_pca: Computed 50 principal components. The first 10 explain 29.7 percent of the variance.\n- n20 compare_embeddings: Compared 5 dimensions of X_pca and X_pca_harmony. Pearson r per dimension: minimum 0.6887, mean 0.9263.\n\nSettings used, from the decision record: Minimum genes per cell: 500 · Maximum genes per cell: 100000 · Maximum percent mitochondrial counts: 20 · Minimum cells per gene: 3 · Counts per cell after normalization: 10000 · Number of top highly variable genes (0 = use the mean and dispersion cutoffs): 1000 · Variables to regress out: none · Number of principal components for the neighbor graph: 30 · Number of neighbors: 15 · Leiden resolution: 0.5 · Random seed: 0 · Which column of the cell table holds the batch (sample, donor or run)?: sample · Harmony diversity penalty (theta): 2 · Number of principal components for Harmony and LISI: 30.",
+   "items": [
+    {
+     "key": "ilisi_before",
+     "description": "Median iLISI of the data sets before Harmony",
+     "expected": 1.01,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0023929554721762,
+      "diff": 0.007607044527823792,
+      "node": "n13",
+      "path": "metrics.mean",
+      "entry": 134
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.06,
+      "diff": 0.050000000000000044,
+      "via": "tolerance",
+      "node": "n30",
+      "claimEntry": 295,
+      "text": "| Median iLISI, all cells, before Harmony | 1.06 (outer tails 1.00 to 1.98) | 9528 cells | None (LISI only) | compute_lisi on X_pca |"
+     }
+    },
+    {
+     "key": "ilisi_after",
+     "description": "Median iLISI of the data sets after Harmony",
+     "expected": 1.59,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.6116062578037897,
+      "diff": 0.021606257803789664,
+      "node": "n30",
+      "path": "table.rows[2][3]",
+      "entry": 267
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.64,
+      "diff": 0.04999999999999982,
+      "via": "tolerance",
+      "node": "n30",
+      "claimEntry": 295,
+      "text": "Harmony raised batch mixing inside each cell line (median iLISI for Jurkat-labeled cells 1.00 to 1.52; for HEK293T-labeled cells 1.64 to 1.77), and the two cell lines stayed apart (median cLISI 1.00 before and after)."
+     }
+    },
+    {
+     "key": "clisi_before",
+     "description": "Median cLISI of the cell lines before Harmony",
+     "expected": 1,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n12",
+      "path": "table.n_rows",
+      "entry": 131
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n28",
+      "claimEntry": 295,
+      "text": "Harmony raised batch mixing inside each cell line (median iLISI for Jurkat-labeled cells 1.00 to 1.52; for HEK293T-labeled cells 1.64 to 1.77), and the two cell lines stayed apart (median cLISI 1.00 before and after)."
+     }
+    },
+    {
+     "key": "clisi_after",
+     "description": "Median cLISI of the cell lines after Harmony",
+     "expected": 1,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n12",
+      "path": "table.n_rows",
+      "entry": 131
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n28",
+      "claimEntry": 295,
+      "text": "Harmony raised batch mixing inside each cell line (median iLISI for Jurkat-labeled cells 1.00 to 1.52; for HEK293T-labeled cells 1.64 to 1.77), and the two cell lines stayed apart (median cLISI 1.00 before and after)."
+     }
+    },
+    {
+     "key": "jurkat_pure_cells_after_qc",
+     "description": "Cells of the pure Jurkat data set after quality control",
+     "expected": 3255,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3255,
+      "diff": 0,
+      "node": "n11",
+      "path": "table.rows[0][1]",
+      "entry": 124
+     },
+     "reported": {
+      "pass": true,
+      "value": 3255,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n29",
+      "claimEntry": 295,
+      "text": "| Cells after QC, jurkat sample | 3255 (from 3258) | 3255 cells | Count only | filter_cells |"
+     }
+    },
+    {
+     "key": "t293_pure_cells_after_qc",
+     "description": "Cells of the pure 293T data set after quality control (paper count)",
+     "expected": 2859,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 2885,
+      "diff": 26,
+      "node": "n11",
+      "path": "table.rows[1][3]",
+      "entry": 124
+     },
+     "reported": {
+      "pass": false,
+      "value": 2885,
+      "diff": 26,
+      "via": null,
+      "node": "n29",
+      "claimEntry": 295,
+      "text": "| Cells after QC, t293 sample | 2885 (from 2885) | 2885 cells | Count only | filter_cells |"
+     }
+    },
+    {
+     "key": "mix_jurkat_cells",
+     "description": "Jurkat cells in the 50:50 mix (paper count)",
+     "expected": 1799,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 1773,
+      "diff": 26,
+      "node": "n11",
+      "path": "table.rows[0][2]",
+      "entry": 124
+     },
+     "reported": {
+      "pass": false,
+      "value": 1960,
+      "diff": 161,
+      "via": null,
+      "node": "n10",
+      "claimEntry": 295,
+      "text": "- Cell line labels come from correlation to the pure samples (median gap 0.062; 1960 cells with low gap)."
+     }
+    },
+    {
+     "key": "mix_t293_cells",
+     "description": "293T cells in the 50:50 mix (paper count)",
+     "expected": 1565,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 1615,
+      "diff": 50,
+      "node": "n11",
+      "path": "table.rows[1][2]",
+      "entry": 124
+     },
+     "reported": {
+      "pass": false,
+      "value": 1960,
+      "diff": 395,
+      "via": null,
+      "node": "n10",
+      "claimEntry": 295,
+      "text": "- Cell line labels come from correlation to the pure samples (median gap 0.062; 1960 cells with low gap)."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 25,
+    "inputTokens": 56,
+    "outputTokens": 25743,
+    "cacheRead": 874919,
+    "cacheWrite": 61997,
+    "toolCalls": 31,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 6,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 24
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/korsunsky2019-harmony",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1",
+     "/Users/parker/Code/guided-analysis/catalog/scanpy",
+     "/Users/parker/Code/guided-analysis/catalog/harmony",
+     "/Users/parker/.cuvette/envs/scanpy",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/scanpy",
+     "/Users/parker/Code/guided-analysis/catalog/harmony"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/korsunsky2019-harmony/jurkat/filtered_matrices_mex/hg19",
+     "/Volumes/T7/guided-analysis/data/korsunsky2019-harmony/mix/filtered_matrices_mex/hg19",
+     "/Volumes/T7/guided-analysis/data/korsunsky2019-harmony/t293/filtered_matrices_mex/hg19",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/build_neighbors-1/neighbors.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/calculate_qc-1/qc.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/calculate_qc-1/qc_cells.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/cluster_leiden-5/leiden.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/compute_lisi-5/lisi_sample_X_pca.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/compute_lisi-6/lisi_sample_X_pca_harmony.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/filter_cells-1/filter_cells.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/filter_genes-1/filter_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/find_variable_genes-1/variable_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/integrate_harmony-4/harmony.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/label_by_reference-1/labeled.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/merge_samples-1/merged.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/normalize_log-1/normalized.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/run_pca-1/pca.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/run_umap-1/umap.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run1/home/sessions/20261012-045357-9599/work/scale_data-1/scaled.h5ad"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "korsunsky2019-harmony",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 427.083,
+   "session": "20261012-050110-f9a2",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2",
+   "answer": "**Harmony raised the median sample iLISI from 1.06 to 1.66, and the median cell-line cLISI stayed at 1.00. The two cell lines stayed apart, and the mix split about 52:48 between the Jurkat and HEK293T labels. The cluster count depends on the resolution.**\n\n| Measure | Value | 95% CI | n (what one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Cells after QC: Jurkat / HEK293T / mix | 3255 / 2885 / 3388 (total 9528, from 9531) | not applicable | 9528 cells | count | filter_cells, count_groups |\n| Genes after filter (min 3 cells) | 18877 (from 32738) | not applicable | 9528 cells | count | filter_genes |\n| Cutoffs used | min 500 genes, max 20% mito; upper gene cutoff removed 0 cells | not applicable | not applicable | none | filter_cells (tool defaults, you accepted) |\n| Median iLISI, sample, before Harmony (30 PCs) | 1.06 (5th–95th percentile 1.00–1.98) | not computed | 9528 cells, descriptive | none | compute_lisi |\n| Median iLISI, sample, after Harmony (theta 2, 30 PCs, seed 0) | 1.66 (5th–95th percentile 1.09–2.00) | not computed | 9528 cells, descriptive | none | compute_lisi |\n| Median cLISI, cell line, before Harmony | 1.00 (5th–95th percentile 1.00–1.00) | not computed | 9528 cells, descriptive | none | compute_lisi |\n| Median cLISI, cell line, after Harmony | 1.00 (5th–95th percentile 1.00–1.00) | not computed | 9528 cells, descriptive | none | compute_lisi |\n| Mix cells labelled Jurkat-like / HEK293T-like | 1773 / 1615 | not applicable | 3388 mix cells | count | label_by_reference, count_groups |\n| Leiden clusters at resolution 0.2 (15 neighbors, 30 PCs, seed 0) | 5 (smallest 46, largest 4405 cells) | not applicable | 9528 cells | count | compare_options on cluster_leiden |\n| Leiden clusters at resolution 0.5 (recorded setting) | 8 (smallest 46, largest 2546 cells) | not applicable | 9528 cells | count | cluster_leiden |\n| Leiden clusters at resolution 1 | 13 (smallest 46, largest 1673 cells) | not applicable | 9528 cells | count | compare_options on cluster_leiden |\n| Leiden clusters at resolution 2 | 19 (smallest 46, largest 875 cells) | not applicable | 9528 cells | count | compare_options on cluster_leiden |\n\nCheckpoint for the final step: /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/cluster_leiden-5/leiden.h5ad\n\nThe iLISI, cLISI, cell counts and mix split do not depend on the resolution. Only the cluster counts do.\n\n**Uncertain:**\n- The cluster count changes with resolution: 5, 8, 13 and 19 at 0.2, 0.5, 1 and 2. The earlier counts of 11 and 16 do not appear in any logged result, so I do not report them. The harness forced resolution 0.5 on the three direct calls, so I used compare_options for the other values.\n- The harness used 30 PCs and 1000 variable genes, not the 20 PCs and 2000 genes I passed. All numbers above use the recorded values.\n- The cell-line labels come from the pure Jurkat and HEK293T samples, so those samples are labelled correctly by construction. The batches differ by cell line, so Harmony can remove real biology. The cLISI of 1.00 after Harmony shows the cell lines did not mix.\n\n**Waits for you:** Nothing.\n\nStep results that the answer does not mention, from the record:\n- n7 normalize_log: Scaled each cell to 10000 total counts and applied log1p. Raw counts are in layers['counts']. Log values are in .raw.\n- n10 run_pca: Computed 50 principal components. The first 10 explain 29.7 percent of the variance.\n\nSettings used, from the decision record: Minimum genes per cell: 500 · Maximum genes per cell: 100000 · Maximum percent mitochondrial counts: 20 · Minimum cells per gene: 3 · Counts per cell after normalization: 10000 · Number of top highly variable genes (0 = use the mean and dispersion cutoffs): 1000 · Variables to regress out: none · Number of principal components for the neighbor graph: 30 · Number of neighbors: 15 · Leiden resolution: 0.5 · Random seed: 0 · Which column of the cell table holds the batch (sample, donor or run)?: sample · Harmony diversity penalty (theta): 2 · Number of principal components for Harmony and LISI: 30.",
+   "items": [
+    {
+     "key": "ilisi_before",
+     "description": "Median iLISI of the data sets before Harmony",
+     "expected": 1.01,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0023929554721762,
+      "diff": 0.007607044527823792,
+      "node": "n13",
+      "path": "metrics.mean",
+      "entry": 141
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.06,
+      "diff": 0.050000000000000044,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 292,
+      "text": "**Harmony raised the median sample iLISI from 1.06 to 1.66, and the median cell-line cLISI stayed at 1.00."
+     }
+    },
+    {
+     "key": "ilisi_after",
+     "description": "Median iLISI of the data sets after Harmony",
+     "expected": 1.59,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.6116062578037897,
+      "diff": 0.021606257803789664,
+      "node": "n12",
+      "path": "table.rows[2][3]",
+      "entry": 137
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.66,
+      "diff": 0.06999999999999984,
+      "via": "tolerance",
+      "node": "n18",
+      "claimEntry": 292,
+      "text": "**Harmony raised the median sample iLISI from 1.06 to 1.66, and the median cell-line cLISI stayed at 1.00."
+     }
+    },
+    {
+     "key": "clisi_before",
+     "description": "Median cLISI of the cell lines before Harmony",
+     "expected": 1,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n13",
+      "path": "metrics.median",
+      "entry": 141
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n30",
+      "claimEntry": 292,
+      "text": "**Harmony raised the median sample iLISI from 1.06 to 1.66, and the median cell-line cLISI stayed at 1.00."
+     }
+    },
+    {
+     "key": "clisi_after",
+     "description": "Median cLISI of the cell lines after Harmony",
+     "expected": 1,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n13",
+      "path": "metrics.median",
+      "entry": 141
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n30",
+      "claimEntry": 292,
+      "text": "**Harmony raised the median sample iLISI from 1.06 to 1.66, and the median cell-line cLISI stayed at 1.00."
+     }
+    },
+    {
+     "key": "jurkat_pure_cells_after_qc",
+     "description": "Cells of the pure Jurkat data set after quality control",
+     "expected": 3255,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3255,
+      "diff": 0,
+      "node": "n6",
+      "path": "table.rows[0][1]",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 3255,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n27",
+      "claimEntry": 292,
+      "text": "| Cells after QC: Jurkat / HEK293T / mix | 3255 / 2885 / 3388 (total 9528, from 9531) | not applicable | 9528 cells | count | filter_cells, count_groups |"
+     }
+    },
+    {
+     "key": "t293_pure_cells_after_qc",
+     "description": "Cells of the pure 293T data set after quality control (paper count)",
+     "expected": 2859,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 2885,
+      "diff": 26,
+      "node": "n6",
+      "path": "table.rows[2][1]",
+      "entry": 73
+     },
+     "reported": {
+      "pass": false,
+      "value": 2885,
+      "diff": 26,
+      "via": null,
+      "node": "n27",
+      "claimEntry": 292,
+      "text": "| Cells after QC: Jurkat / HEK293T / mix | 3255 / 2885 / 3388 (total 9528, from 9531) | not applicable | 9528 cells | count | filter_cells, count_groups |"
+     }
+    },
+    {
+     "key": "mix_jurkat_cells",
+     "description": "Jurkat cells in the 50:50 mix (paper count)",
+     "expected": 1799,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 1773,
+      "diff": 26,
+      "node": "n27",
+      "path": "table.rows[1][1]",
+      "entry": 219
+     },
+     "reported": {
+      "pass": false,
+      "value": 1773,
+      "diff": 26,
+      "via": null,
+      "node": "n27",
+      "claimEntry": 292,
+      "text": "| Mix cells labelled Jurkat-like / HEK293T-like | 1773 / 1615 | not applicable | 3388 mix cells | count | label_by_reference, count_groups |"
+     }
+    },
+    {
+     "key": "mix_t293_cells",
+     "description": "293T cells in the 50:50 mix (paper count)",
+     "expected": 1565,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 1615,
+      "diff": 50,
+      "node": "n27",
+      "path": "table.rows[1][2]",
+      "entry": 219
+     },
+     "reported": {
+      "pass": false,
+      "value": 1615,
+      "diff": 50,
+      "via": null,
+      "node": "n27",
+      "claimEntry": 292,
+      "text": "| Mix cells labelled Jurkat-like / HEK293T-like | 1773 / 1615 | not applicable | 3388 mix cells | count | label_by_reference, count_groups |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 24,
+    "inputTokens": 54,
+    "outputTokens": 21577,
+    "cacheRead": 828188,
+    "cacheWrite": 59260,
+    "toolCalls": 28,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 6,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 4,
+    "overwritten": 4,
+    "nodes": 23
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/korsunsky2019-harmony",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2",
+     "/Users/parker/Code/guided-analysis/catalog/scanpy",
+     "/Users/parker/Code/guided-analysis/catalog/harmony",
+     "/Users/parker/.cuvette/envs/scanpy",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/scanpy",
+     "/Users/parker/Code/guided-analysis/catalog/harmony"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/korsunsky2019-harmony/jurkat/filtered_matrices_mex/hg19",
+     "/Volumes/T7/guided-analysis/data/korsunsky2019-harmony/mix/filtered_matrices_mex/hg19",
+     "/Volumes/T7/guided-analysis/data/korsunsky2019-harmony/t293/filtered_matrices_mex/hg19",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/build_neighbors-1/neighbors.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/calculate_qc-1/qc.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/calculate_qc-1/qc_cells.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/cluster_leiden-5/leiden.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/filter_cells-1/filter_cells.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/filter_genes-1/filter_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/find_variable_genes-1/variable_genes.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/integrate_harmony-4/harmony.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/label_by_reference-1/labeled.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/merge_samples-1/merged.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/normalize_log-1/normalized.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/run_pca-1/pca.h5ad",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-c/bench-runs/korsunsky2019-harmony/claude_claude-haiku-5-5/korsunsky2019-harmony/run2/home/sessions/20261012-050110-f9a2/work/scale_data-1/scaled.h5ad"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-korsunsky2019-harmony.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-korsunsky2019-harmony.json"
+ },
+ "summary": {
+  "cells": {
+   "korsunsky2019-harmony": {
+    "claude:claude-haiku-5-5": {
+     "computed": 10,
+     "computedOf": 10,
+     "reported": 10,
+     "reportedOf": 10,
+     "runs": 2,
+     "statuses": {
+      "answer": 2
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 10,
+    "computedOf": 10,
+    "reported": 10,
+    "reportedOf": 10,
+    "runs": 2,
+    "statuses": {
+     "answer": 2
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 2,
+    "durationS": 857.1410000000001,
+    "requests": 49,
+    "inputTokens": 110,
+    "outputTokens": 47320,
+    "cacheRead": 1703107,
+    "cacheWrite": 121257,
+    "toolCalls": 59,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 2,
+    "revisions": 2,
+    "findings_info": 5,
+    "findings_warning": 12,
+    "findings_error": 2,
+    "unsourced": 0,
+    "deviations": 4,
+    "overwritten": 4,
+    "nodes": 47
+   }
+  },
+  "skipped": []
+ }
+}

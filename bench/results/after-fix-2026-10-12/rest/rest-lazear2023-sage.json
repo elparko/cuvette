@@ -1,0 +1,847 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "lazear2023-sage",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 104.984,
+   "session": "20261012-030843-9111",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run1/home/sessions/20261012-030843-9111",
+   "answer": "1. At 1% PSM FDR, 207 spectra match 47 distinct peptides. At 5% PSM FDR, the comparison run gives 242 spectra and 64 peptides. The record still uses 1%. Most peptides come from bovine serum albumin (ALBU_BOVIN).\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Target PSMs at 1% FDR | 207 | Exact count (no CI) | 207 PSMs; one PSM is one spectrum matched to one peptide | Target-decoy FDR (Sage q-value) | count at 1% (recorded setting) |\n| Distinct peptides at 1% FDR | 47 | Exact count (no CI) | 47 peptide sequences from the 207 PSMs | Target-decoy FDR | count at 1%, peptide list |\n| Target PSMs at 5% FDR | 242 | Exact count (no CI) | 242 PSMs | Target-decoy FDR | comparison run only; record not changed |\n| Distinct peptides at 5% FDR | 64 | Exact count (no CI) | 64 peptide sequences | Target-decoy FDR | comparison run only; record not changed |\n| Change from 1% to 5% | +35 PSMs (+16.9%), +17 peptides | Not computed | Same 3 BSA runs | Arithmetic only | calculate |\n| All PSMs in search | 303 (260 target, 43 decoy) | Exact count | 303 PSMs across BSA1, BSA2, BSA3 | Not applicable | search |\n| Decoy share of all PSMs | 14.2% | Not computed | 303 PSMs | Arithmetic only | calculate |\n| Protein groups at 1% FDR | 11 | Exact count | 11 protein groups | Target-decoy FDR | count at 1% |\n\nSearch settings:\n- Files: BSA1, BSA2, BSA3 (mzML). Database: standards.fasta, date not known. Protein names checked in FASTA headers.\n- Decoys: sage_reverse, tag rev_.\n- Enzyme: trypsin, 1 missed cleavage. Peptide mass window: 500 to 5000 Da. Length limits not set in the logged settings.\n- Fixed mod: C +57.0215 (carbamidomethyl). Variable mod: M +15.9949 (oxidation), max 2 per peptide.\n- Precursor tolerance: 10 ppm. Fragment tolerance: 0.5 Da (unit da).\n- Isotope error: 0 only. Max fragment charge: 1. Minimum peaks: 6.\n- Peptide list at 1%: peptides_1pct.csv.\n\nUncertain:\n- Sage version conflicts. The binary path in the search log is v0.14.7. The output file (results.json) reports 0.14.6.\n- The 1% set has only 1 decoy PSM. Counts near the threshold can change with small setting changes.\n- The 11 protein groups come from a small set. They are not a protein identification result.\n\nWaits for you:\n- Confirm the Sage version to report (v0.14.6 from the output, or v0.14.7 from the binary path).\n\nSettings used, from the decision record: Protein database (FASTA file): /Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta · Decoy strategy: sage_reverse · Decoy tag: rev_ · Digestion enzyme: trypsin · Missed cleavages: 1 · Fixed modifications: C+57.0215 · Variable modifications: M+15.9949 · Most variable modifications on one peptide: 2 · Precursor tolerance (ppm, plus or minus): 10 · Fragment tolerance (plus or minus): 0.5 · Fragment tolerance unit: da · Lowest isotope error: 0 · Highest isotope error: 0 · Highest fragment charge: 1 · Fewest peaks in a spectrum: 6 · FDR level: psm · FDR threshold: 0.01.",
+   "items": [
+    {
+     "key": "psms_result_table",
+     "description": "PSMs in the result table",
+     "expected": 303,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 303,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_psm",
+      "entry": 22
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 121,
+      "text": null
+     }
+    },
+    {
+     "key": "decoy_psms",
+     "description": "Decoy PSMs in the result table",
+     "expected": 43,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 43,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_decoy_psm",
+      "entry": 22
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 121,
+      "text": null
+     }
+    },
+    {
+     "key": "target_psms_fdr1",
+     "description": "Target PSMs at 1 percent PSM FDR",
+     "expected": 207,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 207,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_psm_pass",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 207,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 121,
+      "text": "At 1% PSM FDR, 207 spectra match 47 distinct peptides."
+     }
+    },
+    {
+     "key": "distinct_peptides",
+     "description": "Distinct peptides among the PSMs at 1 percent",
+     "expected": 47,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 47,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_peptides_pass",
+      "entry": 30
+     },
+     "reported": {
+      "pass": true,
+      "value": 47,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 121,
+      "text": "At 1% PSM FDR, 207 spectra match 47 distinct peptides."
+     }
+    },
+    {
+     "key": "decoy_psms_kept",
+     "description": "Decoy PSMs among the kept PSMs",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_decoy_pass",
+      "entry": 30
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 121,
+      "text": null
+     }
+    },
+    {
+     "key": "target_psms_fdr5",
+     "description": "Target PSMs at 5 percent PSM FDR",
+     "expected": 242,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "comparison",
+      "value": 242,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.n_psm_pass",
+      "entry": 42
+     },
+     "reported": {
+      "pass": true,
+      "value": 242,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 121,
+      "text": "At 5% PSM FDR, the comparison run gives 242 spectra and 64 peptides."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 13,
+    "inputTokens": 32,
+    "outputTokens": 14201,
+    "cacheRead": 275322,
+    "cacheWrite": 37313,
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 1,
+     "warning": 7,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run1/home/sessions/20261012-030843-9111/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run1",
+     "/Users/parker/Code/guided-analysis/catalog/sage",
+     "/Volumes/T7/guided-analysis/tools/sage",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/sage"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA1.mzML",
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA2.mzML",
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA3.mzML",
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run1/home/sessions/20261012-030843-9111/work/search_sage-1",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run1/home/sessions/20261012-030843-9111/work/search_sage-1/config.json",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run1/home/sessions/20261012-030843-9111/work/search_sage-1/results.tsv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run1/home/sessions/20261012-030843-9111/work/search_sage-1/sage_out",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run1/home/sessions/20261012-030843-9111/work/search_sage-1/sage_out/results.json"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "lazear2023-sage",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 110.663,
+   "session": "20261012-031028-cd09",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run2/home/sessions/20261012-031028-cd09",
+   "answer": "1. At 1% PSM FDR, 207 PSMs match 47 distinct peptides, and 30 of those peptides come from bovine serum albumin. At 5%, they match 242 PSMs and 64 peptides.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| PSMs at 1% PSM FDR | 207 | not applicable (count) | 207 PSMs; one PSM is one spectrum matched to one peptide, from 3 runs | Sage q-value at 0.01 | count_at_fdr |\n| Distinct peptides at 1% | 47 | not applicable (count) | 47 modified peptide sequences | Sage q-value at 0.01 | count_at_fdr |\n| Bovine serum albumin peptides at 1% | 30 (170 PSMs) | not applicable (count) | 30 peptides | Sage q-value at 0.01 | run_script (split by protein) |\n| Other-protein peptides at 1% | 17 (37 PSMs) | not applicable (count) | 17 peptides | Sage q-value at 0.01 | run_script (split by protein) |\n| Decoy PSMs passing 1% | 1 | not applicable (count) | 1 decoy PSM | Sage decoy count | count_at_fdr |\n| PSMs at 5% PSM FDR | 242 | not applicable (count) | 242 PSMs | Sage q-value at 0.05 | compare_options |\n| Distinct peptides at 5% | 64 | not applicable (count) | 64 peptides | Sage q-value at 0.05 | compare_options |\n| Decoy PSMs passing 5% | 11 | not applicable (count) | 11 decoy PSMs | Sage decoy count | run_script |\n| Change from 1% to 5%, PSMs | +35 (ratio 1.17) | not applicable | 242 vs 207 PSMs | arithmetic | calculate |\n| Change from 1% to 5%, peptides | +17 (ratio 1.36) | not applicable | 64 vs 47 peptides | arithmetic | calculate |\n| Total search | 303 PSMs, 43 decoy, 260 target | not applicable | 3 mzML runs | Sage search | search_sage |\n| Most-matched peptide at 1% | DLGEEHFK, 20 PSMs | not applicable | 20 PSMs, rechecked from the result table | Sage q-value at 0.01 | run_script (recount) |\n\nSettings used: Sage version as reported in the output file: 0.14.6. Files: BSA1, BSA2, BSA3 mzML. Database: standards.fasta (organism list and date not known to me). Decoys: sage_reverse, tag rev_. Enzyme: trypsin, 1 missed cleavage. Peptide mass limits: 500 to 5000 Da (Sage default; the run did not set length limits). Fixed mod: C +57.0215. Variable mod: M +15.9949, at most 2 per peptide. Precursor tolerance: 10 ppm. Fragment tolerance: 0.5 Da (unit da). Isotope error: 0 only. Max fragment charge 1. Minimum 6 peaks. Manual route: config at search_sage-1/config.json, run with `sage config.json`. Full peptide list: peptides_by_fdr.csv.\n\nUncertain:\n- Sage version conflicts. The output file says 0.14.6, but the binary path in the run names sage-v0.14.7. I cannot resolve this from the logs.\n- The 17 peptides from other proteins (keratin, actin, trypsin, transferrin and others) need a check against the sample list.\n- Each count is a set-level statement at FDR. It does not prove each PSM is correct, and modified forms count as separate peptides.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Protein database (FASTA file): /Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta · Decoy strategy: sage_reverse · Decoy tag: rev_ · Digestion enzyme: trypsin · Missed cleavages: 1 · Fixed modifications: C+57.0215 · Variable modifications: M+15.9949 · Most variable modifications on one peptide: 2 · Precursor tolerance (ppm, plus or minus): 10 · Fragment tolerance (plus or minus): 0.5 · Fragment tolerance unit: da · Lowest isotope error: 0 · Highest isotope error: 0 · Highest fragment charge: 1 · Fewest peaks in a spectrum: 6 · FDR level: psm · FDR threshold: 0.01.",
+   "items": [
+    {
+     "key": "psms_result_table",
+     "description": "PSMs in the result table",
+     "expected": 303,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 303,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_psm",
+      "entry": 20
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 115,
+      "text": null
+     }
+    },
+    {
+     "key": "decoy_psms",
+     "description": "Decoy PSMs in the result table",
+     "expected": 43,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 43,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_decoy_psm",
+      "entry": 20
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 115,
+      "text": null
+     }
+    },
+    {
+     "key": "target_psms_fdr1",
+     "description": "Target PSMs at 1 percent PSM FDR",
+     "expected": 207,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 207,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_psm_pass",
+      "entry": 28
+     },
+     "reported": {
+      "pass": true,
+      "value": 207,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 115,
+      "text": "At 1% PSM FDR, 207 PSMs match 47 distinct peptides, and 30 of those peptides come from bovine serum albumin."
+     }
+    },
+    {
+     "key": "distinct_peptides",
+     "description": "Distinct peptides among the PSMs at 1 percent",
+     "expected": 47,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 47,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_peptides_pass",
+      "entry": 28
+     },
+     "reported": {
+      "pass": true,
+      "value": 47,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 115,
+      "text": "At 1% PSM FDR, 207 PSMs match 47 distinct peptides, and 30 of those peptides come from bovine serum albumin."
+     }
+    },
+    {
+     "key": "decoy_psms_kept",
+     "description": "Decoy PSMs among the kept PSMs",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_decoy_pass",
+      "entry": 28
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 115,
+      "text": null
+     }
+    },
+    {
+     "key": "target_psms_fdr5",
+     "description": "Target PSMs at 5 percent PSM FDR",
+     "expected": 242,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 242,
+      "diff": 0,
+      "node": "n5",
+      "path": "stdout",
+      "entry": 51
+     },
+     "reported": {
+      "pass": true,
+      "value": 242,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 115,
+      "text": "At 5%, they match 242 PSMs and 64 peptides."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 12,
+    "inputTokens": 30,
+    "outputTokens": 13979,
+    "cacheRead": 239819,
+    "cacheWrite": 34946,
+    "toolCalls": 13,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 4,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 7
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run2/home/sessions/20261012-031028-cd09/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run2",
+     "/Users/parker/Code/guided-analysis/catalog/sage",
+     "/Volumes/T7/guided-analysis/tools/sage",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/sage"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA1.mzML",
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA2.mzML",
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA3.mzML",
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run2/home/sessions/20261012-031028-cd09/work/search_sage-1/config.json",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run2/home/sessions/20261012-031028-cd09/work/search_sage-1/results.tsv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run2/home/sessions/20261012-031028-cd09/work/search_sage-1/sage_out/results.json"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "lazear2023-sage",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 115.251,
+   "session": "20261012-031219-e263",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run3/home/sessions/20261012-031219-e263",
+   "answer": "1. The protein mix has 47 peptide sequences at 1% PSM FDR, matched by 207 spectra. At 5% FDR, the comparison run gives 242 spectra and 64 peptides.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| PSMs at 1% FDR | 207 | Not applicable (fixed count) | n = 303 PSMs searched across BSA1, BSA2, BSA3 | Count at FDR (Sage q-value) | count_at_fdr, 1% |\n| Distinct peptide sequences at 1% FDR | 47 | Not applicable | n = 207 PSMs passing 1% | Count at FDR | count_at_fdr, 1% |\n| Decoy PSMs passing at 1% FDR | 1 | Not applicable | n = 207 PSMs passing 1% | Count at FDR | count_at_fdr, 1% |\n| Protein groups at 1% FDR | 11 | Not applicable | n = 207 PSMs passing 1% | Count at FDR | count_at_fdr, 1% |\n| PSMs at 5% FDR | 242 | Not applicable | n = 303 PSMs searched | Count at FDR (comparison run) | compare_options, 5% |\n| Distinct peptide sequences at 5% FDR | 64 | Not applicable | n = 242 PSMs passing 5% | Count at FDR (comparison run) | compare_options, 5% |\n| Total PSMs searched | 303 (260 target, 43 decoy) | Not applicable | n = 303 PSMs | Sage search | search_sage |\n| Bovine serum albumin PSMs at 1% | 170 (30 distinct peptides) | Not applicable | n = 207 PSMs passing 1% | Protein name count | run_script (recount) |\n| Top peptides at 1% | DLGEEHFK (20), HLVDEPQNLIK (19), LC[+57.0215]VLHEK (17) | Not applicable | n = PSMs per peptide | Count | run_script |\n| Settings | Sage 0.14.6 (reported by the output file and by the program file itself); FASTA standards.fasta; decoys sage_reverse, tag rev_; trypsin, 1 missed cleavage; length limits not set, so the Sage default applies; peptide mass 500 to 5000 Da; fixed C +57.0215; variable M +15.9949, max 2 per peptide; precursor 10 ppm; fragment 0.5 Da; isotope error 0; max fragment charge 1; min peaks 6 | Not applicable | Not applicable | Not applicable | search_sage, config.json, results.json |\n| Manual route | config.json in the search folder, then run `sage config.json` | Not applicable | Not applicable | Not applicable | search_sage |\n\nFull peptide list at 1%: peptides_1pct.csv.\n\nUncertain:\n- Most hits are bovine serum albumin. The keratin hits are likely from handling contamination, which is an inference.\n- The 1% cut keeps only one decoy hit, so the count is coarse.\n- The binary file name says sage-v0.14.7, but the program reports 0.14.6. I report 0.14.6, the version that ran.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Protein database (FASTA file): /Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta · Decoy strategy: sage_reverse · Decoy tag: rev_ · Digestion enzyme: trypsin · Missed cleavages: 1 · Fixed modifications: C+57.0215 · Variable modifications: M+15.9949 · Most variable modifications on one peptide: 2 · Precursor tolerance (ppm, plus or minus): 10 · Fragment tolerance (plus or minus): 0.5 · Fragment tolerance unit: da · Lowest isotope error: 0 · Highest isotope error: 0 · Highest fragment charge: 1 · Fewest peaks in a spectrum: 6 · FDR level: psm · FDR threshold: 0.01.",
+   "items": [
+    {
+     "key": "psms_result_table",
+     "description": "PSMs in the result table",
+     "expected": 303,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 303,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_psm",
+      "entry": 23
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 117,
+      "text": null
+     }
+    },
+    {
+     "key": "decoy_psms",
+     "description": "Decoy PSMs in the result table",
+     "expected": 43,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 43,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_decoy_psm",
+      "entry": 23
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 117,
+      "text": null
+     }
+    },
+    {
+     "key": "target_psms_fdr1",
+     "description": "Target PSMs at 1 percent PSM FDR",
+     "expected": 207,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 207,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_psm_pass",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 207,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 117,
+      "text": "The protein mix has 47 peptide sequences at 1% PSM FDR, matched by 207 spectra."
+     }
+    },
+    {
+     "key": "distinct_peptides",
+     "description": "Distinct peptides among the PSMs at 1 percent",
+     "expected": 47,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 47,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_peptides_pass",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 47,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 117,
+      "text": "The protein mix has 47 peptide sequences at 1% PSM FDR, matched by 207 spectra."
+     }
+    },
+    {
+     "key": "decoy_psms_kept",
+     "description": "Decoy PSMs among the kept PSMs",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_decoy_pass",
+      "entry": 32
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 117,
+      "text": null
+     }
+    },
+    {
+     "key": "target_psms_fdr5",
+     "description": "Target PSMs at 5 percent PSM FDR",
+     "expected": 242,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "comparison",
+      "value": 242,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.n_psm_pass",
+      "entry": 44
+     },
+     "reported": {
+      "pass": true,
+      "value": 242,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 117,
+      "text": "At 5% FDR, the comparison run gives 242 spectra and 64 peptides."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 12,
+    "inputTokens": 30,
+    "outputTokens": 13023,
+    "cacheRead": 228985,
+    "cacheWrite": 31641,
+    "toolCalls": 13,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 3,
+     "error": 2
+    },
+    "unsourced": 1,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 4
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run3/home/sessions/20261012-031219-e263/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run3",
+     "/Users/parker/Code/guided-analysis/catalog/sage",
+     "/Volumes/T7/guided-analysis/tools/sage",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/sage"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA1.mzML",
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA2.mzML",
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/BSA3.mzML",
+     "/Volumes/T7/guided-analysis/data/lazear2023-sage/standards.fasta",
+     "/Volumes/T7/guided-analysis/tools/sage/sage-v0.14.7-aarch64-apple-darwin/sage",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run3/home/sessions/20261012-031219-e263/work/search_sage-1/config.json",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run3/home/sessions/20261012-031219-e263/work/search_sage-1/results.tsv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lazear2023-sage/claude_claude-haiku-5-5/lazear2023-sage/run3/home/sessions/20261012-031219-e263/work/search_sage-1/sage_out/results.json"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-lazear2023-sage.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-lazear2023-sage.json"
+ },
+ "summary": {
+  "cells": {
+   "lazear2023-sage": {
+    "claude:claude-haiku-5-5": {
+     "computed": 18,
+     "computedOf": 18,
+     "reported": 9,
+     "reportedOf": 9,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 18,
+    "computedOf": 18,
+    "reported": 9,
+    "reportedOf": 9,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 330.898,
+    "requests": 37,
+    "inputTokens": 92,
+    "outputTokens": 41203,
+    "cacheRead": 744126,
+    "cacheWrite": 103900,
+    "toolCalls": 41,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 3,
+    "revisions": 3,
+    "findings_info": 8,
+    "findings_warning": 14,
+    "findings_error": 5,
+    "unsourced": 1,
+    "deviations": 3,
+    "overwritten": 3,
+    "nodes": 16
+   }
+  },
+  "skipped": []
+ }
+}

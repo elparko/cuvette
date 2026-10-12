@@ -1,0 +1,2387 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "kasurinen2018-mmp14-gastric",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 138.263,
+   "session": "20261012-033043-ce6f",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run1/home/sessions/20261012-033043-ce6f",
+   "answer": "Yes. Patients with high serum MMP-14 had lower disease-specific survival (log-rank p = 0.00138; alpha 0.05), and the hazard ratio stayed above 1 after adjustment (adjusted HR 1.55).\n\n| Measure | Value | 95% CI | n (one n = one patient) | Test | Step |\n|---|---|---|---|---|---|\n| Log-rank, high vs low MMP-14 | p = 0.00138 (chi-square 10.23, df 1) | – | 240 patients, 138 deaths | Log-rank, two-sided, alpha 0.05 | kaplan_meier |\n| 5-year disease-specific survival (DSS), low MMP-14 | 0.4923 | 0.4177 to 0.5625 | 201 patients, 108 deaths | Kaplan-Meier | kaplan_meier; run_script (CI) |\n| 5-year DSS, high MMP-14 | 0.2211 | 0.1045 to 0.3647 | 39 patients, 30 deaths | Kaplan-Meier | kaplan_meier; run_script (CI) |\n| Hazard ratio (HR), high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox, Breslow ties, Wald CI, p = 0.00167 | fit_cox |\n| HR, high vs low, adjusted for age ≥67, stage (2, 3, 4) and diffuse type | 1.55 | 1.02 to 2.35 | 240 patients, 138 deaths | Cox, Breslow ties, Wald CI, p = 0.0399 | fit_cox |\n| HR, high vs low, intestinal type, unadjusted | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox, Breslow ties, Wald CI, p = 0.00374 (Holm 0.00747) | fit_cox |\n| HR, high vs low, diffuse type, unadjusted | 1.54 | 0.96 to 2.45 | 156 patients, 101 deaths | Cox, Breslow ties, Wald CI, p = 0.0711 (Holm 0.0711) | fit_cox |\n| Proportional hazards test, high MMP-14 (adjusted model) | p = 0.880 | – | 240 patients, 138 deaths | Schoenfeld rank-time test (lifelines, Efron) | run_script |\n| Count of tests in this session | 11 | – | – | Sum of 1 log-rank, 4 Cox models and 6 proportional hazards checks | calculate |\n\nUncertain:\n- The HRs differ in size between types, but no interaction test was run, so the difference is not tested. The intestinal group has 37 deaths. At 80% power, it can detect an HR of about 3.39. The diffuse group can detect about 1.95. These values use the observed standard errors.\n- The Cox models used Breslow ties, as the record sets. The proportional hazards check used Efron ties, because the lifelines routine supports only Efron. This check does not match the fitted model.\n- The high MMP-14 group has only 39 patients and 30 deaths. Its 5-year estimate is imprecise.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Correction for a list of p-values: holm · Covariates of the Cox model:  · Ties method of the Cox model: breslow · Reference level of each categorical covariate: first.",
+   "items": [
+    {
+     "key": "patients",
+     "description": "Number of patients",
+     "expected": 240,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 240,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_rows",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 136,
+      "text": null
+     }
+    },
+    {
+     "key": "events",
+     "description": "Deaths from gastric cancer",
+     "expected": 138,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 138,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.events",
+      "entry": 27
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 136,
+      "text": null
+     }
+    },
+    {
+     "key": "surv5_low",
+     "description": "5-year disease-specific survival, low MMP-14",
+     "expected": 0.4923,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.4923,
+      "diff": 0,
+      "node": "n9",
+      "path": "stdout",
+      "entry": 81
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.4923,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 136,
+      "text": "| 5-year disease-specific survival (DSS), low MMP-14 | 0.4923 | 0.4177 to 0.5625 | 201 patients, 108 deaths | Kaplan-Meier | kaplan_meier; run_script (CI) |"
+     }
+    },
+    {
+     "key": "surv5_high",
+     "description": "5-year disease-specific survival, high MMP-14",
+     "expected": 0.2211,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.2211,
+      "diff": 0,
+      "node": "n9",
+      "path": "stdout",
+      "entry": 81
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.2211,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 136,
+      "text": "| 5-year DSS, high MMP-14 | 0.2211 | 0.1045 to 0.3647 | 39 patients, 30 deaths | Kaplan-Meier | kaplan_meier; run_script (CI) |"
+     }
+    },
+    {
+     "key": "logrank_chi2",
+     "description": "Log-rank chi-square, high against low MMP-14",
+     "expected": 10.234,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10.233724130813345,
+      "diff": 0.000275869186655342,
+      "node": "n2",
+      "path": "metrics.logrank_chi2",
+      "entry": 27
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 136,
+      "text": null
+     }
+    },
+    {
+     "key": "logrank_p",
+     "description": "Log-rank p, high against low MMP-14",
+     "expected": 0.00138,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0013789596331781257,
+      "diff": 0.0000010403668218742033,
+      "node": "n2",
+      "path": "metrics.logrank_p",
+      "entry": 27
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00138,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 136,
+      "text": "Patients with high serum MMP-14 had lower disease-specific survival (log-rank p = 0.00138; alpha 0.05), and the hazard ratio stayed above 1 after adjustment (adjusted HR 1.55)."
+     }
+    },
+    {
+     "key": "hr_unadjusted",
+     "description": "Hazard ratio, high MMP-14, unadjusted",
+     "expected": 1.918,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.9180040049902363,
+      "diff": 0.0000040049902363392675,
+      "node": "n3",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.92,
+      "diff": 0.0020000000000000018,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 136,
+      "text": "| Hazard ratio (HR), high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox, Breslow ties, Wald CI, p = 0.00167 | fit_cox |"
+     }
+    },
+    {
+     "key": "hr_unadjusted_ci_lo",
+     "description": "95% CI lower bound, unadjusted",
+     "expected": 1.278,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.277804593414835,
+      "diff": 0.00019540658516503662,
+      "node": "n3",
+      "path": "table.rows[0][5]",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.28,
+      "diff": 0.0020000000000000018,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 136,
+      "text": "| Hazard ratio (HR), high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox, Breslow ties, Wald CI, p = 0.00167 | fit_cox |"
+     }
+    },
+    {
+     "key": "hr_unadjusted_ci_hi",
+     "description": "95% CI upper bound, unadjusted",
+     "expected": 2.879,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.878952996504291,
+      "diff": 0.00004700349570896378,
+      "node": "n3",
+      "path": "table.rows[0][6]",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.88,
+      "diff": 0.0009999999999998899,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 136,
+      "text": "| Hazard ratio (HR), high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox, Breslow ties, Wald CI, p = 0.00167 | fit_cox |"
+     }
+    },
+    {
+     "key": "p_unadjusted",
+     "description": "p for high MMP-14, unadjusted",
+     "expected": 0.00167,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.001672368731280222,
+      "diff": 0.0000023687312802219123,
+      "node": "n3",
+      "path": "metrics.p_mmp14_high",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00167,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 136,
+      "text": "| Hazard ratio (HR), high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox, Breslow ties, Wald CI, p = 0.00167 | fit_cox |"
+     }
+    },
+    {
+     "key": "hr_adjusted",
+     "description": "Hazard ratio, high MMP-14, adjusted for age, stage and Lauren type",
+     "expected": 1.5487,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.5487163810907045,
+      "diff": 0.000016381090704564727,
+      "node": "n4",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 46
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.55,
+      "diff": 0.0013000000000000789,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 136,
+      "text": "Patients with high serum MMP-14 had lower disease-specific survival (log-rank p = 0.00138; alpha 0.05), and the hazard ratio stayed above 1 after adjustment (adjusted HR 1.55)."
+     }
+    },
+    {
+     "key": "hr_adjusted_ci_lo",
+     "description": "95% CI lower bound, adjusted",
+     "expected": 1.0205,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0204526315327558,
+      "diff": 0.00004736846724417987,
+      "node": "n4",
+      "path": "table.rows[0][5]",
+      "entry": 46
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.02,
+      "diff": 0.0004999999999999449,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 136,
+      "text": "| HR, high vs low, adjusted for age ≥67, stage (2, 3, 4) and diffuse type | 1.55 | 1.02 to 2.35 | 240 patients, 138 deaths | Cox, Breslow ties, Wald CI, p = 0.0399 | fit_cox |"
+     }
+    },
+    {
+     "key": "hr_adjusted_ci_hi",
+     "description": "95% CI upper bound, adjusted",
+     "expected": 2.3504,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.3504495504666623,
+      "diff": 0.000049550466662218184,
+      "node": "n4",
+      "path": "table.rows[0][6]",
+      "entry": 46
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.35,
+      "diff": 0.00039999999999995595,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 136,
+      "text": "| HR, high vs low, adjusted for age ≥67, stage (2, 3, 4) and diffuse type | 1.55 | 1.02 to 2.35 | 240 patients, 138 deaths | Cox, Breslow ties, Wald CI, p = 0.0399 | fit_cox |"
+     }
+    },
+    {
+     "key": "p_adjusted",
+     "description": "p for high MMP-14, adjusted",
+     "expected": 0.0399,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.039870936825151804,
+      "diff": 0.000029063174848194262,
+      "node": "n4",
+      "path": "metrics.p_mmp14_high",
+      "entry": 46
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0399,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 136,
+      "text": "| HR, high vs low, adjusted for age ≥67, stage (2, 3, 4) and diffuse type | 1.55 | 1.02 to 2.35 | 240 patients, 138 deaths | Cox, Breslow ties, Wald CI, p = 0.0399 | fit_cox |"
+     }
+    },
+    {
+     "key": "hr_age_ge67",
+     "description": "Adjusted hazard ratio, age 67 or more",
+     "expected": 2.516,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.51564259024777,
+      "diff": 0.00035740975223008675,
+      "node": "n4",
+      "path": "metrics.hr_age_ge67",
+      "entry": 46
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 136,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_stage2",
+     "description": "Adjusted hazard ratio, stage II",
+     "expected": 6.876,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6.8752890449415585,
+      "diff": 0.0007109550584418756,
+      "node": "n4",
+      "path": "metrics.hr_stage2",
+      "entry": 46
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 136,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_stage3",
+     "description": "Adjusted hazard ratio, stage III",
+     "expected": 22.01,
+     "tolerance": 0.05,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22.013805915407854,
+      "diff": 0.003805915407852467,
+      "node": "n4",
+      "path": "metrics.hr_stage3",
+      "entry": 46
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 136,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_stage4",
+     "description": "Adjusted hazard ratio, stage IV",
+     "expected": 74.45,
+     "tolerance": 0.2,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 74.45261022193131,
+      "diff": 0.0026102219313060004,
+      "node": "n4",
+      "path": "metrics.hr_stage4",
+      "entry": 46
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 136,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_diffuse",
+     "description": "Adjusted hazard ratio, diffuse type",
+     "expected": 2.232,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.2322036161561005,
+      "diff": 0.00020361615610031691,
+      "node": "n4",
+      "path": "metrics.hr_diffuse",
+      "entry": 46
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 136,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_intestinal",
+     "description": "Hazard ratio, high MMP-14, intestinal type",
+     "expected": 3.542,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.542426283411257,
+      "diff": 0.00042628341125716673,
+      "node": "n7",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.54,
+      "diff": 0.0019999999999997797,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 136,
+      "text": "| HR, high vs low, intestinal type, unadjusted | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox, Breslow ties, Wald CI, p = 0.00374 (Holm 0.00747) | fit_cox |"
+     }
+    },
+    {
+     "key": "hr_intestinal_ci_lo",
+     "description": "95% CI lower bound, intestinal type",
+     "expected": 1.507,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.5065896570608681,
+      "diff": 0.0004103429391317803,
+      "node": "n7",
+      "path": "table.rows[0][5]",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.51,
+      "diff": 0.0030000000000001137,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 136,
+      "text": "| HR, high vs low, intestinal type, unadjusted | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox, Breslow ties, Wald CI, p = 0.00374 (Holm 0.00747) | fit_cox |"
+     }
+    },
+    {
+     "key": "hr_intestinal_ci_hi",
+     "description": "95% CI upper bound, intestinal type",
+     "expected": 8.329,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8.32926465052448,
+      "diff": 0.0002646505244801034,
+      "node": "n7",
+      "path": "table.rows[0][6]",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 8.33,
+      "diff": 0.0009999999999994458,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 136,
+      "text": "| HR, high vs low, intestinal type, unadjusted | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox, Breslow ties, Wald CI, p = 0.00374 (Holm 0.00747) | fit_cox |"
+     }
+    },
+    {
+     "key": "p_intestinal",
+     "description": "p for high MMP-14, intestinal type",
+     "expected": 0.00374,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0037373091162939383,
+      "diff": 0.0000026908837060615233,
+      "node": "n7",
+      "path": "metrics.p_mmp14_high",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00374,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 136,
+      "text": "| HR, high vs low, intestinal type, unadjusted | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox, Breslow ties, Wald CI, p = 0.00374 (Holm 0.00747) | fit_cox |"
+     }
+    },
+    {
+     "key": "hr_diffuse_type",
+     "description": "Hazard ratio, high MMP-14, diffuse type",
+     "expected": 1.5355,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.5355232656807907,
+      "diff": 0.000023265680790585108,
+      "node": "n8",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 72
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.54,
+      "diff": 0.0044999999999999485,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 136,
+      "text": "| HR, high vs low, diffuse type, unadjusted | 1.54 | 0.96 to 2.45 | 156 patients, 101 deaths | Cox, Breslow ties, Wald CI, p = 0.0711 (Holm 0.0711) | fit_cox |"
+     }
+    },
+    {
+     "key": "p_diffuse_type",
+     "description": "p for high MMP-14, diffuse type",
+     "expected": 0.0711,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.07105188909015299,
+      "diff": 0.00004811090984700728,
+      "node": "n8",
+      "path": "metrics.p_mmp14_high",
+      "entry": 72
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0711,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 136,
+      "text": "| HR, high vs low, diffuse type, unadjusted | 1.54 | 0.96 to 2.45 | 156 patients, 101 deaths | Cox, Breslow ties, Wald CI, p = 0.0711 (Holm 0.0711) | fit_cox |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 11,
+    "inputTokens": 26,
+    "outputTokens": 13262,
+    "cacheRead": 280975,
+    "cacheWrite": 41252,
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 7,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 12
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run1/home/sessions/20261012-033043-ce6f/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run1",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric.csv",
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric_diffuse.csv",
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric_intestinal.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run1/home/sessions/20261012-033043-ce6f/work/adjust_pvalues-1/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run1/home/sessions/20261012-033043-ce6f/work/inspect_table-1/columns.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run1/home/sessions/20261012-033043-ce6f/work/kaplan_meier-1/kaplan_meier.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "kasurinen2018-mmp14-gastric",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 156.681,
+   "session": "20261012-033302-e3e9",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run2/home/sessions/20261012-033302-e3e9",
+   "answer": "High serum MMP-14 patients had lower disease-specific survival (log-rank p = 0.00138; Holm-adjusted p = 0.00689 across five tests, alpha 0.05). The adjusted hazard ratio is not significant after correction (Holm p = 0.0797).\n\n| Measure | Value | 95% CI | n (one n = one patient) | Test | Step |\n|---|---|---|---|---|---|\n| 5-year DSS, low MMP-14 | 0.492 | Not given by tool | 201 patients, 108 deaths | Kaplan-Meier | Kaplan-Meier, all patients |\n| 5-year DSS, high MMP-14 | 0.221 | Not given by tool | 39 patients, 30 deaths | Kaplan-Meier | Kaplan-Meier, all patients |\n| Log-rank p, high vs low | p = 0.00138 (chi-square 10.23, df 1); Holm 0.00689 | Not applicable | 240 patients, 138 deaths | Log-rank, two-sided, alpha 0.05 | Kaplan-Meier |\n| HR, high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox model, Wald p = 0.00167; Holm 0.00689 | Cox, unadjusted |\n| HR, high vs low, adjusted for age_ge67, stage2-4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 deaths | Cox model, Wald p = 0.0399; Holm 0.0797 | Cox, adjusted |\n| HR, high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox model, Wald p = 0.00374; Holm 0.0112 | Cox, intestinal file |\n| HR, high vs low, diffuse type | 1.54 | 0.96 to 2.45 | 156 patients, 101 deaths | Cox model, Wald p = 0.0711; Holm 0.0797 | Cox, diffuse file |\n| Tests counted for this question | 5 | Not applicable | 240 patients | Holm across all five p values | Holm adjustment |\n| PH test, overall unadjusted (mmp14_high) | p = 0.627 | Not applicable | 240 patients, 138 deaths | Scaled Schoenfeld residual test, rank time | PH check |\n| PH test, overall adjusted (six covariates) | p = 0.418 to 0.910; all above 0.05 | Not applicable | 240 patients, 138 deaths | Same test, per covariate | PH check |\n| PH test, intestinal (mmp14_high) | p = 0.482 | Not applicable | 84 patients, 37 deaths | Same test | PH check |\n| PH test, diffuse (mmp14_high) | p = 0.343 | Not applicable | 156 patients, 101 deaths | Same test | PH check |\n\nUncertain:\n- The PH check ran outside the record. It used Efron ties in lifelines. The Cox results use Breslow, the recorded ties method.\n- The subgroup estimates are imprecise. The MMP-14 by Lauren type interaction was not tested.\n- The 5-year survival confidence intervals were not given by the tool.\n\nWaits for you:\n- Confirm the adjusted model covariates: age_ge67, stage2, stage3, stage4 and diffuse. Your request named them, but the covariate field in the record is blank.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Correction for a list of p-values: holm · Covariates of the Cox model:  · Ties method of the Cox model: breslow · Reference level of each categorical covariate: first.",
+   "items": [
+    {
+     "key": "patients",
+     "description": "Number of patients",
+     "expected": 240,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 240,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_rows",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 149,
+      "text": null
+     }
+    },
+    {
+     "key": "events",
+     "description": "Deaths from gastric cancer",
+     "expected": 138,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 138,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.events",
+      "entry": 34
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 149,
+      "text": null
+     }
+    },
+    {
+     "key": "surv5_low",
+     "description": "5-year disease-specific survival, low MMP-14",
+     "expected": 0.4923,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.49227532336347957,
+      "diff": 0.000024676636520448714,
+      "node": "n2",
+      "path": "table.rows[0][4]",
+      "entry": 34
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.492,
+      "diff": 0.00030000000000002247,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 149,
+      "text": "| 5-year DSS, low MMP-14 | 0.492 | Not given by tool | 201 patients, 108 deaths | Kaplan-Meier | Kaplan-Meier, all patients |"
+     }
+    },
+    {
+     "key": "surv5_high",
+     "description": "5-year disease-specific survival, high MMP-14",
+     "expected": 0.2211,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.2210526315789474,
+      "diff": 0.00004736842105260153,
+      "node": "n2",
+      "path": "table.rows[1][4]",
+      "entry": 34
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.221,
+      "diff": 0.00009999999999998899,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 149,
+      "text": "| 5-year DSS, high MMP-14 | 0.221 | Not given by tool | 39 patients, 30 deaths | Kaplan-Meier | Kaplan-Meier, all patients |"
+     }
+    },
+    {
+     "key": "logrank_chi2",
+     "description": "Log-rank chi-square, high against low MMP-14",
+     "expected": 10.234,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10.233724130813345,
+      "diff": 0.000275869186655342,
+      "node": "n2",
+      "path": "metrics.logrank_chi2",
+      "entry": 34
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 149,
+      "text": null
+     }
+    },
+    {
+     "key": "logrank_p",
+     "description": "Log-rank p, high against low MMP-14",
+     "expected": 0.00138,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0013789596331781257,
+      "diff": 0.0000010403668218742033,
+      "node": "n2",
+      "path": "metrics.logrank_p",
+      "entry": 34
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00138,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 149,
+      "text": "High serum MMP-14 patients had lower disease-specific survival (log-rank p = 0.00138; Holm-adjusted p = 0.00689 across five tests, alpha 0.05)."
+     }
+    },
+    {
+     "key": "hr_unadjusted",
+     "description": "Hazard ratio, high MMP-14, unadjusted",
+     "expected": 1.918,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.9180040049902363,
+      "diff": 0.0000040049902363392675,
+      "node": "n3",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 60
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.92,
+      "diff": 0.0020000000000000018,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox model, Wald p = 0.00167; Holm 0.00689 | Cox, unadjusted |"
+     }
+    },
+    {
+     "key": "hr_unadjusted_ci_lo",
+     "description": "95% CI lower bound, unadjusted",
+     "expected": 1.278,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.277804593414835,
+      "diff": 0.00019540658516503662,
+      "node": "n3",
+      "path": "table.rows[0][5]",
+      "entry": 60
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.28,
+      "diff": 0.0020000000000000018,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox model, Wald p = 0.00167; Holm 0.00689 | Cox, unadjusted |"
+     }
+    },
+    {
+     "key": "hr_unadjusted_ci_hi",
+     "description": "95% CI upper bound, unadjusted",
+     "expected": 2.879,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.878952996504291,
+      "diff": 0.00004700349570896378,
+      "node": "n3",
+      "path": "table.rows[0][6]",
+      "entry": 60
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.88,
+      "diff": 0.0009999999999998899,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox model, Wald p = 0.00167; Holm 0.00689 | Cox, unadjusted |"
+     }
+    },
+    {
+     "key": "p_unadjusted",
+     "description": "p for high MMP-14, unadjusted",
+     "expected": 0.00167,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.001672368731280222,
+      "diff": 0.0000023687312802219123,
+      "node": "n3",
+      "path": "metrics.p_mmp14_high",
+      "entry": 60
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00167,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 deaths | Cox model, Wald p = 0.00167; Holm 0.00689 | Cox, unadjusted |"
+     }
+    },
+    {
+     "key": "hr_adjusted",
+     "description": "Hazard ratio, high MMP-14, adjusted for age, stage and Lauren type",
+     "expected": 1.5487,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.5487163810907045,
+      "diff": 0.000016381090704564727,
+      "node": "n4",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.55,
+      "diff": 0.0013000000000000789,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, adjusted for age_ge67, stage2-4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 deaths | Cox model, Wald p = 0.0399; Holm 0.0797 | Cox, adjusted |"
+     }
+    },
+    {
+     "key": "hr_adjusted_ci_lo",
+     "description": "95% CI lower bound, adjusted",
+     "expected": 1.0205,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0204526315327558,
+      "diff": 0.00004736846724417987,
+      "node": "n4",
+      "path": "table.rows[0][5]",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.02,
+      "diff": 0.0004999999999999449,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, adjusted for age_ge67, stage2-4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 deaths | Cox model, Wald p = 0.0399; Holm 0.0797 | Cox, adjusted |"
+     }
+    },
+    {
+     "key": "hr_adjusted_ci_hi",
+     "description": "95% CI upper bound, adjusted",
+     "expected": 2.3504,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.3504495504666623,
+      "diff": 0.000049550466662218184,
+      "node": "n4",
+      "path": "table.rows[0][6]",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.35,
+      "diff": 0.00039999999999995595,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, adjusted for age_ge67, stage2-4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 deaths | Cox model, Wald p = 0.0399; Holm 0.0797 | Cox, adjusted |"
+     }
+    },
+    {
+     "key": "p_adjusted",
+     "description": "p for high MMP-14, adjusted",
+     "expected": 0.0399,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.039870936825151804,
+      "diff": 0.000029063174848194262,
+      "node": "n4",
+      "path": "metrics.p_mmp14_high",
+      "entry": 64
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0399,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, adjusted for age_ge67, stage2-4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 deaths | Cox model, Wald p = 0.0399; Holm 0.0797 | Cox, adjusted |"
+     }
+    },
+    {
+     "key": "hr_age_ge67",
+     "description": "Adjusted hazard ratio, age 67 or more",
+     "expected": 2.516,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.51564259024777,
+      "diff": 0.00035740975223008675,
+      "node": "n4",
+      "path": "metrics.hr_age_ge67",
+      "entry": 64
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 149,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_stage2",
+     "description": "Adjusted hazard ratio, stage II",
+     "expected": 6.876,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6.8752890449415585,
+      "diff": 0.0007109550584418756,
+      "node": "n4",
+      "path": "metrics.hr_stage2",
+      "entry": 64
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 149,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_stage3",
+     "description": "Adjusted hazard ratio, stage III",
+     "expected": 22.01,
+     "tolerance": 0.05,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22.013805915407854,
+      "diff": 0.003805915407852467,
+      "node": "n4",
+      "path": "metrics.hr_stage3",
+      "entry": 64
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 149,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_stage4",
+     "description": "Adjusted hazard ratio, stage IV",
+     "expected": 74.45,
+     "tolerance": 0.2,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 74.45261022193131,
+      "diff": 0.0026102219313060004,
+      "node": "n4",
+      "path": "metrics.hr_stage4",
+      "entry": 64
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 149,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_diffuse",
+     "description": "Adjusted hazard ratio, diffuse type",
+     "expected": 2.232,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.2322036161561005,
+      "diff": 0.00020361615610031691,
+      "node": "n4",
+      "path": "metrics.hr_diffuse",
+      "entry": 64
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 149,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_intestinal",
+     "description": "Hazard ratio, high MMP-14, intestinal type",
+     "expected": 3.542,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.542426283411257,
+      "diff": 0.00042628341125716673,
+      "node": "n5",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.54,
+      "diff": 0.0019999999999997797,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox model, Wald p = 0.00374; Holm 0.0112 | Cox, intestinal file |"
+     }
+    },
+    {
+     "key": "hr_intestinal_ci_lo",
+     "description": "95% CI lower bound, intestinal type",
+     "expected": 1.507,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.5065896570608681,
+      "diff": 0.0004103429391317803,
+      "node": "n5",
+      "path": "table.rows[0][5]",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.51,
+      "diff": 0.0030000000000001137,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox model, Wald p = 0.00374; Holm 0.0112 | Cox, intestinal file |"
+     }
+    },
+    {
+     "key": "hr_intestinal_ci_hi",
+     "description": "95% CI upper bound, intestinal type",
+     "expected": 8.329,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8.32926465052448,
+      "diff": 0.0002646505244801034,
+      "node": "n5",
+      "path": "table.rows[0][6]",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 8.33,
+      "diff": 0.0009999999999994458,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox model, Wald p = 0.00374; Holm 0.0112 | Cox, intestinal file |"
+     }
+    },
+    {
+     "key": "p_intestinal",
+     "description": "p for high MMP-14, intestinal type",
+     "expected": 0.00374,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0037373091162939383,
+      "diff": 0.0000026908837060615233,
+      "node": "n5",
+      "path": "metrics.p_mmp14_high",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00374,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 deaths | Cox model, Wald p = 0.00374; Holm 0.0112 | Cox, intestinal file |"
+     }
+    },
+    {
+     "key": "hr_diffuse_type",
+     "description": "Hazard ratio, high MMP-14, diffuse type",
+     "expected": 1.5355,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.5355232656807907,
+      "diff": 0.000023265680790585108,
+      "node": "n6",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 77
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.54,
+      "diff": 0.0044999999999999485,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, diffuse type | 1.54 | 0.96 to 2.45 | 156 patients, 101 deaths | Cox model, Wald p = 0.0711; Holm 0.0797 | Cox, diffuse file |"
+     }
+    },
+    {
+     "key": "p_diffuse_type",
+     "description": "p for high MMP-14, diffuse type",
+     "expected": 0.0711,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.07105188909015299,
+      "diff": 0.00004811090984700728,
+      "node": "n6",
+      "path": "metrics.p_mmp14_high",
+      "entry": 77
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0711,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 149,
+      "text": "| HR, high vs low, diffuse type | 1.54 | 0.96 to 2.45 | 156 patients, 101 deaths | Cox model, Wald p = 0.0711; Holm 0.0797 | Cox, diffuse file |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 15,
+    "inputTokens": 36,
+    "outputTokens": 17293,
+    "cacheRead": 386877,
+    "cacheWrite": 42312,
+    "toolCalls": 15,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 5,
+     "error": 3
+    },
+    "unsourced": 0,
+    "deviations": 3,
+    "overwritten": 3,
+    "nodes": 9
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run2/home/sessions/20261012-033302-e3e9/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run2",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric",
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric.csv",
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric_diffuse.csv",
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric_intestinal.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run2/home/sessions/20261012-033302-e3e9/work/adjust_pvalues-1/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run2/home/sessions/20261012-033302-e3e9/work/adjust_pvalues-2/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run2/home/sessions/20261012-033302-e3e9/work/inspect_table-1/columns.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run2/home/sessions/20261012-033302-e3e9/work/kaplan_meier-1/kaplan_meier.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "kasurinen2018-mmp14-gastric",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 138.871,
+   "session": "20261012-033538-36a1",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run3/home/sessions/20261012-033538-36a1",
+   "answer": "Yes. Patients with high serum MMP-14 had worse disease-specific survival (log-rank p = 0.00138; Holm-adjusted p = 0.0069 across the five tests of this question; two-sided, alpha 0.05).\n\n| Measure | Value | 95% CI | n (one n = one patient) | Test | Step | Holm p (5 tests) |\n|---|---|---|---|---|---|---|\n| 5-year DSS, low MMP-14 | 0.492 | 0.418 to 0.562 | 201 patients, 108 events | Kaplan-Meier | kaplan_meier | not a test |\n| 5-year DSS, high MMP-14 | 0.221 | 0.105 to 0.365 | 39 patients, 30 events | Kaplan-Meier | kaplan_meier | not a test |\n| Log-rank, high vs low | chi-square 10.23 | not applicable | 240 patients, 138 events | Log-rank, df 1, two-sided | kaplan_meier | 0.0069 (raw 0.00138) |\n| HR high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.0069 (raw 0.00167) |\n| HR high vs low, adjusted for age_ge67, stage2–4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.080 (raw 0.0399) |\n| HR high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 events | Cox, unadjusted, Wald CI, two-sided | fit_cox | 0.0112 (raw 0.00374) |\n| HR high vs low, diffuse type | 1.54 | 0.96 to 2.45 | 156 patients, 101 events | Cox, unadjusted, Wald CI, two-sided | fit_cox | 0.080 (raw 0.0711) |\n| Count: all patients | 240 | not applicable | 240 patients, 138 deaths from gastric cancer | not applicable | kaplan_meier | not applicable |\n| Count: MMP-14 low / high | 201 / 39 | not applicable | 240 patients | not applicable | kaplan_meier | not applicable |\n| Count: intestinal / diffuse | 84 / 156 | not applicable | 240 patients | not applicable | inspect_table | not applicable |\n\nUncertain:\n- The adjusted model uses the covariates named in your request. The record has no covariate or strata decision, and no strata were used. Holm correction uses 5 tests. With the 4 proportional hazards checks added (9 tests), the MMP-14 log-rank p is 0.012, the unadjusted Cox p is 0.013, and the intestinal Cox p is 0.026.\n- The proportional hazards p values for MMP-14 are 0.63 (all, unadjusted), 0.88 (all, adjusted), 0.48 (intestinal) and 0.34 (diffuse). None fails at alpha 0.05.\n- The subgroup hazard ratios differ, but no interaction test was run. The intestinal group has 37 events, so its estimate is imprecise. I did not calculate the smallest effect detectable at 80% power.\n\nWaits for you:\n- Confirm the covariates and strata for the adjusted model, and the ties method. The record uses Breslow ties, and you passed Efron. An Efron check gives the same hazard ratios to two decimals.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Correction for a list of p-values: holm · Covariates of the Cox model:  · Ties method of the Cox model: breslow · Reference level of each categorical covariate: first.",
+   "items": [
+    {
+     "key": "patients",
+     "description": "Number of patients",
+     "expected": 240,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 240,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_rows",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 131,
+      "text": null
+     }
+    },
+    {
+     "key": "events",
+     "description": "Deaths from gastric cancer",
+     "expected": 138,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 138,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.events",
+      "entry": 29
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 131,
+      "text": null
+     }
+    },
+    {
+     "key": "surv5_low",
+     "description": "5-year disease-specific survival, low MMP-14",
+     "expected": 0.4923,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.49227532336347957,
+      "diff": 0.000024676636520448714,
+      "node": "n4",
+      "path": "table.rows[0][4]",
+      "entry": 29
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.492,
+      "diff": 0.00030000000000002247,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| 5-year DSS, low MMP-14 | 0.492 | 0.418 to 0.562 | 201 patients, 108 events | Kaplan-Meier | kaplan_meier | not a test |"
+     }
+    },
+    {
+     "key": "surv5_high",
+     "description": "5-year disease-specific survival, high MMP-14",
+     "expected": 0.2211,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.221053,
+      "diff": 0.00004699999999999149,
+      "node": "n9",
+      "path": "stdout",
+      "entry": 71
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.221,
+      "diff": 0.00009999999999998899,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 131,
+      "text": "| 5-year DSS, high MMP-14 | 0.221 | 0.105 to 0.365 | 39 patients, 30 events | Kaplan-Meier | kaplan_meier | not a test |"
+     }
+    },
+    {
+     "key": "logrank_chi2",
+     "description": "Log-rank chi-square, high against low MMP-14",
+     "expected": 10.234,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10.233724130813345,
+      "diff": 0.000275869186655342,
+      "node": "n4",
+      "path": "metrics.logrank_chi2",
+      "entry": 29
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 131,
+      "text": null
+     }
+    },
+    {
+     "key": "logrank_p",
+     "description": "Log-rank p, high against low MMP-14",
+     "expected": 0.00138,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0013789596331781257,
+      "diff": 0.0000010403668218742033,
+      "node": "n4",
+      "path": "metrics.logrank_p",
+      "entry": 29
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00138,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 131,
+      "text": "Patients with high serum MMP-14 had worse disease-specific survival (log-rank p = 0.00138; Holm-adjusted p = 0.0069 across the five tests of this question; two-sided, alpha 0.05)."
+     }
+    },
+    {
+     "key": "hr_unadjusted",
+     "description": "Hazard ratio, high MMP-14, unadjusted",
+     "expected": 1.918,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.9180040049902363,
+      "diff": 0.0000040049902363392675,
+      "node": "n5",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.92,
+      "diff": 0.0020000000000000018,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.0069 (raw 0.00167) |"
+     }
+    },
+    {
+     "key": "hr_unadjusted_ci_lo",
+     "description": "95% CI lower bound, unadjusted",
+     "expected": 1.278,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.277804593414835,
+      "diff": 0.00019540658516503662,
+      "node": "n5",
+      "path": "table.rows[0][5]",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.28,
+      "diff": 0.0020000000000000018,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.0069 (raw 0.00167) |"
+     }
+    },
+    {
+     "key": "hr_unadjusted_ci_hi",
+     "description": "95% CI upper bound, unadjusted",
+     "expected": 2.879,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.878952996504291,
+      "diff": 0.00004700349570896378,
+      "node": "n5",
+      "path": "table.rows[0][6]",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.88,
+      "diff": 0.0009999999999998899,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.0069 (raw 0.00167) |"
+     }
+    },
+    {
+     "key": "p_unadjusted",
+     "description": "p for high MMP-14, unadjusted",
+     "expected": 0.00167,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.001672368731280222,
+      "diff": 0.0000023687312802219123,
+      "node": "n5",
+      "path": "metrics.p_mmp14_high",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00167,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, unadjusted | 1.92 | 1.28 to 2.88 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.0069 (raw 0.00167) |"
+     }
+    },
+    {
+     "key": "hr_adjusted",
+     "description": "Hazard ratio, high MMP-14, adjusted for age, stage and Lauren type",
+     "expected": 1.5487,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.5487163810907045,
+      "diff": 0.000016381090704564727,
+      "node": "n6",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.55,
+      "diff": 0.0013000000000000789,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 131,
+      "text": "| HR high vs low, adjusted for age_ge67, stage2–4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.080 (raw 0.0399) |"
+     }
+    },
+    {
+     "key": "hr_adjusted_ci_lo",
+     "description": "95% CI lower bound, adjusted",
+     "expected": 1.0205,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0204526315327558,
+      "diff": 0.00004736846724417987,
+      "node": "n6",
+      "path": "table.rows[0][5]",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.02,
+      "diff": 0.0004999999999999449,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, adjusted for age_ge67, stage2–4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.080 (raw 0.0399) |"
+     }
+    },
+    {
+     "key": "hr_adjusted_ci_hi",
+     "description": "95% CI upper bound, adjusted",
+     "expected": 2.3504,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.3504495504666623,
+      "diff": 0.000049550466662218184,
+      "node": "n6",
+      "path": "table.rows[0][6]",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.35,
+      "diff": 0.00039999999999995595,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, adjusted for age_ge67, stage2–4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.080 (raw 0.0399) |"
+     }
+    },
+    {
+     "key": "p_adjusted",
+     "description": "p for high MMP-14, adjusted",
+     "expected": 0.0399,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.039870936825151804,
+      "diff": 0.000029063174848194262,
+      "node": "n6",
+      "path": "metrics.p_mmp14_high",
+      "entry": 54
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0399,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, adjusted for age_ge67, stage2–4, diffuse | 1.55 | 1.02 to 2.35 | 240 patients, 138 events | Cox, Breslow ties, Wald CI, two-sided | fit_cox | 0.080 (raw 0.0399) |"
+     }
+    },
+    {
+     "key": "hr_age_ge67",
+     "description": "Adjusted hazard ratio, age 67 or more",
+     "expected": 2.516,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.51564259024777,
+      "diff": 0.00035740975223008675,
+      "node": "n6",
+      "path": "metrics.hr_age_ge67",
+      "entry": 54
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 131,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_stage2",
+     "description": "Adjusted hazard ratio, stage II",
+     "expected": 6.876,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 6.8752890449415585,
+      "diff": 0.0007109550584418756,
+      "node": "n6",
+      "path": "metrics.hr_stage2",
+      "entry": 54
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 131,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_stage3",
+     "description": "Adjusted hazard ratio, stage III",
+     "expected": 22.01,
+     "tolerance": 0.05,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 22.013805915407854,
+      "diff": 0.003805915407852467,
+      "node": "n6",
+      "path": "metrics.hr_stage3",
+      "entry": 54
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 131,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_stage4",
+     "description": "Adjusted hazard ratio, stage IV",
+     "expected": 74.45,
+     "tolerance": 0.2,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 74.45261022193131,
+      "diff": 0.0026102219313060004,
+      "node": "n6",
+      "path": "metrics.hr_stage4",
+      "entry": 54
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 131,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_diffuse",
+     "description": "Adjusted hazard ratio, diffuse type",
+     "expected": 2.232,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.2322036161561005,
+      "diff": 0.00020361615610031691,
+      "node": "n6",
+      "path": "metrics.hr_diffuse",
+      "entry": 54
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 131,
+      "text": null
+     }
+    },
+    {
+     "key": "hr_intestinal",
+     "description": "Hazard ratio, high MMP-14, intestinal type",
+     "expected": 3.542,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.542426283411257,
+      "diff": 0.00042628341125716673,
+      "node": "n7",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.54,
+      "diff": 0.0019999999999997797,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 131,
+      "text": "| HR high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 events | Cox, unadjusted, Wald CI, two-sided | fit_cox | 0.0112 (raw 0.00374) |"
+     }
+    },
+    {
+     "key": "hr_intestinal_ci_lo",
+     "description": "95% CI lower bound, intestinal type",
+     "expected": 1.507,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.5065896570608681,
+      "diff": 0.0004103429391317803,
+      "node": "n7",
+      "path": "table.rows[0][5]",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.51,
+      "diff": 0.0030000000000001137,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 events | Cox, unadjusted, Wald CI, two-sided | fit_cox | 0.0112 (raw 0.00374) |"
+     }
+    },
+    {
+     "key": "hr_intestinal_ci_hi",
+     "description": "95% CI upper bound, intestinal type",
+     "expected": 8.329,
+     "tolerance": 0.02,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8.32926465052448,
+      "diff": 0.0002646505244801034,
+      "node": "n7",
+      "path": "table.rows[0][6]",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 8.33,
+      "diff": 0.0009999999999994458,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 events | Cox, unadjusted, Wald CI, two-sided | fit_cox | 0.0112 (raw 0.00374) |"
+     }
+    },
+    {
+     "key": "p_intestinal",
+     "description": "p for high MMP-14, intestinal type",
+     "expected": 0.00374,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0037373091162939383,
+      "diff": 0.0000026908837060615233,
+      "node": "n7",
+      "path": "metrics.p_mmp14_high",
+      "entry": 58
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00374,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 131,
+      "text": "| HR high vs low, intestinal type | 3.54 | 1.51 to 8.33 | 84 patients, 37 events | Cox, unadjusted, Wald CI, two-sided | fit_cox | 0.0112 (raw 0.00374) |"
+     }
+    },
+    {
+     "key": "hr_diffuse_type",
+     "description": "Hazard ratio, high MMP-14, diffuse type",
+     "expected": 1.5355,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.5355232656807907,
+      "diff": 0.000023265680790585108,
+      "node": "n8",
+      "path": "metrics.hr_mmp14_high",
+      "entry": 62
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.54,
+      "diff": 0.0044999999999999485,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 131,
+      "text": "| HR high vs low, diffuse type | 1.54 | 0.96 to 2.45 | 156 patients, 101 events | Cox, unadjusted, Wald CI, two-sided | fit_cox | 0.080 (raw 0.0711) |"
+     }
+    },
+    {
+     "key": "p_diffuse_type",
+     "description": "p for high MMP-14, diffuse type",
+     "expected": 0.0711,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.07105188909015299,
+      "diff": 0.00004811090984700728,
+      "node": "n8",
+      "path": "metrics.p_mmp14_high",
+      "entry": 62
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0711,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 131,
+      "text": "| HR high vs low, diffuse type | 1.54 | 0.96 to 2.45 | 156 patients, 101 events | Cox, unadjusted, Wald CI, two-sided | fit_cox | 0.080 (raw 0.0711) |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 10,
+    "inputTokens": 24,
+    "outputTokens": 12796,
+    "cacheRead": 267521,
+    "cacheWrite": 40242,
+    "toolCalls": 16,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 5,
+     "error": 3
+    },
+    "unsourced": 0,
+    "deviations": 3,
+    "overwritten": 3,
+    "nodes": 12
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run3/home/sessions/20261012-033538-36a1/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run3",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric",
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric.csv",
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric_diffuse.csv",
+     "/Volumes/T7/guided-analysis/data/kasurinen2018-mmp14-gastric/mmp14_gastric_intestinal.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run3/home/sessions/20261012-033538-36a1/work/adjust_pvalues-1/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run3/home/sessions/20261012-033538-36a1/work/adjust_pvalues-2/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run3/home/sessions/20261012-033538-36a1/work/adjust_pvalues-3/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/kasurinen2018-mmp14-gastric/claude_claude-haiku-5-5/kasurinen2018-mmp14-gastric/run3/home/sessions/20261012-033538-36a1/work/kaplan_meier-1/kaplan_meier.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-kasurinen2018-mmp14-gastric.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-kasurinen2018-mmp14-gastric.json"
+ },
+ "summary": {
+  "cells": {
+   "kasurinen2018-mmp14-gastric": {
+    "claude:claude-haiku-5-5": {
+     "computed": 75,
+     "computedOf": 75,
+     "reported": 51,
+     "reportedOf": 51,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 75,
+    "computedOf": 75,
+    "reported": 51,
+    "reportedOf": 51,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 433.81500000000005,
+    "requests": 36,
+    "inputTokens": 86,
+    "outputTokens": 43351,
+    "cacheRead": 935373,
+    "cacheWrite": 123806,
+    "toolCalls": 46,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 3,
+    "findings_info": 8,
+    "findings_warning": 17,
+    "findings_error": 8,
+    "unsourced": 0,
+    "deviations": 6,
+    "overwritten": 6,
+    "nodes": 33
+   }
+  },
+  "skipped": []
+ }
+}

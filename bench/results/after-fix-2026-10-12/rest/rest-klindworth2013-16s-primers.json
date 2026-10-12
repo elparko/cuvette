@@ -1,0 +1,1315 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "klindworth2013-16s-primers",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 89.574,
+   "session": "20261012-035400-05f9",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/klindworth2013-16s-primers/claude_claude-haiku-5-5/klindworth2013-16s-primers/run1/home/sessions/20261012-035400-05f9",
+   "answer": "1. Pair 1 gives one product of 465 bp, from 1608 to 2072 on J01695.2. Pair 2 gives one product of 919 bp, from 1275 to 2193. The 16S start positions of the forward primers are 341 (pair 1) and 8 (pair 2). The Tm of CCTACGGGAGGCAGCAG is 61.39 C under your buffer conditions.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Pair 1 products | 1 | Not applicable | 1 template (J01695.2, linear, 7258 bp) | In-silico PCR, 13 bp minimum 3' match | simulate_pcr |\n| Pair 1 product start and end | 1608 to 2072 | Not applicable | 1 template | In-silico PCR | simulate_pcr |\n| Pair 1 product length | 465 bp | Not applicable | 1 template | In-silico PCR, checked by arithmetic | simulate_pcr, calculate |\n| Pair 2 products | 1 | Not applicable | 1 template (J01695.2, linear, 7258 bp) | In-silico PCR, 13 bp minimum 3' match | simulate_pcr |\n| Pair 2 product start and end | 1275 to 2193 | Not applicable | 1 template | In-silico PCR | simulate_pcr |\n| Pair 2 product length | 919 bp | Not applicable | 1 template | In-silico PCR, checked by arithmetic | simulate_pcr, calculate |\n| Pair 1 forward primer, 16S start | 341 | Not applicable | 1 primer site | Offset from 1608 with gene start 1268 | calculate |\n| Pair 2 forward primer, 16S start | 8 | Not applicable | 1 primer site | Offset from 1275 with gene start 1268 | calculate |\n| Tm of CCTACGGGAGGCAGCAG | 61.39 C | Not reported by tool | 1 primer (17 nt, GC 70.59%) | Primer3 SantaLucia method, Na 50 mM, Mg 1.5 mM, dNTP 0.6 mM, primer 200 nM | primer_properties |\n\nUncertain:\n- The minimum 3' match in the record is 13 bp. Check the products at your intended match length before you order.\n- The Tm is a calculated value. Your annealing temperature must follow the polymerase vendor rule, not the Tm.\n- In-silico PCR does not show every product that a real PCR can give.\n\nWaits for you:\n- Nothing.\n\nSettings used, from the decision record: Monovalent cations (Na+ and K+) in the PCR buffer, mM: 50 · Mg2+ in the PCR buffer, mM: 1.5 · Total dNTP in the PCR, mM: 0.6 · Primer concentration, nM: 200 · Melting temperature method: primer3 · Salt correction of the Tm: santalucia · Shortest 3' match for a primer binding site, bp: 13 · Linear or circular template: linear.",
+   "items": [
+    {
+     "key": "pair1_products",
+     "description": "Number of products from pair 1",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 102,
+      "text": "Pair 1 gives one product of 465 bp, from 1608 to 2072 on J01695.2."
+     }
+    },
+    {
+     "key": "pair1_start",
+     "description": "Start of the pair 1 product on J01695.2",
+     "expected": 1608,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1608,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.start_1based",
+      "entry": 34
+     },
+     "reported": {
+      "pass": true,
+      "value": 1608,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 102,
+      "text": "Pair 1 gives one product of 465 bp, from 1608 to 2072 on J01695.2."
+     }
+    },
+    {
+     "key": "pair1_end",
+     "description": "End of the pair 1 product on J01695.2",
+     "expected": 2072,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2072,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.end_1based",
+      "entry": 34
+     },
+     "reported": {
+      "pass": true,
+      "value": 2072,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 102,
+      "text": "Pair 1 gives one product of 465 bp, from 1608 to 2072 on J01695.2."
+     }
+    },
+    {
+     "key": "pair1_length",
+     "description": "Length of the pair 1 product, first to last base",
+     "expected": 465,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 465,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.product_bp",
+      "entry": 34
+     },
+     "reported": {
+      "pass": true,
+      "value": 465,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 102,
+      "text": "Pair 1 gives one product of 465 bp, from 1608 to 2072 on J01695.2."
+     }
+    },
+    {
+     "key": "pair1_ecoli_position",
+     "description": "Start of the pair 1 forward primer in the E. coli 16S numbering",
+     "expected": 341,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 341,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.pair1_fwd_16S_pos",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 341,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 102,
+      "text": "The 16S start positions of the forward primers are 341 (pair 1) and 8 (pair 2)."
+     }
+    },
+    {
+     "key": "pair2_products",
+     "description": "Number of products from pair 2",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 102,
+      "text": "Pair 1 gives one product of 465 bp, from 1608 to 2072 on J01695.2."
+     }
+    },
+    {
+     "key": "pair2_start",
+     "description": "Start of the pair 2 product on J01695.2",
+     "expected": 1275,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1275,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.start_1based",
+      "entry": 38
+     },
+     "reported": {
+      "pass": true,
+      "value": 1275,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 102,
+      "text": "Pair 2 gives one product of 919 bp, from 1275 to 2193."
+     }
+    },
+    {
+     "key": "pair2_end",
+     "description": "End of the pair 2 product on J01695.2",
+     "expected": 2193,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2193,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.end_1based",
+      "entry": 38
+     },
+     "reported": {
+      "pass": true,
+      "value": 2193,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 102,
+      "text": "Pair 2 gives one product of 919 bp, from 1275 to 2193."
+     }
+    },
+    {
+     "key": "pair2_length",
+     "description": "Length of the pair 2 product, first to last base",
+     "expected": 919,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 919,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.product_bp",
+      "entry": 38
+     },
+     "reported": {
+      "pass": true,
+      "value": 919,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 102,
+      "text": "Pair 2 gives one product of 919 bp, from 1275 to 2193."
+     }
+    },
+    {
+     "key": "pair2_ecoli_position",
+     "description": "Start of the pair 2 forward primer in the E. coli 16S numbering",
+     "expected": 8,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.pair2_fwd_16S_pos",
+      "entry": 73
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 102,
+      "text": "The 16S start positions of the forward primers are 341 (pair 1) and 8 (pair 2)."
+     }
+    },
+    {
+     "key": "tm_primer3",
+     "description": "Melting temperature of CCTACGGGAGGCAGCAG, in degrees C",
+     "expected": 61.39,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 61.386,
+      "diff": 0.003999999999997783,
+      "node": "n6",
+      "path": "metrics.tm_c_1",
+      "entry": 65
+     },
+     "reported": {
+      "pass": true,
+      "value": 61.39,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 102,
+      "text": "The Tm of CCTACGGGAGGCAGCAG is 61.39 C under your buffer conditions."
+     }
+    },
+    {
+     "key": "pair1_coordinate_difference",
+     "description": "Difference of the two primer start positions in the E. coli numbering (the published amplicon size)",
+     "expected": 464,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 465,
+      "diff": 1,
+      "node": "n4",
+      "path": "metrics.product_bp",
+      "entry": 34
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 102,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 7,
+    "inputTokens": 20,
+    "outputTokens": 5506,
+    "cacheRead": 107583,
+    "cacheWrite": 26805,
+    "toolCalls": 6,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 5,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 6
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/klindworth2013-16s-primers/claude_claude-haiku-5-5/klindworth2013-16s-primers/run1/home/sessions/20261012-035400-05f9/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/klindworth2013-16s-primers/claude_claude-haiku-5-5/klindworth2013-16s-primers/run1",
+     "/Users/parker/Code/guided-analysis/catalog/cloning",
+     "/Users/parker/.cuvette/envs/cloning",
+     "/Volumes/ga-envs/cloning",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/cloning"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers/ecoli_rrnb.fasta"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "klindworth2013-16s-primers",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 81.141,
+   "session": "20261012-035530-2aa8",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/klindworth2013-16s-primers/claude_claude-haiku-5-5/klindworth2013-16s-primers/run2/home/sessions/20261012-035530-2aa8",
+   "answer": "1. Each pair gives one product on J01695.2. Pair 1 gives a 465 bp product (1608–2072). Pair 2 gives a 919 bp product (1275–2193). The forward primers start at 16S positions 341 (pair 1) and 8 (pair 2).\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Pair 1 products (CCTACGGGNGGCWGCAG / GACTACHVGGGTATCTAATCC) | 1 product, 1608–2072, 465 bp, linear template J01695.2 (7258 bp) | Not applicable | 1 template | In-silico PCR | simulate_pcr |\n| Pair 2 products (AGAGTTTGATCMTGGC / CCGTCAATTCMTTTGAGTTT) | 1 product, 1275–2193, 919 bp, linear template J01695.2 | Not applicable | 1 template | In-silico PCR | simulate_pcr |\n| Minimum 3' match for a binding site | 13 bp (stated in the simulate_pcr summary) | Not applicable | 1 setting | In-silico PCR | simulate_pcr |\n| Pair 1 forward primer start in 16S gene (name: 341) | 341 (1608 − 1267) | Not applicable | 1 primer | Arithmetic from the 16S start at 1268 | calculate |\n| Pair 2 forward primer start in 16S gene (name: 8) | 8 (1275 − 1267) | Not applicable | 1 primer | Arithmetic from the 16S start at 1268 | calculate |\n| Tm of CCTACGGGAGGCAGCAG | 61.39 °C; GC 70.6% | Not calculated | 1 primer | Primer3 (SantaLucia 1998), salt correction SantaLucia; Na+ 50 mM, Mg2+ 1.5 mM, dNTP 0.6 mM, primer 200 nM | primer_properties |\n\nUncertain:\n- The in-silico PCR used a 3' match of 13 bp. I did not run the stricter 16 bp or 17 bp settings that I entered in the calls.\n- The Tm summary lists primer 200 nM, but the run record lists DNA 50 nM. Check the value in the program before you quote the Tm.\n- A real PCR can give products that the simulation does not show.\n\nWaits for you:\nNothing.\n\nSettings used, from the decision record: Monovalent cations (Na+ and K+) in the PCR buffer, mM: 50 · Mg2+ in the PCR buffer, mM: 1.5 · Total dNTP in the PCR, mM: 0.6 · Primer concentration, nM: 200 · Melting temperature method: primer3 · Salt correction of the Tm: santalucia · Shortest 3' match for a primer binding site, bp: 13 · Linear or circular template: linear.",
+   "items": [
+    {
+     "key": "pair1_products",
+     "description": "Number of products from pair 1",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 93,
+      "text": "Pair 1 gives a 465 bp product (1608–2072)."
+     }
+    },
+    {
+     "key": "pair1_start",
+     "description": "Start of the pair 1 product on J01695.2",
+     "expected": 1608,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1608,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.start_1based",
+      "entry": 29
+     },
+     "reported": {
+      "pass": true,
+      "value": 1608,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 93,
+      "text": "Pair 1 gives a 465 bp product (1608–2072)."
+     }
+    },
+    {
+     "key": "pair1_end",
+     "description": "End of the pair 1 product on J01695.2",
+     "expected": 2072,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2072,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.end_1based",
+      "entry": 29
+     },
+     "reported": {
+      "pass": true,
+      "value": 2072,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 93,
+      "text": "Pair 1 gives a 465 bp product (1608–2072)."
+     }
+    },
+    {
+     "key": "pair1_length",
+     "description": "Length of the pair 1 product, first to last base",
+     "expected": 465,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 465,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.product_bp",
+      "entry": 29
+     },
+     "reported": {
+      "pass": true,
+      "value": 465,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 93,
+      "text": "Pair 1 gives a 465 bp product (1608–2072)."
+     }
+    },
+    {
+     "key": "pair1_ecoli_position",
+     "description": "Start of the pair 1 forward primer in the E. coli 16S numbering",
+     "expected": 341,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 341,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.pair1_fwd_16S_start",
+      "entry": 63
+     },
+     "reported": {
+      "pass": true,
+      "value": 341,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 93,
+      "text": "The forward primers start at 16S positions 341 (pair 1) and 8 (pair 2)."
+     }
+    },
+    {
+     "key": "pair2_products",
+     "description": "Number of products from pair 2",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 93,
+      "text": "Pair 1 gives a 465 bp product (1608–2072)."
+     }
+    },
+    {
+     "key": "pair2_start",
+     "description": "Start of the pair 2 product on J01695.2",
+     "expected": 1275,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1275,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.start_1based",
+      "entry": 33
+     },
+     "reported": {
+      "pass": true,
+      "value": 1275,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 93,
+      "text": "Pair 2 gives a 919 bp product (1275–2193)."
+     }
+    },
+    {
+     "key": "pair2_end",
+     "description": "End of the pair 2 product on J01695.2",
+     "expected": 2193,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2193,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.end_1based",
+      "entry": 33
+     },
+     "reported": {
+      "pass": true,
+      "value": 2193,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 93,
+      "text": "Pair 2 gives a 919 bp product (1275–2193)."
+     }
+    },
+    {
+     "key": "pair2_length",
+     "description": "Length of the pair 2 product, first to last base",
+     "expected": 919,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 919,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.product_bp",
+      "entry": 33
+     },
+     "reported": {
+      "pass": true,
+      "value": 919,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 93,
+      "text": "Pair 2 gives a 919 bp product (1275–2193)."
+     }
+    },
+    {
+     "key": "pair2_ecoli_position",
+     "description": "Start of the pair 2 forward primer in the E. coli 16S numbering",
+     "expected": 8,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.pair2_fwd_16S_start",
+      "entry": 63
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 93,
+      "text": "The forward primers start at 16S positions 341 (pair 1) and 8 (pair 2)."
+     }
+    },
+    {
+     "key": "tm_primer3",
+     "description": "Melting temperature of CCTACGGGAGGCAGCAG, in degrees C",
+     "expected": 61.39,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 61.386,
+      "diff": 0.003999999999997783,
+      "node": "n7",
+      "path": "metrics.tm_c_1",
+      "entry": 71
+     },
+     "reported": {
+      "pass": true,
+      "value": 61.39,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 93,
+      "text": "| Tm of CCTACGGGAGGCAGCAG | 61.39 °C; GC 70.6% | Not calculated | 1 primer | Primer3 (SantaLucia 1998), salt correction SantaLucia; Na+ 50 mM, Mg2+ 1.5 mM, dNTP 0.6 mM, primer 200 nM | primer_properties |"
+     }
+    },
+    {
+     "key": "pair1_coordinate_difference",
+     "description": "Difference of the two primer start positions in the E. coli numbering (the published amplicon size)",
+     "expected": 464,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 465,
+      "diff": 1,
+      "node": "n4",
+      "path": "metrics.product_bp",
+      "entry": 29
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 93,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 16,
+    "outputTokens": 6329,
+    "cacheRead": 72786,
+    "cacheWrite": 23777,
+    "toolCalls": 6,
+    "failedToolCalls": 2,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 4,
+     "error": 1
+    },
+    "unsourced": 2,
+    "deviations": 1,
+    "overwritten": 1,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/klindworth2013-16s-primers/claude_claude-haiku-5-5/klindworth2013-16s-primers/run2/home/sessions/20261012-035530-2aa8/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/klindworth2013-16s-primers/claude_claude-haiku-5-5/klindworth2013-16s-primers/run2",
+     "/Users/parker/Code/guided-analysis/catalog/cloning",
+     "/Users/parker/.cuvette/envs/cloning",
+     "/Volumes/ga-envs/cloning",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/cloning"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers/ecoli_rrnb.fasta"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 2,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "klindworth2013-16s-primers",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 70.169,
+   "session": "20261012-035651-7c86",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/klindworth2013-16s-primers/claude_claude-haiku-5-5/klindworth2013-16s-primers/run3/home/sessions/20261012-035651-7c86",
+   "answer": "1. Each primer pair gives one product on the linear template J01695.2 (7258 bp). Pair 1 gives a 465 bp product from 1608 to 2072. Pair 2 gives a 919 bp product from 1275 to 2193. Forward primer 1 starts at 16S position 341, and forward primer 2 starts at 16S position 8.\n\n| Measure | Value | 95% CI | n (what one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Template | J01695.2, 7258 bp, linear (set by your answer; the file does not state topology) | Not applicable | 1 template | Not applicable | read_sequence |\n| Pair 1 products | 1 | Not applicable (exact count) | 1 in-silico PCR run | In-silico PCR, minimum 3' match 13 bp (value in the simulate_pcr summary) | simulate_pcr |\n| Pair 1 product start and end | 1608 to 2072 (top strand) | Not applicable | 1 product | In-silico PCR | simulate_pcr |\n| Pair 1 product length | 465 bp | Not applicable | 1 product | In-silico PCR | simulate_pcr, calculate |\n| Pair 2 products | 1 | Not applicable (exact count) | 1 in-silico PCR run | In-silico PCR, minimum 3' match 13 bp (value in the simulate_pcr summary) | simulate_pcr |\n| Pair 2 product start and end | 1275 to 2193 (top strand) | Not applicable | 1 product | In-silico PCR | simulate_pcr |\n| Pair 2 product length | 919 bp | Not applicable | 1 product | In-silico PCR | simulate_pcr, calculate |\n| Forward primer 1 start in 16S gene (name 341) | 341 | Not applicable | 1 primer | 1608 − 1268 + 1, with 1268 as the 16S start you gave | calculate |\n| Forward primer 2 start in 16S gene (name 8) | 8 | Not applicable | 1 primer | 1275 − 1268 + 1, with 1268 as the 16S start you gave | calculate |\n| Tm of CCTACGGGAGGCAGCAG | 61.39 °C | Not reported by the tool | 1 primer sequence | Primer3 (SantaLucia 1998), salt correction SantaLucia; Na+ 50 mM, Mg2+ 1.5 mM, dNTP 0.6 mM, primer 200 nM | primer_properties |\n\nUncertain:\n- The in-silico PCR used a minimum 3' match of 13 bp. A real PCR can give products that this simulation does not show.\n- The melting temperature is calculated, not measured. Other calculators can differ by 1 to 5 °C.\n- Pair 1 has ambiguity codes, so the real binding can differ from the unambiguous primer used for the Tm.\n\nWaits for you:\nNothing.\n\nSettings used, from the decision record: Monovalent cations (Na+ and K+) in the PCR buffer, mM: 50 · Mg2+ in the PCR buffer, mM: 1.5 · Total dNTP in the PCR, mM: 0.6 · Primer concentration, nM: 200 · Melting temperature method: primer3 · Salt correction of the Tm: santalucia · Shortest 3' match for a primer binding site, bp: 13 · Linear or circular template: linear.",
+   "items": [
+    {
+     "key": "pair1_products",
+     "description": "Number of products from pair 1",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 84,
+      "text": "Pair 1 gives a 465 bp product from 1608 to 2072."
+     }
+    },
+    {
+     "key": "pair1_start",
+     "description": "Start of the pair 1 product on J01695.2",
+     "expected": 1608,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1608,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.start_1based",
+      "entry": 29
+     },
+     "reported": {
+      "pass": true,
+      "value": 1608,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 84,
+      "text": "Pair 1 gives a 465 bp product from 1608 to 2072."
+     }
+    },
+    {
+     "key": "pair1_end",
+     "description": "End of the pair 1 product on J01695.2",
+     "expected": 2072,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2072,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.end_1based",
+      "entry": 29
+     },
+     "reported": {
+      "pass": true,
+      "value": 2072,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n4",
+      "claimEntry": 84,
+      "text": "Pair 1 gives a 465 bp product from 1608 to 2072."
+     }
+    },
+    {
+     "key": "pair1_length",
+     "description": "Length of the pair 1 product, first to last base",
+     "expected": 465,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 465,
+      "diff": 0,
+      "node": "n4",
+      "path": "metrics.product_bp",
+      "entry": 29
+     },
+     "reported": {
+      "pass": true,
+      "value": 465,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 84,
+      "text": "Pair 1 gives a 465 bp product from 1608 to 2072."
+     }
+    },
+    {
+     "key": "pair1_ecoli_position",
+     "description": "Start of the pair 1 forward primer in the E. coli 16S numbering",
+     "expected": 341,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 341,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.pair1_fwd_pos_in_16S",
+      "entry": 40
+     },
+     "reported": {
+      "pass": true,
+      "value": 341,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 84,
+      "text": "Forward primer 1 starts at 16S position 341, and forward primer 2 starts at 16S position 8."
+     }
+    },
+    {
+     "key": "pair2_products",
+     "description": "Number of products from pair 2",
+     "expected": 1,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 1,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 84,
+      "text": "Pair 1 gives a 465 bp product from 1608 to 2072."
+     }
+    },
+    {
+     "key": "pair2_start",
+     "description": "Start of the pair 2 product on J01695.2",
+     "expected": 1275,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1275,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.start_1based",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 1275,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 84,
+      "text": "Pair 2 gives a 919 bp product from 1275 to 2193."
+     }
+    },
+    {
+     "key": "pair2_end",
+     "description": "End of the pair 2 product on J01695.2",
+     "expected": 2193,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2193,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.end_1based",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 2193,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n5",
+      "claimEntry": 84,
+      "text": "Pair 2 gives a 919 bp product from 1275 to 2193."
+     }
+    },
+    {
+     "key": "pair2_length",
+     "description": "Length of the pair 2 product, first to last base",
+     "expected": 919,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 919,
+      "diff": 0,
+      "node": "n5",
+      "path": "metrics.product_bp",
+      "entry": 32
+     },
+     "reported": {
+      "pass": true,
+      "value": 919,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 84,
+      "text": "Pair 2 gives a 919 bp product from 1275 to 2193."
+     }
+    },
+    {
+     "key": "pair2_ecoli_position",
+     "description": "Start of the pair 2 forward primer in the E. coli 16S numbering",
+     "expected": 8,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 8,
+      "diff": 0,
+      "node": "n6",
+      "path": "metrics.pair2_fwd_pos_in_16S",
+      "entry": 40
+     },
+     "reported": {
+      "pass": true,
+      "value": 8,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n6",
+      "claimEntry": 84,
+      "text": "Forward primer 1 starts at 16S position 341, and forward primer 2 starts at 16S position 8."
+     }
+    },
+    {
+     "key": "tm_primer3",
+     "description": "Melting temperature of CCTACGGGAGGCAGCAG, in degrees C",
+     "expected": 61.39,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 61.386,
+      "diff": 0.003999999999997783,
+      "node": "n7",
+      "path": "metrics.tm_c_1",
+      "entry": 62
+     },
+     "reported": {
+      "pass": true,
+      "value": 61.39,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 84,
+      "text": "| Tm of CCTACGGGAGGCAGCAG | 61.39 °C | Not reported by the tool | 1 primer sequence | Primer3 (SantaLucia 1998), salt correction SantaLucia; Na+ 50 mM, Mg2+ 1.5 mM, dNTP 0.6 mM, primer 200 nM | primer_properties |"
+     }
+    },
+    {
+     "key": "pair1_coordinate_difference",
+     "description": "Difference of the two primer start positions in the E. coli numbering (the published amplicon size)",
+     "expected": 464,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": 465,
+      "diff": 1,
+      "node": "n4",
+      "path": "metrics.product_bp",
+      "entry": 29
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 84,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 4,
+    "inputTokens": 14,
+    "outputTokens": 5349,
+    "cacheRead": 51281,
+    "cacheWrite": 22912,
+    "toolCalls": 5,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 5,
+     "error": 1
+    },
+    "unsourced": 3,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/klindworth2013-16s-primers/claude_claude-haiku-5-5/klindworth2013-16s-primers/run3/home/sessions/20261012-035651-7c86/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs/klindworth2013-16s-primers/claude_claude-haiku-5-5/klindworth2013-16s-primers/run3",
+     "/Users/parker/Code/guided-analysis/catalog/cloning",
+     "/Users/parker/.cuvette/envs/cloning",
+     "/Volumes/ga-envs/cloning",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-b/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/cloning"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/klindworth2013-16s-primers/ecoli_rrnb.fasta"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 3,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-klindworth2013-16s-primers.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-klindworth2013-16s-primers.json"
+ },
+ "summary": {
+  "cells": {
+   "klindworth2013-16s-primers": {
+    "claude:claude-haiku-5-5": {
+     "computed": 33,
+     "computedOf": 33,
+     "reported": 33,
+     "reportedOf": 33,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 33,
+    "computedOf": 33,
+    "reported": 33,
+    "reportedOf": 33,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 240.88400000000001,
+    "requests": 16,
+    "inputTokens": 50,
+    "outputTokens": 17184,
+    "cacheRead": 231650,
+    "cacheWrite": 73494,
+    "toolCalls": 17,
+    "failedToolCalls": 4,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 3,
+    "findings_info": 11,
+    "findings_warning": 14,
+    "findings_error": 2,
+    "unsourced": 5,
+    "deviations": 2,
+    "overwritten": 2,
+    "nodes": 16
+   }
+  },
+  "skipped": []
+ }
+}

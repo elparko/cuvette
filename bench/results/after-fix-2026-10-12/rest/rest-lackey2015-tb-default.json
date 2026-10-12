@@ -1,0 +1,2780 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "lackey2015-tb-default",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 134.169,
+   "session": "20261012-024713-9f0a",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run1/home/sessions/20261012-024713-9f0a",
+   "answer": "I checked the HIV value against the fit_logistic result. The tool reports the likelihood-ratio test for hiv_status as chi-square 14.06 on 2 df, p = 0.0008845 (metric lrt_p_hiv_status = 0.000884). The value 0.000886 is the Wald p-value for MDR-TB. The two values are close but come from different tests. The answer is corrected below.\n\nSex and age group stay associated with default after Holm correction. Marital status and poverty do not after correction. In the adjusted model, drug use, underweight BMI, MDR-TB, weekly alcohol, HIV test not done and no secondary education have higher adjusted odds of default.\n\n| Measure | Value | 95% CI | n (one n = one patient) | Test | Step |\n|---|---|---|---|---|---|\n| Age group vs default, p | 0.00604 (Holm 0.0181); Cramér's V 0.10; default 11.5% (21 and younger), 11.0% (22 to 26), 13.4% (27 to 37), 5.1% (38 and older) | not reported by test | 1233 patients, 127 defaulted | Pearson chi-square, 3 df, chi-square 12.43; two-sided, alpha 0.05 | chi_square_test |\n| Sex vs default, p | 0.0000395 (Holm 0.000158); Cramér's V 0.12; default 5.9% (female), 13.2% (male) | not reported by test | 1233 patients | Pearson chi-square, 1 df, chi-square 16.90; two-sided, alpha 0.05 | chi_square_test |\n| Marital status vs default, p | 0.742 (Holm 0.742) | not reported by test | 1233 patients | Fisher exact, 4 x 2; chi-square not used because one expected count was 3.71 | fisher_exact |\n| Poverty vs default, p | 0.0344 (Holm 0.0687); Cramér's V 0.06; default 14.4% (poverty), 9.5% (not in poverty) | not reported by test | 1233 patients | Pearson chi-square, 1 df, chi-square 4.48; two-sided, alpha 0.05 | chi_square_test |\n| Adjusted OR, drug use Yes vs No | 4.78 | 3.05 to 7.49 | 1233 patients, 127 events | Logistic regression, Wald CI, two-sided, alpha 0.05 | fit_logistic |\n| Adjusted OR, BMI Overweight/Obese vs Normal | 0.88 | 0.44 to 1.73 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Adjusted OR, BMI Underweight vs Normal | 2.08 | 1.21 to 3.56 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Adjusted OR, MDR-TB Yes vs No | 3.04 | 1.58 to 5.85 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Adjusted OR, weekly alcohol Yes vs No | 2.22 | 1.40 to 3.52 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Adjusted OR, HIV Positive vs Negative | 1.39 | 0.42 to 4.65 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Adjusted OR, HIV test not done vs Negative | 2.30 | 1.50 to 3.54 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Adjusted OR, secondary education No vs Yes | 1.55 | 1.03 to 2.33 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Model likelihood-ratio test | chi-square 139.5, 8 df, p = 3.1e-26 | not applicable | 1233 patients, 127 events, 15.9 events per parameter | Likelihood-ratio test | fit_logistic |\n| Tests in this session | 5 (4 association tests, 1 logistic model) | not applicable | 1233 patients | Count | all steps |\n\nUncertain:\n- The association tests give p values and Cramér's V, not confidence intervals.\n- Odds ratios are not risk ratios. The intervals are Wald intervals.\n- As whole factors, BMI (likelihood-ratio chi-square 7.27, 2 df, p = 0.026) and HIV status (chi-square 14.06, 2 df, p = 0.00088) are significant.\n\nWaits for you:\n- Confirm the correction for the four association tests. I used Holm as a check, and your choice replaces it.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Correction for a list of p-values: holm · Covariates of the logistic model: drug_use, bmi, mdr_tb, alcohol_weekly, hiv_status, secondary_education · Outcome value that counts as the event: 1 · Reference level of each categorical covariate: drug_use=No, bmi=Normal, mdr_tb=No, alcohol_weekly=No, hiv_status=Negative, secondary_education=Yes · Yates continuity correction for a 2x2 chi-square test: false · Sidedness of the Fisher exact test: two-sided.",
+   "items": [
+    {
+     "key": "patients",
+     "description": "Patients in the analysis",
+     "expected": 1233,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1233,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_rows",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 151,
+      "text": null
+     }
+    },
+    {
+     "key": "defaulted",
+     "description": "Patients who defaulted",
+     "expected": 127,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 127,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.events",
+      "entry": 78
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 151,
+      "text": null
+     }
+    },
+    {
+     "key": "p_age",
+     "description": "Chi-square p, age group by default",
+     "expected": 0.00604,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.00603898829164167,
+      "diff": 0.0000010117083583298728,
+      "node": "n2",
+      "path": "metrics.p_value",
+      "entry": 39
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00604,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 151,
+      "text": "| Age group vs default, p | 0.00604 (Holm 0.0181); Cramér's V 0.10; default 11.5% (21 and younger), 11.0% (22 to 26), 13.4% (27 to 37), 5.1% (38 and older) | not reported by test | 1233 patients, 127 defaulted | Pearson chi-square, 3 df, chi-square 12.43; two-sided, alpha 0.05 | chi_square_test |"
+     }
+    },
+    {
+     "key": "p_sex",
+     "description": "Chi-square p, sex by default",
+     "expected": 0.0000395,
+     "tolerance": 0.000005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.00003945092420796785,
+      "diff": 4.907579203214781e-8,
+      "node": "n3",
+      "path": "metrics.p_value",
+      "entry": 42
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0000395,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 151,
+      "text": "| Sex vs default, p | 0.0000395 (Holm 0.000158); Cramér's V 0.12; default 5.9% (female), 13.2% (male) | not reported by test | 1233 patients | Pearson chi-square, 1 df, chi-square 16.90; two-sided, alpha 0.05 | chi_square_test |"
+     }
+    },
+    {
+     "key": "p_marital",
+     "description": "Chi-square p, marital status by default",
+     "expected": 0.6815,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.6814545468936668,
+      "diff": 0.000045453106333193105,
+      "node": "n4",
+      "path": "metrics.p_value",
+      "entry": 45
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.742,
+      "diff": 0.0605,
+      "via": null,
+      "node": "n8",
+      "claimEntry": 151,
+      "text": "| Marital status vs default, p | 0.742 (Holm 0.742) | not reported by test | 1233 patients | Fisher exact, 4 x 2; chi-square not used because one expected count was 3.71 | fisher_exact |"
+     }
+    },
+    {
+     "key": "p_poverty",
+     "description": "Chi-square p, poverty by default",
+     "expected": 0.03436,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03436348964265445,
+      "diff": 0.0000034896426544459014,
+      "node": "n5",
+      "path": "metrics.p_value",
+      "entry": 48
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0344,
+      "diff": 0.00003999999999999837,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 151,
+      "text": "| Poverty vs default, p | 0.0344 (Holm 0.0687); Cramér's V 0.06; default 14.4% (poverty), 9.5% (not in poverty) | not reported by test | 1233 patients | Pearson chi-square, 1 df, chi-square 4.48; two-sided, alpha 0.05 | chi_square_test |"
+     }
+    },
+    {
+     "key": "or_drug",
+     "description": "Adjusted OR, drug use",
+     "expected": 4.7816,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.78155139142713,
+      "diff": 0.000048608572869923705,
+      "node": "n7",
+      "path": "metrics.or_drug_use_Yes",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.78,
+      "diff": 0.0015999999999998238,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, drug use Yes vs No | 4.78 | 3.05 to 7.49 | 1233 patients, 127 events | Logistic regression, Wald CI, two-sided, alpha 0.05 | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_drug_lo",
+     "description": "Adjusted OR, drug use, CI lower",
+     "expected": 3.0522,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.0521784873914464,
+      "diff": 0.000021512608553653223,
+      "node": "n7",
+      "path": "metrics.or_lo_drug_use_Yes",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.05,
+      "diff": 0.002200000000000202,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, drug use Yes vs No | 4.78 | 3.05 to 7.49 | 1233 patients, 127 events | Logistic regression, Wald CI, two-sided, alpha 0.05 | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_drug_hi",
+     "description": "Adjusted OR, drug use, CI upper",
+     "expected": 7.4907,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 7.490791840420467,
+      "diff": 0.00009184042046683771,
+      "node": "n7",
+      "path": "metrics.or_hi_drug_use_Yes",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 7.49,
+      "diff": 0.000700000000000145,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, drug use Yes vs No | 4.78 | 3.05 to 7.49 | 1233 patients, 127 events | Logistic regression, Wald CI, two-sided, alpha 0.05 | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_underweight",
+     "description": "Adjusted OR, underweight",
+     "expected": 2.0795,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.079502516579366,
+      "diff": 0.000002516579366229621,
+      "node": "n7",
+      "path": "metrics.or_bmi_Underweight",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.08,
+      "diff": 0.000500000000000167,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, BMI Underweight vs Normal | 2.08 | 1.21 to 3.56 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_underweight_lo",
+     "description": "Adjusted OR, underweight, CI lower",
+     "expected": 1.2137,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.2136991532262786,
+      "diff": 8.467737213635473e-7,
+      "node": "n7",
+      "path": "metrics.or_lo_bmi_Underweight",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.21,
+      "diff": 0.0037000000000000366,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, BMI Underweight vs Normal | 2.08 | 1.21 to 3.56 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_underweight_hi",
+     "description": "Adjusted OR, underweight, CI upper",
+     "expected": 3.5629,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.5629346077773034,
+      "diff": 0.00003460777730346365,
+      "node": "n7",
+      "path": "metrics.or_hi_bmi_Underweight",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.56,
+      "diff": 0.0028999999999999027,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, BMI Underweight vs Normal | 2.08 | 1.21 to 3.56 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_overweight",
+     "description": "Adjusted OR, overweight or obese",
+     "expected": 0.8777,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.8777123489045796,
+      "diff": 0.000012348904579573272,
+      "node": "n7",
+      "path": "metrics.or_bmi_Overweight_Obese",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.88,
+      "diff": 0.0022999999999999687,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, BMI Overweight/Obese vs Normal | 0.88 | 0.44 to 1.73 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_overweight_lo",
+     "description": "Adjusted OR, overweight or obese, CI lower",
+     "expected": 0.4445,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.4444368093830721,
+      "diff": 0.00006319061692788841,
+      "node": "n7",
+      "path": "metrics.or_lo_bmi_Overweight_Obese",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.44,
+      "diff": 0.004500000000000004,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, BMI Overweight/Obese vs Normal | 0.88 | 0.44 to 1.73 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_overweight_hi",
+     "description": "Adjusted OR, overweight or obese, CI upper",
+     "expected": 1.7333,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.7333824542772827,
+      "diff": 0.00008245427728259536,
+      "node": "n7",
+      "path": "metrics.or_hi_bmi_Overweight_Obese",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.73,
+      "diff": 0.0033000000000000806,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, BMI Overweight/Obese vs Normal | 0.88 | 0.44 to 1.73 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_mdr",
+     "description": "Adjusted OR, MDR treatment",
+     "expected": 3.0385,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.0384841194494236,
+      "diff": 0.00001588055057633042,
+      "node": "n7",
+      "path": "metrics.or_mdr_tb_Yes",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.04,
+      "diff": 0.0015000000000000568,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, MDR-TB Yes vs No | 3.04 | 1.58 to 5.85 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_mdr_lo",
+     "description": "Adjusted OR, MDR treatment, CI lower",
+     "expected": 1.578,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.577974038264568,
+      "diff": 0.00002596173543212288,
+      "node": "n7",
+      "path": "metrics.or_lo_mdr_tb_Yes",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.58,
+      "diff": 0.0020000000000000018,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, MDR-TB Yes vs No | 3.04 | 1.58 to 5.85 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_mdr_hi",
+     "description": "Adjusted OR, MDR treatment, CI upper",
+     "expected": 5.8507,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5.8507843096708845,
+      "diff": 0.00008430967088468577,
+      "node": "n7",
+      "path": "metrics.or_hi_mdr_tb_Yes",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 5.85,
+      "diff": 0.000700000000000145,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, MDR-TB Yes vs No | 3.04 | 1.58 to 5.85 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_alcohol",
+     "description": "Adjusted OR, weekly alcohol",
+     "expected": 2.222,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.2219893823639905,
+      "diff": 0.000010617636009513376,
+      "node": "n7",
+      "path": "metrics.or_alcohol_weekly_Yes",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.22,
+      "diff": 0.0019999999999997797,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, weekly alcohol Yes vs No | 2.22 | 1.40 to 3.52 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_alcohol_lo",
+     "description": "Adjusted OR, weekly alcohol, CI lower",
+     "expected": 1.4008,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.400785466210615,
+      "diff": 0.000014533789385096085,
+      "node": "n7",
+      "path": "metrics.or_lo_alcohol_weekly_Yes",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.4,
+      "diff": 0.0008000000000001339,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, weekly alcohol Yes vs No | 2.22 | 1.40 to 3.52 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_alcohol_hi",
+     "description": "Adjusted OR, weekly alcohol, CI upper",
+     "expected": 3.5246,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.5246202465924,
+      "diff": 0.00002024659239996396,
+      "node": "n7",
+      "path": "metrics.or_hi_alcohol_weekly_Yes",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.52,
+      "diff": 0.0045999999999999375,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, weekly alcohol Yes vs No | 2.22 | 1.40 to 3.52 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_not_tested",
+     "description": "Adjusted OR, HIV test not done",
+     "expected": 2.3031,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.303111624426218,
+      "diff": 0.000011624426218048711,
+      "node": "n7",
+      "path": "metrics.or_hiv_status_Test_not_done",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.3,
+      "diff": 0.0031000000000003247,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, HIV test not done vs Negative | 2.30 | 1.50 to 3.54 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_not_tested_lo",
+     "description": "Adjusted OR, HIV test not done, CI lower",
+     "expected": 1.5,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.499948912475858,
+      "diff": 0.000051087524141957275,
+      "node": "n7",
+      "path": "metrics.or_lo_hiv_status_Test_not_done",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, HIV test not done vs Negative | 2.30 | 1.50 to 3.54 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_not_tested_hi",
+     "description": "Adjusted OR, HIV test not done, CI upper",
+     "expected": 3.5363,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.536335878141149,
+      "diff": 0.00003587814114869303,
+      "node": "n7",
+      "path": "metrics.or_hi_hiv_status_Test_not_done",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.54,
+      "diff": 0.0036999999999998145,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, HIV test not done vs Negative | 2.30 | 1.50 to 3.54 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_positive",
+     "description": "Adjusted OR, HIV positive",
+     "expected": 1.3925,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.3924857809169304,
+      "diff": 0.000014219083069644256,
+      "node": "n7",
+      "path": "metrics.or_hiv_status_Positive",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.39,
+      "diff": 0.0025000000000001688,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, HIV Positive vs Negative | 1.39 | 0.42 to 4.65 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_positive_lo",
+     "description": "Adjusted OR, HIV positive, CI lower",
+     "expected": 0.4167,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.41667282366518404,
+      "diff": 0.00002717633481597037,
+      "node": "n7",
+      "path": "metrics.or_lo_hiv_status_Positive",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.42,
+      "diff": 0.0032999999999999696,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, HIV Positive vs Negative | 1.39 | 0.42 to 4.65 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_positive_hi",
+     "description": "Adjusted OR, HIV positive, CI upper",
+     "expected": 4.6534,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.653571195259722,
+      "diff": 0.00017119525972120186,
+      "node": "n7",
+      "path": "metrics.or_hi_hiv_status_Positive",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.65,
+      "diff": 0.0034000000000000696,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, HIV Positive vs Negative | 1.39 | 0.42 to 4.65 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_no_secondary",
+     "description": "Adjusted OR, secondary school not completed",
+     "expected": 1.5499,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.549942461065434,
+      "diff": 0.00004246106543392969,
+      "node": "n7",
+      "path": "metrics.or_secondary_education_No",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.55,
+      "diff": 0.00009999999999998899,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, secondary education No vs Yes | 1.55 | 1.03 to 2.33 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_no_secondary_lo",
+     "description": "Adjusted OR, secondary school not completed, CI lower",
+     "expected": 1.0317,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0316546463400484,
+      "diff": 0.00004535365995161911,
+      "node": "n7",
+      "path": "metrics.or_lo_secondary_education_No",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.03,
+      "diff": 0.0017000000000000348,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, secondary education No vs Yes | 1.55 | 1.03 to 2.33 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_no_secondary_hi",
+     "description": "Adjusted OR, secondary school not completed, CI upper",
+     "expected": 2.3286,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.3286102971921614,
+      "diff": 0.0000102971921616124,
+      "node": "n7",
+      "path": "metrics.or_hi_secondary_education_No",
+      "entry": 78
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.33,
+      "diff": 0.00140000000000029,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 151,
+      "text": "| Adjusted OR, secondary education No vs Yes | 1.55 | 1.03 to 2.33 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 14,
+    "inputTokens": 34,
+    "outputTokens": 14015,
+    "cacheRead": 360019,
+    "cacheWrite": 39766,
+    "toolCalls": 14,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 6,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 10
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run1/home/sessions/20261012-024713-9f0a/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/lackey2015-tb-default",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run1",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/lackey2015-tb-default/tb_default.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run1/home/sessions/20261012-024713-9f0a/work",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run1/home/sessions/20261012-024713-9f0a/work/adjust_pvalues-1/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run1/home/sessions/20261012-024713-9f0a/work/inspect_table-1/columns.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "lackey2015-tb-default",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 143.075,
+   "session": "20261012-024927-bc4c",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run2/home/sessions/20261012-024927-bc4c",
+   "answer": "1. Age group, sex and poverty are associated with default in the univariate tests, but only sex and age group remain significant after Holm correction (alpha 0.05). Marital status is not associated with default (Fisher exact p = 0.742).\n\n| Measure | Value | 95% CI | n (one n = one patient) | Test | Step |\n|---|---|---|---|---|---|\n| Patients analysed | 1233 patients, 127 defaulted (10.3%) | not applicable | 1233 patients | count | inspect_table, calculate |\n| Age group overall, raw p | p = 0.006; Holm-adjusted p = 0.018 | not applicable | 1233 patients | Pearson chi-square, 3 df, chi-square 12.43 | chi_square_test, adjust_pvalues |\n| Age 38 and older vs 21 and younger (direction: lower odds) | OR 0.41 (default 5.1% vs 11.5%) | 0.22 to 0.77 | 616 patients (321 + 295) | Unadjusted logistic, Wald p = 0.005 | run_script |\n| Age 22 to 26 vs 21 and younger | OR 0.95 (default 11.0% vs 11.5%) | 0.59 to 1.55 | 647 patients (321 + 326) | Unadjusted logistic, Wald p = 0.85 | run_script |\n| Age 27 to 37 vs 21 and younger | OR 1.19 (default 13.4% vs 11.5%) | 0.74 to 1.92 | 612 patients (321 + 291) | Unadjusted logistic, Wald p = 0.48 | run_script |\n| Sex overall, raw p | p = 0.00004; Holm-adjusted p = 0.00016 | not applicable | 1233 patients | Pearson chi-square, 1 df, chi-square 16.90, no Yates correction | chi_square_test, adjust_pvalues |\n| Male vs female (direction: higher odds in men) | OR 2.42 (default 13.2% vs 5.9%) | 1.57 to 3.72 | 1233 patients (743 male, 490 female) | Unadjusted logistic, Wald p = 0.00006 | run_script |\n| Marital status overall, raw p | p = 0.742; Holm-adjusted p = 0.742 | not applicable | 1233 patients | Fisher exact, two-sided | fisher_exact, adjust_pvalues |\n| Married/cohabitating vs divorced/separated | OR 0.86 (default 9.6% vs 11.0%) | 0.42 to 1.78 | 560 patients (91 + 469) | Unadjusted logistic, Wald p = 0.68 | run_script |\n| Single vs divorced/separated | OR 1.00 (default 11.0% vs 11.0%) | 0.50 to 2.02 | 728 patients (91 + 637) | Unadjusted logistic, Wald p = 1.00 | run_script |\n| Widowed vs divorced/separated | OR 0.48 (default 5.6% vs 11.0%) | 0.10 to 2.29 | 127 patients (91 + 36) | Unadjusted logistic, Wald p = 0.35 | run_script |\n| Poverty overall, raw p | p = 0.034; Holm-adjusted p = 0.069 | not applicable | 1233 patients | Pearson chi-square, 1 df, chi-square 4.48, no Yates correction | chi_square_test, adjust_pvalues |\n| Poverty/extreme poverty vs not in poverty (direction: higher odds in poverty) | OR 1.60 (default 14.4% vs 9.5%) | 1.03 to 2.49 | 1233 patients (209 in poverty, 1024 not) | Unadjusted logistic, Wald p = 0.036 | run_script |\n| Effect size, sex | Cramér's V = 0.117 | not computed | 1233 patients | Pearson chi-square | chi_square_test |\n| Effect size, age group | Cramér's V = 0.100 | not computed | 1233 patients | Pearson chi-square | chi_square_test |\n| Effect size, poverty | Cramér's V = 0.060 | not computed | 1233 patients | Pearson chi-square | chi_square_test |\n\nUncertain:\n- The four univariate tests are corrected by Holm. The level-by-level odds ratios and Wald p-values are not corrected.\n- The Wald p-values from the script differ slightly from the chi-square p-values. The chi-square p-values are the tests named in the table.\n- Odds ratios are not risk ratios. The event rate is 10.3%.\n\nWaits for you: The logistic tool kept the recorded covariates for my single-factor calls. Confirm the record if you want those odds ratios from the program tool.\n\nStep results that the answer does not mention, from the record:\n- n13 run_script: The script ran in /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run2/home/sessions/20261012-024927-bc4c/work and wrote 1 new file(s) to /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run2/home/sessions/20261012-024927-bc4c/work.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Correction for a list of p-values: holm · Covariates of the logistic model: drug_use, bmi, mdr_tb, alcohol_weekly, hiv_status, secondary_education · Outcome value that counts as the event: 1 · Reference level of each categorical covariate: drug_use=No, bmi=Normal, mdr_tb=No, alcohol_weekly=No, hiv_status=Negative, secondary_education=Yes · Yates continuity correction for a 2x2 chi-square test: false · Sidedness of the Fisher exact test: two-sided.",
+   "items": [
+    {
+     "key": "patients",
+     "description": "Patients in the analysis",
+     "expected": 1233,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1233,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_rows",
+      "entry": 13
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 165,
+      "text": null
+     }
+    },
+    {
+     "key": "defaulted",
+     "description": "Patients who defaulted",
+     "expected": 127,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 127,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.events",
+      "entry": 79
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 165,
+      "text": null
+     }
+    },
+    {
+     "key": "p_age",
+     "description": "Chi-square p, age group by default",
+     "expected": 0.00604,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.00603898829164167,
+      "diff": 0.0000010117083583298728,
+      "node": "n2",
+      "path": "metrics.p_value",
+      "entry": 40
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.006,
+      "diff": 0.000040000000000000105,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 165,
+      "text": "| Age group overall, raw p | p = 0.006; Holm-adjusted p = 0.018 | not applicable | 1233 patients | Pearson chi-square, 3 df, chi-square 12.43 | chi_square_test, adjust_pvalues |"
+     }
+    },
+    {
+     "key": "p_sex",
+     "description": "Chi-square p, sex by default",
+     "expected": 0.0000395,
+     "tolerance": 0.000005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.00003945092420796785,
+      "diff": 4.907579203214781e-8,
+      "node": "n3",
+      "path": "metrics.p_value",
+      "entry": 43
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00004,
+      "diff": 5.000000000000054e-7,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 165,
+      "text": "| Sex overall, raw p | p = 0.00004; Holm-adjusted p = 0.00016 | not applicable | 1233 patients | Pearson chi-square, 1 df, chi-square 16.90, no Yates correction | chi_square_test, adjust_pvalues |"
+     }
+    },
+    {
+     "key": "p_marital",
+     "description": "Chi-square p, marital status by default",
+     "expected": 0.6815,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.6814545468936668,
+      "diff": 0.000045453106333193105,
+      "node": "n4",
+      "path": "metrics.p_value",
+      "entry": 46
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.68,
+      "diff": 0.0014999999999999458,
+      "via": "rounding",
+      "node": "n4",
+      "claimEntry": 165,
+      "text": "| Married/cohabitating vs divorced/separated | OR 0.86 (default 9.6% vs 11.0%) | 0.42 to 1.78 | 560 patients (91 + 469) | Unadjusted logistic, Wald p = 0.68 | run_script |"
+     }
+    },
+    {
+     "key": "p_poverty",
+     "description": "Chi-square p, poverty by default",
+     "expected": 0.03436,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03436348964265445,
+      "diff": 0.0000034896426544459014,
+      "node": "n5",
+      "path": "metrics.p_value",
+      "entry": 49
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.034,
+      "diff": 0.0003599999999999992,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 165,
+      "text": "| Poverty overall, raw p | p = 0.034; Holm-adjusted p = 0.069 | not applicable | 1233 patients | Pearson chi-square, 1 df, chi-square 4.48, no Yates correction | chi_square_test, adjust_pvalues |"
+     }
+    },
+    {
+     "key": "or_drug",
+     "description": "Adjusted OR, drug use",
+     "expected": 4.7816,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.78155139142713,
+      "diff": 0.000048608572869923705,
+      "node": "n7",
+      "path": "metrics.or_drug_use_Yes",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 4.48,
+      "diff": 0.30159999999999965,
+      "via": null,
+      "node": "n5",
+      "claimEntry": 165,
+      "text": "| Poverty overall, raw p | p = 0.034; Holm-adjusted p = 0.069 | not applicable | 1233 patients | Pearson chi-square, 1 df, chi-square 4.48, no Yates correction | chi_square_test, adjust_pvalues |"
+     }
+    },
+    {
+     "key": "or_drug_lo",
+     "description": "Adjusted OR, drug use, CI lower",
+     "expected": 3.0522,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.0521784873914464,
+      "diff": 0.000021512608553653223,
+      "node": "n7",
+      "path": "metrics.or_lo_drug_use_Yes",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 2.49,
+      "diff": 0.5621999999999998,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Poverty/extreme poverty vs not in poverty (direction: higher odds in poverty) | OR 1.60 (default 14.4% vs 9.5%) | 1.03 to 2.49 | 1233 patients (209 in poverty, 1024 not) | Unadjusted logistic, Wald p = 0.036 | run_script |"
+     }
+    },
+    {
+     "key": "or_drug_hi",
+     "description": "Adjusted OR, drug use, CI upper",
+     "expected": 7.4907,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 7.490791840420467,
+      "diff": 0.00009184042046683771,
+      "node": "n7",
+      "path": "metrics.or_hi_drug_use_Yes",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 5.9,
+      "diff": 1.5907,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Male vs female (direction: higher odds in men) | OR 2.42 (default 13.2% vs 5.9%) | 1.57 to 3.72 | 1233 patients (743 male, 490 female) | Unadjusted logistic, Wald p = 0.00006 | run_script |"
+     }
+    },
+    {
+     "key": "or_underweight",
+     "description": "Adjusted OR, underweight",
+     "expected": 2.0795,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.079502516579366,
+      "diff": 0.000002516579366229621,
+      "node": "n7",
+      "path": "metrics.or_bmi_Underweight",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 2.02,
+      "diff": 0.059499999999999886,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Single vs divorced/separated | OR 1.00 (default 11.0% vs 11.0%) | 0.50 to 2.02 | 728 patients (91 + 637) | Unadjusted logistic, Wald p = 1.00 | run_script |"
+     }
+    },
+    {
+     "key": "or_underweight_lo",
+     "description": "Adjusted OR, underweight, CI lower",
+     "expected": 1.2137,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.2136991532262786,
+      "diff": 8.467737213635473e-7,
+      "node": "n7",
+      "path": "metrics.or_lo_bmi_Underweight",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 1.19,
+      "diff": 0.023700000000000054,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Age 27 to 37 vs 21 and younger | OR 1.19 (default 13.4% vs 11.5%) | 0.74 to 1.92 | 612 patients (321 + 291) | Unadjusted logistic, Wald p = 0.48 | run_script |"
+     }
+    },
+    {
+     "key": "or_underweight_hi",
+     "description": "Adjusted OR, underweight, CI upper",
+     "expected": 3.5629,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.5629346077773034,
+      "diff": 0.00003460777730346365,
+      "node": "n7",
+      "path": "metrics.or_hi_bmi_Underweight",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 3.72,
+      "diff": 0.15710000000000024,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Male vs female (direction: higher odds in men) | OR 2.42 (default 13.2% vs 5.9%) | 1.57 to 3.72 | 1233 patients (743 male, 490 female) | Unadjusted logistic, Wald p = 0.00006 | run_script |"
+     }
+    },
+    {
+     "key": "or_overweight",
+     "description": "Adjusted OR, overweight or obese",
+     "expected": 0.8777,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.8777123489045796,
+      "diff": 0.000012348904579573272,
+      "node": "n7",
+      "path": "metrics.or_bmi_Overweight_Obese",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.86,
+      "diff": 0.01770000000000005,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Married/cohabitating vs divorced/separated | OR 0.86 (default 9.6% vs 11.0%) | 0.42 to 1.78 | 560 patients (91 + 469) | Unadjusted logistic, Wald p = 0.68 | run_script |"
+     }
+    },
+    {
+     "key": "or_overweight_lo",
+     "description": "Adjusted OR, overweight or obese, CI lower",
+     "expected": 0.4445,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.4444368093830721,
+      "diff": 0.00006319061692788841,
+      "node": "n7",
+      "path": "metrics.or_lo_bmi_Overweight_Obese",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.42,
+      "diff": 0.024500000000000022,
+      "via": null,
+      "node": "n12",
+      "claimEntry": 165,
+      "text": "| Married/cohabitating vs divorced/separated | OR 0.86 (default 9.6% vs 11.0%) | 0.42 to 1.78 | 560 patients (91 + 469) | Unadjusted logistic, Wald p = 0.68 | run_script |"
+     }
+    },
+    {
+     "key": "or_overweight_hi",
+     "description": "Adjusted OR, overweight or obese, CI upper",
+     "expected": 1.7333,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.7333824542772827,
+      "diff": 0.00008245427728259536,
+      "node": "n7",
+      "path": "metrics.or_hi_bmi_Overweight_Obese",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 1.78,
+      "diff": 0.046699999999999964,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Married/cohabitating vs divorced/separated | OR 0.86 (default 9.6% vs 11.0%) | 0.42 to 1.78 | 560 patients (91 + 469) | Unadjusted logistic, Wald p = 0.68 | run_script |"
+     }
+    },
+    {
+     "key": "or_mdr",
+     "description": "Adjusted OR, MDR treatment",
+     "expected": 3.0385,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.0384841194494236,
+      "diff": 0.00001588055057633042,
+      "node": "n7",
+      "path": "metrics.or_mdr_tb_Yes",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 2.49,
+      "diff": 0.5484999999999998,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Poverty/extreme poverty vs not in poverty (direction: higher odds in poverty) | OR 1.60 (default 14.4% vs 9.5%) | 1.03 to 2.49 | 1233 patients (209 in poverty, 1024 not) | Unadjusted logistic, Wald p = 0.036 | run_script |"
+     }
+    },
+    {
+     "key": "or_mdr_lo",
+     "description": "Adjusted OR, MDR treatment, CI lower",
+     "expected": 1.578,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.577974038264568,
+      "diff": 0.00002596173543212288,
+      "node": "n7",
+      "path": "metrics.or_lo_mdr_tb_Yes",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 1.57,
+      "diff": 0.008000000000000007,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Male vs female (direction: higher odds in men) | OR 2.42 (default 13.2% vs 5.9%) | 1.57 to 3.72 | 1233 patients (743 male, 490 female) | Unadjusted logistic, Wald p = 0.00006 | run_script |"
+     }
+    },
+    {
+     "key": "or_mdr_hi",
+     "description": "Adjusted OR, MDR treatment, CI upper",
+     "expected": 5.8507,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5.8507843096708845,
+      "diff": 0.00008430967088468577,
+      "node": "n7",
+      "path": "metrics.or_hi_mdr_tb_Yes",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 5.9,
+      "diff": 0.049300000000000566,
+      "via": "rounding",
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Male vs female (direction: higher odds in men) | OR 2.42 (default 13.2% vs 5.9%) | 1.57 to 3.72 | 1233 patients (743 male, 490 female) | Unadjusted logistic, Wald p = 0.00006 | run_script |"
+     }
+    },
+    {
+     "key": "or_alcohol",
+     "description": "Adjusted OR, weekly alcohol",
+     "expected": 2.222,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.2219893823639905,
+      "diff": 0.000010617636009513376,
+      "node": "n7",
+      "path": "metrics.or_alcohol_weekly_Yes",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 2.29,
+      "diff": 0.06800000000000006,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Widowed vs divorced/separated | OR 0.48 (default 5.6% vs 11.0%) | 0.10 to 2.29 | 127 patients (91 + 36) | Unadjusted logistic, Wald p = 0.35 | run_script |"
+     }
+    },
+    {
+     "key": "or_alcohol_lo",
+     "description": "Adjusted OR, weekly alcohol, CI lower",
+     "expected": 1.4008,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.400785466210615,
+      "diff": 0.000014533789385096085,
+      "node": "n7",
+      "path": "metrics.or_lo_alcohol_weekly_Yes",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 1.55,
+      "diff": 0.1492,
+      "via": null,
+      "node": "n12",
+      "claimEntry": 165,
+      "text": "| Age 22 to 26 vs 21 and younger | OR 0.95 (default 11.0% vs 11.5%) | 0.59 to 1.55 | 647 patients (321 + 326) | Unadjusted logistic, Wald p = 0.85 | run_script |"
+     }
+    },
+    {
+     "key": "or_alcohol_hi",
+     "description": "Adjusted OR, weekly alcohol, CI upper",
+     "expected": 3.5246,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.5246202465924,
+      "diff": 0.00002024659239996396,
+      "node": "n7",
+      "path": "metrics.or_hi_alcohol_weekly_Yes",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 3.72,
+      "diff": 0.19540000000000024,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Male vs female (direction: higher odds in men) | OR 2.42 (default 13.2% vs 5.9%) | 1.57 to 3.72 | 1233 patients (743 male, 490 female) | Unadjusted logistic, Wald p = 0.00006 | run_script |"
+     }
+    },
+    {
+     "key": "or_hiv_not_tested",
+     "description": "Adjusted OR, HIV test not done",
+     "expected": 2.3031,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.303111624426218,
+      "diff": 0.000011624426218048711,
+      "node": "n7",
+      "path": "metrics.or_hiv_status_Test_not_done",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 2.29,
+      "diff": 0.013100000000000112,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Widowed vs divorced/separated | OR 0.48 (default 5.6% vs 11.0%) | 0.10 to 2.29 | 127 patients (91 + 36) | Unadjusted logistic, Wald p = 0.35 | run_script |"
+     }
+    },
+    {
+     "key": "or_hiv_not_tested_lo",
+     "description": "Adjusted OR, HIV test not done, CI lower",
+     "expected": 1.5,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.499948912475858,
+      "diff": 0.000051087524141957275,
+      "node": "n7",
+      "path": "metrics.or_lo_hiv_status_Test_not_done",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 1.55,
+      "diff": 0.050000000000000044,
+      "via": null,
+      "node": "n12",
+      "claimEntry": 165,
+      "text": "| Age 22 to 26 vs 21 and younger | OR 0.95 (default 11.0% vs 11.5%) | 0.59 to 1.55 | 647 patients (321 + 326) | Unadjusted logistic, Wald p = 0.85 | run_script |"
+     }
+    },
+    {
+     "key": "or_hiv_not_tested_hi",
+     "description": "Adjusted OR, HIV test not done, CI upper",
+     "expected": 3.5363,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.536335878141149,
+      "diff": 0.00003587814114869303,
+      "node": "n7",
+      "path": "metrics.or_hi_hiv_status_Test_not_done",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 3.72,
+      "diff": 0.18369999999999997,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Male vs female (direction: higher odds in men) | OR 2.42 (default 13.2% vs 5.9%) | 1.57 to 3.72 | 1233 patients (743 male, 490 female) | Unadjusted logistic, Wald p = 0.00006 | run_script |"
+     }
+    },
+    {
+     "key": "or_hiv_positive",
+     "description": "Adjusted OR, HIV positive",
+     "expected": 1.3925,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.3924857809169304,
+      "diff": 0.000014219083069644256,
+      "node": "n7",
+      "path": "metrics.or_hiv_status_Positive",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 1.55,
+      "diff": 0.15749999999999997,
+      "via": null,
+      "node": "n12",
+      "claimEntry": 165,
+      "text": "| Age 22 to 26 vs 21 and younger | OR 0.95 (default 11.0% vs 11.5%) | 0.59 to 1.55 | 647 patients (321 + 326) | Unadjusted logistic, Wald p = 0.85 | run_script |"
+     }
+    },
+    {
+     "key": "or_hiv_positive_lo",
+     "description": "Adjusted OR, HIV positive, CI lower",
+     "expected": 0.4167,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.41667282366518404,
+      "diff": 0.00002717633481597037,
+      "node": "n7",
+      "path": "metrics.or_lo_hiv_status_Positive",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.42,
+      "diff": 0.0032999999999999696,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 165,
+      "text": "| Married/cohabitating vs divorced/separated | OR 0.86 (default 9.6% vs 11.0%) | 0.42 to 1.78 | 560 patients (91 + 469) | Unadjusted logistic, Wald p = 0.68 | run_script |"
+     }
+    },
+    {
+     "key": "or_hiv_positive_hi",
+     "description": "Adjusted OR, HIV positive, CI upper",
+     "expected": 4.6534,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.653571195259722,
+      "diff": 0.00017119525972120186,
+      "node": "n7",
+      "path": "metrics.or_hi_hiv_status_Positive",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 4.48,
+      "diff": 0.1734,
+      "via": null,
+      "node": "n5",
+      "claimEntry": 165,
+      "text": "| Poverty overall, raw p | p = 0.034; Holm-adjusted p = 0.069 | not applicable | 1233 patients | Pearson chi-square, 1 df, chi-square 4.48, no Yates correction | chi_square_test, adjust_pvalues |"
+     }
+    },
+    {
+     "key": "or_no_secondary",
+     "description": "Adjusted OR, secondary school not completed",
+     "expected": 1.5499,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.549942461065434,
+      "diff": 0.00004246106543392969,
+      "node": "n7",
+      "path": "metrics.or_secondary_education_No",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.55,
+      "diff": 0.00009999999999998899,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 165,
+      "text": "| Age 22 to 26 vs 21 and younger | OR 0.95 (default 11.0% vs 11.5%) | 0.59 to 1.55 | 647 patients (321 + 326) | Unadjusted logistic, Wald p = 0.85 | run_script |"
+     }
+    },
+    {
+     "key": "or_no_secondary_lo",
+     "description": "Adjusted OR, secondary school not completed, CI lower",
+     "expected": 1.0317,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0316546463400484,
+      "diff": 0.00004535365995161911,
+      "node": "n7",
+      "path": "metrics.or_lo_secondary_education_No",
+      "entry": 79
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.03,
+      "diff": 0.0017000000000000348,
+      "via": "tolerance",
+      "node": "n12",
+      "claimEntry": 165,
+      "text": "| Poverty/extreme poverty vs not in poverty (direction: higher odds in poverty) | OR 1.60 (default 14.4% vs 9.5%) | 1.03 to 2.49 | 1233 patients (209 in poverty, 1024 not) | Unadjusted logistic, Wald p = 0.036 | run_script |"
+     }
+    },
+    {
+     "key": "or_no_secondary_hi",
+     "description": "Adjusted OR, secondary school not completed, CI upper",
+     "expected": 2.3286,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.3286102971921614,
+      "diff": 0.0000102971921616124,
+      "node": "n7",
+      "path": "metrics.or_hi_secondary_education_No",
+      "entry": 79
+     },
+     "reported": {
+      "pass": false,
+      "value": 2.29,
+      "diff": 0.038599999999999746,
+      "via": null,
+      "node": "n13",
+      "claimEntry": 165,
+      "text": "| Widowed vs divorced/separated | OR 0.48 (default 5.6% vs 11.0%) | 0.10 to 2.29 | 127 patients (91 + 36) | Unadjusted logistic, Wald p = 0.35 | run_script |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 14,
+    "inputTokens": 34,
+    "outputTokens": 17751,
+    "cacheRead": 383483,
+    "cacheWrite": 54548,
+    "toolCalls": 18,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 6,
+     "error": 2
+    },
+    "unsourced": 4,
+    "deviations": 4,
+    "overwritten": 4,
+    "nodes": 13
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run2/home/sessions/20261012-024927-bc4c/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/lackey2015-tb-default",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run2",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/lackey2015-tb-default/tb_default.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run2/home/sessions/20261012-024927-bc4c/work/adjust_pvalues-1/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run2/home/sessions/20261012-024927-bc4c/work/inspect_table-1/columns.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 4,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "lackey2015-tb-default",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 74.384,
+   "session": "20261012-025151-ecbf",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run3/home/sessions/20261012-025151-ecbf",
+   "answer": "All four plan steps are done. The results are below.\n\nSex and age group are associated with default after Holm correction at alpha 0.05. In the adjusted logistic model, drug use, underweight BMI, MDR-TB, weekly alcohol, an HIV test not done and no secondary education have higher odds of default.\n\n| Measure | Value | 95% CI | n (one n = one patient) | Test | Step |\n|---|---|---|---|---|---|\n| Age group vs default, p | 0.00604; Holm 0.0181; Cramér's V 0.10 | Not computed | 1233 patients | Pearson chi-square, 4x2, unpaired | chi_square_test |\n| Sex vs default, p | 0.0000395; Holm 0.000158; Cramér's V 0.117 | Not computed | 1233 patients | Pearson chi-square, 2x2, unpaired, no Yates correction | chi_square_test |\n| Marital status vs default, p | 0.742; Holm 0.742; Cramér's V 0.035 | Not computed | 1233 patients | Fisher exact, 4x2, two-sided (one expected count 3.71 below 5) | fisher_exact |\n| Poverty vs default, p | 0.0344; Holm 0.0687; Cramér's V 0.060 | Not computed | 1233 patients | Pearson chi-square, 2x2, unpaired, no Yates correction | chi_square_test |\n| Drug use (Yes vs No), adjusted OR | 4.78 | 3.05 to 7.49; p = 8.4e-12 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| BMI (Underweight vs Normal), adjusted OR | 2.08 | 1.21 to 3.56; p = 0.0077 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| BMI (Overweight/Obese vs Normal), adjusted OR | 0.88 | 0.44 to 1.73; p = 0.707 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| MDR-TB (Yes vs No), adjusted OR | 3.04 | 1.58 to 5.85; p = 0.00089 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Weekly alcohol (Yes vs No), adjusted OR | 2.22 | 1.40 to 3.52; p = 0.00069 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| HIV (Positive vs Negative), adjusted OR | 1.39 | 0.42 to 4.65; p = 0.591 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| HIV (Test not done vs Negative), adjusted OR | 2.30 | 1.50 to 3.54; p = 0.00014 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Secondary education (No vs Yes), adjusted OR | 1.55 | 1.03 to 2.33; p = 0.035 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |\n| Logistic model, likelihood-ratio test | chi-square 139.5 on 8 df; p = 3.1e-26 | Not applicable | 1233 patients, 127 events | Likelihood-ratio test | fit_logistic |\n| Count of tests in this question | 4 univariate tests, 1 logistic model | Not applicable | 1233 patients | Holm correction over the 4 univariate p-values | adjust_pvalues |\n\nUncertain:\n- The four univariate tests do not adjust for each other's effects. Only the logistic model adjusts for the six listed covariates.\n- Events per parameter are 15.9, which is above 10. No separation warning was given.\n- Secondary education (p = 0.035) and HIV test not done (p = 0.00014) are not corrected for the eight model coefficients. Only the univariate tests were Holm-corrected.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Correction for a list of p-values: holm · Covariates of the logistic model: drug_use, bmi, mdr_tb, alcohol_weekly, hiv_status, secondary_education · Outcome value that counts as the event: 1 · Reference level of each categorical covariate: drug_use=No, bmi=Normal, mdr_tb=No, alcohol_weekly=No, hiv_status=Negative, secondary_education=Yes · Yates continuity correction for a 2x2 chi-square test: false · Sidedness of the Fisher exact test: two-sided.",
+   "items": [
+    {
+     "key": "patients",
+     "description": "Patients in the analysis",
+     "expected": 1233,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1233,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_rows",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 113,
+      "text": null
+     }
+    },
+    {
+     "key": "defaulted",
+     "description": "Patients who defaulted",
+     "expected": 127,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 127,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.events",
+      "entry": 69
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 113,
+      "text": null
+     }
+    },
+    {
+     "key": "p_age",
+     "description": "Chi-square p, age group by default",
+     "expected": 0.00604,
+     "tolerance": 0.0002,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.00603898829164167,
+      "diff": 0.0000010117083583298728,
+      "node": "n2",
+      "path": "metrics.p_value",
+      "entry": 35
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.00604,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 113,
+      "text": "| Age group vs default, p | 0.00604; Holm 0.0181; Cramér's V 0.10 | Not computed | 1233 patients | Pearson chi-square, 4x2, unpaired | chi_square_test |"
+     }
+    },
+    {
+     "key": "p_sex",
+     "description": "Chi-square p, sex by default",
+     "expected": 0.0000395,
+     "tolerance": 0.000005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.00003945092420796785,
+      "diff": 4.907579203214781e-8,
+      "node": "n3",
+      "path": "metrics.p_value",
+      "entry": 38
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0000395,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 113,
+      "text": "| Sex vs default, p | 0.0000395; Holm 0.000158; Cramér's V 0.117 | Not computed | 1233 patients | Pearson chi-square, 2x2, unpaired, no Yates correction | chi_square_test |"
+     }
+    },
+    {
+     "key": "p_marital",
+     "description": "Chi-square p, marital status by default",
+     "expected": 0.6815,
+     "tolerance": 0.001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.6814545468936668,
+      "diff": 0.000045453106333193105,
+      "node": "n4",
+      "path": "metrics.p_value",
+      "entry": 41
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.707,
+      "diff": 0.025499999999999967,
+      "via": null,
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| BMI (Overweight/Obese vs Normal), adjusted OR | 0.88 | 0.44 to 1.73; p = 0.707 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "p_poverty",
+     "description": "Chi-square p, poverty by default",
+     "expected": 0.03436,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.03436348964265445,
+      "diff": 0.0000034896426544459014,
+      "node": "n5",
+      "path": "metrics.p_value",
+      "entry": 44
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0344,
+      "diff": 0.00003999999999999837,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 113,
+      "text": "| Poverty vs default, p | 0.0344; Holm 0.0687; Cramér's V 0.060 | Not computed | 1233 patients | Pearson chi-square, 2x2, unpaired, no Yates correction | chi_square_test |"
+     }
+    },
+    {
+     "key": "or_drug",
+     "description": "Adjusted OR, drug use",
+     "expected": 4.7816,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.78155139142713,
+      "diff": 0.000048608572869923705,
+      "node": "n7",
+      "path": "metrics.or_drug_use_Yes",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.78,
+      "diff": 0.0015999999999998238,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| Drug use (Yes vs No), adjusted OR | 4.78 | 3.05 to 7.49; p = 8.4e-12 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_drug_lo",
+     "description": "Adjusted OR, drug use, CI lower",
+     "expected": 3.0522,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.0521784873914464,
+      "diff": 0.000021512608553653223,
+      "node": "n7",
+      "path": "metrics.or_lo_drug_use_Yes",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.05,
+      "diff": 0.002200000000000202,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| Drug use (Yes vs No), adjusted OR | 4.78 | 3.05 to 7.49; p = 8.4e-12 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_drug_hi",
+     "description": "Adjusted OR, drug use, CI upper",
+     "expected": 7.4907,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 7.490791840420467,
+      "diff": 0.00009184042046683771,
+      "node": "n7",
+      "path": "metrics.or_hi_drug_use_Yes",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 7.49,
+      "diff": 0.000700000000000145,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| Drug use (Yes vs No), adjusted OR | 4.78 | 3.05 to 7.49; p = 8.4e-12 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_underweight",
+     "description": "Adjusted OR, underweight",
+     "expected": 2.0795,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.079502516579366,
+      "diff": 0.000002516579366229621,
+      "node": "n7",
+      "path": "metrics.or_bmi_Underweight",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.08,
+      "diff": 0.000500000000000167,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| BMI (Underweight vs Normal), adjusted OR | 2.08 | 1.21 to 3.56; p = 0.0077 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_underweight_lo",
+     "description": "Adjusted OR, underweight, CI lower",
+     "expected": 1.2137,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.2136991532262786,
+      "diff": 8.467737213635473e-7,
+      "node": "n7",
+      "path": "metrics.or_lo_bmi_Underweight",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.21,
+      "diff": 0.0037000000000000366,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| BMI (Underweight vs Normal), adjusted OR | 2.08 | 1.21 to 3.56; p = 0.0077 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_underweight_hi",
+     "description": "Adjusted OR, underweight, CI upper",
+     "expected": 3.5629,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.5629346077773034,
+      "diff": 0.00003460777730346365,
+      "node": "n7",
+      "path": "metrics.or_hi_bmi_Underweight",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.56,
+      "diff": 0.0028999999999999027,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| BMI (Underweight vs Normal), adjusted OR | 2.08 | 1.21 to 3.56; p = 0.0077 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_overweight",
+     "description": "Adjusted OR, overweight or obese",
+     "expected": 0.8777,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.8777123489045796,
+      "diff": 0.000012348904579573272,
+      "node": "n7",
+      "path": "metrics.or_bmi_Overweight_Obese",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.88,
+      "diff": 0.0022999999999999687,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| BMI (Overweight/Obese vs Normal), adjusted OR | 0.88 | 0.44 to 1.73; p = 0.707 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_overweight_lo",
+     "description": "Adjusted OR, overweight or obese, CI lower",
+     "expected": 0.4445,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.4444368093830721,
+      "diff": 0.00006319061692788841,
+      "node": "n7",
+      "path": "metrics.or_lo_bmi_Overweight_Obese",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.44,
+      "diff": 0.004500000000000004,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| BMI (Overweight/Obese vs Normal), adjusted OR | 0.88 | 0.44 to 1.73; p = 0.707 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_overweight_hi",
+     "description": "Adjusted OR, overweight or obese, CI upper",
+     "expected": 1.7333,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.7333824542772827,
+      "diff": 0.00008245427728259536,
+      "node": "n7",
+      "path": "metrics.or_hi_bmi_Overweight_Obese",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.73,
+      "diff": 0.0033000000000000806,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| BMI (Overweight/Obese vs Normal), adjusted OR | 0.88 | 0.44 to 1.73; p = 0.707 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_mdr",
+     "description": "Adjusted OR, MDR treatment",
+     "expected": 3.0385,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.0384841194494236,
+      "diff": 0.00001588055057633042,
+      "node": "n7",
+      "path": "metrics.or_mdr_tb_Yes",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.04,
+      "diff": 0.0015000000000000568,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| MDR-TB (Yes vs No), adjusted OR | 3.04 | 1.58 to 5.85; p = 0.00089 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_mdr_lo",
+     "description": "Adjusted OR, MDR treatment, CI lower",
+     "expected": 1.578,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.577974038264568,
+      "diff": 0.00002596173543212288,
+      "node": "n7",
+      "path": "metrics.or_lo_mdr_tb_Yes",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.58,
+      "diff": 0.0020000000000000018,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| MDR-TB (Yes vs No), adjusted OR | 3.04 | 1.58 to 5.85; p = 0.00089 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_mdr_hi",
+     "description": "Adjusted OR, MDR treatment, CI upper",
+     "expected": 5.8507,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5.8507843096708845,
+      "diff": 0.00008430967088468577,
+      "node": "n7",
+      "path": "metrics.or_hi_mdr_tb_Yes",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 5.85,
+      "diff": 0.000700000000000145,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| MDR-TB (Yes vs No), adjusted OR | 3.04 | 1.58 to 5.85; p = 0.00089 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_alcohol",
+     "description": "Adjusted OR, weekly alcohol",
+     "expected": 2.222,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.2219893823639905,
+      "diff": 0.000010617636009513376,
+      "node": "n7",
+      "path": "metrics.or_alcohol_weekly_Yes",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.22,
+      "diff": 0.0019999999999997797,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| Weekly alcohol (Yes vs No), adjusted OR | 2.22 | 1.40 to 3.52; p = 0.00069 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_alcohol_lo",
+     "description": "Adjusted OR, weekly alcohol, CI lower",
+     "expected": 1.4008,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.400785466210615,
+      "diff": 0.000014533789385096085,
+      "node": "n7",
+      "path": "metrics.or_lo_alcohol_weekly_Yes",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.4,
+      "diff": 0.0008000000000001339,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| Weekly alcohol (Yes vs No), adjusted OR | 2.22 | 1.40 to 3.52; p = 0.00069 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_alcohol_hi",
+     "description": "Adjusted OR, weekly alcohol, CI upper",
+     "expected": 3.5246,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.5246202465924,
+      "diff": 0.00002024659239996396,
+      "node": "n7",
+      "path": "metrics.or_hi_alcohol_weekly_Yes",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.52,
+      "diff": 0.0045999999999999375,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| Weekly alcohol (Yes vs No), adjusted OR | 2.22 | 1.40 to 3.52; p = 0.00069 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_not_tested",
+     "description": "Adjusted OR, HIV test not done",
+     "expected": 2.3031,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.303111624426218,
+      "diff": 0.000011624426218048711,
+      "node": "n7",
+      "path": "metrics.or_hiv_status_Test_not_done",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.3,
+      "diff": 0.0031000000000003247,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| HIV (Test not done vs Negative), adjusted OR | 2.30 | 1.50 to 3.54; p = 0.00014 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_not_tested_lo",
+     "description": "Adjusted OR, HIV test not done, CI lower",
+     "expected": 1.5,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.499948912475858,
+      "diff": 0.000051087524141957275,
+      "node": "n7",
+      "path": "metrics.or_lo_hiv_status_Test_not_done",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.5,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| HIV (Test not done vs Negative), adjusted OR | 2.30 | 1.50 to 3.54; p = 0.00014 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_not_tested_hi",
+     "description": "Adjusted OR, HIV test not done, CI upper",
+     "expected": 3.5363,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 3.536335878141149,
+      "diff": 0.00003587814114869303,
+      "node": "n7",
+      "path": "metrics.or_hi_hiv_status_Test_not_done",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 3.54,
+      "diff": 0.0036999999999998145,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| HIV (Test not done vs Negative), adjusted OR | 2.30 | 1.50 to 3.54; p = 0.00014 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_positive",
+     "description": "Adjusted OR, HIV positive",
+     "expected": 1.3925,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.3924857809169304,
+      "diff": 0.000014219083069644256,
+      "node": "n7",
+      "path": "metrics.or_hiv_status_Positive",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.39,
+      "diff": 0.0025000000000001688,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| HIV (Positive vs Negative), adjusted OR | 1.39 | 0.42 to 4.65; p = 0.591 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_positive_lo",
+     "description": "Adjusted OR, HIV positive, CI lower",
+     "expected": 0.4167,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.41667282366518404,
+      "diff": 0.00002717633481597037,
+      "node": "n7",
+      "path": "metrics.or_lo_hiv_status_Positive",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.42,
+      "diff": 0.0032999999999999696,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| HIV (Positive vs Negative), adjusted OR | 1.39 | 0.42 to 4.65; p = 0.591 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_hiv_positive_hi",
+     "description": "Adjusted OR, HIV positive, CI upper",
+     "expected": 4.6534,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.653571195259722,
+      "diff": 0.00017119525972120186,
+      "node": "n7",
+      "path": "metrics.or_hi_hiv_status_Positive",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 4.65,
+      "diff": 0.0034000000000000696,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| HIV (Positive vs Negative), adjusted OR | 1.39 | 0.42 to 4.65; p = 0.591 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_no_secondary",
+     "description": "Adjusted OR, secondary school not completed",
+     "expected": 1.5499,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.549942461065434,
+      "diff": 0.00004246106543392969,
+      "node": "n7",
+      "path": "metrics.or_secondary_education_No",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.55,
+      "diff": 0.00009999999999998899,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| Secondary education (No vs Yes), adjusted OR | 1.55 | 1.03 to 2.33; p = 0.035 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_no_secondary_lo",
+     "description": "Adjusted OR, secondary school not completed, CI lower",
+     "expected": 1.0317,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.0316546463400484,
+      "diff": 0.00004535365995161911,
+      "node": "n7",
+      "path": "metrics.or_lo_secondary_education_No",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.03,
+      "diff": 0.0017000000000000348,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| Secondary education (No vs Yes), adjusted OR | 1.55 | 1.03 to 2.33; p = 0.035 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    },
+    {
+     "key": "or_no_secondary_hi",
+     "description": "Adjusted OR, secondary school not completed, CI upper",
+     "expected": 2.3286,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.3286102971921614,
+      "diff": 0.0000102971921616124,
+      "node": "n7",
+      "path": "metrics.or_hi_secondary_education_No",
+      "entry": 69
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.33,
+      "diff": 0.00140000000000029,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 113,
+      "text": "| Secondary education (No vs Yes), adjusted OR | 1.55 | 1.03 to 2.33; p = 0.035 | 1233 patients, 127 events | Logistic regression, Wald CI | fit_logistic |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 9,
+    "inputTokens": 22,
+    "outputTokens": 9912,
+    "cacheRead": 208646,
+    "cacheWrite": 36320,
+    "toolCalls": 12,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 0,
+    "findings": {
+     "info": 3,
+     "warning": 5,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 8
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run3/home/sessions/20261012-025151-ecbf/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/lackey2015-tb-default",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run3",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/lackey2015-tb-default/tb_default.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run3/home/sessions/20261012-025151-ecbf/work/adjust_pvalues-1/adjusted_p.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/lackey2015-tb-default/claude_claude-haiku-5-5/lackey2015-tb-default/run3/home/sessions/20261012-025151-ecbf/work/inspect_table-1/columns.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-lackey2015-tb-default.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-lackey2015-tb-default.json"
+ },
+ "summary": {
+  "cells": {
+   "lackey2015-tb-default": {
+    "claude:claude-haiku-5-5": {
+     "computed": 90,
+     "computedOf": 90,
+     "reported": 62,
+     "reportedOf": 84,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 90,
+    "computedOf": 90,
+    "reported": 62,
+    "reportedOf": 84,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 351.62800000000004,
+    "requests": 37,
+    "inputTokens": 90,
+    "outputTokens": 41678,
+    "cacheRead": 952148,
+    "cacheWrite": 130634,
+    "toolCalls": 44,
+    "failedToolCalls": 1,
+    "nudges": 0,
+    "planReminders": 3,
+    "revisions": 2,
+    "findings_info": 10,
+    "findings_warning": 17,
+    "findings_error": 2,
+    "unsourced": 4,
+    "deviations": 4,
+    "overwritten": 4,
+    "nodes": 31
+   }
+  },
+  "skipped": []
+ }
+}

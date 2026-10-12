@@ -1,0 +1,428 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "minh2020-iqtree2",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 75.065,
+   "session": "20261012-031414-8f59",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run1/home/sessions/20261012-031414-8f59",
+   "answer": "No tool call is pending, and no further step is needed.\n\n1. The best-fit model is TIM2+F+I+G4, and the tree has a log-likelihood of -21152.5377. The 14 internal branches have ultrafast bootstrap support from 51 to 100.\n\nWaits for you: Name an outgroup if you want the tree rooted.\n\nSettings used, from the decision record: Substitution model: MFP · Bootstrap type: ufboot · Number of bootstrap replicates: 1000 · Random seed: 1.",
+   "items": [
+    {
+     "key": "log_likelihood",
+     "description": "Log-likelihood of the ML tree",
+     "expected": -21152.54,
+     "tolerance": 1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -21152.5377,
+      "diff": 0.002300000000104774,
+      "node": "n1",
+      "path": "metrics.log_likelihood",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": -21152.5377,
+      "diff": 0.002300000000104774,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 66,
+      "text": "The best-fit model is TIM2+F+I+G4, and the tree has a log-likelihood of -21152.5377."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 8,
+    "inputTokens": 26,
+    "outputTokens": 5988,
+    "cacheRead": 112360,
+    "cacheWrite": 20149,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 3,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 7,
+     "error": 2
+    },
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 1
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run1/home/sessions/20261012-031414-8f59/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/minh2020-iqtree2",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run1",
+     "/Users/parker/Code/guided-analysis/catalog/phylo",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/iqtree3/3.1.4",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/phylo"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/minh2020-iqtree2/example.phy",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run1/home/sessions/20261012-031414-8f59/work/infer_tree-1/run.contree"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "minh2020-iqtree2",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 87.987,
+   "session": "20261012-031529-e081",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run2/home/sessions/20261012-031529-e081",
+   "answer": "Corrected: the bootstrap type used was ufboot (ultrafast bootstrap). The branch counts now come from a script run on the logged tree file.\n\nThe best-fit model is TIM2+F+I+G4, the tree has log-likelihood −21152.5377, and 10 of 14 internal branches have ultrafast bootstrap support of 95 or more.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Best-fit substitution model | TIM2+F+I+G4 | Not applicable | 17 sequences; ModelFinder compared many models | ModelFinder, lowest Bayesian information criterion (BIC) | infer_tree, run.iqtree |\n| Log-likelihood of the tree | −21152.5377 (standard error 336.3357) | Not computed | 1 maximum-likelihood tree under the chosen model | Maximum likelihood (IQ-TREE 3.1.4) | infer_tree, run.iqtree |\n| Sequences (taxa) | 17 | Not applicable | 17 taxa; one n is one sequence | Count | infer_tree, run.iqtree |\n| Sites in alignment | 1998 (686 constant, 1152 patterns) | Not applicable | 1998 aligned columns | Count | run.iqtree |\n| Internal branches | 14 | Not applicable | 14 internal branches in the consensus tree | Count | run_script (tree file) |\n| Internal branches with ultrafast bootstrap ≥95 | 10 of 14 | Not computed | 14 internal branches; one n is one branch | Threshold from lab standard (95 or more is well supported for ultrafast bootstrap) | run_script (tree file) |\n| Bootstrap type and replicates | ufboot (ultrafast bootstrap), 1000 replicates | Not applicable | 1000 bootstrap trees; one n is one replicate | Not applicable | infer_tree, run.iqtree |\n| Random seed | 1 | Not applicable | Not applicable | Not applicable | infer_tree, run.iqtree |\n\nSettings: no outgroup was given, so the tree is unrooted. Model was chosen by ModelFinder with BIC.\n\nUncertain:\n- Four internal branches are below 95: ultrafast bootstrap values 70, 51, 71 and 93.\n- Ultrafast bootstrap values are not standard bootstrap values. The threshold of 95 applies to ultrafast bootstrap only.\n- Log-likelihoods are not comparable with trees from other alignments or models without a model test.\n\nWaits for you:\n- Choose an outgroup if you want a rooted tree.\n\nSettings used, from the decision record: Substitution model: MFP · Bootstrap type: ufboot · Number of bootstrap replicates: 1000 · Random seed: 1.",
+   "items": [
+    {
+     "key": "log_likelihood",
+     "description": "Log-likelihood of the ML tree",
+     "expected": -21152.54,
+     "tolerance": 1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -21152.5377,
+      "diff": 0.002300000000104774,
+      "node": "n1",
+      "path": "metrics.log_likelihood",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": -21152.5377,
+      "diff": 0.002300000000104774,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 56,
+      "text": "The best-fit model is TIM2+F+I+G4, the tree has log-likelihood −21152.5377, and 10 of 14 internal branches have ultrafast bootstrap support of 95 or more."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 9371,
+    "cacheRead": 79753,
+    "cacheWrite": 30594,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 3,
+     "error": 2
+    },
+    "unsourced": 9,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 1
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run2/home/sessions/20261012-031529-e081/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/minh2020-iqtree2",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run2",
+     "/Users/parker/Code/guided-analysis/catalog/phylo",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/iqtree3/3.1.4",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/phylo"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/minh2020-iqtree2/example.phy",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run2/home/sessions/20261012-031529-e081/work/infer_tree-1/run.contree",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run2/home/sessions/20261012-031529-e081/work/infer_tree-1/run.iqtree"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 9,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "minh2020-iqtree2",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 90.326,
+   "session": "20261012-031657-2db7",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run3/home/sessions/20261012-031657-2db7",
+   "answer": "1. The best-fit model is TIM2+F+I+G4, and the maximum-likelihood tree has a log-likelihood of -21152.5377.\n\n| Measure | Value | 95% CI | n, and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Best-fit model | TIM2+F+I+G4 | Not applicable | 17 sequences, 1998 sites | ModelFinder, BIC (seed 1) | infer_tree |\n| Log-likelihood | -21152.5377 | Not reported by IQ-TREE | 1998 sites (1152 site patterns) | Maximum-likelihood fit under TIM2+F+I+G4 | infer_tree |\n| Internal nodes with a support value | 14 (the top node has none) | Not applicable | 17 sequences | Node list from the consensus tree file | run_script (tree_nodes.csv) |\n| Nodes at 95 or more | 10 of 14 | Not computed | 1000 replicates; one replicate is one resampled alignment | Ultrafast bootstrap (ufboot), seed 1, IQ-TREE 3.1.4 | infer_tree, run_script |\n| Lowest support value | 51 | Not computed | 1000 replicates | Ultrafast bootstrap (ufboot) | run_script |\n\nUncertain:\n- The bootstrap type is ufboot (ultrafast bootstrap), not standard bootstrap. Values of 95 or more are well supported.\n- Nodes below 95 are 51 (Sphenodon with turtle, crocodile and bird), 70 (turtle with crocodile and bird), 71 (seal with cow and whale) and 93 (human with seal, cow and whale).\n- The tree is unrooted because no outgroup was given. The log-likelihood compares only within this alignment and model.\n\nWaits for you: An outgroup, if you want the tree rooted.\n\nStep results that the answer does not mention, from the record:\n- n2 run_script: The script ran in /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run3/home/sessions/20261012-031657-2db7/work and wrote 1 new file(s) to /private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run3/home/sessions/20261012-031657-2db7/work.\n\nSettings used, from the decision record: Substitution model: MFP · Bootstrap type: ufboot · Number of bootstrap replicates: 1000 · Random seed: 1.",
+   "items": [
+    {
+     "key": "log_likelihood",
+     "description": "Log-likelihood of the ML tree",
+     "expected": -21152.54,
+     "tolerance": 1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -21152.5377,
+      "diff": 0.002300000000104774,
+      "node": "n1",
+      "path": "metrics.log_likelihood",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": -21152.5377,
+      "diff": 0.002300000000104774,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 49,
+      "text": "The best-fit model is TIM2+F+I+G4, and the maximum-likelihood tree has a log-likelihood of -21152.5377."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 14,
+    "outputTokens": 11193,
+    "cacheRead": 60388,
+    "cacheWrite": 24328,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 2,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run3/home/sessions/20261012-031657-2db7/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/minh2020-iqtree2",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run3",
+     "/Users/parker/Code/guided-analysis/catalog/phylo",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/iqtree3/3.1.4",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/phylo"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/minh2020-iqtree2/example.phy",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-a/bench-runs/minh2020-iqtree2/claude_claude-haiku-5-5/minh2020-iqtree2/run3/home/sessions/20261012-031657-2db7/work/infer_tree-1/run.contree"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-minh2020-iqtree2.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-minh2020-iqtree2.json"
+ },
+ "summary": {
+  "cells": {
+   "minh2020-iqtree2": {
+    "claude:claude-haiku-5-5": {
+     "computed": 3,
+     "computedOf": 3,
+     "reported": 3,
+     "reportedOf": 3,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 3,
+    "computedOf": 3,
+    "reported": 3,
+    "reportedOf": 3,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 253.378,
+    "requests": 19,
+    "inputTokens": 56,
+    "outputTokens": 26552,
+    "cacheRead": 252501,
+    "cacheWrite": 75071,
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "nudges": 3,
+    "planReminders": 0,
+    "revisions": 3,
+    "findings_info": 10,
+    "findings_warning": 12,
+    "findings_error": 5,
+    "unsourced": 10,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 4
+   }
+  },
+  "skipped": []
+ }
+}

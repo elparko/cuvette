@@ -1,0 +1,831 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "student1908-sleep",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 24.856,
+   "session": "20261012-053139-9e86",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run1/home/sessions/20261012-053139-9e86",
+   "answer": "1. Drug 2 gave about 1.58 more hours of extra sleep than drug 1 (paired t-test, p = 0.0028, so the difference is significant at alpha 0.05).\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Mean difference (drug 2 minus drug 1), extra sleep | 1.58 hours | 0.70 to 2.46 hours | 10 patients (one patient is one replicate; 20 rows) | Paired t-test, two-sided, alpha 0.05, df = 9, t = 4.062 | compare_two_groups |\n| p-value | 0.0028 | not applicable | 10 patients | Paired t-test, two-sided | compare_two_groups |\n| Mean extra sleep, drug 1 | 0.75 hours | not reported | 10 patients | Descriptive | compare_two_groups |\n| Mean extra sleep, drug 2 | 2.33 hours | not reported | 10 patients | Descriptive | compare_two_groups |\n| Effect size (Cohen dz) | 1.28 | not reported | 10 patients | Paired t-test | compare_two_groups |\n\nUncertain:\n- The file uses group codes 1 and 2. It does not name the drugs. I assumed code 1 is drug 1. If the codes are reversed, the sign of the difference changes.\n- The sample has only 10 patients. The test assumes the differences are roughly normal. I did not check this.\n- A rank test (Wilcoxon signed-rank) can confirm the result if the normality assumption is doubtful. I did not run it.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Paired test: true · Test family for two groups: t · Assume equal variances (unpaired t-test): false · Sidedness: two-sided.",
+   "items": [
+    {
+     "key": "mean_difference",
+     "description": "Mean paired difference, group 2 minus group 1",
+     "expected": 1.58,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.58,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.mean_diff",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.58,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 49,
+      "text": "Drug 2 gave about 1.58 more hours of extra sleep than drug 1 (paired t-test, p = 0.0028, so the difference is significant at alpha 0.05)."
+     }
+    },
+    {
+     "key": "paired_t",
+     "description": "Paired t statistic, absolute value",
+     "expected": 4.0621,
+     "tolerance": 0.001,
+     "abs": true,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.062127683382037,
+      "diff": 0.000027683382036514104,
+      "node": "n2",
+      "path": "metrics.statistic",
+      "entry": 41
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 49,
+      "text": null
+     }
+    },
+    {
+     "key": "degrees_of_freedom",
+     "description": "Degrees of freedom",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.df",
+      "entry": 41
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 49,
+      "text": null
+     }
+    },
+    {
+     "key": "paired_p",
+     "description": "Paired two-sided p",
+     "expected": 0.002833,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0028328901973842724,
+      "diff": 1.0980261572765895e-7,
+      "node": "n2",
+      "path": "metrics.p_value",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0028,
+      "diff": 0.00003300000000000004,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 49,
+      "text": "Drug 2 gave about 1.58 more hours of extra sleep than drug 1 (paired t-test, p = 0.0028, so the difference is significant at alpha 0.05)."
+     }
+    },
+    {
+     "key": "ci_lower",
+     "description": "95% CI lower bound",
+     "expected": 0.7,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.7,
+      "diff": 0,
+      "node": "n1",
+      "path": "file:/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run1/home/sessions/20261012-053139-9e86/work/inspect_table-1/columns.csv",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.7,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 49,
+      "text": "| Mean difference (drug 2 minus drug 1), extra sleep | 1.58 hours | 0.70 to 2.46 hours | 10 patients (one patient is one replicate; 20 rows) | Paired t-test, two-sided, alpha 0.05, df = 9, t = 4.062 | compare_two_groups |"
+     }
+    },
+    {
+     "key": "ci_upper",
+     "description": "95% CI upper bound",
+     "expected": 2.46,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.459885763276983,
+      "diff": 0.00011423672301713594,
+      "node": "n2",
+      "path": "metrics.ci_hi",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.46,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 49,
+      "text": "| Mean difference (drug 2 minus drug 1), extra sleep | 1.58 hours | 0.70 to 2.46 hours | 10 patients (one patient is one replicate; 20 rows) | Paired t-test, two-sided, alpha 0.05, df = 9, t = 4.062 | compare_two_groups |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 4,
+    "inputTokens": 10,
+    "outputTokens": 2017,
+    "cacheRead": 54505,
+    "cacheWrite": 20043,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings": {
+     "info": 1,
+     "warning": 0,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run1/home/sessions/20261012-053139-9e86/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/student1908-sleep",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run1",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/student1908-sleep/sleep.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run1/home/sessions/20261012-053139-9e86/work/inspect_table-1/columns.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "student1908-sleep",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 50.566,
+   "session": "20261012-053204-a05d",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run2/home/sessions/20261012-053204-a05d",
+   "answer": "I removed the unmeasured power target and the 95% label from the table. The numbers below come from the logged results.\n\nYes, the second drug group gave more extra sleep. The mean difference was 1.58 hours (group 2 minus group 1), with p = 0.0028 (paired t-test, two-sided, alpha 0.05).\n\n| Measure | Value | Confidence interval (confidence level 1 minus alpha 0.05) | n (what one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Mean difference, group 2 minus group 1 (extra sleep, hours) | 1.58 | 0.70 to 2.46 | 10 subjects (20 rows) | Paired t-test, two-sided, alpha 0.05 | compare_two_groups |\n| Mean extra sleep, group 1 | 0.75 | not reported | 10 subjects | Descriptive | compare_two_groups |\n| Mean extra sleep, group 2 | 2.33 | not reported | 10 subjects | Descriptive | compare_two_groups |\n| p-value | 0.0028 | not applicable | 10 subjects | Paired t-test, t = 4.06, df = 9 | compare_two_groups |\n| Effect size (Cohen dz) | 1.28 | not reported | 10 subjects | Paired t-test | compare_two_groups |\n| Smallest effect detectable at the standard power target (dz) | 0.996 | not applicable | 10 subjects | Power calculation for a two-sided paired t-test, alpha 0.05 (power target is an input, not a measured result) | run_script |\n\nUncertain:\n- The file codes the drugs only as group 1 and group 2. Confirm which code is which drug before you report the direction.\n- The test assumes the differences are roughly normal. I did not check this. A rank test would be the alternative.\n- With 10 subjects, the test detects only large effects (dz about 1.0 or more). This is the smallest effect shown in the table.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Paired test: true · Test family for two groups: t · Assume equal variances (unpaired t-test): false · Sidedness: two-sided.",
+   "items": [
+    {
+     "key": "mean_difference",
+     "description": "Mean paired difference, group 2 minus group 1",
+     "expected": 1.58,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.58,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.mean_diff",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.58,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 68,
+      "text": "The mean difference was 1.58 hours (group 2 minus group 1), with p = 0.0028 (paired t-test, two-sided, alpha 0.05)."
+     }
+    },
+    {
+     "key": "paired_t",
+     "description": "Paired t statistic, absolute value",
+     "expected": 4.0621,
+     "tolerance": 0.001,
+     "abs": true,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.062127683382037,
+      "diff": 0.000027683382036514104,
+      "node": "n2",
+      "path": "metrics.statistic",
+      "entry": 41
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 68,
+      "text": null
+     }
+    },
+    {
+     "key": "degrees_of_freedom",
+     "description": "Degrees of freedom",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.df",
+      "entry": 41
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 68,
+      "text": null
+     }
+    },
+    {
+     "key": "paired_p",
+     "description": "Paired two-sided p",
+     "expected": 0.002833,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0028328901973842724,
+      "diff": 1.0980261572765895e-7,
+      "node": "n2",
+      "path": "metrics.p_value",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0028,
+      "diff": 0.00003300000000000004,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 68,
+      "text": "The mean difference was 1.58 hours (group 2 minus group 1), with p = 0.0028 (paired t-test, two-sided, alpha 0.05)."
+     }
+    },
+    {
+     "key": "ci_lower",
+     "description": "95% CI lower bound",
+     "expected": 0.7,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.7,
+      "diff": 0,
+      "node": "n1",
+      "path": "file:/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run2/home/sessions/20261012-053204-a05d/work/inspect_table-1/columns.csv",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.7,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 68,
+      "text": "| Mean difference, group 2 minus group 1 (extra sleep, hours) | 1.58 | 0.70 to 2.46 | 10 subjects (20 rows) | Paired t-test, two-sided, alpha 0.05 | compare_two_groups |"
+     }
+    },
+    {
+     "key": "ci_upper",
+     "description": "95% CI upper bound",
+     "expected": 2.46,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.459885763276983,
+      "diff": 0.00011423672301713594,
+      "node": "n2",
+      "path": "metrics.ci_hi",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.46,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 68,
+      "text": "| Mean difference, group 2 minus group 1 (extra sleep, hours) | 1.58 | 0.70 to 2.46 | 10 subjects (20 rows) | Paired t-test, two-sided, alpha 0.05 | compare_two_groups |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 4345,
+    "cacheRead": 96070,
+    "cacheWrite": 22750,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 0,
+     "warning": 3,
+     "error": 1
+    },
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run2/home/sessions/20261012-053204-a05d/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/student1908-sleep",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run2",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/student1908-sleep/sleep.csv",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run2/home/sessions/20261012-053204-a05d/work/inspect_table-1/columns.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "student1908-sleep",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 54.93,
+   "session": "20261012-053254-af36",
+   "dir": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run3/home/sessions/20261012-053254-af36",
+   "answer": "1. Group 2 gave 1.58 more hours of extra sleep than group 1 (mean difference, 95% CI 0.70 to 2.46; paired t-test, two-sided, alpha 0.05, p = 0.0028).\n\n| Measure | Value | 95% CI | n (unit) | Test | Step |\n|---|---|---|---|---|---|\n| Mean difference, group 2 minus group 1 | 1.58 hours | 0.70 to 2.46 | 10 subjects (20 rows) | Paired t-test, two-sided, df = 9, t = 4.062 | compare_two_groups |\n| p value | 0.0028 | not applicable | 10 subjects | Same test, alpha 0.05 | compare_two_groups |\n| Mean extra sleep, group 1 | 0.75 hours | not applicable | 10 subjects | Descriptive | compare_two_groups |\n| Mean extra sleep, group 2 | 2.33 hours | not applicable | 10 subjects | Descriptive | compare_two_groups |\n| Effect size, Cohen dz | 1.28 | not applicable | 10 subjects | Paired t-test | compare_two_groups |\n| Smallest standardized effect this sample detects, dz | 0.996 | not applicable | 10 subjects | Power calculation for two-sided paired t-test, alpha 0.05, usual power target | run_script |\n\nUncertain:\n- The file uses the labels 1 and 2 only. It does not name the drugs, so confirm which drug is group 2.\n- The sample has 10 subjects. Smaller effects than dz 0.996 can be missed.\n- The paired t-test assumes the differences are roughly normal. I did not check this assumption.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Significance level (alpha): 0.05 · Paired test: true · Test family for two groups: t · Assume equal variances (unpaired t-test): false · Sidedness: two-sided.",
+   "items": [
+    {
+     "key": "mean_difference",
+     "description": "Mean paired difference, group 2 minus group 1",
+     "expected": 1.58,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1.58,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.mean_diff",
+      "entry": 42
+     },
+     "reported": {
+      "pass": true,
+      "value": 1.58,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 69,
+      "text": "Group 2 gave 1.58 more hours of extra sleep than group 1 (mean difference, 95% CI 0.70 to 2.46; paired t-test, two-sided, alpha 0.05, p = 0.0028)."
+     }
+    },
+    {
+     "key": "paired_t",
+     "description": "Paired t statistic, absolute value",
+     "expected": 4.0621,
+     "tolerance": 0.001,
+     "abs": true,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 4.062127683382037,
+      "diff": 0.000027683382036514104,
+      "node": "n2",
+      "path": "metrics.statistic",
+      "entry": 42
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 69,
+      "text": null
+     }
+    },
+    {
+     "key": "degrees_of_freedom",
+     "description": "Degrees of freedom",
+     "expected": 9,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 9,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.df",
+      "entry": 42
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 69,
+      "text": null
+     }
+    },
+    {
+     "key": "paired_p",
+     "description": "Paired two-sided p",
+     "expected": 0.002833,
+     "tolerance": 0.0001,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.0028328901973842724,
+      "diff": 1.0980261572765895e-7,
+      "node": "n2",
+      "path": "metrics.p_value",
+      "entry": 42
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0028,
+      "diff": 0.00003300000000000004,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 69,
+      "text": "Group 2 gave 1.58 more hours of extra sleep than group 1 (mean difference, 95% CI 0.70 to 2.46; paired t-test, two-sided, alpha 0.05, p = 0.0028)."
+     }
+    },
+    {
+     "key": "ci_lower",
+     "description": "95% CI lower bound",
+     "expected": 0.7,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.7001142367230175,
+      "diff": 0.00011423672301758003,
+      "node": "n2",
+      "path": "metrics.ci_lo",
+      "entry": 42
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.7,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 69,
+      "text": "Group 2 gave 1.58 more hours of extra sleep than group 1 (mean difference, 95% CI 0.70 to 2.46; paired t-test, two-sided, alpha 0.05, p = 0.0028)."
+     }
+    },
+    {
+     "key": "ci_upper",
+     "description": "95% CI upper bound",
+     "expected": 2.46,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.459885763276983,
+      "diff": 0.00011423672301713594,
+      "node": "n2",
+      "path": "metrics.ci_hi",
+      "entry": 42
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.46,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 69,
+      "text": "Group 2 gave 1.58 more hours of extra sleep than group 1 (mean difference, 95% CI 0.70 to 2.46; paired t-test, two-sided, alpha 0.05, p = 0.0028)."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 4065,
+    "cacheRead": 95593,
+    "cacheWrite": 22240,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 2,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run3/home/sessions/20261012-053254-af36/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/student1908-sleep",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs/student1908-sleep/claude_claude-haiku-5-5/student1908-sleep/run3",
+     "/Users/parker/Code/guided-analysis/catalog/biostats",
+     "/Users/parker/.cuvette/envs/biostats",
+     "/opt/homebrew/Cellar/python@3.12/3.12.10_1/Frameworks/Python.framework/Versions/3.12",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/private/tmp/claude-501/-Users-parker-Code-guided-analysis/1838a63c-2a33-4afe-8a2a-f3a4d25b6244/scratchpad/w-rest-part-d/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/biostats"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/student1908-sleep/sleep.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-student1908-sleep.md",
+  "json": "/Users/parker/code/guided-analysis/bench/results/after-fix-2026-10-12/rest/rest-student1908-sleep.json"
+ },
+ "summary": {
+  "cells": {
+   "student1908-sleep": {
+    "claude:claude-haiku-5-5": {
+     "computed": 18,
+     "computedOf": 18,
+     "reported": 12,
+     "reportedOf": 12,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 18,
+    "computedOf": 18,
+    "reported": 12,
+    "reportedOf": 12,
+    "runs": 3,
+    "statuses": {
+     "answer": 3
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 3,
+    "durationS": 130.352,
+    "requests": 16,
+    "inputTokens": 42,
+    "outputTokens": 10427,
+    "cacheRead": 246168,
+    "cacheWrite": 65033,
+    "toolCalls": 11,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 2,
+    "findings_info": 3,
+    "findings_warning": 5,
+    "findings_error": 1,
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 8
+   }
+  },
+  "skipped": []
+ }
+}
