@@ -1,3 +1,6 @@
+import { cpSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test } from "vitest";
 import { Manifest, loadAdapter } from "../src/adapters/manifest.ts";
 
@@ -24,4 +27,12 @@ test("program.citation takes a list or one citation; tools take method citations
   expect(many.citations[0]).toMatchObject({ tool: "server_tool", kind: "method" });
   expect(() => Manifest.parse({ ...base, program: { name: "X", citation: [{ doi: "10.1/x" }] } })).toThrow();
   expect(() => Manifest.parse({ ...base, program: { name: "X", citation: [{ text: "A", kind: "book" }] } })).toThrow();
+});
+
+test("the module loader takes a built adapter.mjs next to adapter.ts, for the desktop app", async () => {
+  const dir = join(mkdtempSync(join(tmpdir(), "cuvette-mjs-")), "drive");
+  cpSync("tests/fixtures/drive", dir, { recursive: true });
+  expect(Object.keys(await loadAdapter(dir).module())).not.toContain("builtMarker");
+  writeFileSync(join(dir, "adapter.mjs"), "export default { builtMarker: true };\n");
+  expect(await loadAdapter(dir).module()).toEqual({ builtMarker: true });
 });

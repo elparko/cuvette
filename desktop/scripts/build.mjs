@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,11 +63,44 @@ async function core() {
   });
   const skip = (p) => /[\\/](data|__pycache__|node_modules)$/.test(p) || p.endsWith(".pyc") || basename(p) === ".DS_Store";
   cpSync(join(ROOT, "catalog"), join(CORE, "catalog"), { recursive: true, filter: (p) => !skip(p) });
+  await adapterModules();
   cpSync(join(ROOT, "samples"), join(CORE, "samples"), { recursive: true, filter: (p) => !skip(p) });
   cpSync(join(ROOT, "ui-dist"), join(CORE, "ui-dist"), { recursive: true });
   for (const f of ["src/adapters/kinds/ga_figures.py", "src/adapters/kinds/python_worker.py", "src/adapters/kinds/cuvette.mplstyle", "src/tools/science-requirements.txt", "package.json"]) {
     mkdirSync(dirname(join(CORE, f)), { recursive: true });
     copyFileSync(join(ROOT, f), join(CORE, f));
+  }
+}
+
+// The app's Node has no type stripping, so each adapter.ts becomes an adapter.mjs next to it.
+// The loader in src/adapters/manifest.ts takes the .mjs file when it exists.
+async function adapterModules() {
+  const files = readdirSync(join(ROOT, "catalog"), { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => join(ROOT, "catalog", d.name, "adapter.ts"))
+    .filter((f) => existsSync(f));
+  for (const f of files) {
+    const rel = relative(ROOT, f).split(sep).join("/");
+    await build({
+      entryPoints: [f],
+      outfile: join(CORE, rel.replace(/\.ts$/, ".mjs")),
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: "node24",
+      minify: true,
+      legalComments: "none",
+      logLevel: "warning",
+      plugins: [metaUrl],
+      banner: {
+        js: [
+          'import { createRequire as __gaRequire } from "node:module";',
+          "const require = __gaRequire(import.meta.url);",
+          'const __gaRoot = new URL("../../", import.meta.url);',
+          "const __gaUrl = (p) => new URL(p, __gaRoot).href;",
+        ].join("\n"),
+      },
+    });
   }
 }
 

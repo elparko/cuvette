@@ -325,7 +325,9 @@ export function loadAdapter(path: string): LoadedAdapter {
     },
     module() {
       if (!manifest.module) return Promise.resolve({});
-      mod ??= import(pathToFileURL(join(root, manifest.module)).href).then((m) => (m.default ?? m) as AdapterModule);
+      const file = join(root, manifest.module);
+      const built = file.replace(/\.tsx?$/, ".mjs");
+      mod ??= import(pathToFileURL(built !== file && existsSync(built) ? built : file).href).then((m) => (m.default ?? m) as AdapterModule);
       return mod;
     },
   };
