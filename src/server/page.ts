@@ -734,7 +734,7 @@ function connect() {
   es.onmessage = (m) => {
     const e = JSON.parse(m.data);
     if (e.type === "status") { live.classList.toggle("busy", e.state === "running"); label.textContent = e.state === "running" ? "working" : "live"; return; }
-    if (e.type === "delta") return;
+    if (e.type === "delta" || e.type === "delta_reset") return;
     clearTimeout(timer);
     timer = setTimeout(load, 150);
   };

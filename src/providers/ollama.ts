@@ -1,6 +1,6 @@
 import { localUrl } from "../core/phi.ts";
 import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from "../core/types.ts";
-import { ProviderError } from "../core/types.ts";
+import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { ImageBudget } from "./images.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText } from "./text.ts";
 import { RETRIES, withRetry, type Sleep } from "./retry.ts";
@@ -8,6 +8,11 @@ import { RETRIES, withRetry, type Sleep } from "./retry.ts";
 const TIMEOUT_MS = 600_000;
 const DEFAULT_NUM_CTX = 32768;
 const MAX_OUTPUT_TOKENS = 8192;
+const FULL_PROMPT = 0.9;
+
+function ollamaError(text: string, status?: number): ProviderError {
+  return new ProviderError(`Ollama ${status ? `error ${status}` : "error"}: ${text.slice(0, 300)}`, false, CONTEXT_OVERFLOW.test(text));
+}
 
 export function repeatStart(text: string, chunk = 300): number | null {
   if (text.length < chunk * 4) return null;
@@ -205,6 +210,7 @@ export class OllamaProvider implements Provider {
       model: this.model,
       messages: this.toNative(this.promptedTools && req.tools.length ? `${req.system}\n\n${promptedToolsText(req.tools)}` : req.system, req.messages),
       stream: true,
+      truncate: false,
       options: { num_ctx: this.numCtx, num_predict: MAX_OUTPUT_TOKENS },
     };
     if (req.tools.length && !this.promptedTools)
@@ -218,7 +224,7 @@ export class OllamaProvider implements Provider {
         this.thinkOk = false;
         delete body.think;
         res = await this.post(body, signal, req.onRetry);
-      } else throw new ProviderError(`Ollama rejected the request: ${err.slice(0, 300)}`);
+      } else throw ollamaError(err, res.status);
     }
     if (!res.ok) {
       const txt = await res.text();
@@ -226,7 +232,7 @@ export class OllamaProvider implements Provider {
       try {
         msg = JSON.parse(txt).error ?? txt;
       } catch {}
-      throw new ProviderError(`Ollama error ${res.status}: ${String(msg).slice(0, 300)}`);
+      throw ollamaError(String(msg), res.status);
     }
 
     let content = "";
@@ -251,7 +257,7 @@ export class OllamaProvider implements Provider {
       } catch {
         return;
       }
-      if (j.error) throw new ProviderError(`Ollama error: ${String(j.error).slice(0, 300)}`);
+      if (j.error) throw ollamaError(String(j.error));
       const m = j.message;
       if (m?.thinking) {
         thinkField += m.thinking;
@@ -306,6 +312,8 @@ export class OllamaProvider implements Provider {
       throw this.networkError(e, ollamaHost(), signal);
     }
     splitter.end();
+    if (inTok >= this.numCtx * FULL_PROMPT)
+      throw new ProviderError(`The prompt has ${inTok} tokens and fills the context window of ${this.numCtx} tokens. Ollama can cut a prompt that is too long without an error.`, false, true);
 
     let text = textOut.join("").trim();
     if (looped) text = cutRepeat(text);
@@ -342,6 +350,7 @@ export class OllamaProvider implements Provider {
       model: this.model,
       messages: [{ role: "system", content: system }, { role: "user", content: text }],
       stream: true,
+      truncate: false,
       options: { num_ctx: this.numCtx, num_predict: MAX_OUTPUT_TOKENS },
     };
     if (this.thinkOk) body.think = false;
@@ -350,7 +359,7 @@ export class OllamaProvider implements Provider {
       delete body.think;
       res = await this.post(body, sig);
     }
-    if (!res.ok) throw new ProviderError(`Ollama error ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) throw ollamaError(await res.text(), res.status);
     let content = "";
     try {
       const reader = res.body!.getReader();
@@ -364,8 +373,8 @@ export class OllamaProvider implements Provider {
         } catch {
           return;
         }
-        if (j.error) throw new ProviderError(`Ollama error: ${String(j.error).slice(0, 300)}`);
-        content += j.message?.content ?? "";
+        if (j.error) throw ollamaError(String(j.error));
+        content +=j.message?.content ?? "";
         if (content.length >= checkAt) {
           checkAt = content.length + 1000;
           if (repeatStart(content) !== null) looped = true;

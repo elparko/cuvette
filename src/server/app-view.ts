@@ -255,6 +255,12 @@ export class WebView {
           this.send({ t: "think", text: e.text });
         }
         break;
+      case "delta_reset":
+        this.live = "";
+        this.thinking = "";
+        this.send({ t: "live", reset: true });
+        this.send({ t: "think", reset: true });
+        break;
       case "status": {
         const was = this.status;
         this.status = { state: e.state, tool: e.tool, purpose: e.purpose, since: e.state === "running" ? e.since : undefined };

@@ -35,7 +35,7 @@ export class OpenAIProvider implements Provider {
       if (m.role === "assistant") {
         const text = m.parts.filter((p) => p.type === "text").map((p) => (p as any).text).join("\n\n");
         const calls = m.parts.filter((p) => p.type === "tool_call") as Extract<Part, { type: "tool_call" }>[];
-        const msg: any = { role: "assistant", content: text || null };
+        const msg: any = { role: "assistant", content: text || (calls.length ? null : "(no reply)") };
         if (calls.length)
           msg.tool_calls = calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.args ?? {}) } }));
         out.push(msg);
@@ -54,9 +54,7 @@ export class OpenAIProvider implements Provider {
     return out;
   }
 
-  private async attempt(body: Record<string, unknown>, user?: AbortSignal): Promise<Response> {
-    const t = AbortSignal.timeout(TIMEOUT_MS);
-    const signal = user ? AbortSignal.any([user, t]) : t;
+  private async attempt(body: Record<string, unknown>, signal: AbortSignal): Promise<Response> {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (process.env.OPENAI_API_KEY) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
     const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal });
@@ -68,9 +66,11 @@ export class OpenAIProvider implements Provider {
   }
 
   private async post(body: Record<string, unknown>, user?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<any> {
+    const t = AbortSignal.timeout(TIMEOUT_MS);
+    const signal = user ? AbortSignal.any([user, t]) : t;
     let res: Response;
     try {
-      res = await this.retry(() => this.attempt(body, user), user, onRetry);
+      res = await this.retry(() => this.attempt(body, signal), signal, onRetry);
     } catch (e) {
       if (user?.aborted) throw e;
       if (typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
@@ -87,7 +87,12 @@ export class OpenAIProvider implements Provider {
       if (res.status === 401 || res.status === 403) throw new ProviderError("The model server rejected the credentials. Set OPENAI_API_KEY.");
       throw new ProviderError(`Model server error ${res.status}: ${String(msg).slice(0, 300)}`, false, res.status === 400 && CONTEXT_OVERFLOW.test(String(msg)));
     }
-    return res.json();
+    try {
+      return await res.json();
+    } catch (e) {
+      if (user?.aborted) throw e;
+      throw new ProviderError(`The model server stopped during the reply, or the reply is not valid JSON: ${(e as Error).message}`, true);
+    }
   }
 
   async step(input: StepRequest): Promise<StepResult> {

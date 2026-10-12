@@ -147,7 +147,8 @@ export class ProviderError extends Error {
   }
 }
 
-export const CONTEXT_OVERFLOW = /prompt is too long|too many (?:input )?tokens|context (?:window|length)|maximum context/i;
+export const CONTEXT_OVERFLOW =
+  /prompt is too long|maximum context length is|context_length_exceeded|exceeds? (?:the )?(?:available |maximum )?context (?:size|length|window)|longer than the maximum model length|too many input tokens(?! per)/i;
 
 // ---------------------------------------------------------------- tools
 
@@ -329,6 +330,7 @@ export interface Claim {
 export type BusEvent =
   | { type: "entry"; entry: Entry }
   | { type: "delta"; kind: "text" | "thinking"; text: string }
+  | { type: "delta_reset" }
   | { type: "status"; state: "idle" | "thinking" | "running" | "waiting"; tool?: string; purpose?: string; since?: number }
   | { type: "permission"; rid: string; tool: string; args: Args; code?: string; touches: string; search?: { root: string; purpose: string } }
   | { type: "question"; question: Question }

@@ -1653,3 +1653,95 @@ test("a call to an unknown tool names the tools that exist", async () => {
   await session.send("go");
   expect(lastToolText(provider)).toMatch(/no tool named nope\. Use only these tools: .*\bstate\b/);
 });
+
+test("read-only calls in one reply run together, keep their order, and a call that writes waits for them", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  for (const f of ["a", "b", "c"]) writeFileSync(join(cwd, `${f}.txt`), `text of ${f}`);
+  const read = (f: string) => ({ name: "read_file", args: { path: join(cwd, `${f}.txt`) } });
+  const provider = new FakeProvider([{ calls: [read("a"), read("b"), { name: "note", args: { text: "x" } }, read("c"), { name: "write_file", args: { name: "out.txt", text: "y" } }] }, { text: "All done." }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, phi_check: false } as never });
+  session.decisions.applySetup({});
+  session.bus.on((e) => {
+    if (e.type === "permission") setTimeout(() => session!.respondPermission(e.rid, true), 0);
+  });
+  const log: string[] = [];
+  const one = session["runOne"].bind(session);
+  session["runOne"] = async (call: { name: string; args: unknown }, signal: AbortSignal) => {
+    const path = (call.args as { path?: string }).path;
+    const name = path ? path.slice(-5, -4) : call.name;
+    log.push(`start ${name}`);
+    await new Promise((r) => setTimeout(r, name === "a" ? 30 : 5));
+    const out = await one(call as never, signal);
+    log.push(`end ${name}`);
+    return out;
+  };
+  await session.send("read the files");
+  expect(log.slice(0, 2)).toEqual(["start a", "start b"]);
+  expect(log.indexOf("start note")).toBeGreaterThan(log.indexOf("end a"));
+  expect(log.indexOf("start c")).toBeGreaterThan(log.indexOf("end note"));
+  expect(log.indexOf("start write_file")).toBeGreaterThan(log.indexOf("end c"));
+  const results = provider.requests[1]!.messages.at(-1)!.parts.filter((p) => p.type === "tool_result") as { name: string; text: string }[];
+  expect(results.map((r) => r.name)).toEqual(["read_file", "read_file", "note", "read_file", "write_file"]);
+  expect(results.filter((r) => r.name === "read_file").map((r) => r.text)).toEqual(["text of a", "text of b", "text of c"]);
+});
+
+test("after a call cancels the plan, the later calls in the same reply do not run", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "note", args: { text: "x" } }, { name: "state", args: {} }] }, { text: "never" }]);
+  session = await recoverySession(provider, { guidance: false });
+  const run = session["runCall"].bind(session);
+  const ran: string[] = [];
+  session["runCall"] = async (call: { name: string }, signal: AbortSignal) => {
+    ran.push(call.name);
+    if (call.name === "note") session!["stopTurn"] = true;
+    return run(call as never, signal);
+  };
+  expect(await session.send("go")).toBe("");
+  expect(ran).toEqual(["note"]);
+  const last = session["history"].at(-1)!.parts as { text: string }[];
+  expect(last[1]!.text).toMatch(/not run/);
+});
+
+test("a switch from a local model to Claude scans the earlier messages for patient identifiers again", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  provider.info = { ...provider.info, provider: "ollama", local: true };
+  session = await recoverySession(provider, { guidance: false });
+  await session.send("go");
+  expect(session["phiFrom"]).toBeGreaterThan(0);
+  await session.applySetting("model", "claude:claude-haiku-5-5");
+  expect(session["phiFrom"]).toBe(0);
+});
+
+test("a read-only call that needs a permission card does not run in parallel", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  const provider = new FakeProvider([{ text: "All done." }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, phi_check: false, permissions: { read_file: "ask" } } as never });
+  const call = { type: "tool_call" as const, id: "c1", name: "read_file", args: { path: join(cwd, "a.txt") } };
+  expect(session["parallelSafe"](call)).toBe(false);
+  expect(session["parallelSafe"]({ ...call, name: "list_dir" })).toBe(true);
+  expect(session["parallelSafe"]({ ...call, name: "write_file" })).toBe(false);
+  expect(session["parallelSafe"]({ ...call, name: "ask_scientist" })).toBe(false);
+});
+
+test("a retry removes the partial streamed text, and the notice counts the real tries", async () => {
+  const provider = new FakeProvider([{ text: "All done." }]);
+  const step = provider.step.bind(provider);
+  let n = 0;
+  provider.step = async (req) => {
+    req.onDelta?.({ type: "text", text: "half a rep" });
+    if (n++ === 0) {
+      for (let attempt = 1; attempt <= 3; attempt++) req.onRetry?.({ attempt, of: 3, waitMs: 0, reason: "server error" });
+      throw new ProviderError("The Claude API had a server error (529). Retry in a moment.", true);
+    }
+    req.onRetry?.({ attempt: 1, of: 3, waitMs: 0, reason: "server error" });
+    return step(req);
+  };
+  session = await recoverySession(provider, { guidance: false });
+  const events: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "delta" || e.type === "delta_reset") events.push(e.type === "delta" ? e.text : "reset");
+    if (e.type === "question") setTimeout(() => session!.answer(e.question.qid, "resume"), 0);
+  });
+  expect(await session.send("go")).toBe("All done.");
+  expect(events).toEqual(["half a rep", "reset", "half a rep", "reset", "All done."]);
+  expect(session.record.entries(["notice"]).map((e) => String(e.data.text))).toContain("The model did not answer after four tries. The conversation is saved up to the last finished step.");
+});

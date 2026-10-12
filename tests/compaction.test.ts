@@ -155,3 +155,17 @@ test("a failed summary does not stop the turn", async () => {
   expect(session.record.entries(["compaction"])).toHaveLength(0);
   await session.close();
 });
+
+test("an empty summary does not replace the older messages", async () => {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-compact-"));
+  const provider = new FakeProvider([{ text: "one" }, { text: "two" }]);
+  provider.complete = async () => "  ";
+  const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-compact-proj-")), settings: { guidance: false, phi_check: false } as never });
+  await session.send("first");
+  await session.send("second");
+  const before = session["history"].length;
+  expect(await session.compact()).toBe(false);
+  expect(session["history"]).toHaveLength(before);
+  expect(session.record.entries(["compaction"])).toHaveLength(0);
+  await session.close();
+});
