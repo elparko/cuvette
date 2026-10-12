@@ -75,7 +75,7 @@ function runCommand(hook: CommandHook, event: HookEvent, cwd: string): Runner {
       child.on("close", (code) => {
         if (code === 2) {
           const reason = stderr.trim() || "Blocked by a command hook.";
-          return finish({ result: event === "PreToolUse" ? { decision: "deny", reason } : { additionalContext: reason } });
+          return finish({ result: event === "PreToolUse" ? { decision: "deny", reason } : event === "Stop" ? { decision: "block", reason } : { additionalContext: reason } });
         }
         if (code !== 0) return finish({ error: `Command hook "${label}" exited with code ${code}: ${stderr.trim()}` });
         const text = stdout.trim();
@@ -173,6 +173,15 @@ export class HookRunner {
       if (r.findings?.length) merged.findings = [...(merged.findings ?? []), ...r.findings];
     }
     return merged;
+  }
+
+  // Like Claude Code: a Stop hook that gives decision "block" keeps the agent working, with the reason as the next note.
+  async stop(input: Record<string, unknown>): Promise<string | undefined> {
+    for (const run of this.runners("Stop", undefined)) {
+      const { result: r } = await run({ ...input, event: "Stop" });
+      if (r?.decision === "block") return String(r.reason || "A Stop hook asks the agent to continue.");
+    }
+    return undefined;
   }
 
   async event(name: HookEvent, input: Record<string, unknown>): Promise<void> {

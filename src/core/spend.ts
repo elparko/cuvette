@@ -113,6 +113,7 @@ export interface TurnUsage {
   cacheRead: number;
   cacheWrite: number;
   usd?: number;
+  unpriced?: number;
 }
 
 export interface UsageSummary {
@@ -136,7 +137,14 @@ function add(t: TurnUsage, d: Record<string, unknown>): void {
   t.cacheRead += Number(d.cacheRead) || 0;
   t.cacheWrite += Number(d.cacheWrite) || 0;
   const c = entryCost(d);
-  t.usd = c === undefined || t.usd === undefined ? undefined : t.usd + c;
+  if (c === undefined) t.unpriced = (t.unpriced ?? 0) + 1;
+  else t.usd = (t.usd ?? 0) + c;
+}
+
+// A sum with no priced step is not known. A sum with some priced steps keeps the known part.
+function settle(t: TurnUsage): TurnUsage {
+  if (t.unpriced === t.steps) t.usd = undefined;
+  return t;
 }
 
 export function usageSummary(entries: { kind: string; data: Record<string, unknown> }[], info: { model: string; provider: string; contextWindow: number; local?: boolean }, contextTokens: number): UsageSummary {
@@ -156,6 +164,7 @@ export function usageSummary(entries: { kind: string; data: Record<string, unkno
   }
   const local = info.local ?? info.provider === "ollama";
   const win = info.contextWindow || 1;
+  for (const t of [...turns, total]) settle(t);
   return { model: info.model, local, usd: total.usd, turns: turns.filter((t) => t.steps), total, contextTokens, contextWindow: win, percent: (contextTokens / win) * 100, steps: total.steps };
 }
 
@@ -173,12 +182,16 @@ export function percentText(p: number): string {
   return p > 0 && p < 1 ? "<1%" : `${Math.round(p)}%`;
 }
 
+function moneyText(u: UsageSummary): string {
+  return u.usd !== undefined && u.total.unpriced ? `${dollars(u.usd)} and steps with no price` : dollars(u.usd);
+}
+
 export function usageShort(u: UsageSummary): string {
-  return `${u.local ? `local, ${dollars(u.usd)}` : dollars(u.usd)} · context ${percentText(u.percent)}`;
+  return `${u.local ? `local, ${moneyText(u)}` : moneyText(u)} · context ${percentText(u.percent)}`;
 }
 
 export function usageLong(u: UsageSummary): string {
-  const money = u.local ? `local model, ${dollars(u.usd)} this session` : u.usd === undefined ? "the price of this model is not known" : `${dollars(u.usd)} this session`;
+  const money = u.local ? `local model, ${moneyText(u)} this session` : u.usd === undefined ? "the price of this model is not known" : `${moneyText(u)} this session`;
   return `${money} · context ${kTokens(u.contextTokens)} of ${kTokens(u.contextWindow)} tokens (${percentText(u.percent)})`;
 }
 

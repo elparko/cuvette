@@ -387,11 +387,14 @@ export class Session {
     const loaded = record.entries(["adapter"]).map((e) => e.data as { name: string; path?: string });
     const adapters = opts.adapters ?? [...((first?.data.adapters ?? []) as { name: string; path?: string }[]), ...loaded].map((a) => (a.path && existsSync(a.path) ? a.path : a.name));
     const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
-    return Session.create({ ...opts, cwd, place, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? first?.data.mode, pick: opts.pick ?? !!first?.data.pick }, record);
+    const lastMode = record.entries(["mode"]).at(-1)?.data;
+    const mode = lastMode ? (lastMode.reason === "plan first" ? lastMode.old : lastMode.new) : first?.data.mode;
+    return Session.create({ ...opts, cwd, place, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
   }
 
   private async init(opts: SessionOptions) {
     const resumed = this.record.entries(["session"]).length > 0;
+    if (resumed) this.record.repairTail();
     const off = (a: LoadedAdapter) => resumed && !!accessOf(a.name, this.cwd).off && !!this.notes.push(`The adapter ${a.name} is turned off in Programs, so this resumed session does not load it.`);
     this.adapters = opts.adapters.map((a) => applyOverlay(findAdapter(a, this.cwd))).filter((a) => !off(a)).map((a) => usable(a, this.cwd));
     this.provider = opts.provider ?? (await makeProvider(this.settings.model, { effort: this.settings.effort, numCtx: this.settings.numCtx, think: this.settings.think, cache: this.settings.promptCache }));
@@ -426,6 +429,15 @@ export class Session {
     if (approved) {
       this.approvedEntry = approved.entry;
       this.plan = structuredClone(currentPlan(this.record));
+    }
+    const ref = this.record.live(["reference"]).at(-1)?.data;
+    if (ref && ref.mode !== "none" && ref.path) {
+      this.reference = { ...ref } as unknown as Reference;
+      if (ref.mode === "blind" && !ref.revealed) {
+        this.hidden.push(String(ref.path));
+        const bp = blindPolicy();
+        if (bp) setBlindPolicy({ allow: bp.allow, deny: [...bp.deny, String(ref.path)], hide: bp.hide });
+      }
     }
     this.planVersion = Math.max(0, ...this.record.entries(["plan", "plan_approved"]).map((e) => Number(e.data.version) || 0));
     let notify: ((q: Question) => Promise<void>) | undefined;
@@ -488,6 +500,7 @@ export class Session {
           this.method = loadMethod(String(used.data.path));
         } catch {}
       this.history = this.record.messages();
+      this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
       if (choice) this.phiChoice = choice as PhiAction;
       this.notes.push("The session was resumed after a restart. Program state may have reset; outputs from earlier steps are still on disk.");
@@ -949,6 +962,7 @@ export class Session {
     if (this.busy) throw new Error("the agent is busy; wait or press Esc to stop it");
     text = this.withoutKeys(text);
     this.busy = true;
+    this.endedBy = "stopped";
     this.abort = new AbortController();
     const signal = this.abort.signal;
     let revised = false;
@@ -956,6 +970,8 @@ export class Session {
     let lastSig = "";
     let repeats = 0;
     let forceAnswer = false;
+    let stopBlocks = 0;
+    let stopHooked = false;
     const turnStart = this.record.entries().length;
     let results: Part[] = [];
     this.summaryFailed = false;
@@ -1050,17 +1066,28 @@ export class Session {
           }
         }
         if (!calls.length) {
+          const block = stopBlocks < MAX_STOP_BLOCKS ? await this.hooks.stop({ session: this.id, answer: said, stop_hook_active: stopBlocks > 0 }).catch(() => undefined) : undefined;
+          if (block && !signal.aborted) {
+            stopBlocks++;
+            if (said) this.record.append("assistant", { text: said, final: false });
+            this.record.append("notice", { text: `A Stop hook asks the agent to continue: ${block}` });
+            this.push({ role: "user", parts: [{ type: "text", text: `[Notes from the harness]\n- A Stop hook asks you to continue: ${block}` }] });
+            continue;
+          }
+          stopHooked = true;
           const out = await this.finishAnswer(said, revised, signal);
           if (out.revise) {
             revised = true;
             this.push({ role: "user", parts: [{ type: "text", text: out.revise }] });
             continue;
           }
+          this.endedBy = "answer";
           return out.text;
         }
         if (said) this.record.append("assistant", { text: said, final: false });
         nudges = 0;
         results = [];
+        this.callOrder.clear();
         let together: number[] = [];
         const runTogether = async () => {
           const list = together;
@@ -1113,10 +1140,12 @@ export class Session {
         }
       }
       this.record.append("notice", { text: `Paused after ${this.settings.maxSteps} steps. Type "continue" to go on.` });
+      this.endedBy = "max_steps";
       return "";
     } catch (e) {
       const msg = e instanceof ProviderError ? e.message : signal.aborted ? "Stopped." : `${(e as Error).name}: ${(e as Error).message}`;
       this.record.append(signal.aborted ? "notice" : "error", signal.aborted ? { text: msg } : { message: msg });
+      if (!signal.aborted) this.endedBy = "error";
       this.closeOpenCalls(results);
       if (this.draft) {
         const { answer } = this.draft;
@@ -1129,6 +1158,7 @@ export class Session {
       return "";
     } finally {
       if (this.planning) this.endPlanning();
+      this.waitedQids.clear();
       this.draft = undefined;
       this.stopTurn = false;
       this.endTurn = undefined;
@@ -1136,10 +1166,13 @@ export class Session {
       this.busy = false;
       this.bus.emit({ type: "status", state: "idle" });
       await this.writeReport();
-      await this.hooks.event("Stop", { session: this.id }).catch(() => {});
+      if (!stopHooked) await this.hooks.event("Stop", { session: this.id }).catch(() => {});
       this.titling = this.retitle(turnStart);
     }
   }
+
+  // How the last turn ended: "answer", "max_steps" (the step limit), "error" or "stopped" (Esc, a card or a cancel).
+  endedBy: "answer" | "max_steps" | "error" | "stopped" = "stopped";
 
   recoveryWaitMs = 60_000;
   recoveryRounds = 3;
@@ -1178,14 +1211,22 @@ export class Session {
         if (retried) this.bus.emit({ type: "status", state: "thinking" });
         return res;
       } catch (e) {
-        dropStreamed();
-        if (e instanceof ProviderError && e.overflow && !compacted && !signal.aborted) {
-          compacted = true;
-          if (await this.maybeCompact(signal, true)) {
-            this.record.append("notice", { text: "The context was too long for the model. The harness summarized the older messages and tries again." });
-            continue;
+        if (e instanceof ProviderError && e.overflow && !signal.aborted) {
+          if (!compacted) {
+            compacted = true;
+            if (await this.maybeCompact(signal, true)) {
+              dropStreamed();
+              this.record.append("notice", { text: "The context was too long for the model. The harness summarized the older messages and tries again." });
+              continue;
+            }
+          }
+          if (e.result) {
+            if (retried) this.bus.emit({ type: "status", state: "thinking" });
+            this.record.append("notice", { text: `${e.message} The summary could not make the context shorter, so the harness keeps this reply.` });
+            return e.result;
           }
         }
+        dropStreamed();
         if (!(e instanceof ProviderError) || !e.transient || signal.aborted) throw e;
         this.record.append("notice", { text: `The model did not answer after ${countWord(tries)} ${tries === 1 ? "try" : "tries"}. The conversation is saved up to the last finished step.` });
         if (this.settings.headless) {
@@ -1292,6 +1333,19 @@ export class Session {
     }
   }
 
+  // After a crash, the last reply can have tool calls with no results in the history. The record still has the results of the calls that ended.
+  private recordedResults(): Part[] {
+    const last = this.history.at(-1);
+    if (last?.role !== "assistant") return [];
+    const ids = new Set(last.parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : [])));
+    const since = this.record.entries(["message"]).at(-1)?.id ?? 0;
+    return this.record.entries(["tool_result"]).filter((e) => e.id > since && ids.has(String(e.data.callId))).map((e) => {
+      const d = e.data;
+      const text = d.ok === false ? `ERROR: ${String(d.error ?? "the step failed")}` : [d.summary, d.text].filter(Boolean).map(String).join("\n");
+      return { type: "tool_result", callId: String(d.callId), name: String(d.tool), text: `${text}\n[From the record after a restart.]`, isError: d.ok === false };
+    });
+  }
+
   private closeOpenCalls(done: Part[] = []) {
     const last = this.history[this.history.length - 1];
     if (last?.role !== "assistant") return;
@@ -1372,7 +1426,11 @@ export class Session {
 
   private maskFrom(from: number) {
     if (!this.masker.map.size) return;
-    for (let i = from; i < this.history.length; i++) this.history[i] = this.masker.message(this.history[i]!);
+    for (let i = from; i < this.history.length; i++) {
+      const was = this.history[i]!;
+      this.history[i] = this.masker.message(was);
+      if (was === this.request) this.request = this.history[i];
+    }
   }
 
   private localSpec(): string | undefined {
@@ -1507,14 +1565,19 @@ export class Session {
     const spec = this.localSpec();
     if (!spec) return "no local model is set (the local_model setting).";
     const old = this.settings.model;
+    const before = { settings: this.settings, provider: this.provider, referee: this.refereeProvider, system: this.system, active: new Set(this.active), phiFrom: this.phiFrom };
+    const restore = () => {
+      Object.assign(this, { settings: before.settings, provider: before.provider, refereeProvider: before.referee, system: before.system, active: before.active, phiFrom: before.phiFrom });
+    };
     try {
       await this.applySetting("model", spec);
-      if (isCloud(this.provider.info)) {
-        await this.applySetting("model", old);
-        return `${spec} does not run on this computer. Set OLLAMA_HOST or the server address to a local address.`;
-      }
     } catch (e) {
+      restore();
       return (e as Error).message;
+    }
+    if (isCloud(this.provider.info)) {
+      restore();
+      return `${spec} does not run on this computer. Set OLLAMA_HOST or the server address to a local address.`;
     }
     this.record.append("setting", { name: "model", old, new: spec, scope: "session", reason });
     if (this.refereeProvider && isCloud(this.refereeProvider.info)) {
@@ -1526,9 +1589,11 @@ export class Session {
 
   // ------------------------------------------------------------- usage
 
+  // The last token count holds only if it came from the current model and the history did not change since.
   contextTokens(): number {
-    const last = this.record.entries(["usage", "compaction"]).at(-1);
-    return !last || last.kind === "compaction" ? estimateTokens(this.history, this.system) : promptTokens(last.data);
+    const last = this.record.entries(["usage", "compaction", "rewind"]).at(-1);
+    if (last?.kind === "usage" && last.data.model === this.provider.info.model) return promptTokens(last.data);
+    return estimateTokens(this.history, this.system, this.activeSchemas());
   }
 
   usage(): UsageSummary {
@@ -1729,17 +1794,28 @@ export class Session {
     const tool = this.findTool(call.name);
     if (!tool?.readOnly || tool.source === "adapter") return false;
     const args = absolutePaths(dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema), this.cwd) as Args;
-    return this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name) || this.permissions.check(tool, args) === "allow";
+    return this.permitted(tool, args) === "allow";
   }
 
+  // A deny rule wins over an earlier "always allow" and over the batch approval.
+  private permitted(tool: Tool, args: Args): "allow" | "ask" | "deny" {
+    const rule = this.permissions.check(tool, args);
+    return rule !== "deny" && (this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name)) ? "allow" : rule;
+  }
+
+  private callSeq = 0;
+  private callOrder = new Map<string, number>();
+  private inspectionOrder = 0;
+
   private async runOne(call: Extract<Part, { type: "tool_call" }>, signal: AbortSignal): Promise<Part> {
+    this.callOrder.set(call.id, ++this.callSeq);
     const tool = this.findTool(call.name);
     this.record.append("tool_call", { callId: call.id, tool: call.name, adapter: tool?.adapter, args: call.args as Record<string, unknown> });
     this.bus.emit({ type: "status", state: "running", tool: call.name, purpose: activity(call.name, (call.args ?? {}) as Args, tool?.source === "adapter" ? tool.title : undefined), since: Date.now() });
     if (call.parseError) return this.fail(call.id, call.name, `the arguments are not valid JSON: ${call.parseError}`);
     if (!tool) return this.fail(call.id, call.name, `no tool named ${call.name}. Use only these tools: ${this.activeSchemas().map((t) => t.name).join(", ")}.${this.active.has("find_tools") ? " To find more tools, call find_tools." : ""}`);
     if (!this.active.has(tool.name)) this.active.add(tool.name);
-    const args = dropNulls((call.args && typeof call.args === "object" ? call.args : {}) as Args, tool.inputSchema);
+    const args = coerceArgs(dropNulls((call.args && typeof call.args === "object" && !Array.isArray(call.args) ? call.args : {}) as Args, tool.inputSchema), tool.inputSchema);
     if (!ownPurpose(tool)) delete args.purpose;
     const r = await this.pipeline(tool, absolutePaths(args, this.cwd) as Args, call.id, signal);
     if (r.images?.length && this.provider.info.vision) await scaleImages(r.images, signal);
@@ -1799,16 +1875,18 @@ export class Session {
       for (const [arg, key] of Object.entries(links)) if ((pre.waitingOn ?? []).includes(key) && this.decisions.hasValue(key)) setArg(next, arg, this.decisions.value(key));
       return this.pipeline(tool, next, callId, signal, depth + 1);
     }
-    let perm = this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name) ? "allow" : this.permissions.check(tool, eff);
+    let perm = this.permitted(tool, eff);
     if (pre.decision === "ask" && perm === "allow") perm = "ask";
     if (perm === "deny") return error("the permission rules deny this tool");
     const searchRoot = tool.source !== "adapter" ? broadSearch(tool.name, eff, this.cwd) : undefined;
     if (searchRoot) {
       const res = await this.requestPermission(tool, eff, signal, undefined, { root: searchRoot, purpose: typeof eff.purpose === "string" ? eff.purpose : "" });
+      if (res.cancelled) return error("not run. The turn stopped before the scientist answered the card.");
       if (!res.ok) return error(`the scientist did not allow a search of ${searchRoot}${res.note ? `: ${res.note}` : ""}. Do not search large folders. Use the absolute paths from earlier tool results, or ask the scientist where the files are.`);
     } else if (perm === "ask") {
       const outward = tool.name === "search_literature" ? `Sends this query to api.sciencemadereadable.com, an outside literature search: "${String(eff.query ?? "")}". It sends no data files.` : undefined;
       const res = await this.requestPermission(tool, eff, signal, outward);
+      if (res.cancelled) return error("not run. The turn stopped before the scientist answered the card.");
       if (!res.ok) return error(`the scientist did not allow this${res.note ? `: ${res.note}` : ""}. Ask what they want instead.`);
     }
     if (pre.decision === "instruct") return this.followStep(tool, eff, callId, signal, pre.applied ?? {});
@@ -2216,7 +2294,7 @@ export class Session {
     const values = (spec.values.length ? spec.values : d.sensitivity?.options.length ? d.sensitivity.options : d.choices).slice(0, 5);
     if (!values.length) return { ok: false, error: `Give the values to compare for ${d.label}.` };
     const signal = this.abort?.signal ?? new AbortController().signal;
-    const perm = this.sessionAllow.has(target.name) ? "allow" : this.permissions.check(target, last.args);
+    const perm = this.permitted(target, last.args);
     if (perm === "deny") return { ok: false, error: "the permission rules deny this tool" };
     if (perm === "ask") {
       const res = await this.requestPermission(target, { ...last.args, [link.arg]: values }, signal);
@@ -2236,7 +2314,7 @@ export class Session {
 
   // ------------------------------------------------------------- permissions and follow mode
 
-  private async requestPermission(tool: Tool, args: Args, signal: AbortSignal, outward?: string, search?: { root: string; purpose: string }): Promise<{ ok: boolean; note: string; always: boolean }> {
+  private async requestPermission(tool: Tool, args: Args, signal: AbortSignal, outward?: string, search?: { root: string; purpose: string }): Promise<{ ok: boolean; note: string; always: boolean; cancelled?: boolean }> {
     const rid = `r${++this.permCount}`;
     const code = typeof args.code === "string" ? args.code : undefined;
     if (this.permissionMode === "bypass" && !outward) {
@@ -2255,16 +2333,16 @@ export class Session {
     if (search) touches = `The agent wants to search ${search.root}${search.purpose ? ` for this purpose: ${search.purpose.replace(/\.$/, "")}` : ""}. This can take minutes and reads folders outside your project.`;
     this.emitWaiting(rid, { type: "permission", rid, tool: tool.name, args, code, touches, search });
     this.bus.emit({ type: "status", state: "waiting", tool: tool.name });
-    let res: { ok: boolean; note: string; always: boolean };
+    let res: { ok: boolean; note: string; always: boolean; cancelled?: boolean };
     try {
       res = await abortable(p, signal);
     } catch {
-      res = { ok: false, note: "the turn stopped", always: false };
+      res = { ok: false, note: "the turn stopped before an answer", always: false, cancelled: true };
     }
     this.permissionWaits.delete(rid);
     this.waiting.delete(rid);
     if (res.ok && res.always && !search) this.sessionAllow.add(tool.name);
-    this.record.append("permission", { rid, tool: tool.name, decision: res.ok ? "allowed" : "denied", by: "scientist", note: res.note, always: res.always && !search, sha256, ...(search ? { search: search.root } : {}) });
+    this.record.append("permission", { rid, tool: tool.name, decision: res.cancelled ? "cancelled" : res.ok ? "allowed" : "denied", by: res.cancelled ? "harness" : "scientist", note: res.note, always: res.always && !search, sha256, ...(search ? { search: search.root } : {}) });
     if (res.ok) this.bus.emit({ type: "status", state: "running", tool: tool.name, purpose: activity(tool.name, args, tool.source === "adapter" ? tool.title : undefined), since: Date.now() });
     return res;
   }
@@ -2367,6 +2445,7 @@ export class Session {
 
   interrupt(): void {
     this.abort?.abort();
+    for (const c of this.sideAborts) c.abort();
     for (const rt of this.runtimes) rt.cancel().catch(() => {});
   }
 
@@ -2531,6 +2610,12 @@ export class Session {
   }
 
   setMode(mode: Mode): void {
+    if (this.planning && this.mode === "plan" && mode !== "plan") {
+      if (mode === this.modeBefore) return;
+      this.modeBefore = mode;
+      this.record.append("notice", { text: `No step runs before you confirm the proposed analysis. After that, the mode is ${mode}.` });
+      return;
+    }
     if (mode === this.mode) return;
     this.record.append("mode", { old: this.mode, new: mode });
     this.mode = mode;
@@ -2541,13 +2626,15 @@ export class Session {
 
   private startPlanning(request: string) {
     this.planning = true;
+    this.pilotStage = false;
+    this.pilotPlan = undefined;
     this.planUpdate = this.approvedEntry > 0 && !!this.plan;
     this.planLooks = 0;
     this.inspection = undefined;
     this.planStart = this.record.entries().at(-1)?.id ?? 0;
     this.toolsHinted = false;
     this.clarified = !this.tools.has("clarify");
-    this.modeBefore = this.mode === "plan" ? "watch" : this.mode;
+    this.modeBefore = this.mode;
     this.refCandidates = this.findReferenceFiles(request);
     if (this.mode !== "plan") {
       this.record.append("mode", { old: this.mode, new: "plan", reason: "plan first" });
@@ -2750,6 +2837,7 @@ export class Session {
   }
 
   private async pilotResult(a: Args): Promise<ToolOutput> {
+    if (this.planning && !this.pilotStage) return { ok: false, error: "The scientist has not confirmed the proposed analysis yet. Call plan first. The pilot runs after the confirmation." };
     this.scientistAsked = undefined;
     const sample = String(a.sample ?? "").trim();
     if (!sample) return { ok: false, error: "Give the pilot sample." };
@@ -2798,7 +2886,10 @@ export class Session {
       definitions,
       images,
     });
-    if (!r) return { ok: false, error: "the scientist stopped the turn before answering the pilot" };
+    if (!r) {
+      this.record.append("pilot_rejected", { run: entry, sample, reason: "the turn stopped before an answer" });
+      return { ok: false, error: "the scientist stopped the turn before answering the pilot" };
+    }
     if (r.action === "confirm") {
       const pilot = { entry, ...run } as PilotRun;
       this.record.append("pilot_approved", { run: entry, sample });
@@ -2962,6 +3053,11 @@ export class Session {
     }
     const table = pairs.map((p) => `${p.sample}: agent ${p.ours}, reference ${p.ref}${p.pilot ? " (pilot)" : ""}`).join("\n");
     return { ok: true, summary: summary.join(" "), text: `${summary.join("\n")}\n${table}\nNow you can read the reference. Explain the gaps between your values and the reference in the answer.` };
+  }
+
+  // A plan that the scientist confirms runs its steps, so plan mode becomes watch mode. A plan that ends with no confirmation goes back to the mode before it.
+  private runMode(): Mode {
+    return this.modeBefore === "plan" ? "watch" : this.modeBefore;
   }
 
   private endPlanning(target?: Mode) {
@@ -3144,7 +3240,7 @@ export class Session {
         update: this.planUpdate,
         qids,
         programs,
-        mode: this.modeBefore,
+        mode: this.runMode(),
         restatement: plan.restatement,
         definitions: plan.definitions,
         pilot: plan.pilot?.sample,
@@ -3160,7 +3256,10 @@ export class Session {
       version = ++this.planVersion;
       this.record.append("plan", { action: "setting_changed", phase: "Proposed metrics", version, label: target.label, key: target.key, old: old ?? null, new: target.value, text: planText(plan), plan: structuredClone(plan) });
     }
-    if (!r) return { ok: false, error: "the scientist stopped the turn before answering the proposed analysis" };
+    if (!r) {
+      this.record.append("plan", { action: "stopped", version });
+      return { ok: false, error: "the scientist stopped the turn before answering the proposed analysis" };
+    }
     if (r.action === "change") {
       if (r.definition) this.changeDefinition(r.definition);
       this.record.append("plan", { action: "change_requested", version, text: r.text });
@@ -3175,7 +3274,7 @@ export class Session {
     if (r.action !== "approve" && r.action !== "pilot") return { ok: false, error: "unknown answer" };
     this.fillDecisions(plan);
     this.commitSettings(plan);
-    const target: Mode = r.mode && r.mode !== "plan" ? r.mode : this.modeBefore;
+    const target: Mode = r.mode && r.mode !== "plan" ? r.mode : this.runMode();
     const answers = [...this.planQids.values(), ...settingsOf(plan).map((x) => x.setting)].filter((d, i, all) => d.by === "you" && all.indexOf(d) === i).map((d) => `${d.label} = ${String(d.value)}`);
     this.setReference(r.reference);
     const refNote = this.reference ? (this.reference.mode === "blind" ? ` The reference ${basename(this.reference.path)} is held back for a blind test. Do not try to read it.` : ` The pilot compares with the reference ${basename(this.reference.path)}.`) : "";
@@ -3222,15 +3321,19 @@ export class Session {
       source: "harness",
       readOnly: true,
       permission: "allow",
-      execute: async (a, ctx) => this.inspectPath(resolve(this.cwd, String(a.path ?? ".").replace(/^~(?=[\\/]|$)/, homedir())), ctx.signal),
+      execute: async (a, ctx) => this.inspectPath(resolve(this.cwd, String(a.path ?? ".").replace(/^~(?=[\\/]|$)/, homedir())), ctx.signal, this.callOrder.get(ctx.callId)),
     };
   }
 
-  private async inspectPath(path: string, signal?: AbortSignal): Promise<ToolOutput> {
+  // Calls in one reply can run together. The inspection of the call that the agent made last stays, not the one that ends last.
+  private async inspectPath(path: string, signal?: AbortSignal, order = ++this.callSeq): Promise<ToolOutput> {
     if (isCredentialsFile(path)) return { ok: false, error: `${path} holds the saved API keys. The agent cannot read it.` };
     const insp = await inspectData(path, join(this.workDir, "inspect"), signal);
     if (!insp.ok) return { ok: false, error: insp.error ?? "The inspection failed." };
-    this.inspection = insp;
+    if (order >= this.inspectionOrder) {
+      this.inspection = insp;
+      this.inspectionOrder = order;
+    }
     this.record.append("inspection", { path, kind: insp.kind, summary: insp.summary, colors: insp.colors, kinds: insp.kinds, groups: (insp.groups ?? []).map((g) => g.name), columns: (insp.columns ?? []).map((c) => c.name) });
     const { previews, ...rest } = insp;
     return { ok: true, summary: insp.summary, text: JSON.stringify(rest).slice(0, 8000), outputs: previews.map((p) => outputFile(p)) };
@@ -3734,12 +3837,23 @@ export class Session {
   async compact(): Promise<boolean> {
     if (this.busy) return false;
     this.busy = true;
+    const ctl = this.sideAbort();
     try {
-      return await this.maybeCompact(new AbortController().signal, true);
+      return await this.maybeCompact(ctl.signal, true);
     } finally {
+      this.sideAborts.delete(ctl);
       this.busy = false;
     }
   }
+
+  // Work outside a turn (/compact, the ELN push card) also stops on Esc.
+  private sideAborts = new Set<AbortController>();
+  private sideAbort(): AbortController {
+    const ctl = new AbortController();
+    this.sideAborts.add(ctl);
+    return ctl;
+  }
+
 
   citationStyle(): CitationStyle {
     return citationStyle(resolveSetting(findSetting("citation_style")!, { cwd: this.cwd, session: this as never }).value);
@@ -3788,7 +3902,8 @@ export class Session {
     const sync = await import("../eln/sync.ts");
     const plan = sync.planPush(this, cfg.url);
     const tool: Tool = { name: "eln_push", title: "Send to eLabFTW", description: "Send this session to the eLabFTW notebook.", inputSchema: {}, source: "harness", execute: async () => ({ ok: true }) };
-    const res = await this.requestPermission(tool, plan.display, new AbortController().signal, `Sends the listed data to ${plan.server}. It leaves this computer.`);
+    const ctl = this.sideAbort();
+    const res = await this.requestPermission(tool, plan.display, ctl.signal, `Sends the listed data to ${plan.server}. It leaves this computer.`).finally(() => this.sideAborts.delete(ctl));
     if (!res.ok) throw new Error(`The scientist did not approve the push${res.note ? `: ${res.note}` : "."}`);
     const client = elabftw(cfg);
     const done = await sync.runPush(plan, client);
@@ -3847,6 +3962,26 @@ function dropNulls(args: Args, schema: Record<string, unknown>): Args {
   return out;
 }
 
+// Small models often give a number, a true or false, or a list as a string. The value changes only if the schema has no string type for it.
+export function coerceArgs(args: Args, schema: Record<string, unknown>): Args {
+  const props = (schema.properties ?? {}) as Record<string, { type?: unknown }>;
+  for (const [k, v] of Object.entries(args)) {
+    const t = props[k]?.type;
+    const types = (Array.isArray(t) ? t : [t]).filter((x): x is string => typeof x === "string");
+    if (typeof v !== "string" || !types.length || types.includes("string")) continue;
+    const s = v.trim();
+    if ((types.includes("number") || (types.includes("integer") && /^-?\d+$/.test(s))) && s !== "" && Number.isFinite(Number(s))) args[k] = Number(s);
+    else if (types.includes("boolean") && /^(true|false)$/i.test(s)) args[k] = s.toLowerCase() === "true";
+    else if ((types.includes("array") || types.includes("object")) && /^[[{]/.test(s)) {
+      try {
+        const p = JSON.parse(s);
+        if (types.includes(Array.isArray(p) ? "array" : "object")) args[k] = p;
+      } catch {}
+    }
+  }
+  return args;
+}
+
 function absolutePaths(v: unknown, cwd: string): unknown {
   if (typeof v === "string") {
     if (!v || v.length > 1024 || isAbsolute(v) || /^[a-z]+:\/\//i.test(v) || !/[\\/.]/.test(v)) return v;
@@ -3883,6 +4018,8 @@ function getArg(args: Args, path: string): unknown {
   }
   return cur;
 }
+
+const MAX_STOP_BLOCKS = 8;
 
 const PARALLEL_TOOLS = new Set(["read_file", "list_dir", "inspect_data", "load_skill", "find_tools", "search_literature"]);
 

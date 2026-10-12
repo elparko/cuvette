@@ -3,7 +3,8 @@ import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from
 import { CONTEXT_OVERFLOW, ProviderError } from "../core/types.ts";
 import { ImageBudget, prepareImages } from "./images.ts";
 import { ThinkSplitter, extractTextToolCall, lastCallNumber, promptedToolsText } from "./text.ts";
-import { RETRIES, withRetry, type Sleep } from "./retry.ts";
+import { RETRIES, errorBody, idleSignal, timedOut, withRetry, type IdleSignal, type Sleep } from "./retry.ts";
+import { estimateTokens } from "../core/compaction.ts";
 
 const TIMEOUT_MS = 600_000;
 const DEFAULT_NUM_CTX = 32768;
@@ -147,8 +148,8 @@ export class OllamaProvider implements Provider {
               if (images.length) body += `\n[${images.length} image(s) follow in the next message]`;
             } else body += `\n(image not shown to this model)`;
           }
-          if (this.promptedTools) texts.push(`<tool_result name="${p.name}">\n${p.isError ? `Error: ${body}` : body}\n</tool_result>`);
-          else out.push({ role: "tool", tool_name: p.name, content: p.isError ? `Error: ${body}` : body });
+          if (this.promptedTools) texts.push(`<tool_result name="${p.name}">\n${p.isError ? errorBody(body) : body}\n</tool_result>`);
+          else out.push({ role: "tool", tool_name: p.name, content: p.isError ? errorBody(body) : body });
         } else if (p.type === "text") texts.push(p.text);
         else if (p.type === "image") {
           if (this.info.vision) pics.push(...budget.pick([p.path]).images.map((i) => i.data));
@@ -162,54 +163,87 @@ export class OllamaProvider implements Provider {
     return out;
   }
 
-  private signal(user?: AbortSignal): AbortSignal {
-    const t = AbortSignal.timeout(TIMEOUT_MS);
-    return user ? AbortSignal.any([user, t]) : t;
-  }
-
   private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
     return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
   }
 
-  private async attempt(body: Record<string, unknown>, signal: AbortSignal | undefined): Promise<Response> {
+  private async attempt(body: Record<string, unknown>, idle: IdleSignal): Promise<Response> {
+    idle.touch();
     const res = await fetch(`${ollamaHost()}/api/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
-      signal,
+      signal: idle.signal,
     });
-    if (res.status === 429 || res.status >= 500) {
+    if (res.status === 429 || res.status === 408 || res.status >= 500) {
       const txt = await res.text();
       throw Object.assign(new Error(`Ollama error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status, headers: res.headers });
     }
     return res;
   }
 
-  private async post(body: Record<string, unknown>, signal: AbortSignal | undefined, onRetry?: StepRequest["onRetry"]): Promise<Response> {
+  private async post(body: Record<string, unknown>, idle: IdleSignal, onRetry?: StepRequest["onRetry"]): Promise<Response> {
     const host = ollamaHost();
     try {
-      return await this.retry(() => this.attempt(body, signal), signal, onRetry);
+      return await this.retry(() => this.attempt(body, idle), idle.signal, onRetry);
     } catch (e) {
-      if (typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
-      throw this.networkError(e, host, signal);
+      if (!idle.signal.aborted && typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
+      throw this.networkError(e, host, idle.signal);
     }
   }
 
   private networkError(e: unknown, host: string, signal: AbortSignal | undefined): unknown {
-    if (signal?.aborted) {
-      if (signal.reason instanceof Error && signal.reason.name === "TimeoutError") return new ProviderError("Ollama did not finish within 600 s.", true);
-      return e;
-    }
+    if (signal?.aborted) return timedOut(signal) ? new ProviderError(`Ollama sent no data for ${TIMEOUT_MS / 1000} s.`, true) : e;
     return new ProviderError(`Cannot reach Ollama at ${host}. Start it with \`ollama serve\`.`, true);
+  }
+
+  // Calls take() for each JSON line. If take() returns true, the read stops and the server stops the reply.
+  private async readLines(res: Response, idle: IdleSignal, take: (j: any) => boolean): Promise<void> {
+    const line = (s: string): boolean => {
+      if (!s.trim()) return false;
+      let j: any;
+      try {
+        j = JSON.parse(s);
+      } catch {
+        return false;
+      }
+      if (j.error) throw ollamaError(String(j.error));
+      return take(j);
+    };
+    const reader = res.body!.getReader();
+    try {
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        idle.touch();
+        buf += dec.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const stop = line(buf.slice(0, nl));
+          buf = buf.slice(nl + 1);
+          if (stop) {
+            await reader.cancel().catch(() => {});
+            return;
+          }
+        }
+      }
+      line(buf + dec.decode());
+    } catch (e) {
+      await reader.cancel().catch(() => {});
+      if (e instanceof ProviderError) throw e;
+      throw this.networkError(e, ollamaHost(), idle.signal);
+    }
   }
 
   async step(input: StepRequest): Promise<StepResult> {
     const req = input.noToolCalls ? { ...input, tools: [] } : input;
-    const signal = this.signal(req.signal);
+    const system = this.promptedTools && req.tools.length ? `${req.system}\n\n${promptedToolsText(req.tools)}` : req.system;
     if (this.info.vision) await prepareImages(req.messages, req.signal);
     const body: Record<string, unknown> = {
       model: this.model,
-      messages: this.toNative(this.promptedTools && req.tools.length ? `${req.system}\n\n${promptedToolsText(req.tools)}` : req.system, req.messages),
+      messages: this.toNative(system, req.messages),
       stream: true,
       truncate: false,
       options: { num_ctx: this.numCtx, num_predict: MAX_OUTPUT_TOKENS },
@@ -217,14 +251,23 @@ export class OllamaProvider implements Provider {
     if (req.tools.length && !this.promptedTools)
       body.tools = req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
     if (this.thinkOk) body.think = this.think;
+    const sent = estimateTokens(req.messages, system, this.promptedTools ? [] : req.tools);
+    const idle = idleSignal(TIMEOUT_MS, req.signal);
+    try {
+      return await this.run(req, body, sent, idle);
+    } finally {
+      idle.stop();
+    }
+  }
 
-    let res = await this.post(body, signal, req.onRetry);
+  private async run(req: StepRequest, body: Record<string, unknown>, sent: number, idle: IdleSignal): Promise<StepResult> {
+    let res = await this.post(body, idle, req.onRetry);
     if (res.status === 400 && "think" in body) {
       const err = await res.text();
       if (/think/i.test(err)) {
         this.thinkOk = false;
         delete body.think;
-        res = await this.post(body, signal, req.onRetry);
+        res = await this.post(body, idle, req.onRetry);
       } else throw ollamaError(err, res.status);
     }
     if (!res.ok) {
@@ -242,6 +285,7 @@ export class OllamaProvider implements Provider {
     let inTok = 0;
     let outTok = 0;
     let doneReason = "";
+    let finished = false;
     let checkAt = 3000;
     let looped = false;
     const textOut: string[] = [];
@@ -250,15 +294,7 @@ export class OllamaProvider implements Provider {
       (kind === "text" ? textOut : thinkOut).push(s);
       req.onDelta?.({ type: kind, text: s });
     });
-    const handle = (line: string) => {
-      if (!line.trim()) return;
-      let j: any;
-      try {
-        j = JSON.parse(line);
-      } catch {
-        return;
-      }
-      if (j.error) throw ollamaError(String(j.error));
+    await this.readLines(res, idle, (j) => {
       const m = j.message;
       if (m?.thinking) {
         thinkField += m.thinking;
@@ -284,37 +320,19 @@ export class OllamaProvider implements Provider {
         nativeCalls.push({ name: c.function?.name ?? "", args });
       }
       if (j.done) {
+        finished = true;
         inTok = j.prompt_eval_count ?? 0;
         outTok = j.eval_count ?? 0;
         doneReason = j.done_reason ?? "";
       }
-    };
-    try {
-      const reader = res.body!.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) >= 0) {
-          handle(buf.slice(0, nl));
-          buf = buf.slice(nl + 1);
-        }
-        if (looped) {
-          await reader.cancel().catch(() => {});
-          break;
-        }
-      }
-      if (!looped) handle(buf + dec.decode());
-    } catch (e) {
-      if (e instanceof ProviderError) throw e;
-      throw this.networkError(e, ollamaHost(), signal);
-    }
+      return looped;
+    });
     splitter.end();
-    if (inTok >= this.numCtx * FULL_PROMPT)
-      throw new ProviderError(`The prompt has ${inTok} tokens and fills the context window of ${this.numCtx} tokens. Ollama can cut a prompt that is too long without an error.`, false, true);
+    if (!finished && !looped) throw new ProviderError("Ollama stopped before the end of the reply.", true);
+    if (!finished) {
+      inTok = sent;
+      outTok = Math.ceil((content.length + thinkField.length) / 3.5);
+    }
 
     let text = textOut.join("").trim();
     if (looped) text = cutRepeat(text);
@@ -340,13 +358,16 @@ export class OllamaProvider implements Provider {
       usage: { inputTokens: inTok, outputTokens: outTok },
       stopReason: calls.length ? "tool_use" : doneReason === "length" ? "max_tokens" : "end",
     };
-    if (looped) note = [note, "stopped a reply that repeated the same text; kept the text before the repeat"].filter(Boolean).join("; ");
+    if (looped) note = [note, "stopped a reply that repeated the same text; kept the text before the repeat; the token counts are estimates"].filter(Boolean).join("; ");
     if (note) result.note = note;
+    if (inTok >= this.numCtx * FULL_PROMPT)
+      throw new ProviderError(`The prompt has ${inTok} tokens and fills the context window of ${this.numCtx} tokens. Ollama can cut a prompt that is too long without an error.`, false, true, result);
+    if (finished && sent > this.numCtx && inTok > 0 && inTok < sent * 0.5)
+      throw new ProviderError(`The prompt has about ${sent} tokens, but Ollama read only ${inTok}. This Ollama version cuts a prompt that is longer than the context window of ${this.numCtx} tokens.`, false, true, result);
     return result;
   }
 
   async complete(system: string, text: string, signal?: AbortSignal): Promise<string> {
-    const sig = this.signal(signal);
     const body: Record<string, unknown> = {
       model: this.model,
       messages: [{ role: "system", content: system }, { role: "user", content: text }],
@@ -355,54 +376,33 @@ export class OllamaProvider implements Provider {
       options: { num_ctx: this.numCtx, num_predict: MAX_OUTPUT_TOKENS },
     };
     if (this.thinkOk) body.think = false;
-    let res = await this.post(body, sig);
-    if (res.status === 400 && "think" in body && /think/i.test(await res.clone().text())) {
-      delete body.think;
-      res = await this.post(body, sig);
-    }
-    if (!res.ok) throw ollamaError(await res.text(), res.status);
-    let content = "";
+    const idle = idleSignal(TIMEOUT_MS, signal);
     try {
-      const reader = res.body!.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      const take = (line: string) => {
-        if (!line.trim()) return;
-        let j: any;
-        try {
-          j = JSON.parse(line);
-        } catch {
-          return;
-        }
-        if (j.error) throw ollamaError(String(j.error));
-        content +=j.message?.content ?? "";
+      let res = await this.post(body, idle);
+      if (res.status === 400 && "think" in body && /think/i.test(await res.clone().text())) {
+        this.thinkOk = false;
+        delete body.think;
+        res = await this.post(body, idle);
+      }
+      if (!res.ok) throw ollamaError(await res.text(), res.status);
+      let content = "";
+      let checkAt = 3000;
+      let looped = false;
+      let finished = false;
+      await this.readLines(res, idle, (j) => {
+        content += j.message?.content ?? "";
+        if (j.done) finished = true;
         if (content.length >= checkAt) {
           checkAt = content.length + 1000;
           if (repeatStart(content) !== null) looped = true;
         }
-      };
-      let checkAt = 3000;
-      let looped = false;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) >= 0) {
-          take(buf.slice(0, nl));
-          buf = buf.slice(nl + 1);
-        }
-        if (looped) {
-          await reader.cancel().catch(() => {});
-          content = cutRepeat(content);
-          break;
-        }
-      }
-      if (!looped) take(buf + dec.decode());
-    } catch (e) {
-      if (e instanceof ProviderError) throw e;
-      throw this.networkError(e, ollamaHost(), sig);
+        return looped;
+      });
+      if (!finished && !looped) throw new ProviderError("Ollama stopped before the end of the reply.", true);
+      if (looped) content = cutRepeat(content);
+      return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    } finally {
+      idle.stop();
     }
-    return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
   }
 }

@@ -142,7 +142,7 @@ export interface Provider {
 }
 
 export class ProviderError extends Error {
-  constructor(message: string, readonly transient = false, readonly overflow = false) {
+  constructor(message: string, readonly transient = false, readonly overflow = false, readonly result?: StepResult) {
     super(message);
   }
 }

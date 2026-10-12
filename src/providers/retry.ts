@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { ProviderError } from "../core/types.ts";
 
 export const RETRIES = 3;
 const MAX_WAIT_MS = 120_000;
@@ -21,6 +22,34 @@ export const realSleep: Sleep = (ms, signal) =>
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 
+export interface IdleSignal {
+  signal: AbortSignal;
+  touch: () => void;
+  stop: () => void;
+}
+
+// A streamed reply can take longer than the timeout. The timer starts again at each chunk, so only a server that sends nothing stops.
+export function idleSignal(ms: number, user?: AbortSignal): IdleSignal {
+  const ctl = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stop = () => clearTimeout(timer);
+  const touch = () => {
+    stop();
+    timer = setTimeout(() => ctl.abort(new DOMException(`No data for ${ms / 1000} s.`, "TimeoutError")), ms);
+    timer.unref?.();
+  };
+  touch();
+  return { signal: user ? AbortSignal.any([user, ctl.signal]) : ctl.signal, touch, stop };
+}
+
+export function timedOut(signal: AbortSignal | undefined): boolean {
+  return !!signal?.aborted && signal.reason instanceof Error && signal.reason.name === "TimeoutError";
+}
+
+export function errorBody(text: string): string {
+  return /^(error|blocked)\b/i.test(text) ? text : `Error: ${text}`;
+}
+
 function headerOf(e: any, name: string): string | undefined {
   const h = e?.headers;
   const v = typeof h?.get === "function" ? h.get(name) : h?.[name];
@@ -39,19 +68,23 @@ function retryAfterMs(e: unknown): number | undefined {
 }
 
 export function retryReason(e: unknown): string | undefined {
-  if (e instanceof Anthropic.APIUserAbortError) return undefined;
+  if (e instanceof Anthropic.APIUserAbortError || e instanceof ProviderError) return undefined;
+  if ((e as any)?.partial === true) return "the reply stopped early";
+  const should = headerOf(e, "x-should-retry");
+  if (should === "false") return undefined;
   if (e instanceof Anthropic.RateLimitError) return "rate limit";
   if (e instanceof Anthropic.APIConnectionError) return "network error";
   if (e instanceof Anthropic.APIError) {
     const type = (e as any).error?.error?.type ?? (e as any).error?.type;
-    if (typeof e.status === "number" && (e.status >= 500 || e.status === 529)) return `server error (${e.status})`;
+    if (typeof e.status === "number" && (e.status >= 500 || e.status === 408 || e.status === 409)) return `server error (${e.status})`;
     if (e.status === undefined && (type === "overloaded_error" || type === "api_error")) return "server error";
+    if (should === "true") return `server error (${e.status})`;
     return undefined;
   }
   const status = (e as any)?.status;
   if (typeof status === "number") {
     if (status === 429) return "rate limit";
-    if (status >= 500) return `server error (${status})`;
+    if (status >= 500 || status === 408 || should === "true") return `server error (${status})`;
     return undefined;
   }
   if (e instanceof Error && !(e as any).status && NETWORK_TEXT.test(`${e.message} ${(e as any).code ?? ""} ${(e as any).cause?.code ?? ""}`)) return "network error";

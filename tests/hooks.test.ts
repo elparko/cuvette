@@ -65,3 +65,12 @@ test("post and preAnswer merge", async () => {
   expect(p.findings).toHaveLength(1);
   expect((await h.preAnswer({ event: "PreAnswer", session: "s", answer: "a" })).answer).toBe("a!?");
 });
+
+test("a Stop command hook blocks with exit code 2 or with decision block, and gets stop_hook_active", async () => {
+  const exit2 = script("stop2.mjs", `let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);process.stderr.write("active "+j.stop_hook_active);process.exit(2)})`);
+  expect(await new HookRunner([], { Stop: [{ command: exit2 }] }, dir).stop({ session: "s", stop_hook_active: true })).toBe("active true");
+  const json = script("stopj.mjs", `process.stdin.resume();process.stdin.on("end",()=>console.log(JSON.stringify({decision:"block",reason:"Run the check."})))`);
+  expect(await new HookRunner([], { Stop: [{ command: json }] }, dir).stop({ session: "s" })).toBe("Run the check.");
+  const ok = script("stopok.mjs", `process.stdin.resume();process.stdin.on("end",()=>process.exit(0))`);
+  expect(await new HookRunner([], { Stop: [{ command: ok }] }, dir).stop({ session: "s" })).toBeUndefined();
+});

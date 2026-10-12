@@ -60,7 +60,7 @@ export function cardFromEvent(e: BusEvent): Card | undefined {
   return undefined;
 }
 
-const PLAN_ENDS = ["change_requested", "cancelled", "pilot_requested"];
+const PLAN_ENDS = ["change_requested", "cancelled", "pilot_requested", "stopped"];
 
 export function closesCard(en: Entry, c: Card): boolean {
   if (en.kind === "answer") return c.t === "question" && c.q.qid === en.data.qid;

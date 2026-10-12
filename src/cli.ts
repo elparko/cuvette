@@ -32,6 +32,7 @@ Usage
 
   With --method, the harness compares the new data with the data that the method used.
   A likely unit change stops the run. Add data-change to --allow to continue.
+  A search of a large folder outside the project needs search in --allow, or all.
 
   --bypass-permissions
   WARNING: In bypass, the agent can run commands and write files without asking.
@@ -251,7 +252,8 @@ async function headless(prompt: string) {
   });
   applyHeadlessSetup(s, readJson(str(o.setup)) as Record<string, unknown> | undefined, answers);
   const answer = await s.send(prompt);
-  if (out === "json") console.log(JSON.stringify({ session: s.id, dir: s.dir, answer, findings: s.findings.list() }, null, 1));
+  if (s.endedBy === "error") process.exitCode = 1;
+  if (out === "json") console.log(JSON.stringify({ session: s.id, dir: s.dir, answer, stop: s.endedBy, findings: s.findings.list() }, null, 1));
   else if (out === "text") console.log(`${answer}\n\nSession: ${s.id}\nFolder: ${s.workDir}\nRecord: ${join(s.dir, "log.jsonl")}`);
   await s.close();
 }

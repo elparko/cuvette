@@ -66,6 +66,22 @@ export class AnalysisRecord {
     this.logPath = join(sessionDir, "log.jsonl");
   }
 
+  // A crash can leave a cut last line. Call this only with the session lock held: the next entry must start on a new line.
+  repairTail(): void {
+    try {
+      const size = statSync(this.logPath).size;
+      if (!size) return;
+      const fd = openSync(this.logPath, "r");
+      const last = Buffer.alloc(1);
+      try {
+        readSync(fd, last, 0, 1, size - 1);
+      } finally {
+        closeSync(fd);
+      }
+      if (last[0] !== 0x0a) appendFileSync(this.logPath, "\n");
+    } catch {}
+  }
+
   private load(): void {
     for (const line of readFileSync(this.logPath, "utf8").split("\n")) {
       if (!line.trim()) continue;

@@ -110,7 +110,7 @@ export function readPlan(a: Record<string, unknown>, statusDefault = true): Part
 const sameStep = (a: PlanStep, b: PlanStep) => a.step.toLowerCase() === b.step.toLowerCase();
 
 export function mergePlan(prev: AnalysisPlan, next: Partial<AnalysisPlan>): AnalysisPlan {
-  const out: AnalysisPlan = { ...prev, ...next, steps: prev.steps.map((s) => ({ ...s })) };
+  const out: AnalysisPlan = { ...structuredClone(prev), ...next, steps: structuredClone(prev.steps) };
   for (const s of next.steps ?? []) {
     const i = out.steps.findIndex((x) => sameStep(x, s));
     if (i < 0) out.steps.push({ ...s, status: s.status ?? "todo" });

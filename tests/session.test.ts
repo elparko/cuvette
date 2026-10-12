@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { blindPolicy, canonical, setBlindPolicy } from "../src/adapters/blind.ts";
 import { applyHeadlessSetup, attachHeadless } from "../src/core/headless.ts";
-import { Session, announcesStep, endsWithPromise } from "../src/core/session.ts";
+import { Session, announcesStep, coerceArgs, endsWithPromise } from "../src/core/session.ts";
 import { ProviderError } from "../src/core/types.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { unzip } from "./fixtures/unzip.ts";
@@ -1788,4 +1788,146 @@ test("a retry removes the partial streamed text, and the notice counts the real 
   expect(await session.send("go")).toBe("All done.");
   expect(events).toEqual(["half a rep", "reset", "half a rep", "reset", "All done."]);
   expect(session.record.entries(["notice"]).map((e) => String(e.data.text))).toContain("The model did not answer after four tries. The conversation is saved up to the last finished step.");
+});
+
+test("a reply after a full context is kept if the summary cannot make the context shorter", async () => {
+  const provider = new FakeProvider([{ text: "All done." }]);
+  const step = provider.step.bind(provider);
+  provider.step = async (req) => {
+    const result = await step(req);
+    throw new ProviderError("The prompt has 31000 tokens and fills the context window of 32768 tokens.", false, true, result);
+  };
+  session = await recoverySession(provider, { guidance: false });
+  session["maybeCompact"] = async () => false;
+  expect(await session.send("go")).toBe("All done.");
+  expect(session.record.entries(["error"])).toHaveLength(0);
+  expect(session.record.entries(["notice"]).some((e) => /could not make the context shorter/.test(String(e.data.text)))).toBe(true);
+});
+
+test("a failed switch to the local model keeps the model, the referee and the tools of before", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  provider.info = { provider: "claude", model: "claude-haiku-5-5", contextWindow: 1_000_000, vision: false, small: false };
+  session = await recoverySession(provider, { local_model: "openai:https://models.example.com/v1|m" });
+  const before = { provider: session.provider, model: session.settings.model, active: [...session["active"]] };
+  const problem = await session["useLocalModel"]();
+  expect(problem).toMatch(/does not run on this computer/);
+  expect(session.provider).toBe(before.provider);
+  expect(session.settings.model).toBe(before.model);
+  expect([...session["active"]]).toEqual(before.active);
+});
+
+test("of two inspections in one reply, the session keeps the one that the agent called last", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  session = await recoverySession(provider, { guidance: false });
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-data-"));
+  writeFileSync(join(dir, "a.csv"), "alpha,beta\n1,2\n3,4\n");
+  writeFileSync(join(dir, "b.csv"), "gamma,delta\n1,2\n3,4\n");
+  await Promise.all([session["inspectPath"](join(dir, "b.csv"), undefined, 2), session["inspectPath"](join(dir, "a.csv"), undefined, 1)]);
+  expect(session.inspection!.columns!.map((c) => c.name)).toEqual(["gamma", "delta"]);
+  await session["inspectPath"](join(dir, "a.csv"), undefined, 1);
+  expect(session.inspection!.columns!.map((c) => c.name)).toEqual(["gamma", "delta"]);
+});
+
+test("a Stop hook that blocks keeps the agent working, with its reason as the next note", async () => {
+  const provider = new FakeProvider([{ text: "First try." }, { text: "Second try." }]);
+  session = await recoverySession(provider, { guidance: false });
+  const seen: unknown[] = [];
+  session["hooks"].add([{ name: "check", event: "Stop", run: async (input: any) => (seen.push(input.stop_hook_active), seen.length === 1 ? { decision: "block", reason: "Save the table first." } : {}) } as never]);
+  expect(await session.send("go")).toBe("Second try.");
+  expect(seen).toEqual([false, true]);
+  const note = provider.requests[1]!.messages.at(-1)!.parts[0] as { text: string };
+  expect(note.text).toMatch(/A Stop hook asks you to continue: Save the table first\./);
+});
+
+test("a deny rule wins over always allow", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd, settings: { guidance: false, phi_check: false, permissions: { read_file: "deny" } } as never });
+  session["sessionAllow"].add("read_file");
+  const tool = session.findTool("read_file")!;
+  expect(session["permitted"](tool, { path: join(cwd, "a.txt") })).toBe("deny");
+});
+
+test("an Esc on a permission card records a cancel by the harness, not a denial by the scientist", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  writeFileSync(join(cwd, "a.txt"), "text");
+  const provider = new FakeProvider([{ calls: [{ name: "read_file", args: { path: join(cwd, "a.txt") } }] }, { text: "never" }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, phi_check: false, permissions: { read_file: "ask" } } as never });
+  session.bus.on((e) => {
+    if (e.type === "permission") setTimeout(() => session!.interrupt(), 0);
+  });
+  await session.send("read a.txt");
+  expect(session.record.entries(["permission"]).map((e) => [e.data.decision, e.data.by])).toEqual([["cancelled", "harness"]]);
+});
+
+test("resume after a crash between the tool calls and their results gives each call a result", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd, settings: { guidance: false } });
+  const id = session.id;
+  session["push"]({ role: "user", parts: [{ type: "text", text: "go" }] });
+  session["push"]({ role: "assistant", parts: [{ type: "tool_call", id: "call_1", name: "state", args: {} }, { type: "tool_call", id: "call_2", name: "note", args: { text: "x" } }] });
+  session.record.append("tool_result", { callId: "call_1", tool: "state", ok: true, summary: "State is fine.", text: "" });
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
+  const last = session["history"].at(-1)!;
+  expect(last.role).toBe("user");
+  const parts = last.parts as { callId: string; text: string; isError?: boolean }[];
+  expect(parts.map((p) => p.callId)).toEqual(["call_1", "call_2"]);
+  expect(parts[0]!.text).toMatch(/^State is fine\./);
+  expect(parts[1]!.text).toMatch(/not run/);
+});
+
+test("a cut last line in the log does not take the next entry with it", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd, settings: { guidance: false } });
+  const id = session.id;
+  const log = join(session.record.dir, "log.jsonl");
+  await session.close();
+  writeFileSync(log, readFileSync(log, "utf8") + '{"id": 99, "kind": "no');
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
+  session.record.append("notice", { text: "after the crash" });
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
+  expect(session.record.entries(["notice"]).some((e) => e.data.text === "after the crash")).toBe(true);
+});
+
+test("after a switch to a model with a smaller window, the context size is an estimate, not the count of the other model", async () => {
+  const provider = new FakeProvider([{ text: "ok" }]);
+  provider.info = { provider: "claude", model: "claude-haiku-5-5", contextWindow: 1_000_000, vision: false, small: false };
+  session = await recoverySession(provider, { guidance: false });
+  await session.send("go");
+  session.record.append("usage", { inputTokens: 300_000, outputTokens: 10, model: "claude-haiku-5-5", provider: "claude" });
+  expect(session.contextTokens()).toBeGreaterThan(300_000);
+  const local = new FakeProvider([]);
+  local.info = { provider: "ollama", model: "qwen3:8b", contextWindow: 32768, vision: false, small: true, local: true };
+  session.provider = local;
+  expect(session.contextTokens()).toBeLessThan(32768);
+});
+
+test("a mode change during planning waits until the plan ends", async () => {
+  session = await recoverySession(new FakeProvider([]), {});
+  session["startPlanning"]("count the cells");
+  session.setMode("watch");
+  expect(session.mode).toBe("plan");
+  session["endPlanning"]();
+  expect(session.mode).toBe("watch");
+});
+
+test("string arguments become numbers, true or false, and lists when the schema asks for them", () => {
+  const schema = { properties: { n: { type: "integer" }, x: { type: "number" }, on: { type: "boolean" }, list: { type: "array" }, name: { type: "string" }, either: { type: ["string", "number"] } } };
+  expect(coerceArgs({ n: "3", x: "2.5", on: "true", list: '["a"]', name: "7", either: "7" }, schema)).toEqual({ n: 3, x: 2.5, on: true, list: ["a"], name: "7", either: "7" });
+  expect(coerceArgs({ n: "2.5", x: "auto" }, schema)).toEqual({ n: "2.5", x: "auto" });
+});
+
+test("resume keeps a blind reference hidden and keeps the last mode", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  writeFileSync(join(cwd, "hand-counts.csv"), "sample,count\na,1\n");
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd, settings: { guidance: false } });
+  const id = session.id;
+  session["setReference"]({ mode: "blind", path: "hand-counts.csv" });
+  session.setMode("teach");
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd });
+  expect(session["hidden"]).toEqual([join(cwd, "hand-counts.csv")]);
+  expect(session["reference"]?.mode).toBe("blind");
+  expect(session.mode).toBe("teach");
 });
