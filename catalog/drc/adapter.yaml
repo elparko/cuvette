@@ -808,7 +808,7 @@ tools:
       well_col: { type: string, description: "Column with the well name, used by exclude. Default well, if the column exists." }
       normalization: { type: string, enum: [percent_activity, percent_inhibition, fraction, percent_of_high, none], description: "Leave out. The harness sets it from the decision record." }
       zprime_stat: { type: string, enum: [mean_sd, median_mad], description: "Leave out. The harness sets it from the decision record." }
-      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Well names to drop, as a list or as comma text." }
+      exclude: { type: [array, string], items: { type: string }, description: "Leave out. The harness sets it from the decision record. Well names to drop, as a list or as comma text. A plain well name drops that well on every plate. plate:well, such as P2:A1, drops it on one plate." }
     required: [data]
     read_only: true
     batch: false
