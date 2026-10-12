@@ -119,7 +119,7 @@ export function App() {
   return (
     <TooltipProvider delayDuration={400}>
       <div className="flex h-full min-h-0">
-        <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar md:flex" aria-label="Navigation">
+        <aside className="hidden w-60 shrink-0 flex-col overflow-hidden border-r bg-sidebar md:flex" aria-label="Navigation">
           <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
             <Logo className="size-7" />
             <span className="text-[15px] font-semibold tracking-tight">Cuvette</span>
@@ -144,7 +144,7 @@ export function App() {
             ))}
           </nav>
           {recent.length > 0 && (
-            <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-3">
+            <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2">
               <div className="px-2.5 pb-1 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">Recent</div>
               {recent.map((s) => (
                 <button
@@ -153,7 +153,7 @@ export function App() {
                   disabled={s.moved}
                   title={s.folder}
                   onClick={() => sessions.open(s.id, opened)}
-                  className={cn("flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-50", state.session?.id === s.id && "bg-muted")}
+                  className={cn("flex w-full min-w-0 flex-col rounded-lg px-2.5 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 disabled:opacity-50", state.session?.id === s.id && "bg-muted")}
                 >
                   <span className="truncate text-[13px]">{s.title}</span>
                   <span className="truncate text-[11.5px] text-muted-foreground">
