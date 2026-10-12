@@ -73,11 +73,19 @@ def load_molecules(path, smiles_column="smiles", id_column=None, target_column=N
     i_key = _find(rows[0], id_column) if id_column else None
     t_key = _find(rows[0], target_column) if target_column else None
     chooser = rdMolStandardize.LargestFragmentChooser() if salts == "largest_fragment" else None
-    ids, smiles, mols, target, bad = [], [], [], [], []
+    ids, smiles, mols, target, bad, no_target = [], [], [], [], [], []
     for n, row in enumerate(rows):
         smi = row[s_key].strip()
         mol = Chem.MolFromSmiles(smi)
         label = row[i_key].strip() if i_key else str(n + 1)
+        if t_key and mol is not None:
+            try:
+                value = float(row[t_key])
+            except ValueError:
+                value = float("nan")
+            if value != value:
+                no_target.append(label)
+                continue
         if mol is None:
             bad.append(label)
             continue
@@ -87,7 +95,7 @@ def load_molecules(path, smiles_column="smiles", id_column=None, target_column=N
         smiles.append(Chem.MolToSmiles(mol))
         mols.append(mol)
         if t_key:
-            target.append(float(row[t_key]))
+            target.append(value)
     if bad and invalid == "stop":
         raise ValueError("%d of %d SMILES cannot be parsed (first: %s). Set invalid to report_and_drop to drop them." % (len(bad), len(rows), ", ".join(bad[:5])))
     n_multi = sum(1 for m in mols if len(Chem.GetMolFrags(m)) > 1)
@@ -96,6 +104,8 @@ def load_molecules(path, smiles_column="smiles", id_column=None, target_column=N
         "n_read": len(rows),
         "n_parsed": len(mols),
         "n_invalid": len(bad),
+        "n_no_target": len(no_target),
+        "no_target_ids": no_target[:20],
         "n_multi_fragment": n_multi,
         "invalid_ids": bad[:20],
         "salts": salts,
@@ -108,7 +118,7 @@ def load_molecules(path, smiles_column="smiles", id_column=None, target_column=N
 def _hbd_hba(mol, definition):
     if definition == "rdmoldescriptors":
         return rdMolDescriptors.CalcNumHBD(mol), rdMolDescriptors.CalcNumHBA(mol)
-    return Lipinski.NumHDonors(mol), Lipinski.NumHAcceptors(mol)
+    return Lipinski.NHOHCount(mol), Lipinski.NOCount(mol)
 
 
 def _aromatic_proportion(mol):
@@ -185,7 +195,7 @@ def _scores(y, p):
     ss_res = float(((y - p) ** 2).sum())
     ss_tot = float(((y - y.mean()) ** 2).sum())
     r = float(np.corrcoef(y, p)[0, 1]) if len(y) > 2 else float("nan")
-    return {"r2": 1 - ss_res / ss_tot, "r_squared_correlation": r * r, "rmse": math.sqrt(ss_res / len(y)), "n": int(len(y))}
+    return {"r2": 1 - ss_res / ss_tot if ss_tot > 0 else float("nan"), "r_squared_correlation": r * r, "rmse": math.sqrt(ss_res / len(y)), "n": int(len(y))}
 
 
 def fit_solubility_model(descriptors, equation="published", test_fraction=0.2, seed=42, n_outliers=10):

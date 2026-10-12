@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { AnalysisRecord } from "../src/core/record.ts";
-import { buildWorkbook, copyFigures, decodeText, outputRules, parseCsv, readTable, savedLine, sheetName, writeResults, xlsx, type Sheet } from "../src/core/results.ts";
+import { buildWorkbook, copyFigures, decodeText, typed, outputRules, parseCsv, readTable, savedLine, sheetName, writeResults, xlsx, type Sheet } from "../src/core/results.ts";
 import type { NodeIn } from "../src/core/types.ts";
 import { runScriptTool, scriptPython } from "../src/tools/run_script.ts";
 import { unzip } from "./fixtures/unzip.ts";
@@ -187,4 +187,8 @@ test("decodeText reads UTF-16 with no byte order mark in both byte orders", () =
   expect(decodeText(le)).toEqual({ text, encoding: "utf-16le" });
   expect(decodeText(Buffer.from(le).swap16())).toEqual({ text, encoding: "utf-16be" });
   expect(decodeText(Buffer.from("caf\xe9,1\n", "latin1")).encoding).toBe("windows-1252");
+});
+
+test("typed keeps a column of IDs with a leading zero as text", () => {
+  expect(typed([["001", "1.5"], ["002", "2"]], 2)).toEqual([["001", 1.5], ["002", 2]]);
 });

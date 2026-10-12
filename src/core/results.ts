@@ -232,7 +232,7 @@ export function typed(rows: unknown[][], width: number): Cell[][] {
       const v = r[j];
       if (v === null || v === undefined || (typeof v === "string" && MISSING.has(v.trim()))) continue;
       any = true;
-      if (!(typeof v === "number" || (typeof v === "string" && NUMBER.test(v)))) numeric = false;
+      if (!(typeof v === "number" || (typeof v === "string" && NUMBER.test(v) && !/^[-+]?0\d+$/.test(v.trim())))) numeric = false;
       if (!(typeof v === "boolean" || (typeof v === "string" && /^(true|false)$/i.test(v.trim())))) bool = false;
     }
     return !any ? "text" : numeric ? "number" : bool ? "bool" : "text";

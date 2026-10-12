@@ -80,7 +80,7 @@ decisions:
     default: lipinski
     owner: human
     group: Descriptors
-    help: lipinski uses Lipinski.NumHDonors and NumHAcceptors. rdmoldescriptors uses CalcNumHBD and CalcNumHBA. The counts differ.
+    help: lipinski counts as in Lipinski 1997. Donors are the NH and OH groups (NHOHCount). Acceptors are the N and O atoms (NOCount). rdmoldescriptors uses CalcNumHBD and CalcNumHBA. The counts differ.
     essential: true
     links:
       - { tool: compute_descriptors, arg: hbd_hba }
@@ -259,7 +259,7 @@ map:
     fidelity: close
     difference: The route needs the wrapper module ga_rdkit.py in the adapter folder. No person ran the route by hand.
     evidence: { source: docs, test: mini-load, note: RDKit Getting Started guide. }
-    summary: "{metrics.n_parsed} of {metrics.n_read} SMILES parsed, {metrics.n_invalid} invalid."
+    summary: "{metrics.n_parsed} of {metrics.n_read} SMILES parsed, {metrics.n_invalid} invalid, {metrics.n_no_target} with no measured value."
   - tool: compute_descriptors
     route: "In Python: Descriptors.MolWt(m), Crippen.MolLogP(m), rdMolDescriptors.CalcTPSA(m), Lipinski.NumHDonors(m), Lipinski.NumHAcceptors(m), Lipinski.NumRotatableBonds(m), aromatic heavy atoms / m.GetNumHeavyAtoms()"
     params:
