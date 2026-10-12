@@ -182,7 +182,7 @@ function scoreDecisions(log: Log, sc: Scenario) {
     if (e.kind === "question") byQid.set(String(e.data.qid), String(e.data.decisionKey ?? ""));
     else if (e.kind === "setup") for (const [k, v] of Object.entries((e.data.values as Record<string, unknown>) ?? {})) timeline.push({ id: e.id, key: k, value: v });
     else if (e.kind === "decision") timeline.push({ id: e.id, key: String(e.data.key), value: e.data.new });
-    else if (e.kind === "answer") {
+    else if (e.kind === "answer" && !e.data.withdrawn) {
       const key = byQid.get(String(e.data.qid));
       if (key) timeline.push({ id: e.id, key, value: e.data.value });
     }

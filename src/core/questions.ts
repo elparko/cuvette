@@ -56,7 +56,7 @@ export class QuestionQueue {
         if (!q) continue;
         q.answer = d.value;
         q.answered = e.ts;
-        q.status = d.by === "timeout" ? "timed_out" : d.by === "timeout-default" ? "defaulted" : "answered";
+        q.status = d.withdrawn ? "withdrawn" : d.by === "timeout" ? "timed_out" : d.by === "timeout-default" ? "defaulted" : "answered";
       }
     }
   }
@@ -104,6 +104,17 @@ export class QuestionQueue {
     q.answered = new Date().toISOString();
     this.record.append("answer", { qid, value: chosen, note: note ?? "", by: "human", changed: true, old: old ?? null });
     upsert(stored(q));
+    return q;
+  }
+
+  withdraw(qid: string, reason: string): Question | undefined {
+    const q = this.questions.get(qid);
+    if (!q || q.status !== "open") return undefined;
+    q.status = "withdrawn";
+    q.answered = new Date().toISOString();
+    this.record.append("answer", { qid, value: null, note: reason, by: "harness", withdrawn: true });
+    upsert(stored(q));
+    this.release(q);
     return q;
   }
 

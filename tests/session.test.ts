@@ -2058,3 +2058,277 @@ test("resume uses the model that the session used last, not the first one", asyn
   session = await Session.resume(id, { cwd });
   expect(session.settings.model).toBe(`fake:${script}`);
 });
+
+const ASK2 = (q1: string, q2: string) => ({ calls: [LOOK, { name: "clarify", args: { found: "I see one image.", questions: [{ question: q1, options: ["a", "b"] }, { question: q2, options: ["c", "d"] }] } }] });
+const COUNT_PLAN = {
+  restatement: "You want: the number of particles in a.tif.",
+  definitions: [{ measure: "particle", definition: "An object above the threshold, at least 5 px." }],
+  steps: [{ step: "Count the particles", tool: "count", settings: [{ key: "method", label: "Threshold method", value: "Otsu", by: "default" }, { key: "min_size", label: "Smallest particle", value: 5, by: "default" }] }],
+};
+const COUNT = { name: "count", args: { input: "/data/a.tif", method: "Otsu", min_size: 5 } };
+
+test("a stopped clarify card closes its questions, so a new request does not ask them a second time", async () => {
+  const provider = new FakeProvider([ASK2("What is one particle?", "Which groups?"), ASK2("What is one cell?", "Which wells?"), { text: "Waiting." }, { text: "Waiting." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({});
+  const s = session;
+  let stopped = false;
+  s.bus.on((e) => {
+    if (e.type === "clarify" && !stopped) {
+      stopped = true;
+      setTimeout(() => s.interrupt(), 0);
+    }
+  });
+  await s.send("Count the particles in a.tif");
+  expect(s.questions.open()).toEqual([]);
+  expect(s.record.entries(["clarify"]).map((e) => e.data.action)).toEqual(["asked", "stopped"]);
+  expect(s.record.entries(["answer"]).filter((e) => e.data.withdrawn)).toHaveLength(2);
+  s.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => s.answer(e.question.qid, e.question.options[0]?.value), 0);
+  });
+  await s.send("Count the cells in b.tif");
+  expect(s.questions.answered().filter((q) => q.status === "answered").map((q) => q.text)).toEqual(["What is one cell?", "Which wells?"]);
+  expect(s.questions.open()).toEqual([]);
+});
+
+test("Answer later on a card that the agent waits for ends the wait, the message typed meanwhile reaches the agent, and a later answer comes as a note", async () => {
+  const provider = new FakeProvider([{ calls: [{ name: "ask_scientist", args: { question: "Which file?", options: ["a.csv", "b.csv"], wait: true } }] }, { text: "I go on without the answer." }]);
+  session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, autoResume: false } });
+  const s = session;
+  let qid = "";
+  s.bus.on((e) => {
+    if (e.type !== "question") return;
+    qid = e.question.qid;
+    setTimeout(() => {
+      s.steer("Use the newest file.");
+      s.answerLater([qid]);
+    }, 0);
+  });
+  await s.send("Read the data.");
+  const parts = provider.requests[1]!.messages.at(-1)!.parts as { type: string; text?: string }[];
+  expect(parts[0]!.text).toMatch(/Question q\d+ is still open\. The scientist did not answer it yet\. The scientist chose to answer it later\./);
+  expect(parts.at(-1)!.text).toContain("Use the newest file.");
+  expect(s.questions.get(qid)?.status).toBe("open");
+  await s.answer(qid, "b.csv");
+  expect(s["notes"].join("\n")).toContain(`The scientist answered ${qid}`);
+});
+
+test("send now on the plan card and on the clarify card: the card closes, the turn goes on, and the agent reads the message", async () => {
+  const provider = new FakeProvider([ASK2("What is one particle?", "Which groups?"), { calls: [{ name: "plan", args: COUNT_PLAN }] }, { calls: [{ name: "plan", args: COUNT_PLAN }] }, { calls: [COUNT] }, { text: "There are 41 particles." }, { text: "There are 41 particles." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({});
+  const s = session;
+  let plans = 0;
+  let answered = false;
+  s.bus.on((e) => {
+    if (e.type === "question" && !answered) {
+      answered = true;
+      setTimeout(() => s.answer(e.question.qid, "a").then(() => s.steer("One particle is one dark spot.", true)), 0);
+    }
+    if (e.type === "plan") setTimeout(() => (plans++ === 0 ? s.steer("Use Otsu.", true) : s.respondPlan({ action: "approve" })), 0);
+  });
+  await s.send("Count the particles in a.tif");
+  const results = s.record.entries(["tool_result"]);
+  const clarify = results.find((e) => e.data.tool === "clarify")!;
+  expect(String(clarify.data.error)).toMatch(/^The scientist sent a message instead of answering the questions\. Read it first\. Answers so far: What is one particle\? -> a\./);
+  expect(s.questions.open()).toEqual([]);
+  const plan = results.filter((e) => e.data.tool === "plan")[0]!;
+  expect(String(plan.data.error)).toMatch(/^The scientist sent a message instead of answering the proposed analysis \(version 1\)/);
+  expect(s.record.entries(["plan"]).map((e) => e.data.action)).toEqual(["proposed", "stopped", "proposed"]);
+  expect(s.record.entries(["plan_approved"])).toHaveLength(1);
+  expect(s.record.entries(["user"]).filter((e) => e.data.now).map((e) => e.data.text)).toEqual(["One particle is one dark spot.", "Use Otsu."]);
+  expect(s.record.nodes().map((n) => n.tool)).toEqual(["count"]);
+});
+
+test("send now on the pilot card: the agent shows the same pilot again with no new run", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [PILOT_CALL] }, { calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  const s = session;
+  let pilots = 0;
+  s.bus.on((e) => {
+    if (e.type === "question") setTimeout(() => s.answer(e.question.qid, e.question.title === "Earlier results" ? "none" : e.question.options[0]?.value ?? "yes"), 0);
+    if (e.type !== "plan") return;
+    if (e.stage === "plan") return void setTimeout(() => s.respondPlan({ action: "pilot" }), 0);
+    setTimeout(() => (pilots++ === 0 ? s.steer("The overlay looks right.", true) : s.respondPlan({ action: "confirm" })), 0);
+  });
+  await s.send(`Count the red-positive cells in ${images}`);
+  const pilot = s.record.entries(["tool_result"]).filter((e) => e.data.tool === "pilot_result");
+  expect(String(pilot[0]!.data.error)).toMatch(/^The scientist sent a message instead of answering the pilot on Set 1\. Read it first\./);
+  expect(s.record.entries(["pilot_rejected"])[0]!.data.reason).toBe("the scientist sent a message instead of an answer");
+  expect(s.record.entries(["plan_approved"])).toHaveLength(1);
+});
+
+test("a plan call during the pilot with an open setting is refused, and its settings go into the decisions", async () => {
+  const { proj, images } = pilotProject();
+  const open = { name: "plan", args: { steps: [{ step: "Count the cells in each field", tool: "count", settings: [{ label: "Edge rule" }] }], reason: "An edge rule." } };
+  const filled = { name: "plan", args: { steps: [{ step: "Count the cells in each field", tool: "count", settings: [{ label: "Edge rule", value: "leave out", by: "agent" }, { label: "Smallest particle", key: "min_size", value: 7, by: "agent" }] }], reason: "An edge rule." } };
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { calls: [open] }, { calls: [filled] }, { calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  const s = session;
+  answerCards(s, (e) => (e.stage === "plan" ? { action: "pilot" } : { action: "confirm" }));
+  await s.send(`Count the red-positive cells in ${images}`);
+  const plans = s.record.entries(["tool_result"]).filter((e) => e.data.tool === "plan");
+  expect(String(plans[1]!.data.error)).toMatch(/^Open settings: Edge rule\./);
+  expect(plans[2]!.data.ok).toBe(true);
+  expect(s.decisions.value("min_size")).toBe(7);
+  const approved = s.record.entries(["plan_approved"]).at(-1)!;
+  expect(String(approved.data.text)).toContain("Smallest particle: 7 (agent)");
+});
+
+test("a definition change on a pilot card with no pending plan waits for the pilot confirmation before the approved plan changes", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: CELL_PLAN(images) }] }, { text: "Done." }, { text: "Done." }]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({ method: "Otsu" });
+  const s = session;
+  let stage = "plan";
+  const change = { action: "change", text: "Count 5 red pixels.", definition: { measure: "positive cell", old: "", new: "A cell with at least 5 red pixels inside its outline." } };
+  answerCards(s, () => (stage === "plan" ? { action: "approve" } : change));
+  await s.send(`Count the red-positive cells in ${images}`);
+  expect(s.record.entries(["plan_approved"])).toHaveLength(1);
+  const before = s.plan!.definitions![0]!.definition;
+  stage = "pilot";
+  s.planFirst = false;
+  s.provider = new FakeProvider([{ calls: [PILOT_CALL] }, { text: "I run it again." }, { text: "I run it again." }]);
+  await s.send("Show me the pilot again");
+  expect(s.plan!.definitions![0]!.definition).toBe(before);
+  expect(s.record.entries(["plan_approved"])).toHaveLength(1);
+  expect(s.pilotStage).toBe(true);
+  const id = s.id;
+  await s.close();
+  session = await Session.resume(id, { provider: new FakeProvider([{ calls: [PILOT_CALL] }, { text: "Done." }, { text: "Done." }]), cwd: proj, interactive: true, settings: { referee: "none", planFirst: "off" } });
+  const r = session;
+  expect(r.pilotStage).toBe(true);
+  answerCards(r, () => ({ action: "confirm" }));
+  await r.send("continue");
+  const approved = r.record.entries(["plan_approved"]);
+  expect(approved).toHaveLength(2);
+  expect((approved[1]!.data.plan as any).definitions[0].definition).toBe("A cell with at least 5 red pixels inside its outline.");
+});
+
+test("resume after a crash during the questions closes them, and a new plan asks again", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [LAB], provider: new FakeProvider([]), cwd, interactive: true, settings: { referee: "none" } });
+  session.record.append("clarify", { action: "asked", phase: "Questions", found: "One image.", questions: ["What is one particle?"] });
+  const q = await session.questions.ask({ decisionKey: "", title: "One particle", text: "What is one particle?", options: [], evidence: "" });
+  const id = session.id;
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd, interactive: true, settings: { referee: "none" } });
+  expect(session.questions.get(q.qid)?.status).toBe("withdrawn");
+  expect(session.record.entries(["clarify"]).map((e) => e.data.action)).toEqual(["asked", "stopped"]);
+  await session.close();
+  session = await Session.resume(id, { provider: new FakeProvider([]), cwd, interactive: true, settings: { referee: "none" } });
+  expect(session.record.entries(["clarify"]).map((e) => e.data.action)).toEqual(["asked", "stopped"]);
+});
+
+test("the referee reads only an answer that has numbers or follows a step", async () => {
+  const ref = new FakeProvider([]);
+  let calls = 0;
+  ref.complete = async () => (calls++, "No findings.");
+  session = await Session.create({ adapters: [LAB], provider: new FakeProvider([{ text: "Hello. Which images do you want to count?" }, { calls: [COUNT] }, { text: "There are 41 particles (step 1)." }]), refereeProvider: ref, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+  session.decisions.applySetup({ method: "Otsu" });
+  await session.send("Hello");
+  expect(calls).toBe(0);
+  await session.send("Count the particles in a.tif");
+  expect(calls).toBe(1);
+});
+
+test("a rewind scans the restored history for patient identifiers again", async () => {
+  const p = new FakeProvider([{ text: "One." }, { text: "Two." }]);
+  session = await Session.create({ adapters: [], provider: p, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, referee: "none" } });
+  const s = session;
+  await s.send("First question");
+  await s.send("Second question");
+  expect(s["phiFrom"]).toBeGreaterThan(0);
+  s.rewind(2);
+  expect(s["phiFrom"]).toBe(0);
+});
+
+test("with deferred tools, a tool that find_tools brought in leaves the list after two turns with no call; the list stays the same inside a turn", async () => {
+  const provider = new FakeProvider([
+    { calls: [{ name: "find_tools", args: { query: "zeta spectrum" } }] },
+    { calls: [{ name: "note", args: { text: "a" } }] },
+    { text: "Found it." },
+    { text: "Two." },
+    { text: "Three." },
+    { text: "Four." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false, referee: "none", toolExposure: "search" } });
+  const s = session;
+  const tools = s["tools"] as Map<string, any>;
+  for (let i = 0; i < 20; i++) tools.set(`extra_${i}`, { name: `extra_${i}`, description: i === 19 ? "Zeta spectrum fit." : `Tool ${i}.`, inputSchema: { type: "object", properties: {} }, source: "adapter", adapter: "lab", readOnly: true, permission: "allow", execute: async () => ({ ok: true }) });
+  const names = (i: number) => provider.requests[i]!.tools.map((t) => t.name);
+  await s.send("Start");
+  expect(names(0)).not.toContain("extra_19");
+  expect(names(1)).toContain("extra_19");
+  expect(names(2)).toEqual(names(1));
+  await s.send("two");
+  await s.send("three");
+  expect(names(4)).toContain("extra_19");
+  await s.send("four");
+  expect(names(5)).not.toContain("extra_19");
+  expect(names(5).filter((n) => n.startsWith("extra_") || ["blur", "count", "state"].includes(n))).toHaveLength(16);
+});
+
+test("a read-only call that repeats an earlier call with the same output does not repeat the output", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  writeFileSync(join(cwd, "data.csv"), Array.from({ length: 60 }, (_, i) => `row${i},${i * 3},${i * 7}`).join("\n"));
+  const read = { name: "read_file", args: { path: join(cwd, "data.csv") } };
+  const provider = new FakeProvider([{ calls: [read] }, { calls: [read] }, { text: "The table has 60 rows." }]);
+  session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, referee: "none" } });
+  await session.send("Read data.csv");
+  const texts = toolTexts(provider);
+  expect(texts[0]).toContain("row59");
+  expect(texts[1]).toMatch(/^\[The output is the same as the output of the earlier call call_1 with the same input\./);
+  expect(String(session.record.entries(["tool_result"])[1]!.data.text)).toContain("row59");
+});
+
+test("a structured tool result has one key on each line and compact values", async () => {
+  session = await Session.create({ adapters: [], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  const tool = session.findTool("run_script")!;
+  const text = session["render"](tool, { ok: true, summary: "Counted.", metrics: { n: 3 }, table: { columns: ["a", "b"], rows: [[1, 2], [3, 4]], n_rows: 2 } }).text;
+  expect(text).toBe('{\n"ok": true,\n"summary": "Counted.",\n"metrics": {"n":3},\n"table": {"columns":["a","b"],"rows":[[1,2],[3,4]],"n_rows":2}\n}');
+  expect(JSON.parse(text).table.rows).toEqual([[1, 2], [3, 4]]);
+});
+
+test("full session: plan first from the request to the results, a continue after the questions plans with the answers, and resume keeps the plan", async () => {
+  const provider = new FakeProvider([
+    ASK2("What is one particle?", "Which groups?"),
+    { text: "I wait for you." },
+    { text: "I wait for you." },
+    { text: "I wait for you." },
+    { calls: [{ name: "plan", args: COUNT_PLAN }] },
+    { calls: [COUNT] },
+    { text: "There are 41 particles (a particle is an object above the threshold, at least 5 px)." },
+    { text: "There are 41 particles (a particle is an object above the threshold, at least 5 px)." },
+  ]);
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-proj-"));
+  session = await Session.create({ adapters: [LAB], provider, cwd, interactive: true, settings: { referee: "none" } });
+  session.decisions.applySetup({});
+  const s = session;
+  answerCards(s, () => ({ action: "approve" }));
+  await s.send("Count the particles in a.tif");
+  expect(s.record.entries(["clarify"]).map((e) => e.data.action)).toEqual(["asked", "answered"]);
+  expect(s.record.entries(["plan_approved"])).toHaveLength(0);
+  await s.send("continue");
+  expect(s.record.entries(["clarify"]).map((e) => e.data.action)).toEqual(["asked", "answered"]);
+  expect(s.record.entries(["question"])).toHaveLength(2);
+  expect(s.record.entries(["plan_approved"])).toHaveLength(1);
+  expect(s.record.nodes().map((n) => n.tool)).toEqual(["count"]);
+  expect(s.endedBy).toBe("answer");
+  const withNote = provider.requests.at(-1)!.messages.filter((m) => m.role === "user" && m.parts.some((p) => p.type === "text" && p.text.includes("Plan first, in two phases.")));
+  expect(withNote).toHaveLength(1);
+  expect(JSON.stringify(provider.requests[4]!.messages)).toContain("The scientist answered the questions above. Call plan now");
+  const id = s.id;
+  await s.close();
+  session = await Session.resume(id, { provider: new FakeProvider([{ calls: [COUNT] }, { text: "Still 41 particles (step 2)." }, { text: "Still 41 particles (step 2)." }]), cwd, interactive: true, settings: { referee: "none" } });
+  const r = session;
+  expect(r.plan?.steps[0]?.step).toBe("Count the particles");
+  expect(r["approvedEntry"]).toBeGreaterThan(0);
+  answerCards(r, () => ({ action: "approve" }));
+  await r.send("Count again");
+  expect(r.record.nodes().filter((n) => !n.sensitivityOf).map((n) => n.tool)).toEqual(["count", "count"]);
+});

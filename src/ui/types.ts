@@ -54,6 +54,7 @@ export interface SessionLike {
   send(text: string, opts?: { internal?: boolean; plan?: boolean }): Promise<string>;
   steer?(text: string, now?: boolean): void;
   takeSteered?(): string[];
+  answerLater?(qids: string[]): void;
   planFirst?: boolean;
   respondPlan?(r: PlanResponse): void;
   setPlanFirst?(on: boolean): void;

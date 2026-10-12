@@ -293,6 +293,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
     case "question":
       return { icon: "question", line: `Question: ${clip(show(d.title || d.text))}`, details: { text: d.text, options: d.options, evidence: d.evidence, recommendation: d.recommendation }, technical: tech({ qid: d.qid }) };
     case "answer":
+      if (d.withdrawn) return { icon: "question", line: `Question ${show(d.qid)} closed with no answer: ${clip(show(d.note))}`, technical: tech() };
       return { icon: "question", line: `Answer to ${show(d.qid)}: ${clip(show(d.value))}${d.by ? ` (by ${show(d.by)})` : ""}`, details: { note: d.note }, technical: tech() };
     case "deviation": {
       const devs = (d.deviations as Record<string, unknown>[] | undefined) ?? [];

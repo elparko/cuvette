@@ -232,7 +232,7 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     const { FakeProvider } = await import("../src/providers/fake.ts");
     replies = [{ blocks: [{ type: "text", text: "[]" }] }];
     const referee = new ClaudeProvider("claude-sonnet-5-5");
-    session = await Session.create({ adapters: [lab], provider: new FakeProvider([{ text: "Nothing to count." }]), refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
+    session = await Session.create({ adapters: [lab], provider: new FakeProvider([{ text: "There are 12 particles." }]), refereeProvider: referee, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")) });
     session.decisions.applySetup({});
     await session.send("hello");
     expect(captured.at(-1)!.body.model).toBe("claude-sonnet-5-5");
