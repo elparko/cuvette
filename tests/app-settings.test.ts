@@ -104,8 +104,8 @@ test("the source badges name the scope, and a project value names its file", asy
   const html = await c.html();
   expect(row(settingsHtml({ settings: { cwd, env: {} } }), "referee")).toMatch(/class="sbadge user"[^>]*>User</);
   expect(row(html, "referee")).toContain(">This session<");
-  expect(row(html, "openImages")).toContain("Project · .cuvette/settings.local.json");
-  expect(row(html, "export_xlsx")).toContain("Project · .cuvette/settings.json");
+  expect(row(html, "openImages")).toContain(`Project · ${join(".cuvette", "settings.local.json")}`);
+  expect(row(html, "export_xlsx")).toContain(`Project · ${join(".cuvette", "settings.json")}`);
   expect(row(html, "mode")).toContain(">This session<");
   expect(row(html, "pilot")).toContain(">Default<");
 });
@@ -262,7 +262,7 @@ describe.skipIf(!CHROME)("the page in headless Chrome", () => {
 
   test("a click asks where to save, saves, and shows the source", async () => {
     await page.eval(`(() => { cfg.sec = "Session"; cfgApply(); })()`);
-    expect(await page.eval(`document.querySelector('#settingsbody [data-setting="mode"] .sbadge').textContent`)).toBe("Project · .cuvette/settings.local.json");
+    expect(await page.eval(`document.querySelector('#settingsbody [data-setting="mode"] .sbadge').textContent`)).toBe(`Project · ${join(".cuvette", "settings.local.json")}`);
     await page.eval(`document.querySelector('#settingsbody [data-setting="mode"] [data-sv="follow"]').click()`);
     const ask = await page.eval<string[]>(`[...document.querySelectorAll('#settingsbody [data-setting="mode"] .sask:not(.hidden) button')].map((b) => b.textContent)`);
     expect(ask).toEqual(["Me (all projects)", "This project", "Cancel"]);

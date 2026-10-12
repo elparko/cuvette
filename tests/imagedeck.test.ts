@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { deflateSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { pdfPages } from "../src/core/databook.ts";
@@ -70,7 +70,7 @@ function session(): Fixture {
   const node = (tool: string, args: Record<string, unknown>, outputs: string[], metrics: Record<string, number>, summary: string) =>
     r.addNode({
       entry: r.entries().length, adapter: "biostats", adapterVersion: "0.1.1", programVersion: "0.30.3", tool, args, decisions: {}, codeHash: "c", inputHashes: [],
-      outputs: outputs.map((p) => ({ path: p, kind: "image" as const, name: p.split("/").pop() })), result: { ok: true, metrics }, parents: [], summary, model: "m", manualRoute: "", fidelity: "close",
+      outputs: outputs.map((p) => ({ path: p, kind: "image" as const, name: basename(p) })), result: { ok: true, metrics }, parents: [], summary, model: "m", manualRoute: "", fidelity: "close",
     });
   const maskB = file("field2_mask.png", 40, 40, 10);
   const tif = join(files, "field2_mask.tif");

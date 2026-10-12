@@ -1,6 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { COPY_LIMIT_BYTES, findPlace, listPlaces, readIndex, slug } from "../src/core/places.ts";
 import { AnalysisRecord } from "../src/core/record.ts";
@@ -105,7 +105,7 @@ test("paths in the project are relative in the record, so a moved project still 
   const raw = readFileSync(join(s.dir, "log.jsonl"), "utf8");
   expect(raw).toContain('"{project}/LDL/Set 1"');
   expect(raw).not.toContain(`"${cwd}`);
-  expect(raw).toContain(outsideFile);
+  expect(raw).toContain(JSON.stringify(outsideFile).slice(1, -1));
 
   const moved = `${cwd}-moved`;
   renameSync(cwd, moved);
@@ -140,7 +140,7 @@ test("a large input is recorded by path, size, time and hash, not copied", () =>
   expect(r.blobPath(madeSha)!.startsWith(r.blobDir)).toBe(true);
 });
 
-test.skipIf(process.getuid?.() === 0)("a read-only project folder falls back to the home folder and says so", async () => {
+test.skipIf(process.getuid?.() === 0 || process.platform === "win32")("a read-only project folder falls back to the home folder and says so", async () => {
   const cwd = project();
   chmodSync(cwd, 0o555);
   try {
@@ -177,10 +177,10 @@ test("an absolute output folder is used as given, and the session opens again fr
   session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, referee: "none", output_folder: share } });
   expect(session.folderLine).toBe(`Results go to ${share}/<date>-<title>/`);
   await session.send("Count the red cells in LDL");
-  expect(session.workDir).toMatch(new RegExp(`^${share}/\\d{4}-\\d\\d-\\d\\d-count-red-cells-ldl$`));
+  expect(session.workDir).toMatch(new RegExp(`^${share.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}[\\\\/]\\d{4}-\\d\\d-\\d\\d-count-red-cells-ldl$`));
   expect(session.folderLine).toBe(`Results: ${session.workDir}`);
   expect(existsSync(join(cwd, "cuvette"))).toBe(false);
-  expect(readFileSync(join(session.dir, "log.jsonl"), "utf8")).toContain(`"${join(cwd, "LDL", "Set 1")}"`);
+  expect(readFileSync(join(session.dir, "log.jsonl"), "utf8")).toContain(JSON.stringify(join(cwd, "LDL", "Set 1")));
   const id = session.id;
   await session.close();
   session = undefined;
@@ -193,7 +193,7 @@ test("a relative output folder is read from the project folder", async () => {
   const cwd = project();
   session = await Session.create({ adapters: [], provider: new FakeProvider([{ text: "ok" }]), cwd, settings: { guidance: false, referee: "none", output_folder: "results/cuvette" } });
   await session.send("Count the cells");
-  expect(session.workDir.startsWith(join(cwd, "results", "cuvette") + "/")).toBe(true);
+  expect(session.workDir.startsWith(join(cwd, "results", "cuvette") + sep)).toBe(true);
 });
 
 test("a project setting for the output folder wins over a user setting", async () => {

@@ -1,5 +1,5 @@
 import { readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Args, Node } from "./types.ts";
 
 // Tools that look at data or run free code. Their arguments do not tell which input a sample uses.
@@ -102,7 +102,7 @@ export function findSamples(root: string, inputs: string[], skip: string[] = [])
   for (const d of folders(root, new Set(skip.map((s) => resolve(s))))) {
     if (d === home) continue;
     const hits = names.map((n) => findIn(d, n));
-    if (hits.every(Boolean)) out.push({ label: relative(root, d) || basename(d), files: new Map(inputs.map((p, i) => [p, hits[i]!])) });
+    if (hits.every(Boolean)) out.push({ label: relative(root, d).split(sep).join("/") || basename(d), files: new Map(inputs.map((p, i) => [p, hits[i]!])) });
     if (out.length >= MAX_SAMPLES) break;
   }
   if (out.length || inputs.length > 1) return out;

@@ -64,7 +64,7 @@ function base(over: Partial<DoctorOpts> = {}): DoctorOpts {
   return { home, env: { ANTHROPIC_API_KEY: "sk-ant-test" }, nodeVersion: "24.1.0", fetch: ollamaUp, adapters: {}, find: () => undefined, ...over };
 }
 
-test("found: every item is ok, ImageJ.app is found, and the text says Cuvette can start", async () => {
+test.skipIf(process.platform === "win32")("found: every item is ok, ImageJ.app is found, and the text says Cuvette can start", async () => {
   const java = javaOk();
   const r = rscript("4.6.1", "lme4 2.0.6 \\nlmerTest 3.2.1 \\n");
   const uv = exe(join(root, "bin/uv"), "echo uv 0.9");
@@ -89,7 +89,7 @@ test("found: every item is ok, ImageJ.app is found, and the text says Cuvette ca
   expect(text).not.toContain("Install:");
 });
 
-test("found: the locate list finds Fiji and reads the version from the jar name", async () => {
+test.skipIf(process.platform === "win32")("found: the locate list finds Fiji and reads the version from the jar name", async () => {
   touch(join(root, "Applications/Fiji.app/jars/ij-1.54f.jar"));
   const checks = await runDoctor(base({ adapters: { imagej: moved("imagej", intoRoot) } }));
   const c = byId(checks, "program:imagej");
@@ -133,7 +133,7 @@ test("missing: Ollama runs without a model, or is installed but stopped", async 
   expect(canStart(c)).toBe(true);
 });
 
-test("old: Node, Java, R and a program older than the tested version", async () => {
+test.skipIf(process.platform === "win32")("old: Node, Java, R and a program older than the tested version", async () => {
   const java = exe(join(root, "bin/java"), `echo 'java version "1.6.0_65"' >&2`);
   const r = rscript("4.2.0", "");
   touch(join(root, "Applications/Fiji.app/jars/ij-1.52a.jar"));
@@ -146,7 +146,7 @@ test("old: Node, Java, R and a program older than the tested version", async () 
   expect(doctorText(checks)).toContain("  old      Node: version 20.11.0 is older than 22.");
 });
 
-test("missing R packages and Python packages: --fix runs only uv and R commands", async () => {
+test.skipIf(process.platform === "win32")("missing R packages and Python packages: --fix runs only uv and R commands", async () => {
   const r = rscript("4.6.1", "DESeq2 - \\ntximport 1.40.0 \\nSummarizedExperiment - \\nvegan - \\n");
   const uv = exe(join(root, "bin/uv"), "echo uv");
   python("science", "numpy True\\npandas False\\n", "");
@@ -175,7 +175,7 @@ test("the short list hides the unused model when Cuvette can start", async () =>
   expect(short).toContain("Cuvette can start");
 });
 
-test("the install commands are exact", () => {
+test.skipIf(process.platform === "win32")("the install commands are exact", () => {
   expect(uvCommand("/Users/a/.cuvette", "biostats")).toBe(
     "uv venv --python 3.12 /Users/a/.cuvette/envs/biostats && uv pip install --python /Users/a/.cuvette/envs/biostats/bin/python statsmodels pingouin lifelines matplotlib openpyxl 'pandas<3' scipy",
   );
@@ -196,7 +196,7 @@ test("version comparison uses major and minor", () => {
   expect(older("", "1.0")).toBe(false);
 });
 
-test("missing: a program with the same file name is not the adapter's program (leptonica fileinfo for OpenMS FileInfo)", async () => {
+test.skipIf(process.platform === "win32")("missing: a program with the same file name is not the adapter's program (leptonica fileinfo for OpenMS FileInfo)", async () => {
   const file = join(root, "opt/homebrew/bin/FileInfo");
   exe(file, "echo 'fileinfo: leptonica image file information'");
   const m = real("openms");

@@ -9,7 +9,7 @@ import { CUSTOM_HOW, findProgram, locate, type Located } from "../adapters/locat
 import { adapterDirs, cuvetteHome, loadAdapter, type Manifest } from "../adapters/manifest.ts";
 import { applyInstall, getInstallPlan, installLines as installCardLines, prepareUpdate, removeInstalled, removeLines, type InstallPlan } from "../adapters/install.ts";
 import { adapterTrust, confirmCode, TRUST_NAME, type InstalledEntry, type TrustLevel } from "../adapters/source.ts";
-import { defaultFind, defaultRun, ENVS, envNameIn, importCheck, older, PROGRAM_INSTALL, q, R_PACKAGES, rInstallCommand, rLibrary, uvCommand, versionParts, type Run } from "./doctor.ts";
+import { defaultFind, defaultRun, ENVS, envNameIn, envPython, importCheck, older, PROGRAM_INSTALL, q, R_PACKAGES, rInstallCommand, rLibrary, uvCommand, versionParts, type Run } from "./doctor.ts";
 import { ageText } from "./sessions.ts";
 import { howToCite } from "./citations.ts";
 
@@ -196,7 +196,7 @@ export function lastUsedMap(home = cuvetteHome()): Map<string, number> {
 function installFor(name: string, m: Manifest, home: string, lib: string, find: (n: string) => string | undefined): Install | undefined {
   const env = envNameIn(m);
   if (env && ENVS[env]) {
-    const py = join(home, "envs", env, "bin", "python");
+    const py = envPython(home, env);
     return { kind: "uv", dir: join(home, "envs", env), command: uvCommand(home, env), update: `uv pip install --python ${q(py)} --upgrade ${ENVS[env]!.packages.map(q).join(" ")}`, needs: find("uv") ? undefined : "uv" };
   }
   const r = R_PACKAGES[name];

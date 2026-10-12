@@ -53,7 +53,7 @@ test("the program check runs once for each adapter in a session", () => {
 });
 
 test("the file-type hint names adapters for the files in the request", () => {
-  const list = adapterIndex(cwd);
+  const list = adapterIndex(cwd).map((a) => ({ ...a, found: a.name === "biostats" ? ("yes" as const) : ("no" as const) }));
   expect(fileTypeHint("Is drug 2 better? Data: /data/sleep.csv", list, cwd)).toMatch(/sleep\.csv -> [a-z0-9-]+(, [a-z0-9-]+){3}\. .*use_adapter/);
   expect(fileTypeHint("Data: /data/sleep.csv", list, cwd)).toContain("biostats");
   expect(fileTypeHint("Count reads in /data/x.bam and call variants in calls.vcf.gz", list, cwd)).toMatch(/x\.bam -> samtools.*calls\.vcf\.gz -> bcftools/);

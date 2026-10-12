@@ -1,5 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -98,7 +98,7 @@ describe("adapter add", () => {
     expect(installedRows()[0]).toMatchObject({ name: "obtest", trust: "Unlisted", state: "as installed" });
   });
 
-  test("a zip file installs", async () => {
+  test.skipIf(spawnSync("zip", ["-v"]).error !== undefined)("a zip file installs", async () => {
     fixture(join(work, "zsrc"));
     execFileSync("zip", ["-q", "-r", join(work, "obtest.zip"), "."], { cwd: join(work, "zsrc") });
     const plan = await prepareAdd(join(work, "obtest.zip"));
@@ -123,9 +123,9 @@ describe("adapter add", () => {
     expect(pinned).toMatchObject({ refused: expect.stringMatching(/already installed/) });
   });
 
-  test("a symbolic link in the source is refused", async () => {
+  test.skipIf(process.platform === "win32")("a symbolic link in the source is refused", async () => {
     const src = fixture(join(work, "link"));
-    execFileSync("ln", ["-s", "/etc/hosts", join(src, "hosts")]);
+    symlinkSync("/etc/hosts", join(src, "hosts"));
     await expect(prepareAdd(src)).rejects.toThrow(/symbolic link/);
   });
 
@@ -476,7 +476,7 @@ describe("the Claude review", () => {
   });
 
   test("the local audit and the registry workflow use the same review prompt", () => {
-    expect(REVIEW_PROMPT).toMatch(/registry-template\/\.github\/review-prompt\.md$/);
+    expect(REVIEW_PROMPT.replace(/\\/g, "/")).toMatch(/registry-template\/\.github\/review-prompt\.md$/);
     const prompt = readFileSync(REVIEW_PROMPT, "utf8");
     for (const t of ["file writes", "Network calls", "Shell commands", "credentials", "Obfuscation", "VERDICT: needs-changes"]) expect(prompt.toLowerCase()).toContain(t.toLowerCase().replace("file writes", "writes or deletes of files"));
     const workflow = readFileSync(join(__dirname, "../registry-template/.github/workflows/review.yml"), "utf8");

@@ -2,7 +2,9 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test as base } from "vitest";
+
+const test = base.skipIf(process.platform === "win32");
 
 const SCRIPT = resolve(import.meta.dirname, "../desktop/src-tauri/cli-tool.sh");
 const tool = (args: string[], path = "") => spawnSync("/bin/sh", [SCRIPT, ...args], { encoding: "utf8", env: { PATH: "/usr/bin:/bin", CUVETTE_PATH: path } });

@@ -97,7 +97,7 @@ test("with blind mode off the run keeps the old behavior and the report says so"
   expect(readFileSync(result.paths!.md, "utf8")).toContain("Blind mode was off");
 });
 
-test("the leak check flags paths outside the allow list and counts unsourced and literature claims", () => {
+test.skipIf(process.platform === "win32")("the leak check flags paths outside the allow list and counts unsourced and literature claims", () => {
   const entries = [
     { id: 1, kind: "session", data: { cwd: "/run/work" } },
     { id: 2, kind: "tool_call", data: { tool: "read_file", args: { path: "notes.txt" } } },

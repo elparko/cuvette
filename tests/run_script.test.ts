@@ -178,7 +178,7 @@ test("a relative path means the same file in list_dir, read_file, run_script and
     code: "import os\nprint(os.path.abspath('LDL/Set 1'))\nprint(os.listdir('LDL/Set 1'))\nprint(open('LDL/Set 1/20X_CH1.txt').read())\nopen('note.txt', 'w').write('x')\nprint(open('note.txt').read())\nprint(os.environ['PROJECT_DIR'], os.environ['WORK_DIR'], os.environ['CUVETTE_PROJECT_DIR'])",
   }, ctx);
   expect(r.ok).toBe(true);
-  const [abs, names, text, note, env] = r.text!.trim().split("\n");
+  const [abs, names, text, note, env] = r.text!.trim().split(/\r?\n/);
   expect(realpathSync(abs!)).toBe(realpathSync(join(project, rel)));
   expect(names).toBe("['20X_CH1.txt']");
   expect(text).toBe("red cells");

@@ -173,7 +173,7 @@ interface Staged {
 
 async function cloneAt(url: string, ref: string | undefined, into: string): Promise<string> {
   if (ref && !/^[\w./@^~+-]+$/.test(ref)) throw new Error(`The ref ${ref} is not allowed.`);
-  await git(["clone", "--quiet", "--no-tags", "--", url, into]);
+  await git(["clone", "--quiet", "--no-tags", "-c", "core.autocrlf=false", "--", url, into]);
   if (ref) await git(["-C", into, "checkout", "--quiet", "--detach", ref]);
   return git(["-C", into, "rev-parse", "HEAD"]);
 }

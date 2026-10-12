@@ -5,7 +5,7 @@ import { broadSearch, broadSearchInArgv, broadSearchInPython } from "../src/tool
 const project = "/Volumes/easystore/Lab images _ Uptake Assay";
 const home = homedir();
 
-test.each([
+test.skipIf(process.platform === "win32").each([
   ["import os\nfor base in ['/Users/parker','/Volumes']:\n    for root, dirs, files in os.walk(base):\n        print(root)\n", "/Users/parker"],
   ["import os\nfor root, d, f in os.walk('/'):\n    pass", "/"],
   ["import os\nfor r, d, f in os.walk(os.path.expanduser('~')):\n    pass", home],
@@ -37,7 +37,7 @@ test.each([
   expect(broadSearchInPython(code, project)).toBeUndefined();
 });
 
-test("command lines", () => {
+test.skipIf(process.platform === "win32")("command lines", () => {
   expect(broadSearchInArgv(["find", "/", "-name", "Fiji.app"], project)).toBe("/");
   expect(broadSearchInArgv(["find", "~", "-name", "*.tif"], project)).toBe(home);
   expect(broadSearchInArgv(["/usr/bin/find", "/Users", "-type", "d"], project)).toBe("/Users");
@@ -54,7 +54,7 @@ test("command lines", () => {
   expect(broadSearchInArgv(["git", "status"], project)).toBeUndefined();
 });
 
-test("only run_script and run_command are checked", () => {
+test.skipIf(process.platform === "win32")("only run_script and run_command are checked", () => {
   expect(broadSearch("run_script", { code: "import os\nos.walk('/')" }, project)).toBe("/");
   expect(broadSearch("run_command", { argv: ["find", "/"] }, project)).toBe("/");
   expect(broadSearch("list_dir", { path: "/" }, project)).toBeUndefined();

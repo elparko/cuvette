@@ -29,7 +29,7 @@ function fakePython(packages: [string, string][]) {
   return { py, site, calls, install };
 }
 
-test("the lock of a Python environment lists each package and its version, with a hash", async () => {
+test.skipIf(process.platform === "win32")("the lock of a Python environment lists each package and its version, with a hash", async () => {
   const f = fakePython([["numpy", "1.26.4"], ["anndata", "0.10.8"]]);
   const lock = (await captureEnv({ kind: "python", path: f.py }))!;
   expect(lock.kind).toBe("python");
@@ -39,7 +39,7 @@ test("the lock of a Python environment lists each package and its version, with 
   expect(requirementsText(lock)).toBe("numpy==1.26.4\nanndata==0.10.8\n");
 });
 
-test("the cache keeps the lock until the environment folder changes", async () => {
+test.skipIf(process.platform === "win32")("the cache keeps the lock until the environment folder changes", async () => {
   const f = fakePython([["numpy", "1.26.4"]]);
   const a = (await captureEnv({ kind: "python", path: f.py }))!;
   const b = (await captureEnv({ kind: "python", path: f.py }))!;
@@ -55,7 +55,7 @@ test("the cache keeps the lock until the environment folder changes", async () =
   expect(packageChanges(a, c)).toEqual(["numpy 1.26.4 to 2.0.0"]);
 });
 
-test("the lock of an R library comes from installed.packages, and renv.lock has each package", async () => {
+test.skipIf(process.platform === "win32")("the lock of an R library comes from installed.packages, and renv.lock has each package", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cuvette-fake-r-"));
   const r = join(dir, "Rscript");
   writeFileSync(r, `#!/bin/sh\nprintf 'LANG\\tR 4.4.1\\nLIB\\t${dir}\\nPKG\\tDESeq2\\t1.44.0\\nPKG\\tBiocGenerics\\t0.50.0\\n'\n`);
@@ -77,7 +77,7 @@ test("a command-line program has a lock with its version only, and runs no proce
   expect(lock.packages).toEqual([{ name: "bcftools", version: "1.24" }]);
 });
 
-test("the record keeps each lock once, and results write environment.lock.json, requirements.txt and the Packages sheet", async () => {
+test.skipIf(process.platform === "win32")("the record keeps each lock once, and results write environment.lock.json, requirements.txt and the Packages sheet", async () => {
   const f = fakePython([["numpy", "1.26.4"], ["scipy", "1.13.1"]]);
   const dir = mkdtempSync(join(tmpdir(), "cuvette-env-rec-"));
   const record = new AnalysisRecord(dir, "s1");

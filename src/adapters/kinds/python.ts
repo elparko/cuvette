@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { createWriteStream, type WriteStream } from "node:fs";
+import { appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -43,8 +43,11 @@ export function pythonLine(fn: string, args: Args): string {
 export function startPython(c: KindContext): AdapterRuntime {
   const conn = c.adapter.manifest.connection;
   const live = inflight();
-  const logPath = join(c.dirs.sessionDir, `adapter-${c.adapter.name}.log`);
-  let log: WriteStream | undefined;
+  const log = (d: Buffer) => {
+    try {
+      appendFileSync(join(c.dirs.sessionDir, `adapter-${c.adapter.name}.log`), d);
+    } catch {}
+  };
   let child: ChildProcess | undefined;
   let stderrTail = "";
   let nextId = 1;
@@ -65,7 +68,7 @@ export function startPython(c: KindContext): AdapterRuntime {
   };
 
   const spawnWorker = (): Promise<void> => {
-    log ??= createWriteStream(logPath, { flags: "a" });
+    log(Buffer.alloc(0));
     stderrTail = "";
     const argv = blindArgv([...interpreter(), "-u", WORKER, c.adapter.root]);
     const p = spawn(argv[0], argv.slice(1), {
@@ -77,7 +80,7 @@ export function startPython(c: KindContext): AdapterRuntime {
     });
     child = p;
     p.stderr?.on("data", (d: Buffer) => {
-      log?.write(d);
+      log(d);
       stderrTail = tail(stderrTail + d.toString("utf8"), 2000);
     });
     p.stdin?.on("error", () => {});
@@ -207,7 +210,6 @@ export function startPython(c: KindContext): AdapterRuntime {
         child = undefined;
         setTimeout(() => killTree(p.pid), 500).unref();
       }
-      log?.end();
     },
   });
 }

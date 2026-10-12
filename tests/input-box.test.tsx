@@ -183,15 +183,10 @@ describe("every text field uses the shared editor: Option+Backspace deletes a wo
     await sleep(250);
     await keys(h, "/config", "\r");
     await until(() => h.all().includes("Settings"));
-    for (let i = 0; i < 40 && !screen(h).includes("▸ Adapters in every session"); i++) {
-      const before = screen(h);
-      h.type("\x1b[B");
-      await until(() => screen(h) !== before);
-    }
+    await keys(h, "adapters in every");
+    await until(() => screen(h).includes("▸ Adapters in every session"));
     await keys(h, "\r");
-    await until(() => screen(h).includes("New value:")).catch((e) => {
-      throw new Error(`${e.message}\n${screen(h)}`);
-    });
+    await until(() => screen(h).includes("New value:"));
     await keys(h, "imagej fiji", bs, "biostats");
     await until(() => screen(h).includes("New value: imagej biostats"));
     await keys(h, "\x1b");

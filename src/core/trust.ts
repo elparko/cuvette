@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { CATALOG_DIR, cuvetteHome } from "../adapters/manifest.ts";
 
 export const PROJECT_DIRS = [".ga", ".cuvette"];
@@ -136,7 +136,7 @@ export function scanFolder(folder: string): FolderScan {
     paths.push(...found);
     methods.push(...found.filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")));
   }
-  for (const p of paths) files[relative(key, p)] = sha(readFileSync(p));
+  for (const p of paths) files[relative(key, p).split(sep).join("/")] = sha(readFileSync(p));
   const layers = projectSettings(key);
   const values: Record<string, unknown> = {};
   for (const l of layers) Object.assign(values, l);

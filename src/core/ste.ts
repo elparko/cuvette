@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 
 export type SteRule = "sentence-length" | "passive" | "filler" | "word" | "phrase" | "modal";
 
@@ -241,7 +241,7 @@ export function lintRepo(root: string): { files: number; issues: TextIssue[] } {
     list.forEach((s, i) => issues.push(...checkSentence(s.text, i + 1, s.line).map((x) => ({ ...x, file }))));
   };
   for (const f of docFiles(root)) take(f, sentences(readFileSync(join(root, f), "utf8")));
-  for (const d of UI_DIRS) for (const p of walk(join(root, d))) take(relative(root, p), uiStrings(readFileSync(p, "utf8")));
+  for (const d of UI_DIRS) for (const p of walk(join(root, d))) take(relative(root, p).split(sep).join("/"), uiStrings(readFileSync(p, "utf8")));
   return { files, issues };
 }
 

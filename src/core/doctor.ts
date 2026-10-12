@@ -118,13 +118,13 @@ export function defaultFind(env: Record<string, string | undefined>) {
 export const defaultRun: Run = (argv, timeoutMs = 60_000) => runProcess(argv, { timeoutMs });
 
 export function envPython(home: string, name: string): string {
-  return join(home, "envs", name, "bin", "python");
+  return join(home, "envs", name, ...(process.platform === "win32" ? ["Scripts", "python.exe"] : ["bin", "python"]));
 }
 
 export function uvCommand(home: string, name: string): string {
   const dir = join(home, "envs", name);
   const pkgs = ENVS[name]?.packages ?? [];
-  return `uv venv --python ${PYTHON} ${q(dir)} && uv pip install --python ${q(join(dir, "bin", "python"))} ${pkgs.map(q).join(" ")}`;
+  return `uv venv --python ${PYTHON} ${q(dir)} && uv pip install --python ${q(envPython(home, name))} ${pkgs.map(q).join(" ")}`;
 }
 
 export function rLibrary(env: Record<string, string | undefined>, home = homedir()): string {

@@ -95,7 +95,7 @@ function sampleRecord() {
 test("figures are copied to figures/ with the step number and a readable name, with the vector copy", () => {
   const { record, out } = sampleRecord();
   const figs = copyFigures(record, out);
-  const names = figs.map((f) => f.path.slice(out.length + 1)).sort();
+  const names = figs.map((f) => f.path.slice(out.length + 1).replace(/\\/g, "/")).sort();
   expect(names).toEqual(["figures/box.png", "figures/step02-histogram-red-intensity.png", "figures/step02-histogram-red-intensity.svg"]);
   expect(readFileSync(join(out, "figures", "step02-histogram-red-intensity.png"))).toEqual(PNG);
   expect(copyFigures(record, out).map((f) => f.path).sort()).toEqual(figs.map((f) => f.path).sort());
@@ -146,7 +146,7 @@ test("writeResults writes results.xlsx and the line names the sheets, the figure
 
 test("the rules name the figures folder, the formats and the CSV tables", () => {
   const on = outputRules({ output: "/o", figureFormats: "png,svg", xlsx: true });
-  expect(on).toContain("/o/figures as PNG (300 dpi) and SVG, with axis labels and units");
+  expect(on).toContain(`${join("/o", "figures")} as PNG (300 dpi) and SVG, with axis labels and units`);
   expect(on).toContain("CSV file in /o");
   expect(on).toContain("results.xlsx");
   expect(outputRules({ output: "/o", figureFormats: "png", xlsx: false })).not.toMatch(/SVG|xlsx/);

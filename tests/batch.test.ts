@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
 import { chainInputs, findSamples, metricsOf, pilotChain, planBatch, swapArgs, writeTable } from "../src/core/batch.ts";
 import type { Node } from "../src/core/types.ts";

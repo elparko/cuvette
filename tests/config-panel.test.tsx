@@ -134,7 +134,7 @@ test("a project file badge names the file, and a model choice shows its price", 
   mkdirSync(join(s.cwd, ".cuvette"), { recursive: true });
   writeFileSync(join(s.cwd, ".cuvette", "settings.local.json"), JSON.stringify({ openImages: "off" }));
   await key(h, DOWN);
-  await until(() => /Open QC images\s+off\s+Project · \.cuvette\/settings\.local\.json/.test(h.last()));
+  await until(() => /Open QC images\s+off\s+Project · \.cuvette[\\/]settings\.local\.json/.test(h.last()));
   await key(h, "\x1b[A");
   await key(h, "\r");
   await until(() => h.last().includes("$4 in, $20 out per million tokens"));

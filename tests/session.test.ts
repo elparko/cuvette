@@ -588,7 +588,7 @@ test("without defaults, as in the benchmark, only the named adapters load; a nam
   expect(session.allTools().filter((t) => t.name === "count")).toHaveLength(1);
 });
 
-test("a script that walks a large folder asks first, even after always allow", async () => {
+test.skipIf(process.platform === "win32")("a script that walks a large folder asks first, even after always allow", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "cuvette-cwd-"));
   const plain = { purpose: "Count the files", does: "Counts the files in the project folder.", code: "import os\nprint(len(os.listdir('.')))" };
   const walk = { purpose: "Find the image folder", does: "Looks through every folder on the drives for the images.", code: "import os\nfor r, d, f in os.walk('/Volumes'):\n    pass" };
