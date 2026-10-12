@@ -229,6 +229,7 @@ def protein_assay(path, sheet=None, assay="BCA", sample_col="Sample", type_col="
     bad = frame[frame["_kind"].isna()]
     if len(bad):
         return _fail("Type values must start with standard, blank or sample (unknown also works). Check rows: %s." % ", ".join(map(str, bad["_row"].head(5))))
+    no_signal = frame.loc[frame[signal_col].isna(), "_row"].tolist()
     frame = frame.dropna(subset=[signal_col])
     std = frame[frame["_kind"] == "standard"].dropna(subset=[conc_col])
     smp = frame[frame["_kind"] == "sample"].copy()
@@ -256,6 +257,8 @@ def protein_assay(path, sheet=None, assay="BCA", sample_col="Sample", type_col="
         return _fail("The %s fit did not converge (%s). Choose a simpler model or remove a standard." % (model, e))
     r2 = _r2(y, pred(x))
     warnings_out = []
+    if no_signal:
+        warnings_out.append("%d rows have no number in %s and are left out (rows %s)." % (len(no_signal), signal_col, ", ".join(map(str, no_signal[:10]))))
     if model == "quadratic" and x.min() < params["vertex"] < x.max():
         warnings_out.append("The quadratic curve turns inside the standard range (at %s %s). Back-calculated values are not reliable. Choose another model." % (_fmt(params["vertex"]), conc_unit))
     levels = std.assign(_y=y, _x=x).groupby("_x")
