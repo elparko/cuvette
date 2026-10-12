@@ -1,0 +1,13 @@
+andreasson2019-endotoxin-health
+belenky2003-sleepstudy
+chure2024-hplc-py
+desveaux2026-pcrv-ic50
+hildyard2021-embryo-refgenes
+klindworth2013-16s-primers
+li2009-samtools
+mahbod2024-nuinsseg
+nair2024-plasmid-growth
+quinlan2010-bedtools
+rouault-gdal-autotest
+sriphoosanaphan2021-vitd-hcv
+white2021-flowkit
