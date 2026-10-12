@@ -1,3 +1,4 @@
+import { InfoTip } from "../components/info-tip.tsx";
 import { CheckIcon, CloudIcon, CpuIcon, KeyRoundIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AppCtx } from "../App.tsx";
@@ -101,8 +102,8 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
               <span className="flex items-center gap-2 font-medium">
                 {c.id === "claude" ? <CloudIcon className="size-4" /> : <CpuIcon className="size-4" />}
                 {c.label}
+                <InfoTip label={`About ${c.label}`}>{c.help}</InfoTip>
               </span>
-              <span className="text-[13px] text-muted-foreground">{c.help}</span>
             </button>
           ))}
         </div>

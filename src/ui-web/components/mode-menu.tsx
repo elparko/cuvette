@@ -1,5 +1,6 @@
 import { ChevronDownIcon, EyeIcon, GraduationCapIcon, ListChecksIcon, MousePointerClickIcon } from "lucide-react";
 import { post } from "../lib/api.ts";
+import { InfoTip } from "./info-tip.tsx";
 import { Button } from "./ui/button.tsx";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "./ui/dropdown-menu.tsx";
 
@@ -22,15 +23,15 @@ export function ModeMenu({ mode }: { mode: string }) {
           <ChevronDownIcon className="size-3.5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Who runs the steps</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={m.id} onValueChange={(v) => void post("api/mode", { mode: v })}>
           {MODES.map((x) => (
-            <DropdownMenuRadioItem key={x.id} value={x.id} className="items-start">
-              <span className="flex flex-col">
-                <span className="font-medium">{x.name}</span>
-                <span className="text-xs text-muted-foreground">{x.help}</span>
-              </span>
+            <DropdownMenuRadioItem key={x.id} value={x.id}>
+              <span className="flex-1 font-medium">{x.name}</span>
+              <InfoTip side="left" label={`About ${x.name}`}>
+                {x.help}
+              </InfoTip>
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

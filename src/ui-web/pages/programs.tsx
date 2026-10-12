@@ -1,3 +1,4 @@
+import { InfoTip } from "../components/info-tip.tsx";
 import { CopyIcon, EllipsisIcon, LoaderCircleIcon, PlusIcon, RefreshCwIcon, SearchIcon, TriangleAlertIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -401,10 +402,10 @@ export function ProgramsPage({ ctx }: { ctx: AppCtx }) {
                         <p className="mt-1 text-[13px] break-words">{checking === r.name ? "Checking…" : r.detail}</p>
                         {r.warn && <p className="mt-1 text-[13px] text-warn">{r.warn}</p>}
                         {r.cite && (
-                          <details className="mt-1 text-xs text-muted-foreground">
-                            <summary className="w-max cursor-default hover:text-foreground">How to cite</summary>
-                            <p className="mt-1 max-w-3xl">{r.cite}</p>
-                          </details>
+                          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                            How to cite
+                            <InfoTip label="How to cite">{r.cite}</InfoTip>
+                          </div>
                         )}
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5 pt-1 sm:pt-0">
