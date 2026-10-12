@@ -2,6 +2,7 @@ adapter:
   name: patch-clamp
   field: cellular electrophysiology
   file_types: [".abf", ".nwb", ".pxp", ".wcp", ".csv", ".txt"]
+  file_label: patch-clamp recording files
   title: Patch clamp (pyABF, Neo and eFEL)
   version: 0.1.0
   spec: "1"

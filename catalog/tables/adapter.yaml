@@ -2,6 +2,7 @@ adapter:
   name: tables
   field: tables and figures
   file_types: [".xlsx", ".csv", ".tsv", ".xlsm", ".xls"]
+  file_label: table files
   title: Tables, Excel and figures (pandas, openpyxl, matplotlib)
   version: 0.2.0
   spec: "1"

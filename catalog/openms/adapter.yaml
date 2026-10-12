@@ -2,6 +2,7 @@ adapter:
   name: openms
   field: proteomics
   file_types: [".mzml", ".featurexml", ".idxml"]
+  file_label: mass spectrometry files
   title: OpenMS TOPP tools for peptide data
   version: 0.1.1
   spec: "1"

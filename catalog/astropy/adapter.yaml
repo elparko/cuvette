@@ -2,6 +2,8 @@ adapter:
   name: astropy
   field: astronomy
   file_types: [".fits", ".fit", ".fts"]
+  file_magic: ["53494d504c45"]
+  file_label: astronomy files
   title: Astropy and photutils
   version: 0.1.2
   spec: "1"

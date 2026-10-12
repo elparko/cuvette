@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -154,6 +154,21 @@ describe("the app server", () => {
     expect((await c.post("api/open", { folder: home })).status).toBe(200);
     for (let i = 0; i < 100 && (await (await c.get("api/state")).json()).session === null; i++) await new Promise((r) => setTimeout(r, 30));
     expect((await (await c.get("api/state")).json()).session).not.toBeNull();
+  });
+
+  test("the start page gets a program suggestion for a folder and opens with the chosen program", async () => {
+    const picked: (string | undefined)[] = [];
+    app = await startApp({ env, start: home, makeSession: async (o) => (picked.push(o.adapter), new FakeSession()) });
+    const c = client(app);
+    const data = join(home, "flow-data");
+    mkdirSync(data, { recursive: true });
+    writeFileSync(join(data, "a.fcs"), "FCS3.1");
+    const r = await (await c.get(`api/suggest?p=${encodeURIComponent(data)}`)).json();
+    expect(r.matches[0].adapter).toBe("flowkit");
+    expect((await c.get(`api/suggest?p=${encodeURIComponent(join(home, "nowhere"))}`)).status).toBe(404);
+    expect((await c.post("api/open", { folder: data, adapter: "flowkit" })).status).toBe(200);
+    for (let i = 0; i < 100 && !picked.length; i++) await new Promise((r) => setTimeout(r, 30));
+    expect(picked).toEqual(["flowkit"]);
   });
 
   test("first start with no key and a Claude model asks for setup", async () => {

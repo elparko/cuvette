@@ -311,6 +311,14 @@ async function interactive(resumeId?: string, folder?: string) {
     if (lock) fail(lock.app ? `This session is open in the app: ${lock.app}\nUse it there, or close the session there (Sessions, or /quit) and run this again.` : "This session is open in another terminal. Close it there first.");
   }
   if (!adapters.length && !resumeId && !sample) console.error("No adapter given. The agent proposes an adapter after your request, and you accept or change it. Use --adapter <name> to choose now; see `cuvette adapters`.");
+  if (!adapters.length && !resumeId && !sample) {
+    const dir = resolve(folder ?? process.cwd());
+    const { suggestPrograms, suggestLines } = await import("./core/suggest.ts");
+    const { adapterIndex } = await import("./adapters/catalog.ts");
+    const hint = suggestPrograms(dir, adapterIndex(dir));
+    const lines = suggestLines(hint);
+    if (lines.length) console.error([...lines, `To use it, run: cuvette --adapter ${hint.matches[0].adapter}`].join("\n"));
+  }
   const s = resumeId
     ? await Session.resume(resumeId, { model: str(o.model), interactive: true, trustFolder, settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(`${e.message}. Give a session id, a session folder or a project folder. See cuvette sessions.`))
     : await Session.create({ adapters, model: str(o.model), referee: str(o.referee), mode: str(o.mode) as Mode, generic: !!o.generic, defaults: true, interactive: true, trustFolder, cwd: sample?.cwd ?? folder, method: str(o.method), settings: { ...bypass(), ...planSetting() } }).catch((e: Error) => fail(e.message));

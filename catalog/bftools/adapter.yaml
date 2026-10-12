@@ -2,6 +2,8 @@ adapter:
   name: bftools
   field: microscopy
   file_types: [".czi", ".nd2", ".lif", ".lsm", ".oib", ".vsi", ".ome.tif", ".ome.tiff"]
+  file_magic: ["5a495352415746494c45", "dacebe0a", "0000000c6a502020"]
+  file_label: microscope image files
   title: Bio-Formats command line tools
   version: 0.1.1
   spec: "1"

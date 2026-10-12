@@ -12,6 +12,9 @@ export interface AdapterSummary {
   field: string;
   does: string;
   fileTypes: string[];
+  fileMagic: string[];
+  fileLabel: string;
+  filePriority: number;
   status: string;
   trust: string;
   found: "yes" | "no" | "not checked";
@@ -61,13 +64,16 @@ export function adapterIndex(cwd: string, cache: FoundCache = new Map()): Adapte
         field: m.adapter.field,
         does: firstSentence(m.adapter.description),
         fileTypes: m.adapter.file_types,
+        fileMagic: m.adapter.file_magic,
+        fileLabel: m.adapter.file_label,
+        filePriority: m.adapter.file_priority,
         status: m.adapter.status,
         trust: adapterTrust(root).label,
         found: checks(m) ? (programFound(m, cache).path ? "yes" : "no") : "not checked",
         root,
       });
     } catch (e) {
-      out.push({ name, program: "", field: "", does: "", fileTypes: [], status: "invalid", trust: "Unlisted", found: "not checked", root, problem: (e as Error).message.split("\n")[0] });
+      out.push({ name, program: "", field: "", does: "", fileTypes: [], fileMagic: [], fileLabel: "", filePriority: 0, status: "invalid", trust: "Unlisted", found: "not checked", root, problem: (e as Error).message.split("\n")[0] });
     }
   }
   return out;
@@ -86,7 +92,7 @@ export function formatIndex(list: AdapterSummary[], filter = ""): string {
   return [`${hits.length} adapters (name | program | field | what it does | input files | status | trust | program found):`, ...lines, "Load one with use_adapter(name, reason)."].join("\n");
 }
 
-function matches(type: string, file: string): boolean {
+export function matches(type: string, file: string): boolean {
   const t = type.toLowerCase();
   const f = file.toLowerCase();
   return t.startsWith(".") ? f.endsWith(t) : f === t || f.endsWith(`.${t}`) || f.endsWith(`_${t}`);

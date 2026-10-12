@@ -2,6 +2,8 @@ adapter:
   name: flowcore
   field: flow cytometry (spillover and population statistics)
   file_types: [".fcs"]
+  file_magic: ["464353"]
+  file_label: flow cytometry files
   title: flowCore (spillover from single-stain controls, percent positive and MFI)
   version: 0.1.0
   spec: "1"

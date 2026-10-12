@@ -2,6 +2,8 @@ adapter:
   name: harmony
   field: single-cell transcriptomics
   file_types: [".h5ad"]
+  file_magic: ["894844460d0a1a0a"]
+  file_label: single-cell data files
   title: Harmony integration of single-cell samples
   version: 0.1.0
   spec: "1"

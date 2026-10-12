@@ -90,6 +90,9 @@ or tool name is an error. Two map entries with the same tool and the same `match
 | `description` | text | `""` | One sentence. `list_adapters` shows the first sentence. |
 | `field` | text | `""` | The science field, such as `statistics` or `mass spectrometry imaging`. `list_adapters` shows it. |
 | `file_types` | list of text | `[]` | The input files that the adapter reads. An entry that starts with a dot is a file ending, such as `.bam` or `.vcf.gz`. Another entry is a file name, such as `quant.sf` or `matrix.mtx.gz`. Case does not matter. Put the main type first. The harness uses the list for the file-type hint and for the other options on the program card. |
+| `file_magic` | list of hex text | `[]` | The first bytes of a file that the adapter reads, as hex at offset 0, such as `464353` for FCS. A file that starts with these bytes counts as a match even if its name has no matching ending. |
+| `file_label` | text | `""` | What the files are, such as `flow cytometry files`. The suggestion card shows it. If empty, the card uses `field`. |
+| `file_priority` | whole number | `0` | Breaks a tie. If two adapters match the same files, the adapter with the higher number is first. |
 | `authors` | list of text | `[]` | Who wrote the adapter. |
 | `status` | `draft`, `approved`, `locked` | `draft` | Approval state. See "Versioning and approval". |
 | `approved_by` | text | `""` | Who approved the adapter. |
