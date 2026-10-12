@@ -200,7 +200,7 @@ describe("claude", () => {
     const msgs: string[] = [];
     for (const e of [auth, rate, srv, conn]) {
       const { client } = fakeClient([e]);
-      await new ClaudeProvider("claude-opus-5-5", { client }).step(req([user("x")])).catch((err) => {
+      await new ClaudeProvider("claude-opus-5-5", { client, retries: 0 }).step(req([user("x")])).catch((err) => {
         expect(err).toBeInstanceOf(ProviderError);
         msgs.push(err.message);
       });
