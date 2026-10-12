@@ -11,6 +11,7 @@ export async function runSample(ctx: AppCtx) {
   askNotify();
   const r = await post("api/open", { sample: true });
   if (r) ctx.opened();
+  return !!r;
 }
 
 export function StartPage({ ctx, sessions }: { ctx: AppCtx; sessions: Sessions }) {
@@ -53,8 +54,7 @@ export function StartPage({ ctx, sessions }: { ctx: AppCtx; sessions: Sessions }
               disabled={busy}
               onClick={async () => {
                 setBusy(true);
-                await runSample(ctx);
-                setBusy(false);
+                if (!(await runSample(ctx))) setBusy(false);
               }}
             >
               Run the sample analysis <ArrowRightIcon />

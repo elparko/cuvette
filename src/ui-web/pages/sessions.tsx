@@ -1,5 +1,5 @@
 import { FolderOpenIcon, ImageIcon, SearchIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx, Page } from "../App.tsx";
 import { Badge } from "../components/ui/badge.tsx";
@@ -33,13 +33,17 @@ export function useSessions(page: Page, boots: number) {
       })
       .catch(() => setLoaded(true));
   }, [page, boots, tick]);
+  const opening = useRef(false);
   const open = useCallback(async (id: string, done: () => void) => {
+    if (opening.current) return;
+    opening.current = true;
     try {
       await call("api/open", { id });
       done();
     } catch (e) {
       toast.error((e as Error).message);
     }
+    setTimeout(() => (opening.current = false), 1500);
   }, []);
   const rename = useCallback(async (id: string, name: string) => {
     try {
