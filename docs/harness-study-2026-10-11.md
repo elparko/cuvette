@@ -33,7 +33,7 @@ It compared settings with a paired exact McNemar test on the same tasks.
 
 ## What changed in Cuvette
 
-### Context management inside one turn (commit 0be9169)
+### Context management inside one turn (commit 0825cee)
 
 Before, compaction needed two user turns. A benchmark run or a headless run has
 one turn. Thus a long run on a 32k local model had no context management. The
@@ -62,7 +62,7 @@ happens only above about 500k tokens.
 The record, the claim check and the number trail use the record, not the live
 history. Thus a shortened tool output does not change a result or a check.
 
-### Paired comparison of two benchmark results (commit b68ae33)
+### Paired comparison of two benchmark results (commit 6b83a73)
 
 `cuvette bench compare --results a.json,b.json [--model spec]` pairs each paper run
 and item in the two files. It shows the four outcome counts and the exact McNemar

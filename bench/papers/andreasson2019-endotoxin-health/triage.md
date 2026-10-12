@@ -4,7 +4,7 @@ Entry numbers (eNN) are ids in the log.jsonl of the session folder.
 Classes: a = tool or adapter fault, b = harness fault, c = benchmark spec fault, d = model fault.
 
 - qwen3:8b: `20261008-180057-ae49`, computed 10/10, reported 7/7
-- qwen3:8b, confirmation run on main 3f5e95b (after the fixes 0a27fc1, f962358, 4a94ac6): `20261008-193918-8cc9`, computed 0/10, reported 0/7. bench/results/confirm-fixes-andreasson2019-endotoxin-health.
+- qwen3:8b, confirmation run on main 6dab17e (after the fixes 30b5eaa, febbc01, d83d595): `20261008-193918-8cc9`, computed 0/10, reported 0/7. bench/results/confirm-fixes-andreasson2019-endotoxin-health.
 
 No item failed.
 

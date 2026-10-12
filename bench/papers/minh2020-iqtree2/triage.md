@@ -11,6 +11,6 @@ Classes: a = tool or adapter fault, b = harness fault, c = benchmark spec fault,
 
 Other findings:
 
-- e8 (a): align_sequences on a PHYLIP file returned "mafft failed:" with no reason. The model recovered in e26. Fixed in e9bc6f2: the tool says that the file is aligned, and algorithm has a default.
+- e8 (a): align_sequences on a PHYLIP file returned "mafft failed:" with no reason. The model recovered in e26. Fixed in 318c168: the tool says that the file is aligned, and algorithm has a default.
 
-Commits in this branch for this paper: e9bc6f2
+Commits in this branch for this paper: 318c168

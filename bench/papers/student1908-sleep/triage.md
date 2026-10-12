@@ -7,6 +7,6 @@ Classes: a = tool or adapter fault, b = harness fault, c = benchmark spec fault,
 
 | Model | Item | Expected | Got | Class | Cause | Fix |
 | --- | --- | --- | --- | --- | --- | --- |
-| qwen3:8b | welch_p_trap | 0.07939 | computed 0.05 (an alpha) | c | A trap value: the unpaired p value appears only if the run uses the wrong test. The run used the paired test and avoided the trap. | 076bce5 (reference item). The coordinator replaces this with a trap flag. |
+| qwen3:8b | welch_p_trap | 0.07939 | computed 0.05 (an alpha) | c | A trap value: the unpaired p value appears only if the run uses the wrong test. The run used the paired test and avoided the trap. | 118ed59 (reference item). The coordinator replaces this with a trap flag. |
 
-Commits in this branch for this paper: 076bce5
+Commits in this branch for this paper: 118ed59
