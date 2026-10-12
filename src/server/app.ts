@@ -22,6 +22,7 @@ import type { SessionLike } from "../ui/types.ts";
 import { decisionsHtml, doctorHtml, planTextHtml, programsHtml, resultsHtml, sessionsHtml, statusHtml, stepsHtml, type Ctx } from "./app-html.ts";
 import { settingsHtml } from "./app-settings.ts";
 import { isProgramAction, listPrograms, planByInstall } from "../core/programs.ts";
+import { scaledCopy } from "../core/thumbs.ts";
 import { dropInstall } from "../ui/programs.ts";
 import { addFor, planFor, reviewFor, runFor, type ProgramHooks } from "../ui/programs.ts";
 import { appPageHtml } from "./app-page.ts";
@@ -354,10 +355,12 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     if (get && p === "/api/file") {
       const f = resolve(url.searchParams.get("p") ?? "");
       if (!allowedFile(f) || !existsSync(f) || !statSync(f).isFile()) return send(res, 404, { error: "no such file" });
-      const headers: Record<string, string> = { "content-type": TYPES[extname(f).toLowerCase()] ?? "application/octet-stream", "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": "sandbox" };
+      const w = Number(url.searchParams.get("w"));
+      const thumb = w > 0 && /\.(png|jpe?g|gif|webp|tiff?)$/i.test(f) ? await scaledCopy(f, Math.min(w, 4000), "jpeg") : null;
+      const headers: Record<string, string> = { "content-type": thumb ? "image/jpeg" : (TYPES[extname(f).toLowerCase()] ?? "application/octet-stream"), "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": "sandbox" };
       if (url.searchParams.get("download")) headers["content-disposition"] = `attachment; filename="${basename(f).replace(/["\\\r\n]/g, "_")}"`;
       res.writeHead(200, headers);
-      createReadStream(f).pipe(res);
+      createReadStream(thumb ?? f).pipe(res);
       return;
     }
     if (get && p === "/api/tab") {

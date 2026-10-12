@@ -167,7 +167,7 @@
     cursor: default;
   }
   a {
-    color: var(--accent-brand);
+    color: var(--info);
   }
   :focus-visible {
     outline: none;
@@ -440,7 +440,7 @@
 .srv button.link {
   background: none;
   border: 0;
-  color: var(--accent-brand);
+  color: var(--info);
   padding: 0 2px;
   font-size: 12.5px;
 }
@@ -687,6 +687,105 @@
 .srv .step.bad .badge {
   color: var(--bad);
   background: color-mix(in srgb, var(--bad) 14%, transparent);
+}
+.srv details.callinfo {
+  margin-top: 2px;
+}
+.srv details.callinfo > summary {
+  font-size: 12px;
+}
+.srv details.callinfo .dim {
+  overflow-wrap: anywhere;
+}
+.srv details.steprun {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+.srv details.steprun > summary {
+  width: auto;
+  color: inherit;
+  font-size: inherit;
+  list-style: none;
+}
+.srv details.steprun > summary::-webkit-details-marker {
+  display: none;
+}
+.srv details.steprun .badge {
+  display: inline-flex;
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--ok);
+  background: var(--ok-bg);
+  border-radius: 6px;
+  padding: 0 7px;
+  margin-right: 6px;
+}
+.srv details.steprun.bad .badge {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+.srv details.steprun .summary::after {
+  content: " · show each step";
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.srv details.steprun[open] .summary::after {
+  content: " · hide";
+}
+.srv details.steprun progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 8px 0 4px;
+  appearance: none;
+  border: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--muted);
+  accent-color: var(--ok);
+}
+.srv details.steprun progress::-webkit-progress-bar {
+  background: var(--muted);
+}
+.srv details.steprun progress::-webkit-progress-value {
+  background: var(--ok);
+}
+.srv details.steprun progress::-moz-progress-bar {
+  background: var(--ok);
+}
+.srv details.steprun .runbar {
+  height: 6px;
+  margin: 8px 0 4px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--muted) 0%, var(--ok) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: runbar 1.4s linear infinite;
+}
+@keyframes runbar {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .srv details.steprun .runbar {
+    animation: none;
+    background: var(--ok);
+    opacity: 0.5;
+  }
+}
+.srv details.steprun > .sub {
+  margin-top: 8px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
 }
 .srv .block {
   margin: 10px 0;

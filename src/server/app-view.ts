@@ -10,7 +10,7 @@ import { commands, openPanels, openSetup, type CommandCtx } from "../ui/commands
 import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items.ts";
 import { activityText, inputPlaceholder, nextQueued, routeMessage, stopTurn } from "../ui/messages.ts";
 import type { SessionLike } from "../ui/types.ts";
-import { cardHtml, itemHtml, type Ctx, type Slot } from "./app-html.ts";
+import { cardHtml, itemHtml, runHtml, splitRuns, type Ctx, type Slot } from "./app-html.ts";
 import { usageFields } from "../ui/messages.ts";
 
 export interface ViewHost {
@@ -32,6 +32,7 @@ export class WebView {
   private byEntry = new Map<number, Item[]>();
   private settled: Item[] = [];
   private pending: Item[] = [];
+  private run: Item[] = [];
   slots: Slot[] = [];
   private seq: QuestionSeq = SEQ_START;
   private nextId = 1;
@@ -98,9 +99,20 @@ export class WebView {
 
   private sub = (ids: number[]) => ids.flatMap((id) => this.byEntry.get(id) ?? []);
   private html = (items: Item[]) => items.map((it) => itemHtml(this.c(), it, { sub: this.sub })).join("");
+  private chunks = (list: (Item | Item[])[]) => list.map((x) => (Array.isArray(x) ? runHtml(this.c(), x, false, { sub: this.sub }) : itemHtml(this.c(), x, { sub: this.sub }))).join("");
+  private pendingHtml = () => runHtml(this.c(), this.run, this.busy, { sub: this.sub }) + this.html(this.pending);
+
+  // Adds items to the open run of steps and returns the HTML of what is done.
+  private take(items: Item[], close = false): string {
+    const { done, open } = splitRuns(items, this.run);
+    this.run = close ? [] : open;
+    return this.chunks(close && open.length ? [...done, open] : done);
+  }
 
   snapshot(): Record<string, unknown> {
-    return { t: "reset", items: this.html(this.settled), pending: this.html(this.pending), cards: this.cardsHtml(), cardCount: this.slots.length, live: this.live, think: this.thinking.slice(-THINK_KEEP), status: this.statusMsg(), session: this.header() };
+    this.run = [];
+    const items = this.take(this.settled, !this.busy);
+    return { t: "reset", items, pending: this.pendingHtml(), cards: this.cardsHtml(), cardCount: this.slots.length, live: this.live, think: this.thinking.slice(-THINK_KEEP), status: this.statusMsg(), session: this.header() };
   }
 
   header(): Record<string, unknown> {
@@ -176,8 +188,9 @@ export class WebView {
     this.settled.push(...add);
     if (!this.details) this.pending = this.collapser.preview();
     if (!live) return;
-    if (add.length) this.send({ t: "append", html: this.html(add) });
-    this.send({ t: "pending", html: this.html(this.pending) });
+    const html = this.take(add);
+    if (html) this.send({ t: "append", html });
+    this.send({ t: "pending", html: this.pendingHtml() });
   }
 
   push(...items: Item[]): void {
@@ -249,7 +262,8 @@ export class WebView {
         if (e.state === "idle") {
           const flushed = this.details ? [] : this.collapser.flush();
           this.settled.push(...flushed);
-          if (flushed.length) this.send({ t: "append", html: this.html(flushed) });
+          const html = this.take(flushed, true);
+          if (html) this.send({ t: "append", html });
           this.pending = [];
           this.live = "";
           this.thinking = "";
@@ -334,6 +348,7 @@ export class WebView {
         this.log = [];
         this.settled = [];
         this.pending = [];
+        this.run = [];
         this.collapser = new Collapser();
         this.send(this.snapshot());
       },

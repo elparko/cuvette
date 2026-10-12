@@ -2,6 +2,7 @@ import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, Networ
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx } from "../App.tsx";
+import { ImageViewer } from "../components/image-viewer.tsx";
 import { ModeMenu } from "../components/mode-menu.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
@@ -92,6 +93,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const follow = useRef(true);
   const autoScroll = useRef(0);
+  const openRuns = useRef(new Set<string>());
 
   useEffect(() => {
     if (!busy) return;
@@ -117,6 +119,25 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   useEffect(() => {
     follow.current = true;
   }, [stream.resets]);
+
+  // Step groups: an open group stays open when the server sends new HTML for it.
+  useEffect(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const onToggle = (e: Event) => {
+      const d = e.target as HTMLDetailsElement;
+      const k = d.dataset?.run;
+      if (!k) return;
+      if (d.open) openRuns.current.add(k);
+      else openRuns.current.delete(k);
+    };
+    sc.addEventListener("toggle", onToggle, true);
+    return () => sc.removeEventListener("toggle", onToggle, true);
+  }, []);
+  useLayoutEffect(() => {
+    if (!openRuns.current.size) return;
+    for (const d of scrollRef.current?.querySelectorAll<HTMLDetailsElement>("details[data-run]") ?? []) if (openRuns.current.has(d.dataset.run!)) d.open = true;
+  }, [stream.items, stream.pending]);
 
   // Cards: put the keyboard focus on the card that waits for an answer.
   useLayoutEffect(() => {
@@ -531,10 +552,9 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
       </div>
 
       <Dialog open={!!light} onOpenChange={(o) => !o && setLight(null)}>
-        <DialogContent wide className="items-center p-4">
+        <DialogContent wide className="h-[94vh] max-h-[94vh] max-w-[97vw] gap-2 p-3 pt-10">
           <DialogTitle className="sr-only">{light?.alt || "Image"}</DialogTitle>
-          {light && <img src={light.src} alt={light.alt} className="max-h-[82vh] max-w-full rounded-lg object-contain" />}
-          {light?.alt && <p className="text-xs text-muted-foreground">{light.alt}</p>}
+          {light && <ImageViewer src={light.src} alt={light.alt} />}
         </DialogContent>
       </Dialog>
       <Dialog open={!!wide} onOpenChange={(o) => !o && setWide("")}>

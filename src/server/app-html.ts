@@ -177,7 +177,7 @@ function outputsHtml(c: Ctx, outs: { path: string; kind: string }[]): string {
 
 export function imageHtml(c: Ctx, path: string): string {
   const u = fileUrl(c, path);
-  return `<button type="button" class="thumb" data-full="${esc(u)}" title="${esc(basename(path))}"><img src="${esc(u)}" alt="${esc(basename(path))}" loading="lazy"></button>`;
+  return `<button type="button" class="thumb" data-full="${esc(u)}" title="${esc(basename(path))}"><img src="${esc(u)}&amp;w=640" alt="${esc(basename(path))}" loading="lazy" decoding="async"></button>`;
 }
 
 export function fileLink(c: Ctx, path: string): string {
@@ -185,6 +185,58 @@ export function fileLink(c: Ctx, path: string): string {
   const ext = extname(name).slice(1).toUpperCase();
   const label = /^[0-9a-f]{40,}\./.test(name) ? `${ext || "Output"} file` : name;
   return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name)}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${esc(path)}">Show in folder</button>`;
+}
+
+// ---------------------------------------------------------------- repeated steps
+
+type StepItem = Extract<Item, { t: "step" }>;
+const isStep = (it: Item): it is StepItem => it.t === "step";
+export const RUN_MIN = 3;
+
+// A run is a series of steps with only dim lines between them. The last run stays open.
+export function splitRuns(items: Item[], open: Item[] = []): { done: (Item | Item[])[]; open: Item[] } {
+  const done: (Item | Item[])[] = [];
+  let run = [...open];
+  for (const it of items) {
+    if (isStep(it) || (run.length && it.t === "line" && it.dim)) {
+      run.push(it);
+      continue;
+    }
+    if (run.length) done.push(run);
+    run = [];
+    done.push(it);
+  }
+  return { done, open: run };
+}
+
+// Steps group when the tool and the purpose before the colon are the same: "Segment cells: a.tif", "Segment cells: b.tif".
+const purposeHead = (s: StepItem) => (s.why?.includes(":") ? s.why.split(":")[0]!.trim() : (s.why ?? "").trim());
+const runKey = (s: StepItem) => `${s.tool}\0${purposeHead(s)}`;
+const clip = (t: string, n = 140) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+
+function groupHtml(c: Ctx, list: StepItem[], live: boolean, opts: { sub?: (ids: number[]) => Item[] }): string {
+  const failed = list.filter((s) => !s.ok).length;
+  const nums = list.flatMap((s) => (s.n ? [s.n] : []));
+  const lo = Math.min(...nums);
+  const hi = Math.max(...nums);
+  const range = nums.length === list.length && hi - lo + 1 === list.length ? `Steps ${lo} to ${hi}` : `${list.length} steps`;
+  const last = list.at(-1)!;
+  const lastText = (last.why ?? "").split(":").slice(1).join(":").trim() || (last.ok ? last.summary : (last.error ?? last.summary));
+  const bar = live ? `<div class="runbar" role="progressbar" aria-label="Running"></div>` : `<progress max="${list.length}" value="${list.length - failed}" aria-label="${list.length - failed} of ${list.length} done without an error"></progress>`;
+  return `<details class="steprun ${failed ? "bad" : "ok"}" data-run="${esc(`${list[0]!.key}`)}"><summary><div class="stephead"><span class="badge">${esc(range)}</span> <span class="summary">${esc(purposeHead(list[0]!) || list[0]!.tool.replace(/_/g, " "))}: ${list.length} done${failed ? `, ${failed} with an error` : ""}</span></div>${bar}<div class="dim small">${live ? "Now" : "Last"}: ${shortPaths(esc(clip(lastText)))}</div></summary><div class="sub">${list.map((s) => itemHtml(c, s, opts)).join("")}</div></details>`;
+}
+
+// Steps with the same tool and purpose that repeat RUN_MIN times or more in a run show as one row, at the place of the first one.
+export function runHtml(c: Ctx, run: Item[], live: boolean, opts: { sub?: (ids: number[]) => Item[] } = {}): string {
+  const byTool = new Map<string, StepItem[]>();
+  for (const it of run) if (isStep(it)) byTool.set(runKey(it), [...(byTool.get(runKey(it)) ?? []), it]);
+  const out: string[] = [];
+  for (const it of run) {
+    const list = isStep(it) ? byTool.get(runKey(it))! : [];
+    if (list.length < RUN_MIN) out.push(itemHtml(c, it, opts));
+    else if (list[0] === it) out.push(groupHtml(c, list, live, opts));
+  }
+  return out.join("");
 }
 
 const DEFS_HEAD = "Definitions, from the confirmed analysis:";
@@ -213,7 +265,7 @@ export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: n
       const fid = fidelityLabel(it.fidelity);
       return `<div class="step ${it.ok ? "ok" : "bad"}${it.n ? "" : " minor"}">
 <div class="stephead"><span class="badge">${esc(label)}</span> <span class="summary">${shortPaths(esc(it.ok ? it.summary : (it.error ?? it.summary)))}</span></div>
-${it.why ? `<div class="dim">Purpose: ${esc(it.why)}</div>` : ""}${detail ? `<div class="dim small">${esc(detail)}</div>` : ""}${fid ? `<div class="warn small">${esc(fid)}</div>` : ""}
+${it.why ? `<div class="dim">Purpose: ${esc(it.why)}</div>` : ""}${detail ? `<details class="callinfo"><summary>Settings</summary><div class="dim small">${esc(detail)}</div></details>` : ""}${fid ? `<div class="warn small">${esc(fid)}</div>` : ""}
 ${outputsHtml(c, it.outputs)}${opts.code && it.code ? `<details><summary>Code</summary><pre>${esc(it.code)}</pre></details>` : ""}</div>`;
     }
   }

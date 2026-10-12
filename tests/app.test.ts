@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { startApp, type AppHandle } from "../src/server/app.ts";
-import { cardHtml, decisionsHtml, sessionsHtml, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
+import { cardHtml, decisionsHtml, itemHtml, runHtml, sessionsHtml, splitRuns, WEB_CARDS, type Slot } from "../src/server/app-html.ts";
+import type { Item } from "../src/ui/items.ts";
 import { WebView } from "../src/server/app-view.ts";
 import { planInit, type Card } from "../src/ui/cards.ts";
 import { CARDS, COMMANDS } from "../src/ui/parity.ts";
@@ -460,4 +461,47 @@ test("the definitions under a final answer fold into a Definitions toggle", asyn
   const html = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "a", t: "assistant", text: "Drug 2 is better.\n\nDefinitions, from the confirmed analysis:\n- n: One patient." } as never);
   expect(html).toContain("<p>Drug 2 is better.</p>");
   expect(html).toContain('<details class="defs"><summary>Definitions</summary><ul><li>n: One patient.</li></ul></details>');
+});
+
+describe("repeated steps", () => {
+  const ctx = { token: "tok", session: new FakeSession(), busy: false };
+  const step = (n: number, tool: string, file: string, ok = true): Item => ({ key: `s${n}`, t: "step", n, ok, tool, summary: `${n * 10} cells`, error: ok ? undefined : "no image", settings: "cell diameter 0 · flow threshold 0.4", route: `cellpose_tools.${tool}(path="${file}")`, outputs: [], why: `Segment cells: ${file}` });
+  const said = (text: string): Item => ({ key: text, t: "assistant", text });
+  const dim = (k: string): Item => ({ key: k, t: "line", sym: "·", text: "Read 1 file", dim: true });
+
+  test("a run is a series of steps with only dim lines between them, and the last run stays open", () => {
+    const items = [said("Start."), step(1, "segment_cells", "a.tif"), dim("d1"), step(2, "segment_cells", "b.tif"), said("Now the stats."), step(3, "stats", "x")];
+    const { done, open } = splitRuns(items);
+    expect(done).toEqual([items[0], [items[1], items[2], items[3]], items[4]]);
+    expect(open).toEqual([items[5]]);
+    expect(splitRuns([step(4, "stats", "y"), said("Done.")], open).done[0]).toEqual([items[5], step(4, "stats", "y")]);
+  });
+
+  test("three or more steps of one tool show as one row with a progress bar and the steps inside", () => {
+    const run = [step(1, "segment_cells", "a.tif"), step(2, "measure", "a.tif"), step(3, "segment_cells", "b.tif"), step(4, "segment_cells", "c.tif", false)];
+    const html = runHtml(ctx, run, false);
+    expect(html.match(/class="steprun/g)).toHaveLength(1);
+    expect(html.indexOf("steprun")).toBeLessThan(html.indexOf("Step 2"));
+    expect(html).toContain('<span class="badge">3 steps</span> <span class="summary">Segment cells: 3 done, 1 with an error</span>');
+    expect(html).toContain('<progress max="3" value="2"');
+    expect(html).toContain("Last: c.tif");
+    expect(html).toContain('data-run="s1"');
+    expect(html.match(/class="step /g)).toHaveLength(4);
+    const live = runHtml(ctx, run, true);
+    expect(live).toContain('class="runbar" role="progressbar"');
+    expect(live).toContain("Now: c.tif");
+    expect(runHtml(ctx, run.slice(0, 3), false)).not.toContain("steprun");
+    expect(runHtml(ctx, [1, 2, 3].map((n) => step(n, "segment_cells", `${n}.tif`)), false)).toContain('<span class="badge">Steps 1 to 3</span>');
+  });
+
+  test("steps of one tool with different purposes do not group", () => {
+    const script = (n: number, why: string): Item => ({ ...(step(n, "run_script", "x") as Extract<Item, { t: "step" }>), why });
+    const html = runHtml(ctx, [script(1, "Join the tables"), script(2, "Plot the counts"), script(3, "Check the thresholds")], false);
+    expect(html).not.toContain("steprun");
+  });
+
+  test("the settings of a step are in a fold, not in the flow", () => {
+    const html = itemHtml(ctx, step(5, "segment_cells", "a.tif"));
+    expect(html).toMatch(/<details class="callinfo"><summary>Settings<\/summary><div class="dim small">cellpose_tools\.segment_cells/);
+  });
 });
