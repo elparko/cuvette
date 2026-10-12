@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { Decision, cuvetteHome } from "../adapters/manifest.ts";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
-import type { Args, Deviation, Enforcement, Hook, Owner, PreToolUseInput, PreToolUseResult } from "./types.ts";
+import { frozenPlan, recordDeviation } from "./freeze.ts";
+import type { Args, Deviation, Entry, Enforcement, Hook, Owner, PreToolUseInput, PreToolUseResult } from "./types.ts";
 
 export interface DecisionField {
   key: string;
@@ -137,9 +138,13 @@ function profileVersions(name: string): number[] {
     .sort((a, b) => a - b);
 }
 
+const PLAN_FLOW_REASON = /^(set in the confirmed analysis|the scientist approved plan version|from the method|from the answers file|changed during the demonstration|the scientist asked:)/;
+const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+
 export class DecisionRecord {
   private states = new Map<string, State>();
   private setupDone = false;
+  onDeviation?: (e: Entry) => void;
 
   constructor(private adapters: LoadedAdapter[], private record: AnalysisRecord, harness: Decision[] = []) {
     for (const def of harness) this.states.set(def.key, { def, adapters: [], owner: def.owner, value: undefined, set: false });
@@ -378,6 +383,10 @@ export class DecisionRecord {
     const reason = opts.reason ?? "";
     const staleNodes = s.set ? this.record.markStale(key, reason || `${s.def.label} changed`) : [];
     this.record.append("decision", { key, old, new: next, by: opts.by ?? "human", reason, staleNodes });
+    if (s.set && !PLAN_FLOW_REASON.test(reason) && frozenPlan(this.record)) {
+      const e = recordDeviation(this.record, { kind: "setting", what: s.def.label, from: show(old), to: show(next) }, "decision", reason);
+      if (e) this.onDeviation?.(e);
+    }
     s.value = next;
     s.set = true;
     return staleNodes;

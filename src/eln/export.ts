@@ -1,4 +1,5 @@
 import { pilotText } from "../core/pilot.ts";
+import { deviationHtml } from "../core/freeze.ts";
 import { approvedPlan, planMarkdown } from "../core/plan.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -162,7 +163,7 @@ export function collect(src: ElnSource): ElnContent {
   const adapterNames = [...new Set(record.nodes().map((n) => n.adapter))];
   const approved = approvedPlan(record);
   const html = [
-    ...(approved ? [`<h2>Proposed analysis, confirmed (version ${approved.version})</h2><h3>Proposed metrics</h3><pre>${esc(approved.text)}</pre>${approved.pilot ? `<h3>Demonstration on a sample</h3><pre>${esc(pilotText(approved.pilot))}</pre>` : ""}`] : []),
+    ...(approved ? [`<h2>Proposed analysis, confirmed (version ${approved.version})</h2><h3>Proposed metrics</h3><pre>${esc(approved.text)}</pre>${approved.pilot ? `<h3>Demonstration on a sample</h3><pre>${esc(pilotText(approved.pilot))}</pre>` : ""}${deviationHtml(record, "h2")}`] : []),
     `<h2>Question</h2><p>${esc(question)}</p>`,
     `<h2>Final answer</h2><p>${esc(answer).replace(/\n/g, "<br>")}</p>`,
     `<h2>Decisions</h2>${decisionRows.length ? table(["Decision", "Value", "Owner", "Set by"], decisionRows.map((r) => [r.label, r.value, r.owner, r.setBy])) : "<p>No setup values were recorded.</p>"}`,
