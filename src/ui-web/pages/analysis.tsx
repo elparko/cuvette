@@ -228,8 +228,8 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     const bs = optionButtons(card);
     markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
     const a = document.activeElement;
-    const writing = typing(a) && !(a?.tagName === "TEXTAREA" && !(a as HTMLTextAreaElement).value.trim());
-    if (!writing && !document.querySelector("[role=dialog]")) {
+    const free = !a || a === document.body || box.contains(a) || (a === inputRef.current && !inputRef.current.value.trim());
+    if (free && !document.querySelector("[role=dialog]")) {
       card.tabIndex = -1;
       card.focus({ preventScroll: true });
     }
@@ -393,7 +393,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         list = await call<Command[]>("api/commands");
         setCommands(list);
       } catch {}
-      if (inputRef.current?.value !== v) return;
+      if (inputRef.current?.value !== v || document.activeElement !== inputRef.current) return;
     }
     setSugg(list.filter((c) => c.name.startsWith(v.slice(1).toLowerCase())).slice(0, 8));
     setSel(0);
@@ -581,6 +581,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 value={text}
                 placeholder={status.placeholder || "Ask for an analysis, or type / for commands"}
                 onChange={(e) => onInput(e.target.value)}
+                onBlur={() => setSugg([])}
                 onKeyDown={(e) => {
                   if (sugg.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
                     e.preventDefault();

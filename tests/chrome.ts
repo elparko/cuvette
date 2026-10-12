@@ -48,6 +48,7 @@ export async function openChrome(): Promise<Page> {
       ws.send(JSON.stringify({ id: n, method, params }));
     });
   await send("Page.enable");
+  await send("Emulation.setFocusEmulationEnabled", { enabled: true });
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: "light" }] });
   return {
     async eval(expr) {
