@@ -232,9 +232,39 @@
   animation: blink 1s steps(1) infinite;
 }
 
+/* The pink cursor also shows that the agent works, before the first word comes. */
+.caret.working {
+  margin-left: 0;
+  animation: caret-breathe 1.6s ease-in-out infinite;
+}
+@keyframes caret-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-brand) 0%, transparent);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 10px 2px color-mix(in srgb, var(--accent-brand) 45%, transparent);
+  }
+}
+.msg.agent.working {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+/* The browser skips the layout of items that are off screen. */
+.srv .item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pulse-dot,
-  .caret {
+  .caret,
+  .caret.working {
     animation: none;
   }
 }
