@@ -15,6 +15,7 @@ Warning: the check is a help, not a guarantee. It finds patterns. It does not fi
 - A local model (Ollama, or an OpenAI-style server on this computer) gets no card. The record logs a notice.
 - A headless run has no one to answer the card. It masks the values and logs the decision.
 - After "Mask", the harness does not send the record to a cloud referee or to the title model, because the record holds the values.
+- The `search_literature` tool sends only its query to api.sciencemadereadable.com. It sends no data file. It refuses a query that has a likely patient identifier. It asks you before each search, also in bypass mode.
 
 ## Settings
 

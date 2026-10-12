@@ -1425,7 +1425,8 @@ export class Session {
       const res = await this.requestPermission(tool, eff, signal, undefined, { root: searchRoot, purpose: typeof eff.purpose === "string" ? eff.purpose : "" });
       if (!res.ok) return error(`the scientist did not allow a search of ${searchRoot}${res.note ? `: ${res.note}` : ""}. Do not search large folders. Use the absolute paths from earlier tool results, or ask the scientist where the files are.`);
     } else if (perm === "ask") {
-      const res = await this.requestPermission(tool, eff, signal);
+      const outward = tool.name === "search_literature" ? `Sends this query to api.sciencemadereadable.com, an outside literature search: "${String(eff.query ?? "")}". It sends no data files.` : undefined;
+      const res = await this.requestPermission(tool, eff, signal, outward);
       if (!res.ok) return error(`the scientist did not allow this${res.note ? `: ${res.note}` : ""}. Ask what they want instead.`);
     }
     if (pre.decision === "instruct") return this.followStep(tool, eff, callId, signal, pre.applied ?? {});
@@ -1868,7 +1869,6 @@ export class Session {
     }
     const sha256 = code ? createHash("sha256").update(code).digest("hex") : undefined;
     const p = new Promise<{ ok: boolean; note: string; always: boolean }>((resolve) => this.permissionWaits.set(rid, { resolve }));
-    if (tool.name === "search_literature" && !outward) touches = `Sends this query to api.sciencemadereadable.com, an outside literature search: "${String(args.query ?? "")}". It sends no data files.`;
     if (search) touches = `The agent wants to search ${search.root}${search.purpose ? ` for this purpose: ${search.purpose.replace(/\.$/, "")}` : ""}. This can take minutes and reads folders outside your project.`;
     this.emitWaiting(rid, { type: "permission", rid, tool: tool.name, args, code, touches, search });
     this.bus.emit({ type: "status", state: "waiting", tool: tool.name });

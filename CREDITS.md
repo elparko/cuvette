@@ -16,6 +16,15 @@ The license check behind this file was done on 2026-10-08. It is a technical che
 - Program names identify the programs. They do not show a partnership or an endorsement. The repository has no third-party logos.
 - Exception: `catalog/cellprofiler/templates/nuclei.cppipe` is derived from the CellProfiler example pipeline `ExampleFly.cppipe`. See the CellProfiler entry.
 
+## Online services
+
+### Literature search
+
+The `search_literature` tool uses the search service of ScienceMadeReadable (https://sciencemadereadable.com), at https://api.sciencemadereadable.com.
+- The paper records come from OpenAlex (https://openalex.org), CC0.
+- The full-text flags come from PubMed Central (PMC) of the National Center for Biotechnology Information (NCBI).
+- The search by meaning uses DenseOn embeddings (lightonai/DenseOn).
+
 ## Software
 
 ### Programs that adapters run

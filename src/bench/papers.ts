@@ -126,7 +126,7 @@ export async function runPaper(paper: Paper, model: string, run: number, opts: R
   let thrown: string | undefined;
   try {
     const { Session } = await import("../core/session.ts");
-    session = await Session.create({ adapters: paper.adapters, model, provider: opts.providerFor?.(model), settings: { ...(opts.modelOptions ?? {}), headless: true, ...(paper.plan ? { planFirst: true } : {}) }, home: true, ...(blind ? { id, cwd } : {}) });
+    session = await Session.create({ adapters: paper.adapters, model, provider: opts.providerFor?.(model), settings: { ...(opts.modelOptions ?? {}), headless: true, permissions: { search_literature: "deny" }, ...(paper.plan ? { planFirst: true } : {}) }, home: true, ...(blind ? { id, cwd } : {}) });
     const answers = readValues(paper, "answers");
     const setup = readValues(paper, "setup");
     attachHeadless(session, { answers, allow: new Set(paper.allow === "all" ? ["all"] : paper.allow) });
