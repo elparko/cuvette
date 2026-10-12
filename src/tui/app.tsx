@@ -10,7 +10,7 @@ import { Collapser, Mapper, mainView, type Item, type Logged } from "../ui/items
 import type { SessionLike, TuiOptions } from "./types.ts";
 import type { ProgramHooks } from "../ui/programs.ts";
 import { FOOTER_HINTS, Header, ItemView, RunningLine, StatusLine, activityText, animationsOn, footerHints, liveLayout, statusRows, type StaticItem } from "./view.tsx";
-import { Markdown } from "./markdown.tsx";
+import { Markdown, liveTail } from "./markdown.tsx";
 import { ConfigPanel } from "./config-panel.tsx";
 import { ProgramsPanel } from "./programs-panel.tsx";
 import { CardRows, Last } from "./fit.tsx";
@@ -403,7 +403,7 @@ export function App({ session, opts, screen }: { session: SessionLike; opts: Tui
       {live && fit.live > 0 ? (
         <Last max={fit.live}>
           <Box marginTop={1}>
-            <Markdown text={live} width={columns - 1} />
+            <Markdown text={liveTail(live, fit.live, columns - 1)} width={columns - 1} />
           </Box>
         </Last>
       ) : null}

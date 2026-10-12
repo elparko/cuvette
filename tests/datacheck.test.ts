@@ -172,7 +172,7 @@ describe("file set checks", () => {
     expect(channelOf("Set 1_01")).toEqual({ field: "Set 1_01" });
   });
 
-  test("bit depth and size come from the TIFF and PNG headers on disk", () => {
+  test("bit depth and size come from the TIFF and PNG headers on disk", async () => {
     const root = mkdtempSync(join(tmpdir(), "cuvette-dc-files-"));
     tiff(join(root, "A/a_01.tif"), 16, 512, 256);
     tiff(join(root, "A/a_02.tif"), 8, 512, 256);
@@ -184,11 +184,11 @@ describe("file set checks", () => {
     writeFileSync(join(root, "A/b.png"), png);
     writeFileSync(join(root, "A/.hidden.tif"), "x");
     writeFileSync(join(root, "notes.docx"), "x");
-    expect(imageInfo(join(root, "A/a_01.tif"))).toEqual({ width: 512, height: 256, bits: 16 });
-    expect(imageInfo(join(root, "A/b.png"))).toEqual({ width: 100, height: 50, bits: 16 });
+    expect(await imageInfo(join(root, "A/a_01.tif"))).toEqual({ width: 512, height: 256, bits: 16 });
+    expect(await imageInfo(join(root, "A/b.png"))).toEqual({ width: 100, height: 50, bits: 16 });
     const rels = listDataFiles(root);
     expect(rels).toEqual(["A/a_01.tif", "A/a_02.tif", "A/b.png"]);
-    const c = checkFiles(fileInfos(root, rels), root);
+    const c = checkFiles(await fileInfos(root, rels), root);
     expect(item(c, "bit_depth").files).toEqual(["A/a_02.tif"]);
   });
 });

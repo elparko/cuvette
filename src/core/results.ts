@@ -12,6 +12,7 @@ import type { DecisionField } from "./decisions.ts";
 import { mainNodes, methodsSentence, stepLines } from "./exports.ts";
 import { stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
+import { replaySheet } from "./samples.ts";
 import type { Node, TablePreview } from "./types.ts";
 import { renvLock, requirementsText } from "./envlock.ts";
 import { testsTable } from "./testcount.ts";
@@ -414,8 +415,8 @@ export function checkSheets(record: AnalysisRecord): Sheet[] {
   for (const i of issues.filter((x, k) => issues.findIndex((y) => y.text === x.text) === k)) rows.push(["sample sheet", i.check.replace(/_/g, " "), i.level === "ask" ? "question" : "shown", "", i.text, answer.get(`design:${i.id}`) ?? (i.level === "ask" ? "not answered" : "")]);
   const out: Sheet[] = [];
   if (rows.length) out.push({ name: "Data check", columns: ["Source", "Check", "Level", "Column or files", "Finding", "Answer"], rows });
-  const sheet = record.entries(["samples"]).filter((e) => Array.isArray(e.data.rows)).at(-1);
-  if (sheet) out.push({ name: "Samples", columns: ["sample", "group", "unit", "batch", "path"], rows: (sheet.data.rows as Record<string, string>[]).map((r) => [r.sample, r.group, r.unit, r.batch, r.path]) });
+  const sheet = replaySheet(record.entries(["samples"]));
+  if (sheet) out.push({ name: "Samples", columns: ["sample", "group", "unit", "batch", "path"], rows: sheet.map((r) => [r.sample, r.group, r.unit, r.batch, r.path]) });
   return out;
 }
 

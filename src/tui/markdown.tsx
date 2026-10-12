@@ -88,6 +88,19 @@ export function tableLines(rows: string[][], width: number): { text: string; hea
   return lines;
 }
 
+export function liveTail(text: string, rows: number, width: number): string {
+  const src = text.split("\n");
+  let need = rows + 2;
+  let i = src.length;
+  while (i > 0 && need > 0) need -= Math.max(1, Math.ceil(src[--i]!.length / Math.max(1, width)));
+  if (i === 0) return text;
+  while (i > 0 && src[i - 1]!.trim()) i--;
+  if (i === 0) return text;
+  const fences = src.slice(0, i).filter((l) => /^\s*```/.test(l)).length;
+  const tail = src.slice(i).join("\n");
+  return fences % 2 ? `\`\`\`\n${tail}` : tail;
+}
+
 export function Markdown({ text, width }: { text: string; width: number }) {
   const src = text.split("\n");
   const blocks: React.ReactNode[] = [];

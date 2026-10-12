@@ -4,7 +4,7 @@ import { ProviderError } from "../core/types.ts";
 import { claudeKey, claudeWorkspace, keyVersion, WORKSPACE_HELP } from "../core/credentials.ts";
 import { keyApiProblem } from "../core/keyhelp.ts";
 import { budgetProblem, recordSpend } from "../core/spend.ts";
-import { ImageBudget } from "./images.ts";
+import { ImageBudget, prepareImages } from "./images.ts";
 import { RETRIES, retryReason, withRetry, type Sleep } from "./retry.ts";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
@@ -162,6 +162,7 @@ export class ClaudeProvider implements Provider {
   async step(req: StepRequest): Promise<StepResult> {
     const over = budgetProblem();
     if (over) throw new ProviderError(over);
+    await prepareImages(req.messages, req.signal);
     const base = this.params(req.system, req.messages, req.tools);
     const run = async (): Promise<any> => {
       const useFallback = this.fallbacks;

@@ -1,4 +1,5 @@
-import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { open } from "node:fs/promises";
 import { basename, extname, join, relative, sep } from "node:path";
 import { parseCsv } from "./results.ts";
 
@@ -311,51 +312,72 @@ export function listDataFiles(root: string, max = 5000, depth = 5): string[] {
   return out;
 }
 
-function readAt(path: string, pos: number, len: number): Buffer {
-  const fd = openSync(path, "r");
+type ReadAt = (pos: number, len: number) => Promise<Buffer>;
+
+async function headerInfo(readAt: ReadAt): Promise<{ bits?: number; width?: number; height?: number }> {
+  const head = await readAt(0, 32);
+  if (head.length >= 26 && head.readUInt32BE(0) === 0x89504e47) return { width: head.readUInt32BE(16), height: head.readUInt32BE(20), bits: head[24] };
+  const le = head.toString("latin1", 0, 2) === "II";
+  if (!le && head.toString("latin1", 0, 2) !== "MM") return {};
+  const u16 = (b: Buffer, o: number) => (le ? b.readUInt16LE(o) : b.readUInt16BE(o));
+  const u32 = (b: Buffer, o: number) => (le ? b.readUInt32LE(o) : b.readUInt32BE(o));
+  if (u16(head, 2) !== 42) return {};
+  const ifd = u32(head, 4);
+  const count = u16(await readAt(ifd, 2), 0);
+  const tags = await readAt(ifd + 2, count * 12);
+  const out: { bits?: number; width?: number; height?: number } = {};
+  for (let i = 0; i + 12 <= tags.length; i += 12) {
+    const tag = u16(tags, i);
+    const type = u16(tags, i + 2);
+    const n = u32(tags, i + 4);
+    const val = type === 3 ? u16(tags, i + 8) : u32(tags, i + 8);
+    if (tag === 256) out.width = val;
+    else if (tag === 257) out.height = val;
+    else if (tag === 258) out.bits = n * 2 <= 4 ? u16(tags, i + 8) : u16(await readAt(u32(tags, i + 8), 2), 0);
+  }
+  return out;
+}
+
+const HEAD_BYTES = 4096;
+
+async function readInfo(path: string, image: boolean): Promise<{ size: number; bits?: number; width?: number; height?: number }> {
+  const fh = await open(path, "r");
   try {
-    const b = Buffer.alloc(len);
-    const got = readSync(fd, b, 0, len, pos);
-    return b.subarray(0, got);
+    const size = (await fh.stat()).size;
+    if (!image) return { size };
+    const head = Buffer.alloc(Math.min(HEAD_BYTES, size));
+    await fh.read(head, 0, head.length, 0);
+    const info = await headerInfo(async (pos, len) => {
+      if (pos + len <= head.length) return head.subarray(pos, pos + len);
+      const b = Buffer.alloc(len);
+      const { bytesRead } = await fh.read(b, 0, len, pos);
+      return b.subarray(0, bytesRead);
+    }).catch(() => ({}));
+    return { size, ...info };
   } finally {
-    closeSync(fd);
+    await fh.close();
   }
 }
 
-export function imageInfo(path: string): { bits?: number; width?: number; height?: number } {
+export async function imageInfo(path: string): Promise<{ bits?: number; width?: number; height?: number }> {
   try {
-    const head = readAt(path, 0, 32);
-    if (head.length >= 26 && head.readUInt32BE(0) === 0x89504e47) return { width: head.readUInt32BE(16), height: head.readUInt32BE(20), bits: head[24] };
-    const le = head.toString("latin1", 0, 2) === "II";
-    if (!le && head.toString("latin1", 0, 2) !== "MM") return {};
-    const u16 = (b: Buffer, o: number) => (le ? b.readUInt16LE(o) : b.readUInt16BE(o));
-    const u32 = (b: Buffer, o: number) => (le ? b.readUInt32LE(o) : b.readUInt32BE(o));
-    if (u16(head, 2) !== 42) return {};
-    const ifd = u32(head, 4);
-    const count = u16(readAt(path, ifd, 2), 0);
-    const tags = readAt(path, ifd + 2, count * 12);
-    const out: { bits?: number; width?: number; height?: number } = {};
-    for (let i = 0; i + 12 <= tags.length; i += 12) {
-      const tag = u16(tags, i);
-      const type = u16(tags, i + 2);
-      const n = u32(tags, i + 4);
-      const val = type === 3 ? u16(tags, i + 8) : u32(tags, i + 8);
-      if (tag === 256) out.width = val;
-      else if (tag === 257) out.height = val;
-      else if (tag === 258) out.bits = n * 2 <= 4 ? u16(tags, i + 8) : u16(readAt(path, u32(tags, i + 8), 2), 0);
-    }
-    return out;
+    const { size: _, ...info } = await readInfo(path, true);
+    return info;
   } catch {
     return {};
   }
 }
 
-export function fileInfos(root: string, rels: string[]): FileInfo[] {
-  return rels.map((rel) => {
-    const p = join(root, rel);
-    const size = statSync(p).size;
-    return { rel, size, ...(/\.(tiff?|png)$/i.test(rel) ? imageInfo(p) : {}) };
-  });
+const FILE_READS = 8;
+
+export async function fileInfos(root: string, rels: string[]): Promise<FileInfo[]> {
+  const out: FileInfo[] = new Array(rels.length);
+  let next = 0;
+  const worker = async () => {
+    for (let i = next++; i < rels.length; i = next++) out[i] = { rel: rels[i]!, ...(await readInfo(join(root, rels[i]!), /\.(tiff?|png)$/i.test(rels[i]!))) };
+  };
+  await Promise.all(Array.from({ length: Math.min(FILE_READS, rels.length) }, worker));
+  return out;
 }
 
 export function splitName(rel: string): { dirs: string[]; stem: string; ext: string } {

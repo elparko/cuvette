@@ -27,6 +27,8 @@ function upsert(q: Question): void {
   renameSync(tmp, indexPath());
 }
 
+const stored = (q: Question): Question => (q.tableFrom && q.table ? { ...q, table: { columns: q.table.columns, rows: [] } } : q);
+
 export function allOpenQuestions(): Question[] {
   if (!existsSync(indexPath())) return [];
   return readIndex()
@@ -68,8 +70,8 @@ export class QuestionQueue {
       created: new Date().toISOString(),
     };
     this.questions.set(q.qid, q);
-    this.record.append("question", { ...q });
-    upsert(q);
+    this.record.append("question", { ...stored(q) });
+    upsert(stored(q));
     if (this.opts.notify)
       void this.opts.notify(q).catch((err) => {
         this.record.append("notice", { text: `Could not send the notice for question ${q.qid}: ${(err as Error).message}` });
@@ -86,7 +88,7 @@ export class QuestionQueue {
     q.answer = chosen;
     q.answered = new Date().toISOString();
     this.record.append("answer", { qid, value: chosen, note: note ?? "", by });
-    upsert(q);
+    upsert(stored(q));
     this.release(q);
     return q;
   }
@@ -101,7 +103,7 @@ export class QuestionQueue {
     q.answer = chosen;
     q.answered = new Date().toISOString();
     this.record.append("answer", { qid, value: chosen, note: note ?? "", by: "human", changed: true, old: old ?? null });
-    upsert(q);
+    upsert(stored(q));
     return q;
   }
 
@@ -142,7 +144,7 @@ export class QuestionQueue {
         q.status = "timed_out";
         this.record.append("answer", { qid: q.qid, value: null, note: "", by: "timeout" });
       }
-      upsert(q);
+      upsert(stored(q));
       this.release(q);
       closed.push(q);
     }

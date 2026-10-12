@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
-import { imageSize, scaledCopySync } from "../core/thumbs.ts";
+import { open } from "node:fs/promises";
+import type { Message } from "../core/types.ts";
+import { imageSize, scaledCopy, scaledCopySync } from "../core/thumbs.ts";
 
 export const MAX_IMAGE_BYTES = Math.floor(3.7 * 1024 * 1024);
 export const MAX_IMAGES_PER_RESULT = 4;
@@ -36,6 +38,40 @@ export function loadImage(path: string): LoadedImage | string {
     return { media, data: buf.toString("base64") };
   } catch {
     return "file not readable";
+  }
+}
+
+async function needsScaling(path: string): Promise<"png" | "jpeg" | undefined> {
+  try {
+    const fh = await open(path, "r");
+    try {
+      const { size: bytes } = await fh.stat();
+      const head = Buffer.alloc(Math.min(bytes, 256 * 1024));
+      await fh.read(head, 0, head.length, 0);
+      const media = mediaType(head);
+      if (media !== "image/png" && media !== "image/jpeg") return undefined;
+      const size = imageSize(head);
+      return (size && Math.max(size.w, size.h) > MAX_SIDE) || bytes > MAX_IMAGE_BYTES ? (media === "image/jpeg" ? "jpeg" : "png") : undefined;
+    } finally {
+      await fh.close();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
+// Makes the scaled copies before the request, so that a stop from the scientist ends a slow resize.
+export async function prepareImages(messages: Message[], signal?: AbortSignal): Promise<void> {
+  const paths: string[] = [];
+  for (const m of messages)
+    for (const p of m.parts) {
+      if (p.type === "tool_result" && !p.isError) paths.push(...(p.images ?? []).slice(0, MAX_IMAGES_PER_RESULT));
+      else if (p.type === "image") paths.push(p.path);
+    }
+  for (const p of paths.slice(0, IMAGE_BUDGET)) {
+    signal?.throwIfAborted();
+    const format = await needsScaling(p);
+    if (format) await scaledCopy(p, MAX_SIDE, format, signal);
   }
 }
 

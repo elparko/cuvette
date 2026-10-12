@@ -276,7 +276,7 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       }
       const node = nodeFor(record, e);
       if (node) joined.add(node.id);
-      if (roleInRecord(record.entries(), e) === "housekeeping") return undefined;
+      if (roleInRecord(d.ok === false ? record.entries() : [], e) === "housekeeping") return undefined;
       return stepBuilt(record, e, node, adapters, stale, compare);
     }
     case "node": {
@@ -686,6 +686,10 @@ function checklistSection(record: AnalysisRecord): string {
 }
 
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
+  return writeOut(path, trailHtml(record, adapters, style));
+}
+
+export function trailHtml(record: AnalysisRecord, adapters: LoadedAdapter[], style: CitationStyle = "apa"): string {
   const m = meta(record);
   const labels = new Map<string, string>();
   for (const a of adapters) for (const d of a.manifest.decisions) labels.set(d.key, d.label);
@@ -721,7 +725,7 @@ ${checklistSection(record)}
 <section id="cite">${referencesHtml(sessionCitations(record, adapters, stepNumbers(record.nodes())), style)}</section>
 </main></body></html>
 `;
-  return writeOut(path, html);
+  return html;
 }
 
 // ---------------------------------------------------------------- markdown
