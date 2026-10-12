@@ -2,6 +2,8 @@ adapter:
   name: imagej
   field: microscopy
   file_types: [".tif", ".tiff", ".png", ".jpg"]
+  file_magic: ["49492a00", "4d4d002a", "89504e470d0a1a0a"]
+  file_label: image files
   title: ImageJ
   version: 0.1.1
   spec: "1"

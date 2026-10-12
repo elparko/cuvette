@@ -2,6 +2,9 @@ adapter:
   name: flowkit
   field: flow cytometry
   file_types: [".fcs", ".wsp"]
+  file_magic: ["464353"]
+  file_label: flow cytometry files
+  file_priority: 1
   title: FlowKit (flow cytometry)
   version: 0.1.1
   spec: "1"

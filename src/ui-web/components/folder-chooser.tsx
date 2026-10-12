@@ -1,6 +1,7 @@
 import { ArrowUpIcon, ClockIcon, FolderIcon, FolderOpenIcon, HomeIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { askNotify, bridge, call, midText } from "../lib/api.ts";
+import { bridge, call, midText } from "../lib/api.ts";
+import { SuggestCard, useFolderPick } from "./suggest-card.tsx";
 import { Button } from "./ui/button.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog.tsx";
 import { Input } from "./ui/input.tsx";
@@ -13,15 +14,10 @@ interface Dirs {
   home: string;
 }
 
-async function openFolder(folder: string) {
-  askNotify();
-  await call("api/open", { folder });
-}
-
 export function FolderChooser({ start, onOpened, big }: { start: string; onOpened: () => void; big?: boolean }) {
-  const [msg, setMsg] = useState("");
-  const [busy, setBusy] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
+  const { pending, busy, msg, open, choose, cancel } = useFolderPick(onOpened);
+  const [pickMsg, setPickMsg] = useState("");
 
   useEffect(() => {
     call<Dirs>("api/dirs?p=" + encodeURIComponent(start || ""))
@@ -30,24 +26,13 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
   }, [start]);
 
   if (bridge.chooseFolder) {
-    const open = async (f: string) => {
-      setBusy(true);
-      try {
-        await openFolder(f);
-        setMsg("Opening…");
-        onOpened();
-      } catch (e) {
-        setBusy(false);
-        setMsg((e as Error).message);
-      }
-    };
     const pick = async () => {
-      setMsg("");
+      setPickMsg("");
       try {
         const f = await bridge.chooseFolder!(start);
-        if (f) await open(f);
+        if (f) await choose(f);
       } catch (e) {
-        setMsg((e as Error).message);
+        setPickMsg((e as Error).message);
       }
     };
     return (
@@ -55,14 +40,15 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
         <Button size={big ? "lg" : "default"} onClick={pick} disabled={busy}>
           <FolderOpenIcon /> Choose a folder in Finder…
         </Button>
-        {msg && <p className="text-sm text-bad">{msg}</p>}
-        {recent.length > 0 && (
+        {(msg || pickMsg) && <p className="text-sm text-bad">{msg || pickMsg}</p>}
+        {pending && <SuggestCard pending={pending} busy={busy} open={open} cancel={cancel} />}
+        {!pending && recent.length > 0 && (
           <div className="w-full">
             <div className="pb-1 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">Recent project folders</div>
             <ul className="rounded-xl border bg-card p-1">
               {recent.slice(0, 6).map((r) => (
                 <li key={r}>
-                  <button type="button" disabled={busy} onClick={() => open(r)} title={r} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
+                  <button type="button" disabled={busy} onClick={() => choose(r)} title={r} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
                     <ClockIcon className="size-4 text-muted-foreground" />
                     <span className="min-w-0 truncate">{r.split("/").filter(Boolean).pop() || r}</span>
                     <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground">{midText(r, 40)}</span>
@@ -82,6 +68,7 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
   const [path, setPath] = useState(start);
   const [d, setD] = useState<Dirs | null>(null);
   const [msg, setMsg] = useState("");
+  const pick = useFolderPick(onOpened);
 
   const list = useCallback(async (p: string) => {
     try {
@@ -97,16 +84,6 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
   useEffect(() => {
     void list(start);
   }, [list, start]);
-
-  const go = async () => {
-    try {
-      await openFolder(path);
-      setMsg("Opening…");
-      onOpened();
-    } catch (e) {
-      setMsg((e as Error).message);
-    }
-  };
 
   const row = (key: string, icon: React.ReactNode, label: string, target: string, sub?: string) => (
     <li key={key}>
@@ -135,10 +112,11 @@ export function FolderBrowser({ start, onOpened }: { start: string; onOpened: ()
           className="flex-1 font-mono text-[13px]"
           spellCheck={false}
         />
-        <Button onClick={go}>Analyze this folder</Button>
+        <Button onClick={() => pick.choose(path)} disabled={pick.busy}>Analyze this folder</Button>
       </div>
-      {msg && <p className="text-sm text-bad">{msg}</p>}
-      {d && (
+      {(msg || pick.msg) && <p className="text-sm text-bad">{msg || pick.msg}</p>}
+      {pick.pending && <SuggestCard pending={pick.pending} busy={pick.busy} open={pick.open} cancel={pick.cancel} />}
+      {d && !pick.pending && (
         <div className="min-h-0 overflow-y-auto rounded-xl border bg-card p-1" style={{ maxHeight: "min(420px, 50vh)" }}>
           <ul>
             {d.parent && row("up", <ArrowUpIcon className="size-4" />, "Up one folder", d.parent, d.parent)}

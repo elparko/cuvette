@@ -2,6 +2,7 @@ adapter:
   name: bedtools
   field: genomics
   file_types: [".bed", ".gff", ".gtf", ".bedgraph"]
+  file_label: genome interval files
   title: bedtools
   version: 0.1.1
   spec: "1"

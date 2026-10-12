@@ -2,6 +2,7 @@ adapter:
   name: openbabel
   field: chemistry
   file_types: [".smi", ".sdf", ".mol", ".mol2"]
+  file_label: molecule files
   title: Open Babel format conversion and descriptors
   version: 0.1.1
   description: Converts molecule files between formats and writes descriptor values with Open Babel.

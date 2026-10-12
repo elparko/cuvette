@@ -2,6 +2,7 @@ adapter:
   name: gdal
   field: geospatial
   file_types: [".geojson", ".gpkg", ".shp", ".tif"]
+  file_label: map data files
   title: GDAL and OGR
   version: 0.1.1
   spec: "1"

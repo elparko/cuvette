@@ -10,6 +10,14 @@ The project is in early development. Version numbers start at the first public r
 - The Claude provider waits and tries again three times after a rate limit (HTTP 429), a server error (HTTP 5xx or 529) or a network error. The wait grows each time, has random jitter, and follows the `retry-after` header. The session shows "Waiting to retry (2 of 3)".
 - After the last try fails, a card offers "Resume", "Switch to the local model" or "Stop". "Resume" goes on from the last finished step. No finished tool call runs again. A headless run waits and tries again three more times, then stops with an error.
 
+### Suggest the program from the files
+
+- When you choose a folder, Cuvette reads the file names and the first 16 bytes of each file. It looks two folder levels down and stops at 400 files. It matches them to the `file_types` and the new `file_magic` of each adapter.
+- The app shows a card: "These look like flow cytometry files. Use FlowKit?" The other matches are below it. "Let Cuvette choose later" starts the session with no program, as before.
+- If no program fits, the card says so and offers the table route (the `tables` adapter). A folder with only `.csv`, `.tsv` or `.xlsx` files gets the same offer.
+- `cuvette` in the terminal prints the same suggestion before it starts, if the folder has data files and you gave no `--adapter`.
+- The adapter manifest has three new optional fields: `file_magic`, `file_label` and `file_priority`. 34 catalog adapters now have a label. See [docs/adapter-spec.md](docs/adapter-spec.md).
+
 ## 9 October 2026
 
 ### Benchmark
