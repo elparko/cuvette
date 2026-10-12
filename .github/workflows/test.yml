@@ -80,6 +80,7 @@ jobs:
           CI: "false"
       - name: ImageJ live tests (Windows)
         if: runner.os == 'Windows'
+        shell: bash
         run: |
           npx vitest run tests/imagej.test.ts tests/macro.test.ts
           node bin/cuvette.js adapter check imagej --run-tests --gui

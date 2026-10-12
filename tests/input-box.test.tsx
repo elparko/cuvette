@@ -189,7 +189,9 @@ describe("every text field uses the shared editor: Option+Backspace deletes a wo
       await until(() => screen(h) !== before);
     }
     await keys(h, "\r");
-    await until(() => screen(h).includes("New value:"));
+    await until(() => screen(h).includes("New value:")).catch((e) => {
+      throw new Error(`${e.message}\n${screen(h)}`);
+    });
     await keys(h, "imagej fiji", bs, "biostats");
     await until(() => screen(h).includes("New value: imagej biostats"));
     await keys(h, "\x1b");

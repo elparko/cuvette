@@ -513,7 +513,13 @@ export class Session {
 
   private async nameFolder(request: string) {
     if (!provisional(this.place)) return;
-    const next = titlePlace(this.place, request, this.runtimes.length > 0);
+    let next: Place;
+    try {
+      next = titlePlace(this.place, request, this.runtimes.length > 0);
+    } catch (e) {
+      this.record.append("notice", { text: `The results folder keeps its temporary name. The rename failed: ${(e as Error).message}` });
+      return;
+    }
     this.place = next;
     this.dir = next.recordDir;
     this.workDir = next.outDir;
