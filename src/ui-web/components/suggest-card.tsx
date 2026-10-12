@@ -28,7 +28,6 @@ export function useFolderPick(onOpened: () => void) {
       askNotify();
       await call("api/open", { folder, adapter });
       setPending(null);
-      setMsg("Opening…");
       onOpened();
     } catch (e) {
       setBusy(false);

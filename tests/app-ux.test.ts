@@ -133,6 +133,21 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     await page.size(1280, 900);
   });
 
+  test("the mode menu items include their help text and hold no extra tab stop", async () => {
+    const r = await page.eval<{ texts: string[]; stops: number }>(`(async () => {
+      const t = document.querySelector('header button[aria-label^="Mode:"]');
+      t.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
+      for (let i = 0; i < 30 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
+      const items = [...document.querySelectorAll('[role="menuitemradio"]')];
+      const out = { texts: items.map((x) => x.textContent), stops: document.querySelectorAll('[role="menu"] [tabindex="0"]').length };
+      document.querySelector('[role="menu"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await new Promise((r) => setTimeout(r, 200));
+      return out;
+    })()`);
+    expect(r.texts[0]).toContain("The agent runs the steps.");
+    expect(r.stops).toBe(0);
+  });
+
   test("the image viewer: a double-click at 100% zooms in, and the arrow keys move the image", async () => {
     await page.eval(`(() => {
       const c = document.createElement("canvas");
@@ -201,6 +216,13 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     expect(await page.eval(`[...document.querySelectorAll("button")].some((b) => b.textContent === "Show the full list")`)).toBe(true);
     await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/doctor")`);
     await page.size(1280, 900);
+  });
+
+  test("the sessions page shows an error when the list does not load", async () => {
+    await page.eval(`window.__mocks.push({ part: "api/sessions.json", reply: () => ({ status: 500, body: { error: "The disk is full." } }) })`);
+    await goPage("Sessions");
+    expect(await until(page, `document.querySelector('main [role="alert"]')?.textContent.includes("The disk is full.")`)).toBe(true);
+    await page.eval(`window.__mocks = window.__mocks.filter((m) => m.part !== "api/sessions.json")`);
   });
 
   test("program dialog: a job that ends after the dialog closes does not change the next dialog", async () => {

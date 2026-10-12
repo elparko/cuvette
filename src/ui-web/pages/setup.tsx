@@ -190,7 +190,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
           </p>
         )}
         <p className="mt-3 text-xs text-muted-foreground">
-          Model now: <span className="font-mono text-foreground">{model}</span>
+          Model now: <span className="font-mono break-all text-foreground">{model}</span>
         </p>
       </Step>
 
@@ -203,7 +203,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
       {done && (
         <Step n={3} title="Run the sample analysis">
           <p className="mb-3 text-sm text-muted-foreground">
-            The sample is a public data set: extra sleep of 10 patients with two drugs (Student, 1908). It takes about 2 minutes. The app copies it to <span className="font-mono text-foreground">{fs?.sample}</span>.
+            The sample is a public data set: extra sleep of 10 patients with two drugs (Student, 1908). It takes about 2 minutes. The app copies it to <span className="font-mono break-all text-foreground">{fs?.sample}</span>.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -218,6 +218,8 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
             <Button
               variant="outline"
               disabled={starting}
+              title={folder || undefined}
+              className="max-w-full"
               onClick={async () => {
                 if (folder) {
                   setStarting(true);
@@ -226,7 +228,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
                 } else ctx.go("start");
               }}
             >
-              {folder ? `Analyze ${folder}` : "Open my own folder"}
+              <span className="truncate">{folder ? `Analyze ${folder.split("/").filter(Boolean).pop() || folder}` : "Open my own folder"}</span>
             </Button>
           </div>
         </Step>

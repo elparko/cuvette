@@ -42,7 +42,7 @@ export function FolderChooser({ start, onOpened, big }: { start: string; onOpene
         <Button size={big ? "lg" : "default"} onClick={pick} disabled={busy}>
           <FolderOpenIcon /> Choose a folder in Finder…
         </Button>
-        {(msg || pickMsg) && <p className="text-sm text-bad">{msg || pickMsg}</p>}
+        {(msg || pickMsg) && <p className="text-sm text-bad" role="alert">{msg || pickMsg}</p>}
         {pending && <SuggestCard pending={pending} busy={busy} open={open} cancel={cancel} />}
         {!pending && recent.length > 0 && (
           <div className="w-full">

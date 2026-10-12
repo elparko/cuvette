@@ -24,14 +24,19 @@ export interface SessionCard {
 export function useSessions(page: Page, boots: number) {
   const [list, setList] = useState<SessionCard[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [err, setErr] = useState("");
   const [tick, setTick] = useState(0);
   useEffect(() => {
     call<SessionCard[]>("api/sessions.json")
       .then((l) => {
         setList(l);
+        setErr("");
         setLoaded(true);
       })
-      .catch(() => setLoaded(true));
+      .catch((e: Error) => {
+        setErr(e.message);
+        setLoaded(true);
+      });
   }, [page, boots, tick]);
   const opening = useRef(false);
   const open = useCallback(async (id: string, done: () => void) => {
@@ -68,7 +73,7 @@ export function useSessions(page: Page, boots: number) {
       toast.error((e as Error).message);
     }
   }, []);
-  return { list, loaded, open, rename, remove, reveal };
+  return { list, loaded, err, open, rename, remove, reveal };
 }
 
 export type Sessions = ReturnType<typeof useSessions>;
@@ -92,8 +97,8 @@ export function SessionGrid({ list, onOpen, compact }: { list: SessionCard[]; on
               </div>
             )}
             <div className="flex min-w-0 flex-1 flex-col gap-1 p-3.5">
-              <span className="line-clamp-2 font-medium">{s.title}</span>
-              {s.text && <span className="line-clamp-2 text-[13px] text-muted-foreground">{s.text}</span>}
+              <span className="line-clamp-2 font-medium break-words">{s.title}</span>
+              {s.text && <span className="line-clamp-2 text-[13px] break-words text-muted-foreground">{s.text}</span>}
               <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-1.5 text-xs text-muted-foreground">
                 <span className="inline-flex min-w-0 items-center gap-1 truncate" title={s.folder}>
                   <FolderOpenIcon className="size-3.5 shrink-0" />
@@ -145,10 +150,15 @@ export function SessionsPage({ ctx, sessions }: { ctx: AppCtx; sessions: Session
           )}
         </div>
       )}
+      {sessions.err && (
+        <p role="alert" className="mb-4 text-sm text-bad">
+          The list of sessions did not load: {sessions.err}
+        </p>
+      )}
       {!sessions.loaded ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : !sessions.list.length ? (
-        <p className="text-muted-foreground">No sessions yet.</p>
+        !sessions.err && <p className="text-muted-foreground">No sessions yet.</p>
       ) : !shown.length ? (
         <p className="text-muted-foreground">No session matches.</p>
       ) : (
