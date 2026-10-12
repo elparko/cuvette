@@ -42,6 +42,7 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
   const [msg, setMsg] = useState("");
   const [model, setModel] = useState(ctx.state.model);
   const [done, setDone] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [folder, setFolder] = useState(ctx.state.folder);
 
   useEffect(() => {
@@ -195,12 +196,23 @@ export function SetupPage({ ctx }: { ctx: AppCtx }) {
             The sample is a public data set: extra sleep of 10 patients with two drugs (Student, 1908). It takes about 2 minutes. The app copies it to <span className="font-mono text-foreground">{fs?.sample}</span>.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => runSample(ctx)}>Run the sample analysis</Button>
+            <Button
+              disabled={starting}
+              onClick={async () => {
+                setStarting(true);
+                if (!(await runSample(ctx))) setStarting(false);
+              }}
+            >
+              Run the sample analysis
+            </Button>
             <Button
               variant="outline"
+              disabled={starting}
               onClick={async () => {
                 if (folder) {
+                  setStarting(true);
                   if (await post("api/open", { folder })) ctx.opened();
+                  else setStarting(false);
                 } else ctx.go("start");
               }}
             >

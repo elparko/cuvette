@@ -1,0 +1,76 @@
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { UI_DIST } from "../src/server/app.ts";
+import { CHROME, openChrome, type Page } from "./chrome.ts";
+
+const ROOT = join(__dirname, "..");
+const until = (page: Page, cond: string) => page.eval(`(async () => { for (let i = 0; i < 80 && !(${cond}); i++) await new Promise((r) => setTimeout(r, 100)); return !!(${cond}); })()`);
+
+describe.skipIf(!CHROME)("a double click in the app", () => {
+  let proc: ChildProcess;
+  let url = "";
+  let page: Page;
+  let home = "";
+  let data = "";
+
+  beforeAll(async () => {
+    if (!existsSync(join(UI_DIST, "index.html"))) execFileSync("npx", ["vite", "build", "--config", "src/ui-web/vite.config.ts", "--logLevel", "warn"], { cwd: ROOT, stdio: "ignore" });
+    home = mkdtempSync(join(tmpdir(), "cuvette-home-"));
+    data = mkdtempSync(join(tmpdir(), "cuvette-data-"));
+    writeFileSync(join(data, "a.csv"), "x,y\n1,2\n3,4\n");
+    const env = { ...process.env, CUVETTE_HOME: home, CUVETTE_SPEND_FILE: join(home, "spend.jsonl"), CUVETTE_NO_OPEN: "1", HOME: home };
+    proc = spawn(process.execPath, [join(ROOT, "bin", "cuvette.js"), "app", "--no-open", "--model", "fake:"], { cwd: tmpdir(), env, stdio: ["ignore", "pipe", "pipe"] });
+    url = await new Promise<string>((done, fail) => {
+      let out = "";
+      proc.stdout!.on("data", (b) => {
+        out += b;
+        const m = /Cuvette app: (\S+)/.exec(out);
+        if (m) done(m[1]!);
+      });
+      proc.on("exit", (code) => fail(new Error(`cuvette app stopped: ${code}`)));
+    });
+    page = await openChrome();
+    await page.size(1280, 900);
+  }, 90000);
+  afterAll(async () => {
+    await page?.close();
+    proc?.kill();
+  });
+
+  const token = () => new URL(url).searchParams.get("t");
+  const api = (path: string, body?: unknown) =>
+    page.eval<any>(`fetch(${JSON.stringify(path + (path.includes("?") ? "&" : "?") + "t=" + token())}, ${JSON.stringify(body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json", "x-token": token() }, body: JSON.stringify(body) })}).then((r) => r.json())`);
+  const sessions = async () => (await api("api/sessions.json")).length as number;
+
+  test("a second click on the sample button after the first request ends does not open a second session", async () => {
+    await page.go(url + "&page=start");
+    await until(page, `document.body.textContent.includes("Run the sample analysis")`);
+    const before = await sessions();
+    await page.eval(`(async () => {
+      const b = [...document.querySelectorAll("button")].find((x) => x.textContent.includes("Run the sample analysis"));
+      b.click();
+      for (let i = 0; i < 300; i++) {
+        await new Promise((r) => setTimeout(r, 5));
+        const s = await fetch("api/state?t=${token()}").then((r) => r.json());
+        if (s.session) break;
+      }
+      b.click();
+    })()`);
+    await new Promise((r) => setTimeout(r, 4000));
+    expect(await sessions()).toBe(before + 1);
+    expect(await page.eval(`document.querySelectorAll(".msg.user").length`)).toBe(1);
+  }, 60000);
+
+  test("the server opens the same folder once when it gets the request twice", async () => {
+    await api("api/close", {});
+    const before = await sessions();
+    expect((await api("api/open", { folder: data })).ok).toBe(true);
+    await new Promise((r) => setTimeout(r, 2500));
+    expect((await api("api/open", { folder: data })).ok).toBe(true);
+    await new Promise((r) => setTimeout(r, 2500));
+    expect(await sessions()).toBe(before + 1);
+  }, 60000);
+});

@@ -167,6 +167,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   const env = opts.env ?? process.env;
   let current: Current | undefined;
   let opening: Promise<void> | undefined;
+  let lastOpen = { key: "", at: 0 };
   let lastError = "";
   const idle = new Set<ServerResponse>();
   let port = 0;
@@ -380,6 +381,8 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     const body = await readBody(req);
     const text = typeof body.text === "string" ? body.text : "";
     if (p === "/api/open") {
+      const key = body.sample ? "sample" : typeof body.id === "string" ? "id:" + body.id : typeof body.folder === "string" ? "folder:" + resolve(body.folder.trim().replace(/^~(?=\/|$)/, homedir())) + "\n" + String(body.adapter ?? "") : "";
+      if (key && key === lastOpen.key && (current || opening) && Date.now() - lastOpen.at < 5000) return send(res, 200, { ok: true });
       if (opening) return send(res, 409, { error: "A session is opening." });
       if (body.sample) {
         const sm = copySample();
@@ -397,6 +400,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
         const adapter = typeof body.adapter === "string" && body.adapter ? body.adapter : undefined;
         void open({ folder: f, adapter });
       } else return send(res, 400, { error: "Give a folder or a session." });
+      lastOpen = { key, at: Date.now() };
       return send(res, 200, { ok: true });
     }
     if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: CHOICES, keyGuide: KEY_GUIDE, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
