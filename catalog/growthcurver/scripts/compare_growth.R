@@ -92,7 +92,7 @@ run_tool(function() {
       data.frame(level = l, n_groups = nrow(s), mean_of_group_means = mean(s$rel_mean), sd = if (nrow(s) > 1) sd(s$rel_mean) else NA, stringsAsFactors = FALSE)
     }))
     for (i in seq_len(nrow(by_tab))) metrics[[paste0("rel_mean_by_", clean_name(by_tab$level[i]))]] <- by_tab$mean_of_group_means[i]
-    if (nrow(by_tab) >= 2) {
+    if (nrow(by_tab) >= 2 && nrow(nr) > nrow(by_tab)) {
       a <- summary(aov(rel_mean ~ factor(nr[[summary_by]]), data = nr))[[1]]
       aov_res <- list(F = a[1, "F value"], df1 = a[1, "Df"], df2 = a[2, "Df"], p = a[1, "Pr(>F)"])
       metrics$anova_F <- aov_res$F; metrics$anova_p <- aov_res$p
