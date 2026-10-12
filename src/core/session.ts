@@ -21,7 +21,7 @@ import { contextWarning, promptTokens, usageSummary, type UsageSummary } from ".
 import { loadSettings, xlsxOn, type Settings } from "./config.ts";
 import { outputDir, savedLine, writeResults, type Saved } from "./results.ts";
 import { outputFile, type Dirs } from "../adapters/kinds/common.ts";
-import { ADAPTER_DECISION, decisionHook, DecisionRecord } from "./decisions.ts";
+import { ADAPTER_DECISION, decisionHook, DecisionRecord, TEST_DECISIONS } from "./decisions.ts";
 import { HookRunner } from "./hooks.ts";
 import { applyOverlay, labText, propose } from "./labmemory.ts";
 import { accessOf, blocksCode, isCodeTool, usable } from "../adapters/access.ts";
@@ -386,7 +386,7 @@ export class Session {
         this.notes.push(`The default adapter ${a.name} did not start: ${(e as Error).message}`);
       }
 
-    this.decisions = new DecisionRecord(this.adapters, this.record, this.pick ? [ADAPTER_DECISION] : []);
+    this.decisions = new DecisionRecord(this.adapters, this.record, [...(this.pick ? [ADAPTER_DECISION] : []), ...TEST_DECISIONS]);
     this.interactive = !!opts.interactive;
     this.decisions.onDeviation = (e) => this.askMissingReason(e);
     const pf = this.settings.planFirst;

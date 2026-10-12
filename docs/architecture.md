@@ -388,7 +388,7 @@ class Session {
 
 Built like Claude Code: a scrolling transcript, an input box at the bottom, a status line, and
 modal cards. Esc interrupts. Shift+Tab cycles the mode. Slash commands: `/setup`, `/decisions`,
-`/owner`, `/mode`, `/questions`, `/answer`, `/trail [1|2|3]`, `/graph`, `/review`, `/findings`,
+`/owner`, `/mode`, `/questions`, `/answer`, `/trail [1|2|3]`, `/graph`, `/review`, `/findings`, `/tests`,
 `/export <fmt>`, `/model`, `/adapters`, `/skills`, `/lab`, `/compact`, `/resume`, `/help`,
 `/quit`. Cards: setup form, permission request, question with options and sensitivity table,
 Follow-mode instruction.

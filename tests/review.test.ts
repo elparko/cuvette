@@ -36,6 +36,63 @@ function ctx(record: any, answer: string, over: any = {}) {
   return { record, decisions, adapters: [], answer, claims: [] as Claim[], ...over };
 }
 
+describe("test families and power", () => {
+  const test1 = (id: string, p: number) => ({
+    id,
+    tool: "compare_two_groups",
+    args: { path: "/d/sleep.csv" },
+    inputFiles: [{ path: "/d/sleep.csv" }],
+    result: { metrics: { p_value: p, n_a: 200, n_b: 200, statistic: 3, mean_diff: 1 }, data: { test: "Welch t-test" } },
+  });
+  const nodes = [test1("n1", 0.01), test1("n2", 0.04), test1("n3", 0.03)];
+  const claim = (node: string, value: number): Claim => ({ text: `The difference has p = ${value}.`, value, label: "measured", node });
+  const answer = "Cohen d = 0.3 (95% CI 0.1 to 0.5), p = 0.01.";
+
+  test("a raw p value from a family of three tests", async () => {
+    const out = await runChecks(ctx(makeRecord([], nodes), answer, { claims: [claim("n1", 0.01)] }));
+    expect(out.map((f) => f.check)).toEqual(["family_uncorrected"]);
+    expect(out[0].severity).toBe("warning");
+    expect(out[0].message).toMatch(/3 tests on sleep\.csv/);
+    expect(out[0].message).toMatch(/test_correction/);
+  });
+
+  test("no finding if the answer names a correction", async () => {
+    const out = await runChecks(ctx(makeRecord([], nodes), answer + " Holm p = 0.03.", { claims: [claim("n1", 0.01)] }));
+    expect(out).toHaveLength(0);
+  });
+
+  test("no finding if the scientist said the extra tests were not part of the analysis", async () => {
+    const seed = [{ kind: "decision" as EntryKind, data: { key: "test_correction", new: "not_part_of_analysis" } }];
+    const out = await runChecks(ctx(makeRecord(seed, nodes), answer, { claims: [claim("n1", 0.01)] }));
+    expect(out).toHaveLength(0);
+  });
+
+  test("a chosen correction asks for the corrected value", async () => {
+    const seed = [{ kind: "decision" as EntryKind, data: { key: "test_correction", new: "holm" } }];
+    const out = await runChecks(ctx(makeRecord(seed, nodes), answer, { claims: [claim("n1", 0.01)] }));
+    expect(out[0].message).toMatch(/Report the corrected p value: 0\.03/);
+  });
+
+  test("no finding for a single test", async () => {
+    const out = await runChecks(ctx(makeRecord([], [nodes[0]]), answer, { claims: [claim("n1", 0.01)] }));
+    expect(out).toHaveLength(0);
+  });
+
+  test("a small sample gives a note", async () => {
+    const small = { ...test1("n1", 0.0028), result: { metrics: { p_value: 0.0028, n_a: 10, n_b: 10, statistic: 4.0621, mean_diff: 1.58 }, data: { test: "paired t-test" } } };
+    const out = await runChecks(ctx(makeRecord([], [small]), answer));
+    expect(out.map((f) => [f.check, f.severity])).toEqual([["low_power", "info"]]);
+    expect(out[0].message).toMatch(/^With 10 pairs/);
+  });
+
+  test("the finding names what the record holds", async () => {
+    const held = { ...nodes[0], result: { metrics: { p_value: 0.01, mean_diff: 1.58, ci_lo: 0.7, ci_hi: 2.46, effect_size: 1.28 }, data: { test: "Welch t-test" } } };
+    const out = await runChecks(ctx(makeRecord([], [held]), "Drug 2 is better, p = 0.01.", { claims: [claim("n1", 0.01)] }));
+    expect(out.find((f) => f.check === "p_without_effect")!.message).toMatch(/step 1 holds mean_diff = 1\.58, effect_size = 1\.28/);
+    expect(out.find((f) => f.check === "p_without_interval")!.message).toMatch(/ci_lo = 0\.7, ci_hi = 2\.46/);
+  });
+});
+
 describe("Findings", () => {
   test("adds, resolves and restores", () => {
     const record = makeRecord();
@@ -75,8 +132,19 @@ describe("runChecks", () => {
 
   test("p value without effect size", async () => {
     const out = await runChecks(ctx(makeRecord(), "The groups differ, p = 0.01."));
-    expect(out.map((f) => f.check)).toEqual(["p_without_effect"]);
-    expect(await runChecks(ctx(makeRecord(), "AUC 0.9, p = 0.01."))).toHaveLength(0);
+    expect(out.map((f) => f.check)).toEqual(["p_without_effect", "p_without_interval"]);
+    expect(await runChecks(ctx(makeRecord(), "AUC 0.9 (95% CI 0.8 to 0.95), p = 0.01."))).toHaveLength(0);
+  });
+
+  test("p value with an effect size but no interval", async () => {
+    const out = await runChecks(ctx(makeRecord(), "Cohen d = 1.2, p = 0.01."));
+    expect(out.map((f) => f.check)).toEqual(["p_without_interval"]);
+    expect(out[0].severity).toBe("warning");
+  });
+
+  test("the effect size and interval in a neighbor block count", async () => {
+    const answer = "Drug 2 gave more sleep, p = 0.003.\n\n| measure | value |\n| --- | --- |\n| mean difference | 1.58 h (95% CI 0.7 to 2.5) |";
+    expect(await runChecks(ctx(makeRecord(), answer))).toHaveLength(0);
   });
 
   test("unsourced and stale numbers", async () => {
