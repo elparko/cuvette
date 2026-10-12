@@ -52,6 +52,32 @@ export const ADAPTER_DECISION: Decision = Decision.parse({
   help: "The programs that do the analysis, as adapter names. The agent chooses one with use_adapter and gives the reason. Change it with /program.",
 });
 
+export const TEST_DECISIONS: Decision[] = [
+  Decision.parse({
+    key: "test_family",
+    label: "Group of tests for a correction",
+    kind: "choice",
+    choices: ["same_data", "one_family", "separate"],
+    default: "same_data",
+    owner: "human",
+    group: "Statistics",
+    stage: "when_needed",
+    changes_conclusion: false,
+    help: "same_data: tests on the same data file are one family. one_family: all tests in the session are one family. separate: each test is its own family and has no correction.",
+  }),
+  Decision.parse({
+    key: "test_correction",
+    label: "Correction for the tests in this session",
+    kind: "choice",
+    choices: ["holm", "benjamini_hochberg", "not_part_of_analysis"],
+    owner: "human",
+    group: "Statistics",
+    stage: "when_needed",
+    changes_conclusion: false,
+    help: "Each test in a family adds a chance of a false positive. Holm controls the chance of any false positive. Benjamini-Hochberg controls the share of false positives among the positive tests. Choose not_part_of_analysis if the extra tests were only checks and not part of the analysis.",
+  }),
+];
+
 export function getPath(obj: unknown, path: string): unknown {
   let cur: any = obj;
   for (const part of path.split(".")) {

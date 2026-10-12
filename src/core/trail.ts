@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import type { LoadedAdapter, MapEntry } from "../adapters/manifest.ts";
+import { testsMarkdown, testsTable } from "./testcount.ts";
 import { referencesHtml, referencesMarkdown, sessionCitations, type CitationStyle } from "./citations.ts";
 import { roleInRecord, stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
@@ -667,6 +668,12 @@ function planHtml(record: AnalysisRecord): string {
   return `<section class="plan" id="plan"><h2>Proposed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${p.version}.</p>${updates}${validation}</section>`;
 }
 
+function testsHtml(record: AnalysisRecord): string {
+  const t = testsTable(record);
+  if (!t) return "";
+  return `<h3>Tests in this session</h3><div class="scroll"><table><thead><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
   const m = meta(record);
   const labels = new Map<string, string>();
@@ -697,6 +704,7 @@ ${title ? `<p class="question"><b>Question</b> ${esc(title)}</p>` : ""}
 <p class="meta"><b>Session</b> ${esc(m.id)} &middot; <b>Adapters</b> ${esc(m.adapters)} &middot; <b>Model</b> ${esc(m.model)} &middot; <b>Date</b> ${esc(m.date)}</p>
 ${planHtml(record)}
 ${settingRowsHtml ? `<h3>Settings</h3><div class="scroll"><table><thead><tr><th>Decision</th><th>Value</th><th>Set by</th></tr></thead><tbody>${settingRowsHtml}</tbody></table></div>` : ""}
+${testsHtml(record)}
 ${sections.join("\n")}
 <section id="cite">${referencesHtml(sessionCitations(record, adapters, stepNumbers(record.nodes())), style)}</section>
 </main></body></html>
@@ -762,6 +770,7 @@ function markdownText(record: AnalysisRecord, adapters: LoadedAdapter[], style: 
     for (const [k, v] of setup) lines.push(`| ${mdCell(labels.get(k) ?? k)} | ${mdCell(v)} |`);
     lines.push("");
   }
+  lines.push(...testsMarkdown(record));
   lines.push("## Steps", "");
   for (const t of trail(record, 2, adapters)) {
     lines.push(`${t.n}. ${t.line.replace(/\n/g, " ")}${t.badges.map((b) => ` [${b}]`).join("")}`);

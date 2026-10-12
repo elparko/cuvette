@@ -2,7 +2,9 @@ import type { AdapterCheckContext, LoadedAdapter } from "../adapters/manifest.ts
 import type { DecisionRecord } from "./decisions.ts";
 import { approvedPlan, currentPlan, definitionFindings, planFindings, planText } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
+import { powerFindings } from "./power.ts";
 import { checkText, summary } from "./ste.ts";
+import { latestValue, testRows } from "./testcount.ts";
 import type { Claim, Entry, Finding, FindingIn, Node, Provider } from "./types.ts";
 
 export interface ReviewContext {
@@ -104,17 +106,58 @@ function deviationsNotMentioned(ctx: ReviewContext): FindingIn[] {
 }
 
 const P_VALUE = /\b[pPqQ](?:[ -]?values?)?\s*(?:=|<|>|≤|≥|<=|>=|~|of)\s*(?:\d*\.\d+|\d+)/;
-const EFFECT = /effect size|fold[- ]?change|\bAUC\b|\bAUROC\b|cohen|hedges|difference of|mean difference|ratio|odds/i;
+const EFFECT_WORDS =
+  /effect size|fold[- ]?change|\bAUC\b|\bAUROC\b|cohen|hedges|difference of|mean difference|difference in means|ratio|odds|\beta[- ]?squared|\bη|\brho\b|correlation (?:coefficient )?of|hazard/i;
+const EFFECT_SYMBOLS = /\b(?:OR|RR|HR)\b|\b[dgr]\s*=|\bd[zs]\b|\bR²|\bρ/;
+const EFFECT = { test: (s: string) => EFFECT_WORDS.test(s) || EFFECT_SYMBOLS.test(s) };
+const INTERVAL = /\b(?:9[059]|99)\s?%\s*(?:confidence|CI\b|credible)|confidence interval|credible interval|\bCI\b/i;
+const EFFECT_KEY = /effect|cohen|hedges|odds_ratio|risk_ratio|hazard_ratio|mean_diff|eta|cramers_v|^r$|rho|fold/i;
+const INTERVAL_KEY = /ci_?(?:lo|hi|low|high|lower|upper)/i;
+const CORRECTION_WORDS = /\b(?:holm|bonferroni|benjamini|hochberg|fdr|false discovery|adjusted p|corrected p|p[- ]?adj|multiple (?:comparison|test)|family-?wise|sidak|correction)/i;
 
-function pWithoutEffect(ctx: ReviewContext): FindingIn[] {
-  if (!P_VALUE.test(ctx.answer) || EFFECT.test(ctx.answer)) return [];
-  return [
-    {
+function recordHint(ctx: ReviewContext, keys: RegExp): string {
+  const steps = new Map(testRows(ctx.record).map((r) => [r.node, r.step]));
+  const parts: string[] = [];
+  for (const node of new Set(ctx.claims.filter((c) => c.node && steps.has(c.node)).map((c) => c.node!))) {
+    const m = (ctx.record.node(node)?.result as { metrics?: Record<string, unknown> } | undefined)?.metrics ?? {};
+    const held = Object.entries(m).filter(([k, v]) => keys.test(k) && typeof v === "number");
+    if (held.length) parts.push(`step ${steps.get(node)} holds ${held.slice(0, 4).map(([k, v]) => `${k} = ${Number((v as number).toPrecision(3))}`).join(", ")}`);
+  }
+  return parts.length ? ` The record: ${parts.join("; ")}.` : "";
+}
+
+function pReporting(ctx: ReviewContext): FindingIn[] {
+  const blocks = ctx.answer.split(/\n\s*\n/);
+  const near = (i: number) => blocks.slice(Math.max(0, i - 1), i + 2).join("\n");
+  const withP = blocks.map((b, i) => (P_VALUE.test(b) ? i : -1)).filter((i) => i >= 0);
+  const out: FindingIn[] = [];
+  if (withP.some((i) => !EFFECT.test(near(i))))
+    out.push({
       check: "p_without_effect",
       severity: "warning",
-      message: "The answer reports a p or q value with no effect size. Add the size of the difference.",
-    },
-  ];
+      message: `The answer reports a p or q value with no effect size. Add the size of the difference, for example Cohen d, an odds ratio or a mean difference.${recordHint(ctx, EFFECT_KEY)}`,
+    });
+  if (withP.some((i) => !INTERVAL.test(near(i))))
+    out.push({
+      check: "p_without_interval",
+      severity: "warning",
+      message: `The answer reports a p or q value with no 95% confidence interval. Add the interval next to the effect size.${recordHint(ctx, INTERVAL_KEY)}`,
+    });
+  return out;
+}
+
+function familyUncorrected(ctx: ReviewContext): FindingIn[] {
+  const chosen = String(latestValue(ctx.record, "test_correction") ?? "");
+  if (chosen === "not_part_of_analysis" || CORRECTION_WORDS.test(ctx.answer)) return [];
+  const raw = testRows(ctx.record).filter(
+    (r) => r.size > 1 && ctx.claims.some((c) => c.label === "measured" && c.node === r.node && c.value !== null && /\b[pP]\b|p[- ]?value/.test(c.text) && Math.abs(c.value - r.p) <= Math.max(0.01 * r.p, 0.0006)),
+  );
+  if (!raw.length) return [];
+  const list = raw.map((r) => `p = ${Number(r.p.toPrecision(3))} (step ${r.step}, ${r.size} tests on ${r.family})`).join("; ");
+  const message = chosen
+    ? `The answer reports a raw p value from a family of tests: ${list}. The scientist chose ${chosen.replace(/_/g, " ")}. Report the corrected p value: ${raw.map((r) => Number((chosen === "holm" ? r.holm : r.bh).toPrecision(3))).join(", ")}.`
+    : `The answer reports a raw p value from a family of tests with no correction: ${list}. Set the decision test_correction to Holm or Benjamini-Hochberg, or to not part of the analysis if the extra tests were not part of it. The table Tests in this session shows each test.`;
+  return [{ check: "family_uncorrected", severity: "warning", message, nodes: raw.map((r) => r.node) }];
 }
 
 function unsourcedNumbers(ctx: ReviewContext): FindingIn[] {
@@ -316,7 +359,9 @@ export async function runChecks(ctx: ReviewContext): Promise<FindingIn[]> {
     ...decisionsMisreported(ctx),
     ...failedNotRepeated(ctx),
     ...deviationsNotMentioned(ctx),
-    ...pWithoutEffect(ctx),
+    ...pReporting(ctx),
+    ...familyUncorrected(ctx),
+    ...powerFindings(ctx.record),
     ...unsourcedNumbers(ctx),
     ...staleUsed(ctx),
     ...openQuestions(ctx),

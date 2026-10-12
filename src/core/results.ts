@@ -12,6 +12,7 @@ import { stepNumbers } from "./housekeeping.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Node, TablePreview } from "./types.ts";
 import { renvLock, requirementsText } from "./envlock.ts";
+import { testsTable } from "./testcount.ts";
 import { changeCell, reruns, stepStatus } from "./status.ts";
 
 export type Cell = string | number | boolean | null | undefined;
@@ -418,7 +419,7 @@ export function checkSheets(record: AnalysisRecord): Sheet[] {
 
 export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const { record, adapters, dir } = w;
-  const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation", "data check", "samples", "changes", "packages", "references"]);
+  const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation", "data check", "samples", "changes", "packages", "references", "tests in this session"]);
   const steps = stepNumbers(record.nodes());
   const status = new Map(stepStatus(record, { labels: Object.fromEntries(w.fields.map((f) => [f.key, f.label || f.key])) }).map((x) => [x.node, x]));
   const rewound = record.rewound();
@@ -528,11 +529,13 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
 
   const pilot = pilotRows(record);
   const validation = validationRows(record);
+  const tests = testsTable(record);
   return [
     { name: "Summary", columns: ["Section", "Item", "Value", "Source", "Definition"], rows: summary },
     ...(pilot.rows.length ? [{ name: "Pilot", columns: pilot.columns, rows: pilot.rows }] : []),
     ...(validation ? [{ name: "Validation", columns: validation.columns, rows: [...validation.rows, [], ...validation.summary.map((x) => [x]), ...(validation.plot ? [[`Bland-Altman plot: ${rel(dir, validation.plot)}`]] : [])] }] : []),
     ...checkSheets(record),
+    ...(tests ? [{ name: "Tests in this session", columns: tests.columns, rows: tests.rows }] : []),
     ...tableSheets,
     { name: "Steps", columns: ["Step", "Tool", "Adapter", "Description", "Result", "Inputs", "Input SHA-256", "Outputs", "Table sheets", "Manual route", "Fidelity", "Status", "Environment", "Node"], rows: stepRows },
     ...(metricRows.length ? [{ name: "Metrics", columns: ["Step", "Metric", "Value"], rows: metricRows }] : []),

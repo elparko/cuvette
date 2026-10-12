@@ -1,3 +1,4 @@
+import { testsTable } from "../core/testcount.ts";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import type { Mode, Question } from "../core/types.ts";
@@ -646,8 +647,10 @@ export function resultsHtml(c: Ctx, outDir: string, sheets: { name: string; colu
       `</div>`,
   );
   if (existsSync(xlsx)) parts.push(`<h4>Tables</h4><p>${fileLink(c, xlsx)}</p>`);
+  const tests = testsTable(c.session.record);
+  if (tests) parts.push(`<h4>Tests in this session</h4><p class="dim small">Each test with a p value. A test on the same data file joins the same family. Change the grouping with the decision test_family. Choose the correction with the decision test_correction.</p>${tableHtml(tests.columns.map(esc), tests.rows.map((r) => r.map((v) => esc(v))))}`);
   if (sheets?.length) {
-    for (const s of sheets) {
+    for (const s of sheets.filter((x) => x.name !== "Tests in this session")) {
       const rows = s.rows.slice(0, 200);
       const table = tableHtml(s.columns.map(esc), rows.map((r) => s.columns.map((_, i) => esc(r[i] ?? ""))));
       const wide = s.columns.length > 3 ? `<div class="row end">${btn("Open full width", `data-wide="1"`, "quiet")}</div>` : "";

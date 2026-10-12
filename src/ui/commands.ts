@@ -10,6 +10,7 @@ import { listSessions, sessionLine } from "../core/sessions.ts";
 import { groupSummary, sheetTable } from "../core/samples.ts";
 import { dollars, kTokens, percentText, priceLine, usageLong, type UsageSummary } from "../core/spend.ts";
 import { applyRewind, changeCard, changePicker, changeRows, choiceLabel, choiceValue, findChange, show, type Card } from "./cards.ts";
+import { testsText } from "../core/testcount.ts";
 import { rewindPoints } from "../core/rewind.ts";
 import { branchesText } from "../core/branch.ts";
 import { listMethods, methodText } from "../core/methods.ts";
@@ -560,6 +561,13 @@ export const commands: Command[] = [
       const list = await ctx.session.review();
       if (!list.length) return ctx.notice("The review found nothing.");
       ctx.openCard({ t: "findings", list });
+    },
+  },
+  {
+    name: "tests",
+    help: "Show each test with a p value in this session, with the Holm and Benjamini-Hochberg p values for its family.",
+    run(_, ctx) {
+      ctx.print(testsText(ctx.session.record), "Tests in this session");
     },
   },
   {
