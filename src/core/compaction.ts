@@ -21,7 +21,6 @@ const RECENT_SHARE = 0.3;
 const BULKY_CHARS = 1500;
 const KEEP_CHARS = 400;
 const SUMMARY_HEAD = "[Summary of the earlier part of this session]";
-const NOTES_HEAD = "[Notes from the harness]";
 
 function partChars(p: Part): number {
   if (p.type === "text" || p.type === "thinking") return p.text.length;
@@ -40,12 +39,6 @@ export function estimateTokens(messages: Message[], system = "", tools: ToolSche
 
 const isResults = (m: Message) => m.parts.some((p) => p.type === "tool_result");
 const isSummary = (m: Message | undefined) => !!m && m.role === "user" && m.parts[0]?.type === "text" && m.parts[0].text.startsWith(SUMMARY_HEAD);
-
-function isRequest(m: Message): boolean {
-  if (m.role !== "user" || isResults(m) || isSummary(m)) return false;
-  const text = m.parts.find((p) => p.type === "text");
-  return !!text && text.type === "text" && !text.text.startsWith(NOTES_HEAD);
-}
 
 export function transcriptText(messages: Message[]): string {
   const out: string[] = [];
@@ -108,18 +101,13 @@ export interface Summarized {
 }
 
 // Summarizes the messages between the start of the history and the recent window.
-// The previous summary is updated, and the latest request of the scientist stays as it is.
-export async function summarizeOld(messages: Message[], provider: Provider, contextWindow: number, signal?: AbortSignal): Promise<Summarized | null> {
+// The previous summary is updated, and the request of the current turn stays as it is.
+export async function summarizeOld(messages: Message[], provider: Provider, contextWindow: number, signal?: AbortSignal, request?: Message): Promise<Summarized | null> {
   const start = isSummary(messages[0]) ? 1 : 0;
   const end = recentStart(messages, contextWindow);
   if (end <= start) return null;
-  let r = -1;
-  if (!messages.slice(end).some(isRequest))
-    for (let i = end - 1; i >= start; i--)
-    if (isRequest(messages[i]!)) {
-      r = i;
-      break;
-    }
+  const at = request ? messages.indexOf(request) : -1;
+  const r = at >= start && at < end ? at : -1;
   const old = messages.slice(start, end).filter((_, i) => i + start !== r);
   if (!old.length) return null;
   const prev = start ? (messages[0]!.parts[0] as { text: string }).text.slice(SUMMARY_HEAD.length).trim() : "";

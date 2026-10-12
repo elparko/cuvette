@@ -51,6 +51,14 @@ Now, before each step:
    The recent steps are at least the last two model replies, up to 30% of the
    window.
 
+The session keeps the request message of the current turn by identity. The
+request text often starts with the harness notes (the decisions brief), so a text
+check cannot find it.
+
+Each new shortened output changes the prompt from that point. This makes the
+prompt cache start again from that point, on Claude and on Ollama. On Claude, this
+happens only above about 500k tokens.
+
 The record, the claim check and the number trail use the record, not the live
 history. Thus a shortened tool output does not change a result or a check.
 
@@ -67,8 +75,9 @@ p value. Use it to test a harness change on the same papers before and after.
   manual route. A shell cannot give the record of each number.
 - Plan tool: Cuvette already has a plan that the scientist approves, and a nudge
   when plan steps are open.
-- Stuck detection: Cuvette stops a run after three identical calls in a row. This
-  is stricter than the study. A change is not necessary.
+- Stuck detection: after three identical calls in a row, Cuvette makes the third
+  call fail and asks for the final answer. This is stricter than the study. A
+  change is not necessary.
 
 ## How to check it on a local model
 
@@ -91,7 +100,9 @@ too large without compaction.
 The 9 October request of 21,717 tokens is too large for a 16,384 window.
 
 All context management happened inside one turn. The largest request stayed below
-the window. This is one run on one paper, so it shows no overflow. It does not show
+the window. This run used the first version of the change. In that version, the
+summary removed the request when the request started with the harness notes. The
+fix came after this run. The scores did not change. This is one run on one paper, so it shows no overflow. It does not show
 an accuracy gain.
 
 At this small window, the harness summarized five times in 14 model steps. Each

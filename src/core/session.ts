@@ -858,7 +858,8 @@ export class Session {
       }
       this.record.append("user", { text, ...(opts.internal ? { internal: true } : {}) });
       const notes = this.drainNotes();
-      this.push({ role: "user", parts: [{ type: "text", text: notes ? `${notes}\n\n${text}` : text }] });
+      this.request = { role: "user", parts: [{ type: "text", text: notes ? `${notes}\n\n${text}` : text }] };
+      this.push(this.request);
       for (let step = 0; step < this.settings.maxSteps; step++) {
         if (!(await this.phiGate(signal))) {
           this.record.append("notice", { text: "Stopped before the content went to the model. Nothing was sent." });
@@ -1084,6 +1085,8 @@ export class Session {
   // Two stages, before each step. Above ELIDE_AT of the window, old bulky tool output
   // is shortened in the live history only. Above SUMMARIZE_AT, the older messages are summarized.
   // The latest request and the recent messages stay as they are, also inside one long turn.
+  private request?: Message;
+
   private async maybeCompact(signal: AbortSignal, force = false) {
     const win = this.provider.info.contextWindow;
     const size = () => estimateTokens(this.history, this.system, this.activeSchemas());
@@ -1096,7 +1099,7 @@ export class Session {
       }
       if (size() <= win * SUMMARIZE_AT) return;
     }
-    const res = await summarizeOld(this.history, this.provider, win, signal);
+    const res = await summarizeOld(this.history, this.provider, win, signal, this.request);
     if (!res) return;
     const steps = this.plan?.steps.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`) ?? [];
     const summary = summaryMessage(steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary);

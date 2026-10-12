@@ -49,7 +49,7 @@ test("the estimate counts the tool schemas", () => {
 test("summarizing inside one turn keeps the request and the recent window, and pairs each call with its result", async () => {
   const h = oneLongTurn(6);
   const provider = new FakeProvider({ steps: [], complete: "## Question\nMeasure the cells." });
-  const res = await summarizeOld(h, provider, 10);
+  const res = await summarizeOld(h, provider, 10, undefined, h[0]);
   expect(res).not.toBeNull();
   expect(res!.request).toBe(h[0]);
   expect(res!.kept).toEqual(h.slice(9));
@@ -65,15 +65,17 @@ test("a second summary updates the first one", async () => {
   let input = "";
   const provider = new FakeProvider({ steps: [], complete: "new" });
   (provider as { complete: (s: string, t: string) => Promise<string> }).complete = async (_s, text) => ((input = text), "new");
-  await summarizeOld(h, provider, 10);
+  await summarizeOld(h, provider, 10, undefined, h[1]);
   expect(input).toMatch(/^Previous summary:\n## Question\nOld question\.\n\nOlder messages:\n/);
   expect(input).not.toContain("Measure the cells in each file.");
 });
 
 test("nothing to summarize when the history is only the request and the recent window", async () => {
   const provider = new FakeProvider({ steps: [], complete: "x" });
-  expect(await summarizeOld(oneLongTurn(2), provider, 10)).toBeNull();
-  expect(await summarizeOld([request("hello")], provider, 10)).toBeNull();
+  const h = oneLongTurn(2);
+  expect(await summarizeOld(h, provider, 10, undefined, h[0])).toBeNull();
+  const one = [request("hello")];
+  expect(await summarizeOld(one, provider, 10, undefined, one[0])).toBeNull();
 });
 
 test("a long single turn on a small window first shortens old output, then summarizes, and never sends more than the window", async () => {
@@ -86,7 +88,8 @@ test("a long single turn on a small window first shortens old output, then summa
   });
   let n = 0;
   const provider = new FakeProvider({ steps: () => (n < files.length ? { calls: [{ name: "read_file", args: { path: files[n++] } }] } : { text: "All plates read." }), complete: "## Question\nRead each plate." });
-  const session = await Session.create({ adapters: [], provider, cwd, settings: { guidance: false, phi_check: false } as never });
+  const session = await Session.create({ adapters: [], provider, cwd, settings: { phi_check: false } as never });
+  session.decisions.applySetup({});
   const base = estimateTokens([request("Read each plate file.")], provider.requests[0]?.system ?? "", []);
   provider.info.contextWindow = 12_000 + base;
   await session.send("Read each plate file.");
@@ -97,16 +100,18 @@ test("a long single turn on a small window first shortens old output, then summa
   expect(notices[0]!.id).toBeLessThan(compactions[0]!.id);
   expect(String(compactions[0]!.data.summary)).toMatch(/^\[Summary of the earlier part of this session\]\n## Question/);
   const last = provider.requests.at(-1)!;
-  expect(last.messages[1]).toEqual(request("Read each plate file."));
+  const sent = last.messages[1]!.parts[0] as { text: string };
+  expect(sent.text).toMatch(/^\[Notes from the harness\]\n- [\s\S]*\n\nRead each plate file\.$/);
   for (const r of provider.requests) expect(estimateTokens(r.messages, r.system, r.tools)).toBeLessThan(provider.info.contextWindow);
   expect(session.record.messages().length).toBe(session["history"].length);
   await session.close();
 });
 
-test("an older request is summarized when a newer request is in the recent window", async () => {
+test("only the request of the current turn stays; it stays in the recent window if it is there", async () => {
   const h = [request("First question."), call("c1"), result("c1", "x".repeat(4000)), { role: "assistant", parts: [{ type: "text", text: "a".repeat(400) }] } as Message, request("Second question."), call("c2"), result("c2", "y")];
   const provider = new FakeProvider({ steps: [], complete: "s" });
-  const res = await summarizeOld(h, provider, 10);
+  const res = await summarizeOld(h, provider, 10, undefined, h[4]);
   expect(res!.request).toBeUndefined();
   expect(res!.kept[0]).toBe(h[3]);
+  expect((await summarizeOld(h, provider, 10, undefined, h[0]))!.request).toBe(h[0]);
 });
