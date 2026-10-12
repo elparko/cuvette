@@ -454,3 +454,10 @@ test("the view streams the thinking text, and a tool call clears it", () => {
   expect(view.snapshot().think).toBe("");
   view.close();
 });
+
+test("the definitions under a final answer fold into a Definitions toggle", async () => {
+  const { itemHtml } = await import("../src/server/app-html.ts");
+  const html = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "a", t: "assistant", text: "Drug 2 is better.\n\nDefinitions, from the confirmed analysis:\n- n: One patient." } as never);
+  expect(html).toContain("<p>Drug 2 is better.</p>");
+  expect(html).toContain('<details class="defs"><summary>Definitions</summary><ul><li>n: One patient.</li></ul></details>');
+});

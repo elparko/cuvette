@@ -187,12 +187,17 @@ export function fileLink(c: Ctx, path: string): string {
   return `<a href="${esc(fileUrl(c, path, true))}" download="${esc(name)}" title="${esc(path)}">${esc(label)}</a> <button type="button" class="link" data-reveal="${esc(path)}">Show in folder</button>`;
 }
 
+const DEFS_HEAD = "Definitions, from the confirmed analysis:";
+
 export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: number[]) => Item[] } = {}): string {
   switch (it.t) {
     case "user":
       return `<div class="msg user"><div class="bubble">${esc(it.text)}</div></div>`;
-    case "assistant":
-      return `<div class="msg agent">${md(it.text, opts)}</div>`;
+    case "assistant": {
+      const at = it.text.indexOf(DEFS_HEAD);
+      if (at < 0) return `<div class="msg agent">${md(it.text, opts)}</div>`;
+      return `<div class="msg agent">${md(it.text.slice(0, at), opts)}<details class="defs"><summary>Definitions</summary>${md(it.text.slice(at + DEFS_HEAD.length), opts)}</details></div>`;
+    }
     case "line": {
       const cls = `line ${it.color ?? ""} ${it.dim ? "dim" : ""}`;
       const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> ${shortPaths(esc(it.text))}${it.change ? ` ${btn("Change", `data-change="${esc(it.change)}"`, "quiet small")}` : ""}`;
