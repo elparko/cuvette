@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
+import type { DataSummary } from "./datacompare.ts";
 import { approvedPlan, currentPlan, planText, type AnalysisPlan } from "./plan.ts";
 import type { AnalysisRecord } from "./record.ts";
 import { afterProjectWrite, folderTrusted, trustStatus } from "./trust.ts";
@@ -19,6 +20,7 @@ export interface Method {
   programs: { adapter: string; version: string; program?: string; programVersion?: string }[];
   decisions: Record<string, unknown>;
   pilot: { required: boolean; shows: string[] };
+  inputs?: DataSummary[];
 }
 
 export function methodsDir(): string {
@@ -55,6 +57,8 @@ export function methodFrom(record: AnalysisRecord, name: string, decisions: Reco
     const list = e.kind === "session" ? ((e.data.adapters as { name: string; version: string; programVersion?: string }[]) ?? []) : [e.data as { name: string; version: string; program?: string; programVersion?: string }];
     for (const x of list) programs.set(x.name, { adapter: x.name, version: String(x.version ?? ""), ...("program" in x && x.program ? { program: String(x.program) } : {}), ...(x.programVersion ? { programVersion: String(x.programVersion) } : {}) });
   }
+  const inputs = new Map<string, DataSummary>();
+  for (const e of record.live(["data_check"])) if (e.data.summary) inputs.set(String((e.data.summary as DataSummary).source), e.data.summary as DataSummary);
   const { question: _q, ...rest } = decisions;
   return {
     cuvette_method: METHOD_FORMAT,
@@ -67,6 +71,7 @@ export function methodFrom(record: AnalysisRecord, name: string, decisions: Reco
     programs: [...programs.values()],
     decisions: rest,
     pilot: { required: true, shows: plan.pilot?.shows ?? [] },
+    ...(inputs.size ? { inputs: [...inputs.values()].slice(-5) } : {}),
   };
 }
 

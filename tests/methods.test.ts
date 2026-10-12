@@ -1,11 +1,12 @@
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { Session } from "../src/core/session.ts";
 import { deleteMethod, exportMethod, importMethod, listMethods, loadMethod, methodsDir, readMethod } from "../src/core/methods.ts";
+import { attachHeadless } from "../src/core/headless.ts";
 import { rewindPoints } from "../src/core/rewind.ts";
-import { FakeProvider } from "../src/providers/fake.ts";
+import { FakeProvider, type FakeStep } from "../src/providers/fake.ts";
 import type { Question } from "../src/core/types.ts";
 import { folderLines, scanFolder, trustFolder } from "../src/core/trust.ts";
 
@@ -142,4 +143,83 @@ test("a method in the project folder loads only after the scientist trusts the f
   const s = await Session.create({ adapters: [LAB], provider: new FakeProvider([]), cwd: colleague, interactive: true, method: "lab-way" });
   open.push(s);
   expect(s.method?.name).toBe("lab-way");
+});
+
+const weights = (scale: number, name = "weight") => [`animal,${name},length`, ...Array.from({ length: 20 }, (_, i) => `M${i + 1},${(20 + (i % 9)) * scale},${10 + (i % 5)}`)].join("\n") + "\n";
+const STEPS = { restatement: "You want: the mean weight.", steps: [{ step: "Count", tool: "count", settings: [{ key: "min_size", label: "Smallest particle", value: 8, by: "agent" }] }] };
+
+async function runOn(csv: string, method?: string, steps: FakeStep[] = [], allow?: Set<string>) {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-weights-"));
+  writeFileSync(join(cwd, "weights.csv"), csv);
+  const p = new FakeProvider([{ calls: [{ name: "read_file", args: { path: join(cwd, "weights.csv") } }] }, { calls: [{ name: "clarify", args: { found: "I see 20 animals." } }] }, { calls: [{ name: "plan", args: STEPS }] }, ...steps, { text: "done" }, { text: "done" }]);
+  const s = await Session.create({ adapters: [LAB], provider: p, cwd, interactive: true, method });
+  open.push(s);
+  s.decisions.applySetup({});
+  const cards: Question[] = [];
+  if (allow) attachHeadless(s, { answers: {}, allow });
+  s.bus.on((e) => {
+    if (e.type === "question" && e.question.title.startsWith("Data check: the data differs")) cards.push(e.question);
+    if (allow) return;
+    if (e.type === "question") setTimeout(() => s.answer(e.question.qid, e.question.recommendation?.value ?? e.question.options[0]?.value), 0);
+    if (e.type === "plan") setTimeout(() => s.respondPlan({ action: e.stage === "pilot" ? "confirm" : "approve" }), 0);
+  });
+  await s.send("Compare the weights in weights.csv");
+  return { s, cards };
+}
+
+test("a saved method stores a summary of its data, and a run on data with another unit shows a card before any step runs", async () => {
+  const first = await runOn(weights(1));
+  expect(first.cards).toEqual([]);
+  const saved = first.s.saveMethod("weights").method;
+  expect(saved.inputs).toHaveLength(1);
+  expect(saved.inputs![0]!.columns.map((c) => [c.name, c.type, c.median])).toEqual([["animal", "text", undefined], ["weight", "number", 23.5], ["length", "number", 12]]);
+  expect(loadMethod("weights").inputs).toEqual(saved.inputs);
+
+  const { s, cards } = await runOn(weights(1000), "weights", [{ calls: [{ name: "count", args: { input: "x", method: "Otsu", min_size: 8 } }] }]);
+  expect(cards).toHaveLength(1);
+  expect(cards[0]!.text).toContain("Column 'weight' has a median of 23,500. Before, the median was 23.5.");
+  expect(cards[0]!.text).toContain("The unit may be grams, not kilograms.");
+  expect(cards[0]!.options.map((o) => o.value)).toEqual(["continue", "stop"]);
+  const entries = s.record.entries();
+  const card = entries.find((e) => e.kind === "question" && String(e.data.title).startsWith("Data check: the data differs"))!;
+  const firstTool = entries.find((e) => e.kind === "tool_call" && !["read_file", "clarify", "plan", "inspect_data"].includes(String(e.data.tool ?? e.data.name)));
+  if (firstTool) expect(card.id).toBeLessThan(firstTool.id);
+  const compare = s.record.entries(["data_compare"]);
+  expect(compare).toHaveLength(1);
+  expect(compare[0]!.data).toMatchObject({ method: "weights", differences: [{ kind: "unit", column: "weight" }] });
+  expect(s.record.entries(["decision"]).some((e) => String(e.data.key).startsWith("data_check:method_data:") && e.data.new === "stop")).toBe(true);
+  expect(s.record.entries(["notice"]).some((e) => /You stopped the analysis to correct the data: Column 'weight' has a median of 23,500/.test(String(e.data.text)))).toBe(true);
+  expect(s.record.entries(["tool_call"]).some((e) => (e.data.tool ?? e.data.name) === "count")).toBe(false);
+});
+
+test("a run on the same kind of data shows no card", async () => {
+  const first = await runOn(weights(1));
+  first.s.saveMethod("weights");
+  const again = await runOn(weights(1), "weights");
+  expect(again.cards).toEqual([]);
+  expect(again.s.record.entries(["data_compare"])[0]!.data.differences).toEqual([]);
+});
+
+test("a method without a stored summary still runs, with one note, and the record holds the summary for the next save", async () => {
+  const first = await runOn(weights(1));
+  const { method } = first.s.saveMethod("old-way");
+  const { inputs: _i, ...old } = method;
+  writeFileSync(join(methodsDir(), "old-way.json"), JSON.stringify(old));
+  expect(loadMethod("old-way").inputs).toBeUndefined();
+  const { s, cards } = await runOn(weights(1000), "old-way");
+  expect(cards).toEqual([]);
+  expect(s.record.entries(["notice"]).filter((e) => /has no stored summary of its data/.test(String(e.data.text)))).toHaveLength(1);
+  expect(s.record.entries(["data_compare"])).toEqual([]);
+  expect(s.record.entries(["data_check"])[0]!.data.summary).toMatchObject({ rows: 20, columns: [{ name: "animal" }, { name: "weight", median: 23500 }, { name: "length" }] });
+});
+
+test("headless mode stops at a likely unit change and writes it to the record, unless --allow data-change is set", async () => {
+  const first = await runOn(weights(1));
+  first.s.saveMethod("weights");
+  const stopped = await runOn(weights(1000), "weights", [], new Set());
+  expect(stopped.s.record.entries(["data_compare"])[0]!.data).toMatchObject({ differences: [{ kind: "unit" }] });
+  expect(stopped.s.record.entries(["decision"]).find((e) => String(e.data.key).startsWith("data_check:method_data:"))!.data.new).toBe("stop");
+  expect(stopped.s.record.entries(["notice"]).some((e) => /Headless mode stops at a likely unit change\. Column 'weight'.*Pass --allow data-change to continue\./.test(String(e.data.text)))).toBe(true);
+  const allowed = await runOn(weights(1000), "weights", [], new Set(["data-change"]));
+  expect(allowed.s.record.entries(["decision"]).find((e) => String(e.data.key).startsWith("data_check:method_data:"))!.data.new).toBe("continue");
 });

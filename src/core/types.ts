@@ -14,7 +14,7 @@ export type EntryKind =
   | "mode" | "follow_step" | "lab_memory" | "plan" | "plan_approved" | "clarify"
   | "pilot_run" | "pilot_approved" | "pilot_rejected" | "reference" | "validation"
   | "data_check" | "samples" | "eln_push" | "eln_link" | "setting" | "note" | "notice" | "error" | "usage" | "compaction" | "correction" | "adapter" | "title" | "program" | "trust"
-  | "rewind" | "fork" | "branch" | "method" | "phi" | "inspection";
+  | "rewind" | "fork" | "branch" | "method" | "phi" | "inspection" | "data_compare";
 
 export interface Entry {
   id: number;
