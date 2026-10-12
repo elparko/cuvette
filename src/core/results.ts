@@ -173,8 +173,10 @@ export function decodeText(buf: Buffer): { text: string; encoding: string } {
   if (buf[0] === 0xfe && buf[1] === 0xff) return { text: Buffer.from(buf.subarray(2, buf.length - (buf.length % 2))).swap16().toString("utf16le"), encoding: "utf-16be" };
   const head = buf.subarray(0, 4096);
   let oddNul = 0;
-  for (let i = 1; i < head.length; i += 2) if (head[i] === 0) oddNul++;
-  if (head.length >= 4 && oddNul > head.length / 4) return { text: buf.subarray(0, buf.length - (buf.length % 2)).toString("utf16le"), encoding: "utf-16le" };
+  let evenNul = 0;
+  for (let i = 0; i < head.length; i++) if (head[i] === 0) i % 2 ? oddNul++ : evenNul++;
+  if (head.length >= 4 && oddNul > head.length / 4 && oddNul > evenNul) return { text: buf.subarray(0, buf.length - (buf.length % 2)).toString("utf16le"), encoding: "utf-16le" };
+  if (head.length >= 4 && evenNul > head.length / 4 && evenNul > oddNul) return { text: Buffer.from(buf.subarray(0, buf.length - (buf.length % 2))).swap16().toString("utf16le"), encoding: "utf-16be" };
   try {
     return { text: new TextDecoder("utf-8", { fatal: true }).decode(buf), encoding: "utf-8" };
   } catch {

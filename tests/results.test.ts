@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { AnalysisRecord } from "../src/core/record.ts";
-import { buildWorkbook, copyFigures, outputRules, parseCsv, readTable, savedLine, sheetName, writeResults, xlsx, type Sheet } from "../src/core/results.ts";
+import { buildWorkbook, copyFigures, decodeText, outputRules, parseCsv, readTable, savedLine, sheetName, writeResults, xlsx, type Sheet } from "../src/core/results.ts";
 import type { NodeIn } from "../src/core/types.ts";
 import { runScriptTool, scriptPython } from "../src/tools/run_script.ts";
 import { unzip } from "./fixtures/unzip.ts";
@@ -179,4 +179,12 @@ test.skipIf(!scriptPython().includes("science"))("a matplotlib figure from run_s
     expect(readFileSync(join(dirs.workDir, "figures", `${stem}.svg`), "utf8")).toContain("<svg");
   }
   expect(r.outputs!.map((o) => o.name).sort()).toEqual(["second.png", "second.svg", "trace.png", "trace.svg"]);
+});
+
+test("decodeText reads UTF-16 with no byte order mark in both byte orders", () => {
+  const text = "group,value\nµ-control,1.5\n";
+  const le = Buffer.from(text, "utf16le");
+  expect(decodeText(le)).toEqual({ text, encoding: "utf-16le" });
+  expect(decodeText(Buffer.from(le).swap16())).toEqual({ text, encoding: "utf-16be" });
+  expect(decodeText(Buffer.from("caf\xe9,1\n", "latin1")).encoding).toBe("windows-1252");
 });

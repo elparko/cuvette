@@ -99,4 +99,26 @@ describe.skipIf(!existsSync(PY))("biostats exclusions and coding", () => {
     expect(r.summary).toMatch(/Games-Howell, not bonferroni/);
     expect(r.summary).toMatch(/Post-hoc: games-howell/);
   });
+
+  test("chi-square, Fisher and McNemar name the rows with a missing category", () => {
+    const p = write("c.csv", "r,c\nx,p\ny,q\nx,p\n,q\ny,p\nx,\ny,q\nx,q\n");
+    for (const fn of ["chi_square_test", "fisher_exact"]) {
+      const r = call(fn, { path: p, row: "r", column: "c", ...(fn === "chi_square_test" ? { correction: false } : {}) });
+      expect(r.metrics!.n).toBe(6);
+      expect(r.metrics!.n_dropped).toBe(2);
+      expect(r.summary).toMatch(/Dropped 2 rows with a missing value in r, c\./);
+    }
+    const m = write("m.csv", "a,b\n1,1\n1,0\n0,0\n,1\n0,1\n");
+    const r = call("mcnemar_test", { path: m, first: "a", second: "b", method: "exact" });
+    expect(r.metrics!.n_pairs).toBe(4);
+    expect(r.summary).toMatch(/Dropped 1 row with a missing value in a, b\./);
+  });
+
+  test("Kaplan-Meier names the rows with a missing time, event or group", () => {
+    const p = write("k.csv", "t,e,g\n1,1,a\n2,0,a\n3,1,a\n4,1,b\n5,0,b\n6,1,\n,1,b\n7,1,b\n");
+    const r = call("kaplan_meier", { path: p, duration: "t", event: "e", group: "g" });
+    expect(r.metrics!.n).toBe(6);
+    expect(r.metrics!.n_dropped).toBe(2);
+    expect(r.summary).toMatch(/Dropped 2 rows with a missing value/);
+  });
 });

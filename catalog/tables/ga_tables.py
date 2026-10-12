@@ -78,11 +78,25 @@ def _is_xlsx(path):
     return path.lower().endswith((".xlsx", ".xlsm"))
 
 
+def text_encoding(path):
+    with open(path, "rb") as f:
+        raw = f.read()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return "utf-16"
+    for enc in ("utf-8-sig", "cp1252"):
+        try:
+            raw.decode(enc)
+            return enc
+        except UnicodeDecodeError:
+            pass
+    return "latin-1"
+
+
 def load(path, sheet=None):
     path = os.path.expanduser(path)
     if _is_xlsx(path):
         return pd.read_excel(path, sheet_name=sheet or 0)
-    return pd.read_csv(path, sep="\t" if path.lower().endswith((".tsv", ".tab")) else ",")
+    return pd.read_csv(path, sep="\t" if path.lower().endswith((".tsv", ".tab")) else ",", encoding=text_encoding(path))
 
 
 def _need(frame, cols):
@@ -150,7 +164,7 @@ def _grid(path, sheet):
         sheets = [{"name": n, "range": wb[n].dimensions, "freeze": wb[n].freeze_panes} for n in names]
         return cells, merges, sheets, ws.title
     sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
-    raw = pd.read_csv(path, header=None, sep=sep, dtype=str, keep_default_na=False, skip_blank_lines=False)
+    raw = pd.read_csv(path, header=None, sep=sep, dtype=str, keep_default_na=False, skip_blank_lines=False, encoding=text_encoding(path))
     cells = {}
     for r, row in enumerate(raw.itertuples(index=False, name=None), 1):
         for c, v in enumerate(row, 1):
@@ -817,7 +831,7 @@ def _plate_sheets(path, sheet=None):
         return out
     sep = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
     cells = {}
-    with open(path, encoding="utf-8-sig", errors="replace", newline="") as f:
+    with open(path, encoding=text_encoding(path), newline="") as f:
         for r, row in enumerate(csv.reader(f, delimiter=sep), 1):
             for c, v in enumerate(row, 1):
                 v = _raw(v)
@@ -896,7 +910,7 @@ def _read_map(map_path, map_sheet, well_column, map_name):
     if _is_xlsx(map_path) or map_path.lower().endswith(".xls"):
         frame = pd.read_excel(map_path, sheet_name=map_sheet or 0, dtype=str, keep_default_na=False)
     else:
-        frame = pd.read_csv(map_path, sep="\t" if map_path.lower().endswith((".tsv", ".tab")) else ",", dtype=str, keep_default_na=False)
+        frame = pd.read_csv(map_path, sep="\t" if map_path.lower().endswith((".tsv", ".tab")) else ",", dtype=str, keep_default_na=False, encoding=text_encoding(map_path))
     frame.columns = [str(c).strip() for c in frame.columns]
     col = well_column or next((c for c in frame.columns if c.lower() in WELL_COLUMNS), None)
     if col not in frame.columns:

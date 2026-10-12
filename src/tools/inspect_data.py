@@ -46,6 +46,8 @@ def full_range(planes, dtype):
     top = max(float(p.max()) for p in planes)
     if dtype == "uint8":
         return 255.0
+    if dtype.startswith("float"):
+        return 1.0 if top <= 1.0 else max(top, 1.0)
     for bits in (10, 12, 14, 16):
         if top < 2**bits:
             return float(2**bits - 1)
@@ -61,7 +63,7 @@ def brightness_kind(s):
     full, med, p1, p99 = s["full"], s["median"], s["p1"], s["p99"]
     if p99 <= 0:
         return "empty"
-    if med / full > 0.2 and (p99 - p1) / max(med, 1.0) < 1.2:
+    if med / full > 0.2 and (p99 - p1) / max(med, min(1.0, full / 255)) < 1.2:
         return "brightfield"
     if med < 0.25 * p99 or med / full < 0.08:
         return "fluorescence"
@@ -117,7 +119,7 @@ def describe_image(path, out_dir):
         prev = preview(planes, rgb, out_dir, stem)
     except Exception:
         prev = None
-    return {"path": path, "name": os.path.basename(path), "token": token, "width": int(w), "height": int(h), "dtype": dtype, "bits": int(round(np.log2(full + 1))), "rgb": rgb, "channels": chans, "overlay": overlay, "preview": prev}
+    return {"path": path, "name": os.path.basename(path), "token": token, "width": int(w), "height": int(h), "dtype": dtype, "bits": np.dtype(dtype).itemsize * 8 if dtype.startswith("float") else int(round(np.log2(full + 1))), "rgb": rgb, "channels": chans, "overlay": overlay, "preview": prev}
 
 
 def image_phrase(d):
@@ -188,16 +190,16 @@ def inspect_table(path, out_dir):
 
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "catalog", "tables"))
     os.environ.setdefault("CUVETTE_OUTPUT_DIR", out_dir)
-    try:
-        from ga_tables import read_table
+    from ga_tables import read_table, text_encoding
 
+    try:
         r = read_table(path)
     except Exception as e:
         r = {"ok": False, "error": str(e)}
     if r.get("ok") and r.get("path"):
         frame = pd.read_csv(r["path"])
     elif path.lower().endswith((".csv", ".tsv")):
-        frame = pd.read_csv(path, sep=None, engine="python")
+        frame = pd.read_csv(path, sep=None, engine="python", encoding=text_encoding(path))
     else:
         frame = pd.read_excel(path)
     cols = []
@@ -211,6 +213,12 @@ def inspect_table(path, out_dir):
             col["range"] = [float(s.min()), float(s.max())]
         cols.append(col)
     return {"kind": "table", "rows": int(len(frame)), "columns": cols, "read_table": r.get("summary"), "head": frame.head(5).astype(str).values.tolist()}
+
+
+def depth(d):
+    if d["dtype"].startswith("float"):
+        return "%d-bit floating point" % d["bits"]
+    return "%d-bit" % d["bits"]
 
 
 def count(n, one, many):
@@ -232,11 +240,11 @@ def summary(d, path):
             else:
                 i = imgs[0]
                 out.append("Each image (for example %s) has %s: %s." % (i["name"], count(len(i["channels"]), "channel", "channels"), image_phrase(i)))
-            out.append("Image size %d x %d, %d-bit." % (imgs[0]["width"], imgs[0]["height"], imgs[0]["bits"]))
+            out.append("Image size %d x %d, %s." % (imgs[0]["width"], imgs[0]["height"], depth(imgs[0])))
         if d["n_tables"]:
             out.append("Tables: %s." % ", ".join(d["tables"][:5]))
     elif d["kind"] == "image":
-        out.append("%s has %s: %s. Size %d x %d, %d-bit." % (d["name"], count(len(d["channels"]), "channel", "channels"), image_phrase(d), d["width"], d["height"], d["bits"]))
+        out.append("%s has %s: %s. Size %d x %d, %s." % (d["name"], count(len(d["channels"]), "channel", "channels"), image_phrase(d), d["width"], d["height"], depth(d)))
     elif d["kind"] == "table":
         out.append("%s: %s, %s: %s." % (name, count(d["rows"], "row", "rows"), count(len(d["columns"]), "column", "columns"), ", ".join("%s (%s)" % (c["name"], c["type"]) for c in d["columns"][:20])))
         for c in d["columns"]:
