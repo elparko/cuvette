@@ -333,7 +333,8 @@ def compare_masks(prediction, truth):
     pred = _read(prediction)
     if pred.ndim == 3:
         pred = pred[..., 0]
-    pred = measure.label(pred) if pred.dtype == np.uint8 else pred.astype(np.int64)
+    binary = pred.dtype == np.uint8 and set(np.unique(pred).tolist()) <= {0, 1, 255}
+    pred = measure.label(pred) if binary else pred.astype(np.int64)
     tr = _read_truth(truth)
     if pred.shape != tr.shape:
         raise ValueError("the shapes differ: %s and %s" % (pred.shape, tr.shape))

@@ -190,16 +190,20 @@ def inspect_table(path, out_dir):
 
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "catalog", "tables"))
     os.environ.setdefault("CUVETTE_OUTPUT_DIR", out_dir)
-    from ga_tables import read_table, text_encoding
-
     try:
-        r = read_table(path)
+        from ga_tables import read_table, text_encoding
     except Exception as e:
+        read_table, text_encoding = None, None
         r = {"ok": False, "error": str(e)}
+    if read_table:
+        try:
+            r = read_table(path)
+        except Exception as e:
+            r = {"ok": False, "error": str(e)}
     if r.get("ok") and r.get("path"):
         frame = pd.read_csv(r["path"])
     elif path.lower().endswith((".csv", ".tsv")):
-        frame = pd.read_csv(path, sep=None, engine="python", encoding=text_encoding(path))
+        frame = pd.read_csv(path, sep=None, engine="python", encoding=text_encoding(path) if text_encoding else "utf-8-sig", encoding_errors="replace")
     else:
         frame = pd.read_excel(path)
     cols = []

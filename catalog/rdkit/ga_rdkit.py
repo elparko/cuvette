@@ -81,9 +81,9 @@ def load_molecules(path, smiles_column="smiles", id_column=None, target_column=N
         if t_key and mol is not None:
             try:
                 value = float(row[t_key])
-            except ValueError:
+            except (TypeError, ValueError):
                 value = float("nan")
-            if value != value:
+            if not math.isfinite(value):
                 no_target.append(label)
                 continue
         if mol is None:

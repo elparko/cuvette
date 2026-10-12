@@ -291,7 +291,7 @@ def scale_data(adata, regress_out="none", max_value=10.0, subset_to_hvg=True):
     if keys:
         missing = [k for k in keys if k not in a.obs]
         if missing:
-            return _fail("regress_out keys not in obs: %s. Run calculate_qc first." % ", ".join(missing))
+            return _fail("regress_out keys not in obs: %s. Load the raw counts again and run calculate_qc before normalize, so the QC values come from counts." % ", ".join(missing))
         sc.pp.regress_out(a, keys)
     sc.pp.scale(a, max_value=max_value)
     summary = "Scaled %d genes to unit variance, clipped at %g%s." % (a.n_vars, max_value, ", after regressing out " + ", ".join(keys) if keys else "")

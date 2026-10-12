@@ -244,6 +244,8 @@ def anova_repeated(path, outcome, within, subject, between=None, correction=None
         row = t[t["Source"] == within].iloc[0]
         brow = t[t["Source"] == between].iloc[0]
         irow = t[t["Source"] == "Interaction"].iloc[0]
+        if levels > 2 and pd.isna(row.get("eps")):
+            return _fail("pingouin gave no Greenhouse-Geisser epsilon for %s. Update pingouin to 0.5 or later, or set correction none." % within)
         eps = float(row["eps"]) if pd.notna(row.get("eps")) else 1.0
         W = float(row["W_spher"]) if "W_spher" in t.columns else float("nan")
         p_spher = float(row["p_spher"]) if "p_spher" in t.columns else float("nan")
