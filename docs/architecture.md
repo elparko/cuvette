@@ -365,8 +365,14 @@ class Session {
 
 1. `send(text)`: `UserPromptSubmit` hooks; append `user` and `message`; add notes (setup brief,
    answers and decision changes since the last turn) to the user message.
-2. Each step: compaction if the history passes 70% of the context window; `provider.step()`;
-   append `message`, `usage`; stream deltas to the bus.
+2. Each step: context management, then `provider.step()`. The estimate counts the system
+   prompt, the tool schemas and the history. Above 50% of the context window, old tool output
+   that is longer than 1,500 characters gets its first 400 characters and a short note. This
+   change is in the live history only. Above 70%, one call summarizes the older messages
+   under fixed headings and updates the previous summary. The latest request and the recent
+   steps stay as they are, also inside one long turn. The recent steps are at least the last
+   two model replies, up to 30% of the window. After the step: append `message` and
+   `usage`, and stream deltas to the bus.
 3. Each tool call, in order: schema check; `PreToolUse` (permissions, mode, decisions, data
    rules, adapter hooks, command hooks); `ask` waits on `respondPermission`; `block` runs the
    sensitivity check, asks the question, logs `blocked`, and returns an error result that tells

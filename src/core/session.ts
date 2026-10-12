@@ -15,7 +15,7 @@ import { findPlace, inProject, placeAt, legacyPlace, local, newPlace, outputRoot
 import { changedAnalysis, describeSession, lastTitle } from "./titles.ts";
 import { Bus } from "./bus.ts";
 import { annotate, checkAnswer, extractNumbers } from "./claims.ts";
-import { compact, estimateTokens, needsCompaction, summaryMessage } from "./compaction.ts";
+import { ELIDE_AT, SUMMARIZE_AT, elideOld, estimateTokens, summarizeOld, summaryMessage } from "./compaction.ts";
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, Masker, phiOn, scanMessages, withheld, type PhiAction, type PhiShown } from "./phi.ts";
 import { contextWarning, promptTokens, usageSummary, type UsageSummary } from "./spend.ts";
 import { loadSettings, xlsxOn, type Settings } from "./config.ts";
@@ -1081,14 +1081,30 @@ export class Session {
     return [...this.tools.values()].filter((t) => this.active.has(t.name)).map((t) => ({ name: t.name, description: t.description, inputSchema: withPurpose(t) }));
   }
 
+  // Two stages, before each step. Above ELIDE_AT of the window, old bulky tool output
+  // is shortened in the live history only. Above SUMMARIZE_AT, the older messages are summarized.
+  // The latest request and the recent messages stay as they are, also inside one long turn.
   private async maybeCompact(signal: AbortSignal, force = false) {
-    if (!force && !needsCompaction(this.history, this.system, this.provider.info.contextWindow)) return;
-    const res = await compact(this.history, this.provider, signal);
+    const win = this.provider.info.contextWindow;
+    const size = () => estimateTokens(this.history, this.system, this.activeSchemas());
+    if (!force && size() <= win * ELIDE_AT) return;
+    if (!force) {
+      const { messages, elided } = elideOld(this.history, win);
+      if (elided) {
+        this.history = messages;
+        this.record.append("notice", { text: `The harness shortened ${elided} older tool output(s) in the context. The record keeps the full output.`, elided });
+      }
+      if (size() <= win * SUMMARIZE_AT) return;
+    }
+    const res = await summarizeOld(this.history, this.provider, win, signal);
     if (!res) return;
+    const steps = this.plan?.steps.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`) ?? [];
+    const summary = summaryMessage(steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary);
     const upTo = this.record.entries(["message"]).at(-1)?.id ?? 0;
-    this.record.append("compaction", { summary: res.summary, upTo });
-    this.history = [summaryMessage(res.summary), ...res.kept];
-    for (const m of res.kept) this.record.append("message", { message: m as unknown as Record<string, unknown> });
+    this.record.append("compaction", { summary: (summary.parts[0] as { text: string }).text, upTo });
+    const rest = [...(res.request ? [res.request] : []), ...res.kept];
+    this.history = [summary, ...rest];
+    for (const m of rest) this.record.append("message", { message: m as unknown as Record<string, unknown> });
     this.phiFrom = this.history.length;
     this.contextWarned = false;
   }

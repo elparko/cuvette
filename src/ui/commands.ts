@@ -179,7 +179,7 @@ export function usageText(u: UsageSummary): string {
     "",
     `Now: ${usageLong(u)}. Model: ${u.model}${u.local ? ", on this computer" : ""}.`,
     u.local ? "A local model has no cost." : priceLine(u.model) || "Cuvette has no price for this model.",
-    `Before each step, the harness summarizes the older messages if its estimate of the context is more than 70% of the window. The context is at ${percentText(u.percent)} now.`,
+    `Before each step, the harness shortens old tool output above 50% of the window. It summarizes the older messages above 70%. The context is at ${percentText(u.percent)} now.`,
     "This table counts the steps of the analysis model. The referee, the titles and the summaries are not in it. /config shows the Claude spend of this month.",
   ].filter(Boolean).join("\n");
 }

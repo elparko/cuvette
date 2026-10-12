@@ -164,7 +164,7 @@ export function usageLong(u: UsageSummary): string {
 }
 
 export function contextWarning(used: number, win: number): string {
-  return `The context is ${percentText((used / win) * 100)} full: ${kTokens(used)} of ${kTokens(win)} tokens. Before each step, the harness summarizes the older messages if its estimate is more than 70%. It does not summarize the current request. Type /compact to summarize now.`;
+  return `The context is ${percentText((used / win) * 100)} full: ${kTokens(used)} of ${kTokens(win)} tokens. Before each step, the harness shortens old tool output if its estimate is more than 50%. It summarizes the older messages if its estimate is more than 70%. It keeps the current request and the recent steps. Type /compact to summarize now.`;
 }
 
 export function priceLine(model: string): string {

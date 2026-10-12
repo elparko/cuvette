@@ -95,23 +95,24 @@ test("/usage prints a row for each turn and the total", async () => {
   expect(lines[3]).toMatch(/^2\s+Make a plot\s+1\s+1.0k\s+2.0k\s+150k\s+10.0k\s+\$0.12$/);
   expect(lines[4]).toMatch(/^Total\s+3\s+103k/);
   expect(text).toContain("List prices for claude-opus-5-5");
-  expect(text).toMatch(/more than 70% of the window/);
+  expect(text).toMatch(/shortens old tool output above 50% of the window\. It summarizes the older messages above 70%\./);
 });
 
 test("the session warns once at 80 percent context fill, and again only after a compaction", async () => {
   process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-ctx-"));
-  const provider = new FakeProvider([{ text: "one" }, { text: "one" }, { text: "two" }, { text: "two" }]);
+  const provider = new FakeProvider(["one", "two", "three"].map((t) => ({ text: t.repeat(40) })));
   provider.info.contextWindow = 60;
   const session = await Session.create({ adapters: [], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-ctx-proj-")), settings: { guidance: false } });
   await session.send("hello");
   await session.send("again");
+  await session.send("third");
   const warnings = session.record.entries(["notice"]).filter((e) => e.data.warn);
   expect(session.record.entries(["compaction"])).toHaveLength(1);
   expect(warnings).toHaveLength(2);
   expect(warnings[1]!.id).toBeGreaterThan(session.record.entries(["compaction"])[0]!.id);
-  expect(String(warnings[0]!.data.text)).toMatch(/^The context is \d+% full: .* of 60 tokens\. Before each step, the harness summarizes the older messages if its estimate is more than 70%\./);
+  expect(String(warnings[0]!.data.text)).toMatch(/^The context is \d+% full: .* of 60 tokens\. Before each step, the harness shortens old tool output if its estimate is more than 50%\. It summarizes the older messages if its estimate is more than 70%\./);
   const u = session.usage();
-  expect(u.steps).toBe(2);
+  expect(u.steps).toBe(3);
   expect(u.percent).toBeGreaterThan(80);
   expect(usageShort(u)).toMatch(/^price not known · context \d+%$/);
   expect(session.record.entries(["usage"])[0]!.data).toMatchObject({ provider: "fake", local: false });
