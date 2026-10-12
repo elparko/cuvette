@@ -50,7 +50,7 @@ async function core() {
     minify: true,
     legalComments: "none",
     logLevel: "warning",
-    external: ["react-devtools-core"],
+    external: ["react-devtools-core", "tsx"],
     plugins: [metaUrl],
     banner: {
       js: [

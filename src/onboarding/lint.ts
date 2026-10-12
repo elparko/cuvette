@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, extname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { extname, join, relative } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { checkText, type SteIssue } from "../core/ste.ts";
+import { ROOT } from "../root.ts";
 
 export type Severity = "error" | "warning";
 
@@ -75,7 +75,6 @@ export const RULES: Record<string, { severity: Severity; rule: string }> = {
   "kat-data-license": { severity: "error", rule: "data/SOURCES.md lists each test data file with its source and license. A license that is not confirmed is a warning. A file that a test fetches is not in the repository: its row needs a source, and its fetch script checks a SHA-256 sum." },
 };
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 export const BENCH_PAPERS = join(ROOT, "bench", "papers");
 
 const CODE_EXT = new Set([".py", ".r", ".ts", ".groovy", ".ijm", ".sh", ".js", ".mjs", ".java"]);

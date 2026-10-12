@@ -1,13 +1,13 @@
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import { locate, which } from "../adapters/locate.ts";
 import { adapterDirs, cuvetteHome, loadAdapter, type LoadedAdapter, type Manifest } from "../adapters/manifest.ts";
 import { runProcess } from "../adapters/kinds/common.ts";
 import { howToCite } from "./citations.ts";
 import { claudeKey, credentialsPath } from "./credentials.ts";
 import { selfTestFor, selfTestOf, type SelfTestRuntime } from "./selftest.ts";
+import { ROOT } from "../root.ts";
 
 export type Status = "ok" | "missing" | "old";
 export type Group = "Needed to start" | "Tools" | "Python environments" | "R packages" | "Programs";
@@ -47,7 +47,7 @@ export const MIN_NODE = 22;
 const MIN_JAVA = 8;
 const MIN_R = [4, 5];
 const PYTHON = "3.12";
-export const SCIENCE_REQUIREMENTS = resolve(dirname(fileURLToPath(import.meta.url)), "../tools/science-requirements.txt");
+export const SCIENCE_REQUIREMENTS = join(ROOT, "src/tools/science-requirements.txt");
 
 export const ENVS: Record<string, { modules: string[]; packages: string[] }> = {
   science: { modules: ["numpy", "pandas", "scipy", "statsmodels", "lifelines", "matplotlib", "openpyxl", "tifffile", "skimage", "pptx"], packages: ["-r", SCIENCE_REQUIREMENTS] },

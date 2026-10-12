@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { encodePng, decodePng } from "./png.ts";
+import { ROOT } from "../root.ts";
 
-export const BENCH_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../bench");
+export const BENCH_DIR = join(ROOT, "bench");
 
 const SIZE = 256;
 

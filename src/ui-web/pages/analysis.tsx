@@ -1,5 +1,5 @@
 import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ScrollTextIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx } from "../App.tsx";
 import { ImageViewer } from "../components/image-viewer.tsx";
@@ -16,7 +16,8 @@ import type { StreamState } from "../lib/stream.ts";
 import { liveHtml } from "../lib/markdown.ts";
 import { useStored } from "../lib/stored.ts";
 import { cn } from "../lib/utils.ts";
-import { SettingsPanel } from "./settings.tsx";
+
+const SettingsPanel = lazy(() => import("./settings.tsx").then((m) => ({ default: m.SettingsPanel })));
 
 interface Command {
   name: string;
@@ -698,7 +699,9 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
             <DialogTitle>Settings</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto pr-1">
-            <SettingsPanel ctx={ctx} />
+            <Suspense fallback={<p className="text-sm text-muted-foreground">Loading the settings...</p>}>
+              <SettingsPanel ctx={ctx} />
+            </Suspense>
           </div>
         </DialogContent>
       </Dialog>

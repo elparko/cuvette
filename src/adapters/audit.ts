@@ -1,12 +1,12 @@
 import { readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { dollars, costUsd } from "../core/spend.ts";
 import type { Provider } from "../core/types.ts";
 import { makeProvider } from "../providers/index.ts";
 import { fileHash, listFiles } from "./source.ts";
+import { ROOT } from "../root.ts";
 
-export const REVIEW_PROMPT = resolve(dirname(fileURLToPath(import.meta.url)), "../../registry-template/.github/review-prompt.md");
+export const REVIEW_PROMPT = join(ROOT, "registry-template/.github/review-prompt.md");
 export const REVIEW_MODEL = "claude:claude-sonnet-5-5";
 
 export type Verdict = "pass" | "needs-changes" | "reject" | "unknown";

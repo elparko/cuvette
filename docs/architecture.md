@@ -11,8 +11,10 @@ OpenCode, which this design copies.
 
 A terminal agent, built like Claude Code and OpenCode, for science programs instead of code.
 
-- **Language:** TypeScript on Node 22+. `tsx` runs the source directly (no build step), so
-  adapter modules written in TypeScript load at run time. `bin/cuvette.js` is the entry.
+- **Language:** TypeScript on Node 22+. `bin/cuvette.js` is the entry. It runs the bundle in
+  `dist/` that `npm run build` makes (the package build runs it). In a source checkout, it uses `tsx`
+  on the source if a source file is newer than the bundle. `CUVETTE_TSX=1` always uses `tsx`.
+  Adapter modules in TypeScript load at run time through `tsx`.
 - **Terminal UI:** Ink (React for the terminal), like Claude Code.
 - **Core is a library with an event bus**, like OpenCode's server: the terminal UI, the headless
   mode, the MCP server mode and the later graph window are all clients of one `Session`.
@@ -35,7 +37,7 @@ A terminal agent, built like Claude Code and OpenCode, for science programs inst
 ## Folders
 
 ```
-bin/cuvette.js               entry: registers tsx, imports src/cli.ts
+bin/cuvette.js               entry: imports dist/cli.js, or registers tsx and imports src/cli.ts
 src/cli.ts                   cuvette (terminal UI), cuvette -p (headless), subcommands  [lead]
 src/core/
   types.ts                   shared types                                             [lead]

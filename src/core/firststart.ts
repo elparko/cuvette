@@ -1,10 +1,10 @@
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve as resolvePath } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { KEY_GUIDE } from "./keyhelp.ts";
 import { claudeKey, keyProblem, saveClaudeKey } from "./credentials.ts";
 import { changeSetting, find, resolve } from "./settings.ts";
+import { ROOT } from "../root.ts";
 
 export type ModelChoice = "claude" | "local";
 
@@ -14,7 +14,7 @@ export const CHOICES: { id: ModelChoice; label: string; help: string }[] = [
 ];
 
 export const RECOMMENDED_LOCAL = "qwen3:8b";
-export const SAMPLE_DIR = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../samples/sleep");
+export const SAMPLE_DIR = join(ROOT, "samples/sleep");
 export const SAMPLE_REQUEST = "Is drug 2 better than drug 1? The data are in sleep.csv: extra hours of sleep for 10 patients, each measured with both drugs.";
 
 export interface Ctx {

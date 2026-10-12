@@ -15,6 +15,7 @@
   "files": [
     "bin/",
     "!bin/ga.js",
+    "dist/",
     "src/",
     "!src/ui-web/",
     "ui-dist/",
@@ -37,8 +38,8 @@
     "lint:text": "tsx src/lint-text.ts",
     "ui:build": "vite build --config src/ui-web/vite.config.ts",
     "ui:dev": "vite --config src/ui-web/vite.config.ts",
-    "prepack": "npm run ui:build",
-    "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/cli.js",
+    "prepack": "npm run ui:build && npm run build",
+    "build": "node scripts/build-cli.mjs",
     "desktop:dev": "node desktop/scripts/build.mjs dev",
     "desktop:build": "node desktop/scripts/build.mjs build"
   },

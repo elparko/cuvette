@@ -1,5 +1,5 @@
+import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { stepNumbers } from "./housekeeping.ts";
@@ -7,6 +7,7 @@ import { approvedPlan, currentPlan } from "./plan.ts";
 import { liveEntries, type AnalysisRecord } from "./record.ts";
 import { replaySheet } from "./samples.ts";
 import type { Node, Question } from "./types.ts";
+import { ROOT } from "../root.ts";
 
 const Source = z.union([
   z.strictObject({ decision: z.array(z.string()) }),
@@ -76,7 +77,7 @@ const cache = new Map<GuidelineId, Guideline>();
 export function loadGuideline(id: GuidelineId): Guideline {
   let g = cache.get(id);
   if (!g) {
-    g = Guideline.parse(parseYaml(readFileSync(fileURLToPath(new URL(`./guidelines/${id}.yaml`, import.meta.url)), "utf8")));
+    g = Guideline.parse(parseYaml(readFileSync(join(ROOT, `src/core/guidelines/${id}.yaml`), "utf8")));
     cache.set(id, g);
   }
   return g;

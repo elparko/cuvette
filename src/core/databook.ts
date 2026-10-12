@@ -2,7 +2,6 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { platform, release, tmpdir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
 import { labelMap, loadAdapters, sha256File, sizeText } from "../bench/papers-cases.ts";
 import { citationStyle, cuvetteRef, Markers, nodeCitations, programCitations, referencesHtml, sessionCitations, type CitationStyle, type Ref, type SessionCitations } from "./citations.ts";
@@ -19,10 +18,10 @@ import { find, resolve as resolveSetting, type Paper } from "./settings.ts";
 export { localePaper, type Paper } from "./settings.ts";
 import { dataUri, esc, fillTemplate, findChrome, findPandoc, renderMarkdown, show } from "./trail.ts";
 import type { Claim, Entry, Node } from "./types.ts";
+import { ROOT } from "../root.ts";
 
 export type BookFormat = "pdf" | "html" | "docx";
 
-const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const IMAGE_CAP = 3 * 1024 * 1024;
 const MAX_ROWS = 30;
 const MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml" };

@@ -1,8 +1,8 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { runProcess } from "../adapters/kinds/common.ts";
 import { scriptPython } from "../tools/run_script.ts";
+import { ROOT } from "../root.ts";
 
 export interface Inspection {
   ok: boolean;
@@ -18,7 +18,7 @@ export interface Inspection {
   columns?: { name: string; type: string; values?: Record<string, number> }[];
 }
 
-const SCRIPT = join(fileURLToPath(new URL(".", import.meta.url)), "..", "tools", "inspect_data.py");
+const SCRIPT = join(ROOT, "src/tools/inspect_data.py");
 
 export async function inspectData(path: string, outDir: string, signal?: AbortSignal): Promise<Inspection> {
   const target = resolve(path);

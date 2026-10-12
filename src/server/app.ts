@@ -5,7 +5,6 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
 import { adapterIndex } from "../adapters/catalog.ts";
 import { suggestPrograms } from "../core/suggest.ts";
 import { loadSettings } from "../core/config.ts";
@@ -33,6 +32,7 @@ import { appPageHtml } from "./app-page.ts";
 import { doctorJson, programsJson, sessionsJson, settingsJson } from "./app-json.ts";
 import { WebView } from "./app-view.ts";
 import { FILE_HEADERS, hostAllowed, pipeFile, tokenOk, windowRoutes, type WindowSession } from "./window.ts";
+import { ROOT } from "../root.ts";
 
 export interface AppOptions {
   folder?: string;
@@ -79,7 +79,7 @@ const TYPES: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2",
 };
 
-export const UI_DIST = fileURLToPath(new URL("../../ui-dist/", import.meta.url));
+export const UI_DIST = join(ROOT, "ui-dist");
 
 function newUiPage(): string | undefined {
   try {

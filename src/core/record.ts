@@ -67,7 +67,11 @@ export class AnalysisRecord {
   }
 
   private load(): void {
-    for (const line of readFileSync(this.logPath, "utf8").split("\n")) {
+    const buf = readFileSync(this.logPath);
+    for (let at = 0, end = 0; at < buf.length; at = end + 1) {
+      end = buf.indexOf(10, at);
+      if (end < 0) end = buf.length;
+      const line = buf.toString("utf8", at, end);
       if (!line.trim()) continue;
       let e: Entry;
       try {
@@ -75,9 +79,28 @@ export class AnalysisRecord {
       } catch {
         continue;
       }
+      if (e.kind === "message") this.readLater(e, at, end - at);
       this.log.push(e);
       this.index(e);
     }
+  }
+
+  // A loaded message holds the full model history of its turn. Only a resume or a rewind reads it, so it stays on disk until then.
+  private readLater(e: Entry, at: number, length: number): void {
+    Object.defineProperty(e, "data", {
+      enumerable: true,
+      configurable: true,
+      get: () => {
+        const buf = Buffer.alloc(length);
+        const fd = openSync(this.logPath, "r");
+        try {
+          readSync(fd, buf, 0, length, at);
+        } finally {
+          closeSync(fd);
+        }
+        return (local(JSON.parse(buf.toString("utf8")), this.project) as Entry).data;
+      },
+    });
   }
 
   private index(e: Entry): void {

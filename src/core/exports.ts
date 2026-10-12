@@ -1,8 +1,7 @@
 import { testsMarkdown } from "./testcount.ts";
 import { planMarkdown } from "./plan.ts";
 import { existsSync, statSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { isAbsolute } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { cuvetteRef, Markers, nodeCitations, programCitations, referencesMarkdown, sessionCitations, type CitationStyle, type Ref } from "./citations.ts";
 import { ADAPTER_DECISION } from "./decisions.ts";
@@ -10,8 +9,9 @@ import type { AnalysisRecord } from "./record.ts";
 import type { Node } from "./types.ts";
 import { describeRoute, fillTemplate, show, writeOut } from "./trail.ts";
 import type { RouteText } from "./trail.ts";
+import { ROOT } from "../root.ts";
 
-const REPLAY_PATH = fileURLToPath(new URL("./replay.ts", import.meta.url));
+const REPLAY_PATH = join(ROOT, "src/core/replay.ts");
 
 export function mainNodes(record: AnalysisRecord): Node[] {
   return record.nodes().filter((n) => !n.sensitivityOf);

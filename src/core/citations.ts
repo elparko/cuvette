@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import type { Citation, LoadedAdapter } from "../adapters/manifest.ts";
 import type { AnalysisRecord } from "./record.ts";
 import type { Node } from "./types.ts";
+import { ROOT } from "../root.ts";
 
 export type CitationStyle = "apa" | "vancouver";
 export const CITATION_STYLES: CitationStyle[] = ["apa", "vancouver"];
@@ -46,7 +46,6 @@ export interface SessionCitations {
   notRun: string[];
 }
 
-const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
 // ---------------------------------------------------------------- BibTeX reading
 

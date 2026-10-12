@@ -2,8 +2,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { costUsd } from "../core/spend.ts";
 import { DEFAULT_CLAUDE_MODEL } from "../providers/claude.ts";
@@ -11,9 +10,10 @@ import type { ItemScore } from "./papers-score.ts";
 import { loadPaper, paperIds, PAPERS_DIR, type Paper } from "./papers-spec.ts";
 import { summarize, type Cell } from "./papers-report.ts";
 import type { PapersResult, PaperRun } from "./papers.ts";
+import { ROOT } from "../root.ts";
 
-const FALLBACK = resolve(dirname(fileURLToPath(import.meta.url)), "fallback_figure.py");
-const STYLED = resolve(dirname(fileURLToPath(import.meta.url)), "../adapters/kinds/ga_figures.py");
+const FALLBACK = join(ROOT, "src/bench/fallback_figure.py");
+const STYLED = join(ROOT, "src/adapters/kinds/ga_figures.py");
 const SCIENCE_PYTHON = join(homedir(), ".cuvette/envs/science/bin/python");
 const MAX_WIDTH = 1600;
 

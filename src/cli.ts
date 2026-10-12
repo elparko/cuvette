@@ -2,8 +2,6 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { adapterDirs, cuvetteHome, loadAdapter } from "./adapters/manifest.ts";
-import { applyHeadlessSetup, attachHeadless } from "./core/headless.ts";
 import { moveOldHome, readOldEnv } from "./core/old-names.ts";
 import type { Mode } from "./core/types.ts";
 
@@ -238,6 +236,7 @@ const bypass = () => ({ ...(o["bypass-permissions"] ? { permissionMode: "bypass"
 
 async function headless(prompt: string) {
   const { Session } = await import("./core/session.ts");
+  const { applyHeadlessSetup, attachHeadless } = await import("./core/headless.ts");
   const answers = (readJson(str(o.answers)) ?? {}) as Record<string, unknown>;
   const allow = new Set((str(o.allow) ?? "").split(",").filter(Boolean));
   const out = FORMATS.has(str(o.output) ?? "") ? str(o.output)! : "text";
@@ -423,6 +422,7 @@ async function main() {
     case "app":
       return app(a1);
     case "adapters": {
+      const { adapterDirs, loadAdapter } = await import("./adapters/manifest.ts");
       for (const [name, dir] of Object.entries(adapterDirs())) {
         try {
           const a = loadAdapter(dir);
@@ -460,6 +460,7 @@ async function main() {
         return;
       }
       if (a1 === "approve") {
+        const { adapterDirs } = await import("./adapters/manifest.ts");
         const dir = existsSync(a2) ? a2 : adapterDirs()[a2];
         if (!dir) fail(`No adapter ${a2}. cuvette adapters lists the names.`);
         await checker.approveAdapter(dir, str(o.by) ?? process.env.USER ?? "scientist");
