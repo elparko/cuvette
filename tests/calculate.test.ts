@@ -34,3 +34,12 @@ test("the tool returns named metrics and reports bad items", async () => {
   expect(r.text).toMatch(/error: bad: unknown function nope/);
   expect((await t.execute({ items: [] }, {} as never)).ok).toBe(false);
 });
+
+test("a minus sign binds less tightly than a power, and a number can start with a point", () => {
+  expect(evaluate("-2^2")).toBe(-4);
+  expect(evaluate("(-2)^2")).toBe(4);
+  expect(evaluate("2^-1")).toBe(0.5);
+  expect(evaluate("2*-3")).toBe(-6);
+  expect(evaluate(".5*2")).toBe(1);
+  expect(evaluate("2^3^2")).toBe(512);
+});

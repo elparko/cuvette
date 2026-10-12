@@ -3294,6 +3294,11 @@ export class Session {
       else if (!found.length && existsTable(g)) found.push({ path: g, label: g, kind: "table" });
     }
     const out: string[] = [];
+    for (const p of [saved, ...given]) {
+      if (!p || own(p) || this.checked.has(p) || !/\.(csv|tsv)$/i.test(p) || !existsSync(p) || !statSync(p).isFile() || existsTable(p)) continue;
+      this.checked.add(p);
+      out.push(`Data check by the harness: ${basename(p)} is larger than 20 MB. The harness did not check it for missing values, copies, mixed columns or extreme values.`);
+    }
     for (const f of found) {
       if (this.checked.has(f.label)) continue;
       this.checked.add(f.label);

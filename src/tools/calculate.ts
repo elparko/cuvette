@@ -67,7 +67,7 @@ function pairs(a: Val, b: Val): [number, number][] {
 }
 
 export function evaluate(src: string): Val {
-  const toks = src.match(/\d+(?:\.\d+)?(?:e[-+]?\d+)?|[A-Za-z_][A-Za-z_0-9]*|\*\*|[-+*/^(),[\]]|\S/gi) ?? [];
+  const toks = src.match(/(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?|[A-Za-z_][A-Za-z_0-9]*|\*\*|[-+*/^(),[\]]|\S/gi) ?? [];
   let i = 0;
   const peek = () => toks[i];
   const take = (t?: string) => {
@@ -85,21 +85,13 @@ export function evaluate(src: string): Val {
     return v;
   };
   const term = (): Val => {
-    let v = power();
+    let v = unary();
     while (peek() === "*" || peek() === "/") {
       const op = take();
-      const r = power();
+      const r = unary();
       v = op === "*" ? num(v) * num(r) : num(v) / num(r);
     }
     return v;
-  };
-  const power = (): Val => {
-    const b = unary();
-    if (peek() === "^" || peek() === "**") {
-      take();
-      return num(b) ** num(power());
-    }
-    return b;
   };
   const unary = (): Val => {
     if (peek() === "-") {
@@ -110,7 +102,15 @@ export function evaluate(src: string): Val {
       take();
       return unary();
     }
-    return atom();
+    return power();
+  };
+  const power = (): Val => {
+    const b = atom();
+    if (peek() === "^" || peek() === "**") {
+      take();
+      return num(b) ** num(unary());
+    }
+    return b;
   };
   const list = (close: string): Val[] => {
     const out: Val[] = [];
@@ -135,7 +135,7 @@ export function evaluate(src: string): Val {
       take("]");
       return items.map(num);
     }
-    if (/^\d/.test(t)) return Number(t);
+    if (/^\.?\d/.test(t)) return Number(t);
     if (/^[A-Za-z_]/.test(t)) {
       if (t === "pi") return Math.PI;
       const f = FUNCS[t.toLowerCase()];
