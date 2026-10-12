@@ -393,10 +393,9 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               const sc = scrollRef.current!;
               follow.current = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 80;
             }}
-            className="min-h-0 flex-1 overflow-y-auto"
-            aria-live="polite"
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
-            <div className="srv stacked-wrap mx-auto w-full max-w-3xl px-5 py-4" onClick={onClick} onChange={onChange}>
+            <div aria-live="polite" className="srv stacked-wrap mx-auto w-full max-w-3xl flex-1 px-5 pt-4" onClick={onClick} onChange={onChange}>
               {stream.items.map((h, i) => (
                 <div key={i} dangerouslySetInnerHTML={{ __html: h }} />
               ))}
@@ -410,8 +409,8 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               )}
               <div ref={cardsRef} dangerouslySetInnerHTML={{ __html: stream.cards }} />
             </div>
-          </div>
 
+          <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background from-75% to-transparent pt-8">
           <div className="mx-auto w-full max-w-3xl px-5 pb-4">
             <div role="status" className="flex min-h-8 flex-wrap items-center gap-2 px-1 pb-1.5 text-[13px] text-muted-foreground">
               <span className={cn("size-2 shrink-0 rounded-full", busy ? "pulse-dot bg-accent-brand" : status.openQuestions ? "bg-mag" : "bg-ok")} aria-hidden="true" />
@@ -499,6 +498,8 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 </div>
               </div>
             </form>
+          </div>
+          </div>
           </div>
         </section>
 

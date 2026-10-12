@@ -180,6 +180,25 @@
   *:focus-within {
     scrollbar-color: var(--border) transparent;
   }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: transparent;
+    border: 3px solid transparent;
+    border-radius: 10px;
+    background-clip: padding-box;
+  }
+  *:hover::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 .select-chevron {
