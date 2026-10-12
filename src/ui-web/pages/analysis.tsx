@@ -526,7 +526,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
 
           <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background from-75% to-transparent pt-8">
           <div className="mx-auto w-full max-w-3xl px-5 pb-4">
-            {(!working || busy) && (
+            {(!working || showQ) && (
               <div role="status" className="flex min-h-8 flex-wrap items-center gap-2 px-1 pb-1.5 text-[13px] text-muted-foreground">
                 {!working && (
                   <>
@@ -537,11 +537,6 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 {showQ && (
                   <Button variant="link" size="sm" onClick={() => send("/questions")}>
                     Show the open decisions
-                  </Button>
-                )}
-                {busy && (
-                  <Button variant="outline" size="sm" onClick={() => post("api/stop", {})} className="ml-auto h-7 text-destructive">
-                    <SquareIcon className="size-3 fill-current" /> Stop
                   </Button>
                 )}
               </div>
@@ -609,6 +604,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
                 <span className="truncate pl-1.5 text-xs text-muted-foreground">{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
                 <div className="flex shrink-0 gap-1.5">
+                  {busy && (
+                    <Tooltip content="Stops the current step. Esc does the same.">
+                      <Button type="button" size="sm" variant="destructive" onClick={() => post("api/stop", {})} aria-label="Stop the agent">
+                        <SquareIcon className="size-3 fill-current" /> Stop
+                      </Button>
+                    </Tooltip>
+                  )}
                   {busy && !status.queueMode && (
                     <Tooltip content="Stops the current step and sends your message now. The same as starting a message with ! in the terminal.">
                       <Button variant="outline" size="sm" onClick={() => submit(true)} disabled={!text.trim()}>
