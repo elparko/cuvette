@@ -111,6 +111,15 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     }
   });
   const gridRef = useRef<HTMLDivElement>(null);
+  // On a narrow screen the header wraps, so the conversation takes the height that is left under it.
+  const [gridH, setGridH] = useState(0);
+  useEffect(() => {
+    const g = gridRef.current;
+    if (!g) return;
+    const ro = new ResizeObserver(() => setGridH(g.clientHeight));
+    ro.observe(g);
+    return () => ro.disconnect();
+  }, []);
   const dragSide = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     const box = gridRef.current!.getBoundingClientRect();
@@ -148,7 +157,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   const tabRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const follow = useRef(true);
-  const autoScroll = useRef(0);
+  const lastTop = useRef(0);
   const openRuns = useRef(new Set<string>());
 
   useEffect(() => {
@@ -162,6 +171,8 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   const send = useCallback(async (value: string, now = false) => {
     if (!value.trim()) return true;
     askNotify();
+    follow.current = true;
+    lastTop.current = 0;
     if (!value.trim().startsWith("/") && (!busy || now)) {
       sentAt.current = itemCount.current;
       setSent(value.trim());
@@ -184,16 +195,34 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   const working = (busy || !!sent) && !stream.live && !stream.think;
 
   // Scroll: follow the end of the conversation unless the user scrolled up.
-  useLayoutEffect(() => {
+  // A scroll up that has no scroll event yet also stops the follow.
+  const pin = (sc: HTMLElement) => {
     if (!follow.current) return;
-    const sc = scrollRef.current;
-    if (!sc) return;
-    autoScroll.current = Date.now();
+    if (sc.scrollTop < lastTop.current - 1 && sc.scrollHeight - sc.scrollTop - sc.clientHeight >= 80) {
+      follow.current = false;
+      return;
+    }
     sc.scrollTop = sc.scrollHeight;
+    lastTop.current = sc.scrollTop;
+  };
+  useLayoutEffect(() => {
+    const sc = scrollRef.current;
+    if (sc) pin(sc);
   }, [stream.items, stream.pending, stream.live, stream.think, stream.cards, sent]);
+
+  // Items with content-visibility, images and cards get their real height after the first paint.
+  useEffect(() => {
+    const sc = scrollRef.current;
+    const log = sc?.firstElementChild;
+    if (!sc || !log) return;
+    const ro = new ResizeObserver(() => pin(sc));
+    ro.observe(log);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     follow.current = true;
+    lastTop.current = 0;
     setSent("");
   }, [stream.resets]);
 
@@ -225,7 +254,11 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     }
     const card = activeCard(box);
     for (const c of box.querySelectorAll("[data-card]")) c.classList.toggle("active", c === card);
-    if (!card) return;
+    if (!card) {
+      // The answered card is gone. Keep the keyboard in the page, but do not open a phone keyboard.
+      if (document.activeElement === document.body && !document.querySelector("[role=dialog]") && !matchMedia("(pointer: coarse)").matches) inputRef.current?.focus({ preventScroll: true });
+      return;
+    }
     const bs = optionButtons(card);
     markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
     const a = document.activeElement;
@@ -493,7 +526,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
               <ScrollTextIcon />
             </Button>
           </Tooltip>
-          <ModelMenu model={session.model} busy={busy} openSettings={() => ctx.go("settings")} />
+          <ModelMenu model={status.model ?? session.model} busy={busy} openSettings={() => ctx.go("settings")} />
           <ModeMenu mode={status.mode ?? "watch"} />
           <Tooltip content={side ? "Hide the side panel" : "Show the side panel"}>
             <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => setSide(!side)} aria-label={side ? "Hide the side panel" : "Show the side panel"} aria-expanded={side}>
@@ -530,14 +563,20 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         </div>
       </header>
 
-      <div ref={gridRef} style={{ "--side": `${sideWidth}px` } as React.CSSProperties} className={cn("grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:overflow-hidden", side && "lg:grid-cols-[minmax(0,1fr)_var(--side)]")}>
-        <section aria-label="Conversation" className="flex h-[calc(100dvh-150px)] min-h-[420px] min-w-0 flex-col lg:h-auto lg:min-h-0">
+      <div ref={gridRef} style={{ "--side": `${sideWidth}px`, ...(gridH ? { "--grid-h": `${gridH}px` } : {}) } as React.CSSProperties} className={cn("grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto lg:overflow-hidden", side && "lg:grid-cols-[minmax(0,1fr)_var(--side)]")}>
+        <section aria-label="Conversation" className="flex h-[var(--grid-h,calc(100dvh-150px))] min-h-[420px] min-w-0 flex-col lg:h-auto lg:min-h-0">
           <div
             ref={scrollRef}
             onScroll={() => {
-              if (Date.now() - autoScroll.current < 150) return;
               const sc = scrollRef.current!;
-              follow.current = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 80;
+              const up = sc.scrollTop < lastTop.current;
+              lastTop.current = sc.scrollTop;
+              const gap = sc.scrollHeight - sc.scrollTop - sc.clientHeight;
+              if (up && gap >= 2) follow.current = false;
+              else if (gap < 80) follow.current = true;
+            }}
+            onWheel={(e) => {
+              if (e.deltaY < 0) follow.current = false;
             }}
             className="flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
@@ -566,7 +605,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
           <div className="mx-auto w-full max-w-3xl px-5 pb-4">
             <div role="status" className="flex min-h-8 flex-wrap items-center gap-2 px-1 pb-1.5 text-[13px] text-muted-foreground">
               <span className={cn("size-2 shrink-0 rounded-full", busy ? "pulse-dot bg-accent-brand" : status.openQuestions ? "bg-mag" : "bg-ok")} aria-hidden="true" />
-              <span className={cn("min-w-0 flex-1 truncate", busy && "text-foreground")}>{line}</span>
+              <span title={line} className={cn("line-clamp-2 min-w-0 flex-1 break-words sm:line-clamp-1", busy && "text-foreground")}>{line}</span>
               {showQ && (
                 <Button variant="link" size="sm" onClick={() => send("/questions")}>
                   Show the open decisions

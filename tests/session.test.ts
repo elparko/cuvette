@@ -1893,6 +1893,9 @@ test("an Esc on a permission card records a cancel by the harness, not a denial 
   });
   await session.send("read a.txt");
   expect(session.record.entries(["permission"]).map((e) => [e.data.decision, e.data.by])).toEqual([["cancelled", "harness"]]);
+  const stopped = session.record.entries(["notice"]).filter((e) => String(e.data.text).startsWith("Stopped"));
+  expect(stopped.length).toBeGreaterThan(0);
+  expect(stopped.every((e) => e.data.warn === true)).toBe(true);
 });
 
 test("resume after a crash between the tool calls and their results gives each call a result", async () => {
@@ -2057,6 +2060,46 @@ test("resume uses the model that the session used last, not the first one", asyn
   await session.close();
   session = await Session.resume(id, { cwd });
   expect(session.settings.model).toBe(`fake:${script}`);
+});
+
+test("the sample sheet leaves out the output folder, a clarify question sets the waiting status, and a step that did not run is a deviation", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "cuvette-out-"));
+  for (const g of ["A", "B"]) {
+    mkdirSync(join(cwd, g));
+    for (const i of [1, 2]) writeFileSync(join(cwd, g, `s${i}.tif`), "xxxx");
+  }
+  mkdirSync(join(cwd, "cuvette", "2026-10-01-old", ".record"), { recursive: true });
+  writeFileSync(join(cwd, "cuvette", "2026-10-01-old", "old.tif"), "xxxx");
+  const provider = new FakeProvider([
+    { calls: [{ name: "list_dir", args: { path: cwd } }] },
+    { calls: [{ name: "clarify", args: { found: "I see 2 groups of 2 images.", questions: [{ question: "What counts as one n?", options: ["One image", "One group"] }] } }] },
+    { calls: [{ name: "plan", args: { restatement: "You want: the cell count.", steps: [{ step: "Count the cells", tool: "count" }] } }] },
+    { text: "Done." },
+    { text: "Done." },
+    { text: "Done." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd, interactive: true });
+  session.decisions.applySetup({});
+  let state = "";
+  const atAnswer: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "status") state = e.state;
+    if (e.type === "question")
+      setTimeout(() => {
+        atAnswer.push(state);
+        session!.answer(e.question.qid, e.question.title === "Sample sheet" ? "accept" : "One image");
+      }, 0);
+    if (e.type === "plan") setTimeout(() => session!.respondPlan({ action: "approve" }), 0);
+  });
+  await session.send("Count the cells in each group.");
+
+  expect(atAnswer.length).toBeGreaterThan(1);
+  expect(atAnswer.every((s) => s === "waiting")).toBe(true);
+  const csv = readFileSync(join(session.outputDir, "samples.csv"), "utf8");
+  expect(csv.split("\n").filter(Boolean)).toHaveLength(5);
+  expect(csv).not.toContain("cuvette");
+  expect(session.record.entries(["tool_result"]).find((e) => e.data.tool === "plan")!.data.fidelity).toBeUndefined();
+  expect(session.record.entries(["plan_deviation"]).map((e) => e.data.what)).toContain("Not done: Count the cells");
 });
 
 const ASK2 = (q1: string, q2: string) => ({ calls: [LOOK, { name: "clarify", args: { found: "I see one image.", questions: [{ question: q1, options: ["a", "b"] }, { question: q2, options: ["c", "d"] }] } }] });

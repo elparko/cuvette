@@ -50,6 +50,7 @@ function scan(folder: string): Seen[] {
     } catch {
       return;
     }
+    if (depth > 0 && entries.some((e) => e.name === ".record" && e.isDirectory())) return;
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const e of entries) {
       if (out.length >= MAX_FILES) return;

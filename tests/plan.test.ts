@@ -163,3 +163,9 @@ test("settings with free labels get the decision key of the planned program, wit
   expect(coerceSetting(known[0]!, "Yen")).toEqual({ ok: false });
   expect(coerceSetting({ key: "paired", label: "Paired test", kind: "bool", tools: [] }, "paired t test")).toEqual({ ok: true, value: true });
 });
+
+test("an exclusion or a check with no full stop gets one before its effect", () => {
+  const text = planText({ steps: [{ step: "Compare" }], exclusions: [{ what: "No sample is left out", effect: "all 6 samples stay" }], checks: [{ check: "normality", if_fails: "use Mann-Whitney U" }] } as AnalysisPlan);
+  expect(text).toContain("- No sample is left out. Effect: all 6 samples stay");
+  expect(text).toContain("- normality. If it fails: use Mann-Whitney U");
+});

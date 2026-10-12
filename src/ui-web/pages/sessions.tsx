@@ -18,7 +18,7 @@ export interface SessionCard {
   thumb: string;
 }
 
-export function useSessions(page: Page, boots: number) {
+export function useSessions(page: Page, boots: number, idle = true) {
   const [list, setList] = useState<SessionCard[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [err, setErr] = useState("");
@@ -34,7 +34,7 @@ export function useSessions(page: Page, boots: number) {
         setErr(e.message);
         setLoaded(true);
       });
-  }, [page, boots, tick]);
+  }, [page, boots, tick, idle]);
   const opening = useRef(false);
   const open = useCallback(async (id: string, done: () => void) => {
     if (opening.current) return;

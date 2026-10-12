@@ -94,6 +94,17 @@ test("the scan reads folders two levels down and no deeper", () => {
   expect(first(d).count).toBe(1);
 });
 
+test("the scan leaves out the session folders that Cuvette wrote", () => {
+  const d = folder();
+  put(d, "a.csv", "a,b\n1,2\n");
+  mkdirSync(join(d, "cuvette", "2026-10-12-run", ".record"), { recursive: true });
+  put(join(d, "cuvette", "2026-10-12-run"), "samples.csv", "sample\n");
+  put(join(d, "cuvette", "2026-10-12-run"), "README.txt", "x");
+  const r = suggestPrograms(d, list);
+  expect(r.scanned).toBe(1);
+  expect(r.matches[0].reason).toBe("1 .csv file");
+});
+
 test("csv files do not count toward a specific adapter", () => {
   const d = folder();
   put(d, "a.abf", "ABF2");

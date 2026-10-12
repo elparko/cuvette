@@ -498,6 +498,32 @@ test("a status line keeps its text and its short path in one element, so the fle
   expect(html).toMatch(/<span class="sym"[^>]*>•<\/span> <span class="ltext">This session saves its results in <span class="path"[^>]*>.*<\/span>\.<\/span><\/div>$/);
   const withChange = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "c", t: "line", sym: "•", text: "Test: t test", change: "test" } as never);
   expect(withChange).toMatch(/<span class="ltext">Test: t test<\/span> <button[^>]*data-change="test"/);
+  expect(withChange).toContain('aria-label="Change the answer: Test"');
+});
+
+test("an answer line for a saved sample sheet names the change count, not the raw value", async () => {
+  const { answerLine } = await import("../src/ui/cards.ts");
+  const q = { qid: "q3", title: "Sample sheet", options: [{ value: "accept", label: "The sheet is correct" }] };
+  expect(answerLine(q, { changes: [] })).toBe("Sample sheet: saved with no change · /change q3");
+  expect(answerLine(q, { changes: [{ row: 1 }, { row: 2 }] })).toBe("Sample sheet: saved with 2 changes · /change q3");
+  expect(answerLine(q, "accept")).toBe("Sample sheet: The sheet is correct · /change q3");
+});
+
+test("a question card with the question as its title does not repeat the question", () => {
+  const s = new FakeSession();
+  const q: Question = { qid: "q9", session: s.id, decisionKey: "", title: "Which test?", text: "Which test?", options: [{ value: "t", label: "t test" }], evidence: "", status: "open", created: "" };
+  const html = cardHtml({ token: "t", session: s }, { id: 1, card: { t: "question", q } });
+  expect(html).toContain("<h3>Your decision: Which test?</h3>");
+  expect(html).not.toContain("<p>Which test?</p>");
+  const long = cardHtml({ token: "t", session: s }, { id: 2, card: { t: "question", q: { ...q, title: "Which...", text: "Which test do you want?" } } });
+  expect(long).toContain("<p>Which test do you want?</p>");
+});
+
+test("the status message names the current model, so the header follows a model change", () => {
+  const s = new FakeSession();
+  const view = new WebView(s, { token: "t", env, url: (p) => p, quit: async () => {} });
+  expect(view.statusMsg().model).toBe(s.model.model);
+  view.close();
 });
 
 describe("repeated steps", () => {

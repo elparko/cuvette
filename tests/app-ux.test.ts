@@ -50,7 +50,7 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     writeFileSync(join(data, "a.csv"), "x,y\n1,2\n3,4\n");
     const script = join(home, "fake.json");
     const ask = (question: string) => ({ calls: [{ name: "ask_scientist", args: { question, options: ["t test", "Wilcoxon"] } }] });
-    writeFileSync(script, JSON.stringify([ask("Which test?"), ask("Which second test?"), { text: "Done." }]));
+    writeFileSync(script, JSON.stringify([ask("Which test?"), ask("Which second test?"), { text: "Done." }, { text: Array(60).fill("This is a line of the long note.").join("\n\n") }]));
     const env = { ...process.env, CUVETTE_HOME: home, CUVETTE_SPEND_FILE: join(home, "spend.jsonl"), CUVETTE_NO_OPEN: "1", HOME: home };
     proc = spawn(process.execPath, [join(ROOT, "bin", "cuvette.js"), "app", "--no-open", "--model", "fake:" + script], { cwd: tmpdir(), env, stdio: ["ignore", "pipe", "pipe"] });
     url = await new Promise<string>((done, fail) => {
@@ -134,17 +134,18 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
   });
 
   test("the mode menu items include their help text and hold no extra tab stop", async () => {
-    const r = await page.eval<{ texts: string[]; stops: number }>(`(async () => {
+    const r = await page.eval<{ texts: string[]; stops: number; shown: boolean }>(`(async () => {
       const t = document.querySelector('header button[aria-label^="Mode:"]');
       t.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
       for (let i = 0; i < 30 && !document.querySelector('[role="menu"]'); i++) await new Promise((r) => setTimeout(r, 50));
       const items = [...document.querySelectorAll('[role="menuitemradio"]')];
-      const out = { texts: items.map((x) => x.textContent), stops: document.querySelectorAll('[role="menu"] [tabindex="0"]').length };
+      const out = { texts: items.map((x) => x.textContent), stops: document.querySelectorAll('[role="menu"] [tabindex="0"]').length, shown: [...items[0].querySelectorAll("span")].some((x) => x.textContent === "The agent runs the steps." && x.offsetHeight > 0) };
       document.querySelector('[role="menu"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       await new Promise((r) => setTimeout(r, 200));
       return out;
     })()`);
     expect(r.texts[0]).toContain("The agent runs the steps.");
+    expect(r.shown).toBe(true);
     expect(r.stops).toBe(0);
   });
 
@@ -256,5 +257,32 @@ describe.skipIf(!CHROME)("app keyboard and phone layout in headless Chrome", () 
     expect(await page.eval(`JSON.parse(window.__calls.find((c) => c.url.includes("api/programs/run")).body).name`)).toBe("bbb");
     await page.eval(`${btnIn('[role="dialog"]', "Cancel")}.click()`);
     await page.eval(`window.__mocks = window.__mocks.filter((m) => !m.part.startsWith("api/programs"))`);
+  });
+
+  test("the conversation shows its end after a reload, the sidebar names the request, and on a phone the message box fits under the header", async () => {
+    await goPage("Analysis");
+    expect(await until(page, `document.querySelector("#msg")`)).toBe(true);
+    expect(await page.eval(`document.querySelector('aside[aria-label="Navigation"]').textContent.includes("Compare the groups")`)).toBe(true);
+    await page.eval(`(() => { const b = [...document.querySelectorAll('[data-card][data-type="setup"] .btn')].find((x) => x.textContent === "Close"); b.focus(); b.click(); })()`);
+    expect(await until(page, `!document.querySelector("[data-card]") && document.activeElement?.id === "msg"`)).toBe(true);
+    const t = new URL(url).searchParams.get("t");
+    await page.eval(`fetch("api/send?t=${t}", { method: "POST", headers: { "content-type": "application/json", "x-token": "${t}" }, body: JSON.stringify({ text: "Write a long note" }) })`);
+    expect(await until(page, `document.querySelector('[role="log"]').textContent.includes("long note") && document.querySelector('[role="status"]').textContent.startsWith("Ready")`)).toBe(true);
+    const gap = `(() => { const e = document.querySelector('[role="log"]').parentElement; return e.scrollHeight - e.scrollTop - e.clientHeight; })()`;
+    await page.go(url);
+    expect(await until(page, `document.querySelector("#msg")`)).toBe(true);
+    await wait(600);
+    expect(await page.eval<number>(gap)).toBeLessThan(5);
+    await page.eval(`(() => { const e = document.querySelector('[role="log"]').parentElement; e.dispatchEvent(new WheelEvent("wheel", { deltaY: -400, bubbles: true })); e.scrollTop -= 400; })()`);
+    await wait(300);
+    await page.eval(`document.querySelector('[role="log"]').appendChild(document.createElement("p")).textContent = "more"`);
+    await wait(300);
+    expect(await page.eval<number>(gap)).toBeGreaterThan(300);
+    await page.size(390, 844);
+    await wait(300);
+    const r = await page.eval<{ bottom: number; clamp: string }>(`({ bottom: document.querySelector("#msg").closest("form").getBoundingClientRect().bottom, clamp: getComputedStyle(document.querySelector('[role="status"] span.flex-1')).webkitLineClamp })`);
+    expect(r.bottom).toBeLessThanOrEqual(844);
+    expect(r.clamp).toBe("2");
+    await page.size(1280, 900);
   });
 });

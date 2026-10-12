@@ -257,7 +257,7 @@ export function planText(p: Partial<AnalysisPlan>, o: PlanTextOptions = {}): str
   } else if (p.question) out.push(`Question: ${p.question}`);
   if (p.exclusions?.length) {
     out.push("", "What I will leave out, and what it does");
-    for (const x of p.exclusions) out.push(`- ${x.what}${x.effect ? ` Effect: ${x.effect}` : ""}`);
+    for (const x of p.exclusions) out.push(`- ${x.effect ? stop(x.what) : x.what}${x.effect ? ` Effect: ${x.effect}` : ""}`);
   }
   const d = p.data;
   if (d && (d.files?.length || d.row || d.replicate || d.n)) {
@@ -277,7 +277,7 @@ export function planText(p: Partial<AnalysisPlan>, o: PlanTextOptions = {}): str
     if (p.reference.question) out.push(`- ${p.reference.question}`);
   }
   if (p.outputs?.length) out.push("", "Outputs", ...p.outputs.map((x) => `- ${x}`));
-  if (p.checks?.length) out.push("", "Checks", ...p.checks.map((c) => `- ${c.check}${c.if_fails ? ` If it fails: ${c.if_fails}` : ""}`));
+  if (p.checks?.length) out.push("", "Checks", ...p.checks.map((c) => `- ${c.if_fails ? stop(c.check) : c.check}${c.if_fails ? ` If it fails: ${c.if_fails}` : ""}`));
   if (p.out_of_scope?.length) out.push("", "Out of scope", ...p.out_of_scope.map((x) => `- ${x}`));
   return out.join("\n").trim();
 }
@@ -422,3 +422,4 @@ export function definitionFindings(record: AnalysisRecord, answer: string): Find
   return out;
 }
 
+const stop = (s: string) => (/[.!?:;]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);

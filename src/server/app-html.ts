@@ -182,7 +182,9 @@ export function itemHtml(c: Ctx, it: Item, opts: { code?: boolean; sub?: (ids: n
     }
     case "line": {
       const cls = `line ${it.color ?? ""} ${it.dim ? "dim" : ""}`;
-      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> <span class="ltext">${shortPaths(esc(it.text.replace(/\s*·\s*\/change \S+$/, "")))}</span>${it.change ? ` ${btn("Change", `data-change="${esc(it.change)}" aria-label="Change ${esc(it.change)}"`, "quiet small")}` : ""}`;
+      const text = it.text.replace(/\s*·\s*\/change \S+$/, "");
+      const what = text.split(/[:?]/)[0]!.trim().slice(0, 80) || it.change;
+      const body = `<span class="sym" aria-hidden="true">${esc(it.sym)}</span> <span class="ltext">${shortPaths(esc(text))}</span>${it.change ? ` ${btn("Change", `data-change="${esc(it.change)}" aria-label="Change the answer: ${esc(what)}"`, "quiet small")}` : ""}`;
       const sub = it.group && opts.sub ? opts.sub(it.group) : [];
       if (sub.length) return `<details class="${cls} house"><summary>${body}</summary><div class="sub">${sub.map((x) => itemHtml(c, x, opts)).join("")}</div></details>`;
       return `<div class="${cls}">${body}</div>`;
@@ -211,11 +213,11 @@ function frame(slot: Slot, title: string, color: string, body: string): string {
   return `<section class="card ${color}" data-card="${slot.id}" data-type="${slot.card.t}" aria-label="${esc(title)}"><h3>${esc(title)}</h3>${body}${slot.msg ? `<p class="cardmsg" role="alert">${esc(slot.msg)}</p>` : ""}</section>`;
 }
 
-function questionBody(q: Question, answer: (i: number, value: unknown) => string, other: string | undefined, later: string | undefined, recommend?: string, opts: { current?: unknown; laterLabel?: string } = {}): string {
+function questionBody(q: Question, answer: (i: number, value: unknown) => string, other: string | undefined, later: string | undefined, recommend?: string, opts: { current?: unknown; laterLabel?: string; titled?: boolean } = {}): string {
   const rec = recommendedIndex(q);
   const pre = opts.current !== undefined ? questionCursor(q, opts.current) : rec;
   const take = rec < 0 && q.recommendation && recommend ? btn(`${show(q.recommendation.value)} (recommended)`, recommend, "primary") : "";
-  return `<p>${esc(q.text)}</p>${q.evidence ? `<p class="evidence">${esc(q.evidence)}</p>` : ""}
+  return `${opts.titled && q.text.trim() === q.title.trim() ? "" : `<p>${esc(q.text)}</p>`}${q.evidence ? `<p class="evidence">${esc(q.evidence)}</p>` : ""}
 <div class="opts">${q.options.map((o, i) => btn(`${o.label}${i === rec ? " (recommended)" : ""}`, answer(i, o.value), i === pre ? "primary" : "")).join("")}${take}</div>
 ${q.recommendation?.reason ? `<p class="dim small">Recommended: ${esc(q.recommendation.reason)}</p>` : ""}
 ${other ? `<div class="row"><input type="text" name="other" placeholder="Other: type your own answer" aria-label="Your own answer">${btn("Answer", other)}</div>` : ""}
@@ -278,7 +280,7 @@ function questionCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "question" }
   const sq = slot.seq;
   const nav = sq && (sq.back || sq.next) ? `<div class="row">${sq.back ? btn("Back", act("back"), "quiet") : ""}${sq.next ? btn("Next", act("next"), "quiet") : ""}</div>` : "";
   const progress = sq?.progress ? `<p class="dim small progress">${esc(sq.progress)}</p>` : "";
-  return frame(slot, `Your decision: ${card.q.title}`, "magenta", progress + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: sq?.current }) + nav);
+  return frame(slot, `Your decision: ${card.q.title}`, "magenta", progress + questionBody(card.q, (i) => act("answer", i), act("other"), act("later"), act("recommend"), { current: sq?.current, titled: true }) + nav);
 }
 
 function instructionCard(c: Ctx, slot: Slot, card: Extract<Card, { t: "instruction" }>): string {
