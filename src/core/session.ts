@@ -1,9 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { isCredentialsFile } from "./credentials.ts";
+import { hideKeys, isCredentialsFile } from "./credentials.ts";
+import { claimLock, lockAlive, ownStart, type OpenLock } from "./sessions.ts";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
 import { findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
@@ -353,9 +354,16 @@ export class Session {
     const place = opts.place ?? (opts.home ? legacyPlace(id, cwd) : newPlace(cwd, settings.output_folder, id));
     if (opts.method) Object.assign(settings, { planFirst: "on", pilot: "on" });
     const s = new Session(id, cwd, settings, place);
+    const held = claimLock(s.dir);
+    if (held) throw new Error(held.app ? `This session is open in the app: ${held.app}. Use it there, or close it there first` : `This session is open in another window (process ${held.pid}). Close it there first`);
     s.overrides = overrides;
     s.onceTrusted = !!opts.trustFolder;
-    await s.init(opts);
+    try {
+      await s.init(opts);
+    } catch (e) {
+      s.releaseLock();
+      throw e;
+    }
     if (opts.method) s.startMethod(opts.method);
     if (place.fallback && !opts.place) s.record.append("notice", { text: `The folder ${outputRoot(cwd, settings.output_folder)} is read-only. The session files are in ${dirname(place.outDir)}.` });
     return s;
@@ -887,8 +895,22 @@ export class Session {
 
   // ------------------------------------------------------------- turn
 
+  private withoutKeys(text: string): string {
+    const h = hideKeys(text);
+    if (h.found) this.record.append("notice", { text: `Cuvette removed ${h.found === 1 ? "an API key" : `${h.found} API keys`} from your text. The key did not go to the model or into the record. To save a Claude key, use /key.` });
+    return h.text;
+  }
+
+  private valueWithoutKeys(v: unknown): unknown {
+    if (typeof v === "string") return this.withoutKeys(v);
+    if (Array.isArray(v)) return v.map((x) => this.valueWithoutKeys(x));
+    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, this.valueWithoutKeys(x)]));
+    return v;
+  }
+
   async send(text: string, opts: { internal?: boolean; plan?: boolean } = {}): Promise<string> {
     if (this.busy) throw new Error("the agent is busy; wait or press Esc to stop it");
+    text = this.withoutKeys(text);
     this.busy = true;
     this.abort = new AbortController();
     const signal = this.abort.signal;
@@ -1156,7 +1178,17 @@ export class Session {
       try {
         old = JSON.parse(readFileSync(this.lockPath(), "utf8"));
       } catch {}
-      writeFileSync(this.lockPath(), JSON.stringify({ ...(old.pid === process.pid ? old : {}), pid: process.pid, started: old.started ?? new Date().toISOString(), ...extra }), { mode: 0o600 });
+      if (old.pid !== process.pid && lockAlive(old as unknown as OpenLock)) return;
+      const mine = old.pid === process.pid;
+      const tmp = `${this.lockPath()}.${process.pid}.tmp`;
+      writeFileSync(tmp, JSON.stringify({ ...(mine ? old : {}), pid: process.pid, procStart: ownStart(), started: (mine && old.started) || new Date().toISOString(), ...extra }), { mode: 0o600 });
+      renameSync(tmp, this.lockPath());
+    } catch {}
+  }
+
+  private releaseLock(): void {
+    try {
+      if (JSON.parse(readFileSync(this.lockPath(), "utf8")).pid === process.pid) rmSync(this.lockPath());
     } catch {}
   }
 
@@ -1557,6 +1589,7 @@ export class Session {
   private callAbort?: AbortController;
 
   steer(text: string, now = false): void {
+    text = this.withoutKeys(text);
     const last = this.record.entries(["tool_result"]).at(-1);
     this.steered.push({ text, typedAt: new Date().toISOString(), afterStep: stepNumbers(this.record.nodes()).size, afterTool: String(last?.data.tool ?? ""), now });
     if (now) this.callAbort?.abort();
@@ -2120,7 +2153,7 @@ export class Session {
   }
 
   respondPermission(rid: string, ok: boolean, note = "", always = false): void {
-    this.permissionWaits.get(rid)?.resolve({ ok, note, always });
+    this.permissionWaits.get(rid)?.resolve({ ok, note: this.withoutKeys(note), always });
   }
 
   pendingPermissions(): string[] {
@@ -2166,7 +2199,7 @@ export class Session {
   }
 
   async followDone(step: number, note = "", agentDoes = false): Promise<void> {
-    this.followWaits.get(step)?.resolve({ note, agentDoes });
+    this.followWaits.get(step)?.resolve({ note: this.withoutKeys(note), agentDoes });
   }
 
   pendingFollowSteps(): number[] {
@@ -2290,6 +2323,8 @@ export class Session {
   }
 
   async answer(qid: string, value: unknown, note = ""): Promise<void> {
+    value = this.valueWithoutKeys(value);
+    note = this.withoutKeys(note);
     if (qid === this.trustQid || this.questions.get(qid)?.title === TRUST_TITLE) {
       const q = this.questions.get(qid);
       if (q?.status === "open") {
@@ -2315,6 +2350,8 @@ export class Session {
   }
 
   async changeAnswer(qid: string, value: unknown, note = ""): Promise<string[]> {
+    value = this.valueWithoutKeys(value);
+    note = this.withoutKeys(note);
     const q = this.questions.get(qid);
     if (!q) throw new Error(`No question ${qid}.`);
     if (q.status === "open") return (await this.answer(qid, value, note), []);
@@ -3651,9 +3688,7 @@ export class Session {
     }
     this.interrupt();
     await this.titling?.catch(() => {});
-    try {
-      if (JSON.parse(readFileSync(this.lockPath(), "utf8")).pid === process.pid) rmSync(this.lockPath());
-    } catch {}
+    this.releaseLock();
     await Promise.all(this.runtimes.map((r) => r.close().catch(() => {})));
   }
 }

@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, renameSync, rmSync, statSync } from "node:fs";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { checkAdapter, type Report } from "../onboarding/checker.ts";
 import { auditLines, estimateReview, runReview, type Audit, type LintSummary } from "./audit.ts";
@@ -114,16 +114,24 @@ async function git(args: string[], cwd?: string): Promise<string> {
   }
 }
 
+function within(base: string, sub: string, label: string): string {
+  if (sub.split(/[\\/]/).includes("..") || isAbsolute(sub)) throw new Error(`The folder name ${sub} is not allowed.`);
+  const p = join(base, sub);
+  if (!existsSync(p)) return p;
+  const rel = relative(realpathSync(base), realpathSync(p));
+  if (rel.startsWith("..") || isAbsolute(rel)) throw new Error(`The folder ${sub} in ${label} goes outside it through a symbolic link. Cuvette does not install it.`);
+  return p;
+}
+
 function findRoot(base: string, sub: string | undefined, label: string): string {
-  if (sub && (sub.split(/[\\/]/).includes("..") || sub.startsWith("/"))) throw new Error(`The folder name ${sub} is not allowed.`);
-  const start = sub ? join(base, sub) : base;
+  const start = sub ? within(base, sub, label) : base;
   if (existsSync(join(start, "adapter.yaml"))) return start;
   const found: string[] = [];
   const walk = (d: string, depth: number) => {
     for (const n of readdirSync(d)) {
       if (n.startsWith(".") || n === "node_modules") continue;
       const p = join(d, n);
-      if (!statSync(p).isDirectory()) continue;
+      if (!lstatSync(p).isDirectory()) continue;
       if (existsSync(join(p, "adapter.yaml"))) found.push(p);
       else if (depth < 2) walk(p, depth + 1);
     }
@@ -172,7 +180,7 @@ interface Staged {
 }
 
 async function cloneAt(url: string, ref: string | undefined, into: string): Promise<string> {
-  if (ref && !/^[\w./@^~+-]+$/.test(ref)) throw new Error(`The ref ${ref} is not allowed.`);
+  if (ref && (!/^[\w./@^~+-]+$/.test(ref) || ref.startsWith("-"))) throw new Error(`The ref ${ref} is not allowed.`);
   await git(["clone", "--quiet", "--no-tags", "--", url, into]);
   if (ref) await git(["-C", into, "checkout", "--quiet", "--detach", ref]);
   return git(["-C", into, "rev-parse", "HEAD"]);
@@ -223,12 +231,13 @@ async function stage(source: string, opts: PrepareOpts): Promise<Staged> {
 }
 
 async function stageEntry(entry: RegistryEntry, registry: string, work: string): Promise<Staged> {
-  if (entry.path.split(/[\\/]/).includes("..") || entry.path.startsWith("/")) throw new Error(`The registry entry ${entry.name} has a path that is not allowed.`);
+  if (entry.path.split(/[\\/]/).includes("..") || isAbsolute(entry.path)) throw new Error(`The registry entry ${entry.name} has a path that is not allowed.`);
+  if (/^https?:/i.test(registry) && !/^(https:\/\/|ssh:\/\/|git@)/i.test(String(entry.git))) throw new Error(`The registry entry ${entry.name} has the address ${entry.git}. An online registry must give an https or ssh address.`);
   const repo = join(work, "repo");
   const commit = await cloneAt(entry.git, entry.commit, repo);
   if (commit !== entry.commit) throw new Error(`The registry commit ${entry.commit} did not resolve to itself.`);
   const dir = join(work, "adapter");
-  copyClean(join(repo, entry.path), dir);
+  copyClean(within(repo, entry.path, entry.name), dir);
   if (hashFolder(dir) !== entry.sha256) throw new Error(`The files of ${entry.name} do not match the SHA-256 in the registry index. Cuvette did not install them.`);
   return { work, dir, kind: "registry", source: `${entry.name}@${entry.version}`, commit, version: entry.version, registry, checked: entry.trust === "checked", expected: entry.sha256 };
 }
@@ -439,12 +448,21 @@ export function applyInstall(id: string, opts: { confirmed: boolean }): { ok: bo
   if (!p) return { ok: false, text: "This install plan is gone. Start again." };
   if (p.refused) return { ok: false, text: p.refused };
   if (!opts.confirmed) return { ok: false, text: "Nothing installed. The install needs your confirmation." };
-  if (hashFolder(p.dir) !== p.entry.sha256) return { ok: false, text: "The staged files changed after the card. Nothing installed. Start again." };
   const target = userAdapterDir(p.name);
   if (p.mode === "add" && existsSync(target)) return { ok: false, text: `The folder ${target} exists. Nothing installed.` };
   mkdirSync(join(cuvetteHome(), "adapters"), { recursive: true });
   const fresh = `${target}.new-${p.id}`;
-  cpSync(p.dir, fresh, { recursive: true });
+  rmSync(fresh, { recursive: true, force: true });
+  try {
+    copyClean(p.dir, fresh);
+  } catch (e) {
+    rmSync(fresh, { recursive: true, force: true });
+    return { ok: false, text: `The staged files changed after the card: ${(e as Error).message} Nothing installed. Start again.` };
+  }
+  if (hashFolder(fresh) !== p.entry.sha256) {
+    rmSync(fresh, { recursive: true, force: true });
+    return { ok: false, text: "The staged files changed after the card. Nothing installed. Start again." };
+  }
   if (existsSync(target)) rmSync(target, { recursive: true });
   renameSync(fresh, target);
   saveInstalled(p.entry);
