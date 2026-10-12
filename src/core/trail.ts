@@ -666,12 +666,12 @@ function planHtml(record: AnalysisRecord): string {
   const q = questionsOf(record, p.entry);
   const questions = q.length ? `<h3>Questions</h3>${pre(q.join("\n"))}` : "";
   const pilot = p.pilot ? `<h3>Demonstration on a sample: ${esc(p.pilot.sample)}</h3>${pre(pilotText(p.pilot))}${p.pilot.images.map((i) => imgTag(i, `QC image of ${p.pilot!.sample}`)).join("")}` : "";
-  const updates = p.updates.length ? `<h3>Changes after confirmation</h3><ul>${p.updates.map((u) => `<li>Version ${u.version}: ${esc(u.reason || "no reason given")}</li>`).join("")}</ul>` : "";
+  const updates = p.updates.length ? `<h3>Changes after confirmation</h3><ul>${p.updates.map((u) => `<li>Version ${esc(u.version)}: ${esc(u.reason || "no reason given")}</li>`).join("")}</ul>` : "";
   const v = validationRows(record);
   const validation = v
     ? `<h3>Validation against the reference</h3><ul>${v.summary.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="scroll"><table><thead><tr>${v.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${v.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${v.plot ? `${imgTag(v.plot, "Bland-Altman plot")}<p class="muted">Bland-Altman plot. Each dot is one sample: the mean of the two values (across) against the agent minus the reference (up). The dark line is the mean difference. The dashed lines are the mean plus and minus 1.96 SD. The gray dot is the pilot sample.</p>` : ""}`
     : "";
-  return `<section class="plan" id="plan"><h2>Proposed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${p.version}.</p>${updates}${validation}${deviationHtml(record, "h3")}</section>`;
+  return `<section class="plan" id="plan"><h2>Proposed analysis (version ${esc(p.version)}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${esc(p.version)}.</p>${updates}${validation}${deviationHtml(record, "h3")}</section>`;
 }
 
 function testsHtml(record: AnalysisRecord): string {
@@ -684,6 +684,8 @@ function checklistSection(record: AnalysisRecord): string {
   const c = recordChecklist(record);
   return c ? `<section id="checklist">${checklistHtml(c, esc)}</section>` : "";
 }
+
+export const TRAIL_CSP = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
 
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
   const m = meta(record);
@@ -708,6 +710,7 @@ export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], pa
   });
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="${TRAIL_CSP}">
 <title>Analysis trail ${esc(m.id)}</title><style>${CSS}</style></head>
 <body><main>
 <h1>Analysis trail</h1>

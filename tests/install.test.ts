@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -8,9 +8,9 @@ import { parse, stringify } from "yaml";
 import { REVIEW_PROMPT } from "../src/adapters/audit.ts";
 import { adapterIndex, formatIndex } from "../src/adapters/catalog.ts";
 import { adapterCommand } from "../src/adapters/commands.ts";
-import { applyInstall, cardLines, installedRows, prepareAdd, prepareUpdate, removeInstalled, reviewPlan } from "../src/adapters/install.ts";
+import { applyInstall, cardLines, installedRows, prepareAdd, prepareUpdate, removeInstalled, reviewPlan, stagingRoot, withoutCredentials } from "../src/adapters/install.ts";
 import { CATALOG_DIR } from "../src/adapters/manifest.ts";
-import { fetchIndex } from "../src/adapters/registry.ts";
+import { DEFAULT_REGISTRY, fetchIndex } from "../src/adapters/registry.ts";
 import { adapterTrust, confirmCode, hashFolder, readInstalled, saveInstalled, userAdapterDir } from "../src/adapters/source.ts";
 import { listPrograms, programsTable, planAction, planFromInstall, runAction } from "../src/core/programs.ts";
 import { Session } from "../src/core/session.ts";
@@ -41,6 +41,7 @@ afterEach(async () => {
   else process.env.CUVETTE_HOME = old.home;
   if (old.stage === undefined) delete process.env.CUVETTE_STAGING;
   else process.env.CUVETTE_STAGING = old.stage;
+  delete process.env.CUVETTE_TRUSTED_REGISTRIES;
   rmSync(home, { recursive: true, force: true });
   rmSync(work, { recursive: true, force: true });
 });
@@ -121,6 +122,34 @@ describe("adapter add", () => {
     expect(parse(readFileSync(join(userAdapterDir("obtest"), "adapter.yaml"), "utf8")).adapter.version).toBe("1.0.0");
     const pinned = await prepareAdd(`file://${r}#${first}`).catch((e: Error) => e);
     expect(pinned).toMatchObject({ refused: expect.stringMatching(/already installed/) });
+  });
+
+  test("a user name and password in a git address stay out of the index, the card and the error", async () => {
+    expect(withoutCredentials("https://ann:s3cret@git.example.org/lab/a.git#main:x")).toBe("https://git.example.org/lab/a.git#main:x");
+    expect(withoutCredentials("https://ghp_token123@github.com/lab/a.git")).toBe("https://github.com/lab/a.git");
+    expect(withoutCredentials("ssh://git:s3cret@host/lab/a.git")).toBe("ssh://git@host/lab/a.git");
+    expect(withoutCredentials("ssh://git@host/lab/a.git")).toBe("ssh://git@host/lab/a.git");
+    expect(withoutCredentials("git@github.com:lab/a.git")).toBe("git@github.com:lab/a.git");
+    const e = await prepareAdd("https://ann:s3cret@127.0.0.1:9/lab/a.git").catch((x: Error) => x);
+    expect(e).toBeInstanceOf(Error);
+    expect((e as Error).message).not.toContain("s3cret");
+  });
+
+  test("the staging folder is private to the user", () => {
+    delete process.env.CUVETTE_STAGING;
+    const root = stagingRoot();
+    expect(root.startsWith(tmpdir())).toBe(true);
+    expect(root).not.toMatch(/Volumes/);
+    if (process.platform !== "win32") expect(statSync(root).mode & 0o777).toBe(0o700);
+    const shared = join(work, "shared");
+    mkdirSync(shared, { mode: 0o755 });
+    process.env.CUVETTE_STAGING = shared;
+    stagingRoot();
+    if (process.platform !== "win32") expect(statSync(shared).mode & 0o777).toBe(0o700);
+    const link = join(work, "staging-link");
+    symlinkSync(shared, link);
+    process.env.CUVETTE_STAGING = link;
+    expect(() => stagingRoot()).toThrow(/not a folder that your user account owns/);
   });
 
   test("a symbolic link in the source is refused", async () => {
@@ -387,10 +416,14 @@ describe("trust labels", () => {
   });
 
   test("a registry adapter is Checked until its files change", async () => {
-    saveInstalled({ name: "obtest", kind: "registry", source: "obtest@1.0.0", version: "1.0.0", sha256: "x", installed_on: "", checked: true });
+    saveInstalled({ name: "obtest", kind: "registry", source: "obtest@1.0.0", version: "1.0.0", registry: DEFAULT_REGISTRY, sha256: "x", installed_on: "", checked: true });
     const dir = fixture(userAdapterDir("obtest"));
     saveInstalled({ ...readInstalled().obtest!, sha256: hashFolder(dir) });
     expect(adapterTrust(dir).label).toBe("Checked");
+    saveInstalled({ ...readInstalled().obtest!, registry: "https://example.org/index.json" });
+    expect(adapterTrust(dir).label).toBe("Unlisted");
+    expect(installedRows()[0]!.trust).toBe("Unlisted");
+    saveInstalled({ ...readInstalled().obtest!, registry: DEFAULT_REGISTRY });
     writeFileSync(join(dir, "NOTE.md"), "changed\n");
     expect(adapterTrust(dir)).toMatchObject({ label: "Unlisted", changed: true });
   });
@@ -444,6 +477,14 @@ describe("the registry", () => {
     const file = join(work, "index.json");
     writeFileSync(file, JSON.stringify(index));
     writeFileSync(join(home, "settings.json"), JSON.stringify({ adapter_registry: file }));
+    const custom = await prepareAdd("obtest");
+    expect(custom.card.trust).toBe("unlisted");
+    expect(custom.entry.checked).toBe(false);
+    expect(cardLines(custom.card).join("\n")).toContain("Trust: Unlisted.");
+    const said: string[] = [];
+    await adapterCommand("list", undefined, { ask: async () => "", say: (l) => said.push(l) }, { registry: true });
+    expect(said.join("\n")).toMatch(/obtest\s+2\.0\.0.*Unlisted/);
+    process.env.CUVETTE_TRUSTED_REGISTRIES = file;
     const plan = await prepareAdd("obtest");
     expect(plan.refused).toBeUndefined();
     expect(plan.card.trust).toBe("checked");

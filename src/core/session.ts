@@ -1689,6 +1689,14 @@ export class Session {
   }
 
   async pipeline(tool: Tool, args: Args, callId: string, signal: AbortSignal, depth = 0): Promise<{ text: string; images?: string[]; isError: boolean; output?: ToolOutput }> {
+    const r = await this.runPipeline(tool, args, callId, signal, depth);
+    const h = hideKeys(r.text);
+    if (!h.found) return r;
+    this.record.append("notice", { text: `Cuvette removed ${h.found === 1 ? "an API key" : `${h.found} API keys`} from the result of ${tool.name}. The key did not go to the model.` });
+    return { ...r, text: h.text };
+  }
+
+  private async runPipeline(tool: Tool, args: Args, callId: string, signal: AbortSignal, depth: number): Promise<{ text: string; images?: string[]; isError: boolean; output?: ToolOutput }> {
     const error = (message: string) => {
       this.record.append("tool_result", { callId, tool: tool.name, adapter: tool.adapter, ok: false, error: message, text: message });
       return { text: `ERROR: ${message}`, isError: true };
@@ -1811,9 +1819,9 @@ export class Session {
         tool: tool.name,
         adapter: tool.adapter,
         ok: output.ok,
-        error: output.error,
-        summary,
-        text: (output.text ?? "").slice(0, 4000),
+        error: output.error === undefined ? undefined : hideKeys(output.error).text,
+        summary: hideKeys(summary).text,
+        text: hideKeys(output.text ?? "").text.slice(0, 4000),
         metrics: output.metrics,
         table: output.table,
         images: images.map((o) => o.sha),

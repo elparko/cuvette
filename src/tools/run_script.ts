@@ -135,35 +135,49 @@ const STYLE_FILE = readFileSync(fileURLToPath(new URL("../adapters/kinds/cuvette
 
 const BOOT = "import sys,runpy;d,s=sys.argv[1:3];sys.path.insert(0,d);import ga_api;sys.argv=[s];runpy.run_path(s,init_globals={k:getattr(ga_api,k) for k in ('call','save_table','save_figure','ToolError')},run_name='__main__')";
 
-type SandboxState = "unknown" | "on" | "off";
+export type SandboxState = "unknown" | "on" | "bwrap" | "unshare" | "off";
 let sandbox: SandboxState = "unknown";
 let probing: Promise<void> | undefined;
 
+async function works(argv: string[]): Promise<boolean> {
+  return (await runProcess(argv, { timeoutMs: 10_000 })).code === 0;
+}
+
 function probeSandbox(): Promise<void> {
   probing ??= (async () => {
-    const argv = process.platform === "darwin" ? ["/usr/bin/sandbox-exec", "-p", "(version 1)(allow default)", "/usr/bin/true"] : process.platform === "linux" ? ["unshare", "-rn", "true"] : undefined;
-    if (!argv) {
-      sandbox = "off";
-      return;
-    }
-    const r = await runProcess(argv, { timeoutMs: 10_000 });
-    sandbox = r.code === 0 ? "on" : "off";
+    if (process.platform === "darwin") sandbox = (await works(["/usr/bin/sandbox-exec", "-p", "(version 1)(allow default)", "/usr/bin/true"])) ? "on" : "off";
+    else if (process.platform === "linux") sandbox = (await works(["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--unshare-net", "--", "true"])) ? "bwrap" : (await works(["unshare", "-rmn", "true"])) ? "unshare" : "off";
+    else sandbox = "off";
   })();
   return probing;
 }
 
-export function describeLimits(network: boolean): string {
+export function describeLimits(network: boolean, state: SandboxState = sandbox, platform: NodeJS.Platform = process.platform): string {
   const net = network ? "The script can use the network." : "The script cannot use the network.";
-  if (process.platform === "darwin") {
-    if (sandbox === "off") return `The operating system sandbox is not available. The script can read and write any file that your user account can. ${network ? "The script can use the network." : "The network is not blocked."}`;
-    return `The script runs in an operating system sandbox. It can read files on this computer. It can write only in the project folder, in the session folder and in temporary folders. ${net}`;
+  const open = `The script can read and write any file that your user account can, also the saved key file. ${network ? net : "The network is not blocked."}`;
+  const limited = `It can read files on this computer, but not the saved key file. It can write only in the project folder, in the session folder and in temporary folders. ${net}`;
+  if (platform === "darwin") return state === "off" ? `The operating system sandbox is not available. ${open}` : `The script runs in an operating system sandbox. ${limited}`;
+  if (platform === "linux") {
+    if (state === "bwrap") return `The script runs in a bubblewrap sandbox. ${limited}`;
+    if (state === "unshare") return `The script runs in a Linux namespace. A normal read of the saved key file fails, but a script can remove this limit. It can read and write the other files that your user account can. Install bubblewrap (bwrap) for a stronger limit. ${net}`;
+    return `No sandbox tool works here. Install bubblewrap (bwrap) to limit the script. ${open}`;
   }
-  if (process.platform === "linux") {
-    const files = "The script can read and write any file that your user account can.";
-    if (network) return `${files} ${net}`;
-    return sandbox === "off" ? `${files} The network is not blocked, because the sandbox tool (unshare) does not work here.` : `${files} ${net}`;
+  return `The script runs as your user account. The operating system does not limit it on Windows. ${open}`;
+}
+
+export function linuxWrap(state: SandboxState, argv: string[], o: { network: boolean; writable: string[]; cred: string }): string[] {
+  const hide = existsSync(o.cred) ? [...new Set([o.cred, realpathSync(o.cred)])] : [];
+  if (state === "bwrap") {
+    const binds = [...new Set(o.writable.filter((p) => existsSync(p)))].flatMap((p) => ["--bind", p, p]);
+    return ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", ...binds, ...hide.flatMap((p) => ["--ro-bind", "/dev/null", p]), ...(o.network ? [] : ["--unshare-net"]), "--die-with-parent", "--", ...argv];
   }
-  return `The script runs as your user account. The operating system does not limit it on Windows. It can read and write any file that your user account can. ${network ? net : "The network is not blocked."}`;
+  if (state === "unshare") {
+    const flags = o.network ? "-rm" : "-rmn";
+    if (!hide.length) return ["unshare", flags, ...argv];
+    const cover = 'mount --bind /dev/null "$1" || { echo "Cuvette could not hide the saved key file. The script did not run." >&2; exit 97; }; shift; exec "$@"';
+    return ["unshare", flags, "sh", "-c", cover, "sh", hide.at(-1)!, ...argv];
+  }
+  return argv;
 }
 
 function sbString(s: string): string {
@@ -171,6 +185,7 @@ function sbString(s: string): string {
 }
 
 function wrap(argv: string[], workDir: string, network: boolean, project?: string): string[] {
+  if (process.platform === "linux") return linuxWrap(sandbox, argv, { network, cred: credentialsPath(), writable: [workDir, ...(project && !blindPolicy() ? [project] : []), tmpdir(), "/tmp", "/var/tmp", "/dev/shm"] });
   if (sandbox !== "on") return argv;
   const blind = blindPolicy();
   if (process.platform === "darwin") {
@@ -183,7 +198,6 @@ function wrap(argv: string[], workDir: string, network: boolean, project?: strin
     const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${secrets}${blind ? sandboxReadRules(agentRules(blind)) : ""}`;
     return ["/usr/bin/sandbox-exec", "-p", profile, ...argv];
   }
-  if (process.platform === "linux" && !network) return ["unshare", "-rn", ...argv];
   return argv;
 }
 
