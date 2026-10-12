@@ -130,6 +130,8 @@ Usage
                                        (a changed decision, input file, adapter, program or package version)
   cuvette bench [scenario|all] --model <model> [--guidance on|off|both]
   cuvette bench papers [--papers id,id|all] --models spec,spec [--runs N] [--out file] [--dry-run] [--no-blind]
+  cuvette bench compare --results a.json,b.json [--model spec]
+                                       paired test of two result files: each paper run and item in A and B (exact McNemar)
   cuvette bench site --results a.json[,b.json] --out <folder>
   cuvette bench cases --results a.json[,b.json] --out <folder> [--style site/style.css]
   cuvette mcp [--adapter <name>]       run the harness as an MCP server on stdio (no --adapter: the client loads adapters with use_adapter)
@@ -776,6 +778,13 @@ async function main() {
           const r = rescoreResults(f);
           console.log(`${f}: rescored ${r.rescored} of ${r.runs} runs`);
         }
+        return;
+      }
+      if (a1 === "compare") {
+        const results = (str(o.results) ?? "").split(",").filter(Boolean);
+        if (results.length !== 2) return fail("usage: cuvette bench compare --results a.json,b.json [--model spec]");
+        const { compareFiles } = await import("./bench/papers-compare.ts");
+        console.log(compareFiles(results[0]!, results[1]!, str(o.model)));
         return;
       }
       if (a1 === "site") {
