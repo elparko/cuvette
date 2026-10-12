@@ -20,6 +20,45 @@ export function isCredentialsFile(path: string): boolean {
   return real(path) === real(credentialsPath());
 }
 
+export const KEY_REMOVED = "[API key removed]";
+
+const KEY_PATTERNS = [
+  /\bsk-ant-[A-Za-z0-9_-]{16,}/g,
+  /\bsk-(?:proj-|svcacct-|admin-)?(?=[A-Za-z_-]*\d)[A-Za-z0-9_-]{32,}/g,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}/g,
+  /\bgh[pousr]_[A-Za-z0-9]{30,}/g,
+  /\bhf_[A-Za-z0-9]{30,}/g,
+  /\bAIza[0-9A-Za-z_-]{35}\b/g,
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
+  /\b\d{1,6}-[a-f0-9]{80,}\b/g,
+];
+
+const SECRET_NAME = /key|token|secret|password|passwd|credential/i;
+
+function knownSecrets(env: Record<string, string | undefined>): string[] {
+  const secret = (v: unknown): v is string => typeof v === "string" && v.length >= 16 && !/\s|^[/~.]|:\/\//.test(v);
+  const out = new Set<string>(Object.entries(readFile()).filter(([k, v]) => /_key$|token|secret/i.test(k) && secret(v)).map(([, v]) => v));
+  for (const [k, v] of Object.entries(env)) if (SECRET_NAME.test(k) && secret(v)) out.add(v);
+  return [...out].sort((a, b) => b.length - a.length);
+}
+
+export function hideKeys(text: string, env: Record<string, string | undefined> = process.env): { text: string; found: number } {
+  let found = 0;
+  let out = text;
+  for (const s of knownSecrets(env)) {
+    const parts = out.split(s);
+    found += parts.length - 1;
+    out = parts.join(KEY_REMOVED);
+  }
+  for (const re of KEY_PATTERNS)
+    out = out.replace(re, () => {
+      found++;
+      return KEY_REMOVED;
+    });
+  return { text: out, found };
+}
+
 function readFile(): Record<string, string> {
   try {
     return JSON.parse(readFileSync(credentialsPath(), "utf8"));

@@ -1,10 +1,11 @@
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { removeIndexRow, renameIndexRow } from "../src/core/places.ts";
-import { ageText, defaultSession, listSessions, sessionLine } from "../src/core/sessions.ts";
+import { ageText, claimLock, defaultSession, listSessions, lockAlive, openLock, sessionLine } from "../src/core/sessions.ts";
+import { TSX_CLI } from "../src/adapters/kinds/common.ts";
 
 function home(): string {
   const h = mkdtempSync(join(tmpdir(), "cuvette-sessions-"));
@@ -113,3 +114,36 @@ test("a custom name wins over the automatic title, and a removed session leaves 
     else process.env.CUVETTE_HOME = old;
   }
 });
+
+test("claimLock takes a free or dead lock, and refuses a live lock of another process", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-"));
+  const lock = join(dir, "open.json");
+  expect(claimLock(dir)).toBeUndefined();
+  expect(JSON.parse(readFileSync(lock, "utf8"))).toMatchObject({ pid: process.pid });
+  expect(claimLock(dir)).toBeUndefined();
+  const other = process.ppid;
+  writeFileSync(lock, JSON.stringify({ pid: other, procStart: 1000 }));
+  expect(claimLock(dir, {}, () => 1000)).toMatchObject({ pid: other });
+  expect(openLock(dir, () => 1000)).toMatchObject({ pid: other });
+  expect(openLock(dir, () => 999_000)).toBeUndefined();
+  expect(claimLock(dir, {}, () => 999_000)).toBeUndefined();
+  expect(JSON.parse(readFileSync(lock, "utf8")).pid).toBe(process.pid);
+  writeFileSync(lock, JSON.stringify({ pid: 2 ** 22 + 7 }));
+  expect(claimLock(dir)).toBeUndefined();
+  expect(lockAlive({ pid: process.pid, procStart: Date.now() - 86_400_000 * 400 })).toBe(false);
+});
+
+test("of many processes that claim one lock at the same time, exactly one gets it", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cuvette-lock-race-"));
+  const code = `import { claimLock } from ${JSON.stringify(join(__dirname, "../src/core/sessions.ts"))}; const at = Number(process.env.AT); while (Date.now() < at) {} const held = claimLock(${JSON.stringify(dir)}); setTimeout(() => { console.log(held ? "lost" : "won"); }, 1500);`;
+  const at = Date.now() + 2500;
+  const runs = Array.from({ length: 6 }, () => new Promise<string>((done) => {
+    const c = spawn(process.execPath, [TSX_CLI, "--eval", code], { env: { ...process.env, AT: String(at) }, stdio: ["ignore", "pipe", "inherit"] });
+    let out = "";
+    c.stdout.on("data", (d) => (out += d));
+    c.on("close", () => done(out.trim()));
+  }));
+  const results = await Promise.all(runs);
+  expect(results.filter((r) => r === "won").length).toBe(1);
+  expect(results.filter((r) => r === "lost").length).toBe(5);
+}, 30_000);

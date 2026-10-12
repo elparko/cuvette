@@ -3,13 +3,14 @@ import { pilotText } from "../core/pilot.ts";
 import { deviationHtml } from "../core/freeze.ts";
 import { approvedPlan, planMarkdown } from "../core/plan.ts";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { userInfo } from "node:os";
 import { basename, extname, join } from "node:path";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import type { DecisionField } from "../core/decisions.ts";
 import { exportProtocol, mainNodes, setupValues, stepLines } from "../core/exports.ts";
 import type { AnalysisRecord } from "../core/record.ts";
+import { hideKeys, isCredentialsFile } from "../core/credentials.ts";
 import { exportHtml, show } from "../core/trail.ts";
 import { allRefs, sessionCitations, toBibtex, type CitationStyle } from "../core/citations.ts";
 import type { Finding } from "../core/types.ts";
@@ -70,9 +71,25 @@ export function esc(s: unknown): string {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+const TEXT_MIME = /^text\/|json|ndjson|svg/;
+
 function file(path: string, data: Buffer | string, description?: string): ElnFile {
-  const buf = typeof data === "string" ? Buffer.from(data) : data;
-  return { path, data: buf, mime: mimeOf(path), sha256: sha(buf), description };
+  const mime = mimeOf(path);
+  let buf = typeof data === "string" ? Buffer.from(data) : data;
+  if (TEXT_MIME.test(mime) || (mime === "application/octet-stream" && !buf.subarray(0, 8000).includes(0))) {
+    const h = hideKeys(buf.toString("utf8"));
+    if (h.found) buf = Buffer.from(h.text);
+  }
+  return { path, data: buf, mime, sha256: sha(buf), description };
+}
+
+function readableOutput(p: string | undefined): string | undefined {
+  if (!p || isCredentialsFile(p)) return undefined;
+  try {
+    return statSync(p).isFile() ? p : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function csv(rows: string[][]): string {
@@ -124,7 +141,8 @@ export function collect(src: ElnSource): ElnContent {
   const protocolPath = exportProtocol(record, adapters, join(exp, "protocol.md"), style);
   const trailPath = exportHtml(record, adapters, join(exp, "trail.html"), style);
   const refs = allRefs(sessionCitations(record, adapters));
-  const logBuf = readFileSync(join(record.dir, "log.jsonl"));
+  const logFile = file("log.jsonl", readFileSync(join(record.dir, "log.jsonl")), "The append-only session log");
+  const logBuf = logFile.data;
   const plan = planMarkdown(record);
   const checklist = recordChecklist(record);
   const files: ElnFile[] = [
@@ -142,7 +160,7 @@ export function collect(src: ElnSource): ElnContent {
         ]
       : []),
     ...(record.nodes().some((n) => n.adapter) ? [file("references.bib", toBibtex(refs), "BibTeX references for the programs and methods that ran")] : []),
-    file("log.jsonl", logBuf, "The append-only session log"),
+    logFile,
   ];
   const steps: ElnStep[] = mainNodes(record).map((n, i) => {
     const folder = `steps/${String(i + 1).padStart(2, "0")}-${slug(n.tool)}`;
@@ -159,9 +177,10 @@ export function collect(src: ElnSource): ElnContent {
     const stepFiles = [file(`${folder}/step.md`, md, "Step description and manual route")];
     const used = new Set<string>(["step.md"]);
     for (const o of n.outputs) {
-      const p = o.sha ? record.blobPath(o.sha) : existsSync(o.path) ? o.path : undefined;
+      const p = readableOutput(o.sha ? record.blobPath(o.sha) : o.path);
       if (!p) continue;
-      let name = basename(o.name || o.path);
+      let name = basename(o.name || o.path || "").replace(/[\\/:]/g, "_");
+      if (!name || name === "." || name === "..") name = `output-${used.size}`;
       if (used.has(name)) name = `${o.sha?.slice(0, 8) ?? used.size}-${name}`;
       used.add(name);
       stepFiles.push(file(`${folder}/${name}`, readFileSync(p), o.kind === "image" ? "Figure" : o.kind === "table" ? "Table" : "Output file"));

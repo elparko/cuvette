@@ -97,3 +97,27 @@ test("the archive has the approved plan as plan.md and at the top of the body", 
   const { collect } = await import("../src/eln/export.ts");
   expect(collect(s).bodyHtml.startsWith("<h2>Proposed analysis, confirmed (version 1)</h2><h3>Proposed metrics</h3><pre>Question: How many particles?</pre>")).toBe(true);
 });
+
+test("the archive leaves out the saved key file, folders and keys in the log, and gives each output a safe name", async () => {
+  const { saveClaudeKey } = await import("../src/core/credentials.ts");
+  const key = "sk-ant-api03-Zx9_abcdefghijklmnopqrstuvwxyz0123456789";
+  const cred = saveClaudeKey(key);
+  s.record.append("notice", { text: `old text with ${key}` });
+  s.record.addNode({
+    entry: 0, adapter: "lab", adapterVersion: "0.2.0", programVersion: "1.0", tool: "leak", args: {},
+    decisions: {}, codeHash: "c", inputHashes: [], outputs: [{ path: cred, kind: "table" }, { path: tmpdir(), kind: "table" }],
+    result: {}, parents: [], summary: "Leak.", model: "m", manualRoute: "", fidelity: "exact",
+  });
+  const sha = s.record.putBlob(Buffer.from("x"), ".csv");
+  s.record.addNode({
+    entry: 0, adapter: "lab", adapterVersion: "0.2.0", programVersion: "1.0", tool: "dots", args: {},
+    decisions: {}, codeHash: "c", inputHashes: [], outputs: [{ path: "/work/..", name: "..", kind: "table", sha }],
+    result: {}, parents: [], summary: "Dots.", model: "m", manualRoute: "", fidelity: "exact",
+  });
+  const { files } = await exported();
+  for (const [name, data] of files) {
+    expect(data.toString("latin1")).not.toContain(key);
+    expect(name.split("/")).not.toContain("..");
+    expect(name.endsWith("credentials.json")).toBe(false);
+  }
+});

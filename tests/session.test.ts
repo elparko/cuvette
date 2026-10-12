@@ -10,6 +10,7 @@ import { FakeProvider } from "../src/providers/fake.ts";
 import { unzip } from "./fixtures/unzip.ts";
 import { writeXlsx } from "./fixtures/xlsx.ts";
 import { recordSpend } from "../src/core/spend.ts";
+import { processStart } from "../src/core/sessions.ts";
 import { trustFolder } from "../src/core/trust.ts";
 
 let session: Session | undefined;
@@ -1652,4 +1653,33 @@ test("a call to an unknown tool names the tools that exist", async () => {
   session = await recoverySession(provider, { guidance: false });
   await session.send("go");
   expect(lastToolText(provider)).toMatch(/no tool named nope\. Use only these tools: .*\bstate\b/);
+});
+
+test("a pasted API key does not reach the model or the record", async () => {
+  const key = "sk-ant-api03-Zx9_abcdefghijklmnopqrstuvwxyz0123456789";
+  const provider = new FakeProvider([{ text: "ok" }]);
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider, cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  await session.send(`my key is ${key} please count`);
+  session.steer(`and ${key}`);
+  const q = await session.questions.ask({ decisionKey: "", title: "Which?", text: "Which?", options: [], evidence: [] } as never);
+  await session.answer(q.qid, { picked: ["a"], other: `the key ${key}` }, `note ${key}`);
+  expect(JSON.stringify(provider.requests)).not.toContain(key);
+  expect(readFileSync(join(session.record.dir, "log.jsonl"), "utf8")).not.toContain(key);
+  expect(session.record.entries(["user"])[0]!.data.text).toBe("my key is [API key removed] please count");
+  expect(session.record.entries(["notice"]).some((e) => /removed an API key/.test(String(e.data.text)))).toBe(true);
+});
+
+test("a session open in another live process cannot open twice, and a reused process ID does not hold it", async () => {
+  session = await Session.create({ adapters: [join(__dirname, "fixtures/lab")], provider: new FakeProvider([]), cwd: mkdtempSync(join(tmpdir(), "cuvette-proj-")), settings: { guidance: false } });
+  const id = session.id;
+  const lock = join(session.record.dir, "open.json");
+  await session.close();
+  session = undefined;
+  const other = process.ppid;
+  const start = processStart(other);
+  writeFileSync(lock, JSON.stringify({ pid: other, procStart: start ?? 0 }));
+  if (start !== undefined) await expect(Session.resume(id, { provider: new FakeProvider([]) })).rejects.toThrow(/open in another window \(process \d+\)/);
+  writeFileSync(lock, JSON.stringify({ pid: other, procStart: (start ?? Date.now()) - 3_600_000 }));
+  session = await Session.resume(id, { provider: new FakeProvider([]) });
+  expect(JSON.parse(readFileSync(lock, "utf8")).pid).toBe(process.pid);
 });
