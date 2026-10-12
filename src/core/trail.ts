@@ -5,7 +5,8 @@ import { approvedPlan, planMarkdown, questionsOf } from "./plan.ts";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, extname, join } from "node:path";
+import { basename, extname, isAbsolute, join, relative, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { LoadedAdapter, MapEntry } from "../adapters/manifest.ts";
 import { testsMarkdown, testsTable } from "./testcount.ts";
 import { referencesHtml, referencesMarkdown, sessionCitations, type CitationStyle } from "./citations.ts";
@@ -441,6 +442,16 @@ export function dataUri(record: AnalysisRecord, sha: string): string | undefined
   return `data:${mime};base64,${readFileSync(p).toString("base64")}`;
 }
 
+// With linkFrom, the page links each image file relative to that folder. Without it, the page holds each image as base64.
+export interface HtmlImages {
+  linkFrom?: string;
+}
+
+function linkTo(from: string, path: string): string {
+  const rel = relative(from, path);
+  return isAbsolute(rel) ? pathToFileURL(path).href : rel.split(sep).map(encodeURIComponent).join("/");
+}
+
 function htmlTable(t: Record<string, unknown>): string {
   const cols = (t.columns as unknown[] | undefined) ?? [];
   const rows = (t.rows as unknown[][] | undefined) ?? [];
@@ -519,10 +530,11 @@ export function renderMarkdown(src: string): string {
   return out.join("\n");
 }
 
-function imageFigures(record: AnalysisRecord, shas: string[]): string {
+function imageFigures(record: AnalysisRecord, shas: string[], img: HtmlImages): string {
   const shown = [...new Set(shas)].filter((sha) => !/\.tiff?$/i.test(record.blobPath(sha) ?? ""));
   const figs = shown.slice(0, 6).map((sha) => {
-    const uri = dataUri(record, sha);
+    const p = img.linkFrom ? record.blobPath(sha) : undefined;
+    const uri = p && MIME[extname(p).toLowerCase()] ? linkTo(img.linkFrom!, p) : dataUri(record, sha);
     return uri ? `<img src="${uri}" alt="Result image ${esc(sha.slice(0, 8))}">` : `<p class="muted">Image ${esc(sha.slice(0, 12))} is not embedded.</p>`;
   });
   return figs.length ? `<figure>${figs.join("")}</figure>` : "";
@@ -643,33 +655,34 @@ function badgeHtml(label: string): string {
   return `<span class="badge ${cls}">${esc(label)}</span>`;
 }
 
-function stepHtml(record: AnalysisRecord, t: TrailLine): string {
+function stepHtml(record: AnalysisRecord, t: TrailLine, img: HtmlImages): string {
   const d = t.details ?? {};
   const classes = ["step", `kind-${t.icon}`, t.failed ? "failed" : "", t.stale ? "stale" : "", t.badges.includes("comparison run") ? "comparison" : ""].filter(Boolean).join(" ");
   const badges = [...(t.failed ? ["failed"] : []), ...t.badges].map(badgeHtml).join(" ");
   const body = htmlDetails(d);
   const tech = t.technical ? `<details><summary>Technical record</summary><div class="body">${htmlDl(t.technical)}</div></details>` : "";
   const more = body ? `<details><summary>${t.failed ? "Full error and details" : "Route, settings and details"}</summary><div class="body">${body}</div></details>` : "";
-  return `<article class="${classes}" id="s${t.n}"><div class="head">${iconSvg(t.icon)}<span class="n">${t.step ? `Step ${t.step}` : ""}</span><span class="t">${esc(t.line)}</span>${badges}</div>${imageFigures(record, (d.images as string[] | undefined) ?? [])}${more}${tech}</article>`;
+  return `<article class="${classes}" id="s${t.n}"><div class="head">${iconSvg(t.icon)}<span class="n">${t.step ? `Step ${t.step}` : ""}</span><span class="t">${esc(t.line)}</span>${badges}</div>${imageFigures(record, (d.images as string[] | undefined) ?? [], img)}${more}${tech}</article>`;
 }
 
-function imgTag(path: string, alt: string): string {
-  if (!existsSync(path) || statSync(path).size > 5_000_000 || !/\.(png|jpe?g)$/i.test(path)) return `<p class="muted">${esc(path)}</p>`;
+function imgTag(path: string, alt: string, img: HtmlImages): string {
+  if (!existsSync(path) || !/\.(png|jpe?g)$/i.test(path) || (!img.linkFrom && statSync(path).size > 5_000_000)) return `<p class="muted">${esc(path)}</p>`;
   const type = /\.png$/i.test(path) ? "image/png" : "image/jpeg";
-  return `<figure><img alt="${esc(alt)}" src="data:${type};base64,${readFileSync(path).toString("base64")}"><figcaption>${esc(basename(path))}</figcaption></figure>`;
+  const src = img.linkFrom ? linkTo(img.linkFrom, path) : `data:${type};base64,${readFileSync(path).toString("base64")}`;
+  return `<figure><img alt="${esc(alt)}" src="${esc(src)}"><figcaption>${esc(basename(path))}</figcaption></figure>`;
 }
 
-function planHtml(record: AnalysisRecord): string {
+function planHtml(record: AnalysisRecord, img: HtmlImages): string {
   const p = approvedPlan(record);
   if (!p) return "";
   const pre = (t: string) => `<pre style="white-space:pre-wrap;font:inherit">${esc(t)}</pre>`;
   const q = questionsOf(record, p.entry);
   const questions = q.length ? `<h3>Questions</h3>${pre(q.join("\n"))}` : "";
-  const pilot = p.pilot ? `<h3>Demonstration on a sample: ${esc(p.pilot.sample)}</h3>${pre(pilotText(p.pilot))}${p.pilot.images.map((i) => imgTag(i, `QC image of ${p.pilot!.sample}`)).join("")}` : "";
+  const pilot = p.pilot ? `<h3>Demonstration on a sample: ${esc(p.pilot.sample)}</h3>${pre(pilotText(p.pilot))}${p.pilot.images.map((i) => imgTag(i, `QC image of ${p.pilot!.sample}`, img)).join("")}` : "";
   const updates = p.updates.length ? `<h3>Changes after confirmation</h3><ul>${p.updates.map((u) => `<li>Version ${esc(u.version)}: ${esc(u.reason || "no reason given")}</li>`).join("")}</ul>` : "";
   const v = validationRows(record);
   const validation = v
-    ? `<h3>Validation against the reference</h3><ul>${v.summary.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="scroll"><table><thead><tr>${v.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${v.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${v.plot ? `${imgTag(v.plot, "Bland-Altman plot")}<p class="muted">Bland-Altman plot. Each dot is one sample: the mean of the two values (across) against the agent minus the reference (up). The dark line is the mean difference. The dashed lines are the mean plus and minus 1.96 SD. The gray dot is the pilot sample.</p>` : ""}`
+    ? `<h3>Validation against the reference</h3><ul>${v.summary.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="scroll"><table><thead><tr>${v.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${v.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${v.plot ? `${imgTag(v.plot, "Bland-Altman plot", img)}<p class="muted">Bland-Altman plot. Each dot is one sample: the mean of the two values (across) against the agent minus the reference (up). The dark line is the mean difference. The dashed lines are the mean plus and minus 1.96 SD. The gray dot is the pilot sample.</p>` : ""}`
     : "";
   return `<section class="plan" id="plan"><h2>Proposed analysis (version ${esc(p.version)}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${esc(p.version)}.</p>${updates}${validation}${deviationHtml(record, "h3")}</section>`;
 }
@@ -691,7 +704,7 @@ export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], pa
   return writeOut(path, trailHtml(record, adapters, style));
 }
 
-export function trailHtml(record: AnalysisRecord, adapters: LoadedAdapter[], style: CitationStyle = "apa"): string {
+export function trailHtml(record: AnalysisRecord, adapters: LoadedAdapter[], style: CitationStyle = "apa", img: HtmlImages = {}): string {
   const m = meta(record);
   const labels = new Map<string, string>();
   for (const a of adapters) for (const d of a.manifest.decisions) labels.set(d.key, d.label);
@@ -708,7 +721,7 @@ export function trailHtml(record: AnalysisRecord, adapters: LoadedAdapter[], sty
     .join("");
   const sections = groups.map((g) => {
     const heading = g.request ? `You asked: ${show(g.request.details?.text ?? g.request.line)}` : hasAsks ? "Before the first request" : "Steps";
-    const steps = g.lines.filter((l) => !l.answer).map((l) => stepHtml(record, l)).join("\n");
+    const steps = g.lines.filter((l) => !l.answer).map((l) => stepHtml(record, l, img)).join("\n");
     const answers = g.lines.filter((l) => l.answer).map((l) => `<div class="answer"><p class="label">Answer</p>${renderMarkdown(show(l.details?.text ?? l.line))}</div>`).join("\n");
     return `<section id="g${g.id}"><h2>${esc(heading)}</h2>\n${steps}\n${answers}</section>`;
   });
@@ -720,7 +733,7 @@ export function trailHtml(record: AnalysisRecord, adapters: LoadedAdapter[], sty
 <h1>Analysis trail</h1>
 ${title ? `<p class="question"><b>Question</b> ${esc(title)}</p>` : ""}
 <p class="meta"><b>Session</b> ${esc(m.id)} &middot; <b>Adapters</b> ${esc(m.adapters)} &middot; <b>Model</b> ${esc(m.model)} &middot; <b>Date</b> ${esc(m.date)}</p>
-${planHtml(record)}
+${planHtml(record, img)}
 ${settingRowsHtml ? `<h3>Settings</h3><div class="scroll"><table><thead><tr><th>Decision</th><th>Value</th><th>Set by</th></tr></thead><tbody>${settingRowsHtml}</tbody></table></div>` : ""}
 ${testsHtml(record)}
 ${sections.join("\n")}

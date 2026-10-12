@@ -12,10 +12,11 @@ import { call, copyText, enableFinder, type AppState } from "./lib/api.ts";
 import { useStream } from "./lib/stream.ts";
 import { cn } from "./lib/utils.ts";
 import { AnalysisPage } from "./pages/analysis.tsx";
-import { SessionsPage, useSessions, type SessionCard } from "./pages/sessions.tsx";
+import { useSessions, type SessionCard } from "./pages/sessions.tsx";
 import { StartPage } from "./pages/start.tsx";
 
 const ProgramsPage = lazy(() => import("./pages/programs.tsx").then((m) => ({ default: m.ProgramsPage })));
+const SessionsPage = lazy(() => import("./pages/sessions-list.tsx").then((m) => ({ default: m.SessionsPage })));
 const SettingsPage = lazy(() => import("./pages/settings.tsx").then((m) => ({ default: m.SettingsPage })));
 const SetupPage = lazy(() => import("./pages/setup.tsx").then((m) => ({ default: m.SetupPage })));
 

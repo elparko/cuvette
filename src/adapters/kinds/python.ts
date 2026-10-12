@@ -1,15 +1,15 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { createWriteStream, type WriteStream } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
 import type { Args, OutputFile, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { AdapterRuntime } from "../runtime.ts";
 import { expand, childEnv, collectOutputs, defTool, failSummary, inflight, killTree, makeRuntime, outputFile, readFields, makeSummary, samePath, tail, type CallDir, type KindContext } from "./common.ts";
 import type { ToolDef } from "../manifest.ts";
 import { blindArgv } from "../blind.ts";
+import { ROOT } from "../../root.ts";
 
-const WORKER = join(dirname(fileURLToPath(import.meta.url)), "python_worker.py");
+const WORKER = join(ROOT, "src/adapters/kinds/python_worker.py");
 
 interface Reply {
   id?: number;

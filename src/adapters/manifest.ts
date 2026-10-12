@@ -1,11 +1,12 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { homeFolder } from "../core/old-names.ts";
 import { folderKey, folderTrusted, projectAdapterDirs } from "../core/trust.ts";
 import type { Hook, Tool } from "../core/types.ts";
+import { ROOT } from "../root.ts";
 
 export const SPEC_VERSION = "1";
 
@@ -340,7 +341,11 @@ export function loadAdapter(path: string): LoadedAdapter {
       if (!manifest.module) return Promise.resolve({});
       const file = join(root, manifest.module);
       const built = file.replace(/\.tsx?$/, ".mjs");
-      mod ??= import(pathToFileURL(built !== file && existsSync(built) ? built : file).href).then((m) => (m.default ?? m) as AdapterModule);
+      if (mod) return mod;
+      const url = pathToFileURL(built !== file && existsSync(built) ? built : file).href;
+      // The bundle in dist/ has no TypeScript loader, so it loads a .ts adapter module with tsx.
+      const load = /\.tsx?$/.test(url) && !/\.tsx?$/.test(import.meta.url) ? import("tsx/esm/api").then((t) => t.tsImport(url, import.meta.url)) : import(url);
+      mod = load.then((m) => (m.default ?? m) as AdapterModule);
       return mod;
     },
   };
@@ -350,7 +355,7 @@ export function cuvetteHome(): string {
   return process.env.CUVETTE_HOME || homeFolder();
 }
 
-export const CATALOG_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../catalog");
+export const CATALOG_DIR = join(ROOT, "catalog");
 
 export function adapterDirs(cwd = process.cwd()): Record<string, string> {
   const found: Record<string, string> = {};

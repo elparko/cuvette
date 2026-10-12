@@ -2,8 +2,8 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, extname, isAbsolute, join, relative } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { basename, isAbsolute, join, relative } from "node:path";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import type { LoadedAdapter } from "../adapters/manifest.ts";
 import { scriptPython } from "../tools/run_script.ts";
@@ -14,6 +14,7 @@ import type { AnalysisRecord } from "./record.ts";
 import { copyFigures } from "./results.ts";
 import { esc, fillTemplate, show } from "./trail.ts";
 import type { Node } from "./types.ts";
+import { ROOT } from "../root.ts";
 
 export type DeckFormat = "pptx" | "pdf";
 export type DeckSet = "figures" | "qc" | "pilot" | "all";
@@ -61,7 +62,7 @@ export interface Page {
 }
 
 export const DECK_USAGE = "Use: /export images [pptx|pdf|both] [figures|qc|pilot|all|<glob>] [step|group|name] [1|2|4|6|9] [16:9|a4|letter]";
-const DECK_PY = fileURLToPath(new URL("./imagedeck.py", import.meta.url));
+const DECK_PY = join(ROOT, "src/core/imagedeck.py");
 const RASTER = /\.(png|jpe?g|gif|bmp|tiff?|webp)$/i;
 const CONVERT = /\.(tiff?|webp|bmp)$/i;
 const CODE = /\w\(.*\)|\w\[.*\]|\s=\s\w+\(|;\s*$|^\s*(import|from|library)\b|^In Python:/m;

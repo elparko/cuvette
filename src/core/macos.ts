@@ -2,9 +2,9 @@ import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { which } from "../adapters/locate.ts";
+import { ROOT } from "../root.ts";
 
 export const ACTION_NAME = "Analyze with Cuvette";
 export const LAUNCHER_ID = "local.cuvette.launcher";
@@ -17,7 +17,7 @@ export interface CuvettePaths {
 
 export function cuvettePaths(env: Record<string, string | undefined> = process.env): CuvettePaths {
   const linked = which("cuvette", env.PATH ?? "");
-  const own = resolve(dirname(fileURLToPath(import.meta.url)), "../../bin/cuvette.js");
+  const own = join(ROOT, "bin/cuvette.js");
   const cuvette = linked ? realpathSync(linked) : own;
   const path = [...new Set((env.PATH ?? "").split(":").filter((d) => d.startsWith("/") && existsSync(d)))].join(":");
   return { node: which("node", env.PATH ?? "") ?? process.execPath, cuvette, path };

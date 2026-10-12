@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import { addOldEnv } from "../core/old-names.ts";
@@ -128,10 +127,11 @@ def _install():
 
 _install()
 `;
+import { ROOT } from "../root.ts";
 
-const FIGURES_PY = readFileSync(fileURLToPath(new URL("../adapters/kinds/ga_figures.py", import.meta.url)), "utf8");
+const FIGURES_PY = readFileSync(join(ROOT, "src/adapters/kinds/ga_figures.py"), "utf8");
 
-const STYLE_FILE = readFileSync(fileURLToPath(new URL("../adapters/kinds/cuvette.mplstyle", import.meta.url)), "utf8");
+const STYLE_FILE = readFileSync(join(ROOT, "src/adapters/kinds/cuvette.mplstyle"), "utf8");
 
 const BOOT = "import sys,runpy;d,s=sys.argv[1:3];sys.path.insert(0,d);import ga_api;sys.argv=[s];runpy.run_path(s,init_globals={k:getattr(ga_api,k) for k in ('call','save_table','save_figure','ToolError')},run_name='__main__')";
 

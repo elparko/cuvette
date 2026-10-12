@@ -1,9 +1,8 @@
 import { mkdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
+import { ROOT } from "../root.ts";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 export const GUIDE_PATH = join(ROOT, "docs", "onboarding-guide.md");
 export const SPEC_PATH = join(ROOT, "docs", "adapter-spec.md");

@@ -562,6 +562,7 @@ export class Session {
   }
 
   private reporting = Promise.resolve();
+  private reportHtml = "";
 
   private writeReport(): Promise<void> {
     if (this.place.legacy || provisional(this.place)) return this.reporting;
@@ -569,7 +570,9 @@ export class Session {
     this.reporting = this.reporting.then(async () => {
       try {
         await new Promise((r) => setTimeout(r, 0));
-        const html = (await import("./trail.ts")).trailHtml(this.record, this.adapters, this.citationStyle());
+        const html = (await import("./trail.ts")).trailHtml(this.record, this.adapters, this.citationStyle(), { linkFrom: this.place.outDir });
+        if (html === this.reportHtml && existsSync(path)) return;
+        this.reportHtml = html;
         await writeFile(`${path}.tmp`, html);
         await rename(`${path}.tmp`, path);
       } catch {}

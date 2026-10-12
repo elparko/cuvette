@@ -2,12 +2,12 @@ import { spawn } from "node:child_process";
 import { blindArgv } from "../blind.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { crc32, deflateSync } from "node:zlib";
 import { addOldEnv } from "../../core/old-names.ts";
 import type { Args, Fidelity, OutputFile, TablePreview, Tool, ToolContext, ToolOutput } from "../../core/types.ts";
 import type { LoadedAdapter, MapEntry, ToolDef } from "../manifest.ts";
 import type { AdapterRuntime } from "../runtime.ts";
+import { ROOT } from "../../root.ts";
 
 export interface Dirs {
   workDir: string;
@@ -32,7 +32,7 @@ export interface CallDir {
   outputs: Record<string, string>;
 }
 
-export const TSX_CLI = resolve(fileURLToPath(import.meta.url), "../../../../node_modules/tsx/dist/cli.mjs");
+export const TSX_CLI = join(ROOT, "node_modules/tsx/dist/cli.mjs");
 
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".tif", ".tiff", ".gif", ".bmp", ".webp", ".svg"]);
 const TABLE_EXT = new Set([".csv", ".tsv"]);

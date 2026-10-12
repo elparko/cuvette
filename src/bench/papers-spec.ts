@@ -1,10 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isAbsolute, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { ROOT } from "../root.ts";
 
-export const PAPERS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../bench/papers");
+export const PAPERS_DIR = join(ROOT, "bench/papers");
 export const DEFAULT_DATA_ROOT = "/Volumes/T7/guided-analysis/data";
 
 const Item = z
