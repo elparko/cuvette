@@ -93,7 +93,8 @@ read_htseq_folder <- function(dir, samples) {
 }
 
 match_samples <- function(m, samples) {
-  if (is.null(samples) || all(samples %in% colnames(m))) return(m)
+  if (is.null(samples)) return(m)
+  if (all(samples %in% colnames(m))) return(m[, samples, drop = FALSE])
   short <- sub("\\.(bam|sam|cram)$", "", basename(colnames(m)))
   hit <- sapply(samples, function(s) name_hit(short, s))
   if (anyNA(hit)) fail(paste("samples of the sample table without a column in the counts:", paste(samples[is.na(hit)], collapse = ", ")))

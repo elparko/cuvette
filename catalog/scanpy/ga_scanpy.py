@@ -184,6 +184,8 @@ def load_data(path, var_names="gene_symbols"):
 
 def calculate_qc(adata, mito_prefix="MT-"):
     a = _get(adata)
+    if not _is_counts(a):
+        return _fail("X does not hold raw counts, so the QC counts are wrong. Run calculate_qc on the loaded data, before normalize.")
     a.var["mt"] = a.var_names.str.startswith(mito_prefix)
     sc.pp.calculate_qc_metrics(a, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True)
     cols = ["n_genes_by_counts", "total_counts", "pct_counts_mt"]
@@ -287,7 +289,6 @@ def scale_data(adata, regress_out="none", max_value=10.0, subset_to_hvg=True):
         a = a[:, a.var["highly_variable"].values].copy()
     keys = [] if regress_out in (None, "", "none") else [k.strip() for k in regress_out.split(",") if k.strip()]
     if keys:
-        _ensure_qc(a)
         missing = [k for k in keys if k not in a.obs]
         if missing:
             return _fail("regress_out keys not in obs: %s. Run calculate_qc first." % ", ".join(missing))
@@ -365,7 +366,7 @@ def find_markers(adata, groupby="leiden", method="t-test", n_genes=25, n_top=3):
     frame = sc.get.rank_genes_groups_df(a, group=None)
     csv = _table(frame, "markers")
     top = frame.sort_values(["group", "scores"], ascending=[True, False]).groupby("group", sort=False).head(int(n_top))
-    top = top[["group", "names", "scores", "logfoldchanges", "pvals_adj"]]
+    top = top[[c for c in ["group", "names", "scores", "logfoldchanges", "pvals_adj"] if c in top.columns]]
     sc.pl.rank_genes_groups(a, n_genes=min(int(n_genes), 20), sharey=False, show=False)
     plot = _png("markers")
     groups = a.obs[groupby].astype(str).nunique()

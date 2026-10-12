@@ -231,19 +231,22 @@ def associate_factors(factors_file, covariates, orientation="features in rows", 
     if len(cov) < 5:
         return _fail("Only %d samples are in both the factors and the covariates. Check the sample names and the orientation (%s)." % (len(cov), orientation))
     rows = []
+    skipped = []
     for c in cov.columns:
         y = cov[c]
         if not pd.api.types.is_numeric_dtype(y):
             codes = pd.Categorical(y).codes.astype(float)
             codes[codes < 0] = np.nan
             if len(set(codes[~np.isnan(codes)])) > 2:
+                skipped.append("%s (text with more than 2 levels)" % c)
                 continue
             y = pd.Series(codes, index=cov.index)
         y = pd.to_numeric(y, errors="coerce")
+        ok = y.notna()
+        if ok.sum() < 5 or y[ok].nunique() < 2:
+            skipped.append("%s (fewer than 5 values or only 1 value)" % c)
+            continue
         for f in fac.columns:
-            ok = y.notna()
-            if ok.sum() < 5 or y[ok].nunique() < 2:
-                continue
             r, p = stats.pearsonr(fac.loc[y.index[ok], f], y[ok])
             rows.append({"covariate": c, "factor": f, "r": float(r), "abs_r": abs(float(r)), "p_value": float(p), "n": int(ok.sum())})
     if not rows:
@@ -263,6 +266,9 @@ def associate_factors(factors_file, covariates, orientation="features in rows", 
         metrics["p_adjusted_%s" % r.covariate] = r.p_adjusted_bh
     summary = "Pearson correlation of %d factors with %d covariates in %d samples, Benjamini-Hochberg over %d pairs. Best factor for each covariate: %s." % (
         fac.shape[1], metrics["n_covariates"], metrics["n_samples"], m, "; ".join("%s %s |r| = %.3f, adjusted p = %.3g" % (r.covariate, r.factor, r.abs_r, r.p_adjusted_bh) for r in best.itertuples()))
+    metrics["n_covariates_skipped"] = len(skipped)
+    if skipped:
+        summary += " Not tested: %s." % "; ".join(skipped)
     return {"ok": True, "summary": summary, "metrics": metrics, "table": _table(res.drop(columns=["abs_r"]), "mofa_factor_covariates", 30), "outputs": []}
 
 

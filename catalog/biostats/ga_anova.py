@@ -25,7 +25,13 @@ def _fail(message):
 
 
 def _read(path):
-    return pd.read_csv(os.path.expanduser(path), encoding="utf-8-sig")
+    path = os.path.expanduser(path)
+    for enc in ("utf-8-sig", "cp1252"):
+        try:
+            return pd.read_csv(path, encoding=enc)
+        except UnicodeDecodeError:
+            pass
+    return pd.read_csv(path, encoding="latin-1")
 
 
 def _need(frame, columns):
@@ -238,9 +244,9 @@ def anova_repeated(path, outcome, within, subject, between=None, correction=None
         row = t[t["Source"] == within].iloc[0]
         brow = t[t["Source"] == between].iloc[0]
         irow = t[t["Source"] == "Interaction"].iloc[0]
-        spher = pg.sphericity(d, dv=outcome, within=within, subject=subject)
-        eps = float(pg.epsilon(d, dv=outcome, within=within, subject=subject, correction="gg"))
-        W, p_spher = float(spher.W), float(spher.pval)
+        eps = float(row["eps"]) if pd.notna(row.get("eps")) else 1.0
+        W = float(row["W_spher"]) if "W_spher" in t.columns else float("nan")
+        p_spher = float(row["p_spher"]) if "p_spher" in t.columns else float("nan")
         df1, df2 = float(row["DF1"]), float(row["DF2"])
         F, p_unc = float(row["F"]), float(row["p_unc"])
         p_gg = float(stats.f.sf(F, df1 * eps, df2 * eps))
@@ -356,8 +362,8 @@ def friedman_test(path, outcome, within, subject, p_adjust=None, alpha=0.05):
     wide = d.pivot_table(index=subject, columns=within, values=outcome, aggfunc="mean")
     removed = int(wide.isna().any(axis=1).sum())
     wide = wide.dropna()
-    if wide.shape[1] < 2 or len(wide) < 2:
-        return _fail("Friedman needs 2 or more levels of %s and 2 or more complete subjects. It has %d levels and %d complete subjects." % (within, wide.shape[1], len(wide)))
+    if wide.shape[1] < 3 or len(wide) < 2:
+        return _fail("Friedman needs 3 or more levels of %s and 2 or more complete subjects. It has %d levels and %d complete subjects. For 2 levels, use rank_test with paired true." % (within, wide.shape[1], len(wide)))
     chi2, p = stats.friedmanchisquare(*[wide[c].values for c in wide.columns])
     rows = []
     for a, b in itertools.combinations(wide.columns, 2):
@@ -402,12 +408,16 @@ def rank_test(path, outcome, group, paired=False, id_column=None, alternative="t
     if paired:
         if not id_column:
             return _fail("A paired rank test needs id_column, the column that names the same subject in both groups.")
-        wide = frame.pivot_table(index=id_column, columns=group, values=outcome, aggfunc="mean").dropna()
+        full = frame.pivot_table(index=id_column, columns=group, values=outcome, aggfunc="mean")
+        wide = full.dropna()
+        unpaired = len(full) - len(wide)
+        if unpaired:
+            note += " The test leaves out %d %s with a value in only one group." % (unpaired, "subject" if unpaired == 1 else "subjects")
         diff = (wide[second] - wide[first]).values
         zeros = int((diff == 0).sum())
         ties = len(diff) - len(np.unique(np.abs(diff[diff != 0])))
         if method == "exact" and (zeros or ties > 0):
-            note = " The differences have %d zeros and %d tied absolute values, so scipy cannot give an exact p; it used the normal approximation." % (zeros, max(ties, 0))
+            note += " The differences have %d zeros and %d tied absolute values, so scipy cannot give an exact p; it used the normal approximation." % (zeros, max(ties, 0))
             res = stats.wilcoxon(diff, alternative=alternative, method="approx", correction=True)
         else:
             res = stats.wilcoxon(diff, alternative=alternative, method="exact" if method == "exact" else "approx", correction=method != "exact")

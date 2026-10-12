@@ -21,7 +21,13 @@ warnings.filterwarnings("ignore")
 
 
 def _read(path):
-    return pd.read_csv(os.path.expanduser(path))
+    path = os.path.expanduser(path)
+    for enc in ("utf-8-sig", "cp1252"):
+        try:
+            return pd.read_csv(path, encoding=enc)
+        except UnicodeDecodeError:
+            pass
+    return pd.read_csv(path, encoding="latin-1")
 
 
 def _fail(message):
