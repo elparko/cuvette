@@ -92,6 +92,12 @@ test("retryReason names the network errors and skips the others", () => {
   expect(retryReason(new Anthropic.APIUserAbortError())).toBeUndefined();
 });
 
+test("retryReason reads the HTTP status of a plain error", () => {
+  expect(retryReason(Object.assign(new Error("slow"), { status: 429 }))).toBe("rate limit");
+  expect(retryReason(Object.assign(new Error("down"), { status: 503 }))).toBe("server error (503)");
+  expect(retryReason(Object.assign(new Error("bad"), { status: 400 }))).toBeUndefined();
+});
+
 test("withRetry returns the first success without a wait", async () => {
   let slept = 0;
   expect(await withRetry(async () => 7, { sleep: async () => void slept++ })).toBe(7);

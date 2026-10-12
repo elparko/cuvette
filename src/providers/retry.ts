@@ -48,6 +48,12 @@ export function retryReason(e: unknown): string | undefined {
     if (e.status === undefined && (type === "overloaded_error" || type === "api_error")) return "server error";
     return undefined;
   }
+  const status = (e as any)?.status;
+  if (typeof status === "number") {
+    if (status === 429) return "rate limit";
+    if (status >= 500) return `server error (${status})`;
+    return undefined;
+  }
   if (e instanceof Error && !(e as any).status && NETWORK_TEXT.test(`${e.message} ${(e as any).code ?? ""} ${(e as any).cause?.code ?? ""}`)) return "network error";
   return undefined;
 }

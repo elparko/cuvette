@@ -2,20 +2,31 @@ import type { Message, ModelInfo, Part, Provider, StepRequest, StepResult } from
 import { ProviderError } from "../core/types.ts";
 import { extractTextToolCall, lastCallNumber, splitThink } from "./text.ts";
 import { localUrl } from "../core/phi.ts";
+import { RETRIES, withRetry, type Sleep } from "./retry.ts";
 
 const TIMEOUT_MS = 600_000;
 
 export interface OpenAIOpts {
   numCtx?: number;
+  sleep?: Sleep;
+  retries?: number;
 }
 
 export class OpenAIProvider implements Provider {
   info: ModelInfo;
   private base: string;
+  private sleep?: Sleep;
+  private retries: number;
 
   constructor(baseUrl: string, readonly model: string, opts: OpenAIOpts = {}) {
     this.base = baseUrl.replace(/\/+$/, "");
     this.info = { provider: "openai", model, contextWindow: opts.numCtx ?? 32768, vision: false, small: true, local: localUrl(this.base) };
+    this.sleep = opts.sleep;
+    this.retries = opts.retries ?? RETRIES;
+  }
+
+  private retry<T>(fn: () => Promise<T>, signal?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<T> {
+    return withRetry(fn, { retries: this.retries, sleep: this.sleep, signal, onRetry });
   }
 
   toNative(system: string, messages: Message[]): unknown[] {
@@ -43,18 +54,28 @@ export class OpenAIProvider implements Provider {
     return out;
   }
 
-  private async post(body: Record<string, unknown>, user?: AbortSignal): Promise<any> {
+  private async attempt(body: Record<string, unknown>, user?: AbortSignal): Promise<Response> {
     const t = AbortSignal.timeout(TIMEOUT_MS);
     const signal = user ? AbortSignal.any([user, t]) : t;
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (process.env.OPENAI_API_KEY) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`;
+    const res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal });
+    if (res.status === 429 || res.status >= 500) {
+      const txt = await res.text();
+      throw Object.assign(new Error(`Model server error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status });
+    }
+    return res;
+  }
+
+  private async post(body: Record<string, unknown>, user?: AbortSignal, onRetry?: StepRequest["onRetry"]): Promise<any> {
     let res: Response;
     try {
-      res = await fetch(`${this.base}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal });
+      res = await this.retry(() => this.attempt(body, user), user, onRetry);
     } catch (e) {
       if (user?.aborted) throw e;
-      if (t.aborted) throw new ProviderError("The model server did not answer within 600 s.");
-      throw new ProviderError(`Cannot reach the model server at ${this.base}. Check that it is running.`);
+      if (typeof (e as any).status === "number") throw new ProviderError((e as Error).message, true);
+      if ((e as Error).name === "TimeoutError") throw new ProviderError("The model server did not answer within 600 s.", true);
+      throw new ProviderError(`Cannot reach the model server at ${this.base}. Check that it is running.`, true);
     }
     if (!res.ok) {
       const txt = await res.text();
@@ -73,7 +94,7 @@ export class OpenAIProvider implements Provider {
     const body: Record<string, unknown> = { model: this.model, messages: this.toNative(req.system, req.messages), stream: false };
     if (req.tools.length)
       body.tools = req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
-    const j = await this.post(body, req.signal);
+    const j = await this.post(body, req.signal, req.onRetry);
     const choice = j.choices?.[0];
     if (!choice) throw new ProviderError("The model server returned no choices.");
     const m = choice.message ?? {};

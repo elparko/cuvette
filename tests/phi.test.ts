@@ -1,7 +1,7 @@
 import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import { beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { folderHasNoPatientData, groupHits, isCloud, isLocal, localUrl, maskShown, Masker, scanContent, scanMessages, scanTable, scanText, setFolderNoPatientData, shownHits, type PhiAction } from "../src/core/phi.ts";
 import { Session } from "../src/core/session.ts";
 import type { Message, PhiEvent } from "../src/core/types.ts";
@@ -200,7 +200,10 @@ test("stop: nothing goes to the model, and a later turn sends a placeholder text
   await session.close();
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 test("use a local model: the session changes to the configured local model", async () => {
+  vi.stubGlobal("fetch", async () => new Response('{"error":"no model"}', { status: 400 }));
   const { session, cards } = await clinicSession({ action: "local", settings: { local_model: "openai:http://127.0.0.1:9/v1|local-test" } });
   await session.send("Summarize visits.csv");
   expect(cards[0]!.local).toBe("openai:http://127.0.0.1:9/v1|local-test");
