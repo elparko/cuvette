@@ -183,6 +183,7 @@ export class Mapper {
         if (d.action === "change_requested") return line("✎", `You asked to change the plan: ${d.text}`, "cyan");
         if (d.action === "cancelled") return line("✗", "You cancelled the plan. No step ran.", "yellow");
         if (d.action === "updated") return line("✎", `Plan changed to version ${d.version}. Reason: ${d.reason || "none given"}`, "cyan");
+        if (d.action === "pilot_changed") return line("✎", `The proposed analysis changed to version ${d.version} before the pilot confirmation. Reason: ${d.reason || "none given"}`, "cyan");
         return [];
       case "follow_step": {
         const diffs = Array.isArray(d.differences) ? (d.differences as unknown[]).map(show) : [];

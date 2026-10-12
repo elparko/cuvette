@@ -389,7 +389,8 @@ export class Session {
     const cwd = !place.legacy ? place.project : opts.cwd ?? (typeof first?.data.cwd === "string" && existsSync(first.data.cwd) ? first.data.cwd : undefined);
     const lastMode = record.entries(["mode"]).at(-1)?.data;
     const mode = lastMode ? (lastMode.reason === "plan first" ? lastMode.old : lastMode.new) : first?.data.mode;
-    return Session.create({ ...opts, cwd, place, adapters, id, model: opts.model ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
+    const switched = record.live(["setting"]).filter((e) => e.data.name === "model" && typeof e.data.new === "string" && e.data.new).at(-1)?.data.new as string | undefined;
+    return Session.create({ ...opts, cwd, place, adapters, id, model: opts.model ?? switched ?? first?.data.modelSpec, mode: opts.mode ?? (mode as Mode | undefined), pick: opts.pick ?? !!first?.data.pick }, record);
   }
 
   private async init(opts: SessionOptions) {
@@ -473,6 +474,7 @@ export class Session {
         log: (kind, data) => this.record.append(kind, data),
         plan: (a) => this.planTool(a),
         fullPlan: () => this.planFirst || this.planning || this.approvedEntry > 0,
+        partialPlan: () => !!this.pilotPlan || (this.approvedEntry > 0 && !!this.plan),
       }),
     );
     if (this.adapters.some((a) => a.manifest.connection.history_tool)) extra.push(this.reviewTool());
@@ -503,6 +505,7 @@ export class Session {
       this.closeOpenCalls(this.recordedResults());
       const choice = this.record.entries(["phi"]).filter((e) => e.data.by === "scientist" && e.data.action !== "stop").at(-1)?.data.action;
       if (choice) this.phiChoice = choice as PhiAction;
+      this.restorePilot();
       this.notes.push("The session was resumed after a restart. Program state may have reset; outputs from earlier steps are still on disk.");
     } else {
       this.record.append("session", {
@@ -725,12 +728,11 @@ export class Session {
     this.bus.emit({ type: "question", question: q });
     this.record.append("blocked", { tool: "use_adapter", reason: `waiting for the scientist: ${key}`, qid: q.qid });
     if (!this.settings.askWaits) return { load: [], by: "human", blocked: `BLOCKED: the choice of program belongs to the scientist. Question ${q.qid} waits for the answer. Call use_adapter again after the answer.` };
-    this.waitedQids.add(q.qid);
     this.bus.emit({ type: "status", state: "waiting", tool: "use_adapter" });
     try {
-      await abortable(this.questions.wait(q.qid), this.abort?.signal);
+      await this.waitFor(q.qid);
     } catch {
-      return { load: [], by: "human", blocked: `The question ${q.qid} about the program is still open.` };
+      return { load: [], by: "human", blocked: `The question ${q.qid} about the program is still open.${this.steerText()}` };
     }
     const now = split(this.decisions.value(key)).filter((n) => !loaded.includes(n));
     return { load: now, by: "human", text: now.includes(a.name) ? undefined : `The scientist chose ${now.join(", ") || "no new adapter"} instead of ${a.name}.` };
@@ -777,10 +779,9 @@ export class Session {
       this.record.append("blocked", { tool: "use_adapter", reason: `waiting for the scientist: self-test of ${a.name}`, qid: q.qid });
     }
     if (q.status === "open" && this.settings.askWaits) {
-      this.waitedQids.add(q.qid);
       this.bus.emit({ type: "status", state: "waiting", tool: "use_adapter" });
       try {
-        await abortable(this.questions.wait(q.qid), this.abort?.signal);
+        await this.waitFor(q.qid);
       } catch {}
       q = this.questions.get(q.qid) ?? q;
     }
@@ -815,12 +816,11 @@ export class Session {
     }
     if (q.status === "open") {
       if (!this.settings.askWaits) return `BLOCKED: ${a.name} is Unlisted and ships code. Question ${q.qid} waits for the scientist. Or run: cuvette adapter allow-code ${a.name}`;
-      this.waitedQids.add(q.qid);
       this.bus.emit({ type: "status", state: "waiting", tool: "use_adapter" });
       try {
-        await abortable(this.questions.wait(q.qid), this.abort?.signal);
+        await this.waitFor(q.qid);
       } catch {
-        return `The question ${q.qid} about the code of ${a.name} is still open.`;
+        return `The question ${q.qid} about the code of ${a.name} is still open.${this.steerText()}`;
       }
       q = this.questions.get(q.qid) ?? q;
     }
@@ -984,6 +984,7 @@ export class Session {
       if (this.setupNeeded()) this.decisions.applySetup({}, { how: "defaults accepted without review (the setup card was skipped)" });
       if (this.history.length === 0 && this.settings.guidance) this.notes.unshift(this.decisions.brief(), MODE_NOTE[this.mode], ...(this.pilotOn() ? [PILOT_NOTE] : []));
       if (this.settings.guidance && !opts.internal && (opts.plan || (this.planFirst && !CONTINUE.test(text.trim())))) this.startPlanning(text);
+      else if (this.settings.guidance && this.planFirst && !this.planning && !this.approvedEntry && !this.pilotPlan) this.startPlanning(String(this.record.entries(["user"]).filter((e) => !e.data.during && !e.data.internal).at(-1)?.data.text ?? text));
       this.chooseActiveTools(text);
       if (this.pick) {
         const hint = fileTypeHint(text, this.adapterList(), this.cwd, this.adapters.map((a) => a.name));
@@ -1341,7 +1342,7 @@ export class Session {
     const last = this.history.at(-1);
     if (last?.role !== "assistant") return [];
     const ids = new Set(last.parts.flatMap((p) => (p.type === "tool_call" ? [p.id] : [])));
-    const since = this.record.entries(["message"]).at(-1)?.id ?? 0;
+    const since = this.record.entries(["message", "compaction"]).at(-1)?.id ?? 0;
     return this.record.entries(["tool_result"]).filter((e) => e.id > since && ids.has(String(e.data.callId))).map((e) => {
       const d = e.data;
       const text = d.ok === false ? `ERROR: ${String(d.error ?? "the step failed")}` : [d.summary, d.text].filter(Boolean).map(String).join("\n");
@@ -1410,10 +1411,9 @@ export class Session {
     const steps = this.plan?.steps.map((s, i) => `${i + 1}. [${s.status}] ${s.step}`) ?? [];
     const summary = summaryMessage(steps.length ? `${res.summary}\n## Current plan\n${steps.join("\n")}` : res.summary);
     const upTo = this.record.entries(["message"]).at(-1)?.id ?? 0;
-    this.record.append("compaction", { summary: (summary.parts[0] as { text: string }).text, upTo });
     const rest = [...(res.request ? [res.request] : []), ...res.kept];
+    this.record.append("compaction", { summary: (summary.parts[0] as { text: string }).text, upTo, kept: rest as unknown as Record<string, unknown>[] });
     this.history = [summary, ...rest];
-    for (const m of rest) this.record.append("message", { message: m as unknown as Record<string, unknown> });
     this.phiFrom = this.history.length;
     this.contextWarned = false;
     return true;
@@ -1476,7 +1476,9 @@ export class Session {
       return false;
     }
     if (answer === "cheaper" && cheaper) {
+      const old = this.settings.model;
       await this.applySetting("model", `claude:${cheaper}`);
+      this.record.append("setting", { name: "model", old, new: `claude:${cheaper}`, scope: "session", reason: "spend limit card" });
       this.record.append("notice", { text: `The model is now ${modelName(cheaper)}.` });
     }
     return true;
@@ -1775,6 +1777,23 @@ export class Session {
     return `[The scientist wrote this while you worked. Read it before your next step.]\n${list.map((m) => m.text).join("\n\n")}`;
   }
 
+  // A wait for an answer stops when the turn stops or when the scientist sends a message with "now". The card stays open, and a later answer comes to the agent as a note.
+  private async waitFor(qid: string, signal?: AbortSignal): Promise<Question> {
+    const calls = [...this.callAborts].map((c) => c.signal);
+    const sig = signal ?? (calls.length ? AbortSignal.any(calls) : this.abort?.signal);
+    this.waitedQids.add(qid);
+    try {
+      return await abortable(this.questions.wait(qid), sig);
+    } catch (e) {
+      this.waitedQids.delete(qid);
+      throw e;
+    }
+  }
+
+  private steerText(): string {
+    return this.steered.some((m) => m.now) ? " The scientist sent a message instead. Read it first. The card stays open, and the answer comes to you as a note." : "";
+  }
+
   private lastRequest(): Entry | undefined {
     return this.record.entries(["user"]).filter((e) => !e.data.during).at(-1);
   }
@@ -2071,8 +2090,10 @@ export class Session {
     const vis = cloud ? (adapter?.manifest.data_rules.cloud_visibility ?? "all") : "all";
     const small = this.provider.info.small;
     const limit = small ? Math.min(this.settings.maxResultChars, 6000) : this.settings.maxResultChars;
-    if (o.text && !o.metrics && !o.table && !o.outputs?.length && vis === "all")
-      return { text: o.text.length > limit ? `${o.text.slice(0, limit)}\n[The harness cut ${o.text.length - limit} characters. Write long output to a file and read it in parts.]` : o.text };
+    if (o.text && !o.metrics && !o.table && !o.outputs?.length && vis === "all") {
+      const reason = !o.ok && o.error && !o.text.includes(o.error) ? `ERROR: ${o.error}\n` : "";
+      return { text: reason + (o.text.length > limit ? `${o.text.slice(0, limit)}\n[The harness cut ${o.text.length - limit} characters. Write long output to a file and read it in parts.]` : o.text) };
+    }
     const obj: Record<string, unknown> = { ok: o.ok };
     if (o.error) obj.error = o.error;
     if (o.summary) obj.summary = o.summary;
@@ -2164,9 +2185,8 @@ export class Session {
             const q = this.questions.open().find((x) => x.decisionKey === u.key);
             if (!q || !this.settings.askWaits) continue;
             this.bus.emit({ type: "status", state: "waiting", tool: tool.name });
-            this.waitedQids.add(q.qid);
             try {
-              await abortable(this.questions.wait(q.qid), signal);
+              await this.waitFor(q.qid, signal);
             } catch {}
             if (this.decisions.hasValue(u.key)) setArg(base, u.arg, this.decisions.value(u.key));
             else if (this.decisions.isSet(u.key) && getArg(proposedArgs, u.arg) !== undefined) setArg(base, u.arg, getArg(proposedArgs, u.arg));
@@ -2209,10 +2229,10 @@ export class Session {
     if (!this.settings.askWaits) return false;
     this.bus.emit({ type: "status", state: "waiting", tool: tool.name });
     try {
-      qids.forEach((q) => this.waitedQids.add(q));
-      for (const qid of qids) await abortable(this.questions.wait(qid), signal);
+      for (const qid of qids) await this.waitFor(qid, signal);
       return keys.every((k) => this.decisions.isSet(k));
     } catch {
+      for (const qid of qids) this.waitedQids.delete(qid);
       return false;
     }
   }
@@ -2229,13 +2249,12 @@ export class Session {
     this.bus.emit({ type: "question", question: q });
     if ((!spec.wait && !this.settings.headless) || !this.settings.askWaits) return { ok: true, summary: `Question ${q.qid} is waiting for the scientist. Continue with other work.` };
     this.bus.emit({ type: "status", state: "waiting" });
-    this.waitedQids.add(q.qid);
     try {
-      const done = await abortable(this.questions.wait(q.qid), this.abort?.signal);
+      const done = await this.waitFor(q.qid);
       const note = this.record.entries(["answer"]).filter((e) => e.data.qid === q.qid).at(-1)?.data.note;
       return { ok: true, summary: `The scientist answered: ${String(done.answer)}${note ? ` (${note})` : ""}`, data: { answer: done.answer, note } };
     } catch {
-      return { ok: false, error: "the question is still open" };
+      return { ok: false, error: `Question ${q.qid} is still open. The scientist did not answer it yet.${this.steerText()}` };
     }
   }
 
@@ -2274,13 +2293,12 @@ export class Session {
     }
     if ((!spec.wait && !this.settings.headless) || !this.settings.askWaits) return { ok: true, summary: `Question ${q.qid} is waiting for the scientist. The record changes only if the scientist agrees.` };
     this.bus.emit({ type: "status", state: "waiting" });
-    this.waitedQids.add(q.qid);
     try {
-      await abortable(this.questions.wait(q.qid), this.abort?.signal);
+      await this.waitFor(q.qid);
       const now = this.decisions.value(f.key);
       return { ok: true, summary: `The scientist answered. The record now says ${JSON.stringify(now)} for ${f.label}.`, data: { key: f.key, value: now } };
     } catch {
-      return { ok: false, error: "the question is still open" };
+      return { ok: false, error: `Question ${q.qid} is still open, so ${f.label} has not changed.${this.steerText()}` };
     }
   }
 
@@ -2713,6 +2731,24 @@ export class Session {
     ];
   }
 
+  // A pilot that waits for its confirmation also waits for the approval of its plan. Without this, a resumed pilot confirms with no plan behind it.
+  private restorePilot() {
+    const plans = this.record.live(["plan"]);
+    const asked = plans.filter((e) => e.data.action === "pilot_requested").at(-1);
+    if (!asked) return;
+    const after = (e: Entry) => e.id > asked.id;
+    if (this.record.live(["plan_approved"]).some(after) || plans.some((e) => after(e) && ["cancelled", "proposed", "update_proposed"].includes(String(e.data.action)))) return;
+    if (this.record.live(["mode"]).some((e) => after(e) && e.data.reason === "plan first")) return;
+    const last = plans.filter((e) => e.data.plan && ["proposed", "update_proposed", "setting_changed", "pilot_changed"].includes(String(e.data.action))).at(-1);
+    if (!last) return;
+    const version = Number(last.data.version) || Number(asked.data.version) || this.planVersion;
+    const target = (asked.data.target as Mode | undefined) ?? (this.mode === "plan" ? "watch" : this.mode);
+    this.pilotPlan = { plan: structuredClone(last.data.plan as unknown as AnalysisPlan), version, target, answers: (asked.data.answers as string[] | undefined) ?? [] };
+    this.pilotStage = true;
+    this.addPilotTools();
+    this.notes.push(`The pilot on ${String(asked.data.sample)} still waits for the scientist. The proposed analysis is confirmed with the pilot. Run the method on the pilot sample, then call pilot_result.`);
+  }
+
   private addPilotTools() {
     for (const t of this.pilotTools()) if (!this.tools.has(t.name)) (this.tools.set(t.name, t), this.active.add(t.name));
   }
@@ -2817,6 +2853,20 @@ export class Session {
 
   private changeDefinition(d: { measure: string; old: string; new: string }) {
     this.record.append("decision", { key: `definition:${d.measure}`, old: d.old, new: d.new, by: "human", reason: "the scientist changed the definition" });
+  }
+
+  // The pending plan is the one that the pilot confirmation approves, so a definition change on the pilot card goes into it.
+  private redefineOnPilot(plan: AnalysisPlan, d: { measure: string; new: string }, pending: boolean) {
+    const before = structuredClone(plan);
+    const defs = (plan.definitions ??= []);
+    const at = defs.find((x) => x.measure.toLowerCase() === d.measure.toLowerCase());
+    if (at) at.definition = d.new;
+    else defs.push({ measure: d.measure, definition: d.new });
+    this.planVersion++;
+    if (this.pilotPlan && pending) this.pilotPlan.version = this.planVersion;
+    const reason = `the scientist changed the definition of ${d.measure} on the pilot card`;
+    this.record.append("plan", { action: pending ? "pilot_changed" : "updated", phase: "Demonstration on a sample", version: this.planVersion, reason, text: planText(plan), plan: structuredClone(plan) });
+    if (!pending) for (const c of planChanges(before, plan)) this.noteDeviation(c, "plan_update", reason);
   }
 
   private referenceQuestion(): { question: string; candidates: { path: string; sheet?: string; columns: string[]; label: string }[] } {
@@ -2933,10 +2983,13 @@ export class Session {
       return { ok: true, summary: `The scientist changed ${t.label} from ${String(old)} to ${String(t.value)}. Run the demonstration again on ${sample} with this value, then call pilot_result.` };
     }
     if (r.action === "change") {
-      if (r.definition) this.changeDefinition(r.definition);
+      if (r.definition) {
+        this.changeDefinition(r.definition);
+        if (shownPlan) this.redefineOnPilot(shownPlan, r.definition, !!pending);
+      }
       this.record.append("pilot_rejected", { run: entry, sample, reason: r.text });
       this.scientistAsked = r.text;
-      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If the change is a setting with a key, call propose_change: the harness applies it at once, with no second card, because the scientist asked for it. If a definition changes, call plan with the new definition and the reason.` };
+      return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If the change is a setting with a key, call propose_change: the harness applies it at once, with no second card, because the scientist asked for it. ${r.definition ? `The harness already put the new definition of ${r.definition.measure} in the proposed analysis.` : "If a definition changes, call plan with the new definition and the reason."}` };
     }
     return { ok: false, error: "unknown answer" };
   }
@@ -3172,6 +3225,18 @@ export class Session {
   private async planTool(a: Args): Promise<ToolOutput> {
     const given = readPlan(a, false);
     const reason = typeof a.reason === "string" ? a.reason.trim() : "";
+    if (!this.planning && this.pilotPlan) {
+      const p = this.pilotPlan;
+      const next = mergePlan(p.plan, given);
+      for (const d of given.definitions ?? []) {
+        const old = p.plan.definitions?.find((x) => x.measure.toLowerCase() === d.measure.toLowerCase());
+        if (old?.definition !== d.definition) this.record.append("decision", { key: `definition:${d.measure}`, old: old?.definition ?? null, new: d.definition, by: "agent", reason: reason || "the agent changed the definition" });
+      }
+      p.plan = next;
+      p.version = ++this.planVersion;
+      this.record.append("plan", { action: "pilot_changed", phase: "Demonstration on a sample", version: p.version, reason, text: planText(next), plan: structuredClone(next) });
+      return { ok: true, summary: `The proposed analysis is now version ${p.version}. The scientist sees it on the pilot card and confirms it with the pilot. Run the demonstration on ${next.pilot?.sample ?? "the pilot sample"} again, then call pilot_result.` };
+    }
     if (!this.planning) {
       if (!this.plan || !this.approvedEntry) {
         const draft = { steps: [], ...readPlan(a) } as AnalysisPlan;
@@ -3286,7 +3351,7 @@ export class Session {
     if ((r.action === "pilot" || methodPilot) && plan.pilot) {
       this.pilotPlan = { plan: structuredClone(plan), version, target, answers };
       this.pilotStage = true;
-      this.record.append("plan", { action: "pilot_requested", phase: "Demonstration on a sample", version, sample: plan.pilot.sample });
+      this.record.append("plan", { action: "pilot_requested", phase: "Demonstration on a sample", version, sample: plan.pilot.sample, target, answers });
       this.endPlanning(target);
       return {
         ok: true,
