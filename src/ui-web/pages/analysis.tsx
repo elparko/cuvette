@@ -228,8 +228,8 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
     const bs = optionButtons(card);
     markSel(card, Math.max(0, bs.findIndex((b) => b.classList.contains("primary"))));
     const a = document.activeElement;
-    const writing = typing(a) && !(a?.tagName === "TEXTAREA" && !(a as HTMLTextAreaElement).value.trim());
-    if (!writing && !document.querySelector("[role=dialog]")) {
+    const free = !a || a === document.body || box.contains(a) || (a === inputRef.current && !inputRef.current.value.trim());
+    if (free && !document.querySelector("[role=dialog]")) {
       card.tabIndex = -1;
       card.focus({ preventScroll: true });
     }
@@ -261,12 +261,26 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   // Keys for the open card: numbers choose, arrows move, Enter confirms, Escape answers later.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (typing(document.activeElement) || document.querySelector("[role=dialog], [role=menu]")) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      const a = document.activeElement;
+      const inCards = !!a && !!cardsRef.current?.contains(a);
+      if (typing(a)) {
+        if (inCards && e.key === "Enter" && !e.shiftKey) {
+          const f = a as HTMLInputElement;
+          const c = f.closest("[data-card]") ?? cardsRef.current!;
+          const go = f.name === "other" ? f.closest(".row")?.querySelector<HTMLButtonElement>(".btn") : f.tagName === "TEXTAREA" && f.name === "text" ? c.querySelector<HTMLButtonElement>(".row .btn.primary") : f.type === "password" || f.type === "url" ? c.querySelector<HTMLButtonElement>('[data-act="save"]') : null;
+          if (go && f.value.trim()) {
+            e.preventDefault();
+            go.click();
+          }
+        }
+        return;
+      }
+      if (document.querySelector("[role=dialog], [role=menu]")) return;
       const card = activeCard(cardsRef.current);
       if (!card) return;
-      const a = document.activeElement;
-      if (a && !cardsRef.current!.contains(a) && (e.key === "Enter" ? a.closest("button, a[href], summary, [role=tab], [role=button]") : a.closest("[role=tab]"))) return;
+      if (a && a !== card && e.key === "Enter" && a.closest("button, a[href], summary, [role=tab], [role=button]")) return;
+      if (a && !inCards && a.closest("[role=tab]")) return;
       const bs = optionButtons(card);
       const i = Number(card.dataset.sel || 0);
       if (/^[1-9]$/.test(e.key) && !card.querySelector(".opts .btn")) {
@@ -290,8 +304,13 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
       if (e.key === "ArrowLeft" && nav("back")) return (e.preventDefault(), nav("back")!.click());
       if (e.key === "ArrowRight" && nav("next")) return (e.preventDefault(), nav("next")!.click());
       if (!bs.length) return;
-      if (e.key === "ArrowDown" || e.key === "ArrowRight") return (e.preventDefault(), markSel(card, (i + 1) % bs.length));
-      if (e.key === "ArrowUp" || e.key === "ArrowLeft") return (e.preventDefault(), markSel(card, (i + bs.length - 1) % bs.length));
+      const move = (n: number) => {
+        e.preventDefault();
+        markSel(card, n);
+        if (a === card || bs.includes(a as HTMLButtonElement)) bs[n]!.focus();
+      };
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") return move((i + 1) % bs.length);
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") return move((i + bs.length - 1) % bs.length);
       if (e.key === "Enter" && bs[i]) return (e.preventDefault(), bs[i]!.click());
       if (e.key === "Escape") {
         const back = card.querySelector<HTMLButtonElement>('[data-act="later"], [data-act="skip"], [data-plan*="back"], [data-plan*="later"]');
@@ -301,8 +320,18 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         }
       }
     };
+    const onFocus = (e: FocusEvent) => {
+      const card = activeCard(cardsRef.current);
+      const n = card ? optionButtons(card).indexOf(e.target as HTMLButtonElement) : -1;
+      if (n >= 0) markSel(card!, n);
+    };
+    const box = cardsRef.current;
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    box?.addEventListener("focusin", onFocus);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      box?.removeEventListener("focusin", onFocus);
+    };
   }, []);
 
   // Clicks inside the server HTML.
@@ -393,7 +422,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
         list = await call<Command[]>("api/commands");
         setCommands(list);
       } catch {}
-      if (inputRef.current?.value !== v) return;
+      if (inputRef.current?.value !== v || document.activeElement !== inputRef.current) return;
     }
     setSugg(list.filter((c) => c.name.startsWith(v.slice(1).toLowerCase())).slice(0, 8));
     setSel(0);
@@ -581,6 +610,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 value={text}
                 placeholder={status.placeholder || "Ask for an analysis, or type / for commands"}
                 onChange={(e) => onInput(e.target.value)}
+                onBlur={() => setSugg([])}
                 onKeyDown={(e) => {
                   if (sugg.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
                     e.preventDefault();
@@ -605,7 +635,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                 className="block max-h-[40vh] min-h-[52px] w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[14.5px] outline-none placeholder:text-muted-foreground"
               />
               <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
-                <span className="truncate pl-1.5 text-xs text-muted-foreground">{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
+                <span className={cn("min-w-0 truncate pl-1.5 text-xs text-muted-foreground", busy && !status.queue?.length && "max-sm:hidden")}>{(status.queue ?? []).map((q) => "Queued: " + q).join(" · ") || "Enter sends. Shift+Enter adds a line."}</span>
                 <div className="flex shrink-0 gap-1.5">
                   {busy && !status.queueMode && (
                     <Tooltip content="Stops the current step and sends your message now. The same as starting a message with ! in the terminal.">

@@ -478,6 +478,14 @@ test("the definitions under a final answer fold into a Definitions toggle", asyn
   expect(html).toContain('<details class="defs"><summary>Definitions</summary><ul><li>n: One patient.</li></ul></details>');
 });
 
+test("a status line keeps its text and its short path in one element, so the flex row does not split the sentence", async () => {
+  const { itemHtml } = await import("../src/server/app-html.ts");
+  const html = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "l", t: "line", sym: "•", text: "This session saves its results in /very/long/folder/name/that/goes/on/and/on/results-2026-10-12-compare-groups." } as never);
+  expect(html).toMatch(/<span class="sym"[^>]*>•<\/span> <span class="ltext">This session saves its results in <span class="path"[^>]*>.*<\/span>\.<\/span><\/div>$/);
+  const withChange = itemHtml({ token: "t", session: new FakeSession() as never }, { key: "c", t: "line", sym: "•", text: "Test: t test", change: "test" } as never);
+  expect(withChange).toMatch(/<span class="ltext">Test: t test<\/span> <button[^>]*data-change="test"/);
+});
+
 describe("repeated steps", () => {
   const ctx = { token: "tok", session: new FakeSession(), busy: false };
   const step = (n: number, tool: string, file: string, ok = true): Item => ({ key: `s${n}`, t: "step", n, ok, tool, summary: `${n * 10} cells`, error: ok ? undefined : "no image", settings: "cell diameter 0 · flow threshold 0.4", route: `cellpose_tools.${tool}(path="${file}")`, outputs: [], why: `Segment cells: ${file}` });

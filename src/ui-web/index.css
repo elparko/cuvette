@@ -464,6 +464,11 @@
   background: var(--muted);
   color: var(--foreground);
 }
+.srv .btn.quiet:focus-visible,
+.srv .btn.quiet.sel {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 45%, transparent);
+  border-color: var(--ring);
+}
 .srv .btn[disabled] {
   opacity: 0.5;
   pointer-events: none;
@@ -668,6 +673,10 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
+}
+.srv .line .ltext {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .srv .line {
   margin: 4px 0;

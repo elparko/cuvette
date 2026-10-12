@@ -28,8 +28,11 @@ export function ModeMenu({ mode }: { mode: string }) {
         <DropdownMenuRadioGroup value={m.id} onValueChange={(v) => void post("api/mode", { mode: v })}>
           {MODES.map((x) => (
             <DropdownMenuRadioItem key={x.id} value={x.id}>
-              <span className="flex-1 font-medium">{x.name}</span>
-              <InfoTip side="left" label={`About ${x.name}`}>
+              <span className="flex-1 font-medium">
+                {x.name}
+                <span className="sr-only">. {x.help}</span>
+              </span>
+              <InfoTip side="left" inMenu>
                 {x.help}
               </InfoTip>
             </DropdownMenuRadioItem>
