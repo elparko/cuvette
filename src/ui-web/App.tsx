@@ -1,9 +1,10 @@
-import { BoxesIcon, FlaskConicalIcon, FolderOpenIcon, HistoryIcon, SettingsIcon, type LucideIcon } from "lucide-react";
+import { BoxesIcon, FlaskConicalIcon, FolderOpenIcon, HistoryIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SettingsIcon, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import { FolderDialog } from "./components/folder-chooser.tsx";
 import { Button } from "./components/ui/button.tsx";
-import { TooltipProvider } from "./components/ui/tooltip.tsx";
+import { Tooltip, TooltipProvider } from "./components/ui/tooltip.tsx";
+import { useStored } from "./lib/stored.ts";
 import { call, enableFinder, type AppState } from "./lib/api.ts";
 import { useStream } from "./lib/stream.ts";
 import { cn } from "./lib/utils.ts";
@@ -57,6 +58,7 @@ export function App() {
   const [boots, setBoots] = useState(0);
   const [folderOpen, setFolderOpen] = useState(false);
   const [programStart, setProgramStart] = useState("");
+  const [rail, setRail] = useStored("cuvette.rail", false);
   const wanted = useRef(page);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -119,31 +121,46 @@ export function App() {
   return (
     <TooltipProvider delayDuration={400}>
       <div className="flex h-full min-h-0">
-        <aside className="hidden w-60 shrink-0 flex-col overflow-hidden border-r bg-sidebar md:flex" aria-label="Navigation">
-          <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
-            <Logo className="size-7" />
-            <span className="text-[15px] font-semibold tracking-tight">Cuvette</span>
+        <aside className={cn("hidden shrink-0 flex-col overflow-hidden border-r bg-sidebar transition-[width] duration-150 md:flex", rail ? "w-14" : "w-60")} aria-label="Navigation">
+          <div className={cn("flex items-center pt-4 pb-3", rail ? "flex-col gap-2 px-2" : "gap-2.5 px-4")}>
+            <Logo className="size-7 shrink-0" />
+            {!rail && <span className="text-[15px] font-semibold tracking-tight">Cuvette</span>}
+            <Tooltip content={rail ? "Show the sidebar" : "Hide the sidebar"} side="right">
+              <Button variant="ghost" size="icon-sm" className={cn("text-muted-foreground", !rail && "ml-auto")} onClick={() => setRail(!rail)} aria-label={rail ? "Show the sidebar" : "Hide the sidebar"} aria-expanded={!rail}>
+                {rail ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
+              </Button>
+            </Tooltip>
           </div>
-          <div className="px-3 pb-2">
-            <Button variant="outline" className="w-full justify-start" onClick={() => setFolderOpen(true)}>
-              <FolderOpenIcon /> Open a folder
-            </Button>
+          <div className={cn("pb-2", rail ? "px-2" : "px-3")}>
+            {rail ? (
+              <Tooltip content="Open a folder" side="right">
+                <Button variant="outline" size="icon" className="w-full" onClick={() => setFolderOpen(true)} aria-label="Open a folder">
+                  <FolderOpenIcon />
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button variant="outline" className="w-full justify-start" onClick={() => setFolderOpen(true)}>
+                <FolderOpenIcon /> Open a folder
+              </Button>
+            )}
           </div>
-          <nav className="flex flex-col gap-0.5 px-3 py-1" aria-label="Pages">
+          <nav className={cn("flex flex-col gap-0.5 py-1", rail ? "px-2" : "px-3")} aria-label="Pages">
             {NAV.map((n) => (
-              <button
-                key={n.page}
-                type="button"
-                onClick={() => go(n.page)}
-                aria-current={current(n.page) ? "page" : undefined}
-                className={cn("flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40", current(n.page) && "bg-card font-medium text-foreground shadow-card")}
-              >
-                <n.icon className="size-4" />
-                {n.label}
-              </button>
+              <Tooltip key={n.page} content={rail ? n.label : ""} side="right">
+                <button
+                  type="button"
+                  onClick={() => go(n.page)}
+                  aria-current={current(n.page) ? "page" : undefined}
+                  aria-label={rail ? n.label : undefined}
+                  className={cn("flex h-8 items-center gap-2.5 rounded-lg text-left text-[13.5px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50", rail ? "justify-center" : "px-2.5", current(n.page) && "bg-card font-medium text-foreground shadow-card")}
+                >
+                  <n.icon className="size-4" />
+                  {!rail && n.label}
+                </button>
+              </Tooltip>
             ))}
           </nav>
-          {recent.length > 0 && (
+          {!rail && recent.length > 0 && (
             <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2">
               <div className="px-2.5 pb-1 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">Recent</div>
               {recent.map((s) => (
@@ -163,16 +180,18 @@ export function App() {
               ))}
             </div>
           )}
-          <div className="mt-auto border-t px-4 py-3 text-xs text-muted-foreground">
-            <div className="truncate" title={state.session?.model ?? state.model}>
-              Model: <span className="text-foreground">{state.session?.model ?? state.model}</span>
-            </div>
-            {stream.status.usage && (
-              <div className="truncate" title={stream.status.usageLong}>
-                {stream.status.usage}
+          {!rail && (
+            <div className="mt-auto border-t px-4 py-3 text-xs text-muted-foreground">
+              <div className="truncate" title={state.session?.model ?? state.model}>
+                Model: <span className="text-foreground">{state.session?.model ?? state.model}</span>
               </div>
-            )}
-          </div>
+              {stream.status.usage && (
+                <div className="truncate" title={stream.status.usageLong}>
+                  {stream.status.usage}
+                </div>
+              )}
+            </div>
+          )}
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">

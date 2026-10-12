@@ -1,4 +1,4 @@
-import { ArrowUpIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
+import { ArrowUpIcon, BoxesIcon, BrainIcon, EllipsisIcon, FolderOpenIcon, NetworkIcon, PanelRightCloseIcon, PanelRightOpenIcon, ShieldAlertIcon, SquareIcon } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppCtx } from "../App.tsx";
@@ -6,11 +6,12 @@ import { ModeMenu } from "../components/mode-menu.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.tsx";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu.tsx";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../components/ui/dropdown-menu.tsx";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.tsx";
 import { Tooltip } from "../components/ui/tooltip.tsx";
 import { askNotify, bridge, call, midText, post, withT } from "../lib/api.ts";
 import type { StreamState } from "../lib/stream.ts";
+import { useStored } from "../lib/stored.ts";
 import { cn } from "../lib/utils.ts";
 import { SettingsPanel } from "./settings.tsx";
 
@@ -76,7 +77,7 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
   const busy = !!status.state && status.state !== "idle";
   const [tab, setTab] = useState("analysis");
   const [tabHtml, setTabHtml] = useState("");
-  const [side, setSide] = useState(true);
+  const [side, setSide] = useStored("cuvette.side", true);
   const [text, setText] = useState("");
   const [commands, setCommands] = useState<Command[]>([]);
   const [sugg, setSugg] = useState<Command[]>([]);
@@ -346,11 +347,6 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {session.programs.slice(0, 3).map((p) => (
-            <Badge key={p} className="hidden lg:inline-flex">
-              {p}
-            </Badge>
-          ))}
           {status.bypass && (
             <Badge tone="warn">
               <ShieldAlertIcon /> bypass permissions
@@ -362,22 +358,35 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
             </Tooltip>
           )}
           <ModeMenu mode={status.mode ?? "watch"} />
+          <Tooltip content={side ? "Hide the side panel" : "Show the side panel"}>
+            <Button variant="ghost" size="icon-sm" className="hidden text-muted-foreground lg:inline-flex" onClick={() => setSide(!side)} aria-label={side ? "Hide the side panel" : "Show the side panel"} aria-expanded={side}>
+              {side ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
+            </Button>
+          </Tooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon-sm" aria-label="More">
                 <EllipsisIcon />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="max-w-80">
+              {session.programs.length > 0 && (
+                <>
+                  <DropdownMenuLabel>Programs in this session</DropdownMenuLabel>
+                  {session.programs.map((p) => (
+                    <DropdownMenuItem key={p} onSelect={() => ctx.go("programs")} className="text-[13px]">
+                      <BoxesIcon /> <span className="min-w-0 whitespace-normal">{p}</span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onSelect={() => send("/details")}>{session.details ? "Hide the housekeeping steps" : "Show every step (/details)"}</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => window.open(withT("graph/"), "_blank", "noopener")}>
                 <NetworkIcon /> Open the step graph
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => bridge.reveal(session.folder)}>
                 <FolderOpenIcon /> Show the folder
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setSide(!side)}>
-                {side ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />} {side ? "Hide the side panel" : "Show the side panel"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -515,19 +524,9 @@ export function AnalysisPage({ ctx, stream }: { ctx: AppCtx; stream: StreamState
                   ))}
                 </TabsList>
               </Tabs>
-              <Tooltip content="Hide the side panel">
-                <Button variant="ghost" size="icon-sm" className="hidden lg:inline-flex" onClick={() => setSide(false)} aria-label="Hide the side panel">
-                  <PanelRightCloseIcon />
-                </Button>
-              </Tooltip>
             </div>
             <div ref={tabRef} role="tabpanel" className="srv stacked-wrap min-h-0 flex-1 overflow-y-auto px-4 pb-6" onClick={onClick} onChange={onChange} dangerouslySetInnerHTML={{ __html: tabHtml }} />
           </aside>
-        )}
-        {!side && (
-          <Button variant="outline" size="icon-sm" className="fixed top-16 right-4 z-10 hidden shadow-md lg:inline-flex" onClick={() => setSide(true)} aria-label="Show the side panel">
-            <PanelRightOpenIcon />
-          </Button>
         )}
       </div>
 
