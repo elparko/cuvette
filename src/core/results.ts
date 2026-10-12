@@ -1,4 +1,5 @@
 import { pilotRows, validationRows } from "./pilot.ts";
+import { AFTER_RESULT, NO_DEVIATIONS, deviations, frozenPlan } from "./freeze.ts";
 import { approvedPlan, definitionsOf } from "./plan.ts";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, isAbsolute, join, relative } from "node:path";
@@ -416,6 +417,13 @@ export function checkSheets(record: AnalysisRecord): Sheet[] {
   return out;
 }
 
+export function deviationSheets(record: AnalysisRecord): Sheet[] {
+  if (!frozenPlan(record)) return [];
+  const list = deviations(record);
+  const rows: Cell[][] = list.length ? list.map((d) => [d.ts, d.kind, d.what, d.from ?? "", d.to ?? "", d.reason, d.afterResult ? AFTER_RESULT : ""]) : [["", "", NO_DEVIATIONS, "", "", "", ""]];
+  return [{ name: "Deviations", columns: ["Time", "Kind", "What changed", "Planned", "Now", "Reason", "Mark"], rows }];
+}
+
 export function buildWorkbook(w: WorkbookInput): Sheet[] {
   const { record, adapters, dir } = w;
   const used = new Set(["summary", "steps", "files", "metrics", "pilot", "validation", "data check", "samples", "changes", "packages", "references"]);
@@ -533,6 +541,7 @@ export function buildWorkbook(w: WorkbookInput): Sheet[] {
     ...(pilot.rows.length ? [{ name: "Pilot", columns: pilot.columns, rows: pilot.rows }] : []),
     ...(validation ? [{ name: "Validation", columns: validation.columns, rows: [...validation.rows, [], ...validation.summary.map((x) => [x]), ...(validation.plot ? [[`Bland-Altman plot: ${rel(dir, validation.plot)}`]] : [])] }] : []),
     ...checkSheets(record),
+    ...deviationSheets(record),
     ...tableSheets,
     { name: "Steps", columns: ["Step", "Tool", "Adapter", "Description", "Result", "Inputs", "Input SHA-256", "Outputs", "Table sheets", "Manual route", "Fidelity", "Status", "Environment", "Node"], rows: stepRows },
     ...(metricRows.length ? [{ name: "Metrics", columns: ["Step", "Metric", "Value"], rows: metricRows }] : []),

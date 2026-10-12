@@ -10,6 +10,7 @@ import { loadSettings } from "../core/config.ts";
 import { claudeKey } from "../core/credentials.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
 import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
+import { deviationHtml } from "../core/freeze.ts";
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
 import { listSessions, openLock } from "../core/sessions.ts";
@@ -260,7 +261,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       const states = await freshStatus(s);
       const v = planView(s.record);
       const plan = v ? `<h4>${v.approved ? "Confirmed analysis" : "Proposed analysis"}, version ${v.version}</h4><div class="plantext">${planTextHtml(v.text)}</div>` : `<p class="empty">No proposed analysis yet. Type your question. The agent proposes the analysis first.</p>`;
-      return `${plan}<h4>Steps</h4>${statusHtml(states)}${stepsHtml(ctx())}<p class="dim small"><a href="graph/?t=${encodeURIComponent(token)}" target="_blank" rel="noopener">Open the step graph</a></p>`;
+      return `${plan}${deviationHtml(s.record, "h4")}<h4>Steps</h4>${statusHtml(states)}${stepsHtml(ctx())}<p class="dim small"><a href="graph/?t=${encodeURIComponent(token)}" target="_blank" rel="noopener">Open the step graph</a></p>`;
     }
     if (name === "results") return resultsHtml(ctx(), outDir(), sheets());
     if (name === "decisions") return decisionsHtml(ctx(), decisionRows(s), await freshStatus(s));

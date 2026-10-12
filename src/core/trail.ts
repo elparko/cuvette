@@ -1,4 +1,5 @@
 import { pilotText, validationRows } from "./pilot.ts";
+import { deviationHtml } from "./freeze.ts";
 import { approvedPlan, planMarkdown, questionsOf } from "./plan.ts";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -303,6 +304,10 @@ function build(record: AnalysisRecord, e: Entry, adapters: LoadedAdapter[] | und
       return { icon: "finding", line: `Finding ${show(d.fid)} ${show(d.action)}${d.reason ? `: ${clip(show(d.reason))}` : ""}`, technical: tech() };
     case "note":
       return { icon: "note", line: clip(show(d.text)), technical: tech() };
+    case "plan_frozen":
+      return { icon: "setup", line: `Plan frozen. SHA-256 ${show(d.hash).slice(0, 12)}`, details: { hash: d.hash, version: d.version }, technical: tech() };
+    case "plan_deviation":
+      return { icon: "deviation", line: `Plan deviation: ${clip(show(d.what))}${d.to !== undefined ? ` (${show(d.from ?? "none")} to ${show(d.to)})` : ""}. Reason: ${clip(show(d.reason || "No reason given"))}`, badges: d.afterResult ? ["Changed after the result was seen"] : undefined, technical: tech() };
     case "plan_approved":
       return { icon: "setup", line: `Confirmed: version ${show(d.version)} of the proposed analysis`, details: { text: d.text, mode: d.mode, answers: d.answers }, technical: tech() };
     case "plan":
@@ -664,7 +669,7 @@ function planHtml(record: AnalysisRecord): string {
   const validation = v
     ? `<h3>Validation against the reference</h3><ul>${v.summary.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="scroll"><table><thead><tr>${v.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${v.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${v.plot ? `${imgTag(v.plot, "Bland-Altman plot")}<p class="muted">Bland-Altman plot. Each dot is one sample: the mean of the two values (across) against the agent minus the reference (up). The dark line is the mean difference. The dashed lines are the mean plus and minus 1.96 SD. The gray dot is the pilot sample.</p>` : ""}`
     : "";
-  return `<section class="plan" id="plan"><h2>Proposed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${p.version}.</p>${updates}${validation}</section>`;
+  return `<section class="plan" id="plan"><h2>Proposed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${p.version}.</p>${updates}${validation}${deviationHtml(record, "h3")}</section>`;
 }
 
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {

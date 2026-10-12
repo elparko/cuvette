@@ -30,6 +30,7 @@ import { compareNote, instruction, teachReview, type TeachSummary } from "./mode
 import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
 import { definitionsOf } from "./plan.ts";
+import { NO_REASON, freezePlan, frozenPlan, planChanges, recordDeviation, setDeviationReason, type PlanChange } from "./freeze.ts";
 import { goalOnly, matchSettings, settingsOf, type KnownDecision } from "./plan.ts";
 import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
 import { citationStyle, type CitationStyle } from "./citations.ts";
@@ -251,6 +252,7 @@ export class Session {
   planning = false;
   plan?: AnalysisPlan;
   private planUpdate = false;
+  private replanReason = "";
   private planVersion = 0;
   private approvedEntry = 0;
   private planWait?: Pending<PlanResponse>;
@@ -385,6 +387,7 @@ export class Session {
 
     this.decisions = new DecisionRecord(this.adapters, this.record, this.pick ? [ADAPTER_DECISION] : []);
     this.interactive = !!opts.interactive;
+    this.decisions.onDeviation = (e) => this.askMissingReason(e);
     const pf = this.settings.planFirst;
     this.planFirst = pf === undefined ? !!opts.interactive : pf === true || pf === "on";
     const approved = approvedPlan(this.record);
@@ -2320,6 +2323,31 @@ export class Session {
     }
   }
 
+  private noteDeviation(change: PlanChange, source: string, reason: string): void {
+    const e = recordDeviation(this.record, change, source, reason);
+    if (e) this.askMissingReason(e);
+  }
+
+  private askMissingReason(e: Entry): void {
+    if (e.data.reason || !this.interactive || this.settings.headless) return;
+    const d = e.data;
+    void this.askDeviationReason(e.id, `${String(d.what)}${d.to !== undefined ? ` (${String(d.from ?? "none")} to ${String(d.to)})` : ""}`);
+  }
+
+  private async askDeviationReason(id: number, what: string): Promise<void> {
+    const q = await this.questions.ask({
+      decisionKey: "",
+      title: "Why did the plan change?",
+      text: `The confirmed plan changed: ${what}. The report lists each change with its reason. Type a short reason.`,
+      options: [{ value: NO_REASON, label: NO_REASON }],
+      recommendation: undefined,
+      evidence: "",
+    });
+    this.bus.emit({ type: "question", question: q });
+    const done = await this.questions.wait(q.qid);
+    if (done.status === "answered" && typeof done.answer === "string" && done.answer !== NO_REASON) setDeviationReason(this.record, id, done.answer);
+  }
+
   private changeDefinition(d: { measure: string; old: string; new: string }) {
     this.record.append("decision", { key: `definition:${d.measure}`, old: d.old, new: d.new, by: "human", reason: "the scientist changed the definition" });
   }
@@ -2334,8 +2362,12 @@ export class Session {
 
   private approvePlan(plan: AnalysisPlan, version: number, target: Mode, answers: string[], pilot?: PilotRun): number {
     const text = planText(plan);
+    const before = this.plan;
     this.plan = structuredClone(plan);
     this.approvedEntry = this.record.append("plan_approved", { phase: "Confirmed", version, text, plan: structuredClone(plan), mode: target, update: this.planUpdate, answers, ...(pilot ? { pilot } : {}) }).id;
+    if (!frozenPlan(this.record)) freezePlan(this.record, plan, version, this.approvedEntry);
+    else if (before) for (const c of planChanges(before, plan, { settings: false })) this.noteDeviation(c, "replan", this.replanReason);
+    this.replanReason = "";
     this.planWarned.clear();
     return this.approvedEntry;
   }
@@ -2604,8 +2636,9 @@ export class Session {
       const added = addedSteps(prev, next);
       const skipped = next.steps.filter((x) => x.status === "skipped" && prev.steps.find((p) => p.step.toLowerCase() === x.step.toLowerCase())?.status !== "skipped");
       const sections = (["restatement", "question", "definitions", "exclusions", "pilot", "reference", "data", "programs", "outputs", "checks", "out_of_scope"] as const).some((k) => given[k] !== undefined);
-      const changed = added.length > 0 || skipped.length > 0 || sections;
-      if (changed && !reason && ![...added, ...skipped].every((x) => x.reason)) return { ok: false, error: "Give the reason for this change of the approved plan in reason. The scientist sees it." };
+      const diffs = planChanges(prev, next);
+      const changed = added.length > 0 || skipped.length > 0 || sections || diffs.length > 0;
+      if (changed && !reason && (![...added, ...skipped].every((x) => x.reason) || diffs.some((c) => c.kind !== "step"))) return { ok: false, error: "Give the reason for this change of the approved plan in reason. The scientist sees it." };
       const ran = this.record.nodes().filter((n) => n.entry > this.approvedEntry && !n.sensitivityOf).map((n) => n.tool);
       for (const x of added) if (x.status === "todo" && ran.some((t) => matchStep({ steps: [x] }, t, this.findTool(t)?.adapter) === 0)) x.status = "done";
       for (const d of given.definitions ?? []) {
@@ -2614,12 +2647,14 @@ export class Session {
       }
       this.plan = next;
       if (changed) this.planVersion++;
+      for (const c of diffs) this.noteDeviation(c, "plan_update", reason || [...added, ...skipped].map((x) => x.reason).join(" "));
       this.record.append("plan", { action: changed ? "updated" : "status", version: this.planVersion, reason: reason || [...added, ...skipped].map((x) => x.reason).join(" "), text: planText(next), plan: structuredClone(next) });
       for (const x of skipped) this.record.append("notice", { text: `Skipped from the approved plan: ${x.step}. Reason: ${x.reason || reason}`, plan: "skipped" });
       for (const x of added) this.record.append("notice", { text: `Added to the approved plan: ${x.step}. Reason: ${x.reason || reason}`, plan: "added" });
       return { ok: true, summary: changed ? `The plan is now version ${this.planVersion}. The scientist sees the change and the reason.` : "Plan status saved." };
     }
     if (!this.planUpdate && !this.clarified) return { ok: false, error: "Phase 1 first: call clarify with what you found in the data and your clarifying questions about meaning (or none). Then call plan with the proposed analysis." };
+    if (this.planUpdate && reason) this.replanReason = reason;
     const plan = this.planUpdate && this.plan ? mergePlan(this.plan, given) : ({ steps: [], ...readPlan(a) } as AnalysisPlan);
     if (this.method && !this.planUpdate) fillFromMethod(plan, this.method);
     if (plan.restatement) {

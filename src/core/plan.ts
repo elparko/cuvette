@@ -1,4 +1,5 @@
 import { pilotText, validationRows, type PilotRun } from "./pilot.ts";
+import { deviationMarkdown } from "./freeze.ts";
 import { liveEntries, type AnalysisRecord } from "./record.ts";
 import type { FindingIn } from "./types.ts";
 
@@ -355,6 +356,7 @@ export function planMarkdown(record: AnalysisRecord): string[] {
     out.push("### Validation against the reference", "", ...v.summary.map((x) => `- ${x}`), "", `| ${v.columns.join(" | ")} |`, `| ${v.columns.map(() => "---").join(" | ")} |`, ...v.rows.map((r) => `| ${r.join(" | ")} |`), "");
     if (v.plot) out.push(`Bland-Altman plot: ${v.plot}. Each dot is one sample: the mean of the two values (across) against the agent minus the reference (up). The dark line is the mean difference; the dashed lines are the mean plus and minus 1.96 SD. The gray dot is the pilot sample.`, "");
   }
+  out.push(...deviationMarkdown(record));
   return out;
 }
 
