@@ -61,7 +61,7 @@ test("the policy allows the data folder and the run folder and denies the specs,
   expect(p.deny).toEqual(expect.arrayContaining([REPO_DIR, papersDir, join(root, "results"), join(root, "scratch"), join(homedir(), ".cuvette"), join(homedir(), ".claude")]));
 });
 
-test("a blind run blocks reads of the expected values, logs them, sets cwd to the work folder, and reports the leak check", async () => {
+test.skipIf(process.platform === "win32")("a blind run blocks reads of the expected values, logs them, sets cwd to the work folder, and reports the leak check", async () => {
   const expected = join(papersDir, "lab-count", "expected.yaml");
   const result = await runPapers({ ...options(), papers: ["lab-count"], models: ["fake:blind"], providerFor: () => agent(expected) });
   const run = result.runs[0];

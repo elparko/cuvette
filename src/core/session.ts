@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { allowAdapter, BLIND_REASON, blindCheck, blindPolicy, pathsIn, setBlindPolicy } from "../adapters/blind.ts";
 import { adapterIndex, alternatives, fileTypeHint, filesFor, formatIndex, installHint, programFound, type AdapterSummary, type FoundCache } from "../adapters/catalog.ts";
 import { findAdapter, cuvetteHome, type LoadedAdapter } from "../adapters/manifest.ts";
@@ -3311,7 +3311,10 @@ export class Session {
           const rels = listDataFiles(f.path);
           if (rels.length < 2) continue;
           check = checkFiles(fileInfos(f.path, rels), f.path);
-          const inside = (p: string) => (p.startsWith(`${this.cwd}/`) ? relative(this.cwd, p) : p);
+          const inside = (p: string) => {
+            const r = relative(this.cwd, p);
+            return (r && !r.startsWith("..") && !isAbsolute(r) ? r : p).split(sep).join("/");
+          };
           if (!this.sheet) sheet = sheetFromFiles(rels.map((r) => inside(join(f.path, r))), f.path);
         } else {
           const t = readCsvTable(f.path);
