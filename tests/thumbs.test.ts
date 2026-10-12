@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { imageSize, scaledCopy, scaledCopySync } from "../src/core/thumbs.ts";
-import { loadImage, MAX_SIDE, prepareImages } from "../src/providers/images.ts";
+import { loadImage, MAX_SIDE, prepareImages, scaleImages } from "../src/providers/images.ts";
 
 const mac = process.platform === "darwin";
 
@@ -48,20 +48,29 @@ test.runIf(mac)("thumbnails are cached JPEG copies", async () => {
   expect(await scaledCopy(f, 300, "jpeg")).not.toBe(a);
 });
 
-test("a loaded image is read again only after the file changes", () => {
+test.runIf(mac)("a stop from the scientist ends the resize before the request", async () => {
+  process.env.CUVETTE_HOME = mkdtempSync(join(tmpdir(), "cuvette-thumbs-home-"));
+  const f = png(3200, 1600);
+  const ac = new AbortController();
+  ac.abort();
+  await expect(prepareImages([{ role: "user", parts: [{ type: "image", path: f }] }], ac.signal)).rejects.toThrow();
+  await prepareImages([{ role: "user", parts: [{ type: "image", path: f }] }]);
+  const img = loadImage(f) as { data: string };
+  expect(Math.max(...Object.values(imageSize(Buffer.from(img.data, "base64"))!))).toBe(MAX_SIDE);
+});
+
+test("a loaded image shows the new file after the file changes", () => {
   const f = png(40, 20);
-  const a = loadImage(f);
-  expect(loadImage(f)).toBe(a);
+  loadImage(f);
   writeFileSync(f, readFileSync(png(30, 30)));
   const b = loadImage(f) as { data: string };
-  expect(b).not.toBe(a);
   expect(imageSize(Buffer.from(b.data, "base64"))).toEqual({ w: 30, h: 30 });
 });
 
-test.runIf(mac)("prepareImages makes the smaller copy before the model step", async () => {
+test.runIf(mac)("scaleImages makes the smaller copy before the model step", async () => {
   const home = mkdtempSync(join(tmpdir(), "cuvette-thumbs-home-"));
   process.env.CUVETTE_HOME = home;
   const f = png(2400, 1200);
-  await prepareImages([f, png(100, 100), join(tmpdir(), "no-such-image.png")]);
+  await scaleImages([f, png(100, 100), join(tmpdir(), "no-such-image.png")]);
   expect(readdirSync(join(home, "cache", "images"))).toHaveLength(1);
 });

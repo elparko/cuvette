@@ -157,6 +157,32 @@ export function applyEdit(rows: SampleRow[], text: string): { rows: SampleRow[];
   return { error: "Type: row column value (for example: 3 group Ceramide), or: column old = new (for example: group Cer = Ceramide)." };
 }
 
+export type SheetChange = [row: number, column: SampleColumn, value: string];
+
+export function sheetChanges(before: SampleRow[], after: SampleRow[]): SheetChange[] | undefined {
+  if (before.length !== after.length) return undefined;
+  const out: SheetChange[] = [];
+  after.forEach((r, i) => {
+    for (const c of SAMPLE_COLUMNS) if ((r[c] ?? "") !== (before[i]![c] ?? "")) out.push([i, c, r[c] ?? ""]);
+  });
+  return out.length > after.length ? undefined : out;
+}
+
+export function applyChanges(rows: SampleRow[], changes: SheetChange[]): SampleRow[] {
+  const next = [...rows];
+  for (const [i, c, v] of changes) if (next[i]) next[i] = { ...next[i]!, [c]: v };
+  return next;
+}
+
+export function replaySheet(entries: { data: Record<string, unknown> }[]): SampleRow[] | undefined {
+  let rows: SampleRow[] | undefined;
+  for (const e of entries) {
+    if (Array.isArray(e.data.rows)) rows = e.data.rows as SampleRow[];
+    else if (rows && Array.isArray(e.data.changes)) rows = applyChanges(rows, e.data.changes as SheetChange[]);
+  }
+  return rows;
+}
+
 export function sheetTable(rows: SampleRow[], max = 12): string {
   const head = ["#", "sample", "group", "unit", "batch", "path"];
   const short = (p: string) => (p.length > 40 ? `…${p.slice(-39)}` : p);

@@ -233,6 +233,7 @@ export interface Question {
   created: string;
   answered?: string;
   table?: { columns: string[]; rows: string[][] };
+  tableFrom?: "samples";
 }
 
 export interface SensitivityResult {

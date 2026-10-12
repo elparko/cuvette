@@ -1,6 +1,6 @@
 import { execFile, execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 
@@ -30,26 +30,40 @@ function target(path: string, maxSide: number, format: Format): string {
 }
 
 const args = (path: string, out: string, maxSide: number, format: Format) => ["-Z", String(maxSide), "-s", "format", format, path, "--out", out];
+const partial = (out: string) => out.replace(/(\.\w+)$/, `.part-${process.pid}-${randomUUID().slice(0, 8)}$1`);
 
 // A copy with the longest side at most maxSide pixels, in the cache. Only macOS has sips; elsewhere null.
 export function scaledCopySync(path: string, maxSide: number, format: Format): string | null {
   if (process.platform !== "darwin") return null;
+  let part = "";
   try {
     const out = target(path, maxSide, format);
-    if (!existsSync(out)) execFileSync("sips", args(path, out, maxSide, format), { stdio: "ignore", timeout: 30_000 });
+    if (!existsSync(out)) {
+      part = partial(out);
+      execFileSync("sips", args(path, part, maxSide, format), { stdio: "ignore", timeout: 30_000 });
+      renameSync(part, out);
+    }
     return existsSync(out) ? out : null;
   } catch {
+    if (part) rmSync(part, { force: true });
     return null;
   }
 }
 
-export async function scaledCopy(path: string, maxSide: number, format: Format): Promise<string | null> {
+export async function scaledCopy(path: string, maxSide: number, format: Format, signal?: AbortSignal): Promise<string | null> {
   if (process.platform !== "darwin") return null;
+  let part = "";
   try {
     const out = target(path, maxSide, format);
-    if (!existsSync(out)) await new Promise<void>((ok, fail) => execFile("sips", args(path, out, maxSide, format), { timeout: 30_000 }, (e) => (e ? fail(e) : ok())));
+    if (!existsSync(out)) {
+      part = partial(out);
+      await new Promise<void>((ok, fail) => execFile("sips", args(path, part, maxSide, format), { timeout: 30_000, signal }, (e) => (e ? fail(e) : ok())));
+      renameSync(part, out);
+    }
     return existsSync(out) ? out : null;
   } catch {
+    if (part) rmSync(part, { force: true });
+    if (signal?.aborted) throw signal.reason;
     return null;
   }
 }

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { applyEdit, designChecks, groupSummary, minPossibleP, nLevel, readSheet, sheetCsv, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type SampleRow } from "../src/core/samples.ts";
+import { applyChanges, applyEdit, designChecks, replaySheet, sheetChanges, groupSummary, minPossibleP, nLevel, readSheet, sheetCsv, sheetFromFiles, sheetFromTable, sheetTable, writeSheet, type SampleRow } from "../src/core/samples.ts";
 
 function efferocytosis(): string[] {
   const out: string[] = [];
@@ -128,6 +128,18 @@ describe("design checks", () => {
     expect(minPossibleP(3, 3)).toBeCloseTo(0.1);
     expect(minPossibleP(4, 4)).toBeCloseTo(2 / 70);
     expect(designChecks(sheet, { n: "One Set", test: "Welch t-test" }).some((i) => i.id === "too_few_rank")).toBe(false);
+  });
+});
+
+describe("sheet changes", () => {
+  test("an edit stores only the changed cells, and the replay gives the full sheet", () => {
+    const rows = [row("a", "Ctrl", "M1"), row("b", "Ctrl", "M2"), row("c", "Drug", "M3")];
+    const edited = (applyEdit(rows, "2 group Drug") as { rows: SampleRow[] }).rows;
+    const changes = sheetChanges(rows, edited)!;
+    expect(changes).toEqual([[1, "group", "Drug"]]);
+    expect(applyChanges(rows, changes)).toEqual(edited);
+    expect(replaySheet([{ data: { action: "drafted", rows } }, { data: { action: "edited", changes } }, { data: { action: "accepted", rows: 3 } }])).toEqual(edited);
+    expect(sheetChanges(rows, rows.slice(1))).toBeUndefined();
   });
 });
 

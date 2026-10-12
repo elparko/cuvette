@@ -307,7 +307,7 @@ export function changeRows(session: SessionLike): ChangeRow[] {
   const keys = new Set<string>();
   for (const [qid, a] of last) {
     const q = asked.get(qid);
-    if (!q || q.decisionKey === "adapter") continue;
+    if (!q || q.decisionKey === "adapter" || q.tableFrom) continue;
     if (q.decisionKey) keys.add(q.decisionKey);
     const demo = demoAfter(session, a.id);
     rows.push({ id: qid, label: q.title, value: optionLabel(q, a.value), kind: "question", q: { ...q, status: "open" }, current: a.value, key: q.decisionKey || undefined, at: a.id, ...(demo ? { note: DEMO_NOTE, rerun: demo.sample } : {}) });
