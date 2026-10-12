@@ -79,3 +79,18 @@ largest earlier request (28,893 tokens, wolf2018) too large without compaction.
 2. Look for the notices that start with "The harness shortened" and for a
    `compaction` entry in the session record.
 3. Run the same paper at 32768 and compare the two files with `cuvette bench compare`.
+
+## Result of the local check (11 October 2026)
+
+| Setting | Status | Computed items | Summaries | Shortened outputs | Largest request |
+|---|---|---|---|---|---|
+| wolf2018-scanpy, qwen3:8b, window 16,384 | answer | 6 of 6 | 5 | 3 | 14,843 tokens |
+| Same paper, window 32,768 (final benchmark, 9 October) | answer | 6 of 6 | 0 | 0 | 28,893 tokens |
+
+All context management happened inside one turn. The largest request stayed below
+the window. This is one run on one paper, so it shows no overflow. It does not show
+an accuracy gain.
+
+At this small window, the harness summarized five times in 14 model steps. Each
+summary is one more model call. Look at this count before you make the window
+smaller.
