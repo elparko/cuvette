@@ -2,13 +2,14 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
+import { KEY_GUIDE } from "./keyhelp.ts";
 import { claudeKey, keyProblem, saveClaudeKey } from "./credentials.ts";
 import { changeSetting, find, resolve } from "./settings.ts";
 
 export type ModelChoice = "claude" | "local";
 
 export const CHOICES: { id: ModelChoice; label: string; help: string }[] = [
-  { id: "claude", label: "Use Claude (needs an API key)", help: "Claude does the analysis. You pay Anthropic for each request. Get a key at https://platform.claude.com/settings/keys." },
+  { id: "claude", label: "Use Claude (needs an API key)", help: "Claude does the analysis. You pay Anthropic for each request. No key yet? Choose this, then ask for help to get a key." },
   { id: "local", label: "Use a local model (Ollama, free, runs on this Mac)", help: "A model on this Mac does the analysis. Nothing leaves the Mac. Small models make more mistakes than Claude." },
 ];
 

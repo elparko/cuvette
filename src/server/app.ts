@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { loadSettings } from "../core/config.ts";
 import { claudeKey } from "../core/credentials.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
+import { KEY_GUIDE } from "../core/keyhelp.ts";
 import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
 import { planView } from "../core/plan.ts";
 import { buildWorkbook, copyFigures } from "../core/results.ts";
@@ -389,7 +390,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       } else return send(res, 400, { error: "Give a folder or a session." });
       return send(res, 200, { ok: true });
     }
-    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: CHOICES, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
+    if (p === "/api/firststart") return send(res, 200, { ...(await firstStartState(fsCtx())), choices: CHOICES, keyGuide: KEY_GUIDE, recommended: RECOMMENDED_LOCAL, sample: sampleFolder() });
     if (p === "/api/firststart/claude") {
       const r = await chooseClaude(String(body.key ?? ""), { ...fsCtx(), check: opts.checkKey });
       if (r.ok) recordSetting(c?.session as unknown as SettingSession, find("claude_key")!, undefined, undefined, "user");

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import type { Mode, Question } from "../core/types.ts";
 import type { Check } from "../core/doctor.ts";
+import { KEY_GUIDE, KEYS_URL } from "../core/keyhelp.ts";
 import { credentialsPath } from "../core/credentials.ts";
 import type { SettingCtx } from "../core/settings.ts";
 import { ageText, type SessionInfo } from "../core/sessions.ts";
@@ -371,8 +372,13 @@ function rewindCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "rewind" }>): 
   return frame(slot, REWIND_TITLE, "cyan", `<p class="dim small">${esc(REWIND_HELP)}</p><ol class="rewind">${rows}</ol><div class="row end">${btn("Close", act("cancel"), "quiet")}</div>`);
 }
 
+function keyGuideHtml(): string {
+  return `<details class="keyguide"><summary>${esc(KEY_GUIDE.title)}</summary><p class="small">${esc(KEY_GUIDE.intro)}</p><ol class="small">${KEY_GUIDE.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol><ul class="small">${KEY_GUIDE.notes.map((s) => `<li>${esc(s)}</li>`).join("")}</ul><p class="small"><a href="${esc(KEYS_URL)}" target="_blank" rel="noopener">Open the keys page</a></p></details>`;
+}
+
 function keyCard(_c: Ctx, slot: Slot, card: Extract<Card, { t: "key" }>, path: string): string {
-  return frame(slot, "Claude API key", "cyan", `${card.reason ? `<p>${esc(card.reason)}</p>` : ""}<p>Paste your key from console.anthropic.com. The page does not show it.</p>
+  return frame(slot, "Claude API key", "cyan", `${card.reason ? `<p>${esc(card.reason)}</p>` : ""}<p>Paste your key from ${esc(KEYS_URL)}. The page does not show it.</p>
+${keyGuideHtml()}
 <p class="dim small">The app checks it with the API, then saves it to ${esc(path)}. Only your user can read that file.</p>
 <label class="field"><span>Key</span><input type="password" name="key" autocomplete="off"></label>
 <div class="row">${btn("Save", act("save"), "primary")}${btn("Close", act("cancel"), "quiet")}</div>`);

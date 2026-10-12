@@ -267,7 +267,15 @@ async function firstStart(): Promise<{ cwd: string; message: string } | undefine
   while (pick !== "1" && pick !== "2") pick = (await ask("Type 1 or 2: ")).trim();
   if (pick === "1") {
     for (let i = 1; ; i++) {
-      const r = await fs.chooseClaude(await readSecret("Paste your Claude API key (it starts with sk-ant-): "));
+      const pasted = await readSecret("Paste your Claude API key (it starts with sk-ant-). Type ? and press Enter if you have no key: ");
+      if (pasted.trim() === "?") {
+        const kh = await import("./core/keyhelp.ts");
+        console.log(`\n${kh.keyGuideText()}\n`);
+        if (/^y/i.test((await ask("Open the keys page in your browser? [y/N] ")).trim())) (await import("./ui/commands.ts")).openWithOs(kh.KEYS_URL);
+        i--;
+        continue;
+      }
+      const r = await fs.chooseClaude(pasted);
       console.log(r.text);
       if (r.ok) break;
       if (i === 3) fail("No key was saved. Run cuvette key when you have a key, or run cuvette again and choose the local model.");
@@ -454,8 +462,15 @@ async function main() {
         cred.saveClaudeWorkspace(a2 ?? "");
         return console.log(a2 ? `Saved the workspace ID ${a2}. Each request now sends it.` : "Removed the workspace ID.");
       }
-      if (a1) return fail("usage: cuvette key [status|remove|workspace <id>]");
-      const key = (await readSecret("Claude API key: ")).trim();
+      if (a1 === "help" || a1 === "open") {
+        const kh = await import("./core/keyhelp.ts");
+        if (a1 === "help") return console.log(kh.keyGuideText());
+        (await import("./ui/commands.ts")).openWithOs(kh.KEYS_URL);
+        return console.log(`Opening ${kh.KEYS_URL}`);
+      }
+      if (a1) return fail("usage: cuvette key [status|remove|workspace <id>|help|open]");
+      const key = (await readSecret("Claude API key (type ? for help): ")).trim();
+      if (key === "?") return console.log((await import("./core/keyhelp.ts")).keyGuideText());
       const problem = cred.keyProblem(key);
       if (problem) return fail(problem);
       const { checkClaudeKey } = await import("./providers/claude.ts");

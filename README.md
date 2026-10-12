@@ -45,6 +45,8 @@ question with two answers. The answers are "Use Claude (needs an API key)" and "
 model (Ollama, free, runs on this Mac)". It saves the choice, checks this Mac, and offers a 2-minute sample analysis. The sample
 is the Student (1908) sleep data in `samples/sleep/` (public domain).
 
+You have no Claude API key? Type `?` at the key prompt, or run `cuvette key help`. [docs/api-key.md](docs/api-key.md) has the steps.
+
 ```bash
 node bin/cuvette.js doctor          # ok, missing or old for Node, the model, Python, R, Java and each program
 node bin/cuvette.js doctor --fix    # asks once, then installs the missing Python environments and R packages

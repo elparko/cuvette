@@ -287,7 +287,14 @@ describe("Claude through the real SDK against a mock Messages API", () => {
     expect(captured[0]!.url).toBe("/v1/models/claude-opus-5-5");
     expect(captured[0]!.headers["x-api-key"]).toBe("sk-ant-good");
     replies = [{ status: 401, error: { type: "authentication_error", message: "invalid x-api-key" } }];
-    expect(await checkClaudeKey("sk-ant-bad")).toMatchObject({ ok: false });
+    expect(await checkClaudeKey("sk-ant-bad")).toMatchObject({ ok: false, text: expect.stringMatching(/HTTP 401.*settings\/keys/) });
+  });
+
+  test("checkClaudeKey sends a low credit balance and a 403 to Billing", async () => {
+    replies = [{ status: 400, error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." } }];
+    expect(await checkClaudeKey("sk-ant-nocredit")).toMatchObject({ ok: false, text: expect.stringMatching(/no credit left.*settings\/billing/) });
+    replies = [{ status: 403, error: { type: "permission_error", message: "no access" } }];
+    expect(await checkClaudeKey("sk-ant-forbidden")).toMatchObject({ ok: false, text: expect.stringMatching(/HTTP 403.*settings\/billing/) });
   });
 
   test("a saved workspace ID goes on every request, and the workspace 400 explains the fix", async () => {

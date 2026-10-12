@@ -1,6 +1,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
+import { keyFormatProblem } from "./keyhelp.ts";
 
 let version = 0;
 
@@ -105,9 +106,5 @@ export function maskKey(key: string): string {
 }
 
 export function keyProblem(key: string): string | undefined {
-  const k = key.trim();
-  if (!k) return "The key is empty.";
-  if (/\s/.test(k)) return "The key has a space in it.";
-  if (!k.startsWith("sk-ant-")) return "A Claude API key starts with sk-ant-.";
-  return undefined;
+  return keyFormatProblem(key);
 }

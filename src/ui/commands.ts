@@ -3,6 +3,7 @@ import type { Mode, Owner, Question } from "../core/types.ts";
 import { pilotText } from "../core/pilot.ts";
 import { planView } from "../core/plan.ts";
 import { claudeKey, claudeWorkspace, credentialsPath, elabftwConfig, maskKey, removeClaudeKey, removeElabftw, saveClaudeWorkspace } from "../core/credentials.ts";
+import { KEYS_URL, keyGuideText } from "../core/keyhelp.ts";
 import { stepNumbers } from "../core/housekeeping.ts";
 import { statusText, stepStatus, type StepState } from "../core/status.ts";
 import { find, recordSetting, type SettingSession } from "../core/settings.ts";
@@ -766,7 +767,7 @@ export const commands: Command[] = [
   },
   {
     name: "key",
-    args: "[status|remove|workspace <id>]",
+    args: "[status|remove|workspace <id>|help|open]",
     help: "Add, check or remove your Claude API key.",
     run(args, ctx) {
       const sub = args[0] ?? "";
@@ -786,7 +787,12 @@ export const commands: Command[] = [
         saveClaudeWorkspace(args[1] ?? "");
         return ctx.notice(args[1] ? `Saved the workspace ID ${args[1]}. Each request now sends it.` : "Removed the workspace ID.");
       }
-      if (sub) return ctx.error("Use /key, /key status, /key remove or /key workspace <id>.");
+      if (sub === "help") return ctx.print(keyGuideText(), "How do I get a key?");
+      if (sub === "open") {
+        openWithOs(KEYS_URL);
+        return ctx.notice(`Opening ${KEYS_URL}`);
+      }
+      if (sub) return ctx.error("Use /key, /key status, /key remove, /key workspace <id>, /key help or /key open.");
       ctx.openCard({ t: "key" });
     },
   },

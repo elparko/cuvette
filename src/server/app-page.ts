@@ -361,6 +361,7 @@ ul.dirs li button .dim { margin-left: 6px; }
     <div id="choices"></div>
     <div id="claudebox" class="hidden">
       <p class="dim small">Paste your key. The app checks it with Anthropic, then saves it in a file that only your user can read.</p>
+      <details id="keyguide"><summary>How do I get a key?</summary><div id="keyguidebody" class="small"></div></details>
       <div class="row"><input type="password" id="setupkey" autocomplete="off" aria-label="Claude API key" placeholder="sk-ant-..."><button type="button" class="btn primary" id="savekey">Save the key</button></div>
     </div>
     <div id="localbox" class="hidden"><div id="models"></div></div>
@@ -891,6 +892,7 @@ async function setupPage() {
   $("setupmodel").textContent = state.model;
   try { fstate = await call("api/firststart", {}); } catch (e) { $("setuperr").textContent = e.message; return; }
   $("samplefolder").textContent = fstate.sample;
+  drawKeyGuide(fstate.keyGuide);
   const box = $("choices");
   box.replaceChildren();
   for (const c of fstate.choices) {
@@ -901,6 +903,19 @@ async function setupPage() {
     b.append(t, h);
     box.append(b);
   }
+}
+function drawKeyGuide(g) {
+  const box = $("keyguidebody");
+  box.replaceChildren();
+  const p = document.createElement("p");
+  p.textContent = g.intro;
+  const ol = document.createElement("ol");
+  for (const s of g.steps) { const li = document.createElement("li"); li.textContent = s; ol.append(li); }
+  const ul = document.createElement("ul");
+  for (const s of g.notes) { const li = document.createElement("li"); li.textContent = s; ul.append(li); }
+  const a = document.createElement("a");
+  a.href = "https://platform.claude.com/settings/keys"; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Open the keys page";
+  box.append(p, ol, ul, a);
 }
 function pickChoice(id) {
   for (const b of document.querySelectorAll("[data-choice]")) b.setAttribute("aria-pressed", b.dataset.choice === id ? "true" : "false");
