@@ -3,7 +3,10 @@ import os
 import re
 import sys
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 IMAGE = {".tif", ".tiff", ".png", ".jpg", ".jpeg", ".bmp"}
 TABLE = {".csv", ".tsv", ".xlsx", ".xls"}
@@ -100,6 +103,8 @@ def preview(planes, rgb, out_dir, name):
 
 
 def describe_image(path, out_dir):
+    if np is None:
+        raise RuntimeError("numpy is not installed")
     planes, rgb, labels, dtype = plane_list(path)
     full = full_range(planes, dtype)
     stem = os.path.splitext(os.path.basename(path))[0]
@@ -183,8 +188,37 @@ def inspect_folder(root, out_dir):
     return {"kind": "folder", "groups": groups, "n_files": len(files), "n_images": len(images), "n_fields": len(by_field), "tokens": tokens, "sample": sample, "tables": [os.path.relpath(t, root) for t in tables[:10]], "n_tables": len(tables)}
 
 
+def inspect_table_plain(path):
+    import csv
+
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        rows = list(csv.reader(f, delimiter="\t" if path.lower().endswith(".tsv") else ","))
+    head = rows[0] if rows else []
+    body = rows[1:]
+    cols = []
+    for i, name in enumerate(head):
+        vals = [r[i] for r in body if i < len(r)]
+        filled = [v for v in vals if v.strip()]
+        try:
+            nums = [float(v) for v in filled]
+        except ValueError:
+            nums = None
+        col = {"name": name, "type": "number" if nums is not None and filled else "text", "n_missing": len(vals) - len(filled)}
+        if nums:
+            col["range"] = [min(nums), max(nums)]
+        elif 1 < len(set(filled)) <= 12:
+            col["values"] = {k: filled.count(k) for k in dict.fromkeys(filled)}
+        cols.append(col)
+    return {"kind": "table", "rows": len(body), "columns": cols, "read_table": None, "head": [r[: len(head)] for r in body[:5]]}
+
+
 def inspect_table(path, out_dir):
-    import pandas as pd
+    try:
+        import pandas as pd
+    except ImportError:
+        if path.lower().endswith((".csv", ".tsv")):
+            return inspect_table_plain(path)
+        raise
 
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "catalog", "tables"))
     os.environ.setdefault("CUVETTE_OUTPUT_DIR", out_dir)

@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,11 +8,13 @@ import { Session } from "../src/core/session.ts";
 import { FakeProvider } from "../src/providers/fake.ts";
 import { scriptPython } from "../src/tools/run_script.ts";
 
+const HAS_IMAGE_PACKAGES = spawnSync(scriptPython(), ["-I", "-c", "import numpy, tifffile, PIL"]).status === 0;
+const imageTest = test.skipIf(!HAS_IMAGE_PACKAGES);
 let root = "";
 let session: Session | undefined;
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "cuvette-inspect-"));
-  execFileSync(scriptPython(), ["-I", join(__dirname, "fixtures/make_two_channel.py"), join(root, "images"), "2"]);
+  if (HAS_IMAGE_PACKAGES) execFileSync(scriptPython(), ["-I", join(__dirname, "fixtures/make_two_channel.py"), join(root, "images"), "2"]);
   writeFileSync(join(root, "counts.csv"), "group,set,positive,total\ncontrol,1,5,40\ncontrol,2,7,38\ntreated,1,20,41\ntreated,2,22,39\n");
 });
 beforeEach(() => {
@@ -23,7 +25,7 @@ afterEach(async () => {
   session = undefined;
 });
 
-test("a folder with a brightfield and a red channel: the summary names both channels and says there is no nuclear stain", async () => {
+imageTest("a folder with a brightfield and a red channel: the summary names both channels and says there is no nuclear stain", async () => {
   const insp = await inspectData(join(root, "images"), join(root, "out"));
   expect(insp.ok).toBe(true);
   expect(insp.summary).toContain("images has 2 groups: control (6 files, 2 fields); treated (6 files, 2 fields).");
@@ -59,7 +61,7 @@ test("the rule check drops a question or an option that names a stain or a chann
   expect(g.dropped[0]!.reason).toMatch(/^The data has no blue channel or stain\./);
 });
 
-test("clarify waits for a data look; then the found text and the questions follow the data, and the dropped ones are logged", async () => {
+imageTest("clarify waits for a data look; then the found text and the questions follow the data, and the dropped ones are logged", async () => {
   const provider = new FakeProvider([
     { calls: [{ name: "clarify", args: { found: "I see DAPI and GFP in each field.", questions: [{ question: "Which channel is DAPI?", options: ["CH1", "CH3"] }] } }] },
     { calls: [{ name: "inspect_data", args: { path: join(root, "images") } }] },
