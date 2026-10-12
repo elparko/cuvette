@@ -1368,3 +1368,34 @@ test("settings of a program that loads after the confirmation count at run time:
   expect(session.decisions.value("min_size")).toBe(5);
   expect(session.record.nodes().find((n) => n.tool === "count")!.decisions).toMatchObject({ method: "Triangle", min_size: 5 });
 });
+
+test("batch runner: after the pilot, the harness repeats the pilot steps on the other samples with no model call", async () => {
+  const { proj, images } = pilotProject();
+  const provider = new FakeProvider([CLARIFY, { calls: [{ name: "plan", args: { ...CELL_PLAN(images), steps: [{ step: "Blur each field", tool: "blur" }] } }] },
+    { calls: [{ name: "blur", args: { input: join(images, "Set 1.tif"), sigma: 2, purpose: "Blur the field: Set 1" } }] },
+    { calls: [{ name: "pilot_result", args: { sample: "Set 1", values: { "positive cell": 41 }, images: [], check: "" } }] },
+    { text: "The model must not be called again." },
+  ]);
+  session = await Session.create({ adapters: [LAB], provider, cwd: proj, interactive: true, settings: { permissionMode: "bypass" } as never });
+  session.decisions.applySetup({ method: "Otsu" });
+  const asked: string[] = [];
+  session.bus.on((e) => {
+    if (e.type === "question") {
+      asked.push(e.question.text);
+      setTimeout(() => session!.answer(e.question.qid, e.question.title === "Earlier results" ? "ignore" : e.question.options[0]?.value ?? "yes"), 0);
+    }
+    if (e.type === "plan") setTimeout(() => session!.respondPlan(e.stage === "plan" ? { action: "pilot" } : { action: "confirm" }), 0);
+  });
+  await session.send(`Blur each field in ${images}`);
+
+  expect(asked.at(-1)).toBe(`Run the confirmed steps (blur) with the same settings on the other 2 samples now? The harness runs them without a model, so the run costs no tokens. First samples: Set 2.tif; Set 3.tif.`);
+  expect(provider.requests).toHaveLength(4);
+  const blurs = session.record.nodes().filter((n) => n.tool === "blur");
+  expect(blurs.map((n) => [n.args.input, n.args.sigma])).toEqual([[join(images, "Set 1.tif"), 2], [join(images, "Set 2.tif"), 2], [join(images, "Set 3.tif"), 2]]);
+  const calls = session.record.entries(["tool_call"]).filter((e) => e.data.tool === "blur").map((e) => (e.data.args as { purpose?: string }).purpose);
+  expect(calls.slice(1)).toEqual(["blur: Set 2.tif", "blur: Set 3.tif"]);
+  const table = readFileSync(join(session.outputDir, "batch-results.csv"), "utf8");
+  expect(table).toBe("sample,status,blur.sigma,error\nSet 2.tif,done,2,\nSet 3.tif,done,2,\n");
+  const notices = session.record.entries(["notice"]).map((e) => String(e.data.text));
+  expect(notices.find((t) => t.startsWith("The harness ran"))).toMatch(/^The harness ran the pilot steps on 2 of 2 samples: 2 done, 0 with an error\. Table: .*batch-results\.csv\. Ask the agent for a summary when you want one\.$/);
+});

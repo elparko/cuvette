@@ -30,6 +30,7 @@ import { compareNote, instruction, teachReview, type TeachSummary } from "./mode
 import { batchReason, pilotState, pilotText, type PilotRun } from "./pilot.ts";
 import { agreement, agreementText, blandAltmanPng, compareLine, describeCandidate, findReferences, norm, referenceValues, type Candidate, type Pair, type Reference } from "./reference.ts";
 import { definitionsOf } from "./plan.ts";
+import { abs, metricsOf, planBatch, swapArgs, writeTable, type BatchPlan, type BatchRow } from "./batch.ts";
 import { goalOnly, matchSettings, settingsOf, type KnownDecision } from "./plan.ts";
 import { find as findSetting, resolve as resolveSetting } from "./settings.ts";
 import { citationStyle, type CitationStyle } from "./citations.ts";
@@ -259,6 +260,8 @@ export class Session {
   private planLooks = 0;
   private planWarned = new Set<string>();
   private stopTurn = false;
+  private endTurn?: string;
+  private batchAllow = new Set<string>();
   pilotStage = false;
   private clarified = false;
   private checked = new Set<string>();
@@ -975,6 +978,11 @@ export class Session {
           this.record.append("notice", { text: "You cancelled the plan. No analysis step ran." });
           return "";
         }
+        if (this.endTurn) {
+          this.record.append("notice", { text: this.endTurn });
+          this.endTurn = undefined;
+          return "";
+        }
         if (signal.aborted) {
           this.record.append("notice", { text: "Stopped. The results so far are kept." });
           return "";
@@ -998,6 +1006,7 @@ export class Session {
     } finally {
       if (this.planning) this.endPlanning();
       this.stopTurn = false;
+      this.endTurn = undefined;
       this.saveResults(turnStart);
       this.busy = false;
       await this.writeReport();
@@ -1436,7 +1445,7 @@ export class Session {
       for (const [arg, key] of Object.entries(links)) if ((pre.waitingOn ?? []).includes(key) && this.decisions.hasValue(key)) setArg(next, arg, this.decisions.value(key));
       return this.pipeline(tool, next, callId, signal, depth + 1);
     }
-    let perm = this.sessionAllow.has(tool.name) ? "allow" : this.permissions.check(tool, eff);
+    let perm = this.sessionAllow.has(tool.name) || this.batchAllow.has(tool.name) ? "allow" : this.permissions.check(tool, eff);
     if (pre.decision === "ask" && perm === "allow") perm = "ask";
     if (perm === "deny") return error("the permission rules deny this tool");
     const searchRoot = tool.source !== "adapter" ? broadSearch(tool.name, eff, this.cwd) : undefined;
@@ -2399,7 +2408,10 @@ export class Session {
         this.pilotPlan = undefined;
       }
       const next = this.reference ? " After all samples ran, call batch_results with the value of each sample, so that the harness compares them with the reference." : "";
-      return { ok: true, summary: `The scientist confirmed the ${pending ? "plan and the " : ""}pilot on ${sample}. Run all samples now with the same method and settings.${next}` };
+      const confirmed = `The scientist confirmed the ${pending ? "plan and the " : ""}pilot on ${sample}.`;
+      const batch = await this.offerBatch(entry, confirmed, next);
+      if (batch) return batch;
+      return { ok: true, summary: `${confirmed} Run all samples now with the same method and settings.${next}` };
     }
     if (r.action === "cancel") {
       this.record.append("pilot_rejected", { run: entry, sample, reason: "cancelled" });
@@ -2433,6 +2445,74 @@ export class Session {
       return { ok: true, summary: `The scientist asks for a change: "${r.text}". Change the metrics or the method, run the demonstration on ${sample} again, then call pilot_result. If the change is a setting with a key, call propose_change: the harness applies it at once, with no second card, because the scientist asked for it. If a definition changes, call plan with the new definition and the reason.` };
     }
     return { ok: false, error: "unknown answer" };
+  }
+
+  // The batch runner: after the pilot, the harness repeats the pilot steps on each other sample,
+  // with the same settings and no model call. See docs/design-2026-10-11-separate-contexts.md.
+  private async offerBatch(pilotEntry: number, confirmed: string, next: string): Promise<ToolOutput | undefined> {
+    if (this.settings.headless) return undefined;
+    const marks = this.record.entries(["pilot_rejected", "pilot_approved", "plan_approved"]).filter((e) => e.id < pilotEntry);
+    const out = this.outputDir;
+    const skip = [out, this.workDir, ...(basename(dirname(out)) === "cuvette" ? [dirname(out)] : [])];
+    const plan = planBatch(this.record.nodes(), marks.at(-1)?.id ?? 0, pilotEntry, this.cwd, skip);
+    if (!plan) return undefined;
+    const names = plan.steps.map((n) => this.findTool(n.tool)?.title ?? n.tool.replace(/_/g, " "));
+    const n = plan.samples.length;
+    const RUN_STOP = "Run all, then stop";
+    const RUN_SUM = "Run all, then the agent summarizes";
+    const r = await this.askTool({
+      question: `Run the confirmed steps (${names.join(", then ")}) with the same settings on the other ${n} ${n === 1 ? "sample" : "samples"} now? The harness runs them without a model, so the run costs no tokens. First samples: ${plan.samples.slice(0, 3).map((x) => x.label).join("; ")}${n > 3 ? "; ..." : ""}.`,
+      options: [RUN_STOP, RUN_SUM, "Not now"],
+      recommendation: RUN_STOP,
+      reason: "The steps and settings are the ones you confirmed in the pilot. No model runs in the loop.",
+      wait: true,
+    });
+    const answer = String((r.data as { answer?: unknown } | undefined)?.answer ?? "");
+    if (!r.ok || !answer.startsWith("Run all")) return undefined;
+    const rows = await this.runBatch(plan, names);
+    const done = rows.filter((x) => x.ok).length;
+    const failed = rows.filter((x) => !x.ok);
+    const table = join(out, "batch-results.csv");
+    mkdirSync(out, { recursive: true });
+    writeTable(table, rows);
+    const head = `The harness ran the pilot steps on ${rows.length} of ${n} samples: ${done} done, ${failed.length} with an error.${failed.length ? ` Errors: ${failed.slice(0, 5).map((x) => `${x.sample} (${x.error})`).join("; ")}${failed.length > 5 ? "; ..." : ""}.` : ""} Table: ${table}.`;
+    this.record.append("note", { text: head, batch: { samples: n, done, failed: failed.length, table } });
+    if (answer === RUN_SUM) return { ok: true, summary: `${confirmed} ${head} Do not run these samples again. Read the table, then make the summary that the plan asks for.${next}` };
+    this.endTurn = `${head} Ask the agent for a summary when you want one.`;
+    return { ok: true, summary: `${confirmed} ${head} The scientist asked to stop after the batch.` };
+  }
+
+  private async runBatch(plan: BatchPlan, names: string[]): Promise<BatchRow[]> {
+    const signal = this.abort?.signal ?? new AbortController().signal;
+    const rows: BatchRow[] = [];
+    for (const n of plan.steps) this.batchAllow.add(this.findTool(n.tool)?.name ?? n.tool);
+    try {
+      for (const [i, s] of plan.samples.entries()) {
+        if (signal.aborted) break;
+        const map = new Map(s.files);
+        const values: Record<string, number> = {};
+        let error: string | undefined;
+        for (const [k, step] of plan.steps.entries()) {
+          const before = this.record.nodes().length;
+          const args = { ...swapArgs(step.args, map, this.cwd), purpose: `${names[k]}: ${s.label}` };
+          const res = await this.runOne({ type: "tool_call", id: `batch_${i + 1}_${k + 1}`, name: step.tool, args }, signal);
+          const node = this.record.nodes().slice(before).find((x) => x.tool === step.tool && !x.sensitivityOf);
+          if (res.type !== "tool_result" || res.isError || !node) {
+            error = (res.type === "tool_result" ? res.text : "no result").replace(/^ERROR:\s*/, "").split("\n")[0]!.slice(0, 200);
+            break;
+          }
+          step.outputs.forEach((o, j) => {
+            const made = node.outputs[j]?.path;
+            if (made) map.set(abs(o.path, this.cwd), abs(made, this.cwd));
+          });
+          for (const [key, v] of Object.entries(metricsOf(node.result))) values[`${step.tool}.${key}`] = v;
+        }
+        rows.push({ sample: s.label, ok: !error, error, values });
+      }
+    } finally {
+      this.batchAllow.clear();
+    }
+    return rows;
   }
 
   private async batchResults(a: Args): Promise<ToolOutput> {
