@@ -503,9 +503,9 @@ export function howToCite(a: { manifest: { program: { citation: Citation[]; name
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const linkify = (s: string) =>
-  escHtml(s)
-    .replace(/(https?:\/\/[^\s<]+[^\s<.,;)])/g, '<a href="$1">$1</a>')
-    .replace(/\bdoi:(10\.[^\s<]+[^\s<.,;)])/g, '<a href="https://doi.org/$1">doi:$1</a>');
+  escHtml(s).replace(/(https?:\/\/[^\s<]+[^\s<.,;)])|\bdoi:(10\.[^\s<]+[^\s<.,;)])/g, (_m, url: string | undefined, doi: string | undefined) =>
+    url ? `<a href="${url}">${url}</a>` : `<a href="https://doi.org/${doi}">doi:${doi}</a>`,
+  );
 
 function ordered(refs: Ref[], style: CitationStyle): Ref[] {
   return style === "apa" ? [...refs].sort((a, b) => authorYear(a).localeCompare(authorYear(b))) : refs;

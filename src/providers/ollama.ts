@@ -175,7 +175,7 @@ export class OllamaProvider implements Provider {
     });
     if (res.status === 429 || res.status >= 500) {
       const txt = await res.text();
-      throw Object.assign(new Error(`Ollama error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status });
+      throw Object.assign(new Error(`Ollama error ${res.status}: ${txt.slice(0, 300)}`), { status: res.status, headers: res.headers });
     }
     return res;
   }

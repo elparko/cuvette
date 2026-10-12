@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -279,9 +279,7 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
         const sha = url.pathname.slice("/api/blob/".length);
         const path = /^[0-9a-f]{64}$/.test(sha) ? session.record.blobPath(sha) : undefined;
         if (!path) return send(res, 404, '{"error":"no such blob"}');
-        res.writeHead(200, { "content-type": BLOB_TYPES[extname(path).toLowerCase()] ?? "application/octet-stream", "cache-control": "private, max-age=3600" });
-        createReadStream(path).pipe(res);
-        return;
+        return pipeFile(res, path, { "content-type": BLOB_TYPES[extname(path).toLowerCase()] ?? "application/octet-stream", "cache-control": "private, max-age=3600" });
       }
       if (req.method === "GET" && url.pathname === "/events") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
@@ -326,6 +324,28 @@ export function windowRoutes(session: WindowSession, token: string): { handle(re
   };
 }
 
+export const FILE_HEADERS = { "x-content-type-options": "nosniff", "content-security-policy": "sandbox" };
+
+export function pipeFile(res: ServerResponse, path: string, headers: Record<string, string>, o: { sandbox?: boolean } = {}): void {
+  const stream = createReadStream(path);
+  stream.once("open", () => {
+    res.writeHead(200, { ...(o.sandbox === false ? { "x-content-type-options": "nosniff" } : FILE_HEADERS), ...headers });
+    stream.pipe(res);
+  });
+  stream.once("error", () => {
+    if (!res.headersSent) send(res, 404, '{"error":"cannot read the file"}');
+    else res.destroy();
+  });
+  res.once("close", () => stream.destroy());
+}
+
+export function tokenOk(given: unknown, token: string): boolean {
+  if (typeof given !== "string") return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export function hostAllowed(host: string, port: number): boolean {
   return host === `127.0.0.1:${port}` || host === `localhost:${port}`;
 }
@@ -340,10 +360,10 @@ export async function startWindow(
     const { port } = server.address() as AddressInfo;
     const host = req.headers.host ?? "";
     if (!hostAllowed(host, port)) return send(res, 403, '{"error":"bad host"}');
+    if (req.headers.origin && req.headers.origin !== `http://${host}`) return send(res, 403, '{"error":"bad origin"}');
     const url = new URL(req.url ?? "/", `http://${host}`);
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
-    const given = url.searchParams.get("t") ?? req.headers["x-token"];
-    if (given !== token) return send(res, 401, '{"error":"missing or wrong token"}');
+    if (!tokenOk(url.searchParams.get("t") ?? req.headers["x-token"], token)) return send(res, 401, '{"error":"missing or wrong token"}');
     await routes.handle(req, res, url);
   });
 

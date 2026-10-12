@@ -6,7 +6,7 @@ import { afterAll, expect, test } from "vitest";
 import type { Args, Tool, ToolContext, ToolOutput } from "../src/core/types.ts";
 import { loadAdapter } from "../src/adapters/manifest.ts";
 import { startAdapter, type AdapterRuntime } from "../src/adapters/runtime.ts";
-import { parseCsv, parseKeyValue, renderArgv, solidPng, tablePreview, validateArgs } from "../src/adapters/kinds/common.ts";
+import { parseCsv, parseKeyValue, renderArgv, runProcess, solidPng, tablePreview, validateArgs } from "../src/adapters/kinds/common.ts";
 
 const root = mkdtempSync(join(tmpdir(), "cuvette-kinds-"));
 const started: AdapterRuntime[] = [];
@@ -467,3 +467,14 @@ def fine(): return {"ok": True, "metrics": {"n": 3}}
   expect(q).toMatchObject({ ok: false, error: "The fit did not converge", summary: "quiet failed: The fit did not converge." });
   expect((await run("fine")).summary).toBe("Fine tool finished. n=3.");
 }, 60000);
+
+test.skipIf(process.platform === "win32")("runProcess returns after the program exits, also if a child keeps the output open", async () => {
+  const code = "const c=require('child_process').spawn('sleep',['30'],{stdio:'inherit',detached:true});console.log(c.pid);c.unref();";
+  const t0 = Date.now();
+  const r = await runProcess([process.execPath, "-e", code], { timeoutMs: 20_000 });
+  expect(Date.now() - t0).toBeLessThan(10_000);
+  expect(r.code).toBe(0);
+  try {
+    process.kill(Number(r.stdout.trim()), "SIGKILL");
+  } catch {}
+}, 15_000);

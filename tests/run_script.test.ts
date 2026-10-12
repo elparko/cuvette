@@ -120,6 +120,26 @@ test.skipIf(!sandboxed)("macOS sandbox: blocks a write outside the work folder",
   expect(inside.ok).toBe(true);
 });
 
+test.skipIf(!sandboxed)("macOS sandbox: blocks a read of the saved API keys and gives the script no key variables", async () => {
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "cuvette-script-home-")));
+  const old = process.env.CUVETTE_HOME;
+  process.env.CUVETTE_HOME = home;
+  process.env.ANTHROPIC_API_KEY_TEST_ONLY = "sk-ant-secret";
+  try {
+    writeFileSync(join(home, "credentials.json"), '{"anthropic_api_key":"sk-ant-secret"}');
+    const { run } = setup();
+    const r = await run(`import os\nprint(os.environ.get('ANTHROPIC_API_KEY_TEST_ONLY'))\nprint(open(${JSON.stringify(join(home, "credentials.json"))}).read())`);
+    expect(r.ok).toBe(false);
+    expect(r.text).toContain("None");
+    expect(r.text).not.toContain("sk-ant-secret");
+    expect(r.error).toMatch(/PermissionError|Operation not permitted/);
+  } finally {
+    delete process.env.ANTHROPIC_API_KEY_TEST_ONLY;
+    if (old === undefined) delete process.env.CUVETTE_HOME;
+    else process.env.CUVETTE_HOME = old;
+  }
+});
+
 test.skipIf(!sandboxed)("macOS sandbox: blocks a socket connect unless network is on", async () => {
   const server = createServer((s) => s.end("hi"));
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));

@@ -36,3 +36,9 @@ test("the module loader takes a built adapter.mjs next to adapter.ts, for the de
   writeFileSync(join(dir, "adapter.mjs"), "export default { builtMarker: true };\n");
   expect(await loadAdapter(dir).module()).toEqual({ builtMarker: true });
 });
+
+test("a manifest homepage that is not a web address is dropped", () => {
+  const base = { adapter: { name: "x" }, connection: { kind: "cli" } };
+  expect(Manifest.parse({ ...base, program: { name: "X", homepage: "javascript:alert(1)" } }).program.homepage).toBe("");
+  expect(Manifest.parse({ ...base, program: { name: "X", homepage: "https://x.org" } }).program.homepage).toBe("https://x.org");
+});

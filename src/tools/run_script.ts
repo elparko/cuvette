@@ -11,7 +11,8 @@ import { cuvetteHome } from "../adapters/manifest.ts";
 import { agentRules, BLIND_REASON, blindPolicy, sandboxDenials, sandboxReadRules } from "../adapters/blind.ts";
 import { PLAIN_DOES, PLAIN_PURPOSE } from "./generic.ts";
 import { outputRules } from "../core/results.ts";
-import { cap, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, type Dirs } from "../adapters/kinds/common.ts";
+import { cap, EXIT_GRACE_MS, fileKind, killTree, listFiles, runProcess, tail, uniqueDir, validateArgs, withoutSecrets, type Dirs } from "../adapters/kinds/common.ts";
+import { credentialsPath } from "../core/credentials.ts";
 
 export function scriptPython(): string {
   if (process.env.CUVETTE_PYTHON) return process.env.CUVETTE_PYTHON;
@@ -176,7 +177,10 @@ function wrap(argv: string[], workDir: string, network: boolean, project?: strin
     const real = realpathSync(workDir);
     const extra = project && !blind && existsSync(project) ? [project, realpathSync(project)] : [];
     const subs = [real, workDir, ...extra, "/private/var/folders", "/private/tmp", "/dev"].map((p) => `(subpath ${sbString(p)})`).join("");
-    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${blind ? sandboxReadRules(agentRules(blind)) : ""}`;
+    const cred = credentialsPath();
+    const credPaths = [cred, ...(existsSync(cred) ? [realpathSync(cred)] : [])];
+    const secrets = `(deny file-read* file-write* ${credPaths.map((p) => `(literal ${sbString(p)})`).join("")})`;
+    const profile = `(version 1)(allow default)${network ? "" : "(deny network*)"}(deny file-write*)(allow file-write* ${subs})${secrets}${blind ? sandboxReadRules(agentRules(blind)) : ""}`;
     return ["/usr/bin/sandbox-exec", "-p", profile, ...argv];
   }
   if (process.platform === "linux" && !network) return ["unshare", "-rn", ...argv];
@@ -193,11 +197,8 @@ function snapshot(dir: string, skip: string): Map<string, string> {
   return m;
 }
 
-const SECRET = /key|token|secret|password|credential/i;
-
 function scriptEnv(dirs: Dirs, project: string): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !SECRET.test(k)) env[k] = v;
+  const env = withoutSecrets();
   const folders = { PROJECT_DIR: project, WORK_DIR: dirs.workDir, SESSION_DIR: dirs.sessionDir, OUTPUT_DIR: dirs.outputDir ?? dirs.workDir };
   for (const [k, v] of Object.entries(folders)) env[k] = env[`CUVETTE_${k}`] = v;
   if (dirs.figureFormats !== undefined) env.CUVETTE_FIGURE_FORMATS = dirs.figureFormats;
@@ -303,12 +304,20 @@ export function runScriptTool(dirs: Dirs, opts: { network: boolean }): Tool {
           stderr += `cannot start ${argv[0]}: ${e.message}`;
           done(null);
         });
+        child.on("exit", (c) => {
+          setTimeout(() => {
+            child.stdout!.destroy();
+            child.stderr!.destroy();
+            requests.destroy();
+            done(c);
+          }, EXIT_GRACE_MS).unref();
+        });
         child.on("close", (c) => done(c));
       });
       clearTimeout(timer);
       ctx.signal.removeEventListener("abort", onAbort);
-      await Promise.allSettled(handling);
       replies.destroy();
+      if (!timedOut && !aborted) await Promise.allSettled(handling);
 
       const after = snapshot(dirs.workDir, scriptDir);
       const outputs: OutputFile[] = [];

@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { FakeSession } from "../src/ui/fake-session.ts";
 import { ntfyNotifier, setWindowUrl } from "../src/server/notify.ts";
-import { startWindow } from "../src/server/window.ts";
+import { startWindow, tokenOk } from "../src/server/window.ts";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createServer, request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
 
@@ -143,4 +146,34 @@ describe("ntfy notifier", () => {
   test("does not throw when the topic is unreachable", async () => {
     await expect(ntfyNotifier("http://127.0.0.1:1/x")({ title: "t", text: "" } as never)).resolves.toBeUndefined();
   });
+});
+
+test("the token check compares the full value", () => {
+  expect(tokenOk("abc", "abc")).toBe(true);
+  expect(tokenOk("abd", "abc")).toBe(false);
+  expect(tokenOk("ab", "abc")).toBe(false);
+  expect(tokenOk(undefined, "abc")).toBe(false);
+  expect(tokenOk(["abc"], "abc")).toBe(false);
+});
+
+test("the window server sandboxes blobs, refuses a foreign origin and survives a missing blob file", async () => {
+  const s = new FakeSession({ delayMs: 0 });
+  const w = await startWindow(s, { port: 0 });
+  closers.push(w.close);
+  const u = new URL(w.url);
+  const token = u.searchParams.get("t")!;
+  const src = join(mkdtempSync(join(tmpdir(), "cuvette-hard-")), "fig.svg");
+  writeFileSync(src, "<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>");
+  const sha = s.record.putBlob(src, ".svg");
+  const res = await fetch(`${u.origin}/api/blob/${sha}?t=${token}`);
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-security-policy")).toBe("sandbox");
+  expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+  await res.text();
+  expect((await fetch(`${u.origin}/api/state?t=${token}`, { headers: { origin: "http://evil.example" } })).status).toBe(403);
+  const { rmSync } = await import("node:fs");
+  rmSync(s.record.blobPath(sha)!);
+  const gone = await fetch(`${u.origin}/api/blob/${sha}?t=${token}`);
+  expect(gone.status).toBe(404);
+  expect((await fetch(`${u.origin}/api/state?t=${token}`)).status).toBe(200);
 });

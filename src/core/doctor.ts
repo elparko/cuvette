@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -384,7 +384,15 @@ function installedAdapters(): LoadedAdapter[] {
 async function startForTest(a: LoadedAdapter) {
   const { startAdapter } = await import("../adapters/runtime.ts");
   const work = mkdtempSync(join(tmpdir(), "cuvette-doctor-"));
-  return startAdapter(a, { workDir: work, sessionDir: work });
+  const drop = () => rmSync(work, { recursive: true, force: true });
+  try {
+    const rt = await startAdapter(a, { workDir: work, sessionDir: work });
+    const close = rt.close.bind(rt);
+    return Object.assign(rt, { close: () => close().finally(drop) });
+  } catch (e) {
+    drop();
+    throw e;
+  }
 }
 
 export async function runSelfTests(checks: Check[], opts: SelfTestOpts = {}): Promise<SelfTestRow[]> {

@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { adapterIndex } from "../adapters/catalog.ts";
 import { suggestPrograms } from "../core/suggest.ts";
 import { loadSettings } from "../core/config.ts";
-import { claudeKey } from "../core/credentials.ts";
+import { claudeKey, isCredentialsFile } from "../core/credentials.ts";
 import { canStart, runDoctor, type Check } from "../core/doctor.ts";
 import { KEY_GUIDE } from "../core/keyhelp.ts";
 import { CHOICES, chooseClaude, chooseLocal, copySample, firstStartState, needsFirstStart, RECOMMENDED_LOCAL, sampleFolder } from "../core/firststart.ts";
@@ -32,7 +32,7 @@ import { addFor, planFor, reviewFor, runFor, type ProgramHooks } from "../ui/pro
 import { appPageHtml } from "./app-page.ts";
 import { doctorJson, programsJson, sessionsJson, settingsJson } from "./app-json.ts";
 import { WebView } from "./app-view.ts";
-import { hostAllowed, windowRoutes, type WindowSession } from "./window.ts";
+import { FILE_HEADERS, hostAllowed, pipeFile, tokenOk, windowRoutes, type WindowSession } from "./window.ts";
 
 export interface AppOptions {
   folder?: string;
@@ -97,8 +97,7 @@ function sendAsset(res: ServerResponse, p: string): boolean {
     return false;
   }
   if (!f.startsWith(resolve(UI_DIST, "assets") + sep) || !existsSync(f) || !statSync(f).isFile()) return false;
-  res.writeHead(200, { "content-type": TYPES[extname(f).toLowerCase()] ?? "application/octet-stream", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" });
-  createReadStream(f).pipe(res);
+  pipeFile(res, f, { "content-type": TYPES[extname(f).toLowerCase()] ?? "application/octet-stream", "cache-control": "public, max-age=31536000, immutable" }, { sandbox: false });
   return true;
 }
 
@@ -239,7 +238,14 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
   const allowedFile = (p: string) => {
     const s = current?.session as (SessionLike & { outputDir?: string }) | undefined;
     if (!s) return false;
-    return [s.dir, s.workDir, s.outputDir, s.cwd].filter(Boolean).some((root) => inside(root!, p));
+    const real = (x: string) => {
+      try {
+        return realpathSync(x);
+      } catch {
+        return resolve(x);
+      }
+    };
+    return !isCredentialsFile(p) && [s.dir, s.workDir, s.outputDir, s.cwd].filter(Boolean).some((root) => inside(root!, p) && inside(real(root!), real(p)));
   };
 
   const outDir = () => {
@@ -328,9 +334,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     if (get && p === "/api/thumb") {
       const f = listSessions().find((s) => s.id === url.searchParams.get("id"))?.figure;
       if (!f || !existsSync(f)) return send(res, 404, { error: "no figure" });
-      res.writeHead(200, { "content-type": TYPES[extname(f).toLowerCase()] ?? "application/octet-stream", "cache-control": "private, max-age=300", "x-content-type-options": "nosniff" });
-      createReadStream(f).pipe(res);
-      return;
+      return pipeFile(res, f, { "content-type": TYPES[extname(f).toLowerCase()] ?? "application/octet-stream", "cache-control": "private, max-age=300" });
     }
     if (get && p === "/api/settings") return send(res, 200, settingsHtml(ctx()), "text/html; charset=utf-8");
     if (get && p === "/api/programs") {
@@ -367,11 +371,9 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
       if (!allowedFile(f) || !existsSync(f) || !statSync(f).isFile()) return send(res, 404, { error: "no such file" });
       const w = Number(url.searchParams.get("w"));
       const thumb = w > 0 && /\.(png|jpe?g|gif|webp|tiff?)$/i.test(f) ? await scaledCopy(f, Math.min(w, 4000), "jpeg") : null;
-      const headers: Record<string, string> = { "content-type": thumb ? "image/jpeg" : (TYPES[extname(f).toLowerCase()] ?? "application/octet-stream"), "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": "sandbox" };
+      const headers: Record<string, string> = { "content-type": thumb ? "image/jpeg" : (TYPES[extname(f).toLowerCase()] ?? "application/octet-stream"), "cache-control": "no-store", ...FILE_HEADERS };
       if (url.searchParams.get("download")) headers["content-disposition"] = `attachment; filename="${basename(f).replace(/["\\\r\n]/g, "_")}"`;
-      res.writeHead(200, headers);
-      createReadStream(thumb ?? f).pipe(res);
-      return;
+      return pipeFile(res, thumb ?? f, headers);
     }
     if (get && p === "/api/tab") {
       if (!c) return send(res, 409, { error: "no session" });
@@ -527,8 +529,7 @@ export async function startApp(opts: AppOptions = {}): Promise<AppHandle> {
     const url = new URL(req.url ?? "/", `http://${host}`);
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
     if (req.method === "GET" && url.pathname.startsWith("/assets/") && sendAsset(res, url.pathname)) return;
-    const given = url.searchParams.get("t") ?? req.headers["x-token"];
-    if (given !== token) return send(res, 401, { error: "missing or wrong token" });
+    if (!tokenOk(url.searchParams.get("t") ?? req.headers["x-token"], token)) return send(res, 401, { error: "missing or wrong token" });
     try {
       await route(req, res, url);
     } catch (e) {

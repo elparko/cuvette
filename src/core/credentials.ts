@@ -1,5 +1,5 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { cuvetteHome } from "../adapters/manifest.ts";
 import { keyFormatProblem } from "./keyhelp.ts";
 
@@ -7,6 +7,17 @@ let version = 0;
 
 export function credentialsPath(): string {
   return join(cuvetteHome(), "credentials.json");
+}
+
+export function isCredentialsFile(path: string): boolean {
+  const real = (p: string) => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return resolve(p);
+    }
+  };
+  return real(path) === real(credentialsPath());
 }
 
 function readFile(): Record<string, string> {
