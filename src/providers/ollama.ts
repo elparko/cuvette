@@ -198,7 +198,8 @@ export class OllamaProvider implements Provider {
     return new ProviderError(`Cannot reach Ollama at ${host}. Start it with \`ollama serve\`.`, true);
   }
 
-  async step(req: StepRequest): Promise<StepResult> {
+  async step(input: StepRequest): Promise<StepResult> {
+    const req = input.noToolCalls ? { ...input, tools: [] } : input;
     const signal = this.signal(req.signal);
     const body: Record<string, unknown> = {
       model: this.model,
