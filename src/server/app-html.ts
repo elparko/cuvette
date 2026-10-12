@@ -335,7 +335,8 @@ function planCard(c: Ctx, slot: Slot, card: Extract<Card, { t: "plan" }>): strin
   const images = card.images?.length ? `<div class="images">${card.images.map((p) => imageHtml(c, p)).join("")}</div>` : "";
   const details = card.details ? `<div class="row">${btn(st.details ? "Hide the details" : "Show the details", planAct({ a: "details" }), "quiet")}</div>${st.details ? `<div class="plantext details">${itemChips(planTextHtml(card.details))}</div>` : ""}` : "";
   const text = card.stage === "pilot" ? `<div class="plantext">${planTextHtml(card.text)}</div>${images}${settingList(card)}` : `<div class="plantext">${itemChips(planTextHtml(card.text))}</div>${images}`;
-  const head = st.step === "restate" && card.restatement ? `<p class="restate"><strong>You want: ${esc(card.restatement.replace(/^you want:?\s*/i, ""))}</strong></p><p>Is that right?</p><div class="row">${btn("Yes", planAct({ a: "restate", ok: true }), "primary")}${btn("Correct it", planAct({ a: "restate", ok: false }))}</div>` : text + details;
+  const estimate = card.estimate ? `<p class="dim estimate">${esc(card.estimate)}</p>` : "";
+  const head = st.step === "restate" && card.restatement ? `<p class="restate"><strong>You want: ${esc(card.restatement.replace(/^you want:?\s*/i, ""))}</strong></p><p>Is that right?</p><div class="row">${btn("Yes", planAct({ a: "restate", ok: true }), "primary")}${btn("Correct it", planAct({ a: "restate", ok: false }))}</div>` : text + estimate + details;
   const setQ = st.step === "setting" ? settingQuestion(card, st) : undefined;
   let body = "";
   if (st.step === "pick") body = prompt(PICK_LABEL, "text", planAct({ a: "item", n: 0 }), planAct({ a: "back" }));

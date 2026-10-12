@@ -3,6 +3,14 @@
 All notable changes to Cuvette. The newest changes are at the top. Dates are in Central Time.
 The project is in early development. Version numbers start at the first public release.
 
+## 11 October 2026
+
+### Spend
+
+- The plan card shows a cost range, for example "About $0.40 to $1.20 with Sonnet." A local model shows "Free: runs on this computer." The range comes from the benchmark runs of 9 October. On papers that the fit did not see, 93% to 94% of the runs fall in the range. See [docs/cost-estimate.md](docs/cost-estimate.md).
+- At 80% of the spend limit, a card asks if the scientist wants to continue, switch to a cheaper model or stop. It appears once. A headless run logs a notice instead. At 100%, Claude requests still stop.
+- `scripts/fit-estimate.ts` fits the range again from benchmark results.
+
 ## 9 October 2026
 
 ### Benchmark

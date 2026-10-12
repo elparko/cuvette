@@ -353,6 +353,7 @@ export interface PlanEvent {
   reference?: { question: string; candidates: { path: string; sheet?: string; columns: string[]; label: string }[] };
   images?: string[];
   details?: string;
+  estimate?: string;
   settings?: { index: number; step: number; label: string; key?: string; value?: unknown; by?: string; options?: string[] }[];
 }
 
