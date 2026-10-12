@@ -1,0 +1,169 @@
+id: strobe
+name: "STROBE"
+full: "Strengthening the Reporting of Observational Studies in Epidemiology"
+reference: "von Elm E, et al. Lancet 370:1453-1457 (2007)"
+guess:
+  adapters: [epi-rates]
+  words: "\\b(cohort|case.control|cross.sectional|incidence|prevalence|exposure|confounders?|hazard|observational|registry)\\b"
+items:
+  - id: "4"
+    section: "Methods"
+    text: "Present the key elements of the study design."
+    from:
+      - { plan: restatement }
+    ask: "The record has no description of the study design. Add it?"
+  - id: "5"
+    section: "Methods"
+    text: "Describe the setting, the places and the dates of the recruitment, exposure, follow-up and data collection."
+    hand: "The record has no setting or dates. Add them by hand."
+  - id: 6a
+    section: "Methods"
+    text: "Give the eligibility criteria and the sources and methods of selection of the participants. For a cohort, give the follow-up methods."
+    from:
+      - { decision: [analysis_population, eligibility] }
+    ask: "The record has no eligibility criteria. Add them?"
+  - id: 6b
+    section: "Methods"
+    text: "If the study is matched, give the matching criteria and the number of exposed and unexposed."
+    from:
+      - { decision: [matching, matching_criteria] }
+    ask: "The record has no matching. Add it, or answer not applicable?"
+  - id: "7"
+    section: "Methods"
+    text: "Define each outcome, exposure, predictor, confounder and effect modifier. Give the diagnostic criteria if they apply."
+    from:
+      - { plan: definitions }
+      - { decision: [endpoint_definition, outcome, exposure, covariates, logistic_covariates, cox_covariates] }
+    ask: "The record has no definition of the outcome and the exposure. Add it?"
+  - id: "8"
+    section: "Methods"
+    text: "For each variable, give the data source and the method of measurement. Say if the methods are the same in all groups."
+    from:
+      - { plan: data.files }
+      - { data_check: [mixed_units, mixed_type, number_as_text], clear: "The data check found no mixed units or mixed types." }
+    ask: "The record has no data source or measurement method. Add it?"
+  - id: "9"
+    section: "Methods"
+    text: "Describe each effort to address possible bias."
+    from:
+      - { decision: [confounders, covariates, batch_effect, standardization_method, standard_population] }
+      - { steps: "bias|sensitivity|adjust" }
+    ask: "The record has no step against bias. Add it?"
+  - id: "10"
+    section: "Methods"
+    text: "Explain how you chose the study size."
+    from:
+      - { decision: [power, sample_size] }
+    ask: "The record has no explanation of the study size. Add it?"
+  - id: "11"
+    section: "Methods"
+    text: "Explain how you handled quantitative variables in the analysis. Say which groupings you chose and why."
+    from:
+      - { decision: [transform, cutpoints, categories, standardize, cofactor] }
+    ask: "The record does not say how quantitative variables were handled. Add it?"
+  - id: 12a
+    section: "Statistical methods"
+    text: "Describe all statistical methods, with the methods to control for confounding."
+    from:
+      - { decision: [test, group_test, binary_test, model_formula, cox_covariates, logistic_covariates, rate_ratio_method, ci_method, standardization_method] }
+      - { steps: "test|regress|model|cox|logistic|rate|ratio|standardi" }
+    ask: "The record has no statistical method. Add it?"
+  - id: 12b
+    section: "Statistical methods"
+    text: "Describe the methods for the subgroups and the interactions."
+    from:
+      - { steps: "subgroup|interaction|stratif" }
+      - { decision: [cox_strata, stratum_column] }
+    ask: "The record has no subgroup analysis. Add it, or answer not applicable?"
+  - id: 12c
+    section: "Statistical methods"
+    text: "Explain how you handled missing data."
+    from:
+      - { decision: [missing_outcome, imputation, zero_as_missing, valid_rule, impute_scope] }
+      - { data_check: [missing], clear: "The data check found no missing value." }
+    ask: "The record has no handling of missing data. Add it?"
+  - id: 12d
+    section: "Statistical methods"
+    text: "Explain how you handled loss to follow-up (cohort), matching (case-control) or the sampling strategy (cross-sectional)."
+    from:
+      - { decision: [missing_outcome, matching, landmark_time, time_horizon] }
+    ask: "The record has no handling of loss to follow-up, matching or sampling. Add it?"
+  - id: 12e
+    section: "Statistical methods"
+    text: "Describe each sensitivity analysis."
+    from:
+      - { steps: "sensitivity" }
+    ask: "The record has no sensitivity analysis. Add it, or answer not applicable?"
+  - id: 13a
+    section: "Results"
+    text: "Give the number of people at each stage: possibly eligible, eligible, included, followed up and analyzed."
+    from:
+      - { sheet: size }
+      - { plan: data.n }
+      - { metric: ["^n($|_)", "^n_"] }
+    ask: "The record has no count of people at each stage. Add it?"
+  - id: 13b
+    section: "Results"
+    text: "Give the reasons for non-participation at each stage."
+    from:
+      - { decision: [exclusions, exclude_samples] }
+      - { plan: exclusions }
+    ask: "The record has no reason for non-participation. Add it?"
+  - id: 13c
+    section: "Results"
+    text: "Consider a flow diagram."
+    hand: "Cuvette makes no flow diagram. Add one by hand."
+  - id: 14a
+    section: "Descriptive data"
+    text: "Give the characteristics of the participants, and the information on exposures and confounders."
+    from:
+      - { steps: "baseline|characteristics|descriptive|summary" }
+    ask: "The record has no table of the characteristics. Add it?"
+  - id: 14b
+    section: "Descriptive data"
+    text: "For each variable, give the number of participants with missing data."
+    from:
+      - { data_check: [missing], clear: "The data check found no missing value." }
+      - { metric: ["missing", "n_na", "non_detect"] }
+    ask: "The record has no count of missing data. Add it?"
+  - id: 14c
+    section: "Descriptive data"
+    text: "For a cohort, give the follow-up time, as a mean and total."
+    from:
+      - { decision: [time_horizon, landmark_time, time_unit] }
+      - { metric: ["follow", "person_time", "person_years"] }
+    ask: "The record has no follow-up time. Add it, or answer not applicable?"
+  - id: "15"
+    section: "Outcome data"
+    text: "Give the number of outcome events or the summary measures over time."
+    from:
+      - { metric: ["events", "n_event", "cases", "rate"] }
+    ask: "The record has no count of outcome events. Add it?"
+  - id: 16a
+    section: "Main results"
+    text: "Give the unadjusted estimates and, if they apply, the estimates adjusted for confounders, with the precision, such as a 95% confidence interval."
+    from:
+      - { metric: ["lower", "upper", "ci_", "_ci", "conf"] }
+    ask: "The record has no estimate with an interval. Add it?"
+  - id: 16b
+    section: "Main results"
+    text: "When you group a continuous variable, report the boundaries of the groups."
+    from:
+      - { decision: [cutpoints, categories, thresholds] }
+    ask: "The record has no group boundaries. Add them, or answer not applicable?"
+  - id: 16c
+    section: "Main results"
+    text: "For a relevant risk, consider a translation of the relative risk into an absolute risk over a period."
+    from:
+      - { metric: ["risk_diff", "^rd_", "absolute", "nnt"] }
+    ask: "The record has no absolute risk. Add it, or answer not applicable?"
+  - id: "17"
+    section: "Other analyses"
+    text: "Report other analyses, such as subgroup, interaction and sensitivity analyses."
+    from:
+      - { steps: "subgroup|interaction|sensitivity" }
+    ask: "The record has no other analysis. Add it, or answer not applicable?"
+  - id: "22"
+    section: "Other information"
+    text: "Name the source of funding and the role of the funders."
+    hand: "The record has no funding. Add it by hand."

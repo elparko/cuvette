@@ -1,3 +1,4 @@
+import { checklistHtml, checklistMarkdown, recordChecklist } from "./checklist.ts";
 import { pilotText, validationRows } from "./pilot.ts";
 import { approvedPlan, planMarkdown, questionsOf } from "./plan.ts";
 import { spawnSync } from "node:child_process";
@@ -667,6 +668,11 @@ function planHtml(record: AnalysisRecord): string {
   return `<section class="plan" id="plan"><h2>Proposed analysis (version ${p.version}, confirmed ${esc(p.ts.slice(0, 16).replace("T", " "))})</h2>${questions}<h3>Proposed metrics</h3>${pre(p.text)}${pilot}<h3>Confirmed</h3><p>The scientist confirmed version ${p.version}.</p>${updates}${validation}</section>`;
 }
 
+function checklistSection(record: AnalysisRecord): string {
+  const c = recordChecklist(record);
+  return c ? `<section id="checklist">${checklistHtml(c, esc)}</section>` : "";
+}
+
 export function exportHtml(record: AnalysisRecord, adapters: LoadedAdapter[], path: string, style: CitationStyle = "apa"): string {
   const m = meta(record);
   const labels = new Map<string, string>();
@@ -698,6 +704,7 @@ ${title ? `<p class="question"><b>Question</b> ${esc(title)}</p>` : ""}
 ${planHtml(record)}
 ${settingRowsHtml ? `<h3>Settings</h3><div class="scroll"><table><thead><tr><th>Decision</th><th>Value</th><th>Set by</th></tr></thead><tbody>${settingRowsHtml}</tbody></table></div>` : ""}
 ${sections.join("\n")}
+${checklistSection(record)}
 <section id="cite">${referencesHtml(sessionCitations(record, adapters, stepNumbers(record.nodes())), style)}</section>
 </main></body></html>
 `;
@@ -767,6 +774,8 @@ function markdownText(record: AnalysisRecord, adapters: LoadedAdapter[], style: 
     lines.push(`${t.n}. ${t.line.replace(/\n/g, " ")}${t.badges.map((b) => ` [${b}]`).join("")}`);
     if (t.details) lines.push(...mdDetails(record, t.details));
   }
+  const checklist = recordChecklist(record);
+  if (checklist) lines.push("", ...checklistMarkdown(checklist));
   lines.push("", ...referencesMarkdown(sessionCitations(record, adapters, stepNumbers(record.nodes())), style));
   return lines.join("\n") + "\n";
 }

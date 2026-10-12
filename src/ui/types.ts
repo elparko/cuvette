@@ -72,6 +72,7 @@ export interface SessionLike {
   askTrust?(): Promise<Question | undefined>;
   followDone(step: number, note?: string, agentDoes?: boolean): Promise<void>;
   review(): Promise<Finding[]>;
+  checklist?(arg?: string): Promise<{ text: string; asked: number }>;
   compact(): Promise<void>;
   exportAs(fmt: any): Promise<string>;
   exportImages?(options: DeckOptions): Promise<DeckWritten>;
