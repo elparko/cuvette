@@ -1,0 +1,13 @@
+alexandrov2019-metaspace
+bates2015-lme4-sleepstudy
+caicedo2019-bbbc039
+delaney2004-esol
+hackshaw1997-ets-lung-cancer
+kasurinen2018-mmp14-gastric
+lazear2023-sage
+love2014-deseq2-airway
+minh2020-iqtree2
+palmer2017-metaspace-fdr
+rost2016-openms
+sriphoosanaphan2021-sample-size
+weber2023-nnsvg-dlpfc

@@ -1,0 +1,4731 @@
+{
+ "date": "2026-10-12",
+ "models": [
+  "claude:claude-haiku-5-5"
+ ],
+ "runsPerCell": 3,
+ "blind": true,
+ "runs": [
+  {
+   "paper": "aledo2022-renz-onpg",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 60.082,
+   "session": "20261012-020617-b136",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run1/home/sessions/20261012-020617-b136",
+   "answer": "1. Km is 2.48 mM (95% CI 1.77 to 3.19 mM) and Vmax is 0.184 mM/min (95% CI 0.170 to 0.198 mM/min), from a Michaelis-Menten fit of all ten rates with no inhibitor.\n\n| Measure | Value | 95% CI | n | Test or method | Step |\n|---|---|---|---|---|---|\n| Km | 2.48 mM | 1.77 to 3.19 mM | 10 rates (one rate for each ONPG concentration; no replicates in the file) | Nonlinear least squares, t-based interval with 8 df | fit_enzyme_kinetics |\n| Vmax | 0.184 mM/min | 0.170 to 0.198 mM/min | 10 rates | Same fit | fit_enzyme_kinetics |\n\nThe residual check used the fitted Vmax and Km. The 20 mM rate (0.152 mM/min) is 0.0118 mM/min below the fitted curve. The 30 mM rate (0.181 mM/min) is 0.0110 mM/min above it. Step: run_script (residuals_mm_fit.csv).\n\nUncertain:\n- The two highest rates have residuals of opposite sign. This does not show substrate inhibition.\n- The fit tool output lists drc version 4.0.0, but the adapter lists 4.6.1. Check which version ran.\n- The file has no replicate wells, so the scatter of the rates is not known.\n\nWaits for you: Decide whether to keep the 20 and 30 mM rates. They are kept now. Removing them would change Km and Vmax.\n\nStep results that the answer does not mention, from the record:\n- n2 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run1/home/sessions/20261012-020617-b136/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run1/home/sessions/20261012-020617-b136/work.\n\nSettings used, from the decision record: Enzyme kinetic model: michaelis-menten.",
+   "items": [
+    {
+     "key": "km",
+     "description": "Km (mM), nonlinear fit",
+     "expected": 2.4793,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.47926431006817,
+      "diff": 0.00003568993182989644,
+      "node": "n1",
+      "path": "metrics.Km",
+      "entry": 27
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.48,
+      "diff": 0.000700000000000145,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 57,
+      "text": "Km is 2.48 mM (95% CI 1.77 to 3.19 mM) and Vmax is 0.184 mM/min (95% CI 0.170 to 0.198 mM/min), from a Michaelis-Menten fit of all ten rates with no inhibitor."
+     }
+    },
+    {
+     "key": "vmax",
+     "description": "Vmax (mM/min), nonlinear fit",
+     "expected": 0.18407,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.184073549301546,
+      "diff": 0.0000035493015460019706,
+      "node": "n1",
+      "path": "metrics.Vmax",
+      "entry": 27
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.184,
+      "diff": 0.0000700000000000145,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 57,
+      "text": "Km is 2.48 mM (95% CI 1.77 to 3.19 mM) and Vmax is 0.184 mM/min (95% CI 0.170 to 0.198 mM/min), from a Michaelis-Menten fit of all ten rates with no inhibitor."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 14,
+    "outputTokens": 5695,
+    "cacheRead": 66751,
+    "cacheWrite": 23066,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 3,
+     "error": 1
+    },
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run1/home/sessions/20261012-020617-b136/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/aledo2022-renz-onpg",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run1",
+     "/Users/parker/Code/guided-analysis/catalog/drc",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/drc"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/aledo2022-renz-onpg/onpg_table2.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "aledo2022-renz-onpg",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 50.112,
+   "session": "20261012-020718-576a",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run2/home/sessions/20261012-020718-576a",
+   "answer": "1. The Michaelis-Menten fit gives Vmax 0.1841 mM/min (95% CI 0.1697 to 0.1985) and Km 2.479 mM (95% CI 1.772 to 3.187).\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Vmax | 0.1841 mM/min | 0.1697 to 0.1985 | 10 substrate levels, one rate each | Nonlinear least squares fit (drc, MM.2 model); no hypothesis test | fit_enzyme_kinetics |\n| Km | 2.479 mM | 1.772 to 3.187 | 10 substrate levels, one rate each | Nonlinear least squares fit (drc, MM.2 model); no hypothesis test | fit_enzyme_kinetics |\n\nUncertain:\n- The data check note in inspect_data flagged the values 20 and 30 mM as extreme. It gave row numbers 10 and 11. The file has 10 rows, so these values are rows 9 and 10. I kept all points in the fit.\n- The residuals (measured minus fitted) from the logged Vmax and Km are -0.0118 mM/min at 20 mM and +0.0110 mM/min at 30 mM. The 20 mM point lies below the curve and the 30 mM point lies above it. There is no clear sign of substrate inhibition from these two points. The fit tool reports drc version 4.0.0. The adapter lists 4.6.1.\n\nWaits for you: Nothing.\n\nStep results that the answer does not mention, from the record:\n- n2 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run2/home/sessions/20261012-020718-576a/work and wrote 0 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run2/home/sessions/20261012-020718-576a/work.\n\nSettings used, from the decision record: Enzyme kinetic model: michaelis-menten.",
+   "items": [
+    {
+     "key": "km",
+     "description": "Km (mM), nonlinear fit",
+     "expected": 2.4793,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.47926431006817,
+      "diff": 0.00003568993182989644,
+      "node": "n1",
+      "path": "metrics.Km",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.479,
+      "diff": 0.0002999999999997449,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 52,
+      "text": "The Michaelis-Menten fit gives Vmax 0.1841 mM/min (95% CI 0.1697 to 0.1985) and Km 2.479 mM (95% CI 1.772 to 3.187)."
+     }
+    },
+    {
+     "key": "vmax",
+     "description": "Vmax (mM/min), nonlinear fit",
+     "expected": 0.18407,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.184073549301546,
+      "diff": 0.0000035493015460019706,
+      "node": "n1",
+      "path": "metrics.Vmax",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.1841,
+      "diff": 0.000030000000000002247,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 52,
+      "text": "The Michaelis-Menten fit gives Vmax 0.1841 mM/min (95% CI 0.1697 to 0.1985) and Km 2.479 mM (95% CI 1.772 to 3.187)."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 14,
+    "outputTokens": 4154,
+    "cacheRead": 64430,
+    "cacheWrite": 21098,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 0,
+     "warning": 1,
+     "error": 3
+    },
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run2/home/sessions/20261012-020718-576a/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/aledo2022-renz-onpg",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run2",
+     "/Users/parker/Code/guided-analysis/catalog/drc",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/drc"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/aledo2022-renz-onpg/onpg_table2.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "aledo2022-renz-onpg",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 49.971,
+   "session": "20261012-020808-ded1",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run3/home/sessions/20261012-020808-ded1",
+   "answer": "1. The Michaelis-Menten fit gives Vmax 0.184 mM/min and Km 2.48 mM for ONPG.\n\n| Measure | Value | 95% CI | n (one n = one initial rate at one ONPG concentration) | Test | Step |\n|---|---|---|---|---|---|\n| Vmax | 0.184 mM/min | 0.170 to 0.198 mM/min | 10 | Nonlinear least squares, Michaelis-Menten model (drc MM.2) | fit_enzyme_kinetics; rerun in run_script |\n| Km | 2.48 mM | 1.77 to 3.19 mM | 10 | Nonlinear least squares, Michaelis-Menten model (drc MM.2) | fit_enzyme_kinetics; rerun in run_script |\n\nUncertain:\n- The two highest substrate concentrations lie below the fitted curve. Substrate inhibition was not tested.\n- The table has one rate for each concentration. No replicate rates were given, so the CIs come only from the fit.\n- The run output reports drc version 4.0.0. The version in the installed program must be checked before you report it.\n\nWaits for you:\n- Say if you want a substrate-inhibition model tested for the two highest substrate concentrations.\n\nStep results that the answer does not mention, from the record:\n- n3 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run3/home/sessions/20261012-020808-ded1/work and wrote 3 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run3/home/sessions/20261012-020808-ded1/work.\n\nSettings used, from the decision record: Enzyme kinetic model: michaelis-menten.",
+   "items": [
+    {
+     "key": "km",
+     "description": "Km (mM), nonlinear fit",
+     "expected": 2.4793,
+     "tolerance": 0.005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.47926431006817,
+      "diff": 0.00003568993182989644,
+      "node": "n1",
+      "path": "metrics.Km",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.48,
+      "diff": 0.000700000000000145,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 56,
+      "text": "The Michaelis-Menten fit gives Vmax 0.184 mM/min and Km 2.48 mM for ONPG."
+     }
+    },
+    {
+     "key": "vmax",
+     "description": "Vmax (mM/min), nonlinear fit",
+     "expected": 0.18407,
+     "tolerance": 0.0005,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.184073549301546,
+      "diff": 0.0000035493015460019706,
+      "node": "n1",
+      "path": "metrics.Vmax",
+      "entry": 25
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.184,
+      "diff": 0.0000700000000000145,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 56,
+      "text": "The Michaelis-Menten fit gives Vmax 0.184 mM/min and Km 2.48 mM for ONPG."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 5,
+    "inputTokens": 14,
+    "outputTokens": 4626,
+    "cacheRead": 64997,
+    "cacheWrite": 24013,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 3,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run3/home/sessions/20261012-020808-ded1/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/aledo2022-renz-onpg",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/aledo2022-renz-onpg/run3",
+     "/Users/parker/Code/guided-analysis/catalog/drc",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/drc"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/aledo2022-renz-onpg/onpg_table2.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "astapova2021-deseq2-kgn",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 155.138,
+   "session": "20261012-020858-1c3a",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run1/home/sessions/20261012-020858-1c3a",
+   "answer": "The review point does not apply. I made no comparison run. The DDIT4 value of 0.228 is in the chosen run's results file (run_deseq-6, minimum count 0, minimum samples 1). I kept the answer as before.\n\n1. DHT changes the expression of 173 genes at adjusted p below 0.05: 125 go up and 48 go down.\n\n| Measure | Value | 95% CI | n (one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Genes with padj < 0.05, all | 173 | Not applicable (count) | 5 experiments, each one DHT and one VEH culture (10 libraries) | DESeq2 Wald test, Benjamini-Hochberg padj (DESeq2 1.52.0) | run_deseq |\n| Genes up with DHT | 125 | Not applicable (count) | same | same | run_deseq |\n| Genes down with DHT | 48 | Not applicable (count) | same | same | run_deseq |\n| CCN2: log2 FC 0.368, padj 1.55e-28 | 0.368 | 0.307 to 0.428 | same | same | top_genes, calculate |\n| TMTC1: log2 FC 0.694, padj 3.06e-22 | 0.694 | 0.565 to 0.823 | same | same | top_genes, calculate |\n| PLAT: log2 FC 0.289, padj 5.36e-20 | 0.289 | 0.232 to 0.346 | same | same | top_genes, calculate |\n| ERRFI1: log2 FC 0.347, padj 2.30e-19 | 0.347 | 0.278 to 0.416 | same | same | top_genes, calculate |\n| VCAM1: log2 FC 0.576, padj 1.15e-18 | 0.576 | 0.459 to 0.693 | same | same | top_genes, calculate |\n| GCNT1: log2 FC 0.373, padj 9.08e-13 | 0.373 | 0.283 to 0.463 | same | same | top_genes, calculate |\n| DDIT4: log2 FC 0.228, padj 3.63e-10 | 0.228 | 0.167 to 0.289 | same | same | top_genes, calculate |\n| NCAM1: log2 FC 0.227, padj 4.24e-10 | 0.227 | 0.166 to 0.288 | same | same | top_genes, calculate |\n| B4GALT5: log2 FC 0.200, padj 1.37e-09 | 0.200 | 0.145 to 0.255 | same | same | top_genes, calculate |\n| CXCL8: log2 FC 0.422, padj 4.53e-09 | 0.422 | 0.303 to 0.541 | same | same | top_genes, calculate |\n| KRT18: log2 FC -0.198, padj 5.97e-09 | -0.198 | -0.255 to -0.142 | same | same | top_genes, calculate |\n| MGP: log2 FC 0.269, padj 1.38e-08 | 0.269 | 0.191 to 0.347 | same | same | top_genes, calculate |\n| EPB41L2: log2 FC 0.211, padj 8.79e-08 | 0.211 | 0.147 to 0.275 | same | same | top_genes, calculate |\n| EGR1: log2 FC 0.271, padj 2.04e-07 | 0.271 | 0.187 to 0.355 | same | same | top_genes, calculate |\n| CD55: log2 FC 0.222, padj 5.03e-07 | 0.222 | 0.152 to 0.293 | same | same | top_genes, calculate |\n| NNMT: log2 FC 0.219, padj 5.23e-07 | 0.219 | 0.149 to 0.288 | same | same | top_genes, calculate |\n| DNMBP: log2 FC 0.193, padj 1.48e-06 | 0.193 | 0.130 to 0.257 | same | same | top_genes, calculate |\n| MEG3: log2 FC 0.325, padj 1.94e-06 | 0.325 | 0.218 to 0.432 | same | same | top_genes, calculate |\n| THBS1: log2 FC 0.159, padj 1.98e-06 | 0.159 | 0.106 to 0.211 | same | same | top_genes, calculate |\n| FPR3: log2 FC 0.271, padj 2.23e-06 | 0.271 | 0.181 to 0.361 | same | same | top_genes, calculate |\n\nLog2 fold changes are DHT versus VEH. Positive values mean higher with DHT. The 95% CI is the log2 fold change plus or minus 1.96 times its standard error (Wald). The design is ~ experiment + treatment. The input is a count matrix with no length offsets. The minimum count is 0, the minimum number of samples is 1, the fold change threshold is 0 and the padj cutoff is 0.05.\n\nUncertain:\n- The filter (minimum count 0, minimum samples 1) keeps all 59087 genes, including 29568 genes with zero counts. The gene count depends on this choice.\n- The fold change threshold is 0, so the 173 genes pass a test against zero change. They are not limited to large changes.\n- Five experiments give small power. I did not compute the smallest detectable effect, because the pwr program is not available in this session.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Input type: count matrix · Design formula: ~ experiment + treatment · Variable of interest: treatment · Reference level: VEH · Test level: DHT · Minimum count for a gene to count as detected: 0 · Minimum number of samples with a detected gene: 1 · False discovery rate cutoff (padj): 0.05 · Log2 fold change threshold: 0.",
+   "items": [
+    {
+     "key": "significant_padj_005",
+     "description": "Genes with padj < 0.05, DHT vs vehicle, paired design",
+     "expected": 173,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 173,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_significant",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 173,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 96,
+      "text": "DHT changes the expression of 173 genes at adjusted p below 0.05: 125 go up and 48 go down."
+     }
+    },
+    {
+     "key": "up_padj_005",
+     "description": "Genes up with DHT at padj < 0.05",
+     "expected": 125,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 125,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_up",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 125,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 96,
+      "text": "DHT changes the expression of 173 genes at adjusted p below 0.05: 125 go up and 48 go down."
+     }
+    },
+    {
+     "key": "down_padj_005",
+     "description": "Genes down with DHT at padj < 0.05",
+     "expected": 48,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 48,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_down",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 48,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 96,
+      "text": "DHT changes the expression of 173 genes at adjusted p below 0.05: 125 go up and 48 go down."
+     }
+    },
+    {
+     "key": "genes_in_table",
+     "description": "Genes in the count table",
+     "expected": 59087,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 59087,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_genes",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 96,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 7,
+    "inputTokens": 20,
+    "outputTokens": 12159,
+    "cacheRead": 119161,
+    "cacheWrite": 33315,
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 5,
+     "error": 3
+    },
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 4
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run1/home/sessions/20261012-020858-1c3a/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run1",
+     "/Users/parker/Code/guided-analysis/catalog/deseq2",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/deseq2"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_counts.csv",
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_samples.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run1/home/sessions/20261012-020858-1c3a/work/run_deseq-6/results.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "astapova2021-deseq2-kgn",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 175.925,
+   "session": "20261012-021133-fd02",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run2/home/sessions/20261012-021133-fd02",
+   "answer": "1. Of the 173 genes at padj < 0.05, 125 go up and 48 go down with DHT.\n\n| Measure | Value | 95% CI | n (one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Genes with padj < 0.05 (DHT vs VEH) | 173 | not applicable | 5 experiments, 10 libraries (one experiment = one DHT and one VEH culture) | DESeq2 Wald test, Benjamini-Hochberg adjusted | run_deseq (run_deseq-6), recounted in script-1 |\n| Genes up with DHT | 125 | not applicable | same | same | script-1 |\n| Genes down with DHT | 48 | not applicable | same | same | script-1 |\n| DESeq2 version | 1.52.0 | not applicable | not applicable | not applicable | run_deseq output field deseq2_version |\n| Normal quantile for 95% CI | 1.959964 | not applicable | not applicable | scipy normal quantile | script-1 |\n| CCN2: log2 FC; FC; padj | 0.368; FC 1.290; 1.55e-28 | 0.307 to 0.428 (log2) | 5 experiments | same | script-1 (top 20 from run_deseq-6) |\n| TMTC1: log2 FC; FC; padj | 0.694; FC 1.618; 3.06e-22 | 0.565 to 0.823 (log2) | same | same | script-1 |\n| PLAT: log2 FC; FC; padj | 0.289; FC 1.222; 5.36e-20 | 0.232 to 0.346 (log2) | same | same | script-1 |\n| ERRFI1: log2 FC; FC; padj | 0.347; FC 1.272; 2.30e-19 | 0.278 to 0.416 (log2) | same | same | script-1 |\n| VCAM1: log2 FC; FC; padj | 0.576; FC 1.490; 1.15e-18 | 0.459 to 0.693 (log2) | same | same | script-1 |\n| GCNT1: log2 FC; FC; padj | 0.373; FC 1.295; 9.08e-13 | 0.283 to 0.463 (log2) | same | same | script-1 |\n| DDIT4: log2 FC; FC; padj | 0.228; FC 1.172; 3.63e-10 | 0.167 to 0.289 (log2) | same | same | script-1 (chosen run, run_deseq-6) |\n| NCAM1: log2 FC; FC; padj | 0.227; FC 1.170; 4.24e-10 | 0.166 to 0.288 (log2) | same | same | script-1 |\n| B4GALT5: log2 FC; FC; padj | 0.200; FC 1.149; 1.37e-9 | 0.145 to 0.255 (log2) | same | same | script-1 |\n| CXCL8: log2 FC; FC; padj | 0.422; FC 1.340; 4.53e-9 | 0.303 to 0.541 (log2) | same | same | script-1 |\n| KRT18: log2 FC; FC; padj | -0.198; FC 0.872; 5.97e-9 | -0.255 to -0.142 (log2) | same | same | script-1 |\n| MGP: log2 FC; FC; padj | 0.269; FC 1.205; 1.38e-8 | 0.191 to 0.347 (log2) | same | same | script-1 |\n| EPB41L2: log2 FC; FC; padj | 0.211; FC 1.157; 8.79e-8 | 0.147 to 0.275 (log2) | same | same | script-1 |\n| EGR1: log2 FC; FC; padj | 0.271; FC 1.207; 2.04e-7 | 0.187 to 0.355 (log2) | same | same | script-1 |\n| CD55: log2 FC; FC; padj | 0.222; FC 1.166; 5.03e-7 | 0.152 to 0.293 (log2) | same | same | script-1 |\n| NNMT: log2 FC; FC; padj | 0.219; FC 1.164; 5.23e-7 | 0.149 to 0.288 (log2) | same | same | script-1 |\n| DNMBP: log2 FC; FC; padj | 0.193; FC 1.143; 1.48e-6 | 0.130 to 0.257 (log2) | same | same | script-1 |\n| MEG3: log2 FC; FC; padj | 0.325; FC 1.253; 1.94e-6 | 0.218 to 0.432 (log2) | same | same | script-1 |\n| THBS1: log2 FC; FC; padj | 0.159; FC 1.116; 1.98e-6 | 0.106 to 0.211 (log2) | same | same | script-1 |\n| FPR3: log2 FC; FC; padj | 0.271; FC 1.207; 2.23e-6 | 0.181 to 0.361 (log2) | same | same | script-1 |\n\nSettings: count matrix input, no length offsets. Design ~ experiment + treatment, reference VEH, test DHT. Minimum count 0 and minimum samples 1, so all 59,087 genes pass. Padj cutoff 0.05, log2 fold change threshold 0. The 95% CI is log2 fold change ± 1.959964 × standard error. FC is 2 to the power of log2 fold change. Positive values are higher with DHT. No comparison run was made in this session. All values come from the chosen run.\n\nUncertain:\n- The threshold is 0. The 173 genes have a change that is not zero, but not all are large. The top 20 fold changes range from 0.872 to 1.618.\n- Five experiments give limited power. I did not run a power calculation, because the pwr program is not available here.\n- The filter kept genes with zero counts in every sample. Their padj is NA and they are not results.\n\nWaits for you: Nothing.\n\nStep results that the answer does not mention, from the record:\n- n10 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run2/home/sessions/20261012-021133-fd02/work and wrote 1 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run2/home/sessions/20261012-021133-fd02/work.\n\nSettings used, from the decision record: Input type: count matrix · Design formula: ~ experiment + treatment · Variable of interest: treatment · Reference level: VEH · Test level: DHT · Minimum count for a gene to count as detected: 0 · Minimum number of samples with a detected gene: 1 · False discovery rate cutoff (padj): 0.05 · Log2 fold change threshold: 0.",
+   "items": [
+    {
+     "key": "significant_padj_005",
+     "description": "Genes with padj < 0.05, DHT vs vehicle, paired design",
+     "expected": 173,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 173,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_significant",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 173,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 98,
+      "text": "Of the 173 genes at padj < 0.05, 125 go up and 48 go down with DHT."
+     }
+    },
+    {
+     "key": "up_padj_005",
+     "description": "Genes up with DHT at padj < 0.05",
+     "expected": 125,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 125,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_up",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 125,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 98,
+      "text": "Of the 173 genes at padj < 0.05, 125 go up and 48 go down with DHT."
+     }
+    },
+    {
+     "key": "down_padj_005",
+     "description": "Genes down with DHT at padj < 0.05",
+     "expected": 48,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 48,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_down",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 48,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 98,
+      "text": "Of the 173 genes at padj < 0.05, 125 go up and 48 go down with DHT."
+     }
+    },
+    {
+     "key": "genes_in_table",
+     "description": "Genes in the count table",
+     "expected": 59087,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 59087,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_genes",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 98,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 7,
+    "inputTokens": 20,
+    "outputTokens": 15153,
+    "cacheRead": 123015,
+    "cacheWrite": 37018,
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 2,
+     "error": 3
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run2/home/sessions/20261012-021133-fd02/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run2",
+     "/Users/parker/Code/guided-analysis/catalog/deseq2",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/deseq2"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_counts.csv",
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_samples.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run2/home/sessions/20261012-021133-fd02/work/run_deseq-6/results.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "astapova2021-deseq2-kgn",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 199.986,
+   "session": "20261012-021429-a4dc",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run3/home/sessions/20261012-021429-a4dc",
+   "answer": "1. DHT changes expression of 173 genes at adjusted p below 0.05: 125 genes go up and 48 go down with DHT.\n\n| Measure | Value | 95% CI | n (one n) | Test | Step |\n|---|---|---|---|---|---|\n| Genes with padj < 0.05 (total) | 173 | not applicable (count) | 5 DHT and 5 VEH cultures, paired by experiment (one n = one experiment) | Wald test, DESeq2 1.52.0, Benjamini-Hochberg padj | run_deseq |\n| Genes up with DHT | 125 | not applicable (count) | same | same | run_deseq |\n| Genes down with DHT | 48 | not applicable (count) | same | same | run_deseq |\n| CCN2 log2 fold change (padj 1.55e-28) | 0.368 | 0.307 to 0.428 | same | same | top_genes |\n| TMTC1 (padj 3.06e-22) | 0.694 | 0.565 to 0.823 | same | same | top_genes |\n| PLAT (padj 5.36e-20) | 0.289 | 0.232 to 0.346 | same | same | top_genes |\n| ERRFI1 (padj 2.30e-19) | 0.347 | 0.278 to 0.416 | same | same | top_genes |\n| VCAM1 (padj 1.15e-18) | 0.576 | 0.459 to 0.693 | same | same | top_genes |\n| GCNT1 (padj 9.08e-13) | 0.373 | 0.283 to 0.463 | same | same | top_genes |\n| DDIT4 (padj 3.63e-10) | 0.228 | 0.167 to 0.289 | same | same | run_deseq (chosen run, file row checked by run_script) |\n| NCAM1 (padj 4.24e-10) | 0.227 | 0.166 to 0.288 | same | same | top_genes |\n| B4GALT5 (padj 1.37e-9) | 0.200 | 0.145 to 0.255 | same | same | top_genes |\n| CXCL8 (padj 4.53e-9) | 0.422 | 0.303 to 0.541 | same | same | top_genes |\n| KRT18 (padj 5.97e-9) | -0.198 | -0.255 to -0.142 | same | same | top_genes |\n| MGP (padj 1.38e-8) | 0.269 | 0.191 to 0.347 | same | same | top_genes |\n| EPB41L2 (padj 8.79e-8) | 0.211 | 0.147 to 0.275 | same | same | top_genes |\n| EGR1 (padj 2.04e-7) | 0.271 | 0.187 to 0.355 | same | same | top_genes |\n| CD55 (padj 5.03e-7) | 0.222 | 0.152 to 0.293 | same | same | top_genes |\n| NNMT (padj 5.23e-7) | 0.219 | 0.149 to 0.288 | same | same | top_genes |\n| DNMBP (padj 1.48e-6) | 0.193 | 0.130 to 0.257 | same | same | top_genes |\n| MEG3 (padj 1.94e-6) | 0.325 | 0.218 to 0.432 | same | same | top_genes |\n| THBS1 (padj 1.98e-6) | 0.159 | 0.106 to 0.211 | same | same | top_genes |\n| FPR3 (padj 2.23e-6) | 0.271 | 0.181 to 0.361 | same | same | top_genes |\n\nSettings: count matrix input, no length offsets, design ~ experiment + treatment, reference VEH, test DHT. The filter kept all 59087 genes (minimum count 0, minimum samples 1). The log2 fold change threshold is 0, so the list shows any change, not strong changes. Each 95% CI is the estimate plus or minus 1.96 times the DESeq2 standard error. The value 1.96 is the two-sided 95% normal critical value, computed by run_script.\n\nUncertain:\n- The filter removed no genes. 29568 genes have zero counts in all samples and get no padj. The scientist set these values.\n- The fold changes are small. The largest in the top 20 is 0.694 log2 (TMTC1). The threshold of 0 does not test for strong change.\n- Five experiments give limited power. I did not run a power calculation, so I cannot state the smallest effect found.\n\nWaits for you: Nothing.\n\nStep results that the answer does not mention, from the record:\n- n10 run_script: The script ran in /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run3/home/sessions/20261012-021429-a4dc/work and wrote 0 new file(s) to /Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run3/home/sessions/20261012-021429-a4dc/work.\n\nSettings used, from the decision record: Input type: count matrix · Design formula: ~ experiment + treatment · Variable of interest: treatment · Reference level: VEH · Test level: DHT · Minimum count for a gene to count as detected: 0 · Minimum number of samples with a detected gene: 1 · False discovery rate cutoff (padj): 0.05 · Log2 fold change threshold: 0.",
+   "items": [
+    {
+     "key": "significant_padj_005",
+     "description": "Genes with padj < 0.05, DHT vs vehicle, paired design",
+     "expected": 173,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 173,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_significant",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 173,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 95,
+      "text": "DHT changes expression of 173 genes at adjusted p below 0.05: 125 genes go up and 48 go down with DHT."
+     }
+    },
+    {
+     "key": "up_padj_005",
+     "description": "Genes up with DHT at padj < 0.05",
+     "expected": 125,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 125,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_up",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 125,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 95,
+      "text": "DHT changes expression of 173 genes at adjusted p below 0.05: 125 genes go up and 48 go down with DHT."
+     }
+    },
+    {
+     "key": "down_padj_005",
+     "description": "Genes down with DHT at padj < 0.05",
+     "expected": 48,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 48,
+      "diff": 0,
+      "node": "n7",
+      "path": "metrics.n_down",
+      "entry": 50
+     },
+     "reported": {
+      "pass": true,
+      "value": 48,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n7",
+      "claimEntry": 95,
+      "text": "DHT changes expression of 173 genes at adjusted p below 0.05: 125 genes go up and 48 go down with DHT."
+     }
+    },
+    {
+     "key": "genes_in_table",
+     "description": "Genes in the count table",
+     "expected": 59087,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 59087,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_genes",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 95,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 7,
+    "inputTokens": 20,
+    "outputTokens": 10884,
+    "cacheRead": 117400,
+    "cacheWrite": 31364,
+    "toolCalls": 5,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 2,
+     "error": 2
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 5
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run3/home/sessions/20261012-021429-a4dc/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run3",
+     "/Users/parker/Code/guided-analysis/catalog/deseq2",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/r/4.6.1_1",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/deseq2"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_counts.csv",
+     "/Volumes/T7/guided-analysis/data/astapova2021-deseq2-kgn/kgn_samples.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/astapova2021-deseq2-kgn/run3/home/sessions/20261012-021429-a4dc/work/run_deseq-6/results.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "bradley-photutils-100gaussians",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 118.229,
+   "session": "20261012-021749-9cc6",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run1/home/sessions/20261012-021749-9cc6",
+   "answer": "1. The sky level is 5.152 ct and the sky noise is 2.094 ct (1 sigma). The image has 82 detections at 3 sigma, and the three named stars have net aperture fluxes of 936.5, 760.2 and 925.2 ct.\n\n| Measure | Value | Uncertainty | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Sky level: method global, estimator sextractor (as recorded), 3 sigma clipping, box 50 px, sources not masked | 5.152 ct | none reported | 145,818 pixels kept of 150,000 (image is 300 by 500 px) | 3 sigma clipping, 10 passes | estimate_background |\n| Sky noise, same setting | 2.094 ct | none reported | 145,818 pixels | 3 sigma clipping | estimate_background |\n| Sources above 3 sigma (smoothing 3 px, 10 pixels minimum, no deblending) | 82 | none | 82 detections in one image | threshold count | detect_sources |\n| Net aperture flux, star at (48.70, 200.33) | 936.5 ct | ±37.1 ct (1 sigma, sky noise only) | 1 aperture, radius 10 px | sky from annulus 15 to 20 px | measure_apertures |\n| Net aperture flux, star at (145.05, 168.52) | 760.2 ct | ±37.1 ct (1 sigma, sky noise only) | 1 aperture, radius 10 px | sky from annulus 15 to 20 px | measure_apertures |\n| Net aperture flux, star at (355.56, 252.20) | 925.2 ct | ±37.1 ct (1 sigma, sky noise only) | 1 aperture, radius 10 px | sky from annulus 15 to 20 px | measure_apertures |\n\nUncertain:\n- A comparison run with sources masked gave a sky level of 5.029 ct and noise of 1.988 ct. This is not the chosen setting. The chosen setting does not mask sources.\n- The count depends on the threshold. A comparison run gave 48 at 5 sigma and 5 at 10 sigma. The 3 sigma count includes noise detections.\n- No 95% confidence interval is reported, because no test was run. The ±37.1 ct is 1 sigma from sky noise alone. The fluxes are aperture fluxes, not total fluxes. Clipping at 3 sigma reads the noise about 1.5 percent low.\n\nWaits for you: Confirm the source mask setting (recorded off), and the aperture radius (recorded 10 px) and sky ring (recorded 15 to 20 px). I entered 5 px and 8 to 12 px, but the harness used the recorded values.\n\nSettings used, from the decision record: Sigma-clip level: 3 · Background method: global · Background box size (pixels): 50 · Background estimator in each box: sextractor · Mask bright sources before the background: false · Detection threshold (sigma above background): 3 · Minimum connected pixels for a source: 10 · Smoothing kernel width (FWHM, pixels): 3 · Split touching sources: false · Aperture radius (pixels): 10 · Sky level for the aperture: annulus · Annulus inner radius (pixels): 15 · Annulus outer radius (pixels): 20.",
+   "items": [
+    {
+     "key": "sky_level",
+     "description": "Sky level (clipped median).",
+     "expected": 5.152,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5.152399778366089,
+      "diff": 0.0003997783660887322,
+      "node": "n5",
+      "path": "metrics.median",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 5.152,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 212,
+      "text": "The sky level is 5.152 ct and the sky noise is 2.094 ct (1 sigma)."
+     }
+    },
+    {
+     "key": "sky_noise",
+     "description": "Sky noise (clipped standard deviation).",
+     "expected": 2.094,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.0937247157426375,
+      "diff": 0.0002752842573623404,
+      "node": "n5",
+      "path": "metrics.std",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.094,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 212,
+      "text": "The sky level is 5.152 ct and the sky noise is 2.094 ct (1 sigma)."
+     }
+    },
+    {
+     "key": "sources_detected",
+     "description": "Sources detected.",
+     "expected": 82,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 82,
+      "diff": 0,
+      "node": "n22",
+      "path": "metrics.n_sources",
+      "entry": 132
+     },
+     "reported": {
+      "pass": true,
+      "value": 82,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n24",
+      "claimEntry": 212,
+      "text": "The image has 82 detections at 3 sigma, and the three named stars have net aperture fluxes of 936.5, 760.2 and 925.2 ct."
+     }
+    },
+    {
+     "key": "net_flux_48_70_200_33",
+     "description": "Net flux at (48.70, 200.33).",
+     "expected": 895.4,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 925.2356566301798,
+      "diff": 29.83565663017987,
+      "node": "n23",
+      "path": "metrics.median_net_flux",
+      "entry": 153
+     },
+     "reported": {
+      "pass": true,
+      "value": 925.2,
+      "diff": 29.800000000000068,
+      "via": "tolerance",
+      "node": "n23",
+      "claimEntry": 212,
+      "text": "The image has 82 detections at 3 sigma, and the three named stars have net aperture fluxes of 936.5, 760.2 and 925.2 ct."
+     }
+    },
+    {
+     "key": "net_flux_145_05_168_52",
+     "description": "Net flux at (145.05, 168.52).",
+     "expected": 734.1,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 760.1982396747551,
+      "diff": 26.098239674755064,
+      "node": "n23",
+      "path": "table.rows[1][5]",
+      "entry": 153
+     },
+     "reported": {
+      "pass": true,
+      "value": 760.2,
+      "diff": 26.100000000000023,
+      "via": "tolerance",
+      "node": "n23",
+      "claimEntry": 212,
+      "text": "The image has 82 detections at 3 sigma, and the three named stars have net aperture fluxes of 936.5, 760.2 and 925.2 ct."
+     }
+    },
+    {
+     "key": "net_flux_355_56_252_20",
+     "description": "Net flux at (355.56, 252.20).",
+     "expected": 873.9,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 925.2356566301798,
+      "diff": 51.33565663017987,
+      "node": "n23",
+      "path": "metrics.median_net_flux",
+      "entry": 153
+     },
+     "reported": {
+      "pass": true,
+      "value": 925.2,
+      "diff": 51.30000000000007,
+      "via": "tolerance",
+      "node": "n23",
+      "claimEntry": 212,
+      "text": "The image has 82 detections at 3 sigma, and the three named stars have net aperture fluxes of 936.5, 760.2 and 925.2 ct."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 13,
+    "inputTokens": 34,
+    "outputTokens": 7866,
+    "cacheRead": 197559,
+    "cacheWrite": 23823,
+    "toolCalls": 12,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 4,
+     "error": 2
+    },
+    "unsourced": 1,
+    "deviations": 3,
+    "overwritten": 3,
+    "nodes": 7
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run1/home/sessions/20261012-021749-9cc6/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/bradley-photutils-100gaussians",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run1",
+     "/Users/parker/Code/guided-analysis/catalog/astropy",
+     "/Users/parker/.cuvette/envs/astropy",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/astropy"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/bradley-photutils-100gaussians/gaussians_noisy.fits",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run1/home/sessions/20261012-021749-9cc6/work/estimate_background-6/background_subtracted.fits",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run1/home/sessions/20261012-021749-9cc6/work/measure_apertures-1/photometry.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "bradley-photutils-100gaussians",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 115.735,
+   "session": "20261012-021948-70b6",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run2/home/sessions/20261012-021948-70b6",
+   "answer": "1. The sky level is 5.152 counts, with noise of 2.094 counts (1 sigma). The image has 82 detections at 3 sigma, and 48 at 5 sigma. The three named stars have net fluxes of 936.5, 760.2 and 925.2 counts.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Sky level (global method, sextractor estimator, sigma-clipped at 3 sigma, no source mask) | 5.152 counts | Not computed | 145818 pixels kept (upper limit) | None | estimate_background |\n| Sky noise (standard deviation, clipped at 3 sigma) | 2.094 counts (1 sigma) | Not computed | 145818 pixels kept | None | clip_statistics |\n| Sources above 3 sigma (smoothing 3 px, minimum 10 px, no deblending) | 82 | Not applicable (count) | 82 detected sources | None | detect_sources |\n| Sources above 5 sigma (same settings) | 48 | Not applicable (count) | 48 detected sources | None | compare_options |\n| Net flux at (48.70, 200.33), sky from annulus | 936.5 counts (noise 37.1 counts, 1 sigma) | Not computed | 1 aperture of 10 px radius, sky from 15 to 20 px ring | None | measure_apertures |\n| Net flux at (145.05, 168.52), sky from annulus | 760.2 counts (noise 37.1 counts, 1 sigma) | Not computed | 1 aperture of 10 px radius, sky from 15 to 20 px ring | None | measure_apertures |\n| Net flux at (355.56, 252.20), sky from annulus | 925.2 counts (noise 37.1 counts, 1 sigma) | Not computed | 1 aperture of 10 px radius, sky from 15 to 20 px ring | None | measure_apertures |\n\nUncertain:\n- The sky level has no source mask. Bright stars can raise it, so it is an upper limit.\n- Most of the 82 detections at 3 sigma can be noise. The 5 sigma count is a stricter check.\n- The fluxes are aperture fluxes, not total fluxes. The noise counts only the sky noise, not the error of the sky estimate.\n\nWaits for you:\n- Confirm whether to rerun the sky with bright stars masked. Confirm also the 10 px aperture and 15 to 20 px sky ring. These differ from the radius and ring I asked for.\n\nSettings used, from the decision record: Sigma-clip level: 3 · Background method: global · Background box size (pixels): 50 · Background estimator in each box: sextractor · Mask bright sources before the background: false · Detection threshold (sigma above background): 3 · Minimum connected pixels for a source: 10 · Smoothing kernel width (FWHM, pixels): 3 · Split touching sources: false · Aperture radius (pixels): 10 · Sky level for the aperture: annulus · Annulus inner radius (pixels): 15 · Annulus outer radius (pixels): 20.",
+   "items": [
+    {
+     "key": "sky_level",
+     "description": "Sky level (clipped median).",
+     "expected": 5.152,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5.152399778366089,
+      "diff": 0.0003997783660887322,
+      "node": "n5",
+      "path": "metrics.median",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 5.152,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 185,
+      "text": "The sky level is 5.152 counts, with noise of 2.094 counts (1 sigma)."
+     }
+    },
+    {
+     "key": "sky_noise",
+     "description": "Sky noise (clipped standard deviation).",
+     "expected": 2.094,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.0937247157426375,
+      "diff": 0.0002752842573623404,
+      "node": "n5",
+      "path": "metrics.std",
+      "entry": 41
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.094,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 185,
+      "text": "The sky level is 5.152 counts, with noise of 2.094 counts (1 sigma)."
+     }
+    },
+    {
+     "key": "sources_detected",
+     "description": "Sources detected.",
+     "expected": 82,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 82,
+      "diff": 0,
+      "node": "n20",
+      "path": "metrics.n_sources",
+      "entry": 119
+     },
+     "reported": {
+      "pass": true,
+      "value": 82,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n20",
+      "claimEntry": 185,
+      "text": "The image has 82 detections at 3 sigma, and 48 at 5 sigma."
+     }
+    },
+    {
+     "key": "net_flux_48_70_200_33",
+     "description": "Net flux at (48.70, 200.33).",
+     "expected": 895.4,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 925.2356566301798,
+      "diff": 29.83565663017987,
+      "node": "n21",
+      "path": "metrics.median_net_flux",
+      "entry": 140
+     },
+     "reported": {
+      "pass": true,
+      "value": 925.2,
+      "diff": 29.800000000000068,
+      "via": "tolerance",
+      "node": "n21",
+      "claimEntry": 185,
+      "text": "The three named stars have net fluxes of 936.5, 760.2 and 925.2 counts."
+     }
+    },
+    {
+     "key": "net_flux_145_05_168_52",
+     "description": "Net flux at (145.05, 168.52).",
+     "expected": 734.1,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 760.1982396747551,
+      "diff": 26.098239674755064,
+      "node": "n21",
+      "path": "table.rows[1][5]",
+      "entry": 140
+     },
+     "reported": {
+      "pass": true,
+      "value": 760.2,
+      "diff": 26.100000000000023,
+      "via": "tolerance",
+      "node": "n21",
+      "claimEntry": 185,
+      "text": "The three named stars have net fluxes of 936.5, 760.2 and 925.2 counts."
+     }
+    },
+    {
+     "key": "net_flux_355_56_252_20",
+     "description": "Net flux at (355.56, 252.20).",
+     "expected": 873.9,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 925.2356566301798,
+      "diff": 51.33565663017987,
+      "node": "n21",
+      "path": "metrics.median_net_flux",
+      "entry": 140
+     },
+     "reported": {
+      "pass": true,
+      "value": 925.2,
+      "diff": 51.30000000000007,
+      "via": "tolerance",
+      "node": "n21",
+      "claimEntry": 185,
+      "text": "The three named stars have net fluxes of 936.5, 760.2 and 925.2 counts."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 11,
+    "inputTokens": 30,
+    "outputTokens": 7007,
+    "cacheRead": 153783,
+    "cacheWrite": 21537,
+    "toolCalls": 10,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 1,
+     "warning": 4,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 6
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run2/home/sessions/20261012-021948-70b6/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/bradley-photutils-100gaussians",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run2",
+     "/Users/parker/Code/guided-analysis/catalog/astropy",
+     "/Users/parker/.cuvette/envs/astropy",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/astropy"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/bradley-photutils-100gaussians/gaussians_noisy.fits",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run2/home/sessions/20261012-021948-70b6/work/estimate_background-6/background_subtracted.fits",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run2/home/sessions/20261012-021948-70b6/work/measure_apertures-1/photometry.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "bradley-photutils-100gaussians",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 143.416,
+   "session": "20261012-022144-1f82",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run3/home/sessions/20261012-022144-1f82",
+   "answer": "The sky level is 5.15 ct with noise of 2.09 ct, and 82 sources stand out at 3 sigma (48 at 5 sigma). The net brightness at the three named positions is 936 ct, 760 ct and 925 ct, with the sky taken from an annulus.\n\n| Measure | Value | 95% CI | n, what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Sky level (global sigma-clipped median, 3 sigma clip, no source mask; estimator recorded as sextractor) | 5.152 ct | Not computed | 145,818 pixels kept of 150,000 (300 by 500 pixels, from inspect_fits) | None | clip_statistics, estimate_background |\n| Sky noise (standard deviation, same clip) | 2.094 ct | Not computed | 145,818 pixels | None | clip_statistics |\n| Sources above 3 sigma (smoothing 3 px, 10 px minimum, no deblending) | 82 | Not applicable (count) | 1 count of the full image | None | detect_sources |\n| Sources above 5 sigma (same settings; comparison run, not the chosen setting) | 48 | Not applicable (count) | 1 count of the full image | None | compare_options |\n| Net flux at (48.70, 200.33), aperture radius 10 px, sky from annulus 15 to 20 px | 936.5 ct | ±72.7 ct (sky noise only) | 1 aperture (314 px area) | None (aperture photometry) | measure_apertures |\n| Net flux at (145.05, 168.52), aperture radius 10 px, sky from annulus 15 to 20 px | 760.2 ct | ±72.7 ct (sky noise only) | 1 aperture (314 px area) | None (aperture photometry) | measure_apertures |\n| Net flux at (355.56, 252.20), aperture radius 10 px, sky from annulus 15 to 20 px | 925.2 ct | ±72.7 ct (sky noise only) | 1 aperture (314 px area) | None (aperture photometry) | measure_apertures |\n\nUncertain:\n- The sky is not source-masked, so 5.15 ct is an upper limit. Stars raise it.\n- The program standards say 3 sigma clipping reads the noise about 1.5 percent low. I did not correct the 2.09 ct value.\n- The 3 sigma count includes noise peaks in a 300 by 500 image. Completeness is not stated.\n\nWaits for you:\n- Nothing.\n\nSettings used, from the decision record: Sigma-clip level: 3 · Background method: global · Background box size (pixels): 50 · Background estimator in each box: sextractor · Mask bright sources before the background: false · Detection threshold (sigma above background): 3 · Minimum connected pixels for a source: 10 · Smoothing kernel width (FWHM, pixels): 3 · Split touching sources: false · Aperture radius (pixels): 10 · Sky level for the aperture: annulus · Annulus inner radius (pixels): 15 · Annulus outer radius (pixels): 20.",
+   "items": [
+    {
+     "key": "sky_level",
+     "description": "Sky level (clipped median).",
+     "expected": 5.152,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 5.152399778366089,
+      "diff": 0.0003997783660887322,
+      "node": "n5",
+      "path": "metrics.median",
+      "entry": 42
+     },
+     "reported": {
+      "pass": true,
+      "value": 5.152,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 209,
+      "text": "| Sky level (global sigma-clipped median, 3 sigma clip, no source mask; estimator recorded as sextractor) | 5.152 ct | Not computed | 145,818 pixels kept of 150,000 (300 by 500 pixels, from inspect_fits) | None | clip_statistics, estimate_background |"
+     }
+    },
+    {
+     "key": "sky_noise",
+     "description": "Sky noise (clipped standard deviation).",
+     "expected": 2.094,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.0937247157426375,
+      "diff": 0.0002752842573623404,
+      "node": "n5",
+      "path": "metrics.std",
+      "entry": 42
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.094,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n11",
+      "claimEntry": 209,
+      "text": "| Sky noise (standard deviation, same clip) | 2.094 ct | Not computed | 145,818 pixels | None | clip_statistics |"
+     }
+    },
+    {
+     "key": "sources_detected",
+     "description": "Sources detected.",
+     "expected": 82,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 82,
+      "diff": 0,
+      "node": "n20",
+      "path": "metrics.n_sources",
+      "entry": 120
+     },
+     "reported": {
+      "pass": true,
+      "value": 82,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n20",
+      "claimEntry": 209,
+      "text": "The sky level is 5.15 ct with noise of 2.09 ct, and 82 sources stand out at 3 sigma (48 at 5 sigma)."
+     }
+    },
+    {
+     "key": "net_flux_48_70_200_33",
+     "description": "Net flux at (48.70, 200.33).",
+     "expected": 895.4,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 867.5662626750388,
+      "diff": 27.833737324961135,
+      "node": "n21",
+      "path": "table.rows[0][3]",
+      "entry": 141
+     },
+     "reported": {
+      "pass": true,
+      "value": 925,
+      "diff": 29.600000000000023,
+      "via": "tolerance",
+      "node": "n22",
+      "claimEntry": 209,
+      "text": "The net brightness at the three named positions is 936 ct, 760 ct and 925 ct, with the sky taken from an annulus."
+     }
+    },
+    {
+     "key": "net_flux_145_05_168_52",
+     "description": "Net flux at (145.05, 168.52).",
+     "expected": 734.1,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 760.1982394182622,
+      "diff": 26.09823941826221,
+      "node": "n21",
+      "path": "table.rows[1][5]",
+      "entry": 141
+     },
+     "reported": {
+      "pass": true,
+      "value": 760,
+      "diff": 25.899999999999977,
+      "via": "tolerance",
+      "node": "n21",
+      "claimEntry": 209,
+      "text": "The net brightness at the three named positions is 936 ct, 760 ct and 925 ct, with the sky taken from an annulus."
+     }
+    },
+    {
+     "key": "net_flux_355_56_252_20",
+     "description": "Net flux at (355.56, 252.20).",
+     "expected": 873.9,
+     "tolerance": 106,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 867.5662626750388,
+      "diff": 6.333737324961135,
+      "node": "n21",
+      "path": "table.rows[0][3]",
+      "entry": 141
+     },
+     "reported": {
+      "pass": true,
+      "value": 925,
+      "diff": 51.10000000000002,
+      "via": "tolerance",
+      "node": "n22",
+      "claimEntry": 209,
+      "text": "The net brightness at the three named positions is 936 ct, 760 ct and 925 ct, with the sky taken from an annulus."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 14,
+    "inputTokens": 38,
+    "outputTokens": 9473,
+    "cacheRead": 224471,
+    "cacheWrite": 24581,
+    "toolCalls": 12,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 3,
+     "error": 3
+    },
+    "unsourced": 1,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 7
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run3/home/sessions/20261012-022144-1f82/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/bradley-photutils-100gaussians",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run3",
+     "/Users/parker/Code/guided-analysis/catalog/astropy",
+     "/Users/parker/.cuvette/envs/astropy",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/astropy"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/bradley-photutils-100gaussians/gaussians_noisy.fits",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run3/home/sessions/20261012-022144-1f82/work/estimate_background-6/background_subtracted.fits",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/bradley-photutils-100gaussians/run3/home/sessions/20261012-022144-1f82/work/measure_apertures-2/photometry.csv"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 1,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "danecek2021-bcftools",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 54.021,
+   "session": "20261012-022408-1efc",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/danecek2021-bcftools/run1/home/sessions/20261012-022408-1efc",
+   "answer": "1. The file has 1955 single-base changes (SNPs) and 248 insertions or deletions (indels), with a Ts/Tv ratio of 2.2. 1137 variants lie between 1,000,000 and 1,050,000, and 328 variants have an allele frequency of at least 5 percent.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Single-base changes (SNPs), whole file | 1955 records | Not applicable (exact count) | 2210 records in the file | None (count) | vcf_stats, whole file |\n| Insertions or deletions (indels), whole file | 248 records | Not applicable (exact count) | 2210 records | None (count) | vcf_stats, whole file |\n| Other variant types, whole file | 7 records | Not applicable (exact count) | 2210 records | None (count) | vcf_stats, whole file |\n| Ts/Tv ratio, SNPs, whole file | 2.2 (1344 transitions, 611 transversions) | Not computed | 1955 SNPs | None | vcf_stats, whole file |\n| Variants, chr20:1000000-1050000 | 1137 records (1021 SNPs, 115 indels, 1 other) | Not applicable (exact count) | 1137 records | None (count) | vcf_stats, region |\n| Variants with INFO/AF ≥ 0.05 | 328 records (279 SNPs, 47 indels, 2 other) | Not applicable (exact count) | 2210 records before the filter | None (count) | filter_variants, INFO/AF≥0.05 |\n\nSettings for every count: Variant types to keep = all (decision value). The SNP, indel and other numbers are breakdowns of the counted records, not a type filter. QUAL cutoff = 0 (none). Depth cutoff = 0 (none). FILTER column = any (not restricted). Reference build: GRCh38, from your setup. Multiallelic sites: none. Records equal alleles here.\n\nUncertain:\n- The file header was not read, so the build is taken from your setup only.\n- The allele frequencies are the INFO/AF values stored in the file. They were not recalculated.\n- The filtered set has only 279 SNPs. Its Ts/Tv of 2.32 has a large random error.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Smallest variant quality (QUAL): 0 · Smallest read depth (INFO/DP): 0 · Variant types to keep: all · Use the FILTER column: any.",
+   "items": [
+    {
+     "key": "snp_records",
+     "description": "SNP records",
+     "expected": 1955,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1955,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_snps",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 1955,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 37,
+      "text": "The file has 1955 single-base changes (SNPs) and 248 insertions or deletions (indels), with a Ts/Tv ratio of 2.2."
+     }
+    },
+    {
+     "key": "indel_records",
+     "description": "Indel records",
+     "expected": 248,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 248,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_indels",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 248,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 37,
+      "text": "The file has 1955 single-base changes (SNPs) and 248 insertions or deletions (indels), with a Ts/Tv ratio of 2.2."
+     }
+    },
+    {
+     "key": "total_records",
+     "description": "Total records",
+     "expected": 2210,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2210,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 37,
+      "text": null
+     }
+    },
+    {
+     "key": "ts_tv_ratio",
+     "description": "Ts/Tv ratio of the SNPs",
+     "expected": 2.2,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.2,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.ts_tv",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.2,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 37,
+      "text": "The file has 1955 single-base changes (SNPs) and 248 insertions or deletions (indels), with a Ts/Tv ratio of 2.2."
+     }
+    },
+    {
+     "key": "records_in_region",
+     "description": "Records in chr20:1000000-1050000",
+     "expected": 1137,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1137,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_records",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 1137,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 37,
+      "text": "1137 variants lie between 1,000,000 and 1,050,000, and 328 variants have an allele frequency of at least 5 percent."
+     }
+    },
+    {
+     "key": "records_af_5pct",
+     "description": "Records with INFO/AF at least 0.05",
+     "expected": 328,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 328,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.n_after",
+      "entry": 18
+     },
+     "reported": {
+      "pass": true,
+      "value": 328,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 37,
+      "text": "1137 variants lie between 1,000,000 and 1,050,000, and 328 variants have an allele frequency of at least 5 percent."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 3,
+    "inputTokens": 10,
+    "outputTokens": 4945,
+    "cacheRead": 21433,
+    "cacheWrite": 15013,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 0,
+     "error": 1
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/danecek2021-bcftools/run1/home/sessions/20261012-022408-1efc/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/danecek2021-bcftools",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/danecek2021-bcftools/run1",
+     "/Users/parker/Code/guided-analysis/catalog/bcftools",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/bcftools/1.24",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/bcftools"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/danecek2021-bcftools/g1k_chr20_1000000_1100000.vcf.gz"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "danecek2021-bcftools",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 30.293,
+   "session": "20261012-022502-f994",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/danecek2021-bcftools/run2/home/sessions/20261012-022502-f994",
+   "answer": "1. The file has 1,955 single-base changes (SNPs) and 248 insertions or deletions (indels). The SNP Ts/Tv ratio is 2.20.\n2. The region 1,000,000 to 1,050,000 has 1,137 variants.\n3. Keeping variants with allele frequency (INFO/AF) of at least 5 percent leaves 328 variants.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| SNP records, whole file | 1,955 | not applicable (count) | 1,955 records, one record = one site | none (count) | vcf_stats, whole file |\n| Indel records, whole file | 248 | not applicable (count) | 2,210 records in total, one record = one site | none (count) | vcf_stats, whole file |\n| Other records, whole file (neither SNP nor indel) | 7 | not applicable (count) | 2,210 records in total | none (count) | vcf_stats, whole file |\n| Ts/Tv of SNPs, whole file | 2.20 (1,344 transitions / 611 transversions) | not computed | 1,955 SNPs, one n = one SNP record | none (ratio) | vcf_stats, whole file |\n| Variants in chr20:1,000,000-1,050,000 | 1,137 (1,021 SNPs, 115 indels, 1 other) | not applicable (count) | 1,137 records, one record = one site | none (count) | vcf_stats, region |\n| Ts/Tv of SNPs in that region | 2.27 (709 / 312) | not computed | 1,021 SNPs, one n = one SNP record | none (ratio) | vcf_stats, region |\n| Variants with INFO/AF ≥ 0.05 | 328 (279 SNPs, 47 indels, 2 other) | not applicable (count) | 328 records, one record = one site | none (count) | filter_variants, INFO/AF ≥ 0.05 |\n\nSettings for all counts: no QUAL cutoff (0), no depth cutoff (0), all variant types, FILTER column not used (any). Normalization and splitting were not run. The file has no multiallelic sites and no samples, so there are no genotype counts. The genome build is GRCh38, as you stated. I did not check the file header for the build.\n\nUncertain:\n- The 7 other records are neither SNPs nor indels. I did not inspect them.\n- The 5 percent cutoff uses the INFO/AF field in the file. I did not check it against the sample genotypes.\n- No statistical test ran in this session, so no multiple-test correction applies.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Smallest variant quality (QUAL): 0 · Smallest read depth (INFO/DP): 0 · Variant types to keep: all · Use the FILTER column: any.",
+   "items": [
+    {
+     "key": "snp_records",
+     "description": "SNP records",
+     "expected": 1955,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1955,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_snps",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 1955,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 30,
+      "text": "The file has 1,955 single-base changes (SNPs) and 248 insertions or deletions (indels)."
+     }
+    },
+    {
+     "key": "indel_records",
+     "description": "Indel records",
+     "expected": 248,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 248,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_indels",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 248,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 30,
+      "text": "The file has 1,955 single-base changes (SNPs) and 248 insertions or deletions (indels)."
+     }
+    },
+    {
+     "key": "total_records",
+     "description": "Total records",
+     "expected": 2210,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2210,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 30,
+      "text": null
+     }
+    },
+    {
+     "key": "ts_tv_ratio",
+     "description": "Ts/Tv ratio of the SNPs",
+     "expected": 2.2,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.2,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.ts_tv",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.2,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 30,
+      "text": "The SNP Ts/Tv ratio is 2.20."
+     }
+    },
+    {
+     "key": "records_in_region",
+     "description": "Records in chr20:1000000-1050000",
+     "expected": 1137,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1137,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_records",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 1137,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 30,
+      "text": "The region 1,000,000 to 1,050,000 has 1,137 variants."
+     }
+    },
+    {
+     "key": "records_af_5pct",
+     "description": "Records with INFO/AF at least 0.05",
+     "expected": 328,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 328,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.n_after",
+      "entry": 18
+     },
+     "reported": {
+      "pass": true,
+      "value": 328,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 30,
+      "text": "Keeping variants with allele frequency (INFO/AF) of at least 5 percent leaves 328 variants."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 2,
+    "inputTokens": 6,
+    "outputTokens": 3071,
+    "cacheRead": 9050,
+    "cacheWrite": 12352,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings": {
+     "info": 4,
+     "warning": 1,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/danecek2021-bcftools/run2/home/sessions/20261012-022502-f994/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/danecek2021-bcftools",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/danecek2021-bcftools/run2",
+     "/Users/parker/Code/guided-analysis/catalog/bcftools",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/bcftools/1.24",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/bcftools"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/danecek2021-bcftools/g1k_chr20_1000000_1100000.vcf.gz"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "danecek2021-bcftools",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 35.058,
+   "session": "20261012-022532-bd3e",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/danecek2021-bcftools/run3/home/sessions/20261012-022532-bd3e",
+   "answer": "1. The file has 1955 single-base changes (SNPs) and 248 insertions or deletions. The SNP Ts/Tv ratio is 2.2. 2. 1137 variants lie between 1,000,000 and 1,050,000. 3. 328 variants have an allele frequency of at least 5 percent.\n\n| Measure | Value | 95% CI | n (one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Single-base changes (SNPs) | 1955 | Not applicable (count) | 1955 records | None (count) | vcf_stats, whole file |\n| Insertions or deletions (indels) | 248 | Not applicable (count) | 248 records | None (count) | vcf_stats, whole file |\n| Other records (neither SNP nor indel) | 7 | Not applicable (count) | 7 records | None (count) | vcf_stats, whole file |\n| Ts/Tv ratio of SNPs | 2.2 (1344 transitions, 611 transversions) | Not computed | 1955 SNPs | None | vcf_stats, whole file |\n| Variants from 1,000,000 to 1,050,000 | 1137 | Not applicable (count) | 1137 records | None (count) | vcf_stats, region chr20:1000000-1050000 |\n| Variants with allele frequency (INFO/AF) of at least 0.05 | 328 (279 SNPs, 47 indels, 2 other) | Not applicable (count) | 328 records | None (count) | filter_variants, INFO/AF>=0.05 |\n\nSettings for all counts: QUAL cutoff 0, depth cutoff 0, all variant types, FILTER column not used (any). Genome build: GRCh38, as you stated. The tools did not check the build in the file. No normalization or splitting was done. The file has no samples, so there are no genotype counts.\n\nUncertain:\n- The tool did not give a confidence interval for the Ts/Tv ratio. The 1955 SNPs give a fairly small random error.\n- The 5 percent filter uses the INFO/AF field in the file. It is not a frequency that I recalculated.\n- Counts are records. The file has no multiallelic sites, so records and alleles are the same here.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Smallest variant quality (QUAL): 0 · Smallest read depth (INFO/DP): 0 · Variant types to keep: all · Use the FILTER column: any.",
+   "items": [
+    {
+     "key": "snp_records",
+     "description": "SNP records",
+     "expected": 1955,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1955,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_snps",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 1955,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 36,
+      "text": "The file has 1955 single-base changes (SNPs) and 248 insertions or deletions."
+     }
+    },
+    {
+     "key": "indel_records",
+     "description": "Indel records",
+     "expected": 248,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 248,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_indels",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 248,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 36,
+      "text": "The file has 1955 single-base changes (SNPs) and 248 insertions or deletions."
+     }
+    },
+    {
+     "key": "total_records",
+     "description": "Total records",
+     "expected": 2210,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2210,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_records",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 36,
+      "text": null
+     }
+    },
+    {
+     "key": "ts_tv_ratio",
+     "description": "Ts/Tv ratio of the SNPs",
+     "expected": 2.2,
+     "tolerance": 0.01,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2.2,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.ts_tv",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 2.2,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 36,
+      "text": "The SNP Ts/Tv ratio is 2.2."
+     }
+    },
+    {
+     "key": "records_in_region",
+     "description": "Records in chr20:1000000-1050000",
+     "expected": 1137,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 1137,
+      "diff": 0,
+      "node": "n3",
+      "path": "metrics.n_records",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 1137,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n3",
+      "claimEntry": 36,
+      "text": "1137 variants lie between 1,000,000 and 1,050,000."
+     }
+    },
+    {
+     "key": "records_af_5pct",
+     "description": "Records with INFO/AF at least 0.05",
+     "expected": 328,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 328,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_after",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 328,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 36,
+      "text": "328 variants have an allele frequency of at least 5 percent."
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 3,
+    "inputTokens": 8,
+    "outputTokens": 3708,
+    "cacheRead": 20517,
+    "cacheWrite": 12411,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 0,
+    "findings": {
+     "info": 4,
+     "warning": 2,
+     "error": 0
+    },
+    "unsourced": 0,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 3
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/danecek2021-bcftools/run3/home/sessions/20261012-022532-bd3e/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/danecek2021-bcftools",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/danecek2021-bcftools/run3",
+     "/Users/parker/Code/guided-analysis/catalog/bcftools",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/bcftools/1.24",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/bcftools"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/danecek2021-bcftools/g1k_chr20_1000000_1100000.vcf.gz"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 0,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "gramfort2013-mne-sample",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 142.192,
+   "session": "20261012-022607-31bb",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb",
+   "answer": "The left-ear tone response peaks in the gradiometers at 93 ms, with a global field power of 42.11 fT/cm, from 68 averaged epochs. The kept-epoch count depends on the EEG limit, so the sensitivity rows come first.\n\n| Measure | Value | 95% CI | n and what n is | Test | Step |\n|---|---|---|---|---|---|\n| Kept epochs, EEG limit 100 uV | 286 of 319 | Not applicable | 319 matching events | Peak-to-peak rejection | make_epochs-1 (epoch_counts.csv) |\n| Kept epochs, EEG limit 150 uV (main run) | 309 of 319 | Not applicable | 319 matching events; 10 dropped | Peak-to-peak rejection | make_epochs-4 (summary); total from make_epochs-2 counts, sum 309 |\n| Kept epochs, EEG limit 200 uV | 310 of 319 | Not applicable | 319 matching events | Peak-to-peak rejection | make_epochs-3 (epoch_counts.csv) |\n| Auditory/left kept, 100 / 150 / 200 uV | 59 / 68 / 68 of 72 | Not applicable | 72 auditory/left events | Peak-to-peak rejection | make_epochs-1, -4, -3 |\n| Events, id 1 auditory/left | 72 | Not applicable | 319 events on STI 014 | Event count | count_events |\n| Events, id 2 auditory/right | 73 | Not applicable | 319 events | Event count | count_events |\n| Events, id 3 visual/left | 73 | Not applicable | 319 events | Event count | count_events |\n| Events, id 4 visual/right | 70 | Not applicable | 319 events | Event count | count_events |\n| Events, id 5 smiley | 15 | Not applicable | 319 events | Event count | count_events |\n| Events, id 32 buttonpress | 16 | Not applicable | 319 events | Event count | count_events |\n| Epoch window and baseline | -0.2 to 0.5 s; baseline -0.2 to 0 s | Not applicable | Settings | Not applicable | make_epochs-4 |\n| Rejection limits | Grad 4000 fT/cm; mag 4000 fT; EOG 250 uV; EEG 150 uV | Not applicable | Settings | Not applicable | make_epochs-4 |\n| Gradiometer peak latency, global field power | 93 ms (0.0932 s) | Not computed | 68 epochs averaged; one recording; sample length 6.7 ms (6.66 ms calculated from 150.15 Hz) | None; window 80 to 120 ms | measure_peak-1 |\n| Gradiometer peak amplitude, global field power | 42.11 fT/cm | Not computed | 68 epochs averaged; one recording | None | measure_peak-1 |\n| Strongest single gradiometer, MEG 1332 | 87 ms (0.0866 s), 198.96 fT/cm, absolute value | Not computed | 68 epochs averaged; one recording | None | measure_peak-1 |\n\nFiles: epochs-epo.fif (make_epochs-4), evoked-ave.fif (compute_evoked-1), drop_log.png (make_epochs-4).\n\nUncertain:\n- The harness notes do not show your EEG limit answer. The main run used 150 uV, which the tool summary reports.\n- I passed no reference, but the tool applied the average of all EEG channels. The file was also filtered again at its existing 0.1 to 40 Hz band.\n- No statistical test was run. The peak values come from one recording and are not a property of the person.\n\nWaits for you: Confirm the EEG rejection limit (100, 150 or 200 uV) and confirm the average reference.\n\nStep results that the answer does not mention, from the record:\n- n3 set_bad_channels: Bad channels set to: MEG 2443, EEG 053.\n\nSettings used, from the decision record: Bad channels: MEG 2443,EEG 053 · High-pass edge (Hz): 0.1 · Low-pass edge (Hz): 40 · Notch filter (Hz): none · EEG reference: average · Epoch start (s): -0.2 · Epoch end (s): 0.5 · Baseline start (s): -0.2 · Baseline end (s): 0 · Reject gradiometer epochs above (fT/cm): 4000 · Reject magnetometer epochs above (fT): 4000 · Reject EEG epochs above (uV): 150 · Reject EOG epochs above (uV): 250 · Channel type for the peak: grad · Peak window start (s): 0.08 · Peak window end (s): 0.12.",
+   "items": [
+    {
+     "key": "events_total",
+     "description": "Events found on STI 014.",
+     "expected": 319,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 319,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_events",
+      "entry": 15
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 175,
+      "text": null
+     }
+    },
+    {
+     "key": "events_id1",
+     "description": "Events with id 1 (auditory/left).",
+     "expected": 72,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 72,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_1",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 72,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 175,
+      "text": "| Auditory/left kept, 100 / 150 / 200 uV | 59 / 68 / 68 of 72 | Not applicable | 72 auditory/left events | Peak-to-peak rejection | make_epochs-1, -4, -3 |"
+     }
+    },
+    {
+     "key": "events_id2",
+     "description": "Events with id 2 (auditory/right).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_2",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 73,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 175,
+      "text": "| Events, id 2 auditory/right | 73 | Not applicable | 319 events | Event count | count_events |"
+     }
+    },
+    {
+     "key": "events_id3",
+     "description": "Events with id 3 (visual/left).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_2",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 73,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 175,
+      "text": "| Events, id 2 auditory/right | 73 | Not applicable | 319 events | Event count | count_events |"
+     }
+    },
+    {
+     "key": "events_id4",
+     "description": "Events with id 4 (visual/right).",
+     "expected": 70,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 70,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_4",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 70,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 175,
+      "text": "| Events, id 4 visual/right | 70 | Not applicable | 319 events | Event count | count_events |"
+     }
+    },
+    {
+     "key": "events_id5",
+     "description": "Events with id 5 (smiley).",
+     "expected": 15,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 15,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_5",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 15,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 175,
+      "text": "| Events, id 5 smiley | 15 | Not applicable | 319 events | Event count | count_events |"
+     }
+    },
+    {
+     "key": "events_id32",
+     "description": "Events with id 32 (buttonpress).",
+     "expected": 16,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_32",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 175,
+      "text": "| Events, id 32 buttonpress | 16 | Not applicable | 319 events | Event count | count_events |"
+     }
+    },
+    {
+     "key": "epochs_dropped",
+     "description": "Epochs dropped by the limits, all six ids.",
+     "expected": 10,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.n_dropped",
+      "entry": 89
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 175,
+      "text": null
+     }
+    },
+    {
+     "key": "epochs_kept",
+     "description": "Epochs kept, all six ids.",
+     "expected": 309,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 309,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.n_epochs",
+      "entry": 89
+     },
+     "reported": {
+      "pass": true,
+      "value": 309,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n15",
+      "claimEntry": 175,
+      "text": "| Kept epochs, EEG limit 150 uV (main run) | 309 of 319 | Not applicable | 319 matching events; 10 dropped | Peak-to-peak rejection | make_epochs-4 (summary); total from make_epochs-2 counts, sum 309 |"
+     }
+    },
+    {
+     "key": "auditory_left_kept",
+     "description": "Auditory/left epochs kept.",
+     "expected": 68,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 68,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.count_auditory_left",
+      "entry": 89
+     },
+     "reported": {
+      "pass": true,
+      "value": 68,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 175,
+      "text": "The left-ear tone response peaks in the gradiometers at 93 ms, with a global field power of 42.11 fT/cm, from 68 averaged epochs."
+     }
+    },
+    {
+     "key": "n100_latency_gfp",
+     "description": "N100 latency (s), global field power of good gradiometers, auditory/left.",
+     "expected": 0.0932,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.09323776297702369,
+      "diff": 0.00003776297702368092,
+      "node": "n14",
+      "path": "metrics.gfp_latency_s",
+      "entry": 121
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0932,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 175,
+      "text": "| Gradiometer peak latency, global field power | 93 ms (0.0932 s) | Not computed | 68 epochs averaged; one recording; sample length 6.7 ms (6.66 ms calculated from 150.15 Hz) | None; window 80 to 120 ms | measure_peak-1 |"
+     }
+    },
+    {
+     "key": "n100_amplitude_gfp",
+     "description": "N100 global field power amplitude in gradiometers (fT/cm).",
+     "expected": 42.1,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42.1061322703358,
+      "diff": 0.00613227033579733,
+      "node": "n14",
+      "path": "metrics.gfp_amplitude",
+      "entry": 121
+     },
+     "reported": {
+      "pass": true,
+      "value": 42.11,
+      "diff": 0.00999999999999801,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 175,
+      "text": "The left-ear tone response peaks in the gradiometers at 93 ms, with a global field power of 42.11 fT/cm, from 68 averaged epochs."
+     }
+    },
+    {
+     "key": "strongest_grad_latency",
+     "description": "Latency (s) of the strongest gradiometer channel.",
+     "expected": 0.0866,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.08657792253841073,
+      "diff": 0.00002207746158926216,
+      "node": "n14",
+      "path": "metrics.peak_latency_s",
+      "entry": 121
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.0866,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 175,
+      "text": "| Strongest single gradiometer, MEG 1332 | 87 ms (0.0866 s), 198.96 fT/cm, absolute value | Not computed | 68 epochs averaged; one recording | None | measure_peak-1 |"
+     }
+    },
+    {
+     "key": "strongest_grad_amplitude",
+     "description": "Amplitude (fT/cm) of the strongest gradiometer channel, absolute value.",
+     "expected": 199,
+     "tolerance": 8,
+     "abs": true,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 198.96312231634658,
+      "diff": 0.03687768365341526,
+      "node": "n14",
+      "path": "metrics.peak_amplitude",
+      "entry": 121
+     },
+     "reported": {
+      "pass": true,
+      "value": 198.96,
+      "diff": 0.03999999999999204,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 175,
+      "text": "| Strongest single gradiometer, MEG 1332 | 87 ms (0.0866 s), 198.96 fT/cm, absolute value | Not computed | 68 epochs averaged; one recording | None | measure_peak-1 |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 11,
+    "inputTokens": 30,
+    "outputTokens": 11318,
+    "cacheRead": 193024,
+    "cacheWrite": 26812,
+    "toolCalls": 13,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 3,
+     "warning": 7,
+     "error": 5
+    },
+    "unsourced": 15,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 9
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/gramfort2013-mne-sample",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1",
+     "/Users/parker/Code/guided-analysis/catalog/mne",
+     "/Users/parker/.cuvette/envs/mne",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/mne"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/gramfort2013-mne-sample/MNE-sample-data/MEG/sample/sample_audvis_filt-0-40_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work/compute_evoked-1/evoked-ave.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work/load_raw-1/loaded_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work/make_epochs-1/epoch_counts.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work/make_epochs-2/epoch_counts.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work/make_epochs-3/epoch_counts.csv",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work/make_epochs-4/epochs-epo.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work/set_bad_channels-1/bads_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run1/home/sessions/20261012-022607-31bb/work/set_reference-1/ref_raw.fif"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 15,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "gramfort2013-mne-sample",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 137.535,
+   "session": "20261012-022830-0a6a",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run2/home/sessions/20261012-022830-0a6a",
+   "answer": "The left-ear tone response peaks at 0.093 s (about 93 ms) in the gradiometers, at 42.07 fT/cm global field power, from 68 averaged auditory left epochs.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Events, id 1 (auditory/left) | 72 | not applicable (count) | 72 events | count | count_events |\n| Events, id 2 (auditory/right) | 73 | not applicable (count) | 73 events | count | count_events |\n| Events, id 3 (visual/left) | 73 | not applicable (count) | 73 events | count | count_events |\n| Events, id 4 (visual/right) | 70 | not applicable (count) | 70 events | count | count_events |\n| Events, id 5 (smiley) | 15 | not applicable (count) | 15 events | count | count_events |\n| Events, id 32 (buttonpress) | 16 | not applicable (count) | 16 events | count | count_events |\n| Total events | 319 | not applicable (count) | 319 events | count | count_events |\n| Epochs kept, all conditions | 309 (10 dropped) | not applicable (count) | 309 epochs of 319 events | rejection at grad 4000 fT/cm, mag 4000 fT, EEG 150 µV, EOG 250 µV | make_epochs |\n| Auditory left epochs kept | 68 (4 dropped) | not applicable (count) | 68 epochs of 72 events | rejection as above | make_epochs |\n| Gradiometer peak latency (global field power, 0.08 to 0.12 s) | 0.093 s (93.2 ms) | not computed | one averaged response of 68 epochs | global field power maximum | measure_peak; calculate |\n| Gradiometer peak amplitude (global field power) | 42.07 fT/cm | not computed | one averaged response of 68 epochs | global field power maximum | measure_peak |\n| Strongest gradiometer | MEG 1332 at 0.087 s, 198.80 fT/cm | not computed | one averaged response of 68 epochs | single-channel maximum | measure_peak |\n\nThe latency resolution is one sample, 6.66 ms at the file rate of 150.15 Hz (calculate). The gradiometer limit check (0, 2000, 3000 and 4000 fT/cm) gave the same epoch counts at every value (compare_options).\n\nUncertain:\n- I filtered the file again at 0.1 to 40 Hz, although it already carried that band. This changes the data a little.\n- The gradiometer peak at 0.093 s lies inside the 0.08 to 0.12 s window. Other windows can give other peaks.\n\nWaits for you:\nNothing.\n\nFiles: epochs-epo.fif (make_epochs-4), evoked-ave.fif (compute_evoked-1), drop_log.png (make_epochs-4).\n\nStep results that the answer does not mention, from the record:\n- n3 set_bad_channels: Bad channels set to: MEG 2443, EEG 053.\n\nSettings used, from the decision record: Bad channels: MEG 2443,EEG 053 · High-pass edge (Hz): 0.1 · Low-pass edge (Hz): 40 · Notch filter (Hz): none · EEG reference: average · Epoch start (s): -0.2 · Epoch end (s): 0.5 · Baseline start (s): -0.2 · Baseline end (s): 0 · Reject gradiometer epochs above (fT/cm): 4000 · Reject magnetometer epochs above (fT): 4000 · Reject EEG epochs above (uV): 150 · Reject EOG epochs above (uV): 250 · Channel type for the peak: grad · Peak window start (s): 0.08 · Peak window end (s): 0.12.",
+   "items": [
+    {
+     "key": "events_total",
+     "description": "Events found on STI 014.",
+     "expected": 319,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 319,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_events",
+      "entry": 23
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 192,
+      "text": null
+     }
+    },
+    {
+     "key": "events_id1",
+     "description": "Events with id 1 (auditory/left).",
+     "expected": 72,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 72,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_1",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 72,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 192,
+      "text": "| Events, id 1 (auditory/left) | 72 | not applicable (count) | 72 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id2",
+     "description": "Events with id 2 (auditory/right).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_2",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 73,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 192,
+      "text": "| Events, id 2 (auditory/right) | 73 | not applicable (count) | 73 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id3",
+     "description": "Events with id 3 (visual/left).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_2",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 73,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 192,
+      "text": "| Events, id 2 (auditory/right) | 73 | not applicable (count) | 73 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id4",
+     "description": "Events with id 4 (visual/right).",
+     "expected": 70,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 70,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_4",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 70,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 192,
+      "text": "| Events, id 4 (visual/right) | 70 | not applicable (count) | 70 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id5",
+     "description": "Events with id 5 (smiley).",
+     "expected": 15,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 15,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_5",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 15,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 192,
+      "text": "| Events, id 5 (smiley) | 15 | not applicable (count) | 15 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id32",
+     "description": "Events with id 32 (buttonpress).",
+     "expected": 16,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_32",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 192,
+      "text": "| Events, id 32 (buttonpress) | 16 | not applicable (count) | 16 events | count | count_events |"
+     }
+    },
+    {
+     "key": "epochs_dropped",
+     "description": "Epochs dropped by the limits, all six ids.",
+     "expected": 10,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.n_dropped",
+      "entry": 96
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 192,
+      "text": null
+     }
+    },
+    {
+     "key": "epochs_kept",
+     "description": "Epochs kept, all six ids.",
+     "expected": 309,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 309,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.n_epochs",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 309,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 192,
+      "text": "| Epochs kept, all conditions | 309 (10 dropped) | not applicable (count) | 309 epochs of 319 events | rejection at grad 4000 fT/cm, mag 4000 fT, EEG 150 µV, EOG 250 µV | make_epochs |"
+     }
+    },
+    {
+     "key": "auditory_left_kept",
+     "description": "Auditory/left epochs kept.",
+     "expected": 68,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 68,
+      "diff": 0,
+      "node": "n9",
+      "path": "metrics.count_auditory_left",
+      "entry": 96
+     },
+     "reported": {
+      "pass": true,
+      "value": 68,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n10",
+      "claimEntry": 192,
+      "text": "The left-ear tone response peaks at 0.093 s (about 93 ms) in the gradiometers, at 42.07 fT/cm global field power, from 68 averaged auditory left epochs."
+     }
+    },
+    {
+     "key": "n100_latency_gfp",
+     "description": "N100 latency (s), global field power of good gradiometers, auditory/left.",
+     "expected": 0.0932,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.09323776297702369,
+      "diff": 0.00003776297702368092,
+      "node": "n14",
+      "path": "metrics.gfp_latency_s",
+      "entry": 130
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.093,
+      "diff": 0.00020000000000000573,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 192,
+      "text": "The left-ear tone response peaks at 0.093 s (about 93 ms) in the gradiometers, at 42.07 fT/cm global field power, from 68 averaged auditory left epochs."
+     }
+    },
+    {
+     "key": "n100_amplitude_gfp",
+     "description": "N100 global field power amplitude in gradiometers (fT/cm).",
+     "expected": 42.1,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42.0727626035133,
+      "diff": 0.027237396486704313,
+      "node": "n14",
+      "path": "metrics.gfp_amplitude",
+      "entry": 130
+     },
+     "reported": {
+      "pass": true,
+      "value": 42.07,
+      "diff": 0.030000000000001137,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 192,
+      "text": "The left-ear tone response peaks at 0.093 s (about 93 ms) in the gradiometers, at 42.07 fT/cm global field power, from 68 averaged auditory left epochs."
+     }
+    },
+    {
+     "key": "strongest_grad_latency",
+     "description": "Latency (s) of the strongest gradiometer channel.",
+     "expected": 0.0866,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.08657792253841073,
+      "diff": 0.00002207746158926216,
+      "node": "n14",
+      "path": "metrics.peak_latency_s",
+      "entry": 130
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.087,
+      "diff": 0.0003999999999999976,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 192,
+      "text": "| Strongest gradiometer | MEG 1332 at 0.087 s, 198.80 fT/cm | not computed | one averaged response of 68 epochs | single-channel maximum | measure_peak |"
+     }
+    },
+    {
+     "key": "strongest_grad_amplitude",
+     "description": "Amplitude (fT/cm) of the strongest gradiometer channel, absolute value.",
+     "expected": 199,
+     "tolerance": 8,
+     "abs": true,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 198.79908064612383,
+      "diff": 0.20091935387617355,
+      "node": "n14",
+      "path": "metrics.peak_amplitude",
+      "entry": 130
+     },
+     "reported": {
+      "pass": true,
+      "value": 198.8,
+      "diff": 0.19999999999998863,
+      "via": "tolerance",
+      "node": "n14",
+      "claimEntry": 192,
+      "text": "| Strongest gradiometer | MEG 1332 at 0.087 s, 198.80 fT/cm | not computed | one averaged response of 68 epochs | single-channel maximum | measure_peak |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 14,
+    "inputTokens": 38,
+    "outputTokens": 9942,
+    "cacheRead": 258526,
+    "cacheWrite": 27481,
+    "toolCalls": 13,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 4,
+     "warning": 3,
+     "error": 4
+    },
+    "unsourced": 5,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 10
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run2/home/sessions/20261012-022830-0a6a/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/gramfort2013-mne-sample",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run2",
+     "/Users/parker/Code/guided-analysis/catalog/mne",
+     "/Users/parker/.cuvette/envs/mne",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/mne"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/gramfort2013-mne-sample/MNE-sample-data/MEG/sample/sample_audvis_filt-0-40_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run2/home/sessions/20261012-022830-0a6a/work/compute_evoked-1/evoked-ave.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run2/home/sessions/20261012-022830-0a6a/work/filter_raw-1/filtered_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run2/home/sessions/20261012-022830-0a6a/work/load_raw-1/loaded_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run2/home/sessions/20261012-022830-0a6a/work/make_epochs-4/epochs-epo.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run2/home/sessions/20261012-022830-0a6a/work/set_bad_channels-1/bads_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run2/home/sessions/20261012-022830-0a6a/work/set_reference-1/ref_raw.fif"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 5,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "gramfort2013-mne-sample",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 123.838,
+   "session": "20261012-023048-b0e0",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run3/home/sessions/20261012-023048-b0e0",
+   "answer": "1. The gradiometer response to the left-ear tone peaks at about 93 ms (global field power), and the global field power is 42.11 fT/cm, from 68 averaged epochs.\n\n| Measure | Value | 95% CI | n (one n = one epoch or event) | Test | Step |\n|---|---|---|---|---|---|\n| Events auditory/left (id 1) | 72 | not applicable | 72 events | count | count_events |\n| Events auditory/right (id 2) | 73 | not applicable | 73 events | count | count_events |\n| Events visual/left (id 3) | 73 | not applicable | 73 events | count | count_events |\n| Events visual/right (id 4) | 70 | not applicable | 70 events | count | count_events |\n| Events smiley (id 5) | 15 | not applicable | 15 events | count | count_events |\n| Events buttonpress (id 32) | 16 | not applicable | 16 events | count | count_events |\n| Epochs kept at EEG limit 100 / 150 / 200 uV | 286 / 309 / 310 | not applicable | 319 events | rejection, sensitivity | make_epochs, compare_options |\n| Epochs dropped at EEG limit 100 / 150 / 200 uV | 33 / 10 / 9 | not applicable | 319 events | rejection, sensitivity | make_epochs, compare_options |\n| Auditory left epochs kept at EEG limit 100 / 150 / 200 uV | 59 / 68 / 68 | not applicable | 72 auditory left events | rejection, sensitivity | make_epochs, compare_options |\n| Gradiometer peak latency, global field power, window 80 to 120 ms | 93 ms (93.2 ms before rounding) | not computed | 68 epochs averaged | peak, no test | measure_peak |\n| Gradiometer peak amplitude, global field power | 42.11 fT/cm | not computed | 68 epochs averaged | peak, no test | measure_peak |\n| Strongest single gradiometer, MEG 1332 | 87 ms (86.6 ms before rounding), 198.96 fT/cm | not computed | 68 epochs averaged | peak, no test | measure_peak |\n\nSettings: file band 0.10 to 40 Hz, already filtered, not filtered again. No notch. Reference: average. Bad channels: MEG 2443, EEG 053. Epochs -0.2 to 0.5 s. Baseline -0.2 to 0 s. Rejection: gradiometer 4000 fT/cm, magnetometer 4000 fT, EOG 250 uV, EEG 150 uV (your answer). Checkpoints: epochs-epo.fif (make_epochs-4) and evoked-ave.fif (compute_evoked-1). Sample resolution is 6.7 ms (1000 / 150.15 Hz = 6.66 ms).\n\nUncertain:\n- The auditory left count depends on the EEG limit: 59 at 100 uV, 68 at 150 uV.\n- Latency and amplitude come from one person and one recording. The tool gives no confidence interval.\n- The peak depends on the 80 to 120 ms window, the 0.10 to 40 Hz band and the average reference.\n\nWaits for you:\n- Nothing.\n\nSettings used, from the decision record: Bad channels: MEG 2443,EEG 053 · EEG reference: average · Epoch start (s): -0.2 · Epoch end (s): 0.5 · Baseline start (s): -0.2 · Baseline end (s): 0 · Reject gradiometer epochs above (fT/cm): 4000 · Reject magnetometer epochs above (fT): 4000 · Reject EEG epochs above (uV): 150 · Reject EOG epochs above (uV): 250 · Channel type for the peak: grad · Peak window start (s): 0.08 · Peak window end (s): 0.12.",
+   "items": [
+    {
+     "key": "events_total",
+     "description": "Events found on STI 014.",
+     "expected": 319,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 319,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.n_events",
+      "entry": 15
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 159,
+      "text": null
+     }
+    },
+    {
+     "key": "events_id1",
+     "description": "Events with id 1 (auditory/left).",
+     "expected": 72,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 72,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_1",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 72,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 159,
+      "text": "| Events auditory/left (id 1) | 72 | not applicable | 72 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id2",
+     "description": "Events with id 2 (auditory/right).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_2",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 73,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 159,
+      "text": "| Events auditory/right (id 2) | 73 | not applicable | 73 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id3",
+     "description": "Events with id 3 (visual/left).",
+     "expected": 73,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 73,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_2",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 73,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 159,
+      "text": "| Events auditory/right (id 2) | 73 | not applicable | 73 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id4",
+     "description": "Events with id 4 (visual/right).",
+     "expected": 70,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 70,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_4",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 70,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 159,
+      "text": "| Events visual/right (id 4) | 70 | not applicable | 70 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id5",
+     "description": "Events with id 5 (smiley).",
+     "expected": 15,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 15,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_5",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 15,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 159,
+      "text": "| Events smiley (id 5) | 15 | not applicable | 15 events | count | count_events |"
+     }
+    },
+    {
+     "key": "events_id32",
+     "description": "Events with id 32 (buttonpress).",
+     "expected": 16,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 16,
+      "diff": 0,
+      "node": "n2",
+      "path": "metrics.count_32",
+      "entry": 15
+     },
+     "reported": {
+      "pass": true,
+      "value": 16,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 159,
+      "text": "| Events buttonpress (id 32) | 16 | not applicable | 16 events | count | count_events |"
+     }
+    },
+    {
+     "key": "epochs_dropped",
+     "description": "Epochs dropped by the limits, all six ids.",
+     "expected": 10,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 10,
+      "diff": 0,
+      "node": "n8",
+      "path": "metrics.n_dropped",
+      "entry": 76
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 159,
+      "text": null
+     }
+    },
+    {
+     "key": "epochs_kept",
+     "description": "Epochs kept, all six ids.",
+     "expected": 309,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 309,
+      "diff": 0,
+      "node": "n8",
+      "path": "metrics.n_epochs",
+      "entry": 76
+     },
+     "reported": {
+      "pass": true,
+      "value": 309,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n8",
+      "claimEntry": 159,
+      "text": "| Epochs kept at EEG limit 100 / 150 / 200 uV | 286 / 309 / 310 | not applicable | 319 events | rejection, sensitivity | make_epochs, compare_options |"
+     }
+    },
+    {
+     "key": "auditory_left_kept",
+     "description": "Auditory/left epochs kept.",
+     "expected": 68,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 68,
+      "diff": 0,
+      "node": "n8",
+      "path": "metrics.count_auditory_left",
+      "entry": 76
+     },
+     "reported": {
+      "pass": true,
+      "value": 68,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n9",
+      "claimEntry": 159,
+      "text": "The gradiometer response to the left-ear tone peaks at about 93 ms (global field power), and the global field power is 42.11 fT/cm, from 68 averaged epochs."
+     }
+    },
+    {
+     "key": "n100_latency_gfp",
+     "description": "N100 latency (s), global field power of good gradiometers, auditory/left.",
+     "expected": 0.0932,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.09323776297702369,
+      "diff": 0.00003776297702368092,
+      "node": "n13",
+      "path": "metrics.gfp_latency_s",
+      "entry": 110
+     },
+     "reported": {
+      "pass": true,
+      "value": 0.1,
+      "diff": 0.0068000000000000005,
+      "via": "tolerance",
+      "node": "n1",
+      "claimEntry": 159,
+      "text": "Settings: file band 0.10 to 40 Hz, already filtered, not filtered again."
+     }
+    },
+    {
+     "key": "n100_amplitude_gfp",
+     "description": "N100 global field power amplitude in gradiometers (fT/cm).",
+     "expected": 42.1,
+     "tolerance": 2,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 42.1061322703358,
+      "diff": 0.00613227033579733,
+      "node": "n13",
+      "path": "metrics.gfp_amplitude",
+      "entry": 110
+     },
+     "reported": {
+      "pass": true,
+      "value": 42.11,
+      "diff": 0.00999999999999801,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 159,
+      "text": "The gradiometer response to the left-ear tone peaks at about 93 ms (global field power), and the global field power is 42.11 fT/cm, from 68 averaged epochs."
+     }
+    },
+    {
+     "key": "strongest_grad_latency",
+     "description": "Latency (s) of the strongest gradiometer channel.",
+     "expected": 0.0866,
+     "tolerance": 0.007,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 0.08657792253841073,
+      "diff": 0.00002207746158926216,
+      "node": "n13",
+      "path": "metrics.peak_latency_s",
+      "entry": 110
+     },
+     "reported": {
+      "pass": false,
+      "value": 0.1,
+      "diff": 0.013400000000000009,
+      "via": null,
+      "node": "n1",
+      "claimEntry": 159,
+      "text": "Settings: file band 0.10 to 40 Hz, already filtered, not filtered again."
+     }
+    },
+    {
+     "key": "strongest_grad_amplitude",
+     "description": "Amplitude (fT/cm) of the strongest gradiometer channel, absolute value.",
+     "expected": 199,
+     "tolerance": 8,
+     "abs": true,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 198.96312231634658,
+      "diff": 0.03687768365341526,
+      "node": "n13",
+      "path": "metrics.peak_amplitude",
+      "entry": 110
+     },
+     "reported": {
+      "pass": true,
+      "value": 198.96,
+      "diff": 0.03999999999999204,
+      "via": "tolerance",
+      "node": "n13",
+      "claimEntry": 159,
+      "text": "| Strongest single gradiometer, MEG 1332 | 87 ms (86.6 ms before rounding), 198.96 fT/cm | not computed | 68 epochs averaged | peak, no test | measure_peak |"
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 10,
+    "inputTokens": 28,
+    "outputTokens": 9008,
+    "cacheRead": 162465,
+    "cacheWrite": 24731,
+    "toolCalls": 9,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 7,
+     "error": 2
+    },
+    "unsourced": 6,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 8
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run3/home/sessions/20261012-023048-b0e0/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/gramfort2013-mne-sample",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run3",
+     "/Users/parker/Code/guided-analysis/catalog/mne",
+     "/Users/parker/.cuvette/envs/mne",
+     "/Users/parker/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/mne"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/gramfort2013-mne-sample/MNE-sample-data/MEG/sample/sample_audvis_filt-0-40_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run3/home/sessions/20261012-023048-b0e0/work/compute_evoked-1/evoked-ave.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run3/home/sessions/20261012-023048-b0e0/work/load_raw-1/loaded_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run3/home/sessions/20261012-023048-b0e0/work/make_epochs-4/epochs-epo.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run3/home/sessions/20261012-023048-b0e0/work/set_bad_channels-1/bads_raw.fif",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/gramfort2013-mne-sample/run3/home/sessions/20261012-023048-b0e0/work/set_reference-1/ref_raw.fif"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 6,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "kanetis2022-iqtree-sporocadaceae",
+   "model": "claude:claude-haiku-5-5",
+   "run": 1,
+   "status": "answer",
+   "durationS": 139.399,
+   "session": "20261012-023252-df00",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run1/home/sessions/20261012-023252-df00",
+   "answer": "The tree has 55 sequences and 2375 sites. Your 16 isolates (11 L and 5 P) fall into five groups with reference species. The log-likelihood is -15895.48.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Sequences | 55 | Not applicable | 55 sequences, one per strain | Alignment check (file already aligned) | alignment_stats |\n| Sites | 2375 columns | Not applicable | 2375 columns; 891 site patterns | None | infer_tree |\n| Substitution model | TIM2e+I+G4 | Not applicable | Fixed by your setup. ModelFinder did not run. | None | infer_tree |\n| Log-likelihood | -15895.48 | Not applicable | Tree from 2375 sites | None | infer_tree (IQ-TREE 3.1.4) |\n| Bootstrap | Ultrafast bootstrap (UFBoot), 1000 replicates, seed 1 | Not applicable | 1000 replicates | None | infer_tree |\n| L105, L106, L240 (3 isolates) grouped with Sporocadus rosigena CBS 182.50 | UFBoot 100 | Not applicable | n = 3 isolates; one isolate = one strain | Ultrafast bootstrap | Consensus tree (run.contree) |\n| L158, L164, L181 (3 isolates) grouped with Sporocadus kurdistanicus CBS 143778 | UFBoot 100 | Not applicable | n = 3 isolates | Ultrafast bootstrap | Consensus tree |\n| L111, L112 (2 isolates) grouped with Seimatosporium marivanicum CBS 143781 | UFBoot 100 | Not applicable | n = 2 isolates | Ultrafast bootstrap | Consensus tree |\n| P210 (1 isolate) grouped with Seimatosporium vitis-viniferae CBS 123004 | UFBoot 85 | Not applicable | n = 1 isolate | Ultrafast bootstrap | Consensus tree |\n| L33, L34, L189, P46, P56, P57, P60 (7 isolates) form a clade, sister to Seimatosporium vitis MFLUCC 140051 | Clade UFBoot 88; link to MFLUCC 140051 UFBoot 51 | Not applicable | n = 7 isolates | Ultrafast bootstrap | Consensus tree |\n\nUncertain:\n- The link between the 7-isolate clade and S. vitis MFLUCC 140051 has weak support (UFBoot 51). P210 (UFBoot 85) is below the 95 threshold for well supported.\n- Many isolates have near-zero branch lengths. This tree cannot separate very close strains.\n- The tree is the maximum-likelihood tree under TIM2e+I+G4, fixed by your setup. It is rooted on Beltrania rhombica CBS 123.58.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Substitution model: TIM2e+I+G4 · Bootstrap type: ufboot · Number of bootstrap replicates: 1000 · Outgroup: Beltrania_rhombica_CBS_123.58 · Random seed: 1.",
+   "items": [
+    {
+     "key": "log_likelihood",
+     "description": "Log-likelihood of the ML tree, concatenated alignment, TIM2e+I+G4",
+     "expected": -15895.468,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -15895.4825,
+      "diff": 0.01449999999931606,
+      "node": "n2",
+      "path": "metrics.log_likelihood",
+      "entry": 20
+     },
+     "reported": {
+      "pass": true,
+      "value": -15895.48,
+      "diff": 0.011999999998806743,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 58,
+      "text": "The log-likelihood is -15895.48."
+     }
+    },
+    {
+     "key": "alignment_sites",
+     "description": "Sites in the concatenated alignment",
+     "expected": 2375,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2375,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.alignment_length",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 2375,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 58,
+      "text": "The tree has 55 sequences and 2375 sites."
+     }
+    },
+    {
+     "key": "sequences",
+     "description": "Sequences in the concatenated alignment (54 Sporocadaceae and the outgroup)",
+     "expected": 55,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 55,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_sequences",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 58,
+      "text": null
+     }
+    },
+    {
+     "key": "log_likelihood_iqtree3_modelfinder",
+     "description": "Log-likelihood with the model that ModelFinder of IQ-TREE 3 picks (TIM2+F+R3)",
+     "expected": -15891.367,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": -15895.4825,
+      "diff": 4.115499999999884,
+      "node": "n2",
+      "path": "metrics.log_likelihood",
+      "entry": 20
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 58,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 6,
+    "inputTokens": 16,
+    "outputTokens": 15305,
+    "cacheRead": 72416,
+    "cacheWrite": 27110,
+    "toolCalls": 4,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 2,
+     "warning": 4,
+     "error": 2
+    },
+    "unsourced": 10,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run1/home/sessions/20261012-023252-df00/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/kanetis2022-iqtree-sporocadaceae",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run1",
+     "/Users/parker/Code/guided-analysis/catalog/phylo",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/iqtree3/3.1.4",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/phylo"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/kanetis2022-iqtree-sporocadaceae/concat_dush_subalign.fas",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run1/home/sessions/20261012-023252-df00/work/infer_tree-1/run.contree"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 10,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "kanetis2022-iqtree-sporocadaceae",
+   "model": "claude:claude-haiku-5-5",
+   "run": 2,
+   "status": "answer",
+   "durationS": 162.167,
+   "session": "20261012-023512-447a",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run2/home/sessions/20261012-023512-447a",
+   "answer": "Nine of your 16 isolates group with four reference species. The other seven form one clade, linked to Seimatosporium vitis MFLUCC 140051 with weak support.\n\n| Measure | Value | 95% CI | n (what one n is) | Test | Step |\n|---|---|---|---|---|---|\n| Sequences | 55 | Not computed | 55 sequences (one per taxon) | None | alignment_stats, infer_tree. File was already aligned; MAFFT not run. |\n| Sites | 2375 | Not computed | 2375 alignment columns | None | alignment_stats |\n| Trim status | Not trimmed (setting false); 0 columns removed | Not applicable | 2375 columns | None | alignment_stats |\n| Gap fraction | 0.1524 | Not computed | 2375 columns | None | alignment_stats |\n| Substitution model | TIM2e+I+G4 (IQ-TREE 3.1.4) | Not applicable | Fixed by your setup; ModelFinder not run | None | infer_tree |\n| Log-likelihood of tree | −15895.4825 | Not computed (one maximum-likelihood estimate) | 1 tree | None | infer_tree |\n| Bootstrap type, replicates, seed | ufboot (ultrafast), 1000 replicates, seed 1 | Not applicable | 1000 replicates | None | infer_tree |\n| Outgroup | Beltrania rhombica CBS 123.58 | Not applicable | 1 sequence | None | infer_tree |\n| Isolates (names start L or P) | 16 | Not applicable | 16 isolates | None | run_script count |\n| Reference sequences | 39 | Not applicable | 39 reference sequences | None | run_script count |\n| L240, L106, L105 with Sporocadus rosigena CBS 182.50 | Support 100 (group of 4 tips) | Not applicable | 3 isolates | None | run_script tree parse |\n| L158, L181, L164 with Sporocadus kurdistanicus CBS 143778 | Support 100 (group of 4 tips) | Not applicable | 3 isolates | None | run_script tree parse |\n| P210 with Seimatosporium vitis-viniferae CBS 123004 | Support 85 (group of 2 tips) | Not applicable | 1 isolate | None | run_script tree parse |\n| L111, L112 with Seimatosporium marivanicum CBS 143781 | Support 100 (group of 3 tips) | Not applicable | 2 isolates | None | run_script tree parse |\n| L33, L34, L189, P46, P56, P57, P60 clade | Clade support 88; link to Seimatosporium vitis MFLUCC 140051 support 51 | Not applicable | 7 isolates | None | run_script tree parse |\n\nUncertain:\n- Ultrafast support values 85, 88 and 51 are below 95, the lab standard for well supported. Read them as weak.\n- You fixed TIM2e+I+G4. ModelFinder was not run, so the model fit is not tested.\n- The tree is the maximum-likelihood tree under this model. It is not the true tree.\n\nWaits for you: Nothing.\n\nSettings used, from the decision record: Substitution model: TIM2e+I+G4 · Bootstrap type: ufboot · Number of bootstrap replicates: 1000 · Outgroup: Beltrania_rhombica_CBS_123.58 · Random seed: 1.",
+   "items": [
+    {
+     "key": "log_likelihood",
+     "description": "Log-likelihood of the ML tree, concatenated alignment, TIM2e+I+G4",
+     "expected": -15895.468,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -15895.4825,
+      "diff": 0.01449999999931606,
+      "node": "n2",
+      "path": "metrics.log_likelihood",
+      "entry": 23
+     },
+     "reported": {
+      "pass": true,
+      "value": -15895.4825,
+      "diff": 0.01449999999931606,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 88,
+      "text": "| Log-likelihood of tree | −15895.4825 | Not computed (one maximum-likelihood estimate) | 1 tree | None | infer_tree |"
+     }
+    },
+    {
+     "key": "alignment_sites",
+     "description": "Sites in the concatenated alignment",
+     "expected": 2375,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2375,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.alignment_length",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 2375,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 88,
+      "text": "| Sites | 2375 | Not computed | 2375 alignment columns | None | alignment_stats |"
+     }
+    },
+    {
+     "key": "sequences",
+     "description": "Sequences in the concatenated alignment (54 Sporocadaceae and the outgroup)",
+     "expected": 55,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 55,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_sequences",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 88,
+      "text": null
+     }
+    },
+    {
+     "key": "log_likelihood_iqtree3_modelfinder",
+     "description": "Log-likelihood with the model that ModelFinder of IQ-TREE 3 picks (TIM2+F+R3)",
+     "expected": -15891.367,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": -15895.4825,
+      "diff": 4.115499999999884,
+      "node": "n2",
+      "path": "metrics.log_likelihood",
+      "entry": 23
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 88,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 10,
+    "inputTokens": 26,
+    "outputTokens": 18907,
+    "cacheRead": 180572,
+    "cacheWrite": 33743,
+    "toolCalls": 8,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 1,
+    "revisions": 1,
+    "findings": {
+     "info": 5,
+     "warning": 2,
+     "error": 1
+    },
+    "unsourced": 12,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run2/home/sessions/20261012-023512-447a/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/kanetis2022-iqtree-sporocadaceae",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run2",
+     "/Users/parker/Code/guided-analysis/catalog/phylo",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/iqtree3/3.1.4",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/phylo"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/kanetis2022-iqtree-sporocadaceae/concat_dush_subalign.fas",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run2/home/sessions/20261012-023512-447a/work/infer_tree-1/run.contree"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 12,
+    "literature": 0
+   }
+  },
+  {
+   "paper": "kanetis2022-iqtree-sporocadaceae",
+   "model": "claude:claude-haiku-5-5",
+   "run": 3,
+   "status": "answer",
+   "durationS": 120.387,
+   "session": "20261012-023754-6794",
+   "dir": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run3/home/sessions/20261012-023754-6794",
+   "answer": "1. The maximum-likelihood tree has 55 sequences and 2375 sites under TIM2e+I+G4 (log-likelihood -15895.48). Your 16 isolates group with five reference groups: Sporocadus rosigena, Sporocadus kurdistanicus, Seimatosporium vitis-viniferae, Seimatosporium vitis (MFLUCC 140051) and Seimatosporium marivanicum.\n\n| Measure | Value | 95% CI | n and what one n is | Test | Step |\n|---|---|---|---|---|---|\n| Sequences in file | 55 | Not computed | 55 sequences (one strain each) | None (no statistical test) | alignment_stats |\n| Alignment sites | 2375 | Not applicable | 2375 columns | None | alignment_stats |\n| Gap fraction | 0.1524 | Not applicable | 2375 columns | None | alignment_stats |\n| Alignment step | File already aligned, MAFFT not run | Not applicable | 55 sequences | None | align_sequences skipped |\n| Substitution model | TIM2e+I+G4 (fixed by you, ModelFinder not run) | Not applicable | Not applicable | None | infer_tree |\n| Log-likelihood | -15895.48 | Not computed | One tree | None | infer_tree |\n| Program version | IQ-TREE 3.1.4 | Not applicable | Not applicable | None | infer_tree |\n| Seed | 1 | Not applicable | Not applicable | None | infer_tree |\n| Bootstrap | Ultrafast, 1000 replicates | Not applicable | 1000 replicates | None | infer_tree |\n| Outgroup | Beltrania rhombica CBS 123.58 (tree rooted) | Not applicable | 1 outgroup sequence | None | infer_tree |\n| Isolates L105, L106, L240 with S. rosigena CBS 182.50 | 3 isolates; clade support 100 | Not computed | 3 isolates | None | infer_tree |\n| Isolates L158, L181, L164 with S. kurdistanicus CBS 143778 | 3 isolates; clade support 100 | Not computed | 3 isolates | None | infer_tree |\n| Isolate P210 with S. vitis-viniferae CBS 123004 | 1 isolate; clade support 85 | Not computed | 1 isolate | None | infer_tree |\n| Isolates L189, P46, P56, L33, P57, L34, P60 with S. vitis MFLUCC 140051 | 7 isolates; clade support 88 | Not computed | 7 isolates | None | infer_tree |\n| Isolates L111, L112 with S. marivanicum CBS 143781 | 2 isolates; clade support 100 | Not computed | 2 isolates | None | infer_tree |\n| Total isolates counted | 16 | Not applicable | 16 isolates (names start with L or P) | None | infer_tree |\n\nUncertain:\n- The link between the seven-isolate group and S. vitis MFLUCC 140051 has support 51, which is weak.\n- The P210 link to S. vitis-viniferae CBS 123004 has support 85. This is below 95, the level for well-supported ultrafast bootstrap values.\n- The model was fixed by you. Its log-likelihood cannot be compared with other models without a model test.\n\nWaits for you: Nothing.",
+   "items": [
+    {
+     "key": "log_likelihood",
+     "description": "Log-likelihood of the ML tree, concatenated alignment, TIM2e+I+G4",
+     "expected": -15895.468,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": -15895.4825,
+      "diff": 0.01449999999931606,
+      "node": "n2",
+      "path": "metrics.log_likelihood",
+      "entry": 20
+     },
+     "reported": {
+      "pass": true,
+      "value": -15895.48,
+      "diff": 0.011999999998806743,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 39,
+      "text": "The maximum-likelihood tree has 55 sequences and 2375 sites under TIM2e+I+G4 (log-likelihood -15895.48)."
+     }
+    },
+    {
+     "key": "alignment_sites",
+     "description": "Sites in the concatenated alignment",
+     "expected": 2375,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": true,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 2375,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.alignment_length",
+      "entry": 12
+     },
+     "reported": {
+      "pass": true,
+      "value": 2375,
+      "diff": 0,
+      "via": "tolerance",
+      "node": "n2",
+      "claimEntry": 39,
+      "text": "The maximum-likelihood tree has 55 sequences and 2375 sites under TIM2e+I+G4 (log-likelihood -15895.48)."
+     }
+    },
+    {
+     "key": "sequences",
+     "description": "Sequences in the concatenated alignment (54 Sporocadaceae and the outgroup)",
+     "expected": 55,
+     "tolerance": "exact",
+     "abs": false,
+     "inAnswer": false,
+     "reference": false,
+     "computed": {
+      "pass": true,
+      "via": "main",
+      "value": 55,
+      "diff": 0,
+      "node": "n1",
+      "path": "metrics.n_sequences",
+      "entry": 12
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 39,
+      "text": null
+     }
+    },
+    {
+     "key": "log_likelihood_iqtree3_modelfinder",
+     "description": "Log-likelihood with the model that ModelFinder of IQ-TREE 3 picks (TIM2+F+R3)",
+     "expected": -15891.367,
+     "tolerance": 0.1,
+     "abs": false,
+     "inAnswer": false,
+     "reference": true,
+     "computed": {
+      "pass": false,
+      "value": -15895.4825,
+      "diff": 4.115499999999884,
+      "node": "n2",
+      "path": "metrics.log_likelihood",
+      "entry": 20
+     },
+     "reported": {
+      "pass": null,
+      "value": null,
+      "diff": null,
+      "via": null,
+      "node": null,
+      "claimEntry": 39,
+      "text": null
+     }
+    }
+   ],
+   "metrics": {
+    "requests": 4,
+    "inputTokens": 10,
+    "outputTokens": 8999,
+    "cacheRead": 33633,
+    "cacheWrite": 15506,
+    "toolCalls": 3,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 0,
+    "revisions": 1,
+    "findings": {
+     "info": 0,
+     "warning": 0,
+     "error": 0
+    },
+    "unsourced": 12,
+    "deviations": 0,
+    "overwritten": 0,
+    "nodes": 2
+   },
+   "blind": {
+    "cwd": "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run3/home/sessions/20261012-023754-6794/work",
+    "allow": [
+     "/Volumes/T7/guided-analysis/data/kanetis2022-iqtree-sporocadaceae",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run3",
+     "/Users/parker/Code/guided-analysis/catalog/phylo",
+     "/opt/homebrew",
+     "/opt/homebrew/Cellar/iqtree3/3.1.4",
+     "/Users/parker/.cuvette/envs",
+     "/Users/parker/.cuvette/adapters",
+     "/Users/parker/.cuvette/R-library",
+     "/Users/parker/.guided-analysis/envs",
+     "/Users/parker/.guided-analysis/adapters",
+     "/Users/parker/.guided-analysis/R-library",
+     "/Volumes/T7/guided-analysis/tools/R-library",
+     "/Users/parker/Code/guided-analysis/src/adapters",
+     "/Users/parker/Code/guided-analysis/src/tools/inspect_data.py",
+     "/Users/parker/Code/guided-analysis/node_modules",
+     "/Users/parker/Code/guided-analysis/package.json",
+     "/Users/parker/Code/guided-analysis/tsconfig.json",
+     "/usr",
+     "/bin",
+     "/sbin",
+     "/opt",
+     "/Library",
+     "/System",
+     "/Applications",
+     "/etc",
+     "/private/etc",
+     "/dev",
+     "/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T",
+     "/private/var/folders/gl/2688_pw90hb4tg2qtb24pr3r0000gn/T"
+    ],
+    "deny": [
+     "/Users/parker/Code/guided-analysis",
+     "/Users/parker/Code/guided-analysis/bench/papers",
+     "/Users/parker/Code/guided-analysis/bench/results",
+     "/Volumes/T7/guided-analysis/tools/bench-runs",
+     "/Volumes/T7/guided-analysis/tools",
+     "/Volumes/T7/guided-analysis/reference",
+     "/Users/parker/.cuvette",
+     "/Users/parker/.guided-analysis",
+     "/Users/parker/.claude",
+     "/private/tmp/claude-501"
+    ],
+    "hide": [
+     "/Users/parker/Code/guided-analysis/catalog/phylo"
+    ],
+    "sandbox": "on"
+   },
+   "leaks": {
+    "read": [
+     "/Volumes/T7/guided-analysis/data/kanetis2022-iqtree-sporocadaceae/concat_dush_subalign.fas",
+     "/Volumes/T7/guided-analysis/tools/bench-runs/2026-10-12/claude_claude-haiku-5-5/kanetis2022-iqtree-sporocadaceae/run3/home/sessions/20261012-023754-6794/work/infer_tree-1/run.contree"
+    ],
+    "outside": [],
+    "blocked": 0,
+    "unsourced": 12,
+    "literature": 0
+   }
+  }
+ ],
+ "problems": [],
+ "paths": {
+  "md": "bench/results/after-fix-2026-10-12/shards/after-haiku-s0.md",
+  "json": "bench/results/after-fix-2026-10-12/shards/after-haiku-s0.json"
+ },
+ "summary": {
+  "cells": {
+   "aledo2022-renz-onpg": {
+    "claude:claude-haiku-5-5": {
+     "computed": 6,
+     "computedOf": 6,
+     "reported": 6,
+     "reportedOf": 6,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   },
+   "astapova2021-deseq2-kgn": {
+    "claude:claude-haiku-5-5": {
+     "computed": 12,
+     "computedOf": 12,
+     "reported": 9,
+     "reportedOf": 9,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   },
+   "bradley-photutils-100gaussians": {
+    "claude:claude-haiku-5-5": {
+     "computed": 18,
+     "computedOf": 18,
+     "reported": 18,
+     "reportedOf": 18,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   },
+   "danecek2021-bcftools": {
+    "claude:claude-haiku-5-5": {
+     "computed": 18,
+     "computedOf": 18,
+     "reported": 15,
+     "reportedOf": 15,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   },
+   "gramfort2013-mne-sample": {
+    "claude:claude-haiku-5-5": {
+     "computed": 42,
+     "computedOf": 42,
+     "reported": 35,
+     "reportedOf": 36,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   },
+   "kanetis2022-iqtree-sporocadaceae": {
+    "claude:claude-haiku-5-5": {
+     "computed": 9,
+     "computedOf": 9,
+     "reported": 6,
+     "reportedOf": 6,
+     "runs": 3,
+     "statuses": {
+      "answer": 3
+     }
+    }
+   }
+  },
+  "totals": {
+   "claude:claude-haiku-5-5": {
+    "computed": 105,
+    "computedOf": 105,
+    "reported": 89,
+    "reportedOf": 90,
+    "runs": 18,
+    "statuses": {
+     "answer": 18
+    }
+   }
+  },
+  "metrics": {
+   "claude:claude-haiku-5-5": {
+    "runs": 18,
+    "durationS": 2013.4839999999997,
+    "requests": 137,
+    "inputTokens": 376,
+    "outputTokens": 162220,
+    "cacheRead": 2083203,
+    "cacheWrite": 434974,
+    "toolCalls": 119,
+    "failedToolCalls": 0,
+    "nudges": 0,
+    "planReminders": 3,
+    "revisions": 16,
+    "findings_info": 56,
+    "findings_warning": 53,
+    "findings_error": 33,
+    "unsourced": 65,
+    "deviations": 3,
+    "overwritten": 3,
+    "nodes": 83
+   }
+  },
+  "skipped": []
+ }
+}
